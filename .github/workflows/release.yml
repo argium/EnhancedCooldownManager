@@ -47,11 +47,6 @@ jobs:
             --exclude '.idea' \
             --exclude 'package'
 
-      - name: Create zip archive
-        run: |
-          cd package
-          zip -r "EnhancedCooldownManager-${{ steps.version.outputs.version }}.zip" EnhancedCooldownManager
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -62,5 +57,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: package/EnhancedCooldownManager-${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
