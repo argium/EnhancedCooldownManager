@@ -1,0 +1,32 @@
+## Interface: 120000, 120001, 110207
+## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r
+## Notes: Standalone resource bars anchored to Blizzard Cooldown Manager viewers.
+## Author: Solär
+## Version: v0.2.1
+## SavedVariables: EnhancedCooldownManagerDB
+## OptionalDeps: Ace3, LibSharedMedia-3.0
+## Category-enUS: User Interface
+## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
+
+# Embedded library bootstrap
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+
+# Embedded Ace3
+Libs\AceAddon-3.0\AceAddon-3.0.xml
+Libs\AceEvent-3.0\AceEvent-3.0.xml
+Libs\AceConsole-3.0\AceConsole-3.0.xml
+Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceGUI-3.0\AceGUI-3.0.xml
+Libs\AceConfig-3.0\AceConfig-3.0.xml
+Libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+
+EnhancedCooldownManager.lua
+SparkleUtil.lua
+Utilities.lua
+Options.lua
+PowerBars.lua
+SegmentBar.lua
+BuffBars.lua
+ProcOverlay.lua
+ViewerHook.lua

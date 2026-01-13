@@ -1,0 +1,65 @@
+name: Package Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., v0.2.1)'
+        required: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" == v* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION=$(grep -oP '## Version: \K.*' EnhancedCooldownManager.toc | tr -d '[:space:]')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Packaging version: $VERSION"
+
+      - name: Create package directory
+        run: |
+          mkdir -p package/EnhancedCooldownManager
+
+      - name: Copy addon files
+        run: |
+          rsync -av --progress . package/EnhancedCooldownManager/ \
+            --exclude '.*' \
+            --exclude 'TODO.md' \
+            --exclude 'CLAUDE.md' \
+            --exclude '*.code-workspace' \
+            --exclude '.vscode' \
+            --exclude '.idea' \
+            --exclude 'package'
+
+      - name: Create zip archive
+        run: |
+          cd package
+          zip -r "EnhancedCooldownManager-${{ steps.version.outputs.version }}.zip" EnhancedCooldownManager
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EnhancedCooldownManager-${{ steps.version.outputs.version }}
+          path: package/EnhancedCooldownManager-${{ steps.version.outputs.version }}.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: package/EnhancedCooldownManager-${{ steps.version.outputs.version }}.zip
+          generate_release_notes: true
