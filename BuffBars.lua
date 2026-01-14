@@ -190,6 +190,37 @@ local function TryGetChildSpellId(child)
     return nil
 end
 
+--- Returns visible bar children sorted by Y position (top to bottom) to preserve edit mode order.
+--- GetChildren() returns in creation order, not visual order, so we must sort by position.
+---@param viewer Frame The BuffBarCooldownViewer frame
+---@return table[] Array of {frame, top, order} sorted top-to-bottom
+local function GetSortedVisibleChildren(viewer)
+    local children = { viewer:GetChildren() }
+    local result = {}
+    local insertOrder = 0
+
+    for _, child in ipairs(children) do
+        if child and child.Bar and child:IsShown() then
+            local top = child.GetTop and child:GetTop()
+            insertOrder = insertOrder + 1
+            table.insert(result, { frame = child, top = top, order = insertOrder })
+        end
+    end
+
+    -- Sort top-to-bottom (highest Y first). Use insertion order as tiebreaker
+    -- when Y positions are equal or nil (bars not yet positioned by Blizzard).
+    table.sort(result, function(a, b)
+        local aTop = a.top or 0
+        local bTop = b.top or 0
+        if aTop ~= bTop then
+            return aTop > bTop
+        end
+        return a.order < b.order
+    end)
+
+    return result
+end
+
 --- Hooks a child frame to re-layout when Blizzard changes its anchors.
 ---@param child Frame
 ---@param module ECM_BuffBarsModule
@@ -350,6 +381,19 @@ function BuffBars:ResetStyledMarkers()
             child.__ecmStyled = nil
         end
     end
+
+    -- Clear bar cache for current class/spec so it gets rebuilt fresh.
+    -- This ensures the Options UI shows correct spell names after reordering.
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    if profile and profile.buffBarColors and profile.buffBarColors.cache then
+        local classID, specID = GetCurrentClassSpec()
+        if classID and specID then
+            local cache = profile.buffBarColors.cache
+            if cache[classID] then
+                cache[classID][specID] = {}
+            end
+        end
+    end
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -366,7 +410,12 @@ function BuffBars:HookEditMode()
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         self:ResetStyledMarkers()
-        self:ScheduleLayoutUpdate()
+        -- Use immediate update (not scheduled) so the cache is rebuilt before
+        -- the user opens Options. Edit mode exit is infrequent, so no throttling needed.
+        local viewer = self:GetViewer()
+        if viewer and viewer:IsShown() then
+            self:UpdateLayout()
+        end
     end)
 
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
@@ -486,34 +535,25 @@ function BuffBars:RescanBars()
         return
     end
 
-    local children = { viewer:GetChildren() }
-    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
-
-    local newBarsFound = false
-    local barIndex = 0
-    for _, child in ipairs(children) do
+    -- Hook all children for anchor change detection
+    for _, child in ipairs({ viewer:GetChildren() }) do
         if child and child.Bar then
-            -- Hook anchoring to detect when Blizzard repositions this child
             HookChildAnchoring(child, self)
-
-            -- Track bar index for visible bars (for per-bar colors)
-            local currentBarIndex = nil
-            if child:IsShown() then
-                barIndex = barIndex + 1
-                currentBarIndex = barIndex
-            end
-
-            -- Debug: dump any text/count fields we can find on visible bars
-            -- self:DebugDumpBarInfo(child)
-
-            if not child.__ecmStyled then
-                ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, currentBarIndex)
-                newBarsFound = true
-            end
         end
     end
 
-    -- Re-layout if new bars were styled
+    -- Style unstyled bars in sorted order
+    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
+    local visibleChildren = GetSortedVisibleChildren(viewer)
+    local newBarsFound = false
+
+    for barIndex, entry in ipairs(visibleChildren) do
+        if not entry.frame.__ecmStyled then
+            ApplyCooldownBarStyle(entry.frame, profile, dynamicStyleBySpellId, barIndex)
+            newBarsFound = true
+        end
+    end
+
     if newBarsFound then
         self:LayoutBars()
     end
@@ -594,7 +634,7 @@ function BuffBars:DebugDumpBarInfo(child)
     Util.Log("BuffBars", "DebugDumpBarInfo", debugData)
 end
 
---- Positions all bar children in a vertical stack.
+--- Positions all bar children in a vertical stack, preserving edit mode order.
 function BuffBars:LayoutBars()
     local viewer = self:GetViewer()
     if not viewer then
@@ -603,33 +643,23 @@ function BuffBars:LayoutBars()
 
     viewer.__ecmLayoutRunning = true
 
-    local children = { viewer:GetChildren() }
-    local viewerWidth = viewer.GetWidth and viewer:GetWidth() or 0
-
-    local visibleCount = 0
+    local visibleChildren = GetSortedVisibleChildren(viewer)
     local prev
-    for _, child in ipairs(children) do
-        -- Only include visible children with a Bar in the layout chain
-        if child and child.Bar and child:IsShown() then
-            visibleCount = visibleCount + 1
-            child:ClearAllPoints()
-            if not prev then
-                child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
-                child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
-            else
-                child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
-                child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
-            end
-            -- Explicitly set child width to ensure it matches the viewer (with minimum)
-            if child.SetWidth then
-                local childWidth = math.max(viewerWidth, MIN_BAR_WIDTH)
-                child:SetWidth(childWidth)
-            end
-            prev = child
+
+    for _, entry in ipairs(visibleChildren) do
+        local child = entry.frame
+        child:ClearAllPoints()
+        if not prev then
+            child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
+            child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
+        else
+            child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
+            child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
         end
+        prev = child
     end
 
-    Util.Log("BuffBars", "LayoutBars complete", { visibleCount = visibleCount, viewerWidth = viewerWidth })
+    Util.Log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
 
     viewer.__ecmLayoutRunning = nil
 end
@@ -654,46 +684,36 @@ function BuffBars:UpdateLayout()
         return
     end
 
-    -- Get anchor width for explicit sizing
-    local anchorWidth = anchor.GetWidth and anchor:GetWidth() or 0
-
-    -- Position viewer under anchor and explicitly set width
-    if viewer._lastAnchor ~= anchor or viewer._lastAnchorWidth ~= anchorWidth then
+    -- Position viewer under anchor. Use both TOPLEFT and TOPRIGHT anchor points
+    -- so the viewer width automatically matches the anchor. Do NOT set explicit width
+    -- as this conflicts with anchor-based sizing and causes offset issues after zone changes.
+    if viewer._lastAnchor ~= anchor then
         viewer:ClearAllPoints()
         viewer:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, 0)
         viewer:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, 0)
-        -- Explicitly set width to ensure children inherit correct size (with minimum)
-        local effectiveWidth = math.max(anchorWidth, MIN_BAR_WIDTH)
-        viewer:SetWidth(effectiveWidth)
         viewer._lastAnchor = anchor
-        viewer._lastAnchorWidth = anchorWidth
     end
 
-    -- Style and layout all bars
-    local children = { viewer:GetChildren() }
-    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
-
-    local barIndex = 0
-    for _, child in ipairs(children) do
+    -- Hook all children for anchor change detection
+    for _, child in ipairs({ viewer:GetChildren() }) do
         if child and child.Bar then
-            -- Hook anchoring to detect when Blizzard repositions this child
             HookChildAnchoring(child, self)
-            -- Track bar index for visible bars (for per-bar colors)
-            local currentBarIndex = nil
-            if child:IsShown() then
-                barIndex = barIndex + 1
-                currentBarIndex = barIndex
-            end
-            ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, currentBarIndex)
         end
+    end
+
+    -- Style visible bars in sorted order so bar indices match display order
+    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
+    local visibleChildren = GetSortedVisibleChildren(viewer)
+
+    for barIndex, entry in ipairs(visibleChildren) do
+        ApplyCooldownBarStyle(entry.frame, profile, dynamicStyleBySpellId, barIndex)
     end
 
     self:LayoutBars()
 
     Util.Log("BuffBars", "UpdateLayout complete", {
         anchorName = anchor.GetName and anchor:GetName() or "unknown",
-        anchorWidth = anchorWidth,
-        childrenCount = #children
+        visibleCount = #visibleChildren,
     })
 end
 

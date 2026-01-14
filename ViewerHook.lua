@@ -122,6 +122,9 @@ local function OnEvent(_, event, arg1)
 
     if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" then
         C_Timer.After(0.4, function()
+            -- Reset BuffBars markers on world entry (hearthing, portals, loading screens)
+            -- to force re-anchor since Blizzard may have repositioned frames.
+            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
             ScheduleLayoutUpdate(0)
         end)
         return
@@ -129,6 +132,10 @@ local function OnEvent(_, event, arg1)
 
     if event == "ZONE_CHANGED_NEW_AREA" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
         C_Timer.After(0.3, function()
+            -- Reset BuffBars markers to force re-anchor after zone transition.
+            -- Blizzard repositions frames during zone changes, so our cached anchor
+            -- positions become stale even though the anchor frame reference is the same.
+            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
             ScheduleLayoutUpdate(0)
         end)
         return
