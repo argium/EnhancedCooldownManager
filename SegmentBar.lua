@@ -348,12 +348,11 @@ local function LayoutTicks(bar, maxSegments)
 end
 
 --- Updates fragmented rune display (individual bars per rune).
+--- Only repositions bars when rune ready states change to avoid flickering.
 ---@param bar ECM_SegmentBarFrame
 ---@param maxRunes number
 local function UpdateFragmentedRuneDisplay(bar, maxRunes)
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local cfg = profile and profile.segmentBar
-    local gbl = profile and profile.global
 
     local barWidth = bar:GetWidth()
     local barHeight = bar:GetHeight()
@@ -364,90 +363,95 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
     -- Hide main status bar when using fragmented display
     bar.StatusBar:SetAlpha(0)
 
-    -- Pixel-perfect sizing
-    local baseWidth = math.floor(barWidth / maxRunes)
-    local remainingWidth = barWidth - (baseWidth * maxRunes)
-
-    -- Update texture
-    local tex = Util.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
-
     -- Get color
     local r, g, b = GetSegmentBarColor(profile, "runes")
 
     -- Collect rune states
-    local readyList = {}
-    local cdList = {}
+    local readySet = {}
+    local cdLookup = {}
     local now = GetTime()
 
     for i = 1, maxRunes do
         local start, duration, runeReady = GetRuneCooldown(i)
-        if runeReady then
-            table.insert(readyList, { index = i })
+        if runeReady or not start or start == 0 or not duration or duration == 0 then
+            readySet[i] = true
         else
-            if start and duration and duration > 0 then
-                local elapsed = now - start
-                local remaining = math.max(0, duration - elapsed)
-                local frac = math.max(0, math.min(1, elapsed / duration))
-                table.insert(cdList, { index = i, remaining = remaining, frac = frac })
-            else
-                table.insert(cdList, { index = i, remaining = math.huge, frac = 0 })
+            local elapsed = now - start
+            local remaining = math.max(0, duration - elapsed)
+            local frac = math.max(0, math.min(1, elapsed / duration))
+            cdLookup[i] = { remaining = remaining, frac = frac }
+        end
+    end
+
+    -- Check if ready states changed
+    local statesChanged = not bar._lastReadySet
+    if not statesChanged then
+        for i = 1, maxRunes do
+            if (readySet[i] or false) ~= (bar._lastReadySet[i] or false) then
+                statesChanged = true
+                break
             end
         end
     end
 
-    -- Sort recharging runes by remaining time
-    table.sort(cdList, function(a, b)
-        return a.remaining < b.remaining
-    end)
+    -- Reposition bars only when ready states change
+    if statesChanged then
+        bar._lastReadySet = readySet
 
-    -- Build display order: ready first, then recharging
-    local displayOrder = {}
-    local readyLookup = {}
-    local cdLookup = {}
+        -- Build display order: ready first, then recharging sorted by time
+        local readyList = {}
+        local cdList = {}
+        for i = 1, maxRunes do
+            if readySet[i] then
+                table.insert(readyList, i)
+            else
+                table.insert(cdList, { index = i, remaining = cdLookup[i] and cdLookup[i].remaining or math.huge })
+            end
+        end
+        table.sort(cdList, function(a, b) return a.remaining < b.remaining end)
 
-    for _, v in ipairs(readyList) do
-        table.insert(displayOrder, v.index)
-        readyLookup[v.index] = true
-    end
+        bar._displayOrder = {}
+        for _, idx in ipairs(readyList) do
+            table.insert(bar._displayOrder, idx)
+        end
+        for _, v in ipairs(cdList) do
+            table.insert(bar._displayOrder, v.index)
+        end
 
-    for _, v in ipairs(cdList) do
-        table.insert(displayOrder, v.index)
-        cdLookup[v.index] = v
-    end
+        -- Apply positions
+        local cfg = profile and profile.segmentBar
+        local gbl = profile and profile.global
+        local tex = Util.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
+        local baseWidth = math.floor(barWidth / maxRunes)
+        local remainingWidth = barWidth - (baseWidth * maxRunes)
 
-    -- Position and update each fragmented bar
-    for pos = 1, #displayOrder do
-        local runeIndex = displayOrder[pos]
-        local frag = bar.FragmentedBars[runeIndex]
-
-        if frag then
-            frag:SetStatusBarTexture(tex)
-            frag:ClearAllPoints()
-
-            local x = (pos - 1) * baseWidth
-            local w = (pos == #displayOrder) and (baseWidth + remainingWidth) or baseWidth
-
-            frag:SetSize(w, barHeight)
-            frag:SetPoint("LEFT", bar, "LEFT", x, 0)
-
-            if readyLookup[runeIndex] then
+        for pos, runeIndex in ipairs(bar._displayOrder) do
+            local frag = bar.FragmentedBars[runeIndex]
+            if frag then
+                frag:SetStatusBarTexture(tex)
+                frag:ClearAllPoints()
+                local x = (pos - 1) * baseWidth
+                local w = (pos == maxRunes) and (baseWidth + remainingWidth) or baseWidth
+                frag:SetSize(w, barHeight)
+                frag:SetPoint("LEFT", bar, "LEFT", x, 0)
                 frag:SetMinMaxValues(0, 1)
+                frag:Show()
+            end
+        end
+    end
+
+    -- Update values and colors every tick (no repositioning)
+    for i = 1, maxRunes do
+        local frag = bar.FragmentedBars[i]
+        if frag then
+            if readySet[i] then
                 frag:SetValue(1)
                 frag:SetStatusBarColor(r, g, b)
             else
-                local cdInfo = cdLookup[runeIndex]
-                if cdInfo then
-                    frag:SetMinMaxValues(0, 1)
-                    frag:SetValue(cdInfo.frac)
-                    frag:SetStatusBarColor(r * 0.5, g * 0.5, b * 0.5)
-                else
-                    frag:SetMinMaxValues(0, 1)
-                    frag:SetValue(0)
-                    frag:SetStatusBarColor(r * 0.5, g * 0.5, b * 0.5)
-                end
+                local cd = cdLookup[i]
+                frag:SetValue(cd and cd.frac or 0)
+                frag:SetStatusBarColor(r * 0.5, g * 0.5, b * 0.5)
             end
-
-            frag:Show()
         end
     end
 end
@@ -536,6 +540,9 @@ function SegmentBar:UpdateLayout()
     -- Set up fragmented bars for runes
     if kind == "runes" then
         EnsureFragmentedBars(bar, maxSegments)
+        -- Reset cached state so display will reinitialize
+        bar._lastReadySet = nil
+        bar._displayOrder = nil
     else
         -- Hide fragmented bars for non-rune types
         for _, frag in ipairs(bar.FragmentedBars) do
