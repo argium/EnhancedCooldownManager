@@ -251,6 +251,72 @@ local function GeneralOptionsTable()
                 hidden = function() return not IsValueChanged("offsetY") end,
                 func = MakeResetHandler("offsetY"),
             },
+            combatFadeHeader = {
+                type = "header",
+                name = "Combat Fade",
+                order = 60,
+            },
+            combatFadeEnabled = {
+                type = "toggle",
+                name = "Fade Out When Out of Combat",
+                desc = "Fade out cooldown viewer and resource bars when not in combat.",
+                order = 70,
+                width = "double",
+                get = function() return db.profile.combatFade.enabled end,
+                set = function(_, val)
+                    db.profile.combatFade.enabled = val
+                    if ns.UpdateCombatFade then
+                        ns.UpdateCombatFade()
+                    end
+                end,
+            },
+            combatFadeOpacity = {
+                type = "range",
+                name = "Out of Combat Opacity",
+                desc = "How visible the bars are when faded (0% = invisible, 100% = fully visible).",
+                order = 80,
+                width = "double",
+                min = 0,
+                max = 100,
+                step = 5,
+                disabled = function() return not db.profile.combatFade.enabled end,
+                get = function() return db.profile.combatFade.opacity end,
+                set = function(_, val)
+                    db.profile.combatFade.opacity = val
+                    if ns.UpdateCombatFade then
+                        ns.UpdateCombatFade()
+                    end
+                end,
+            },
+            combatFadeOpacityReset = {
+                type = "execute",
+                name = "X",
+                desc = "Reset to default",
+                order = 81,
+                width = 0.3,
+                hidden = function() return not IsValueChanged("combatFade.opacity") end,
+                disabled = function() return not db.profile.combatFade.enabled end,
+                func = MakeResetHandler("combatFade.opacity", function()
+                    if ns.UpdateCombatFade then
+                        ns.UpdateCombatFade()
+                    end
+                end),
+            },
+            combatFadeExceptInInstance = {
+                type = "toggle",
+                name = "Except Inside Raid, Dungeon, Battleground, or PVP",
+                desc = "When enabled, bars will not fade in instanced content (raids, dungeons, battlegrounds, arenas).",
+                order = 90,
+                width = "double",
+                disabled = function() return not db.profile.combatFade.enabled end,
+                get = function() return db.profile.combatFade.exceptInInstance end,
+                set = function(_, val)
+                    db.profile.combatFade.exceptInInstance = val
+                    if ns.UpdateCombatFade then
+                        ns.UpdateCombatFade()
+                    end
+                end,
+            },
         },
     }
 end

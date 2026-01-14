@@ -83,6 +83,11 @@ local ADDON_NAME, ns = ...
 ---@field defaultColor number[] Default RGBA color for tick marks
 ---@field defaultWidth number Default width for tick marks
 
+---@class ECM_CombatFadeConfig
+---@field enabled boolean Master toggle for combat fade feature
+---@field opacity number Opacity percentage (0-100) when faded out of combat
+---@field exceptInInstance boolean When true, don't fade in raids, dungeons, battlegrounds, or PVP
+
 ---@class ECM_Profile
 ---@field enabled boolean
 ---@field hideWhenMounted number
@@ -90,6 +95,7 @@ local ADDON_NAME, ns = ...
 ---@field schemaVersion number
 ---@field debug boolean
 ---@field offsetY number
+---@field combatFade ECM_CombatFadeConfig
 ---@field global ECM_GlobalConfig
 ---@field powerBar ECM_PowerBarConfig
 ---@field segmentBar ECM_SegmentBarConfig
@@ -110,7 +116,7 @@ local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 
 -- Priority list for default texture selection (first available wins)
 local TEXTURE_PRIORITY = {
-    "ElvUI Norm",
+    -- "ElvUI Norm",
     "Solid",
 }
 
@@ -134,10 +140,15 @@ local defaults = {
         hideWhenMounted = true,
         updateFrequency = 0.066,
         schemaVersion = 1,
-        offsetY = 3,
+        offsetY = 4,
+        combatFade = {
+            enabled = false,
+            opacity = 50,
+            exceptInInstance = false,
+        },
         global = {
             barHeight = 22,
-            barBgColor = { 0.08, 0.08, 0.08, 0.85 },
+            barBgColor = { 0.08, 0.08, 0.08, 0.65 },
             texture = nil, -- Selected from TEXTURE_PRIORITY on first load
             font = "Expressway",
             fontSize = 11,

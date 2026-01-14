@@ -8,7 +8,7 @@ local LSM = LibStub("LibSharedMedia-3.0", true)
 Util.WHITE8 = "Interface\\Buttons\\WHITE8X8"
 
 --- Default background color used across all ECM bars.
-Util.DEFAULT_BG_COLOR = { 0.08, 0.08, 0.08, 0.85 }
+Util.DEFAULT_BG_COLOR = { 0.08, 0.08, 0.08, 0.65 }
 
 function Util.InSecretRegime()
     return type(canaccesssecrets) == "function" and not canaccesssecrets()
