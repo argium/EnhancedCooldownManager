@@ -155,17 +155,17 @@ jobs:
             -F "metadata=${METADATA}" \
             -F "file=@${ADDON_NAME}-${{ steps.version.outputs.version }}.zip" \
             "https://wow.curseforge.com/api/projects/${{ env.CF_PROJECT_ID }}/upload-file")
-          
+
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
-          
+
           echo "CurseForge response: $BODY"
-          
+
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
             echo "::error::CurseForge upload failed with HTTP $HTTP_CODE: $BODY"
             exit 1
           fi
-          
+
           echo "Successfully uploaded to CurseForge (HTTP $HTTP_CODE)"
 
       - name: Create GitHub Release
@@ -175,7 +175,7 @@ jobs:
           if [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-beta"* ]]; then
             PRERELEASE_FLAG="--prerelease"
           fi
-          
+
           gh release create "$VERSION" \
             "${ADDON_NAME}-${VERSION}.zip" \
             --generate-notes \
