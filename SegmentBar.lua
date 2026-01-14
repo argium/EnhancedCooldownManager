@@ -169,54 +169,43 @@ local function GetSegmentBarValues(profile)
     return nil, nil, nil
 end
 
+--- Extracts RGB from a color table or returns fallback.
+local function ExtractColor(c, fallbackR, fallbackG, fallbackB)
+    if type(c) == "table" then
+        return c[1] or 1, c[2] or 1, c[3] or 1
+    end
+    return fallbackR or 1, fallbackG or 1, fallbackB or 1
+end
+
 --- Returns the color for the segment bar based on kind (string or power type).
 ---@param profile table
 ---@param kind string|Enum.PowerType
----@return number r
----@return number g
----@return number b
+---@return number r, number g, number b
 local function GetSegmentBarColor(profile, kind)
     local cfg = profile and profile.segmentBar
 
-    -- Special string-based kinds
-    if kind == "souls" then
-        local c = cfg and cfg.colorDemonHunterSouls
-        if type(c) == "table" then
-            return c[1] or 1, c[2] or 1, c[3] or 1
-        end
-        return 0.64, 0.19, 0.79
+    -- Special string-based kinds with defaults
+    local kindColors = {
+        souls = { cfg and cfg.colorDemonHunterSouls, 0.64, 0.19, 0.79 },
+        runes = { cfg and cfg.colorDkRunes, 0.78, 0.10, 0.22 },
+        icicles = { cfg and cfg.colorFrostMageIcicles, 0.41, 0.80, 0.94 },
+    }
+
+    local kindEntry = kindColors[kind]
+    if kindEntry then
+        return ExtractColor(kindEntry[1], kindEntry[2], kindEntry[3], kindEntry[4])
     end
 
-    if kind == "runes" then
-        local c = cfg and cfg.colorDkRunes
-        if type(c) == "table" then
-            return c[1] or 1, c[2] or 1, c[3] or 1
-        end
-        return 0.78, 0.10, 0.22
-    end
-
-    if kind == "icicles" then
-        local c = cfg and cfg.colorFrostMageIcicles
-        if type(c) == "table" then
-            return c[1] or 1, c[2] or 1, c[3] or 1
-        end
-        return 0.41, 0.80, 0.94
-    end
-
-    -- Check segmentBar-specific color override for combo points
-    if kind == Enum.PowerType.ComboPoints then
-        local c = cfg and cfg.colorComboPoints
-        if type(c) == "table" then
-            return c[1] or 1, c[2] or 1, c[3] or 1
-        end
+    -- Combo points override
+    if kind == Enum.PowerType.ComboPoints and cfg and cfg.colorComboPoints then
+        return ExtractColor(cfg.colorComboPoints)
     end
 
     -- Use powerTypeColors for discrete power types
     if type(kind) == "number" then
-        local colors = profile.powerTypeColors and profile.powerTypeColors.colors
-        local c = colors and colors[kind]
-        if type(c) == "table" then
-            return c[1] or 1, c[2] or 1, c[3] or 1
+        local c = profile.powerTypeColors and profile.powerTypeColors.colors and profile.powerTypeColors.colors[kind]
+        if c then
+            return ExtractColor(c)
         end
     end
 
@@ -491,27 +480,13 @@ end
 --- Marks the segment bar as externally hidden.
 ---@param hidden boolean
 function SegmentBar:SetExternallyHidden(hidden)
-    local wasHidden = self._externallyHidden
-    self._externallyHidden = hidden and true or false
-    if wasHidden ~= self._externallyHidden then
-        Util.Log("SegmentBar", "SetExternallyHidden", { hidden = self._externallyHidden })
-    end
-    if self._externallyHidden and self._frame then
-        self._frame:Hide()
-    end
+    Util.SetExternallyHidden(self, hidden, "SegmentBar")
 end
 
 --- Returns the frame only if currently shown.
 ---@return ECM_SegmentBarFrame|nil
 function SegmentBar:GetFrameIfShown()
-    if self._externallyHidden then
-        return nil
-    end
-    local f = self._frame
-    if f and f:IsShown() then
-        return f
-    end
-    return nil
+    return Util.GetFrameIfShown(self)
 end
 
 --- Updates layout: positioning, sizing, anchoring, appearance.

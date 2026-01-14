@@ -104,49 +104,36 @@ end
 -- Refresh all bar modules
 --------------------------------------------------------------------------------
 local function RefreshAllBars()
-    local powerBars = EnhancedCooldownManager.PowerBars
-    local segmentBar = EnhancedCooldownManager.SegmentBar
-    local buffBars = EnhancedCooldownManager.BuffBars
-
-    if powerBars and powerBars.UpdateLayout then
-        pcall(powerBars.UpdateLayout, powerBars)
-    end
-    if segmentBar and segmentBar.UpdateLayout then
-        pcall(segmentBar.UpdateLayout, segmentBar)
-    end
-    if buffBars and buffBars.UpdateLayout then
-        pcall(buffBars.UpdateLayout, buffBars)
+    for _, modName in ipairs({ "PowerBars", "SegmentBar", "BuffBars" }) do
+        local mod = EnhancedCooldownManager[modName]
+        if mod and mod.UpdateLayout then
+            mod:UpdateLayout()
+        end
     end
 end
 
 --------------------------------------------------------------------------------
 -- Build LibSharedMedia dropdown values
 --------------------------------------------------------------------------------
-local function GetLSMStatusbarValues()
+local function GetLSMValues(mediaType, fallback)
     local values = {}
     if LSM and LSM.List then
-        for _, name in ipairs(LSM:List("statusbar")) do
+        for _, name in ipairs(LSM:List(mediaType)) do
             values[name] = name
         end
     end
-    -- Fallback if empty
     if not next(values) then
-        values["Blizzard"] = "Blizzard"
+        values[fallback] = fallback
     end
     return values
 end
 
+local function GetLSMStatusbarValues()
+    return GetLSMValues("statusbar", "Blizzard")
+end
+
 local function GetLSMFontValues()
-    local values = {}
-    if LSM and LSM.List then
-        for _, name in ipairs(LSM:List("font")) do
-            values[name] = name
-        end
-    end
-    if not next(values) then
-        values["Friz Quadrata TT"] = "Friz Quadrata TT"
-    end
-    return values
+    return GetLSMValues("font", "Friz Quadrata TT")
 end
 
 --------------------------------------------------------------------------------

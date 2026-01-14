@@ -209,21 +209,6 @@ local defaults = {
 -- Export defaults for Options module to access
 ns.defaults = defaults
 
----@param colorPrefix string
----@param ... any
-local function PrintColored(addon, colorPrefix, ...)
-    local n = select("#", ...)
-    if n <= 0 then
-        return
-    end
-
-    local args = {}
-    for i = 1, n do
-        args[i] = addon:SafeGetDebugValue(select(i, ...))
-    end
-
-    print(colorPrefix .. table.concat(args, " ") .. "|r")
-end
 
 --------------------------------------------------------------------------------
 -- Trace Log Buffer (circular buffer for last 100 debug messages)
@@ -366,50 +351,40 @@ function EnhancedCooldownManager:SafeGetDebugValue(v)
         return "<nil>"
     end
 
-    -- Secret values: check for secret scalar first, then secret table
+    -- Handle Blizzard secret values
     if type(issecretvalue) == "function" and issecretvalue(v) then
-        if type(canaccessvalue) == "function" and canaccessvalue(v) then
-            return "s|" .. tostring(v)
-        end
-        return "<secret>"
+        return (type(canaccessvalue) == "function" and canaccessvalue(v)) and ("s|" .. tostring(v)) or "<secret>"
     end
-
     if type(issecrettable) == "function" and issecrettable(v) then
-        if type(canaccesstable) == "function" and canaccesstable(v) then
-            return "s|<table>"
-        end
-        return "<secrettable>"
+        return (type(canaccesstable) == "function" and canaccesstable(v)) and "s|<table>" or "<secrettable>"
     end
 
-    if type(v) == "table" then
-        return "<table>"
-    end
-
-    return tostring(v)
+    return type(v) == "table" and "<table>" or tostring(v)
 end
 
 --- Buffers a debug message when debug mode is enabled.
 ---@param ... any
 function EnhancedCooldownManager:DebugPrint(...)
-    if not self.db or not self.db.profile or not self.db.profile.debug then
-        return
-    end
-
-    local n = select("#", ...)
-    if n <= 0 then
+    local profile = self.db and self.db.profile
+    if not profile or not profile.debug or select("#", ...) == 0 then
         return
     end
 
     local args = {}
-    for i = 1, n do
+    for i = 1, select("#", ...) do
         args[i] = self:SafeGetDebugValue(select(i, ...))
     end
-
     AddToTraceLog(table.concat(args, " "))
 end
 
 function EnhancedCooldownManager:Warning(...)
-    PrintColored(self, "|cffbbcccc", ...)
+    local args = {}
+    for i = 1, select("#", ...) do
+        args[i] = self:SafeGetDebugValue(select(i, ...))
+    end
+    if #args > 0 then
+        print("|cffbbcccc" .. table.concat(args, " ") .. "|r")
+    end
 end
 
 --- Shows a confirmation popup and reloads the UI on accept.
@@ -418,29 +393,26 @@ end
 ---@param onAccept fun()|nil Optional accept callback (runs before ReloadUI).
 ---@param onCancel fun()|nil Optional cancel callback.
 function EnhancedCooldownManager:ConfirmReloadUI(text, onAccept, onCancel)
-    local okCombat, inCombat = pcall(InCombatLockdown)
-    if okCombat and inCombat then
+    if InCombatLockdown() then
         self:Print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
     end
 
-    local dialogs = rawget(_G, "StaticPopupDialogs")
-    local show = rawget(_G, "StaticPopup_Show")
-    if not dialogs or not show then
+    if not StaticPopupDialogs or not StaticPopup_Show then
         self:Print("Unable to show confirmation dialog (StaticPopup API unavailable).")
         return
     end
 
-    if not dialogs[POPUP_CONFIRM_RELOAD_UI] then
-        dialogs[POPUP_CONFIRM_RELOAD_UI] = {
+    if not StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] then
+        StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] = {
             text = "Reload the UI?",
-            button1 = rawget(_G, "YES") or "Yes",
-            button2 = rawget(_G, "NO") or "No",
+            button1 = YES or "Yes",
+            button2 = NO or "No",
             OnAccept = function(_, data)
                 if data and data.onAccept then
                     data.onAccept()
                 end
-                pcall(rawget(_G, "ReloadUI"))
+                ReloadUI()
             end,
             OnCancel = function(_, data)
                 if data and data.onCancel then
@@ -454,47 +426,46 @@ function EnhancedCooldownManager:ConfirmReloadUI(text, onAccept, onCancel)
         }
     end
 
-    -- Update the text per-call.
-    dialogs[POPUP_CONFIRM_RELOAD_UI].text = text or "Reload the UI?"
-    show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+    StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or "Reload the UI?"
+    StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
 --- Prompts the user to confirm disabling ECM and reloading the UI.
----
---- Notes:
---- - This does NOT disable the addon in the AddOns list; it flips ECM's internal master toggle.
---- - Reloading is required to fully undo all hooks/styling (especially BuffBars reskins).
---- - ReloadUI is blocked in combat.
+--- Reloading is required to fully undo all hooks/styling (especially BuffBars reskins).
 ---@param onCancel fun()|nil Called if the user cancels (e.g. to refresh options UI state).
 function EnhancedCooldownManager:ConfirmDisableAndReload(onCancel)
     self:ConfirmReloadUI(
         "Disable Enhanced Cooldown Manager and reload the UI?",
         function()
-            local addon = ns and ns.Addon
-            if not addon or not addon.db or not addon.db.profile then
-                return
+            if self.db and self.db.profile then
+                self.db.profile.enabled = false
             end
-
-            addon.db.profile.enabled = false
-
-            -- Best-effort: stop modules before reload.
-            local powerBars = addon.PowerBars
-            local segmentBar = addon.SegmentBar
-            if powerBars then pcall(powerBars.Disable, powerBars) end
-            if segmentBar then pcall(segmentBar.Disable, segmentBar) end
+            if self.PowerBars then self.PowerBars:Disable() end
+            if self.SegmentBar then self.SegmentBar:Disable() end
         end,
         onCancel
     )
 end
 
+--- Parses on/off/toggle argument and returns the new boolean value.
+---@param arg string The argument ("on", "off", "toggle", or "")
+---@param current boolean The current value
+---@return boolean|nil newValue, string|nil error
+local function ParseToggleArg(arg, current)
+    if arg == "" or arg == "toggle" then
+        return not current, nil
+    elseif arg == "on" then
+        return true, nil
+    elseif arg == "off" then
+        return false, nil
+    end
+    return nil, "Usage: expected on|off|toggle"
+end
+
 --- Handles slash command input for toggling ECM bars.
 ---@param input string|nil
 function EnhancedCooldownManager:ChatCommand(input)
-    input = (tostring(input or ""):gsub("^%s+", ""):gsub("%s+$", "")):lower()
-
-    local cmd, arg = input:match("^(%S+)%s*(.-)$")
-    cmd = cmd or ""
-    arg = (arg or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "" or cmd == "help" then
         self:Print("Commands: /ecm on|off|toggle | /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
@@ -504,7 +475,7 @@ function EnhancedCooldownManager:ChatCommand(input)
     if cmd == "bug" then
         local profile = self.db and self.db.profile
         if not profile or not profile.debug then
-            self:Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on and then reproduce the issue to collect logs.")
+            self:Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
             return
         end
         ShowBugReportPopup()
@@ -526,49 +497,32 @@ function EnhancedCooldownManager:ChatCommand(input)
         return
     end
 
-    local powerBars = self.PowerBars
-    local segmentBar = self.SegmentBar
-    assert(powerBars, "ECM: PowerBars module missing")
-    assert(segmentBar, "ECM: SegmentBar module missing")
-
     if cmd == "debug" then
-        if arg == "" or arg == "toggle" then
-            profile.debug = not profile.debug
-        elseif arg == "on" then
-            profile.debug = true
-        elseif arg == "off" then
-            profile.debug = false
-        else
-            self:Print("Usage: /ecm debug [on|off|toggle]")
+        local newVal, err = ParseToggleArg(arg, profile.debug)
+        if err then
+            self:Print(err)
             return
         end
-
+        profile.debug = newVal
         self:Print("Debug:", profile.debug and "ON" or "OFF")
         return
     end
 
-    if cmd == "on" then
-        profile.enabled = true
-        powerBars:Refresh()
-        segmentBar:Refresh()
-    elseif cmd == "off" then
+    -- Handle on/off/toggle for main enabled state
+    if cmd == "off" or (cmd == "toggle" and profile.enabled) then
         self:ConfirmDisableAndReload()
-        return
-    elseif cmd == "toggle" then
-        if profile.enabled then
-            self:ConfirmDisableAndReload()
-            return
-        end
-
-        profile.enabled = true
-        powerBars:Refresh()
-        segmentBar:Refresh()
-    else
-        self:Print("Unknown command. Use /ecm help")
         return
     end
 
-    self:Print("Enabled:", profile.enabled and "ON" or "OFF")
+    if cmd == "on" or cmd == "toggle" then
+        profile.enabled = true
+        self.PowerBars:Refresh()
+        self.SegmentBar:Refresh()
+        self:Print("Enabled:", profile.enabled and "ON" or "OFF")
+        return
+    end
+
+    self:Print("Unknown command. Use /ecm help")
 end
 
 --- Initializes saved variables, runs migrations, and registers slash commands.

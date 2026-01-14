@@ -1,5 +1,4 @@
-local ADDON_NAME, ns = ...
-local ADDON_NAME, ns = ...
+local _, ns = ...
 local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
 
@@ -117,51 +116,34 @@ end
 -- Icon Tracking Helpers
 --------------------------------------------------------------------------------
 
---- Returns array of visible icon frames from BuffIconCooldownViewer.
+--- Returns array of visible icon frames from a viewer.
+---@param viewerName string
 ---@return table<number, Frame> [index] = iconFrame
-function ProcOverlay:GetBuffIcons()
-    local viewer = _G[BUFF_ICON_VIEWER_NAME]
-    if not viewer or not viewer.GetChildren then
+local function GetVisibleIcons(viewerName)
+    local viewer = _G[viewerName]
+    if not viewer then
         return {}
     end
-    
-    local ok, children = pcall(function() return { viewer:GetChildren() } end)
-    if not ok or not children then
-        return {}
-    end
-    
+
     local icons = {}
-    for _, child in ipairs(children) do
-        -- BuffIconCooldownViewer children are button-like with Icon texture
-        if child and child.IsShown and child:IsShown() then
+    for _, child in ipairs({ viewer:GetChildren() }) do
+        if child and child:IsShown() then
             table.insert(icons, child)
         end
     end
-    
     return icons
 end
 
+--- Returns array of visible icon frames from BuffIconCooldownViewer.
+---@return table<number, Frame>
+function ProcOverlay:GetBuffIcons()
+    return GetVisibleIcons(BUFF_ICON_VIEWER_NAME)
+end
+
 --- Returns array of visible icon frames from EssentialCooldownViewer.
----@return table<number, Frame> [index] = iconFrame
+---@return table<number, Frame>
 function ProcOverlay:GetTargetIcons()
-    local viewer = _G[ESSENTIAL_VIEWER_NAME]
-    if not viewer or not viewer.GetChildren then
-        return {}
-    end
-    
-    local ok, children = pcall(function() return { viewer:GetChildren() } end)
-    if not ok or not children then
-        return {}
-    end
-    
-    local icons = {}
-    for _, child in ipairs(children) do
-        if child and child.IsShown and child:IsShown() then
-            table.insert(icons, child)
-        end
-    end
-    
-    return icons
+    return GetVisibleIcons(ESSENTIAL_VIEWER_NAME)
 end
 
 --- Returns a specific target icon by index.
@@ -209,30 +191,28 @@ local function RestoreOriginalState(buffIcon)
     if not state then
         return
     end
-    
+
     buffIcon:ClearAllPoints()
-    
+
     -- Restore original points
     for _, pointData in ipairs(state.originalPoints) do
         local point, relativeTo, relativePoint, xOfs, yOfs = unpack(pointData)
         if point and relativeTo then
-            pcall(buffIcon.SetPoint, buffIcon, point, relativeTo, relativePoint or point, xOfs or 0, yOfs or 0)
+            buffIcon:SetPoint(point, relativeTo, relativePoint or point, xOfs or 0, yOfs or 0)
         end
     end
-    
-    -- Restore size
+
+    -- Restore size, strata, and level
     if state.originalWidth and state.originalHeight then
-        pcall(buffIcon.SetSize, buffIcon, state.originalWidth, state.originalHeight)
+        buffIcon:SetSize(state.originalWidth, state.originalHeight)
     end
-    
-    -- Restore strata and level
     if state.originalStrata then
-        pcall(buffIcon.SetFrameStrata, buffIcon, state.originalStrata)
+        buffIcon:SetFrameStrata(state.originalStrata)
     end
     if state.originalLevel then
-        pcall(buffIcon.SetFrameLevel, buffIcon, state.originalLevel)
+        buffIcon:SetFrameLevel(state.originalLevel)
     end
-    
+
     _modifiedIcons[buffIcon] = nil
 end
 

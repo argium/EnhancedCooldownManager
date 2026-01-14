@@ -132,7 +132,7 @@ end
 ---@param fontString FontString
 ---@param profile table|nil Full profile table
 function Util.ApplyFont(fontString, profile)
-    if not fontString then
+    if not fontString or not fontString.SetFont then
         return
     end
 
@@ -140,23 +140,16 @@ function Util.ApplyFont(fontString, profile)
     local fontPath = Util.GetFontPath(gbl and gbl.font)
     local fontSize = (gbl and gbl.fontSize) or 11
     local fontOutline = (gbl and gbl.fontOutline) or "OUTLINE"
-    local fontShadow = gbl and gbl.fontShadow
-
-    -- Handle "NONE" outline as empty string for SetFont
     local outlineFlag = fontOutline ~= "NONE" and fontOutline or ""
 
-    -- Try SetFont first (standard FontString)
-    if fontString.SetFont then
-        pcall(fontString.SetFont, fontString, fontPath, fontSize, outlineFlag)
-    end
+    fontString:SetFont(fontPath, fontSize, outlineFlag)
 
-    -- Apply shadow - check for both methods
-    if fontString.SetShadowColor and fontString.SetShadowOffset then
-        if fontShadow then
-            pcall(fontString.SetShadowColor, fontString, 0, 0, 0, 1)
-            pcall(fontString.SetShadowOffset, fontString, 1, -1)
+    if fontString.SetShadowOffset then
+        if gbl and gbl.fontShadow then
+            fontString:SetShadowColor(0, 0, 0, 1)
+            fontString:SetShadowOffset(1, -1)
         else
-            pcall(fontString.SetShadowOffset, fontString, 0, 0)
+            fontString:SetShadowOffset(0, 0)
         end
     end
 end
@@ -186,18 +179,11 @@ function Util.SetExternallyHidden(module, hidden, moduleName)
 end
 
 --- Returns the module's frame if it exists and is shown.
---- Use as: Util.GetFrameIfShown(self)
 ---@param module table AceModule with _externallyHidden, _frame fields
 ---@return Frame|nil
 function Util.GetFrameIfShown(module)
-    if module._externallyHidden then
-        return nil
-    end
     local f = module._frame
-    if f and f:IsShown() then
-        return f
-    end
-    return nil
+    return (not module._externallyHidden and f and f:IsShown()) and f or nil
 end
 
 --- Common UpdateLayout guards: checks profile, externally hidden, enabled, and shouldShow.
@@ -271,15 +257,11 @@ end
 -- CooldownViewer icon-strip bound helpers.
 
 local function TryGetLeftRight(frame)
-    if not (frame and frame.GetLeft and frame.GetRight) then
+    if not frame then
         return nil, nil
     end
-    local okL, l = pcall(frame.GetLeft, frame)
-    local okR, r = pcall(frame.GetRight, frame)
-    if okL and okR and type(l) == "number" and type(r) == "number" then
-        return l, r
-    end
-    return nil, nil
+    local l, r = frame:GetLeft(), frame:GetRight()
+    return (type(l) == "number" and type(r) == "number") and l or nil, r
 end
 
 --- Attempts to find the left/right bounds of the icon strip inside EssentialCooldownViewer.
@@ -393,12 +375,7 @@ local VIEWER_ANCHOR_NAME = "EssentialCooldownViewer"
 ---@return Frame
 function Util.GetViewerAnchor()
     local f = _G[VIEWER_ANCHOR_NAME]
-    if f and f.GetPoint then
-        if f:GetPoint(1) ~= nil then
-            return f
-        end
-    end
-    return UIParent
+    return (f and f:GetPoint(1)) and f or UIParent
 end
 
 --- Returns the bottom-most visible ECM bar frame for anchoring.
@@ -434,8 +411,20 @@ function Util.GetPreferredAnchor(addon, excludeModule)
     return viewer, true
 end
 
+--- Safely converts a value to a copyable form, handling WoW secret values.
+---@param v any
+---@return any
+local function SafeCopyValue(v)
+    if type(issecretvalue) == "function" and issecretvalue(v) then
+        return (type(canaccessvalue) == "function" and canaccessvalue(v)) and ("s|" .. tostring(v)) or "<secret>"
+    end
+    if type(issecrettable) == "function" and issecrettable(v) then
+        return (type(canaccesstable) == "function" and canaccesstable(v)) and "s|<table>" or "<secrettable>"
+    end
+    return v
+end
+
 --- Creates a deep copy of a table with cycle detection and depth limit.
---- Handles WoW secret values safely.
 ---@param tbl any Value to copy
 ---@param seen table|nil Table tracking visited tables (for recursion)
 ---@param depth number|nil Current depth (for recursion)
@@ -445,7 +434,7 @@ function Util.DeepCopy(tbl, seen, depth)
         return tbl
     end
 
-    depth = depth or 0
+    depth = (depth or 0) + 1
     if depth > 10 then
         return "<max depth>"
     end
@@ -458,34 +447,17 @@ function Util.DeepCopy(tbl, seen, depth)
 
     local copy = {}
     for k, v in pairs(tbl) do
-        -- Handle secret keys - skip the entire entry for safety
+        -- Handle secret keys
         if type(issecretvalue) == "function" and issecretvalue(k) then
             copy["<secret_key>"] = "<secret>"
+        elseif type(v) == "table" then
+            copy[k] = Util.DeepCopy(v, seen, depth)
         else
-            -- Handle secret values
-            if type(issecretvalue) == "function" and issecretvalue(v) then
-                if type(canaccessvalue) == "function" and canaccessvalue(v) then
-                    copy[k] = "s|" .. tostring(v)
-                else
-                    copy[k] = "<secret>"
-                end
-            -- Handle secret tables
-            elseif type(issecrettable) == "function" and issecrettable(v) then
-                if type(canaccesstable) == "function" and canaccesstable(v) then
-                    copy[k] = "s|<table>"
-                else
-                    copy[k] = "<secrettable>"
-                end
-            -- Handle regular tables
-            elseif type(v) == "table" then
-                copy[k] = Util.DeepCopy(v, seen, depth + 1)
-            else
-                copy[k] = v
-            end
+            copy[k] = SafeCopyValue(v)
         end
     end
 
-    seen[tbl] = nil  -- Clean up when backtracking to avoid false cycle detection
+    seen[tbl] = nil
     return copy
 end
 
@@ -495,11 +467,7 @@ end
 ---@param data any|nil Optional data to log (tables are deep-copied for DevTool)
 function Util.Log(moduleName, message, data)
     local addon = ns.Addon
-    if not addon then
-        return
-    end
-
-    local profile = addon.db and addon.db.profile
+    local profile = addon and addon.db and addon.db.profile
     if not profile or not profile.debug then
         return
     end
@@ -529,23 +497,8 @@ function Util.Log(moduleName, message, data)
             module = moduleName,
             message = message,
             timestamp = GetTime(),
+            data = type(data) == "table" and Util.DeepCopy(data) or SafeCopyValue(data),
         }
-
-        if data ~= nil then
-            if type(data) == "table" then
-                payload.data = Util.DeepCopy(data)
-            -- Handle secret scalar values for DevTool
-            elseif type(issecretvalue) == "function" and issecretvalue(data) then
-                if type(canaccessvalue) == "function" and canaccessvalue(data) then
-                    payload.data = "s|" .. tostring(data)
-                else
-                    payload.data = "<secret>"
-                end
-            else
-                payload.data = data
-            end
-        end
-
         pcall(DevTool.AddData, DevTool, payload, prefix)
     end
 end

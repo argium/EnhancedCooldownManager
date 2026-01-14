@@ -8,16 +8,14 @@ ns.SparkleUtil = SparkleUtil
 --------------------------------------------------------------------------------
 
 local function Clamp(v, minV, maxV)
-    if v < minV then return minV end
-    if v > maxV then return maxV end
-    return v
+    return math.max(minV, math.min(maxV, v))
 end
 
 ---@param v any
 ---@return number
 local function ToNumberOrError(v)
     local n = tonumber(v)
-    assert(type(n) == "number", "ECM.Util: expected number")
+    assert(n, "ECM.Util: expected number")
     return n
 end
 
@@ -110,19 +108,6 @@ local function RGBToHex(r, g, b)
     return string.format("%02x%02x%02x", ri, gi, bi)
 end
 
----@param s string
----@return number
-local function GetCharCount(s)
-    return #s
-end
-
----@param s string
----@param i number 1-based character index
----@return string
-local function GetCharAt(s, i)
-    return s:sub(i, i)
-end
-
 --- Returns `text` with each character wrapped in a 3-stop gradient color.
 ---
 --- The gradient is computed dynamically so that the start, midpoint, and endpoint colors
@@ -139,8 +124,8 @@ end
 function SparkleUtil.GradientText(text, startColor, midColor, endColor)
     assert(type(text) == "string", "ECM.Util.GradientText: text must be a string")
 
-    local charCount = GetCharCount(text)
-    if charCount <= 0 then
+    local charCount = #text
+    if charCount == 0 then
         return ""
     end
 
@@ -149,21 +134,15 @@ function SparkleUtil.GradientText(text, startColor, midColor, endColor)
     local er, eg, eb = NormalizeRGB(endColor or "22c55e")
 
     local effectiveLen = Clamp(charCount, 4, 60)
-
     local parts = {}
+
     for i = 1, charCount do
-        local pos
-        if charCount == 1 then
-            pos = math.ceil(effectiveLen / 2)
-        else
-            -- Map the actual character index into [1..effectiveLen] so strings longer than
-            -- effectiveLen still preserve the same start/mid/end colors.
-            pos = 1 + math.floor(((i - 1) * (effectiveLen - 1) / (charCount - 1)) + 0.5)
-        end
+        local pos = (charCount == 1) and math.ceil(effectiveLen / 2)
+            or (1 + math.floor(((i - 1) * (effectiveLen - 1) / (charCount - 1)) + 0.5))
 
         local t = (effectiveLen == 1) and 0 or ((pos - 1) / (effectiveLen - 1))
         local r, g, b = ThreeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
-        parts[#parts + 1] = "|cff" .. RGBToHex(r, g, b) .. GetCharAt(text, i) .. "|r"
+        parts[i] = "|cff" .. RGBToHex(r, g, b) .. text:sub(i, i) .. "|r"
     end
 
     return table.concat(parts)

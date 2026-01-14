@@ -24,44 +24,37 @@ local function SetHidden(hidden)
         local frame = _G[name]
         if frame then
             if hidden then
-                if frame.IsShown and frame:IsShown() then
+                if frame:IsShown() then
                     frame._ecmHidden = true
-                    pcall(frame.Hide, frame)
+                    frame:Hide()
                 end
             elseif frame._ecmHidden then
                 frame._ecmHidden = nil
-                pcall(frame.Show, frame)
+                frame:Show()
             end
         end
     end
 
-    assert(EnhancedCooldownManager.PowerBars, "ECM: PowerBars module missing")
-    assert(EnhancedCooldownManager.SegmentBar, "ECM: SegmentBar module missing")
     EnhancedCooldownManager.PowerBars:SetExternallyHidden(hidden)
     EnhancedCooldownManager.SegmentBar:SetExternallyHidden(hidden)
 end
 
 local function UpdateLayoutInternal()
-    local EssentialCooldownViewer = _G["EssentialCooldownViewer"]
-    if not EssentialCooldownViewer then
+    if not _G["EssentialCooldownViewer"] then
         Util.Log("ViewerHook", "UpdateLayoutInternal skipped - no EssentialCooldownViewer")
         return
     end
 
     -- Hide if Cooldown Manager CVar is disabled
-    local cooldownViewerEnabled = C_CVar.GetCVarBool("cooldownViewerEnabled")
-    if not cooldownViewerEnabled then
+    if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
         Util.Log("ViewerHook", "UpdateLayoutInternal - hidden (cooldownViewerEnabled CVar disabled)")
         SetHidden(true)
         return
     end
 
     -- Hide/show based on mounted state
-    local hidden = false
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if profile and profile.hideWhenMounted then
-        hidden = IsMounted()
-    end
+    local hidden = profile and profile.hideWhenMounted and IsMounted()
     SetHidden(hidden)
 
     if hidden then
@@ -71,24 +64,16 @@ local function UpdateLayoutInternal()
 
     Util.Log("ViewerHook", "UpdateLayoutInternal - triggering module layouts")
 
-    -- Trigger layout updates on ECM-managed bars
-    assert(EnhancedCooldownManager.PowerBars, "ECM: PowerBars module missing")
-    assert(EnhancedCooldownManager.SegmentBar, "ECM: SegmentBar module missing")
-    assert(EnhancedCooldownManager.BuffBars, "ECM: BuffBars module missing")
-    assert(EnhancedCooldownManager.ProcOverlay, "ECM: ProcOverlay module missing")
-
     EnhancedCooldownManager.PowerBars:UpdateLayout()
     EnhancedCooldownManager.SegmentBar:UpdateLayout()
+    EnhancedCooldownManager.BuffBars:UpdateLayout()
+    EnhancedCooldownManager.ProcOverlay:UpdateLayout()
 
     -- BuffBarCooldownViewer children can be re-created/re-anchored during zone transitions.
     -- A small delay ensures Blizzard frames have settled before we style them.
-    EnhancedCooldownManager.BuffBars:UpdateLayout()
     C_Timer.After(0.1, function()
         EnhancedCooldownManager.BuffBars:UpdateLayout()
     end)
-
-    -- ProcOverlay needs to run after buff icons are visible
-    EnhancedCooldownManager.ProcOverlay:UpdateLayout()
 end
 
 local function ScheduleLayoutUpdate(delay)
@@ -102,52 +87,50 @@ local function ScheduleLayoutUpdate(delay)
     end)
 end
 
+-- Event handling configuration: maps events to their delay and whether to reset BuffBars
+local EVENT_CONFIG = {
+    -- Immediate updates (no delay, no reset)
+    PLAYER_MOUNT_DISPLAY_CHANGED = { delay = 0 },
+    PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
+    -- Delayed updates with BuffBars reset (zone/world transitions)
+    PLAYER_ENTERING_WORLD = { delay = 0.4, resetBuffBars = true },
+    PLAYER_REGEN_ENABLED = { delay = 0.4, resetBuffBars = true },
+    ZONE_CHANGED_NEW_AREA = { delay = 0.3, resetBuffBars = true },
+    ZONE_CHANGED = { delay = 0.3, resetBuffBars = true },
+    ZONE_CHANGED_INDOORS = { delay = 0.3, resetBuffBars = true },
+}
+
 local f = CreateFrame("Frame")
-local function OnEvent(_, event, arg1)
+f:SetScript("OnEvent", function(_, event, arg1)
+    -- CVAR_UPDATE is special: only handle cooldownManager changes
     if event == "CVAR_UPDATE" then
         if arg1 == "cooldownManager" then
-            -- Only log the CVAR_UPDATE events we care about.
             Util.Log("ViewerHook", "OnEvent", { event = event, arg1 = arg1 })
             ScheduleLayoutUpdate(0)
         end
         return
     end
 
+    local config = EVENT_CONFIG[event]
+    if not config then
+        return
+    end
+
     Util.Log("ViewerHook", "OnEvent", { event = event, arg1 = arg1 })
 
-    if event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "PLAYER_SPECIALIZATION_CHANGED" then
+    if config.delay > 0 then
+        C_Timer.After(config.delay, function()
+            if config.resetBuffBars then
+                EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
+            end
+            ScheduleLayoutUpdate(0)
+        end)
+    else
         ScheduleLayoutUpdate(0)
-        return
     end
+end)
 
-    if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" then
-        C_Timer.After(0.4, function()
-            -- Reset BuffBars markers on world entry (hearthing, portals, loading screens)
-            -- to force re-anchor since Blizzard may have repositioned frames.
-            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
-            ScheduleLayoutUpdate(0)
-        end)
-        return
-    end
-
-    if event == "ZONE_CHANGED_NEW_AREA" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" then
-        C_Timer.After(0.3, function()
-            -- Reset BuffBars markers to force re-anchor after zone transition.
-            -- Blizzard repositions frames during zone changes, so our cached anchor
-            -- positions become stale even though the anchor frame reference is the same.
-            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
-            ScheduleLayoutUpdate(0)
-        end)
-        return
-    end
+for event in pairs(EVENT_CONFIG) do
+    f:RegisterEvent(event)
 end
-
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-f:RegisterEvent("PLAYER_REGEN_ENABLED")
-f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-f:RegisterEvent("ZONE_CHANGED")
-f:RegisterEvent("ZONE_CHANGED_INDOORS")
-f:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 f:RegisterEvent("CVAR_UPDATE")
-f:SetScript("OnEvent", OnEvent)
