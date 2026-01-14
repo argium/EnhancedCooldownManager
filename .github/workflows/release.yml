@@ -91,15 +91,16 @@ jobs:
           TOC_INTERFACES=$(grep -oP '## Interface: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
           echo "TOC Interface versions: $TOC_INTERFACES"
 
-          # Fetch game versions from CurseForge API
-          CF_VERSIONS=$(curl -s "https://wow.curseforge.com/api/game/versions")
+          # Fetch game versions from CurseForge API (requires auth)
+          CF_VERSIONS=$(curl -s -H "X-Api-Token: ${CF_TOKEN}" "https://wow.curseforge.com/api/game/versions")
 
           # Match by apiVersion and verify all TOC versions are mapped
+          # Filter to only objects that have apiVersion field
           RESULT=$(echo "$CF_VERSIONS" | jq -c --arg interfaces "$TOC_INTERFACES" '
-            # Split the comma-separated interface versions into an array
-            ($interfaces | split(",") | map(tonumber)) as $toc_versions |
-            # Get matched versions
-            ([.[] | select(.apiVersion as $api | $toc_versions | index($api))]) as $matched |
+            # Split the comma-separated interface versions into an array (keep as strings)
+            ($interfaces | split(",")) as $toc_versions |
+            # Get matched versions (only from entries that have apiVersion)
+            ([.[] | select(type == "object" and .apiVersion != null) | select(.apiVersion as $api | $toc_versions | index($api))]) as $matched |
             # Get the apiVersions that were matched
             ([$matched[].apiVersion]) as $matched_apis |
             # Find unmatched TOC versions
