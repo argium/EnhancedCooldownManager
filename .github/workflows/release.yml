@@ -4,11 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version override (e.g., v0.2.1)'
-        required: false
 
 env:
   ADDON_NAME: EnhancedCooldownManager
@@ -25,40 +20,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get version
+      - name: Get version and changelog
         id: version
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" == v* ]]; then
-            VERSION="${{ github.ref_name }}"
-          else
-            VERSION=$(grep -oP '## Version: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
-          fi
+          VERSION="${{ github.ref_name }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Packaging version: $VERSION"
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Get the previous tag
-          CURRENT_TAG="${{ steps.version.outputs.version }}"
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || echo "")
+          # Generate changelog from commits since previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
 
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
-            CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${CURRENT_TAG}" 2>/dev/null || echo "")
+            echo "Generating changelog from $PREVIOUS_TAG to $VERSION"
+            CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${VERSION}" 2>/dev/null || echo "")
           else
-            echo "No previous tag found, using all commits"
-            CHANGELOG=$(git log --pretty=format:"- %s" "${CURRENT_TAG}" 2>/dev/null || echo "")
+            echo "No previous tag found, using all commits up to $VERSION"
+            CHANGELOG=$(git log --pretty=format:"- %s" "${VERSION}" 2>/dev/null || echo "")
           fi
 
           # Handle empty changelog
           if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="- Release ${CURRENT_TAG}"
+            CHANGELOG="- Release ${VERSION}"
           fi
 
-          # Write to file to preserve newlines
           echo "$CHANGELOG" > changelog.txt
           echo "Changelog:"
           cat changelog.txt
@@ -90,7 +74,6 @@ jobs:
           zip -r ../${ADDON_NAME}-${{ steps.version.outputs.version }}.zip ${ADDON_NAME}
 
       - name: Upload to CurseForge
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           CF_TOKEN: ${{ secrets.CF_TOKEN }}
         run: |
@@ -171,8 +154,9 @@ jobs:
             "https://wow.curseforge.com/api/projects/${{ env.CF_PROJECT_ID }}/upload-file"
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: ${{ env.ADDON_NAME }}-${{ steps.version.outputs.version }}.zip
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            "${ADDON_NAME}-${{ steps.version.outputs.version }}.zip" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
