@@ -100,15 +100,6 @@ local function ShouldShowSegmentBar()
         return true
     end
 
-    -- Frost Mage Icicles
-    if class == "MAGE" then
-        local specIndex = GetSpecialization()
-        local specId = GetSpecializationInfo(specIndex or 0)
-        if specId == 64 and not Util.InSecretRegime() then -- Frost Mage, only if we can access auras
-            return true
-        end
-    end
-
     -- Check for discrete power types
     local discretePower = GetDiscretePowerType()
     Util.Log("SegmentBar", "ShouldShowSegmentBar - discrete power fallback", { discretePower = discretePower })
@@ -143,21 +134,6 @@ local function GetSegmentBarValues(profile)
         return maxSouls, count, "souls"
     end
 
-    -- Special: Frost Mage Icicles (aura-based stacks)
-    -- NOTE: This uses AuraUtil.FindAuraBySpellId which will likely break in v12.0 due to secret value restrictions
-    if class == "MAGE" then
-        local specId = GetSpecializationInfo(GetSpecialization() or 0)
-        if specId == 64 then -- Frost Mage
-            local maxIcicles = (cfg and cfg.frostMageIciclesMax) or 5
-            local spellId = cfg and cfg.frostMageIciclesSpellId
-            local count = GetAuraStackCount(spellId)
-            if count > maxIcicles then
-                count = maxIcicles
-            end
-            return maxIcicles, count, "icicles"
-        end
-    end
-
     -- Generic discrete power types
     local powerType = GetDiscretePowerType()
     if powerType then
@@ -188,7 +164,6 @@ local function GetSegmentBarColor(profile, kind)
     local kindColors = {
         souls = { cfg and cfg.colorDemonHunterSouls, 0.64, 0.19, 0.79 },
         runes = { cfg and cfg.colorDkRunes, 0.78, 0.10, 0.22 },
-        icicles = { cfg and cfg.colorFrostMageIcicles, 0.41, 0.80, 0.94 },
     }
 
     local kindEntry = kindColors[kind]

@@ -23,13 +23,10 @@ local ADDON_NAME, ns = ...
 ---@field demonHunterSoulsSpellId number
 ---@field demonHunterSoulsMax number
 ---@field deathKnightRunesMax number
----@field frostMageIciclesSpellId number
----@field frostMageIciclesMax number
 ---@field colorDkBlood number[]
 ---@field colorDkFrost number[]
 ---@field colorDkUnholy number[]
 ---@field colorDemonHunterSouls number[]
----@field colorFrostMageIcicles number[]
 
 ---@alias ECM_ResourceType number|string
 
@@ -143,7 +140,7 @@ local defaults = {
         enabled = true,
         debug = false,
         hideWhenMounted = true,
-        updateFrequency = 0.066,
+        updateFrequency = 0.016,
         schemaVersion = 1,
         offsetY = 4,
         combatFade = {
@@ -153,7 +150,7 @@ local defaults = {
         },
         global = {
             barHeight = 22,
-            barBgColor = { 0.08, 0.08, 0.08, 0.65 },
+            barBgColor = { 0.08, 0.08, 0.08, 0.75 },
             texture = nil, -- Selected from TEXTURE_PRIORITY on first load
             font = "Expressway",
             fontSize = 11,
@@ -176,10 +173,6 @@ local defaults = {
             demonHunterSoulsMax = 5,
             colorDemonHunterSouls = { 0.46, 0.98, 1.00 },
             deathKnightRunesMax = 6,
-            -- NOTE: Icicles tracking uses AuraUtil.FindAuraBySpellId which will likely break in v12.0 due to secret value restrictions
-            frostMageIciclesSpellId = 205473,
-            frostMageIciclesMax = 5,
-            colorFrostMageIcicles = { 0.41, 0.80, 0.94 },
             colorDkRunes = { 0.87, 0.10, 0.22 },
             colorComboPoints = { 0.75, 0.15, 0.15 },
         },
