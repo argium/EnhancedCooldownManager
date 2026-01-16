@@ -206,7 +206,7 @@ local function GeneralOptionsTable()
                     -- },
                     hideWhenMountedDesc = {
                         type = "description",
-                        name = "\nAutomatically hide icons and bars when mounted and show them when dismounted.",
+                        name = "Automatically hide icons and bars when mounted and show them when dismounted.",
                         order = 3,
                     },
                     hideWhenMounted = {
@@ -1715,7 +1715,7 @@ local function AboutOptionsTable()
                         name = "Update Frequency",
                         order = 2,
                         width = "double",
-                        min = 0.016,
+                        min = 0.04,
                         max = 0.5,
                         step = 0.04,
                         get = function() return db.profile.updateFrequency end,
