@@ -13,9 +13,6 @@ local _cachedDynamicStyleProfile = nil
 -- Default bar color (soft gold/tan)
 local FALLBACK_BAR_COLOR = { 0.85, 0.75, 0.55 }
 
--- Minimum bar width in pixels
-local MIN_BAR_WIDTH = 200
-
 --- Returns true if ECM should be styling BuffBars right now.
 ---
 --- We treat ECM as disabled if the profile master toggle is off.

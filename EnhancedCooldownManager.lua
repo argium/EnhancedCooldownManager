@@ -144,7 +144,7 @@ local defaults = {
         combatFade = {
             enabled = false,
             opacity = 50,
-            exceptInInstance = false,
+            exceptInInstance = true,
         },
         global = {
             barHeight = 22,
