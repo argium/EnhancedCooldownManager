@@ -1,56 +1,33 @@
-You are a seasoned software engineer that writes addons for the game World of Warcraft in LUA. You have experience in writing concise and efficient code that is readable by humans.
+# Enhanced Cooldown Manager
 
-Enhanced Cooldown Manager (ECM) is a World of Warcraft addon that displays customizable resource bars anchored to Blizzard's Cooldown Manager viewer UI frames. It provides visual feedback for player power resources (eg. mana) and special resources (eg. combo points).
+WoW addon: customizable resource bars anchored to Blizzard's Cooldown Manager viewers.
 
-## Engineering Guidelines
+## Guidelines
 
 - Implement EXACTLY and ONLY what is requested
-- Do not reach into another module's internals
-- Prefer `assert()`/`error()` with clear messages for internal invariants
-- For Blizzard/third-party frames where methods may not exist, prefer `pcall` over `type(...)` checks
-- Do not add `type(x) == "function"` guards except for future-update functions (`issecretvalue`, `canaccessvalue`, etc.)
-- Remove unused code; minimize duplication via shared helpers
-- **Do NOT use upvalue caching** (e.g., `local math_floor = math.floor`) - use standard Lua/WoW globals directly
-- All settings in `EnhancedCooldownManager.db.profile`. Modules have their own settings section and may reference global or debat default options.
-- Use `Util.GetPreferredAnchor(addon, excludeModule)` to find the bottom-most visible ECM bar.
+- Don't reach into other modules' internals
+- Use `assert()`/`error()` for invariants; `pcall` for Blizzard/third-party frames
+- No `type(x) == "function"` guards except for `issecretvalue`, `canaccessvalue`
+- No upvalue caching (e.g., `local math_floor = math.floor`)
+- Config: `EnhancedCooldownManager.db.profile` with module subsections
 
-The build-in cooldown viewer has the following well-known frames: "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer"
+## Architecture
 
-Our bars stack vertically below `EssentialCooldownViewer`:
+Blizzard frames: `EssentialCooldownViewer`, `UtilityCooldownViewer`, `BuffIconCooldownViewer`, `BuffBarCooldownViewer`
 
-```
-EssentialCooldownViewer (Blizzard icons)
-    PowerBar (if visible)
-    SegmentBar (if visible)
-    BuffBarCooldownViewer (Blizzard, restyled by BuffBars, and auto positioning is enabled)
-```
+Bar stack: `EssentialCooldownViewer` → `PowerBar` → `SegmentBar` → `BuffBarCooldownViewer`
 
-### Common Module Interface
+Use `Util.GetPreferredAnchor(addon, excludeModule)` for anchor chaining.
 
-- Use consistent semantics for common methods when creating new modules:
+**Module interface**: `:GetFrame()`, `:GetFrameIfShown()`, `:SetExternallyHidden(bool)`, `:UpdateLayout()`, `:Refresh()`, `:Enable()`/`:Disable()`
 
-| Method | Description |
-|--------|-------------|
-| `:GetFrame()` | Lazy-creates and returns the module's frame |
-| `:GetFrameIfShown()` | Returns frame only if currently visible (for anchor chaining) |
-| `:SetExternallyHidden(bool)` | Hides frame externally (e.g., mounted); does NOT unregister events |
-| `:UpdateLayout()` | Positions/sizes/styles the frame, then calls `:Refresh()` |
-| `:Refresh()` | Updates values only (colors, text, progress) |
-| `:Enable()` / `:Disable()` | Registers/unregisters power/aura events |
+## Secret Values
 
-### Critical: Secret Value Handling
+In combat/instances, many Blizzard API returns are restricted. Cannot compare, convert type, or concatenate.
 
-- Many Blizzard APIs are severely restricted in how they and their return values can be used. This regime is in effect typically when in combat or in instances, and affect: spell IDs, spell names, aura data, UI text.
-- Secret values CAN be passed by "reference" but CANNOT be: compared, converted to a different type, concatenated in a string, bypassed with `pcall`.
-- Some Blizzard functions can accept secret parameters.
--  Use `issecretvalue(v)` to check if a value is secret
-- Use `canaccessvalue(v)` to check if you can safely use the value
-- Pass to `SafeGetDebugValue()` for debug output
-
-**Forbidden APIs** (due to secret restrictions):
-- C_UnitAuras APIs that use spellId; use `auraInstanceId` functions instead.
-- Spell IDs from `GetSpellID()`
-- Spell names from `fontString:GetText()` on buff/aura bars
+- `issecretvalue(v)` / `canaccessvalue(v)` to check
+- `SafeGetDebugValue()` for debug output
+- Avoid `C_UnitAuras` APIs using spellId; use `auraInstanceId` instead
 
 ## Serena MCP Tools (Lua Plugin)
 
