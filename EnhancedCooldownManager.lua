@@ -115,6 +115,8 @@ ns.Addon = EnhancedCooldownManager
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
+local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
+local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
 -- Priority list for default texture selection (first available wins)
 local TEXTURE_PRIORITY = {
@@ -441,6 +443,121 @@ function EnhancedCooldownManager:ConfirmReloadUI(text, onAccept, onCancel)
 
     StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or "Reload the UI?"
     StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+end
+
+--- Safely gets the edit box from a StaticPopup dialog.
+---@param dialog table The StaticPopup dialog frame
+---@return EditBox editBox The edit box widget
+local function GetDialogEditBox(dialog)
+    return dialog.editBox or dialog:GetEditBox()
+end
+
+--- Creates or retrieves a StaticPopup dialog with common settings for editbox dialogs.
+---@param key string The dialog key (e.g., "ECM_EXPORT_PROFILE")
+---@param config table Dialog-specific configuration overrides
+local function EnsureEditBoxDialog(key, config)
+    if StaticPopupDialogs[key] then
+        return
+    end
+
+    local defaults = {
+        hasEditBox = true,
+        editBoxWidth = 350,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+
+    -- Merge config into defaults
+    local dialog = {}
+    for k, v in pairs(defaults) do
+        dialog[k] = v
+    end
+    for k, v in pairs(config or {}) do
+        dialog[k] = v
+    end
+
+    StaticPopupDialogs[key] = dialog
+end
+
+--- Shows a dialog with the export string for copying.
+---@param exportString string The export string to display
+function EnhancedCooldownManager:ShowExportDialog(exportString)
+    if not exportString or exportString == "" then
+        self:Print("Invalid export string provided")
+        return
+    end
+
+    EnsureEditBoxDialog(POPUP_EXPORT_PROFILE, {
+        text = "Press Ctrl+C to copy the export string:",
+        button1 = CLOSE or "Close",
+    })
+
+    StaticPopupDialogs[POPUP_EXPORT_PROFILE].OnShow = function(self)
+        self:SetFrameStrata("TOOLTIP")
+        local editBox = GetDialogEditBox(self)
+        editBox:SetText(exportString)
+        editBox:HighlightText()
+        editBox:SetFocus()
+    end
+
+    StaticPopup_Show(POPUP_EXPORT_PROFILE)
+end
+
+--- Shows a dialog to paste an import string and handles the import process.
+function EnhancedCooldownManager:ShowImportDialog()
+    EnsureEditBoxDialog(POPUP_IMPORT_PROFILE, {
+        text = "Paste your import string:",
+        button1 = OKAY or "Import",
+        button2 = CANCEL or "Cancel",
+        EditBoxOnEnterPressed = function(editBox)
+            local parent = editBox:GetParent()
+            if parent and parent.button1 then
+                parent.button1:Click()
+            end
+        end,
+    })
+
+    StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnShow = function(self)
+        self:SetFrameStrata("TOOLTIP")
+        local editBox = GetDialogEditBox(self)
+        editBox:SetText("")
+        editBox:SetFocus()
+    end
+
+    StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnAccept = function(self)
+        local editBox = GetDialogEditBox(self)
+        local input = editBox:GetText() or ""
+
+        if input:trim() == "" then
+            EnhancedCooldownManager:Print("Import cancelled: no string provided")
+            return
+        end
+
+        -- Validate first WITHOUT applying (fixes critical bug)
+        local data, errorMsg = ns.ImportExport.ValidateImportString(input)
+        if not data then
+            EnhancedCooldownManager:Print("Import failed: " .. (errorMsg or "unknown error"))
+            return
+        end
+
+        local versionStr = data.metadata and data.metadata.addonVersion or "unknown"
+        local confirmText = string.format(
+            "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI.",
+            versionStr
+        )
+
+        -- Only apply the import AFTER user confirms reload
+        EnhancedCooldownManager:ConfirmReloadUI(confirmText, function()
+            local success, applyErr = ns.ImportExport.ApplyImportData(data)
+            if not success then
+                EnhancedCooldownManager:Print("Import apply failed: " .. (applyErr or "unknown error"))
+            end
+        end, nil)
+    end
+
+    StaticPopup_Show(POPUP_IMPORT_PROFILE)
 end
 
 --- Prompts the user to confirm disabling ECM and reloading the UI.

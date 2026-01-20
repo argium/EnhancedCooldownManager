@@ -123,15 +123,18 @@ end
 ---@return string
 function SparkleUtil.GradientText(text, startColor, midColor, endColor)
     assert(type(text) == "string", "ECM.Util.GradientText: text must be a string")
+    assert(type(startColor) == "string" or type(startColor) == "table", "ECM.Util.GradientText: startColor must be a string or table")
+    assert(type(midColor) == "string" or type(midColor) == "table", "ECM.Util.GradientText: midColor must be a string or table")
+    assert(type(endColor) == "string" or type(endColor) == "table", "ECM.Util.GradientText: endColor must be a string or table")
 
     local charCount = #text
     if charCount == 0 then
         return ""
     end
 
-    local sr, sg, sb = NormalizeRGB(startColor or "a855f7")
-    local mr, mg, mb = NormalizeRGB(midColor or "4cc9f0")
-    local er, eg, eb = NormalizeRGB(endColor or "22c55e")
+    local sr, sg, sb = NormalizeRGB(startColor)
+    local mr, mg, mb = NormalizeRGB(midColor )
+    local er, eg, eb = NormalizeRGB(endColor)
 
     local effectiveLen = Clamp(charCount, 4, 60)
     local parts = {}
