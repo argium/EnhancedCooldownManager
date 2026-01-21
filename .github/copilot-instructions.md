@@ -14,15 +14,6 @@ Enhanced Cooldown Manager (ECM) is a World of Warcraft addon that displays custo
 
 The build-in cooldown viewer has the following well-known frames: "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer", "BuffBarCooldownViewer"
 
-Our bars stack vertically below `EssentialCooldownViewer`:
-
-```
-EssentialCooldownViewer (Blizzard icons)
-    PowerBar (if visible)
-    SegmentBar (if visible)
-    BuffBarCooldownViewer (Blizzard, restyled by BuffBars, and auto positioning is enabled)
-```
-
 ### Common Module Interface
 
 - Use consistent semantics for common methods when creating new modules:
