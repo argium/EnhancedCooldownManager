@@ -241,8 +241,11 @@ function PowerBars:UpdateLayout()
 
     local desiredHeight = Util.GetBarHeight(cfg, profile, Util.DEFAULT_POWER_BAR_HEIGHT)
     local desiredOffsetY = -Util.GetTopGapOffset(cfg, profile)
+    local widthCfg = profile.width or {}
+    local desiredWidth = widthCfg.value or 330
+    local matchAnchorWidth = widthCfg.auto ~= false
 
-    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight)
+    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight, desiredWidth, matchAnchorWidth)
 
     -- Update appearance (background, texture)
     local tex = Util.ApplyBarAppearance(bar, cfg, profile)

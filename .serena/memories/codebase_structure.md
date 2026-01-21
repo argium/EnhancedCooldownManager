@@ -7,7 +7,6 @@
 - `Modules/PowerBar.lua` - Primary resource bar (mana/rage/energy)
 - `Modules/SegmentBar.lua` - Segmented resources (runes, Holy Power)
 - `Modules/BuffBars.lua` - Styles Blizzard's BuffBarCooldownViewer
-- `Modules/ProcOverlay.lua` - Proc overlays
 - `Modules/ViewerHook.lua` - Mount/spec change handler
 
 ## Bar Anchor Chain

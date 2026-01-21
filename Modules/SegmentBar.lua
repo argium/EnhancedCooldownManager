@@ -500,8 +500,11 @@ function SegmentBar:UpdateLayout()
     local desiredOffsetY = isFirstBar and anchor == viewer
         and -Util.GetTopGapOffset(cfg, profile)
         or 0
+    local widthCfg = profile.width or {}
+    local desiredWidth = widthCfg.value or 330
+    local matchAnchorWidth = widthCfg.auto ~= false
 
-    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight)
+    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight, desiredWidth, matchAnchorWidth)
 
     -- Update appearance (background, texture)
     local tex = Util.ApplyBarAppearance(bar, cfg, profile)

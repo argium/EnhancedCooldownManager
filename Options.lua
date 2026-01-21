@@ -257,11 +257,55 @@ local function GeneralOptionsTable()
                     },
                 },
             },
+            widthSettings = {
+                type = "group",
+                name = "Width",
+                inline = true,
+                order = 3,
+                args = {
+                    autoWidthDesc = {
+                        type = "description",
+                        name = "Automatically resize bars to match the cooldown manager width.",
+                        order = 1,
+                    },
+                    autoWidth = {
+                        type = "toggle",
+                        name = "Automatically resize to match cooldown manager",
+                        order = 2,
+                        width = "full",
+                        get = function() return db.profile.width.auto end,
+                        set = function(_, val)
+                            db.profile.width.auto = val
+                            RefreshAllBars()
+                        end,
+                    },
+                    widthDesc = {
+                        type = "description",
+                        name = "\nWidth of bars when automatic resizing is disabled.",
+                        order = 3,
+                    },
+                    widthValue = {
+                        type = "range",
+                        name = "Width",
+                        order = 4,
+                        width = "double",
+                        min = 150,
+                        max = 600,
+                        step = 1,
+                        disabled = function() return db.profile.width.auto end,
+                        get = function() return db.profile.width.value end,
+                        set = function(_, val)
+                            db.profile.width.value = val
+                            RefreshAllBars()
+                        end,
+                    },
+                },
+            },
             combatFadeSettings = {
                 type = "group",
                 name = "Combat Fade",
                 inline = true,
-                order = 3,
+                order = 4,
                 args = {
                     combatFadeEnabledDesc = {
                         type = "description",
@@ -382,6 +426,7 @@ local function BarDefaultsArgs()
                     hidden = function() return not IsValueChanged("global.barHeight") end,
                     func = MakeResetHandler("global.barHeight"),
                 },
+
                 textureDesc = {
                     type = "description",
                     name = "\nDefault statusbar texture for all bars.",
@@ -1542,163 +1587,6 @@ TickMarksOptionsTable = function()
     return options
 end
 
---------------------------------------------------------------------------------
--- Proc Overlay Options (Experimental feature)
---------------------------------------------------------------------------------
-local function ProcOverlayOptionsTable()
-    local db = EnhancedCooldownManager.db
-    local procOverlay = EnhancedCooldownManager.ProcOverlay
-
-    --- Generates dropdown values for target icon indices.
-    local function GetTargetIconValues()
-        local values = { [0] = "None" }
-        local _, targetCount = procOverlay:GetIconCounts()
-        for i = 1, math.max(targetCount, 10) do
-            values[i] = "Icon " .. i
-        end
-        return values
-    end
-
-    --- Generates per-buff-icon mapping options dynamically.
-    local function GenerateMappingArgs()
-        local args = {}
-        local buffCount, _ = procOverlay:GetIconCounts()
-        local mappings = procOverlay:GetAllMappings()
-
-        -- Show at least 5 slots, or as many as there are buff icons
-        local slotCount = math.max(buffCount, 5)
-
-        for i = 1, slotCount do
-            local currentTarget = mappings[i] or 0
-            args["buffIcon" .. i] = {
-                type = "select",
-                name = "Buff Icon " .. i,
-                desc = "Select which Essential Cooldown icon this buff should overlay when active.",
-                order = i,
-                width = "double",
-                values = GetTargetIconValues,
-                get = function()
-                    return procOverlay:GetMapping(i) or 0
-                end,
-                set = function(_, val)
-                    if val == 0 then
-                        procOverlay:SetMapping(i, nil)
-                    else
-                        local success = procOverlay:SetMapping(i, val)
-                        if not success then
-                            -- Target already mapped to another buff
-                            EnhancedCooldownManager:Print("Target icon " .. val .. " is already mapped to another buff icon.")
-                        end
-                    end
-                end,
-            }
-        end
-
-        return args
-    end
-
-    return {
-        type = "group",
-        name = "Proc Overlay",
-        order = 6,
-        args = {
-            header = {
-                type = "header",
-                name = "Proc Overlay (Experimental)",
-                order = 1,
-            },
-            description = {
-                type = "description",
-                name = "|cffffcc00Experimental Feature:|r When a buff icon in the Buff Icon Cooldown Viewer becomes visible, " ..
-                       "it can be repositioned to overlay on top of an icon in the Essential Cooldown Viewer. " ..
-                       "This creates the illusion that the ability icon has changed to show the proc.\n\n" ..
-                       "|cffff6666Requirements:|r\n" ..
-                       "• Buff icons must have 'Hide when inactive' enabled in Blizzard's Cooldown Viewer settings\n" ..
-                       "• One buff icon can only map to one target icon\n",
-                order = 2,
-                fontSize = "medium",
-            },
-            enabled = {
-                type = "toggle",
-                name = "Enable Proc Overlay",
-                desc = "Enable the proc overlay feature.",
-                order = 10,
-                width = "full",
-                get = function() return db.profile.procOverlay.enabled end,
-                set = function(_, val)
-                    db.profile.procOverlay.enabled = val
-                    procOverlay:UpdateLayout()
-                end,
-            },
-            spacer1 = {
-                type = "description",
-                name = " ",
-                order = 15,
-            },
-            mappingsHeader = {
-                type = "header",
-                name = "Icon Mappings",
-                order = 20,
-            },
-            mappingsDescription = {
-                type = "description",
-                name = "Configure which buff icons overlay which Essential Cooldown icons. " ..
-                       "Icons are numbered left-to-right starting at 1.\n",
-                order = 21,
-            },
-            iconCounts = {
-                type = "description",
-                name = function()
-                    local buffCount, targetCount = procOverlay:GetIconCounts()
-                    return string.format("|cff888888Current visible icons: %d buff icons, %d target icons|r", buffCount, targetCount)
-                end,
-                order = 22,
-            },
-            refreshCounts = {
-                type = "execute",
-                name = "Refresh Icon Counts",
-                desc = "Rescan visible icons in both viewers.",
-                order = 23,
-                width = "normal",
-                func = function()
-                    procOverlay:UpdateLayout()
-                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-                end,
-            },
-            spacer2 = {
-                type = "description",
-                name = " ",
-                order = 24,
-            },
-            mappings = {
-                type = "group",
-                name = "Buff Icon Mappings",
-                order = 30,
-                inline = true,
-                args = GenerateMappingArgs(),
-            },
-            spacer3 = {
-                type = "description",
-                name = " ",
-                order = 40,
-            },
-            clearAll = {
-                type = "execute",
-                name = "Clear All Mappings",
-                desc = "Remove all buff-to-target icon mappings for the current spec.",
-                order = 50,
-                width = "normal",
-                confirm = true,
-                confirmText = "Are you sure you want to clear all proc overlay mappings for this spec?",
-                func = function()
-                    procOverlay:ClearAllMappings()
-                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-                end,
-            },
-        },
-    }
-end
-
 local function AboutOptionsTable()
     local db = EnhancedCooldownManager.db
     local authorColored = "|cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r"
@@ -1824,7 +1712,6 @@ local function GetOptionsTable()
             powerBar = PowerBarOptionsTable(),
             segmentBar = SegmentBarOptionsTable(),
             auraBars = AuraBarsOptionsTable(),
-            -- procOverlay = ProcOverlayOptionsTable(),
             profile = ProfileOptionsTable(),
             about = AboutOptionsTable(),
         },

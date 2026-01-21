@@ -233,24 +233,40 @@ function Util.CheckUpdateLayoutPreconditions(module, configKey, shouldShowFn, mo
     return { profile = profile, cfg = cfg }
 end
 
---- Applies layout (anchor, height) to a bar frame only if changed.
---- Caches _lastAnchor, _lastOffsetY, _lastHeight on the bar.
+--- Applies layout (anchor, height, optional width) to a bar frame only if changed.
+--- Caches _lastAnchor, _lastOffsetY, _lastHeight, _lastWidth, _lastMatchAnchorWidth on the bar.
 ---@param bar Frame Bar frame with ClearAllPoints, SetPoint, SetHeight methods
 ---@param anchor Frame Anchor frame
 ---@param offsetY number Vertical offset from anchor
 ---@param height number Desired bar height
-function Util.ApplyLayoutIfChanged(bar, anchor, offsetY, height)
-    if bar._lastAnchor ~= anchor or bar._lastOffsetY ~= offsetY then
+---@param width number|nil Desired bar width when not matching anchor
+---@param matchAnchorWidth boolean|nil When true, match the anchor width via left/right points
+function Util.ApplyLayoutIfChanged(bar, anchor, offsetY, height, width, matchAnchorWidth)
+    local shouldMatchWidth = matchAnchorWidth ~= false
+
+    if bar._lastAnchor ~= anchor or bar._lastOffsetY ~= offsetY or bar._lastMatchAnchorWidth ~= shouldMatchWidth then
         bar:ClearAllPoints()
-        bar:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offsetY)
-        bar:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, offsetY)
+        if shouldMatchWidth then
+            bar:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offsetY)
+            bar:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, offsetY)
+        else
+            bar:SetPoint("TOP", anchor, "BOTTOM", 0, offsetY)
+        end
         bar._lastAnchor = anchor
         bar._lastOffsetY = offsetY
+        bar._lastMatchAnchorWidth = shouldMatchWidth
     end
 
     if bar._lastHeight ~= height then
         bar:SetHeight(height)
         bar._lastHeight = height
+    end
+
+    if not shouldMatchWidth and width ~= nil and bar._lastWidth ~= width then
+        bar:SetWidth(width)
+        bar._lastWidth = width
+    elseif shouldMatchWidth then
+        bar._lastWidth = nil
     end
 end
 

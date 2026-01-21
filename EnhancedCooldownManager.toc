@@ -29,5 +29,4 @@ Options.lua
 Modules\PowerBar.lua
 Modules\SegmentBar.lua
 Modules\BuffBars.lua
-Modules\ProcOverlay.lua
 Modules\ViewerHook.lua

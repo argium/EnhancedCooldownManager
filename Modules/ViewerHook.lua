@@ -166,7 +166,6 @@ local function UpdateLayoutInternal()
     EnhancedCooldownManager.PowerBars:UpdateLayout()
     EnhancedCooldownManager.SegmentBar:UpdateLayout()
     EnhancedCooldownManager.BuffBars:UpdateLayout()
-    EnhancedCooldownManager.ProcOverlay:UpdateLayout()
 
     -- BuffBarCooldownViewer children can be re-created/re-anchored during zone transitions.
     -- A small delay ensures Blizzard frames have settled before we style them.

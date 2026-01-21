@@ -70,10 +70,6 @@ local ADDON_NAME, ns = ...
 ---@field autoPosition boolean When true, automatically position below other ECM bars
 ---@field barWidth number Width of buff bars when autoPosition is false
 
----@class ECM_ProcOverlayConfig
----@field enabled boolean Master toggle for proc overlay feature
----@field mappings table<number, table<number, table<number, number>>> [classID][specID][buffIconIndex] = targetIconIndex
-
 ---@class ECM_TickMark
 ---@field value number The resource value at which to display the tick
 ---@field color number[] RGBA color for this tick mark
@@ -104,7 +100,6 @@ local ADDON_NAME, ns = ...
 ---@field dynamicBars ECM_DynamicBarsConfig|ECM_DynamicBarConfig[]
 ---@field buffBars ECM_BuffBarsConfig
 ---@field buffBarColors ECM_BuffBarColorsConfig
----@field procOverlay ECM_ProcOverlayConfig
 ---@field powerBarTicks ECM_PowerBarTicksConfig
 
 -- END Configuration
@@ -145,6 +140,10 @@ local defaults = {
         updateFrequency = 0.04,
         schemaVersion = 1,
         offsetY = 4,
+        width = {
+            auto = true,
+            value = 330,
+        },
         combatFade = {
             enabled = false,
             opacity = 50,
@@ -191,10 +190,6 @@ local defaults = {
             colors = {},
             cache = {},
             defaultColor = { 0.85, 0.75, 0.55 },
-        },
-        procOverlay = {
-            enabled = false,
-            mappings = {}, -- [classID][specID][buffIconIndex] = targetIconIndex
         },
         powerBarTicks = {
             mappings = {}, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
