@@ -17,28 +17,6 @@ local discretePowerTypes = {
     [Enum.PowerType.Essence] = true,
 }
 
-local function GetAuraStackCount(spellId)
-    spellId = tonumber(spellId)
-    if not spellId or spellId <= 0 then
-        return 0
-    end
-
-    if Util.InSecretRegime() then
-        Util.Log("SegmentBar", "GetAuraStackCount unavailable due to secrets.")
-        return 0
-    end
-
-    if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
-        local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellId)
-        if aura then
-            return aura.applications or 1
-        end
-        return 0
-    end
-
-    return 0
-end
-
 --- Returns fractional rune progress (ready + partial recharge).
 ---@param maxRunes number
 ---@return number
@@ -107,7 +85,7 @@ local function ShouldShowSegmentBar()
     local _, class = UnitClass("player")
 
     -- Special class-based resources
-    if class == "DEATHKNIGHT" or class == "DEMONHUNTER" then
+    if class == "DEATHKNIGHT" or (class == "DEMONHUNTER") then --and GetSpecialization() ~= 3) then
         return true
     end
 
@@ -135,14 +113,27 @@ local function GetSegmentBarValues(profile)
 
     -- Special: DH Souls (aura-based stacks)
     if class == "DEMONHUNTER" then
-        local maxSouls = (cfg and cfg.demonHunterSoulsMax) or 5
-        local spellId = cfg and cfg.demonHunterSoulsSpellId
-        -- Bypass C_Auras and use C_Spell indirectly get the current count. It's still secret.
-        local count = C_Spell.GetSpellCastCount(247454) or 0
-        -- if count > maxSouls then
-        --     count = maxSouls
-        -- end
-        return maxSouls, count, "souls"
+        if GetSpecialization() == 3 then
+            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", 1225789)
+            local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", 1227702)
+            if collapsingStar then
+                return 6, collapsingStar.applications / 5, "souls"
+            end
+            if voidFragments then
+                return 7, voidFragments.applications / 5, "souls"
+            end
+            return nil, nil, nil
+
+        else
+            local maxSouls = (cfg and cfg.demonHunterSoulsMax) or 5
+            local spellId = cfg and cfg.demonHunterSoulsSpellId
+            -- Bypass C_Auras and use C_Spell indirectly get the current count. It's still secret.
+            local count = C_Spell.GetSpellCastCount(247454) or 0
+            -- if count > maxSouls then
+            --     count = maxSouls
+            -- end
+            return maxSouls, count, "souls"
+        end
     end
 
     -- Generic discrete power types
