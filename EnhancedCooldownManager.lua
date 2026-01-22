@@ -143,6 +143,7 @@ local defaults = {
         width = {
             auto = true,
             value = 330,
+            min = 300,
         },
         combatFade = {
             enabled = false,

@@ -2,10 +2,17 @@ local ADDON_NAME, ns = ...
 local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
 
+-- Mixins
+local BarFrame = ns.Mixins.BarFrame
+local Lifecycle = ns.Mixins.Lifecycle
+local TickRenderer = ns.Mixins.TickRenderer
+
 local SegmentBar = EnhancedCooldownManager:NewModule("SegmentBar", "AceEvent-3.0")
 EnhancedCooldownManager.SegmentBar = SegmentBar
 
-local WHITE8 = Util.WHITE8 or "Interface\\Buttons\\WHITE8X8"
+--------------------------------------------------------------------------------
+-- Domain Logic (module-specific value/config handling)
+--------------------------------------------------------------------------------
 
 -- Discrete power types that should be shown as segments
 local discretePowerTypes = {
@@ -21,7 +28,6 @@ local discretePowerTypes = {
 ---@param maxRunes number
 ---@return number
 local function GetDkRuneProgressValue(maxRunes)
-    -- assert that the player is a deathknight
     maxRunes = tonumber(maxRunes) or 6
     if not GetRuneCooldown then
         return 0
@@ -52,17 +58,14 @@ end
 local function GetDiscretePowerType()
     local _, class = UnitClass("player")
 
-    -- Check all discrete power types to find one the player has
     for powerType in pairs(discretePowerTypes) do
         local max = UnitPowerMax("player", powerType)
         if max and max > 0 then
-            -- Special case: Druids only show combo points in Cat Form
             if class == "DRUID" then
                 local formIndex = GetShapeshiftForm()
                 if formIndex == 2 then
                     return powerType
                 end
-                -- Not in cat form, skip combo points
             else
                 return powerType
             end
@@ -84,12 +87,10 @@ local function ShouldShowSegmentBar()
 
     local _, class = UnitClass("player")
 
-    -- Special class-based resources
-    if class == "DEATHKNIGHT" or (class == "DEMONHUNTER") then --and GetSpecialization() ~= 3) then
+    if class == "DEATHKNIGHT" or class == "DEMONHUNTER" then
         return true
     end
 
-    -- Check for discrete power types
     local discretePower = GetDiscretePowerType()
     Util.Log("SegmentBar", "ShouldShowSegmentBar - discrete power fallback", { discretePower = discretePower })
     return discretePower ~= nil
@@ -123,15 +124,9 @@ local function GetSegmentBarValues(profile)
                 return 7, voidFragments.applications / 5, "souls"
             end
             return nil, nil, nil
-
         else
             local maxSouls = (cfg and cfg.demonHunterSoulsMax) or 5
-            local spellId = cfg and cfg.demonHunterSoulsSpellId
-            -- Bypass C_Auras and use C_Spell indirectly get the current count. It's still secret.
             local count = C_Spell.GetSpellCastCount(247454) or 0
-            -- if count > maxSouls then
-            --     count = maxSouls
-            -- end
             return maxSouls, count, "souls"
         end
     end
@@ -162,7 +157,6 @@ end
 local function GetSegmentBarColor(profile, kind)
     local cfg = profile and profile.segmentBar
 
-    -- Special string-based kinds with defaults
     local kindColors = {
         souls = { cfg and cfg.colorDemonHunterSouls, 0.64, 0.19, 0.79 },
         runes = { cfg and cfg.colorDkRunes, 0.78, 0.10, 0.22 },
@@ -173,12 +167,10 @@ local function GetSegmentBarColor(profile, kind)
         return ExtractColor(kindEntry[1], kindEntry[2], kindEntry[3], kindEntry[4])
     end
 
-    -- Combo points override
     if kind == Enum.PowerType.ComboPoints and cfg and cfg.colorComboPoints then
         return ExtractColor(cfg.colorComboPoints)
     end
 
-    -- Use powerTypeColors for discrete power types
     if type(kind) == "number" then
         local c = profile.powerTypeColors and profile.powerTypeColors.colors and profile.powerTypeColors.colors[kind]
         if c then
@@ -189,57 +181,9 @@ local function GetSegmentBarColor(profile, kind)
     return 1, 1, 1
 end
 
----@class ECM_SegmentBarFrame : Frame
----@field Background Texture
----@field StatusBar StatusBar
----@field TicksFrame Frame
----@field ticks Texture[]
----@field FragmentedBars StatusBar[]
----@field _lastAnchor Frame|nil
----@field _lastOffsetY number|nil
----@field _lastHeight number|nil
----@field _lastWidth number|nil
----@field _lastTexture string|nil
----@field _maxSegments number|nil
----@field _onUpdateAttached boolean|nil
-
---- Creates the segment bar frame with all child elements.
----@param frameName string
----@param parent Frame
----@return ECM_SegmentBarFrame
-local function CreateSegmentBar(frameName, parent)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local cfg = profile and profile.segmentBar
-
-    local bar = CreateFrame("Frame", frameName, parent or UIParent)
-    bar:SetFrameStrata("MEDIUM")
-    bar:SetHeight(Util.GetBarHeight(cfg, profile, Util.DEFAULT_SEGMENT_BAR_HEIGHT))
-
-    -- Background
-    bar.Background = bar:CreateTexture(nil, "BACKGROUND")
-    bar.Background:SetAllPoints()
-
-    -- StatusBar (for non-fragmented resources like souls)
-    bar.StatusBar = CreateFrame("StatusBar", nil, bar)
-    bar.StatusBar:SetAllPoints()
-    bar.StatusBar:SetFrameLevel(bar:GetFrameLevel() + 1)
-
-    -- Apply initial appearance
-    Util.ApplyBarAppearance(bar, cfg, profile)
-
-    -- Ticks frame (above status bar)
-    bar.TicksFrame = CreateFrame("Frame", nil, bar)
-    bar.TicksFrame:SetAllPoints(bar)
-    bar.TicksFrame:SetFrameLevel(bar:GetFrameLevel() + 2)
-
-    -- Containers
-    bar.ticks = {}
-    bar.FragmentedBars = {}
-
-    bar:Hide()
-    ---@cast bar ECM_SegmentBarFrame
-    return bar
-end
+--------------------------------------------------------------------------------
+-- Fragmented Bars (DK Runes - module-specific, too specialized for mixin)
+--------------------------------------------------------------------------------
 
 --- Creates or returns fragmented sub-bars for runes.
 ---@param bar ECM_SegmentBarFrame
@@ -262,64 +206,9 @@ local function EnsureFragmentedBars(bar, maxSegments)
         bar.FragmentedBars[i]:Show()
     end
 
-    -- Hide extra
     for i = maxSegments + 1, #bar.FragmentedBars do
         if bar.FragmentedBars[i] then
             bar.FragmentedBars[i]:Hide()
-        end
-    end
-end
-
---- Ensures tick textures exist for segment divisions.
----@param bar ECM_SegmentBarFrame
----@param maxSegments number
-local function EnsureTicks(bar, maxSegments)
-    local needed = math.max(0, (tonumber(maxSegments) or 0) - 1)
-
-    for i = 1, needed do
-        if not bar.ticks[i] then
-            local t = bar.TicksFrame:CreateTexture(nil, "OVERLAY")
-            t:SetTexture(WHITE8)
-            bar.ticks[i] = t
-        end
-        bar.ticks[i]:Show()
-    end
-
-    for i = needed + 1, #bar.ticks do
-        if bar.ticks[i] then
-            bar.ticks[i]:Hide()
-        end
-    end
-end
-
---- Positions ticks evenly across the bar.
----@param bar ECM_SegmentBarFrame
----@param maxSegments number
-local function LayoutTicks(bar, maxSegments)
-    maxSegments = tonumber(maxSegments) or 0
-    if maxSegments <= 1 then
-        for _, t in ipairs(bar.ticks) do
-            t:Hide()
-        end
-        return
-    end
-
-    local width = bar:GetWidth()
-    local height = bar:GetHeight()
-    if width <= 0 or height <= 0 then
-        return
-    end
-
-    local step = width / maxSegments
-    local tr, tg, tb, ta = 0, 0, 0, 1
-
-    for i, t in ipairs(bar.ticks) do
-        if t:IsShown() then
-            t:ClearAllPoints()
-            local x = Util.PixelSnap(step * i)
-            t:SetPoint("LEFT", bar, "LEFT", x, 0)
-            t:SetSize(math.max(1, Util.PixelSnap(1)), height)
-            t:SetVertexColor(tr, tg, tb, ta)
         end
     end
 end
@@ -337,13 +226,10 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         return
     end
 
-    -- Hide main status bar when using fragmented display
     bar.StatusBar:SetAlpha(0)
 
-    -- Get color
     local r, g, b = GetSegmentBarColor(profile, "runes")
 
-    -- Collect rune states
     local readySet = {}
     local cdLookup = {}
     local now = GetTime()
@@ -360,7 +246,6 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         end
     end
 
-    -- Check if ready states changed
     local statesChanged = not bar._lastReadySet
     if not statesChanged then
         for i = 1, maxRunes do
@@ -371,11 +256,9 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         end
     end
 
-    -- Reposition bars only when ready states change
     if statesChanged then
         bar._lastReadySet = readySet
 
-        -- Build display order: ready first, then recharging sorted by time
         local readyList = {}
         local cdList = {}
         for i = 1, maxRunes do
@@ -395,7 +278,6 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
             table.insert(bar._displayOrder, v.index)
         end
 
-        -- Apply positions
         local cfg = profile and profile.segmentBar
         local gbl = profile and profile.global
         local tex = Util.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
@@ -417,7 +299,6 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         end
     end
 
-    -- Update values and colors every tick (no repositioning)
     for i = 1, maxRunes do
         local frag = bar.FragmentedBars[i]
         if frag then
@@ -432,6 +313,10 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         end
     end
 end
+
+--------------------------------------------------------------------------------
+-- Frame Management (uses BarFrame mixin)
+--------------------------------------------------------------------------------
 
 --- Returns the base viewer anchor frame.
 ---@return Frame|nil
@@ -454,25 +339,47 @@ function SegmentBar:GetFrame()
     end
 
     Util.Log("SegmentBar", "Creating frame")
-    self._frame = CreateSegmentBar(ADDON_NAME .. "SegmentBar", UIParent)
+
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+
+    -- Create base bar with Background + StatusBar
+    self._frame = BarFrame.Create(
+        ADDON_NAME .. "SegmentBar",
+        UIParent,
+        Util.DEFAULT_SEGMENT_BAR_HEIGHT
+    )
+
+    -- Add ticks frame for segment dividers
+    BarFrame.AddTicksFrame(self._frame)
+
+    -- Initialize fragmented bars container
+    self._frame.FragmentedBars = {}
+
+    -- Apply initial appearance
+    BarFrame.ApplyAppearance(self._frame, profile and profile.segmentBar, profile)
+
     return self._frame
 end
 
 --- Marks the segment bar as externally hidden.
 ---@param hidden boolean
 function SegmentBar:SetExternallyHidden(hidden)
-    Util.SetExternallyHidden(self, hidden, "SegmentBar")
+    Lifecycle.SetExternallyHidden(self, hidden, "SegmentBar")
 end
 
 --- Returns the frame only if currently shown.
 ---@return ECM_SegmentBarFrame|nil
 function SegmentBar:GetFrameIfShown()
-    return Util.GetFrameIfShown(self)
+    return Lifecycle.GetFrameIfShown(self)
 end
+
+--------------------------------------------------------------------------------
+-- Layout and Rendering
+--------------------------------------------------------------------------------
 
 --- Updates layout: positioning, sizing, anchoring, appearance.
 function SegmentBar:UpdateLayout()
-    local result = Util.CheckUpdateLayoutPreconditions(self, "segmentBar", ShouldShowSegmentBar, "SegmentBar")
+    local result = Lifecycle.CheckLayoutPreconditions(self, "segmentBar", ShouldShowSegmentBar, "SegmentBar")
     if not result then
         Util.Log("SegmentBar", "UpdateLayout - preconditions failed")
         return
@@ -498,7 +405,7 @@ function SegmentBar:UpdateLayout()
     Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight, desiredWidth, matchAnchorWidth)
 
     -- Update appearance (background, texture)
-    local tex = Util.ApplyBarAppearance(bar, cfg, profile)
+    local tex = BarFrame.ApplyAppearance(bar, cfg, profile)
     bar._lastTexture = tex
 
     -- Get segment info
@@ -520,18 +427,18 @@ function SegmentBar:UpdateLayout()
     -- Set up fragmented bars for runes
     if kind == "runes" then
         EnsureFragmentedBars(bar, maxSegments)
-        -- Reset cached state so display will reinitialize
         bar._lastReadySet = nil
         bar._displayOrder = nil
     else
-        -- Hide fragmented bars for non-rune types
         for _, frag in ipairs(bar.FragmentedBars) do
             frag:Hide()
         end
         bar.StatusBar:SetAlpha(1)
     end
 
-    EnsureTicks(bar, maxSegments)
+    -- Set up ticks using TickRenderer
+    local tickCount = math.max(0, maxSegments - 1)
+    TickRenderer.EnsureTicks(bar, tickCount, bar.TicksFrame, "ticks")
 
     Util.Log("SegmentBar", "UpdateLayout complete", {
         anchorName = anchor.GetName and anchor:GetName() or "unknown",
@@ -541,7 +448,7 @@ function SegmentBar:UpdateLayout()
     })
 
     bar:Show()
-    LayoutTicks(bar, maxSegments)
+    TickRenderer.LayoutSegmentTicks(bar, maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
 
     -- Set up OnUpdate for DK runes
     if kind == "runes" then
@@ -594,8 +501,12 @@ function SegmentBar:Refresh()
         bar.StatusBar:SetStatusBarColor(r, g, b)
     end
 
-    LayoutTicks(bar, maxSegments)
+    TickRenderer.LayoutSegmentTicks(bar, maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
 end
+
+--------------------------------------------------------------------------------
+-- Event Handling
+--------------------------------------------------------------------------------
 
 function SegmentBar:OnUpdateThrottled()
     if self._externallyHidden then
@@ -607,35 +518,43 @@ function SegmentBar:OnUpdateThrottled()
         return
     end
 
-    local now = GetTime()
-    local last = self._lastUpdate or 0
-    local freq = profile.updateFrequency or 0.066
-
-    if now - last >= freq then
-        self:Refresh()
-        self._lastUpdate = now
-    end
+    Lifecycle.ThrottledRefresh(self, profile, function(mod)
+        mod:Refresh()
+    end)
 end
 
--- Event handler for UNIT_POWER_UPDATE and UNIT_AURA (player-only)
 function SegmentBar:OnUnitEvent(event, unit)
     if unit == "player" then
         self:OnUpdateThrottled()
     end
 end
 
-function SegmentBar:Enable()
-    if self._enabled then
-        return
-    end
-    self._enabled = true
-    self._lastUpdate = GetTime()
+--------------------------------------------------------------------------------
+-- Module Lifecycle
+--------------------------------------------------------------------------------
 
-    self:RegisterEvent("RUNE_POWER_UPDATE", "OnUpdateThrottled")
-    self:RegisterEvent("RUNE_TYPE_UPDATE", "OnUpdateThrottled")
-    self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitEvent")
-    self:RegisterEvent("UNIT_AURA", "OnUnitEvent")
-    Util.Log("SegmentBar", "Enabled - registered events")
+local LAYOUT_EVENTS = {
+    "PLAYER_SPECIALIZATION_CHANGED",
+    "PLAYER_ENTERING_WORLD",
+    "UPDATE_SHAPESHIFT_FORM",
+}
+
+local REFRESH_EVENTS = {
+    { event = "RUNE_POWER_UPDATE", handler = "OnUpdateThrottled" },
+    { event = "RUNE_TYPE_UPDATE", handler = "OnUpdateThrottled" },
+    { event = "UNIT_POWER_UPDATE", handler = "OnUnitEvent" },
+    { event = "UNIT_AURA", handler = "OnUnitEvent" },
+}
+
+local REFRESH_EVENT_NAMES = {
+    "RUNE_POWER_UPDATE",
+    "RUNE_TYPE_UPDATE",
+    "UNIT_POWER_UPDATE",
+    "UNIT_AURA",
+}
+
+function SegmentBar:Enable()
+    Lifecycle.Enable(self, "SegmentBar", REFRESH_EVENTS)
 end
 
 function SegmentBar:Disable()
@@ -644,35 +563,15 @@ function SegmentBar:Disable()
             self._frame._onUpdateAttached = nil
             self._frame:SetScript("OnUpdate", nil)
         end
-        self._frame:Hide()
     end
 
-    if not self._enabled then
-        return
-    end
-    self._enabled = false
-
-    self:UnregisterEvent("RUNE_POWER_UPDATE")
-    self:UnregisterEvent("RUNE_TYPE_UPDATE")
-    self:UnregisterEvent("UNIT_POWER_UPDATE")
-    self:UnregisterEvent("UNIT_AURA")
-    Util.Log("SegmentBar", "Disabled - unregistered events")
+    Lifecycle.Disable(self, "SegmentBar", REFRESH_EVENT_NAMES)
 end
 
 function SegmentBar:OnEnable()
-    Util.Log("SegmentBar", "OnEnable - module starting")
-    self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED", "UpdateLayout")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", "UpdateLayout")
-    self:RegisterEvent("UPDATE_SHAPESHIFT_FORM", "UpdateLayout")
-
-    C_Timer.After(0.1, function()
-        self:UpdateLayout()
-    end)
+    Lifecycle.OnEnable(self, "SegmentBar", LAYOUT_EVENTS)
 end
 
 function SegmentBar:OnDisable()
-    Util.Log("SegmentBar", "OnDisable - module stopping")
-    self:UnregisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-    self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-    self:Disable()
+    Lifecycle.OnDisable(self, "SegmentBar", LAYOUT_EVENTS, REFRESH_EVENT_NAMES)
 end

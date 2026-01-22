@@ -172,7 +172,17 @@
             "YES",
             "NO",
             "ReloadUI",
-            "AddonList_Update"
+            "AddonList_Update",
+            "RESET_TO_DEFAULT",
+            "MouseIsOver",
+            "HUD_EDIT_MODE_RESET_POSITION",
+            "SettingsListElementMixin",
+            "CreateSettingsButtonInitializer",
+            "MinimalSliderWithSteppersMixin",
+            "SettingsDropdownControlMixin",
+            "ButtonStateBehaviorMixin",
+            "DefaultTooltipMixin",
+            "MenuConstants"
         ],
         "Lua.type.weakUnionCheck": true
 	}
