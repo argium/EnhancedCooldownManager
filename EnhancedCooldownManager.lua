@@ -51,11 +51,6 @@ local ADDON_NAME, ns = ...
 ---@field bgColor ECM_ColorARGB|nil
 ---@field color number[]|nil
 
----@class ECM_DynamicBarsConfig
----@field showIcon boolean|nil When nil, defaults to showing the icon.
----@field showSpellName boolean|nil When nil, defaults to showing the spell name.
----@field showDuration boolean|nil When nil, defaults to showing the duration.
-
 ---@class ECM_BarCacheEntry
 ---@field spellName string|nil Display name (safe string, not secret)
 ---@field lastSeen number Timestamp of last appearance
@@ -68,6 +63,10 @@ local ADDON_NAME, ns = ...
 ---@class ECM_BuffBarsConfig
 ---@field autoPosition boolean When true, automatically position below other ECM bars
 ---@field barWidth number Width of buff bars when autoPosition is false
+---@field showIcon boolean|nil When nil, defaults to showing the icon.
+---@field showSpellName boolean|nil When nil, defaults to showing the spell name.
+---@field showDuration boolean|nil When nil, defaults to showing the duration.
+---@field dynamicBars ECM_DynamicBarConfig[]|nil Per-aura style overrides
 
 ---@class ECM_TickMark
 ---@field value number The resource value at which to display the tick
@@ -96,7 +95,6 @@ local ADDON_NAME, ns = ...
 ---@field segmentBar ECM_SegmentBarConfig
 ---@field runeBar ECM_RuneBarConfig
 ---@field powerTypeColors ECM_PowerTypeColorsConfig
----@field dynamicBars ECM_DynamicBarsConfig|ECM_DynamicBarConfig[]
 ---@field buffBars ECM_BuffBarsConfig
 ---@field buffBarColors ECM_BuffBarColorsConfig
 ---@field powerBarTicks ECM_PowerBarTicksConfig
@@ -187,19 +185,18 @@ local defaults = {
             max = 6,
             color = { 0.87, 0.10, 0.22 },
         },
-        dynamicBars = {
-            showIcon = false,
-            showSpellName = true,
-            showDuration = true,
-        },
         buffBars = {
             autoPosition = true,
             barWidth = 300,
+            showIcon = false,
+            showSpellName = true,
+            showDuration = true,
+            dynamicBars = {},
         },
         buffBarColors = {
             colors = {},
             cache = {},
-            defaultColor = { 0.85, 0.75, 0.55 },
+            defaultColor = { 228 / 255, 233 / 255, 235 / 255 },
         },
         powerBarTicks = {
             mappings = {}, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }

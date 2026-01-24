@@ -363,211 +363,6 @@ local function GeneralOptionsTable()
     }
 end
 
-local function BarDefaultsArgs()
-    local db = EnhancedCooldownManager.db
-    return {
-        barAppearance = {
-            type = "group",
-            name = "Bar Appearance",
-            inline = true,
-            order = 1,
-            args = {
-                desc = {
-                    type = "description",
-                    name = "These settings apply to all bars unless overridden in individual bar settings.",
-                    order = 1,
-                },
-                barHeightDesc = {
-                    type = "description",
-                    name = "\nDefault height for all bars in pixels.",
-                    order = 2,
-                },
-                barHeight = {
-                    type = "range",
-                    name = "Bar Height",
-                    order = 3,
-                    width = "double",
-                    min = 8,
-                    max = 40,
-                    step = 1,
-                    get = function() return db.profile.global.barHeight end,
-                    set = function(_, val)
-                        db.profile.global.barHeight = val
-                        RefreshAllBars()
-                    end,
-                },
-                barHeightReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 4,
-                    width = 0.3,
-                    hidden = function() return not IsValueChanged("global.barHeight") end,
-                    func = MakeResetHandler("global.barHeight"),
-                },
-
-                textureDesc = {
-                    type = "description",
-                    name = "\nDefault statusbar texture for all bars.",
-                    order = 5,
-                },
-                texture = {
-                    type = "select",
-                    name = "Bar Texture",
-                    order = 6,
-                    width = "double",
-                    dialogControl = LSM and "LSM30_Statusbar" or nil,
-                    values = GetLSMStatusbarValues,
-                    get = function() return db.profile.global.texture end,
-                    set = function(_, val)
-                        db.profile.global.texture = val
-                        RefreshAllBars()
-                    end,
-                },
-                textureReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 7,
-                    width = 0.3,
-                    hidden = function()
-                        local current = db.profile.global.texture
-                        local default = ns.GetDefaultTexture and ns.GetDefaultTexture()
-                        return current == default
-                    end,
-                    func = function()
-                        db.profile.global.texture = ns.GetDefaultTexture and ns.GetDefaultTexture()
-                        RefreshAllBars()
-                        AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-                    end,
-                },
-                barBgColorDesc = {
-                    type = "description",
-                    name = "\nDefault background colour for all bars.",
-                    order = 8,
-                },
-                barBgColor = {
-                    type = "color",
-                    name = "Background Colour",
-                    order = 9,
-                    width = "double",
-                    hasAlpha = true,
-                    get = function()
-                        local c = db.profile.global.barBgColor
-                        return c[1], c[2], c[3], c[4] or 1
-                    end,
-                    set = function(_, r, g, b, a)
-                        db.profile.global.barBgColor = { r, g, b, a }
-                        RefreshAllBars()
-                    end,
-                },
-                barBgColorReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 10,
-                    width = 0.3,
-                    hidden = function() return not IsValueChanged("global.barBgColor") end,
-                    func = MakeResetHandler("global.barBgColor"),
-                },
-            },
-        },
-        fontSettings = {
-            type = "group",
-            name = "Font Style",
-            inline = true,
-            order = 2,
-            args = {
-                fontDesc = {
-                    type = "description",
-                    name = "Default font for all bar text.",
-                    order = 1,
-                },
-                font = {
-                    type = "select",
-                    name = "Font",
-                    order = 2,
-                    width = "double",
-                    dialogControl = LSM and "LSM30_Font" or nil,
-                    values = GetLSMFontValues,
-                    get = function() return db.profile.global.font end,
-                    set = function(_, val)
-                        db.profile.global.font = val
-                        RefreshAllBars()
-                    end,
-                },
-                fontReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 3,
-                    width = 0.3,
-                    hidden = function() return not IsValueChanged("global.font") end,
-                    func = MakeResetHandler("global.font"),
-                },
-                fontSize = {
-                    type = "range",
-                    name = "Font Size",
-                    order = 4,
-                    width = "double",
-                    min = 6,
-                    max = 24,
-                    step = 1,
-                    get = function() return db.profile.global.fontSize end,
-                    set = function(_, val)
-                        db.profile.global.fontSize = val
-                        RefreshAllBars()
-                    end,
-                },
-                fontSizeReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 5,
-                    width = 0.3,
-                    hidden = function() return not IsValueChanged("global.fontSize") end,
-                    func = MakeResetHandler("global.fontSize"),
-                },
-                fontOutline = {
-                    type = "select",
-                    name = "Font outline",
-                    order = 6,
-                    width = "double",
-                    values = {
-                        ["NONE"] = "None",
-                        ["OUTLINE"] = "Outline",
-                        ["THICKOUTLINE"] = "Thick Outline",
-                        ["MONOCHROME"] = "Monochrome",
-                    },
-                    get = function() return db.profile.global.fontOutline end,
-                    set = function(_, val)
-                        db.profile.global.fontOutline = val
-                        RefreshAllBars()
-                    end,
-                },
-                fontOutlineReset = {
-                    type = "execute",
-                    name = "X",
-                    order = 7,
-                    width = 0.3,
-                    hidden = function() return not IsValueChanged("global.fontOutline") end,
-                    func = MakeResetHandler("global.fontOutline"),
-                },
-                fontShadowDesc = {
-                    type = "description",
-                    name = "\nAdd a shadow behind bar text for better readability.",
-                    order = 8,
-                },
-                fontShadow = {
-                    type = "toggle",
-                    name = "Enable font shadow",
-                    order = 9,
-                    width = "full",
-                    get = function() return db.profile.global.fontShadow end,
-                    set = function(_, val)
-                        db.profile.global.fontShadow = val
-                        RefreshAllBars()
-                    end,
-                }
-            },
-        },
-    }
-end
 
 -- Forward declarations (these are defined later, but referenced by option-table builders)
 local TickMarksOptionsTable
@@ -582,7 +377,7 @@ local function PowerBarOptionsTable()
     return {
         type = "group",
         name = "Power Bar",
-        order = 3,
+        order = 2,
         args = {
             basicSettings = {
                 type = "group",
@@ -590,11 +385,6 @@ local function PowerBarOptionsTable()
                 inline = true,
                 order = 1,
                 args = {
-                    desc = {
-                        type = "description",
-                        name = "Settings for the primary resource bar (mana, rage, energy, runic power, etc.).",
-                        order = 1,
-                    },
                     enabled = {
                         type = "toggle",
                         name = "Enable power bar",
@@ -684,8 +474,8 @@ local function SegmentBarOptionsTable()
     local db = EnhancedCooldownManager.db
     return {
         type = "group",
-        name = "Segment Bar",
-        order = 4,
+        name = "Resource Bar",
+        order = 3,
         args = {
             basicSettings = {
                 type = "group",
@@ -693,19 +483,9 @@ local function SegmentBarOptionsTable()
                 inline = true,
                 order = 1,
                 args = {
-                    desc = {
-                        type = "description",
-                        name = "Settings for segmented resources (Death Knight runes, combo points, Holy Power, Demon Hunter souls).",
-                        order = 1,
-                    },
-                    enabledDesc = {
-                        type = "description",
-                        name = "\nShow the segment bar.",
-                        order = 2,
-                    },
                     enabled = {
                         type = "toggle",
-                        name = "Enable segment bar",
+                        name = "Enable resource bar",
                         order = 3,
                         width = "full",
                         get = function() return db.profile.segmentBar.enabled end,
@@ -751,13 +531,13 @@ local function SegmentBarOptionsTable()
                 args = {
                     desc = {
                         type = "description",
-                        name = "Customize the color for each segment type. These settings only apply to the relevant class/spec.\n\n",
+                        name = "Customize the color for each resource type. These only apply to the relevant class/spec.\n\n",
                         order = 1,
                         fontSize = "medium",
                     },
                     colorDemonHunterSouls = {
                         type = "color",
-                        name = "Demon Hunter Souls",
+                        name = "Soul Fragments (Demon Hunter)",
                         order = 6,
                         width = "double",
                         get = function()
@@ -922,9 +702,9 @@ local function AuraBarsOptionsTable()
                         name = "Show icon",
                         order = 3,
                         width = "full",
-                        get = function() return db.profile.dynamicBars.showIcon end,
+                        get = function() return db.profile.buffBars.showIcon end,
                         set = function(_, val)
-                            db.profile.dynamicBars.showIcon = val
+                            db.profile.buffBars.showIcon = val
                             RefreshAllBars()
                         end,
                     },
@@ -933,9 +713,9 @@ local function AuraBarsOptionsTable()
                         name = "Show spell name",
                         order = 5,
                         width = "full",
-                        get = function() return db.profile.dynamicBars.showSpellName end,
+                        get = function() return db.profile.buffBars.showSpellName end,
                         set = function(_, val)
-                            db.profile.dynamicBars.showSpellName = val
+                            db.profile.buffBars.showSpellName = val
                             RefreshAllBars()
                         end,
                     },
@@ -944,9 +724,9 @@ local function AuraBarsOptionsTable()
                         name = "Show remaining duration",
                         order = 7,
                         width = "full",
-                        get = function() return db.profile.dynamicBars.showDuration end,
+                        get = function() return db.profile.buffBars.showDuration end,
                         set = function(_, val)
-                            db.profile.dynamicBars.showDuration = val
+                            db.profile.buffBars.showDuration = val
                             RefreshAllBars()
                         end,
                     },

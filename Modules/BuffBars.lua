@@ -124,7 +124,7 @@ end
 
 local function BuildDynamicStyleIndex(profile)
     -- Return cached index if profile hasn't changed
-    local dynamicBars = profile and profile.dynamicBars
+    local dynamicBars = profile and profile.buffBars and profile.buffBars.dynamicBars
     if _cachedDynamicStyleProfile == dynamicBars and _cachedDynamicStyleIndex then
         return _cachedDynamicStyleIndex
     end
@@ -302,8 +302,8 @@ local function ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, barI
 
     local iconFrame = child.Icon or child.IconFrame or child.IconButton
 
-    -- Apply visibility settings from dynamicBars config
-    local dynCfg = profile.dynamicBars
+    -- Apply visibility settings from buffBars config
+    local dynCfg = profile.buffBars
     local showIcon = dynCfg == nil or dynCfg.showIcon ~= false
     local showName = dynCfg == nil or dynCfg.showSpellName ~= false
     local showDur = dynCfg == nil or dynCfg.showDuration ~= false
