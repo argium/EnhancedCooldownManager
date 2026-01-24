@@ -21,8 +21,7 @@ local ADDON_NAME, ns = ...
 
 ---@class ECM_SegmentBarConfig : ECM_BarConfigBase
 ---@field demonHunterSoulsMax number
----@field colorDemonHunterSouls number[]
----@field colorComboPoints number[]|nil
+---@field colors table<ECM_ResourceType, number[]>
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase
 ---@field max number
@@ -171,12 +170,14 @@ local defaults = {
             texture = nil,
             bgColor = nil,
             demonHunterSoulsMax = 6,
-            colorDemonHunterSouls = { 0.46, 0.98, 1.00 },
-            colorComboPoints = { 0.75, 0.15, 0.15 },
-            colorChi = { 0.00, 1.00, 0.59 },
-            colorHolyPower = { 1.00, 0.82, 0.00 },
-            colorSoulShards = { 0.58, 0.51, 0.79 },
-            colorEssence = { 0.20, 0.58, 0.50 },
+            colors = {
+                souls = { 0.46, 0.98, 1.00 },
+                [Enum.PowerType.ComboPoints] = { 0.75, 0.15, 0.15 },
+                [Enum.PowerType.Chi] = { 0.00, 1.00, 0.59 },
+                [Enum.PowerType.HolyPower] = { 0.95, 0.89, 0.40 },
+                [Enum.PowerType.SoulShards] = { 0.58, 0.51, 0.79 },
+                [Enum.PowerType.Essence] = { 0.20, 0.58, 0.50 }
+            },
         },
         runeBar = {
             enabled = true,
@@ -206,21 +207,15 @@ local defaults = {
             defaultWidth = 1,
         },
         powerTypeColors = {
-            colors = {
-                [Enum.PowerType.Mana] = { 0.00, 0.00, 1.00 },
-                [Enum.PowerType.Rage] = { 1.00, 0.00, 0.00 },
-                [Enum.PowerType.Focus] = { 1.00, 0.57, 0.31 },
-                [Enum.PowerType.Energy] = { 0.85, 0.65, 0.13 },
-                [Enum.PowerType.RunicPower] = { 0.00, 0.82, 1.00 },
-                [Enum.PowerType.LunarPower] = { 0.30, 0.52, 0.90 },
-                [Enum.PowerType.Fury] = { 0.79, 0.26, 0.99 },
-                [Enum.PowerType.Maelstrom] = { 0.00, 0.50, 1.00 },
-                [Enum.PowerType.Essence] = { 0.20, 0.58, 0.50 },
-                [Enum.PowerType.ArcaneCharges] = { 0.20, 0.60, 1.00 },
-                [Enum.PowerType.Chi] = { 0.00, 1.00, 0.59 },
-                [Enum.PowerType.HolyPower] = { 1.00, 0.82, 0.00 },
-                [Enum.PowerType.SoulShards] = { 0.58, 0.51, 0.79 },
-            },
+            [Enum.PowerType.Mana] = { 0.00, 0.00, 1.00 },
+            [Enum.PowerType.Rage] = { 1.00, 0.00, 0.00 },
+            [Enum.PowerType.Focus] = { 1.00, 0.57, 0.31 },
+            [Enum.PowerType.Energy] = { 0.85, 0.65, 0.13 },
+            [Enum.PowerType.RunicPower] = { 0.00, 0.82, 1.00 },
+            [Enum.PowerType.LunarPower] = { 0.30, 0.52, 0.90 },
+            [Enum.PowerType.Fury] = { 0.79, 0.26, 0.99 },
+            [Enum.PowerType.Maelstrom] = { 0.00, 0.50, 1.00 },
+            [Enum.PowerType.ArcaneCharges] = { 0.20, 0.60, 1.00 },
         },
     },
 }

@@ -93,30 +93,6 @@ local function GetValues(profile)
     return nil, nil, nil
 end
 
---- Returns the color for the segment bar based on kind (string or power type).
----@param profile table
----@param kind string|Enum.PowerType
----@return number r, number g, number b
-local function GetSegmentBarColor(profile, kind)
-    local cfg = profile and profile.segmentBar
-
-    local colorsFromProfile = {
-        souls = cfg.colorDemonHunterSouls,
-        [Enum.PowerType.ComboPoints] = cfg.colorComboPoints,
-        [Enum.PowerType.Chi] = cfg.colorChi,
-        [Enum.PowerType.HolyPower] = cfg.colorHolyPower,
-        [Enum.PowerType.SoulShards] = cfg.colorSoulShards,
-        [Enum.PowerType.Essence] = cfg.colorEssence
-    }
-
-    local colors = colorsFromProfile[kind]
-    if colors then
-        return colors[1], colors[2], colors[3]
-    end
-
-    return 1, 1, 1
-end
-
 --------------------------------------------------------------------------------
 -- Frame Management (uses BarFrame mixin)
 --------------------------------------------------------------------------------
@@ -231,7 +207,8 @@ end
 --- Updates values: status bar value, colors.
 function SegmentBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if self._externallyHidden or not (profile and profile.segmentBar and profile.segmentBar.enabled) then
+    local cfg = profile and profile.segmentBar
+    if self._externallyHidden or not (cfg and cfg.enabled) then
         return
     end
 
@@ -250,8 +227,7 @@ function SegmentBar:Refresh()
     end
 
     bar.StatusBar:SetValue(currentValue or 0)
-    local r, g, b = GetSegmentBarColor(profile, kind)
-    bar.StatusBar:SetStatusBarColor(r, g, b)
+    bar.StatusBar:SetStatusBarColor(cfg.colors[kind][1] or 1, cfg.colors[kind][2] or 1, cfg.colors[kind][3] or 1)
 
     TickRenderer.LayoutSegmentTicks(bar, maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
 end

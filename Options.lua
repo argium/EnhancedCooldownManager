@@ -761,11 +761,11 @@ local function SegmentBarOptionsTable()
                         order = 6,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorDemonHunterSouls
+                            local c = db.profile.segmentBar.colors.souls
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorDemonHunterSouls = { r, g, b }
+                            db.profile.segmentBar.colors.souls = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -774,8 +774,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 7,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorDemonHunterSouls") end,
-                        func = MakeResetHandler("segmentBar.colorDemonHunterSouls"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors.souls") end,
+                        func = MakeResetHandler("segmentBar.colors.souls"),
                     },
                     colorComboPoints = {
                         type = "color",
@@ -783,11 +783,11 @@ local function SegmentBarOptionsTable()
                         order = 9,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorComboPoints
+                            local c = db.profile.segmentBar.colors[Enum.PowerType.ComboPoints]
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorComboPoints = { r, g, b }
+                            db.profile.segmentBar.colors[Enum.PowerType.ComboPoints] = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -796,8 +796,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 10,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorComboPoints") end,
-                        func = MakeResetHandler("segmentBar.colorComboPoints"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors." .. Enum.PowerType.ComboPoints) end,
+                        func = MakeResetHandler("segmentBar.colors." .. Enum.PowerType.ComboPoints),
                     },
                     colorChi = {
                         type = "color",
@@ -805,11 +805,11 @@ local function SegmentBarOptionsTable()
                         order = 12,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorChi
+                            local c = db.profile.segmentBar.colors[Enum.PowerType.Chi]
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorChi = { r, g, b }
+                            db.profile.segmentBar.colors[Enum.PowerType.Chi] = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -818,8 +818,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 13,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorChi") end,
-                        func = MakeResetHandler("segmentBar.colorChi"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors." .. Enum.PowerType.Chi) end,
+                        func = MakeResetHandler("segmentBar.colors." .. Enum.PowerType.Chi),
                     },
                     colorHolyPower = {
                         type = "color",
@@ -827,11 +827,11 @@ local function SegmentBarOptionsTable()
                         order = 15,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorHolyPower
+                            local c = db.profile.segmentBar.colors[Enum.PowerType.HolyPower]
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorHolyPower = { r, g, b }
+                            db.profile.segmentBar.colors[Enum.PowerType.HolyPower] = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -840,8 +840,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 16,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorHolyPower") end,
-                        func = MakeResetHandler("segmentBar.colorHolyPower"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors." .. Enum.PowerType.HolyPower) end,
+                        func = MakeResetHandler("segmentBar.colors." .. Enum.PowerType.HolyPower),
                     },
                     colorSoulShards = {
                         type = "color",
@@ -849,11 +849,11 @@ local function SegmentBarOptionsTable()
                         order = 18,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorSoulShards
+                            local c = db.profile.segmentBar.colors[Enum.PowerType.SoulShards]
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorSoulShards = { r, g, b }
+                            db.profile.segmentBar.colors[Enum.PowerType.SoulShards] = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -862,8 +862,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 19,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorSoulShards") end,
-                        func = MakeResetHandler("segmentBar.colorSoulShards"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors." .. Enum.PowerType.SoulShards) end,
+                        func = MakeResetHandler("segmentBar.colors." .. Enum.PowerType.SoulShards),
                     },
                     colorEssence = {
                         type = "color",
@@ -871,11 +871,11 @@ local function SegmentBarOptionsTable()
                         order = 21,
                         width = "double",
                         get = function()
-                            local c = db.profile.segmentBar.colorEssence
+                            local c = db.profile.segmentBar.colors[Enum.PowerType.Essence]
                             return c[1], c[2], c[3]
                         end,
                         set = function(_, r, g, b)
-                            db.profile.segmentBar.colorEssence = { r, g, b }
+                            db.profile.segmentBar.colors[Enum.PowerType.Essence] = { r, g, b }
                             RefreshAllBars()
                         end,
                     },
@@ -884,8 +884,8 @@ local function SegmentBarOptionsTable()
                         name = "X",
                         order = 22,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("segmentBar.colorEssence") end,
-                        func = MakeResetHandler("segmentBar.colorEssence"),
+                        hidden = function() return not IsValueChanged("segmentBar.colors." .. Enum.PowerType.Essence) end,
+                        func = MakeResetHandler("segmentBar.colors." .. Enum.PowerType.Essence),
                     },
                 },
             },
