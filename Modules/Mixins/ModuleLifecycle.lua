@@ -35,8 +35,10 @@ function Lifecycle.Setup(module, config)
     end
     module._lifecycleConfig.refreshEventNames = refreshEventNames
 
-    -- Inject Enable method
-    function module:Enable()
+    -- Inject OnEnable method (AceAddon lifecycle hook)
+    function module:OnEnable()
+        Util.Log(self._lifecycleConfig.name, "OnEnable - module starting")
+
         if self._enabled then
             return
         end
@@ -48,11 +50,23 @@ function Lifecycle.Setup(module, config)
             self:RegisterEvent(cfg.event, cfg.handler)
         end
 
-        Util.Log(self._lifecycleConfig.name, "Enabled")
+        for _, eventName in ipairs(self._lifecycleConfig.layoutEvents) do
+            self:RegisterEvent(eventName, "UpdateLayout")
+        end
+
+        C_Timer.After(0.1, function()
+            self:UpdateLayout()
+        end)
     end
 
-    -- Inject Disable method
-    function module:Disable()
+    -- Inject OnDisable method (AceAddon lifecycle hook)
+    function module:OnDisable()
+        Util.Log(self._lifecycleConfig.name, "OnDisable - module stopping")
+
+        for _, eventName in ipairs(self._lifecycleConfig.layoutEvents) do
+            self:UnregisterEvent(eventName)
+        end
+
         -- Call custom cleanup if provided
         if self._lifecycleConfig.onDisable then
             self._lifecycleConfig.onDisable(self)
@@ -73,30 +87,6 @@ function Lifecycle.Setup(module, config)
         end
 
         Util.Log(self._lifecycleConfig.name, "Disabled")
-    end
-
-    -- Inject OnEnable method (AceAddon lifecycle hook)
-    function module:OnEnable()
-        Util.Log(self._lifecycleConfig.name, "OnEnable - module starting")
-
-        for _, eventName in ipairs(self._lifecycleConfig.layoutEvents) do
-            self:RegisterEvent(eventName, "UpdateLayout")
-        end
-
-        C_Timer.After(0.1, function()
-            self:UpdateLayout()
-        end)
-    end
-
-    -- Inject OnDisable method (AceAddon lifecycle hook)
-    function module:OnDisable()
-        Util.Log(self._lifecycleConfig.name, "OnDisable - module stopping")
-
-        for _, eventName in ipairs(self._lifecycleConfig.layoutEvents) do
-            self:UnregisterEvent(eventName)
-        end
-
-        self:Disable()
     end
 end
 
