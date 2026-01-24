@@ -6,12 +6,7 @@ local Util = ns.Util
 local BuffBars = EnhancedCooldownManager:NewModule("BuffBars", "AceEvent-3.0")
 EnhancedCooldownManager.BuffBars = BuffBars
 
--- Cached dynamic style index (invalidated on profile change)
-local _cachedDynamicStyleIndex = nil
-local _cachedDynamicStyleProfile = nil
-
--- Default bar color (soft gold/tan)
-local FALLBACK_BAR_COLOR = { 0.85, 0.75, 0.55 }
+local FALLBACK_BAR_COLOR = { 0.90, 0.90, 0.90 }
 
 --- Returns current class ID and spec ID.
 ---@return number|nil classID, number|nil specID
@@ -122,58 +117,6 @@ local function GetBuffBarBackground(statusBar)
     return nil
 end
 
-local function BuildDynamicStyleIndex(profile)
-    -- Return cached index if profile hasn't changed
-    local dynamicBars = profile and profile.buffBars and profile.buffBars.dynamicBars
-    if _cachedDynamicStyleProfile == dynamicBars and _cachedDynamicStyleIndex then
-        return _cachedDynamicStyleIndex
-    end
-
-    ---@type table<number, table>
-    local map = {}
-
-    if type(dynamicBars) ~= "table" then
-        _cachedDynamicStyleIndex = map
-        _cachedDynamicStyleProfile = dynamicBars
-        return map
-    end
-
-    for _, cfg in ipairs(dynamicBars) do
-        if type(cfg) == "table" and type(cfg.auraSpellIds) == "table" then
-            for _, sid in ipairs(cfg.auraSpellIds) do
-                sid = tonumber(sid)
-                if sid and sid > 0 then
-                    map[sid] = cfg
-                end
-            end
-        end
-    end
-
-    _cachedDynamicStyleIndex = map
-    _cachedDynamicStyleProfile = dynamicBars
-    return map
-end
-
-local function TryGetChildSpellId(child)
-    if not child then
-        return nil
-    end
-
-    local ok, sid = pcall(child.GetSpellID, child)
-    sid = ok and tonumber(sid) or nil
-    -- Guard against Blizzard secret values (canaccessvalue required, not pcall)
-    if sid and (type(canaccessvalue) == "function" and canaccessvalue(sid)) and sid > 0 then
-        return sid
-    end
-
-    sid = tonumber(child.spellID or child.spellId or child.SpellID)
-    if sid and sid > 0 then
-        return sid
-    end
-
-    return nil
-end
-
 --- Returns visible bar children sorted by Y position (top to bottom) to preserve edit mode order.
 --- GetChildren() returns in creation order, not visual order, so we must sort by position.
 ---@param viewer Frame The BuffBarCooldownViewer frame
@@ -236,9 +179,8 @@ end
 --- Applies styling to a single cooldown bar child.
 ---@param child Frame
 ---@param profile table
----@param dynamicStyleBySpellId table
 ---@param barIndex number|nil 1-based index in layout order (for per-bar colors)
-local function ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, barIndex)
+local function ApplyCooldownBarStyle(child, profile, barIndex)
     if not (child and child.Bar and profile) then
         return
     end
@@ -250,11 +192,7 @@ local function ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, barI
 
     local gbl = profile.global or {}
 
-    local spellId = TryGetChildSpellId(child)
-    local dyn = (spellId and dynamicStyleBySpellId and dynamicStyleBySpellId[spellId]) or nil
-
-    -- Use dynamic style overrides when available; otherwise fall back to global.
-    local texKey = (dyn and dyn.texture) or gbl.texture
+    local texKey = gbl.texture
     local tex = Util.GetTexture(texKey)
     bar:SetStatusBarTexture(tex)
 
@@ -278,7 +216,7 @@ local function ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, barI
         UpdateBarCache(barIndex, spellName, profile)
     end
 
-    local bgColor = (dyn and dyn.bgColor) or Util.GetBgColor(nil, profile)
+    local bgColor = Util.GetBgColor(nil, profile)
     local barBG = GetBuffBarBackground(bar)
     if barBG then
         barBG:SetTexture(Util.WHITE8)
@@ -294,7 +232,7 @@ local function ApplyCooldownBarStyle(child, profile, dynamicStyleBySpellId, barI
         bar.Pip:SetTexture(nil)
     end
 
-    local height = Util.GetBarHeight(dyn, profile, 13)
+    local height = Util.GetBarHeight(nil, profile, 13)
     if height and height > 0 then
         bar:SetHeight(height)
         child:SetHeight(height)
@@ -509,13 +447,12 @@ function BuffBars:RescanBars()
     end
 
     -- Style unstyled bars in sorted order
-    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
     local visibleChildren = GetSortedVisibleChildren(viewer)
     local newBarsFound = false
 
     for barIndex, entry in ipairs(visibleChildren) do
         if not entry.frame.__ecmStyled then
-            ApplyCooldownBarStyle(entry.frame, profile, dynamicStyleBySpellId, barIndex)
+            ApplyCooldownBarStyle(entry.frame, profile, barIndex)
             newBarsFound = true
         end
     end
@@ -523,81 +460,6 @@ function BuffBars:RescanBars()
     if newBarsFound then
         self:LayoutBars()
     end
-end
-
---- Debug helper to dump info about a bar child.
---- NOTE: All text values from Blizzard frames may be secret. Never compare them.
---- Sends detailed table data to DevTool for inspection; console output respects debug flag.
-function BuffBars:DebugDumpBarInfo(child)
-    if not child then
-        return
-    end
-
-    local bar = child.Bar
-    local iconFrame = child.Icon or child.IconFrame or child.IconButton
-
-    -- Collect all data into a table for DevTool inspection
-    local debugData = {
-        childName = child.GetName and child:GetName() or "anonymous",
-        barName = bar and bar.Name and bar.Name.GetText and EnhancedCooldownManager:SafeGetDebugValue(bar.Name:GetText()) or nil,
-        childFields = {},
-        barFields = {},
-        iconInfo = {},
-    }
-
-    -- Check common field names on the child frame
-    local fieldsToCheck = {
-        "auraInstanceID", "auraInstanceId", "AuraInstanceID",
-        "instanceID", "instanceId", "InstanceID",
-        "auraID", "auraId", "AuraID",
-        "buffInstanceID", "buffInstanceId",
-        "spellID", "spellId", "SpellID",
-    }
-
-    for _, fieldName in ipairs(fieldsToCheck) do
-        local val = child[fieldName]
-        if val ~= nil then
-            debugData.childFields[fieldName] = EnhancedCooldownManager:SafeGetDebugValue(val)
-        end
-    end
-
-    -- Check if child has GetAuraInstanceID method
-    if child.GetAuraInstanceID then
-        local ok, result = pcall(child.GetAuraInstanceID, child)
-        debugData.childFields["GetAuraInstanceID()"] = ok and EnhancedCooldownManager:SafeGetDebugValue(result) or "errored"
-    end
-
-    -- Check bar for these fields too
-    if bar then
-        for _, fieldName in ipairs(fieldsToCheck) do
-            local val = bar[fieldName]
-            if val ~= nil then
-                debugData.barFields[fieldName] = EnhancedCooldownManager:SafeGetDebugValue(val)
-            end
-        end
-
-        if bar.GetAuraInstanceID then
-            local ok, result = pcall(bar.GetAuraInstanceID, bar)
-            debugData.barFields["GetAuraInstanceID()"] = ok and EnhancedCooldownManager:SafeGetDebugValue(result) or "errored"
-        end
-    end
-
-    -- Collect icon info
-    if iconFrame then
-        if iconFrame.Count and iconFrame.Count.GetText then
-            debugData.iconInfo["Count"] = EnhancedCooldownManager:SafeGetDebugValue(iconFrame.Count:GetText())
-        end
-        if iconFrame.StackCount and iconFrame.StackCount.GetText then
-            debugData.iconInfo["StackCount"] = EnhancedCooldownManager:SafeGetDebugValue(iconFrame.StackCount:GetText())
-        end
-    end
-
-    if child.Count and child.Count.GetText then
-        debugData.childFields["Count"] = EnhancedCooldownManager:SafeGetDebugValue(child.Count:GetText())
-    end
-
-    -- Send to DevTool/console via unified logging
-    Util.Log("BuffBars", "DebugDumpBarInfo", debugData)
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
@@ -673,11 +535,10 @@ function BuffBars:UpdateLayout()
     end
 
     -- Style visible bars in sorted order so bar indices match display order
-    local dynamicStyleBySpellId = BuildDynamicStyleIndex(profile)
     local visibleChildren = GetSortedVisibleChildren(viewer)
 
     for barIndex, entry in ipairs(visibleChildren) do
-        ApplyCooldownBarStyle(entry.frame, profile, dynamicStyleBySpellId, barIndex)
+        ApplyCooldownBarStyle(entry.frame, profile, barIndex)
     end
 
     self:LayoutBars()
