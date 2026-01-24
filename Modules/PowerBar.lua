@@ -36,24 +36,6 @@ local function GetPrimaryResourceValue(resource, cfg)
     return max, current, current, "number"
 end
 
---- Returns the configured color for a resource type.
----@param resource Enum.PowerType
----@return number r
----@return number g
----@return number b
-local function GetColorForResource(resource)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local ptc = profile and profile.powerTypeColors
-    assert(ptc ~= nil, "Expected powerTypeColors config to be present.")
-
-    local colors = ptc and ptc.colors
-    local override = colors and colors[resource]
-    if type(override) == "table" then
-        return override[1] or 1, override[2] or 1, override[3] or 1
-    end
-
-    return 1, 1, 1
-end
 
 local function ShouldShowPowerBar()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
@@ -205,7 +187,8 @@ end
 --- Updates values: status bar value, text, colors, ticks.
 function PowerBars:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if self._externallyHidden or not (profile and profile.powerBar and profile.powerBar.enabled) then
+    local cfg = profile and profile.powerBar
+    if self._externallyHidden or not (cfg and cfg.enabled) then
         return
     end
 
@@ -221,7 +204,6 @@ function PowerBars:Refresh()
         return
     end
 
-    local cfg = profile.powerBar
     local resource = UnitPowerType("player")
     local max, current, displayValue, valueType = GetPrimaryResourceValue(resource, cfg)
 
@@ -233,8 +215,7 @@ function PowerBars:Refresh()
     current = current or 0
     displayValue = displayValue or 0
 
-    local r, g, b = GetColorForResource(resource)
-    BarFrame.SetValue(bar, 0, max, current, r, g, b)
+    BarFrame.SetValue(bar, 0, max, current, cfg.colors[resource][1] or 1, cfg.colors[resource][2] or 1, cfg.colors[resource][3] or 1)
 
     -- Update text
     if valueType == "percent" then

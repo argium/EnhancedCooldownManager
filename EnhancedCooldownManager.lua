@@ -14,10 +14,11 @@ local ADDON_NAME, ns = ...
 ---@field height number|nil
 ---@field texture string|nil
 ---@field showText boolean|nil
----@field bgColor ECM_ColorARGB|nil
+---@field bgColor number[]|nil
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase
 ---@field showManaAsPercent boolean
+---@field colors table<ECM_ResourceType, number[]>
 
 ---@class ECM_SegmentBarConfig : ECM_BarConfigBase
 ---@field demonHunterSoulsMax number
@@ -25,31 +26,18 @@ local ADDON_NAME, ns = ...
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase
 ---@field max number
----@field colorDkRunes number[]
+---@field color number[]
 
 ---@alias ECM_ResourceType number|string
 
----@class ECM_PowerTypeColorsSpecial
----@field deathKnight table|nil
-
----@class ECM_PowerTypeColorsConfig
----@field colors table<ECM_ResourceType, number[]>
----@field special ECM_PowerTypeColorsSpecial
-
 ---@class ECM_GlobalConfig
 ---@field barHeight number
----@field texture string
+---@field barBgColor number[]
+---@field texture string|nil
 ---@field font string
 ---@field fontSize number
 ---@field fontOutline string Font outline style: "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"
 ---@field fontShadow boolean Whether to show font shadow
-
----@class ECM_DynamicBarConfig
----@field auraSpellIds number[] Spell IDs that map to this style entry.
----@field height number|nil
----@field texture string|nil
----@field bgColor ECM_ColorARGB|nil
----@field color number[]|nil
 
 ---@class ECM_BarCacheEntry
 ---@field spellName string|nil Display name (safe string, not secret)
@@ -66,7 +54,6 @@ local ADDON_NAME, ns = ...
 ---@field showIcon boolean|nil When nil, defaults to showing the icon.
 ---@field showSpellName boolean|nil When nil, defaults to showing the spell name.
 ---@field showDuration boolean|nil When nil, defaults to showing the duration.
----@field dynamicBars ECM_DynamicBarConfig[]|nil Per-aura style overrides
 
 ---@class ECM_TickMark
 ---@field value number The resource value at which to display the tick
@@ -84,7 +71,7 @@ local ADDON_NAME, ns = ...
 ---@field exceptInInstance boolean When true, don't fade in raids, dungeons, battlegrounds, or PVP
 
 ---@class ECM_Profile
----@field hideWhenMounted number
+---@field hideWhenMounted boolean
 ---@field updateFrequency number
 ---@field schemaVersion number
 ---@field debug boolean
@@ -94,7 +81,6 @@ local ADDON_NAME, ns = ...
 ---@field powerBar ECM_PowerBarConfig
 ---@field segmentBar ECM_SegmentBarConfig
 ---@field runeBar ECM_RuneBarConfig
----@field powerTypeColors ECM_PowerTypeColorsConfig
 ---@field buffBars ECM_BuffBarsConfig
 ---@field buffBarColors ECM_BuffBarColorsConfig
 ---@field powerBarTicks ECM_PowerBarTicksConfig
@@ -109,25 +95,6 @@ local LSM = LibStub("LibSharedMedia-3.0", true)
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
-
--- Priority list for default texture selection (first available wins)
-local TEXTURE_PRIORITY = {
-    -- "ElvUI Norm",
-    "Solid",
-}
-
---- Returns the first available texture from the priority list.
----@return string|nil
-local function GetDefaultTexture()
-    if not LSM or not LSM.IsValid then return nil end
-    for _, textureName in ipairs(TEXTURE_PRIORITY) do
-        if LSM:IsValid("statusbar", textureName) then
-            return textureName
-        end
-    end
-    return nil
-end
-ns.GetDefaultTexture = GetDefaultTexture
 
 local defaults = {
     profile = {
@@ -149,7 +116,7 @@ local defaults = {
         global = {
             barHeight = 22,
             barBgColor = { 0.08, 0.08, 0.08, 0.75 },
-            texture = nil, -- Selected from TEXTURE_PRIORITY on first load
+            texture = "Solid",
             font = "Expressway",
             fontSize = 11,
             fontOutline = "OUTLINE",
@@ -161,6 +128,17 @@ local defaults = {
             texture           = nil,
             showManaAsPercent = true,
             showText          = true,
+            colors = {
+                [Enum.PowerType.Mana] = { 0.00, 0.00, 1.00 },
+                [Enum.PowerType.Rage] = { 1.00, 0.00, 0.00 },
+                [Enum.PowerType.Focus] = { 1.00, 0.57, 0.31 },
+                [Enum.PowerType.Energy] = { 0.85, 0.65, 0.13 },
+                [Enum.PowerType.RunicPower] = { 0.00, 0.82, 1.00 },
+                [Enum.PowerType.LunarPower] = { 0.30, 0.52, 0.90 },
+                [Enum.PowerType.Fury] = { 0.79, 0.26, 0.99 },
+                [Enum.PowerType.Maelstrom] = { 0.00, 0.50, 1.00 },
+                [Enum.PowerType.ArcaneCharges] = { 0.20, 0.60, 1.00 },
+            },
         },
         segmentBar = {
             enabled = true,
@@ -191,7 +169,6 @@ local defaults = {
             showIcon = false,
             showSpellName = true,
             showDuration = true,
-            dynamicBars = {},
         },
         buffBarColors = {
             colors = {},
@@ -203,23 +180,11 @@ local defaults = {
             defaultColor = { 0, 0, 0, 0.5 },
             defaultWidth = 1,
         },
-        powerTypeColors = {
-            [Enum.PowerType.Mana] = { 0.00, 0.00, 1.00 },
-            [Enum.PowerType.Rage] = { 1.00, 0.00, 0.00 },
-            [Enum.PowerType.Focus] = { 1.00, 0.57, 0.31 },
-            [Enum.PowerType.Energy] = { 0.85, 0.65, 0.13 },
-            [Enum.PowerType.RunicPower] = { 0.00, 0.82, 1.00 },
-            [Enum.PowerType.LunarPower] = { 0.30, 0.52, 0.90 },
-            [Enum.PowerType.Fury] = { 0.79, 0.26, 0.99 },
-            [Enum.PowerType.Maelstrom] = { 0.00, 0.50, 1.00 },
-            [Enum.PowerType.ArcaneCharges] = { 0.20, 0.60, 1.00 },
-        },
     },
 }
 
 -- Export defaults for Options module to access
 ns.defaults = defaults
-
 
 --------------------------------------------------------------------------------
 -- Trace Log Buffer (circular buffer for last 100 debug messages)
@@ -531,7 +496,7 @@ function EnhancedCooldownManager:ShowImportDialog()
             return
         end
 
-        -- Validate first WITHOUT applying (fixes critical bug)
+        -- Validate first WITHOUT applying
         local data, errorMsg = ns.ImportExport.ValidateImportString(input)
         if not data then
             EnhancedCooldownManager:Print("Import failed: " .. (errorMsg or "unknown error"))
@@ -624,11 +589,6 @@ function EnhancedCooldownManager:OnInitialize()
     if LSM and LSM.Register then
         pcall(LSM.Register, LSM, "font", "Expressway",
         "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf")
-    end
-
-    -- Select default texture from priority list on first load
-    if self.db.profile.global.texture == nil then
-        self.db.profile.global.texture = GetDefaultTexture()
     end
 
     self:RegisterChatCommand("enhancedcooldownmanager", "ChatCommand")
