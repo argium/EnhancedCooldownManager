@@ -152,13 +152,21 @@ local function UpdateLayoutInternal()
         return
     end
 
-    -- Hide/show based on mounted state
+    -- Hide/show based on mounted state or rest-area out-of-combat rule
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local hidden = profile and profile.hideWhenMounted and IsMounted()
+    local hideWhenMounted = profile and profile.hideWhenMounted and IsMounted()
+    local hideWhenRestingOutOfCombat = profile
+        and profile.hideOutOfCombatInRestAreas
+        and (not _inCombat)
+        and IsResting()
+    local hidden = hideWhenMounted or hideWhenRestingOutOfCombat
     SetHidden(hidden)
 
     if hidden then
-        Util.Log("ViewerHook", "UpdateLayoutInternal - hidden (mounted)")
+        Util.Log("ViewerHook", "UpdateLayoutInternal - hidden", {
+            mounted = hideWhenMounted,
+            restOutOfCombat = hideWhenRestingOutOfCombat,
+        })
         return
     end
 
@@ -194,6 +202,7 @@ end
 local EVENT_CONFIG = {
     -- Immediate updates (no delay, no reset)
     PLAYER_MOUNT_DISPLAY_CHANGED = { delay = 0 },
+    PLAYER_UPDATE_RESTING = { delay = 0 },
     PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
     -- Delayed updates with BuffBars reset (zone/world transitions)
     PLAYER_LEVEL_UP = { delay = 0.05, resetBuffBars = true },
@@ -256,3 +265,4 @@ f:RegisterEvent("CVAR_UPDATE")
 
 -- Export for Options.lua to call when settings change
 ns.UpdateCombatFade = UpdateCombatFade
+ns.ScheduleLayoutUpdate = ScheduleLayoutUpdate

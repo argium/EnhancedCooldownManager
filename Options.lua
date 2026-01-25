@@ -102,18 +102,6 @@ local function ResetToDefault(path)
 end
 
 --------------------------------------------------------------------------------
--- Refresh all bar modules
---------------------------------------------------------------------------------
-local function RefreshAllBars()
-    for _, modName in ipairs({ "PowerBars", "SegmentBar", "BuffBars" }) do
-        local mod = EnhancedCooldownManager[modName]
-        if mod and mod.UpdateLayout then
-            mod:UpdateLayout()
-        end
-    end
-end
-
---------------------------------------------------------------------------------
 -- Build LibSharedMedia dropdown values
 --------------------------------------------------------------------------------
 local function GetLSMValues(mediaType, fallback)
@@ -131,10 +119,6 @@ end
 
 local function GetLSMStatusbarValues()
     return GetLSMValues("statusbar", "Blizzard")
-end
-
-local function GetLSMFontValues()
-    return GetLSMValues("font", "Friz Quadrata TT")
 end
 
 --------------------------------------------------------------------------------
@@ -164,7 +148,7 @@ local function MakeResetHandler(path, refreshFunc)
     return function()
         ResetToDefault(path)
         if refreshFunc then refreshFunc() end
-        RefreshAllBars()
+        ns.ScheduleLayoutUpdate(0)
         AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
     end
 end
@@ -195,26 +179,37 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.hideWhenMounted end,
                         set = function(_, val)
                             db.profile.hideWhenMounted = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    hideOutOfCombatInRestAreas = {
+                        type = "toggle",
+                        name = "Always hide when out of combat in rest areas",
+                        order = 6,
+                        width = "full",
+                        get = function() return db.profile.hideOutOfCombatInRestAreas end,
+                        set = function(_, val)
+                            db.profile.hideOutOfCombatInRestAreas = val
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     texture = {
                         type = "select",
                         name = "Bar Texture",
-                        order = 6,
+                        order = 8,
                         width = "double",
                         dialogControl = "LSM30_Statusbar",
                         values = GetLSMStatusbarValues,
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
                             db.profile.global.texture = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     textureReset = {
                         type = "execute",
                         name = "X",
-                        order = 7,
+                        order = 9,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("global.texture") end,
                         func = MakeResetHandler("global.texture"),
@@ -243,7 +238,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.offsetY end,
                         set = function(_, val)
                             db.profile.offsetY = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -262,7 +257,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.width.auto end,
                         set = function(_, val)
                             db.profile.width.auto = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     widthDesc = {
@@ -282,7 +277,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.width.value end,
                         set = function(_, val)
                             db.profile.width.value = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -401,7 +396,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -420,7 +415,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.height or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.height = val > 0 and val or nil
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -452,7 +447,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showText end,
                         set = function(_, val)
                             db.profile.powerBar.showText = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     showManaAsPercentDesc = {
@@ -468,7 +463,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showManaAsPercent end,
                         set = function(_, val)
                             db.profile.powerBar.showManaAsPercent = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -499,7 +494,7 @@ local function SegmentBarOptionsTable()
                         get = function() return db.profile.segmentBar.enabled end,
                         set = function(_, val)
                             db.profile.segmentBar.enabled = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -518,7 +513,7 @@ local function SegmentBarOptionsTable()
                         get = function() return db.profile.segmentBar.height or 0 end,
                         set = function(_, val)
                             db.profile.segmentBar.height = val > 0 and val or nil
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -554,7 +549,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors.souls = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorDemonHunterSoulsReset = {
@@ -576,7 +571,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors[Enum.PowerType.ComboPoints] = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorComboPointsReset = {
@@ -598,7 +593,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors[Enum.PowerType.Chi] = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorChiReset = {
@@ -620,7 +615,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors[Enum.PowerType.HolyPower] = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorHolyPowerReset = {
@@ -642,7 +637,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors[Enum.PowerType.SoulShards] = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorSoulShardsReset = {
@@ -664,7 +659,7 @@ local function SegmentBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.segmentBar.colors[Enum.PowerType.Essence] = { r, g, b }
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorEssenceReset = {
@@ -713,7 +708,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showIcon end,
                         set = function(_, val)
                             db.profile.buffBars.showIcon = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     showSpellName = {
@@ -724,7 +719,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showSpellName end,
                         set = function(_, val)
                             db.profile.buffBars.showSpellName = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     showDuration = {
@@ -735,7 +730,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showDuration end,
                         set = function(_, val)
                             db.profile.buffBars.showDuration = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -760,7 +755,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.autoPosition end,
                         set = function(_, val)
                             db.profile.buffBars.autoPosition = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     barWidthDesc = {
@@ -780,7 +775,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.barWidth end,
                         set = function(_, val)
                             db.profile.buffBars.barWidth = val
-                            RefreshAllBars()
+                            ns.ScheduleLayoutUpdate(0)
                         end,
                     },
                     barWidthReset = {
@@ -845,7 +840,7 @@ ColoursOptionsTable = function()
                 end,
                 set = function(_, r, g, b)
                     db.profile.buffBarColors.defaultColor = { r, g, b }
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                 end,
             },
             defaultColorReset = {
@@ -1145,7 +1140,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "value", val)
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1164,7 +1159,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "width", val)
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1182,7 +1177,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, r, g, b, a)
                     UpdateTick(i, "color", { r, g, b, a })
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1196,7 +1191,7 @@ TickMarksOptionsTable = function()
                 confirmText = "Remove tick mark at value " .. (tick.value or "?") .. "?",
                 func = function()
                     RemoveTick(i)
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1285,7 +1280,7 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 func = function()
                     AddTick(50, nil, nil)
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1319,7 +1314,7 @@ TickMarksOptionsTable = function()
                 end,
                 func = function()
                     SetCurrentTicks({})
-                    RefreshAllBars()
+                    ns.ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1486,7 +1481,7 @@ function Options:OnInitialize()
 end
 
 function Options:OnProfileChanged()
-    RefreshAllBars()
+    ns.ScheduleLayoutUpdate(0)
     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
 end
 

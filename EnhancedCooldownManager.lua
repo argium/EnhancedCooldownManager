@@ -72,6 +72,7 @@ local ADDON_NAME, ns = ...
 
 ---@class ECM_Profile
 ---@field hideWhenMounted boolean
+---@field hideOutOfCombatInRestAreas boolean
 ---@field updateFrequency number
 ---@field schemaVersion number
 ---@field debug boolean
@@ -100,6 +101,7 @@ local defaults = {
     profile = {
         debug = false,
         hideWhenMounted = true,
+        hideOutOfCombatInRestAreas = false,
         updateFrequency = 0.04,
         schemaVersion = 1,
         offsetY = 4,
