@@ -239,6 +239,11 @@ end
 function RuneBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     if self._externallyHidden or not (profile and profile.runeBar and profile.runeBar.enabled) then
+        LogSkip(self, "Refresh skipped - hidden or disabled", {
+            externallyHidden = self._externallyHidden,
+            hasProfile = profile ~= nil,
+            enabled = profile and profile.runeBar and profile.runeBar.enabled,
+        })
         return
     end
 

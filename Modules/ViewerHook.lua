@@ -166,6 +166,7 @@ local function UpdateLayoutInternal()
 
     EnhancedCooldownManager.PowerBars:UpdateLayout()
     EnhancedCooldownManager.SegmentBar:UpdateLayout()
+    EnhancedCooldownManager.RuneBar:UpdateLayout()
     EnhancedCooldownManager.BuffBars:UpdateLayout()
 
     -- BuffBarCooldownViewer children can be re-created/re-anchored during zone transitions.
