@@ -116,97 +116,24 @@ function SegmentBar:GetFrame()
     self._frame = BarFrame.Create(
         ADDON_NAME .. "SegmentBar",
         UIParent,
-        Util.DEFAULT_SEGMENT_BAR_HEIGHT
+        BarFrame.DEFAULT_SEGMENT_BAR_HEIGHT
     )
 
-    -- Add ticks frame for segment dividers
-    BarFrame.AddTicksFrame(self._frame)
+    -- Add tick functionality for segment dividers
+    TickRenderer.AttachTo(self._frame)
 
     -- Apply initial appearance
-    BarFrame.ApplyAppearance(self._frame, profile and profile.segmentBar, profile)
+    self._frame:ApplyAppearance(profile and profile.segmentBar, profile)
 
     return self._frame
 end
 
---- Marks the segment bar as externally hidden.
----@param hidden boolean
-function SegmentBar:SetExternallyHidden(hidden)
-    Lifecycle.SetExternallyHidden(self, hidden, "SegmentBar")
-end
-
---- Returns the frame only if currently shown.
----@return ECM_SegmentBarFrame|nil
-function SegmentBar:GetFrameIfShown()
-    return Lifecycle.GetFrameIfShown(self)
-end
 
 --------------------------------------------------------------------------------
 -- Layout and Rendering
 --------------------------------------------------------------------------------
 
---- Updates layout: positioning, sizing, anchoring, appearance.
-function SegmentBar:UpdateLayout()
-    local result = Lifecycle.CheckLayoutPreconditions(self, "segmentBar", ShouldShowSegmentBar, "SegmentBar")
-    if not result then
-        Util.Log("SegmentBar", "UpdateLayout - preconditions failed")
-        return
-    end
-
-    Util.Log("SegmentBar", "UpdateLayout - preconditions passed")
-
-    self:Enable()
-
-    local profile, cfg = result.profile, result.cfg
-    local bar = self:GetFrame()
-    local anchor, isFirstBar = Util.GetPreferredAnchor(EnhancedCooldownManager, "SegmentBar")
-    local viewer = Util.GetViewerAnchor()
-
-    local desiredHeight = Util.GetBarHeight(cfg, profile, Util.DEFAULT_SEGMENT_BAR_HEIGHT)
-    local desiredOffsetY = isFirstBar and anchor == viewer
-        and -Util.GetTopGapOffset(cfg, profile)
-        or 0
-    local widthCfg = profile.width or {}
-    local desiredWidth = widthCfg.value or 330
-    local matchAnchorWidth = widthCfg.auto ~= false
-
-    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight, desiredWidth, matchAnchorWidth)
-
-    -- Update appearance (background, texture)
-    local tex = BarFrame.ApplyAppearance(bar, cfg, profile)
-    bar._lastTexture = tex
-
-    -- Get segment info
-    local maxSegments, currentValue, kind = GetValues(profile)
-    Util.Log("SegmentBar", "UpdateLayout - GetSegmentBarValues", {
-        maxSegments = maxSegments,
-        currentValue = currentValue,
-        kind = kind
-    })
-    if not maxSegments or maxSegments <= 0 then
-        Util.Log("SegmentBar", "UpdateLayout - hiding (no segments)")
-        bar:Hide()
-        return
-    end
-
-    bar._maxSegments = maxSegments
-    bar.StatusBar:SetMinMaxValues(0, maxSegments)
-
-    -- Set up ticks using TickRenderer
-    local tickCount = math.max(0, maxSegments - 1)
-    TickRenderer.EnsureTicks(bar, tickCount, bar.TicksFrame, "ticks")
-
-    Util.Log("SegmentBar", "UpdateLayout complete", {
-        anchorName = anchor.GetName and anchor:GetName() or "unknown",
-        height = desiredHeight,
-        maxSegments = maxSegments,
-        kind = tostring(kind)
-    })
-
-    bar:Show()
-    TickRenderer.LayoutSegmentTicks(bar, maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
-
-    self:Refresh()
-end
+-- UpdateLayout is injected by Lifecycle.Setup with onLayoutSetup hook
 
 --- Updates values: status bar value, colors.
 function SegmentBar:Refresh()
@@ -233,7 +160,7 @@ function SegmentBar:Refresh()
     bar.StatusBar:SetValue(currentValue or 0)
     bar.StatusBar:SetStatusBarColor(cfg.colors[kind][1] or 1, cfg.colors[kind][2] or 1, cfg.colors[kind][3] or 1)
 
-    TickRenderer.LayoutSegmentTicks(bar, maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
+    bar:LayoutSegmentTicks(maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
 end
 
 --------------------------------------------------------------------------------
@@ -263,6 +190,9 @@ end
 
 Lifecycle.Setup(SegmentBar, {
     name = "SegmentBar",
+    configKey = "segmentBar",
+    shouldShow = ShouldShowSegmentBar,
+    defaultHeight = BarFrame.DEFAULT_SEGMENT_BAR_HEIGHT,
     layoutEvents = {
         "PLAYER_SPECIALIZATION_CHANGED",
         "PLAYER_ENTERING_WORLD",
@@ -272,4 +202,18 @@ Lifecycle.Setup(SegmentBar, {
         { event = "UNIT_POWER_UPDATE", handler = "OnUnitEvent" },
         { event = "UNIT_AURA", handler = "OnUnitEvent" },
     },
+    onLayoutSetup = function(self, bar, cfg, profile)
+        local maxSegments = GetValues(profile)
+        if not maxSegments or maxSegments <= 0 then
+            bar:Hide()
+            return false
+        end
+
+        bar._maxSegments = maxSegments
+        bar.StatusBar:SetMinMaxValues(0, maxSegments)
+
+        local tickCount = math.max(0, maxSegments - 1)
+        bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
+        bar:LayoutSegmentTicks(maxSegments, { 0, 0, 0, 1 }, 1, "ticks")
+    end,
 })

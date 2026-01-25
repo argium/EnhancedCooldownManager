@@ -83,12 +83,6 @@ end
 -- Frame Management (uses BarFrame mixin)
 --------------------------------------------------------------------------------
 
---- Marks the power bar as externally hidden (e.g., via ViewerHook).
----@param hidden boolean
-function PowerBars:SetExternallyHidden(hidden)
-    Lifecycle.SetExternallyHidden(self, hidden, "PowerBars")
-end
-
 --- Returns or creates the power bar frame.
 ---@return ECM_PowerBarFrame
 function PowerBars:GetFrame()
@@ -104,23 +98,21 @@ function PowerBars:GetFrame()
     self._frame = BarFrame.Create(
         ADDON_NAME .. "PowerBar",
         UIParent,
-        Util.DEFAULT_POWER_BAR_HEIGHT
+        BarFrame.DEFAULT_POWER_BAR_HEIGHT
     )
 
     -- Add text overlay (PowerBar-specific)
     BarFrame.AddTextOverlay(self._frame, profile)
 
+    -- Add tick functionality
+    TickRenderer.AttachTo(self._frame)
+
     -- Apply initial appearance
-    BarFrame.ApplyAppearance(self._frame, profile and profile.powerBar, profile)
+    self._frame:ApplyAppearance(profile and profile.powerBar, profile)
 
     return self._frame
 end
 
---- Returns the frame only if currently shown.
----@return ECM_PowerBarFrame|nil
-function PowerBars:GetFrameIfShown()
-    return Lifecycle.GetFrameIfShown(self)
-end
 
 --------------------------------------------------------------------------------
 -- Layout and Rendering
@@ -133,7 +125,7 @@ end
 function PowerBars:UpdateTicks(bar, resource, max)
     local ticks = self:GetCurrentTicks()
     if not ticks or #ticks == 0 then
-        TickRenderer.HideAllTicks(bar)
+        bar:HideAllTicks()
         return
     end
 
@@ -142,47 +134,11 @@ function PowerBars:UpdateTicks(bar, resource, max)
     local defaultColor = ticksCfg and ticksCfg.defaultColor or { 0, 0, 0, 0.5 }
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
-    TickRenderer.EnsureTicks(bar, #ticks, bar.StatusBar)
-    TickRenderer.LayoutValueTicks(bar, bar.StatusBar, ticks, max, defaultColor, defaultWidth)
+    bar:EnsureTicks(#ticks, bar.StatusBar)
+    bar:LayoutValueTicks(bar.StatusBar, ticks, max, defaultColor, defaultWidth)
 end
 
---- Updates layout: positioning, sizing, anchoring, appearance.
-function PowerBars:UpdateLayout()
-    local result = Lifecycle.CheckLayoutPreconditions(self, "powerBar", ShouldShowPowerBar, "PowerBars")
-    if not result then
-        return
-    end
-
-    self:Enable()
-
-    local profile, cfg = result.profile, result.cfg
-    local bar = self:GetFrame()
-    local anchor = Util.GetViewerAnchor()
-
-    local desiredHeight = Util.GetBarHeight(cfg, profile, Util.DEFAULT_POWER_BAR_HEIGHT)
-    local desiredOffsetY = -Util.GetTopGapOffset(cfg, profile)
-    local widthCfg = profile.width or {}
-    local desiredWidth = widthCfg.value or 330
-    local matchAnchorWidth = widthCfg.auto ~= false
-
-    Util.ApplyLayoutIfChanged(bar, anchor, desiredOffsetY, desiredHeight, desiredWidth, matchAnchorWidth)
-
-    -- Update appearance (background, texture)
-    local tex = BarFrame.ApplyAppearance(bar, cfg, profile)
-    bar._lastTexture = tex
-
-    -- Update font
-    Util.ApplyFont(bar.TextValue, profile)
-
-    Util.Log("PowerBars", "UpdateLayout complete", {
-        anchorName = anchor.GetName and anchor:GetName() or "unknown",
-        height = desiredHeight,
-        offsetY = desiredOffsetY
-    })
-
-    bar:Show()
-    self:Refresh()
-end
+-- UpdateLayout is injected by Lifecycle.Setup with onLayoutSetup hook
 
 --- Updates values: status bar value, text, colors, ticks.
 function PowerBars:Refresh()
@@ -215,16 +171,16 @@ function PowerBars:Refresh()
     current = current or 0
     displayValue = displayValue or 0
 
-    BarFrame.SetValue(bar, 0, max, current, cfg.colors[resource][1] or 1, cfg.colors[resource][2] or 1, cfg.colors[resource][3] or 1)
+    bar:SetValue(0, max, current, cfg.colors[resource][1] or 1, cfg.colors[resource][2] or 1, cfg.colors[resource][3] or 1)
 
     -- Update text
     if valueType == "percent" then
-        BarFrame.SetText(bar, string.format("%.0f%%", displayValue))
+        bar:SetText(string.format("%.0f%%", displayValue))
     else
-        BarFrame.SetText(bar, tostring(displayValue))
+        bar:SetText(tostring(displayValue))
     end
 
-    BarFrame.SetTextVisible(bar, cfg.showText ~= false)
+    bar:SetTextVisible(cfg.showText ~= false)
 
     -- Update ticks
     self:UpdateTicks(bar, resource, max)
@@ -253,6 +209,10 @@ end
 
 Lifecycle.Setup(PowerBars, {
     name = "PowerBars",
+    configKey = "powerBar",
+    shouldShow = ShouldShowPowerBar,
+    defaultHeight = BarFrame.DEFAULT_POWER_BAR_HEIGHT,
+    anchorMode = "viewer",
     layoutEvents = {
         "PLAYER_SPECIALIZATION_CHANGED",
         "UPDATE_SHAPESHIFT_FORM",
@@ -261,4 +221,7 @@ Lifecycle.Setup(PowerBars, {
     refreshEvents = {
         { event = "UNIT_POWER_UPDATE", handler = "OnUnitPower" },
     },
+    onLayoutSetup = function(self, bar, cfg, profile)
+        BarFrame.ApplyFont(bar.TextValue, profile)
+    end,
 })
