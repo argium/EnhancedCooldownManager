@@ -59,7 +59,8 @@ local function GetCombatFadeState()
     -- Check instance exception
     if profile.combatFade.exceptInInstance then
         local inInstance, instanceType = IsInInstance()
-        if inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "arena" or instanceType == "pvp") then
+        local groupInstanceTypes = { party = true, raid = true, arena = true, pvp = true }
+        if inInstance and groupInstanceTypes[instanceType] then
             return false, 1
         end
     end
@@ -110,15 +111,12 @@ local function ApplyCombatFade(targetAlpha, instant)
         end
     end
 
-    -- Fade ECM module frames (use public GetFrame() method)
-    local powerBarFrame = EnhancedCooldownManager.PowerBars and EnhancedCooldownManager.PowerBars:GetFrame()
-    if powerBarFrame and powerBarFrame:IsShown() then
-        ApplyFrameFade(powerBarFrame, targetAlpha, duration)
-    end
-
-    local segmentBarFrame = EnhancedCooldownManager.SegmentBar and EnhancedCooldownManager.SegmentBar:GetFrame()
-    if segmentBarFrame and segmentBarFrame:IsShown() then
-        ApplyFrameFade(segmentBarFrame, targetAlpha, duration)
+    -- Fade ECM module frames
+    for _, module in ipairs({ EnhancedCooldownManager.PowerBars, EnhancedCooldownManager.SegmentBar }) do
+        local frame = module and module:GetFrame()
+        if frame and frame:IsShown() then
+            ApplyFrameFade(frame, targetAlpha, duration)
+        end
     end
 end
 
@@ -246,15 +244,17 @@ f:SetScript("OnEvent", function(_, event, arg1)
         end
     end
 
-    if config.delay > 0 then
-        C_Timer.After(config.delay, function()
-            if config.resetBuffBars then
-                EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
-            end
-            ScheduleLayoutUpdate(0)
-        end)
-    else
+    local function doUpdate()
+        if config.resetBuffBars then
+            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
+        end
         ScheduleLayoutUpdate(0)
+    end
+
+    if config.delay > 0 then
+        C_Timer.After(config.delay, doUpdate)
+    else
+        doUpdate()
     end
 end)
 

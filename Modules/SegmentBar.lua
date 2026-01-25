@@ -11,7 +11,6 @@ local SegmentBar = EnhancedCooldownManager:NewModule("SegmentBar", "AceEvent-3.0
 EnhancedCooldownManager.SegmentBar = SegmentBar
 
 local C_SPECID_DH_HAVOC = 1
-local C_SPECID_DH_VENG = 2
 local C_SPECID_DH_DEVOURER = 3
 
 --------------------------------------------------------------------------------

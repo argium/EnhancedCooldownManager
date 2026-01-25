@@ -111,9 +111,8 @@ function BarFrame.ApplyFont(fontString, profile)
     local fontPath = BarFrame.GetFontPath(gbl and gbl.font)
     local fontSize = (gbl and gbl.fontSize) or 11
     local fontOutline = (gbl and gbl.fontOutline) or "OUTLINE"
-    local outlineFlag = fontOutline ~= "NONE" and fontOutline or ""
 
-    fontString:SetFont(fontPath, fontSize, outlineFlag)
+    fontString:SetFont(fontPath, fontSize, fontOutline ~= "NONE" and fontOutline or "")
 
     if fontString.SetShadowOffset then
         if gbl and gbl.fontShadow then

@@ -37,7 +37,7 @@ local function GetResourceValue(profile)
 
     for i = 1, maxRunes do
         local start, duration, runeReady = GetRuneCooldown(i)
-        if runeReady or (not start or start == 0) or (not duration or duration == 0) then
+        if runeReady or not start or start == 0 or not duration or duration == 0 then
             current = current + 1
         else
             local elapsed = now - (tonumber(start) or now)
@@ -157,7 +157,6 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
             table.insert(bar._displayOrder, v.index)
         end
 
-        local cfg = profile and profile.runeBar
         local gbl = profile and profile.global
         local tex = BarFrame.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
 
@@ -239,11 +238,6 @@ end
 function RuneBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     if self._externallyHidden or not (profile and profile.runeBar and profile.runeBar.enabled) then
-        LogSkip(self, "Refresh skipped - hidden or disabled", {
-            externallyHidden = self._externallyHidden,
-            hasProfile = profile ~= nil,
-            enabled = profile and profile.runeBar and profile.runeBar.enabled,
-        })
         return
     end
 
