@@ -1,28 +1,31 @@
 local ADDON_NAME, ns = ...
 
----@class ECM_ColorARGB
+---@class ECM_Color
 ---@field a number
 ---@field r number
 ---@field g number
 ---@field b number
 
--- BEGIN: Configuration (type docs)
-
 ---@class ECM_BarConfigBase
 ---@field enabled boolean
+---@field offsetX number|nil
 ---@field offsetY number|nil
+---@field width number|nil
 ---@field height number|nil
 ---@field texture string|nil
 ---@field showText boolean|nil
 ---@field bgColor number[]|nil
+---@field anchorMode string|nil "viewer" | "chain"
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase
 ---@field showManaAsPercent boolean
 ---@field colors table<ECM_ResourceType, number[]>
+---@field border ECM_BorderConfig
 
 ---@class ECM_ResourceBarConfig : ECM_BarConfigBase
 ---@field demonHunterSoulsMax number
 ---@field colors table<ECM_ResourceType, number[]>
+---@field border ECM_BorderConfig
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase
 ---@field max number
@@ -38,6 +41,11 @@ local ADDON_NAME, ns = ...
 ---@field fontSize number
 ---@field fontOutline string Font outline style: "NONE", "OUTLINE", "THICKOUTLINE", "MONOCHROME"
 ---@field fontShadow boolean Whether to show font shadow
+
+---@class ECM_BorderConfig
+---@field enabled boolean
+---@field thickness number Border thickness in pixels
+---@field color ECM_Color Border color
 
 ---@class ECM_BarCacheEntry
 ---@field spellName string|nil Display name (safe string, not secret)
@@ -62,12 +70,13 @@ local ADDON_NAME, ns = ...
 
 ---@class ECM_PowerBarTicksConfig
 ---@field mappings table<number, table<number, ECM_TickMark[]>> [classID][specID] = array of tick marks
----@field defaultColor number[] Default RGBA color for tick marks
+---@field defaultColor ECM_Color Default RGBA color for tick marks
 ---@field defaultWidth number Default width for tick marks
 
 ---@class ECM_CombatFadeConfig
 ---@field enabled boolean Master toggle for combat fade feature
 ---@field opacity number Opacity percentage (0-100) when faded out of combat
+---@field exceptIfTargetCanBeAttacked boolean When true, don't fade while targeting an attackable unit
 ---@field exceptInInstance boolean When true, don't fade in raids, dungeons, battlegrounds, or PVP
 
 ---@class ECM_Profile
@@ -112,7 +121,8 @@ local defaults = {
         },
         combatFade = {
             enabled = false,
-            opacity = 50,
+            opacity = 65,
+            exceptIfTargetCanBeAttacked = true,
             exceptInInstance = true,
         },
         global = {
@@ -126,13 +136,21 @@ local defaults = {
         },
         powerBar = {
             enabled           = true,
+            width             = nil,
             height            = nil,
-            texture           = nil,
-            anchorMode        = "viewer",
             offsetX           = 0,
-            showManaAsPercent = true,
+            offsetY           = 0,
+            texture           = nil,
+            bgColor           = nil,
+            anchorMode        = "viewer",
             showText          = true,
-            colors = {
+            showManaAsPercent = true,
+            border            = {
+                enabled = true,
+                thickness = 4,
+                color = { r = 1, g = 0.5, b = 0.5, a = 0.5 },
+            },
+            colors            = {
                 [Enum.PowerType.Mana] = { 0.00, 0.00, 1.00 },
                 [Enum.PowerType.Rage] = { 1.00, 0.00, 0.00 },
                 [Enum.PowerType.Focus] = { 1.00, 0.57, 0.31 },
@@ -145,14 +163,21 @@ local defaults = {
             },
         },
         resourceBar = {
-            enabled = true,
-            height = nil,
-            texture = nil,
-            bgColor = nil,
-            anchorMode = "chain",
-            offsetX = 0,
+            enabled             = true,
+            width               = nil,
+            height              = nil,
+            offsetX             = 0,
+            offsetY             = 0,
+            bgColor             = nil,
+            texture             = nil,
+            anchorMode          = "chain",
             demonHunterSoulsMax = 6,
-            colors = {
+            border              = {
+                enabled = false,
+                thickness = 1,
+                color = { r = 1, g = 1, b = 1, a = 1 },
+            },
+            colors              = {
                 souls = { 0.46, 0.98, 1.00 },
                 [Enum.PowerType.ComboPoints] = { 0.75, 0.15, 0.15 },
                 [Enum.PowerType.Chi] = { 0.00, 1.00, 0.59 },
@@ -162,14 +187,16 @@ local defaults = {
             },
         },
         runeBar = {
-            enabled = true,
-            height = nil,
-            texture = nil,
-            bgColor = nil,
+            enabled    = true,
+            width      = nil,
+            height     = nil,
+            offsetX    = 0,
+            offsetY    = 0,
+            texture    = nil,
+            bgColor    = nil,
             anchorMode = "chain",
-            offsetX = 0,
-            max = 6,
-            color = { 0.87, 0.10, 0.22 },
+            max        = 6,
+            color      = { 0.87, 0.10, 0.22 },
         },
         buffBars = {
             autoPosition = true,
@@ -266,7 +293,9 @@ local function GetBugReportFrame()
     frame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
         insets = { left = 8, right = 8, top = 8, bottom = 8 }
     })
     frame:Hide()
@@ -596,7 +625,7 @@ function EnhancedCooldownManager:OnInitialize()
     -- Register bundled font with LibSharedMedia if present.
     if LSM and LSM.Register then
         pcall(LSM.Register, LSM, "font", "Expressway",
-        "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf")
+            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf")
     end
 
     self:RegisterChatCommand("enhancedcooldownmanager", "ChatCommand")

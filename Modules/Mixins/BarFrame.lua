@@ -221,6 +221,11 @@ function BarFrame.Create(frameName, parent, defaultHeight)
     bar.Background = bar:CreateTexture(nil, "BACKGROUND")
     bar.Background:SetAllPoints()
 
+    -- Optional border frame (shown when cfg.border.enabled)
+    bar.Border = CreateFrame("Frame", nil, bar, "BackdropTemplate")
+    bar.Border:SetFrameLevel(bar:GetFrameLevel() + 2)
+    bar.Border:Hide()
+
     -- StatusBar for value display
     bar.StatusBar = CreateFrame("StatusBar", nil, bar)
     bar.StatusBar:SetAllPoints()
@@ -259,6 +264,26 @@ function BarFrame.Create(frameName, parent, defaultHeight)
             self.StatusBar:SetStatusBarTexture(tex)
         end
 
+        local borderCfg = cfg and cfg.border
+        if self.Border and borderCfg and borderCfg.enabled then
+            local thickness = borderCfg.thickness or 1
+            local color = borderCfg.color or {}
+            if self._lastBorderThickness ~= thickness then
+                self.Border:SetBackdrop({
+                    edgeFile = "Interface\\Buttons\\WHITE8X8",
+                    edgeSize = thickness,
+                })
+                self._lastBorderThickness = thickness
+            end
+            self.Border:ClearAllPoints()
+            self.Border:SetPoint("TOPLEFT", -thickness, thickness)
+            self.Border:SetPoint("BOTTOMRIGHT", thickness, -thickness)
+            self.Border:SetBackdropBorderColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+            self.Border:Show()
+        elseif self.Border then
+            self.Border:Hide()
+        end
+
         return tex
     end
 
@@ -275,9 +300,9 @@ function BarFrame.Create(frameName, parent, defaultHeight)
         offsetX = offsetX or 0
 
         if self._lastAnchor ~= anchor
-                or self._lastOffsetX ~= offsetX
-                or self._lastOffsetY ~= offsetY
-                or self._lastMatchAnchorWidth ~= shouldMatchWidth then
+            or self._lastOffsetX ~= offsetX
+            or self._lastOffsetY ~= offsetY
+            or self._lastMatchAnchorWidth ~= shouldMatchWidth then
             self:ClearAllPoints()
             if shouldMatchWidth then
                 self:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY)

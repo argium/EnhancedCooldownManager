@@ -301,8 +301,9 @@ local function GeneralOptionsTable()
                 args = {
                     combatFadeEnabledDesc = {
                         type = "description",
-                        name = "Automatically fade icons and bars in and out when you enter and leave combat.",
+                        name = "Automatically fade bars when out of combat to reduce screen clutter.",
                         order = 1,
+                        fontSize = "medium",
                     },
                     combatFadeEnabled = {
                         type = "toggle",
@@ -346,20 +347,37 @@ local function GeneralOptionsTable()
                             EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end),
                     },
+                    spacer2 = {
+                        type = "description",
+                        name = " ",
+                        order = 6,
+                    },
                     combatFadeExceptInInstanceDesc = {
                         type = "description",
-                        name = "\nWhen enabled, bars will not fade in instanced content (raids, dungeons, battlegrounds, arenas).",
-                        order = 6,
+                        name = "\nWhen enabled, bars will not fade in instanced content.",
+                        order = 7,
                     },
                     combatFadeExceptInInstance = {
                         type = "toggle",
-                        name = "Don't fade in instances",
-                        order = 7,
+                        name = "Except inside instances",
+                        order = 8,
                         width = "full",
                         disabled = function() return not db.profile.combatFade.enabled end,
                         get = function() return db.profile.combatFade.exceptInInstance end,
                         set = function(_, val)
                             db.profile.combatFade.exceptInInstance = val
+                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                        end,
+                    },
+                    exceptIfTargetCanBeAttackedEnabled ={
+                        type = "toggle",
+                        name = "Except if current target can be attacked",
+                        order = 9,
+                        width = "full",
+                        disabled = function() return not db.profile.combatFade.enabled end,
+                        get = function() return db.profile.combatFade.exceptIfTargetCanBeAttacked end,
+                        set = function(_, val)
+                            db.profile.combatFade.exceptIfTargetCanBeAttacked = val
                             EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end,
                     },
@@ -469,6 +487,53 @@ local function PowerBarOptionsTable()
                             EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
+                    borderSpacer = {
+                        type = "description",
+                        name = " ",
+                        order = 5,
+                    },
+                    borderEnabled = {
+                        type = "toggle",
+                        name = "Show border",
+                        order = 7,
+                        width = "full",
+                        get = function() return db.profile.powerBar.border.enabled end,
+                        set = function(_, val)
+                            db.profile.powerBar.border.enabled = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    borderThickness = {
+                        type = "range",
+                        name = "Border width",
+                        order = 8,
+                        width = "small",
+                        min = 1,
+                        max = 10,
+                        step = 1,
+                        disabled = function() return not db.profile.powerBar.border.enabled end,
+                        get = function() return db.profile.powerBar.border.thickness end,
+                        set = function(_, val)
+                            db.profile.powerBar.border.thickness = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    borderColor = {
+                        type = "color",
+                        name = "Border color",
+                        order = 9,
+                        width = "small",
+                        hasAlpha = true,
+                        disabled = function() return not db.profile.powerBar.border.enabled end,
+                        get = function()
+                            local c = db.profile.powerBar.border.color
+                            return c.r, c.g, c.b, c.a
+                        end,
+                        set = function(_, r, g, b, a)
+                            db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
                 },
             },
             tickMarks = tickMarks,
@@ -531,7 +596,7 @@ local function ResourceBarOptionsTable()
             },
             resourceColors = {
                 type = "group",
-                name = "Colours",
+                name = "Display Options",
                 inline = true,
                 order = 2,
                 args = {
@@ -541,10 +606,68 @@ local function ResourceBarOptionsTable()
                         order = 1,
                         fontSize = "medium",
                     },
+                    borderSpacer = {
+                        type = "description",
+                        name = " ",
+                        order = 2,
+                    },
+                    borderEnabled = {
+                        type = "toggle",
+                        name = "Show border",
+                        order = 4,
+                        width = "full",
+                        get = function() return db.profile.resourceBar.border.enabled end,
+                        set = function(_, val)
+                            db.profile.resourceBar.border.enabled = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    borderThickness = {
+                        type = "range",
+                        name = "Border width",
+                        order = 5,
+                        width = "small",
+                        min = 1,
+                        max = 10,
+                        step = 1,
+                        disabled = function() return not db.profile.resourceBar.border.enabled end,
+                        get = function() return db.profile.resourceBar.border.thickness end,
+                        set = function(_, val)
+                            db.profile.resourceBar.border.thickness = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    borderColor = {
+                        type = "color",
+                        name = "Border color",
+                        order = 6,
+                        width = "small",
+                        hasAlpha = true,
+                        disabled = function() return not db.profile.resourceBar.border.enabled end,
+                        get = function()
+                            local c = db.profile.resourceBar.border.color
+                            return c.r, c.g, c.b, c.a
+                        end,
+                        set = function(_, r, g, b, a)
+                            db.profile.resourceBar.border.color = { r = r, g = g, b = b, a = a }
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    colorsSpacer = {
+                        type = "description",
+                        name = " ",
+                        order = 7,
+                    },
+                    colorsDescription = {
+                        type = "description",
+                        name = "Modify the colour of each resource type below:",
+                        fontSize = "medium",
+                        order = 8,
+                    },
                     colorDemonHunterSouls = {
                         type = "color",
                         name = "Soul Fragments (Demon Hunter)",
-                        order = 6,
+                        order = 9,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors.souls
@@ -558,7 +681,7 @@ local function ResourceBarOptionsTable()
                     colorDemonHunterSoulsReset = {
                         type = "execute",
                         name = "X",
-                        order = 7,
+                        order = 10,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors.souls") end,
                         func = MakeResetHandler("resourceBar.colors.souls"),
@@ -566,7 +689,7 @@ local function ResourceBarOptionsTable()
                     colorComboPoints = {
                         type = "color",
                         name = "Combo Points",
-                        order = 9,
+                        order = 11,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.ComboPoints]
@@ -580,7 +703,7 @@ local function ResourceBarOptionsTable()
                     colorComboPointsReset = {
                         type = "execute",
                         name = "X",
-                        order = 10,
+                        order = 12,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.ComboPoints) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.ComboPoints),
@@ -588,7 +711,7 @@ local function ResourceBarOptionsTable()
                     colorChi = {
                         type = "color",
                         name = "Chi",
-                        order = 12,
+                        order = 13,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.Chi]
@@ -602,7 +725,7 @@ local function ResourceBarOptionsTable()
                     colorChiReset = {
                         type = "execute",
                         name = "X",
-                        order = 13,
+                        order = 14,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.Chi) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Chi),
@@ -632,7 +755,7 @@ local function ResourceBarOptionsTable()
                     colorSoulShards = {
                         type = "color",
                         name = "Soul Shards",
-                        order = 18,
+                        order = 17,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.SoulShards]
@@ -646,7 +769,7 @@ local function ResourceBarOptionsTable()
                     colorSoulShardsReset = {
                         type = "execute",
                         name = "X",
-                        order = 19,
+                        order = 18,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.SoulShards) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.SoulShards),
@@ -654,7 +777,7 @@ local function ResourceBarOptionsTable()
                     colorEssence = {
                         type = "color",
                         name = "Essence",
-                        order = 21,
+                        order = 19,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.Essence]
@@ -668,7 +791,7 @@ local function ResourceBarOptionsTable()
                     colorEssenceReset = {
                         type = "execute",
                         name = "X",
-                        order = 22,
+                        order = 20,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.Essence) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Essence),
