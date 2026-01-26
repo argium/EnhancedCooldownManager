@@ -183,7 +183,8 @@
             "ButtonStateBehaviorMixin",
             "DefaultTooltipMixin",
             "MenuConstants",
-            "class"
+            "class",
+            "UIFrameFadeRemoveFrame"
         ],
         "Lua.type.weakUnionCheck": true
 	}

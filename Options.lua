@@ -159,7 +159,7 @@ local function MakeResetHandler(path, refreshFunc)
     return function()
         ResetToDefault(path)
         if refreshFunc then refreshFunc() end
-        ns.ScheduleLayoutUpdate(0)
+        EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
         AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
     end
 end
@@ -190,7 +190,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.hideWhenMounted end,
                         set = function(_, val)
                             db.profile.hideWhenMounted = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     hideOutOfCombatInRestAreas = {
@@ -201,7 +201,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.hideOutOfCombatInRestAreas end,
                         set = function(_, val)
                             db.profile.hideOutOfCombatInRestAreas = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     texture = {
@@ -214,7 +214,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
                             db.profile.global.texture = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     textureReset = {
@@ -249,7 +249,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.offsetY end,
                         set = function(_, val)
                             db.profile.offsetY = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -268,7 +268,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.width.auto end,
                         set = function(_, val)
                             db.profile.width.auto = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     widthDesc = {
@@ -288,7 +288,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.width.value end,
                         set = function(_, val)
                             db.profile.width.value = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -312,9 +312,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.enabled end,
                         set = function(_, val)
                             db.profile.combatFade.enabled = val
-                            if ns.UpdateCombatFade then
-                                ns.UpdateCombatFade()
-                            end
+                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end,
                     },
                     combatFadeOpacityDesc = {
@@ -334,9 +332,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.opacity end,
                         set = function(_, val)
                             db.profile.combatFade.opacity = val
-                            if ns.UpdateCombatFade then
-                                ns.UpdateCombatFade()
-                            end
+                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end,
                     },
                     combatFadeOpacityReset = {
@@ -347,9 +343,7 @@ local function GeneralOptionsTable()
                         hidden = function() return not IsValueChanged("combatFade.opacity") end,
                         disabled = function() return not db.profile.combatFade.enabled end,
                         func = MakeResetHandler("combatFade.opacity", function()
-                            if ns.UpdateCombatFade then
-                                ns.UpdateCombatFade()
-                            end
+                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end),
                     },
                     combatFadeExceptInInstanceDesc = {
@@ -366,9 +360,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.exceptInInstance end,
                         set = function(_, val)
                             db.profile.combatFade.exceptInInstance = val
-                            if ns.UpdateCombatFade then
-                                ns.UpdateCombatFade()
-                            end
+                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
                         end,
                     },
                 },
@@ -407,7 +399,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -426,7 +418,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.height or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.height = val > 0 and val or nil
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -458,7 +450,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showText end,
                         set = function(_, val)
                             db.profile.powerBar.showText = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showManaAsPercentDesc = {
@@ -474,7 +466,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showManaAsPercent end,
                         set = function(_, val)
                             db.profile.powerBar.showManaAsPercent = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -505,7 +497,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.enabled end,
                         set = function(_, val)
                             db.profile.resourceBar.enabled = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -524,7 +516,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.height or 0 end,
                         set = function(_, val)
                             db.profile.resourceBar.height = val > 0 and val or nil
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -560,7 +552,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors.souls = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorDemonHunterSoulsReset = {
@@ -582,7 +574,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.ComboPoints] = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorComboPointsReset = {
@@ -604,7 +596,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.Chi] = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorChiReset = {
@@ -626,7 +618,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.HolyPower] = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorHolyPowerReset = {
@@ -648,7 +640,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.SoulShards] = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorSoulShardsReset = {
@@ -670,7 +662,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.Essence] = { r, g, b }
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorEssenceReset = {
@@ -719,7 +711,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showIcon end,
                         set = function(_, val)
                             db.profile.buffBars.showIcon = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showSpellName = {
@@ -730,7 +722,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showSpellName end,
                         set = function(_, val)
                             db.profile.buffBars.showSpellName = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showDuration = {
@@ -741,7 +733,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showDuration end,
                         set = function(_, val)
                             db.profile.buffBars.showDuration = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -766,7 +758,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.autoPosition end,
                         set = function(_, val)
                             db.profile.buffBars.autoPosition = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     barWidthDesc = {
@@ -786,7 +778,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.barWidth end,
                         set = function(_, val)
                             db.profile.buffBars.barWidth = val
-                            ns.ScheduleLayoutUpdate(0)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     barWidthReset = {
@@ -851,7 +843,7 @@ ColoursOptionsTable = function()
                 end,
                 set = function(_, r, g, b)
                     db.profile.buffBarColors.defaultColor = { r, g, b }
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             },
             defaultColorReset = {
@@ -1151,7 +1143,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "value", val)
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1170,7 +1162,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "width", val)
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1188,7 +1180,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, r, g, b, a)
                     UpdateTick(i, "color", { r, g, b, a })
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1202,7 +1194,7 @@ TickMarksOptionsTable = function()
                 confirmText = "Remove tick mark at value " .. (tick.value or "?") .. "?",
                 func = function()
                     RemoveTick(i)
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1291,7 +1283,7 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 func = function()
                     AddTick(50, nil, nil)
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1325,7 +1317,7 @@ TickMarksOptionsTable = function()
                 end,
                 func = function()
                     SetCurrentTicks({})
-                    ns.ScheduleLayoutUpdate(0)
+                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1492,7 +1484,7 @@ function Options:OnInitialize()
 end
 
 function Options:OnProfileChanged()
-    ns.ScheduleLayoutUpdate(0)
+    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
 end
 

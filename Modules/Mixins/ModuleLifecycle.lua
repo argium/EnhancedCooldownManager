@@ -1,5 +1,6 @@
 local _, ns = ...
 
+local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
 
 --- ModuleLifecycle mixin: Enable/Disable, throttling, and event helpers.
@@ -61,8 +62,8 @@ function Lifecycle.Setup(module, config)
             self:RegisterEvent(eventName, "UpdateLayout")
         end
 
-        -- Reigster ourselves with the viewer hook to respond to global events
-        ns.RegisterBar(self)
+        -- Register ourselves with the viewer hook to respond to global events
+        EnhancedCooldownManager.ViewerHook:RegisterBar(self)
 
         C_Timer.After(0.1, function()
             self:UpdateLayout()
