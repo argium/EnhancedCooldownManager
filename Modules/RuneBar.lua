@@ -222,7 +222,7 @@ function RuneBar:GetFrame()
     self._frame.FragmentedBars = {}
 
     -- Apply initial appearance
-    self._frame:ApplyAppearance(profile and profile.runeBar, profile)
+    self._frame:SetAppearance(profile and profile.runeBar, profile)
 
     return self._frame
 end
@@ -288,11 +288,10 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-Lifecycle.Setup(RuneBar, {
+BarFrame.Setup(RuneBar, {
     name = "RuneBar",
     configKey = "runeBar",
     shouldShow = ShouldShowRuneBar,
-    defaultHeight = BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT,
     layoutEvents = {
         "PLAYER_SPECIALIZATION_CHANGED",
         "PLAYER_ENTERING_WORLD",
@@ -301,34 +300,6 @@ Lifecycle.Setup(RuneBar, {
         { event = "RUNE_POWER_UPDATE", handler = "OnUpdateThrottled" },
         { event = "RUNE_TYPE_UPDATE", handler = "OnUpdateThrottled" },
     },
-    onLayoutSetup = function(self, bar, cfg, profile)
-        local maxRunes = GetResourceValue(profile)
-        if not maxRunes or maxRunes <= 0 then
-            bar:Hide()
-            return false
-        end
-
-        bar._maxResources = maxRunes
-        bar.StatusBar:SetMinMaxValues(0, maxRunes)
-
-        -- Set up fragmented bars for runes
-        EnsureFragmentedBars(bar, maxRunes)
-        bar._lastReadySet = nil
-        bar._displayOrder = nil
-
-        -- Set up ticks
-        local tickCount = math.max(0, maxRunes - 1)
-        bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
-        bar:LayoutResourceTicks(maxRunes, { 0, 0, 0, 1 }, 1, "ticks")
-
-        -- Set up OnUpdate for continuous recharge animation
-        if not bar._onUpdateAttached then
-            bar._onUpdateAttached = true
-            bar:SetScript("OnUpdate", function()
-                RuneBar:OnUpdateThrottled()
-            end)
-        end
-    end,
     onDisable = function(self)
         if self._frame and self._frame._onUpdateAttached then
             self._frame._onUpdateAttached = nil
@@ -336,3 +307,34 @@ Lifecycle.Setup(RuneBar, {
         end
     end,
 })
+
+function RuneBar:OnLayoutComplete(bar, cfg, profile)
+    local maxRunes = GetResourceValue(profile)
+    if not maxRunes or maxRunes <= 0 then
+        bar:Hide()
+        return false
+    end
+
+    bar._maxResources = maxRunes
+    bar.StatusBar:SetMinMaxValues(0, maxRunes)
+
+    -- Set up fragmented bars for runes
+    EnsureFragmentedBars(bar, maxRunes)
+    bar._lastReadySet = nil
+    bar._displayOrder = nil
+
+    -- Set up ticks
+    local tickCount = math.max(0, maxRunes - 1)
+    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
+    bar:LayoutResourceTicks(maxRunes, { 0, 0, 0, 1 }, 1, "ticks")
+
+    -- Set up OnUpdate for continuous recharge animation
+    if not bar._onUpdateAttached then
+        bar._onUpdateAttached = true
+        bar:SetScript("OnUpdate", function()
+            RuneBar:OnUpdateThrottled()
+        end)
+    end
+
+    return true
+end

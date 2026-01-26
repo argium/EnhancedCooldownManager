@@ -122,7 +122,7 @@ function ResourceBar:GetFrame()
     TickRenderer.AttachTo(self._frame)
 
     -- Apply initial appearance
-    self._frame:ApplyAppearance(profile and profile.resourceBar, profile)
+    self._frame:SetAppearance(profile and profile.resourceBar, profile)
 
     return self._frame
 end
@@ -187,11 +187,10 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-Lifecycle.Setup(ResourceBar, {
+BarFrame.Setup(ResourceBar, {
     name = "ResourceBar",
     configKey = "resourceBar",
     shouldShow = ShouldShowResourceBar,
-    defaultHeight = BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT,
     layoutEvents = {
         "PLAYER_SPECIALIZATION_CHANGED",
         "PLAYER_ENTERING_WORLD",
@@ -201,18 +200,21 @@ Lifecycle.Setup(ResourceBar, {
         { event = "UNIT_POWER_UPDATE", handler = "OnUnitEvent" },
         { event = "UNIT_AURA", handler = "OnUnitEvent" },
     },
-    onLayoutSetup = function(self, bar, cfg, profile)
-        local maxResources = GetValues(profile)
-        if not maxResources or maxResources <= 0 then
-            bar:Hide()
-            return false
-        end
-
-        bar._maxResources = maxResources
-        bar.StatusBar:SetMinMaxValues(0, maxResources)
-
-        local tickCount = math.max(0, maxResources - 1)
-        bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
-        bar:LayoutResourceTicks(maxResources, { 0, 0, 0, 1 }, 1, "ticks")
-    end,
 })
+
+function ResourceBar:OnLayoutComplete(bar, cfg, profile)
+    local maxResources = GetValues(profile)
+    if not maxResources or maxResources <= 0 then
+        bar:Hide()
+        return false
+    end
+
+    bar._maxResources = maxResources
+    bar.StatusBar:SetMinMaxValues(0, maxResources)
+
+    local tickCount = math.max(0, maxResources - 1)
+    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
+    bar:LayoutResourceTicks(maxResources, { 0, 0, 0, 1 }, 1, "ticks")
+
+    return true
+end

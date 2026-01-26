@@ -24,35 +24,35 @@ Bar stack: `EssentialCooldownViewer` → `PowerBar` → `ResourceBar` → `RuneB
 Bar modules use object-based mixins (methods attached directly to bar frames):
 
 ### BarFrame
-Frame creation, layout, appearance, text overlay. Constants and helpers for styling.
+Frame creation, layout, appearance, text overlay, and module setup. Bar-specific mixin.
+
+**Module Setup (entry point):**
+- `BarFrame.Setup(module, config)` - Orchestrates Lifecycle + bar config, injects UpdateLayout
 
 **Constants:** `DEFAULT_POWER_BAR_HEIGHT`, `DEFAULT_RESOURCE_BAR_HEIGHT`, `DEFAULT_BG_COLOR`
 
-**Helpers:** `GetBarHeight()`, `GetTopGapOffset()`, `GetBgColor()`, `GetTexture()`, `ApplyFont()`
+**Helpers:** `GetBarHeight()`, `GetTopGapOffset()`, `GetBgColor()`, `GetTexture()`, `ApplyFont()`, `ResolveAnchor()`
 
-**Anchoring:** `GetViewerAnchor()`, `GetPreferredAnchor(addon, excludeModule)`
+**Anchoring:** `GetViewerAnchor()`, `GetPreferredAnchor(addon, excludeModule)`, `ResolveAnchor(addon, cfg, moduleName)`
 
 **Bar methods (attached during Create):**
-- `bar:ApplyLayout(anchor, offsetY, height, width, matchAnchorWidth)`
-- `bar:ApplyLayoutAndAppearance(anchor, offsetY, cfg, profile, defaultHeight)`
-- `bar:ApplyAppearance(cfg, profile)`
-- `bar:SetValue(min, max, current, r, g, b)`
+- `bar:SetLayout(anchor, offsetX, offsetY, height, width)` - Apply layout (cached)
+- `bar:SetAppearance(cfg, profile)` - Apply appearance (bg color, texture)
+- `bar:SetValue(min, max, current, r, g, b)` - Update StatusBar value and color
+- `bar:ApplyConfig(module)` - Complete layout/appearance from profile (called by UpdateLayout)
 
 **Text methods (attached via AddTextOverlay):**
 - `bar:SetText(text)`
 - `bar:SetTextVisible(shown)`
 
 ### ModuleLifecycle
-Enable/Disable, event registration, throttled refresh. Injects methods onto modules.
+Generic event handling mixin. Enable/Disable, event registration, throttled refresh.
 
 **Injected methods:** `OnEnable`, `OnDisable`, `SetExternallyHidden`, `GetFrameIfShown`
 
-**Auto-generated UpdateLayout:** When `configKey` is provided, injects a default `UpdateLayout` that:
-1. Checks preconditions (profile, enabled, shouldShow)
-2. Calculates anchor based on `anchorMode` ("viewer" or "chain")
-3. Applies layout and appearance
-4. Calls `onLayoutSetup` hook for module-specific setup
-5. Shows bar and calls Refresh
+**Config:** Name, layoutEvents, refreshEvents, onDisable callback
+
+**Note:** Does NOT inject UpdateLayout (that's BarFrame's job). Modules must define their own UpdateLayout or use BarFrame.Setup.
 
 ### TickRenderer
 Tick pooling and positioning. Attaches methods to bars via `TickRenderer.AttachTo(bar)`.
@@ -81,23 +81,43 @@ end
 function MyBar:Refresh()
     local bar = self._frame
     local max, current, kind = GetValues(profile)
-    bar.StatusBar:SetValue(current)
-    bar.StatusBar:SetStatusBarColor(cfg.colors[kind][1], cfg.colors[kind][2], cfg.colors[kind][3])
+    bar:SetValue(0, max, current, cfg.colors[kind][1], cfg.colors[kind][2], cfg.colors[kind][3])
 end
 
--- Configuration (UpdateLayout is auto-generated)
-Lifecycle.Setup(MyBar, {
+-- Module setup (UpdateLayout is injected by BarFrame.Setup)
+BarFrame.Setup(MyBar, {
     name = "MyBar",
     configKey = "myBar",
     shouldShow = ShouldShow,
-    defaultHeight = BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT,
-    anchorMode = "chain",  -- or "viewer"
     layoutEvents = { "PLAYER_ENTERING_WORLD" },
     refreshEvents = { { event = "UNIT_POWER_UPDATE", handler = "OnRefresh" } },
-    onLayoutSetup = function(self, bar, cfg, profile)
-        -- Module-specific setup after layout (return false to abort)
-    end,
 })
+
+-- Optional: module-specific layout completion hook
+function MyBar:OnLayoutComplete(bar, cfg, profile)
+    -- Module-specific setup after layout (return false to abort)
+    local maxResources = GetValues(profile)
+    if not maxResources or maxResources <= 0 then
+        bar:Hide()
+        return false
+    end
+    bar.StatusBar:SetMinMaxValues(0, maxResources)
+    bar:EnsureTicks(maxResources - 1, bar.TicksFrame, "ticks")
+    bar:LayoutResourceTicks(maxResources, { 0, 0, 0, 1 }, 1, "ticks")
+    return true
+end
+```
+
+**Profile config** (in `EnhancedCooldownManager.lua` defaults):
+```lua
+myBar = {
+    enabled = true,
+    height = nil,  -- defaults to global.barHeight
+    texture = nil,  -- defaults to global.texture
+    anchorMode = "chain",  -- "viewer" or "chain"
+    offsetX = 0,  -- horizontal offset from anchor
+    -- module-specific config...
+},
 ```
 
 ## Utilities

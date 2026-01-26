@@ -15,19 +15,13 @@ ns.Mixins.Lifecycle = Lifecycle
 
 --- Configures a module with lifecycle event handling.
 --- Injects OnEnable, OnDisable, SetExternallyHidden, GetFrameIfShown methods onto the module.
---- Optionally injects a default UpdateLayout if configKey is provided.
---- Modules can override any injected method by saving the base method before defining their own.
+--- Modules must define their own UpdateLayout method.
 ---@param module table AceModule to configure
 ---@param config table Configuration table with:
 ---   - name: string - Module name for logging
 ---   - layoutEvents: string[] - Events that trigger UpdateLayout
 ---   - refreshEvents: table[] - Events that trigger refresh: { { event = "NAME", handler = "method" }, ... }
 ---   - onDisable: function|nil - Optional cleanup callback called before standard disable
----   - configKey: string|nil - Profile config key (e.g., "powerBar"). If provided, injects default UpdateLayout
----   - shouldShow: function|nil - Visibility check function, used with configKey
----   - defaultHeight: number|nil - Default bar height, used with configKey
----   - anchorMode: string|nil - "viewer" (always viewer) or "chain" (GetPreferredAnchor). Default "chain"
----   - onLayoutSetup: function|nil - Hook called after layout: onLayoutSetup(module, bar, cfg, profile)
 function Lifecycle.Setup(module, config)
     assert(config.name, "Lifecycle.Setup requires config.name")
     assert(config.layoutEvents, "Lifecycle.Setup requires config.layoutEvents")
@@ -117,96 +111,6 @@ function Lifecycle.Setup(module, config)
 
         Util.Log(self._lifecycleConfig.name, "Disabled")
     end
-
-    -- Inject default UpdateLayout if configKey is provided
-    if config.configKey then
-        function module:UpdateLayout()
-            local BarFrame = ns.Mixins.BarFrame
-            local result = Lifecycle.CheckLayoutPreconditions(self, config.configKey, config.shouldShow, config.name)
-            if not result then
-                return
-            end
-
-            self:Enable()
-
-            local profile, cfg = result.profile, result.cfg
-            local bar = self:GetFrame()
-
-            -- Calculate anchor based on anchorMode
-            local anchor, isFirstBar
-            if config.anchorMode == "viewer" then
-                anchor = BarFrame.GetViewerAnchor()
-                isFirstBar = true
-            else
-                anchor, isFirstBar = BarFrame.GetPreferredAnchor(ns.Addon, config.name)
-            end
-
-            -- Calculate offsetY
-            local viewer = BarFrame.GetViewerAnchor()
-            local offsetY = (isFirstBar and anchor == viewer) and -BarFrame.GetTopGapOffset(cfg, profile) or 0
-
-            -- Apply layout and appearance
-            local defaultHeight = config.defaultHeight or BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT
-            bar:ApplyLayoutAndAppearance(anchor, offsetY, cfg, profile, defaultHeight)
-
-            -- Call module-specific setup hook if provided
-            -- Hook can return false to abort (e.g., if no valid data)
-            if config.onLayoutSetup then
-                local shouldContinue = config.onLayoutSetup(self, bar, cfg, profile)
-                if shouldContinue == false then
-                    return
-                end
-            end
-
-            bar:Show()
-            self:Refresh()
-        end
-    end
-end
-
---------------------------------------------------------------------------------
--- Layout Preconditions
---------------------------------------------------------------------------------
-
---- Checks UpdateLayout preconditions and returns config if successful.
---- Handles externally hidden state, addon disabled, module disabled, and shouldShow check.
----@param module table Module with _externallyHidden, _frame, :Disable()
----@param configKey string Config key in profile (e.g., "powerBar")
----@param shouldShowFn function|nil Optional visibility check function
----@param moduleName string Module name for logging
----@return table|nil result { profile, cfg } or nil if should skip
-function Lifecycle.CheckLayoutPreconditions(module, configKey, shouldShowFn, moduleName)
-    local addon = ns.Addon
-    local profile = addon and addon.db and addon.db.profile
-    if not profile then
-        Util.Log(moduleName, "UpdateLayout skipped - no profile")
-        return nil
-    end
-
-    if module._externallyHidden then
-        Util.Log(moduleName, "UpdateLayout skipped - externally hidden")
-        if module._frame then
-            module._frame:Hide()
-        end
-        return nil
-    end
-
-    local cfg = profile[configKey]
-    if not (cfg and cfg.enabled) then
-        Util.Log(moduleName, "UpdateLayout - " .. configKey .. " disabled in config")
-        module:Disable()
-        return nil
-    end
-
-    if shouldShowFn and not shouldShowFn() then
-        Util.Log(moduleName, "UpdateLayout - shouldShow returned false")
-        if module._frame then
-            module._frame:Hide()
-        end
-        return nil
-    end
-
-    return { profile = profile, cfg = cfg }
 end
 
 --------------------------------------------------------------------------------

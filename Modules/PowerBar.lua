@@ -109,7 +109,7 @@ function PowerBar:GetFrame()
     TickRenderer.AttachTo(self._frame)
 
     -- Apply initial appearance
-    self._frame:ApplyAppearance(profile and profile.powerBar, profile)
+    self._frame:SetAppearance(profile and profile.powerBar, profile)
 
     return self._frame
 end
@@ -208,12 +208,10 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-Lifecycle.Setup(PowerBar, {
+BarFrame.Setup(PowerBar, {
     name = "PowerBar",
     configKey = "powerBar",
     shouldShow = ShouldShowPowerBar,
-    defaultHeight = BarFrame.DEFAULT_POWER_BAR_HEIGHT,
-    anchorMode = "viewer",
     layoutEvents = {
         "PLAYER_SPECIALIZATION_CHANGED",
         "UPDATE_SHAPESHIFT_FORM",
@@ -222,7 +220,9 @@ Lifecycle.Setup(PowerBar, {
     refreshEvents = {
         { event = "UNIT_POWER_UPDATE", handler = "OnUnitPower" },
     },
-    onLayoutSetup = function(self, bar, cfg, profile)
-        BarFrame.ApplyFont(bar.TextValue, profile)
-    end,
 })
+
+function PowerBar:OnLayoutComplete(bar, cfg, profile)
+    BarFrame.ApplyFont(bar.TextValue, profile)
+    return true
+end

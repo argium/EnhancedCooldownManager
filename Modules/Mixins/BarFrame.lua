@@ -32,17 +32,6 @@ function BarFrame.GetBgColor(cfg, profile)
     return (cfg and cfg.bgColor) or (gbl and gbl.barBgColor) or BarFrame.DEFAULT_BG_COLOR
 end
 
---- Returns the resolved bar height from config or defaults.
----@param cfg table|nil Module-specific config
----@param profile table|nil Full profile table
----@param fallback number|nil Fallback height if nothing is configured
----@return number
-function BarFrame.GetBarHeight(cfg, profile, fallback)
-    local gbl = profile and profile.global
-    local h = (cfg and cfg.height) or (gbl and gbl.barHeight) or (fallback or 20)
-    return Util.PixelSnap(h)
-end
-
 --- Returns the top gap offset for the first bar anchored to the viewer.
 ---@param cfg table|nil Module-specific config
 ---@param profile table|nil Full profile table
@@ -124,6 +113,15 @@ function BarFrame.ApplyFont(fontString, profile)
     end
 end
 
+--- Returns the bar height from config or defaults.
+---@param cfg table|nil Module-specific config
+---@param profile table|nil Full profile table
+---@param defaultHeight number Default height if not configured
+---@return number
+function BarFrame.GetBarHeight(cfg, profile, defaultHeight)
+    return Util.PixelSnap(cfg and cfg.height or profile and profile.global and profile.global.barHeight or defaultHeight)
+end
+
 --------------------------------------------------------------------------------
 -- Anchor Helpers
 --------------------------------------------------------------------------------
@@ -166,13 +164,28 @@ function BarFrame.GetPreferredAnchor(addon, excludeModule)
     return viewer, true
 end
 
+--- Resolves the anchor frame based on anchorMode in config.
+---@param addon table The EnhancedCooldownManager addon table
+---@param cfg table Module-specific config
+---@param moduleName string Module name for chain exclusion
+---@return Frame anchor The frame to anchor to
+---@return boolean isAnchoredToViewer True if anchoring directly to the viewer (for top gap offset)
+function BarFrame.ResolveAnchor(addon, cfg, moduleName)
+    local anchorMode = cfg and cfg.anchorMode or "chain"
+    if anchorMode == "viewer" then
+        return BarFrame.GetViewerAnchor(), true
+    else
+        return BarFrame.GetPreferredAnchor(addon, moduleName)
+    end
+end
+
 --------------------------------------------------------------------------------
 -- Frame Creation
 --------------------------------------------------------------------------------
 
 --- Creates a base resource bar frame with Background and StatusBar.
 --- Modules can add additional elements (text, ticks, fragments) after creation.
---- Core methods (SetValue, ApplyAppearance) are attached directly to the bar.
+--- Core methods (SetValue, SetAppearance) are attached directly to the bar.
 ---@param frameName string Unique frame name
 ---@param parent Frame Parent frame (typically UIParent)
 ---@param defaultHeight number Default bar height
@@ -183,6 +196,9 @@ function BarFrame.Create(frameName, parent, defaultHeight)
     local bar = CreateFrame("Frame", frameName, parent or UIParent)
     bar:SetFrameStrata("MEDIUM")
     bar:SetHeight(Util.PixelSnap(defaultHeight or 20))
+
+    -- Store default height for ApplyConfig to use
+    bar._defaultHeight = defaultHeight or BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT
 
     -- Background texture
     bar.Background = bar:CreateTexture(nil, "BACKGROUND")
@@ -214,7 +230,7 @@ function BarFrame.Create(frameName, parent, defaultHeight)
     ---@param cfg table|nil Module-specific config
     ---@param profile table|nil Full profile
     ---@return string|nil texture The applied texture path
-    function bar:ApplyAppearance(cfg, profile)
+    function bar:SetAppearance(cfg, profile)
         local bgColor = BarFrame.GetBgColor(cfg, profile)
         if self.Background and self.Background.SetColorTexture then
             self.Background:SetColorTexture(bgColor[1], bgColor[2], bgColor[3], bgColor[4] or 1)
@@ -232,23 +248,28 @@ function BarFrame.Create(frameName, parent, defaultHeight)
     --- Applies layout (anchor, position, size) only if changed.
     --- Caches layout state to avoid unnecessary frame updates.
     ---@param self Frame
-    ---@param anchor Frame Frame to anchor to
+    ---@param anchor Frame Frame to anchor to (for vertical position)
+    ---@param offsetX number|nil Horizontal offset (default 0)
     ---@param offsetY number Vertical offset from anchor
     ---@param height number Desired bar height
-    ---@param width number|nil Desired bar width when not matching anchor
-    ---@param matchAnchorWidth boolean|nil When true, match anchor width via left/right points
-    function bar:ApplyLayout(anchor, offsetY, height, width, matchAnchorWidth)
-        local shouldMatchWidth = matchAnchorWidth ~= false
+    ---@param width number|nil Desired bar width. If nil, width matches viewer width.
+    function bar:SetLayout(anchor, offsetX, offsetY, height, width)
+        local shouldMatchWidth = width == nil
+        offsetX = offsetX or 0
 
-        if self._lastAnchor ~= anchor or self._lastOffsetY ~= offsetY or self._lastMatchAnchorWidth ~= shouldMatchWidth then
+        if self._lastAnchor ~= anchor
+                or self._lastOffsetX ~= offsetX
+                or self._lastOffsetY ~= offsetY
+                or self._lastMatchAnchorWidth ~= shouldMatchWidth then
             self:ClearAllPoints()
             if shouldMatchWidth then
-                self:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offsetY)
-                self:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, offsetY)
+                self:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY)
+                self:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY)
             else
-                self:SetPoint("TOP", anchor, "BOTTOM", 0, offsetY)
+                self:SetPoint("TOP", anchor, "BOTTOM", offsetX, offsetY)
             end
             self._lastAnchor = anchor
+            self._lastOffsetX = offsetX
             self._lastOffsetY = offsetY
             self._lastMatchAnchorWidth = shouldMatchWidth
         end
@@ -266,27 +287,77 @@ function BarFrame.Create(frameName, parent, defaultHeight)
         end
     end
 
-    --- Applies layout (position, size) and appearance (background, texture) in one call.
-    --- Consolidates common UpdateLayout logic for all bar modules.
-    ---@param self Frame
-    ---@param anchor Frame Frame to anchor to
-    ---@param offsetY number Vertical offset from anchor
-    ---@param cfg table Module-specific config
-    ---@param profile table Full profile
-    ---@param defaultHeight number Default bar height if not configured
-    ---@return string|nil texture The applied texture path
-    function bar:ApplyLayoutAndAppearance(anchor, offsetY, cfg, profile, defaultHeight)
-        local desiredHeight = BarFrame.GetBarHeight(cfg, profile, defaultHeight)
+    --- Applies complete configuration from profile.
+    --- Handles preconditions internally - no coupling to Lifecycle.
+    ---@param self Frame Bar instance
+    ---@param module table Module reference
+    ---@return boolean success True if layout applied, false if preconditions failed
+    function bar:ApplyConfig(module)
+        local addon = ns.Addon
+        local barConfig = module._barConfig
+        local configKey = barConfig.configKey
+
+        -- 1. Check preconditions (moved from Lifecycle)
+        local profile = addon and addon.db and addon.db.profile
+        if not profile then
+            Util.Log(barConfig.name, "ApplyConfig skipped - no profile")
+            return false
+        end
+
+        if module._externallyHidden then
+            self:Hide()
+            return false
+        end
+
+        local cfg = profile[configKey]
+        if not (cfg and cfg.enabled) then
+            module:Disable()
+            return false
+        end
+
+        if barConfig.shouldShow and not barConfig.shouldShow() then
+            self:Hide()
+            Util.Log(barConfig.name, "ApplyConfig skipped - shouldShow returned false")
+            return false
+        end
+
+        -- 2. Calculate anchor (reads cfg.anchorMode)
+        local anchor, isAnchoredToViewer = BarFrame.ResolveAnchor(addon, cfg, barConfig.name)
+
+        -- 3. Calculate offsets
+        local viewer = BarFrame.GetViewerAnchor()
+        local offsetY = (isAnchoredToViewer and anchor == viewer) and -BarFrame.GetTopGapOffset(cfg, profile) or 0
+        local offsetX = (cfg and cfg.offsetX) or 0
+
+        -- 4. Calculate dimensions (uses stored defaultHeight)
+        local height = BarFrame.GetBarHeight(cfg, profile, self._defaultHeight)
         local widthCfg = profile.width or {}
-        local desiredWidth = widthCfg.value or 330
-        local matchAnchorWidth = widthCfg.auto ~= false
+        local width = nil
+        if widthCfg.auto == false then
+            width = Util.PixelSnap(widthCfg.value or 200)
+        end
 
-        self:ApplyLayout(anchor, offsetY, desiredHeight, desiredWidth, matchAnchorWidth)
+        Util.Log(barConfig.name, "Applying layout", {
+            anchor = anchor:GetName() or tostring(anchor),
+            offsetX = offsetX,
+            offsetY = offsetY,
+            height = height,
+            width = width or "auto",
+        })
 
-        local tex = self:ApplyAppearance(cfg, profile)
-        self._lastTexture = tex
+        -- 5. Apply layout and appearance
+        self:SetLayout(anchor, offsetX, offsetY, height, width)
+        self:SetAppearance(cfg, profile)
 
-        return tex
+        -- 6. Call module override if defined
+        if module.OnLayoutComplete then
+            local shouldContinue = module:OnLayoutComplete(self, cfg, profile)
+            if shouldContinue == false then
+                return false
+            end
+        end
+
+        return true
     end
 
     bar:Hide()
@@ -337,4 +408,47 @@ function BarFrame.AddTextOverlay(bar, profile)
     end
 
     return bar.TextValue
+end
+
+--------------------------------------------------------------------------------
+-- Module Setup (orchestrates Lifecycle + bar-specific config)
+--------------------------------------------------------------------------------
+
+--- Sets up a bar module with UpdateLayout and integrates with Lifecycle.
+---@param module table AceModule to configure
+---@param config table Configuration:
+---   - configKey: string - Profile config key (e.g., "powerBar")
+---   - shouldShow: function|nil - Visibility check
+---   - name: string - Module name for logging
+---   - layoutEvents: string[] - Events that trigger UpdateLayout
+---   - refreshEvents: table[] - Events that trigger refresh
+---   - onDisable: function|nil - Optional cleanup
+function BarFrame.Setup(module, config)
+    local Lifecycle = ns.Mixins.Lifecycle
+
+    -- 1. Call Lifecycle.Setup for generic event handling
+    Lifecycle.Setup(module, {
+        name = config.name,
+        layoutEvents = config.layoutEvents,
+        refreshEvents = config.refreshEvents,
+        onDisable = config.onDisable,
+    })
+
+    -- 2. Store bar-specific config on module
+    module._barConfig = {
+        configKey = config.configKey,
+        shouldShow = config.shouldShow,
+        name = config.name,
+    }
+
+    -- 3. Inject bar-specific UpdateLayout
+    function module:UpdateLayout()
+        self:Enable()
+        local bar = self:GetFrame()
+        local success = bar:ApplyConfig(self)
+        if success then
+            bar:Show()
+            self:Refresh()
+        end
+    end
 end
