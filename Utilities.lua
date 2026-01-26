@@ -103,3 +103,25 @@ function Util.Log(moduleName, message, data)
         pcall(DevTool.AddData, DevTool, payload, prefix)
     end
 end
+
+--- Prints a chat message with a colorful ECM prefix.
+---@param ... any
+function Util.Print(...)
+    local parts = {}
+    for i = 1, select("#", ...) do
+        parts[i] = tostring(select(i, ...))
+    end
+
+    local message = table.concat(parts, " ")
+    local prefixText = "Enhanced Cooldown Manager:"
+    local sparkle = ns.SparkleUtil
+    local coloredPrefix = (sparkle and sparkle.GradientText)
+        and sparkle.GradientText(prefixText, { 0.25, 0.82, 1.00 }, { 0.62, 0.45, 1.00 }, { 0.13, 0.77, 0.37 })
+        or prefixText
+
+    if message ~= "" then
+        print(coloredPrefix .. " " .. message)
+    else
+        print(coloredPrefix)
+    end
+end

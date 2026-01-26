@@ -1,4 +1,5 @@
 local ADDON_NAME, ns = ...
+local Util = ns.Util
 
 ---@class ECM_Color
 ---@field a number
@@ -99,7 +100,7 @@ local ADDON_NAME, ns = ...
 
 local EnhancedCooldownManager = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
 ns.Addon = EnhancedCooldownManager
-
+local Util = ns.Util
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
@@ -407,12 +408,12 @@ end
 ---@param onCancel fun()|nil
 function EnhancedCooldownManager:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        self:Print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        Util.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
     end
 
     if not StaticPopupDialogs or not StaticPopup_Show then
-        self:Print("Unable to show confirmation dialog (StaticPopup API unavailable).")
+        Util.Print("Unable to show confirmation dialog (StaticPopup API unavailable).")
         return
     end
 
@@ -483,7 +484,7 @@ end
 ---@param exportString string
 function EnhancedCooldownManager:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        self:Print("Invalid export string provided")
+        Util.Print("Invalid export string provided")
         return
     end
 
@@ -579,14 +580,14 @@ function EnhancedCooldownManager:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        self:Print("Commands: /ecm on|off|toggle | /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
+        Util.Print("Commands: /ecm on|off|toggle | /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
         return
     end
 
     if cmd == "bug" then
         local profile = self.db and self.db.profile
         if not profile or not profile.debug then
-            self:Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
+            Util.Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
             return
         end
         ShowBugReportPopup()
@@ -594,8 +595,19 @@ function EnhancedCooldownManager:ChatCommand(input)
     end
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
+        if InCombatLockdown() then
+            Util.Print("Options cannot be opened during combat. They will open when combat ends.")
+            if not self._openOptionsAfterCombat then
+                self._openOptionsAfterCombat = true
+                self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
+            end
+            return
+        end
+
         local optionsModule = self:GetModule("Options", true)
-        optionsModule:OpenOptions()
+        if optionsModule then
+            optionsModule:OpenOptions()
+        end
         return
     end
 
@@ -607,15 +619,29 @@ function EnhancedCooldownManager:ChatCommand(input)
     if cmd == "debug" then
         local newVal, err = ParseToggleArg(arg, profile.debug)
         if err then
-            self:Print(err)
+            Util.Print(err)
             return
         end
         profile.debug = newVal
-        self:Print("Debug:", profile.debug and "ON" or "OFF")
+        Util.Print("Debug:", profile.debug and "ON" or "OFF")
         return
     end
 
-    self:Print("Unknown command. Use /ecm help")
+    Util.Print("Unknown command. Use /ecm help")
+end
+
+function EnhancedCooldownManager:HandleOpenOptionsAfterCombat()
+    if not self._openOptionsAfterCombat then
+        return
+    end
+
+    self._openOptionsAfterCombat = nil
+    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+
+    local optionsModule = self:GetModule("Options", true)
+    if optionsModule then
+        optionsModule:OpenOptions()
+    end
 end
 
 --- Initializes saved variables, runs migrations, and registers slash commands.
