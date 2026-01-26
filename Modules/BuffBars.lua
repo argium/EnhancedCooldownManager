@@ -24,7 +24,7 @@ local BuffBars = EnhancedCooldownManager:NewModule("BuffBars", "AceEvent-3.0")
 EnhancedCooldownManager.BuffBars = BuffBars
 
 local WHITE8 = "Interface\\Buttons\\WHITE8X8"
-local FALLBACK_BAR_COLOR = { 0.90, 0.90, 0.90 }
+local DEFAULT_BAR_COLOR = { 0.90, 0.90, 0.90 }
 
 --- Returns current class ID and spec ID.
 ---@return number|nil classID, number|nil specID
@@ -41,7 +41,7 @@ local function EnsureColorStorage(profile)
         profile.buffBarColors = {
             colors = {},
             cache = {},
-            defaultColor = FALLBACK_BAR_COLOR,
+            defaultColor = DEFAULT_BAR_COLOR,
         }
     end
     if not profile.buffBarColors.colors then
@@ -51,7 +51,7 @@ local function EnsureColorStorage(profile)
         profile.buffBarColors.cache = {}
     end
     if not profile.buffBarColors.defaultColor then
-        profile.buffBarColors.defaultColor = FALLBACK_BAR_COLOR
+        profile.buffBarColors.defaultColor = DEFAULT_BAR_COLOR
     end
 end
 
@@ -61,7 +61,7 @@ end
 ---@return number r, number g, number b
 local function GetBarColor(barIndex, profile)
     if not profile then
-        return FALLBACK_BAR_COLOR[1], FALLBACK_BAR_COLOR[2], FALLBACK_BAR_COLOR[3]
+        return DEFAULT_BAR_COLOR[1], DEFAULT_BAR_COLOR[2], DEFAULT_BAR_COLOR[3]
     end
 
     EnsureColorStorage(profile)
@@ -75,7 +75,7 @@ local function GetBarColor(barIndex, profile)
         end
     end
 
-    local dc = profile.buffBarColors.defaultColor or FALLBACK_BAR_COLOR
+    local dc = profile.buffBarColors.defaultColor or DEFAULT_BAR_COLOR
     return dc[1], dc[2], dc[3]
 end
 
@@ -518,7 +518,9 @@ function BuffBars:UpdateLayout()
         -- Position viewer under anchor. Use both TOPLEFT and TOPRIGHT anchor points
         -- so the viewer width automatically matches the anchor. Do NOT set explicit width
         -- as this conflicts with anchor-based sizing and causes offset issues after zone changes.
-        if viewer._lastAnchor ~= anchor then
+        local _, rel1 = viewer:GetPoint(1)
+        local _, rel2 = viewer:GetPoint(2)
+        if viewer._lastAnchor ~= anchor or rel1 ~= anchor or rel2 ~= anchor then
             viewer:ClearAllPoints()
             viewer:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, 0)
             viewer:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, 0)
