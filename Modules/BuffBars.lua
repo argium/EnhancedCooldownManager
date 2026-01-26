@@ -1,11 +1,13 @@
 local _, ns = ...
 local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
+local BarHelpers = EnhancedCooldownManager.BarHelpers
 
 ---@class ECM_BuffBarsModule
 local BuffBars = EnhancedCooldownManager:NewModule("BuffBars", "AceEvent-3.0")
 EnhancedCooldownManager.BuffBars = BuffBars
 
+local WHITE8 = "Interface\\Buttons\\WHITE8X8"
 local FALLBACK_BAR_COLOR = { 0.90, 0.90, 0.90 }
 
 --- Returns current class ID and spec ID.
@@ -187,7 +189,7 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
     local gbl = profile.global or {}
 
     local texKey = gbl.texture
-    local tex = Util.GetTexture(texKey)
+    local tex = BarHelpers.GetTexture(texKey)
     bar:SetStatusBarTexture(tex)
 
     -- Apply bar color from per-bar settings or default
@@ -210,10 +212,10 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
         UpdateBarCache(barIndex, spellName, profile)
     end
 
-    local bgColor = Util.GetBgColor(nil, profile)
+    local bgColor = BarHelpers.GetBgColor(nil, profile)
     local barBG = GetBuffBarBackground(bar)
     if barBG then
-        barBG:SetTexture(Util.WHITE8)
+        barBG:SetTexture(WHITE8)
         barBG:SetVertexColor(bgColor[1] or 0, bgColor[2] or 0, bgColor[3] or 0, bgColor[4] or 1)
         barBG:ClearAllPoints()
         barBG:SetPoint("TOPLEFT", bar, "TOPLEFT")
@@ -226,7 +228,7 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
         bar.Pip:SetTexture(nil)
     end
 
-    local height = Util.GetBarHeight(nil, profile, 13)
+    local height = BarHelpers.GetBarHeight(nil, profile, 13)
     if height and height > 0 then
         bar:SetHeight(height)
         child:SetHeight(height)
@@ -250,8 +252,8 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
         iconFrame:SetSize(height, height)
     end
 
-    Util.ApplyFont(bar.Name, profile)
-    Util.ApplyFont(bar.Duration, profile)
+    BarHelpers.ApplyFont(bar.Name, profile)
+    BarHelpers.ApplyFont(bar.Duration, profile)
 
     if iconFrame then
         iconFrame:ClearAllPoints()
@@ -495,7 +497,7 @@ function BuffBars:UpdateLayout()
     local autoPosition = buffBarsConfig.autoPosition ~= false -- Default to true
 
     if autoPosition then
-        local anchor = Util.GetPreferredAnchor(EnhancedCooldownManager, nil)
+        local anchor = BarHelpers.GetPreferredAnchor(EnhancedCooldownManager, nil)
         if not anchor then
             Util.Log("BuffBars", "UpdateLayout skipped - no anchor")
             return

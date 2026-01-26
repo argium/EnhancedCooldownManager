@@ -179,6 +179,23 @@ function BarFrame.ResolveAnchor(addon, cfg, moduleName)
     end
 end
 
+BarFrame.Helpers = {
+    GetBgColor = BarFrame.GetBgColor,
+    GetTopGapOffset = BarFrame.GetTopGapOffset,
+    GetTexture = BarFrame.GetTexture,
+    GetFontPath = BarFrame.GetFontPath,
+    ApplyFont = BarFrame.ApplyFont,
+    GetBarHeight = BarFrame.GetBarHeight,
+    GetViewerAnchor = BarFrame.GetViewerAnchor,
+    GetPreferredAnchor = BarFrame.GetPreferredAnchor,
+    ResolveAnchor = BarFrame.ResolveAnchor,
+}
+
+ns.BarHelpers = BarFrame.Helpers
+if ns.Addon then
+    ns.Addon.BarHelpers = BarFrame.Helpers
+end
+
 --------------------------------------------------------------------------------
 -- Frame Creation
 --------------------------------------------------------------------------------
