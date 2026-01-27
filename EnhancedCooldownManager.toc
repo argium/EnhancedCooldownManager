@@ -27,6 +27,7 @@ Modules\TraceLog.lua
 Modules\BugReports.lua
 Utilities.lua
 Defaults.lua
+Widgets\PositionModeSelector.lua
 EnhancedCooldownManager.lua
 Modules\ImportExport.lua
 Options.lua

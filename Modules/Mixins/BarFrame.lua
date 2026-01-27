@@ -211,7 +211,7 @@ end
 function BarFrame.ResolveAnchor(addon, cfg, moduleName)
     local anchorMode = (cfg and cfg.anchorMode) or "chain"
     if anchorMode == "viewer" then
-        return BarFrame.GetViewerAnchor(), true, false
+        anchorMode = "chain"
     end
     if anchorMode == "independent" then
         return UIParent, false, true

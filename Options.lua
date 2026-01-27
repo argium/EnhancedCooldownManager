@@ -16,6 +16,33 @@ local LSM = LibStub("LibSharedMedia-3.0", true)
 
 -- Constants
 local SIDEBAR_BG_COLOR = { 0.1, 0.1, 0.1, 0.9 }
+local DEFAULT_BAR_WIDTH = 250
+local POSITION_MODE_VALUES = {
+    auto = "Position Automatically",
+    custom = "Custom Positioning",
+}
+
+local function GetPositionModeFromAnchor(anchorMode)
+    if anchorMode == "independent" then
+        return "custom"
+    end
+    return "auto"
+end
+
+local function ApplyPositionModeToBar(cfg, mode)
+    if mode == "custom" then
+        cfg.anchorMode = "independent"
+        if cfg.width == nil then
+            cfg.width = DEFAULT_BAR_WIDTH
+        end
+    else
+        cfg.anchorMode = "chain"
+    end
+end
+
+local function IsIndependent(cfg)
+    return cfg and cfg.anchorMode == "independent"
+end
 
 --------------------------------------------------------------------------------
 -- Utility: Deep compare for detecting changes from defaults
@@ -150,6 +177,11 @@ local function GetCurrentClassSpec()
         specID, specName = GetSpecializationInfo(specIndex)
     end
     return classID, specID, localisedClassName or "Unknown", specName or "None"
+end
+
+local function IsDeathKnight()
+    local _, className = UnitClass("player")
+    return className == "DEATHKNIGHT"
 end
 
 
@@ -398,7 +430,7 @@ local function PowerBarOptionsTable()
     local tickMarks = TickMarksOptionsTable()
     tickMarks.name = "Tick Marks"
     tickMarks.inline = true
-    tickMarks.order = 3
+    tickMarks.order = 4
     return {
         type = "group",
         name = "Power Bar",
@@ -534,6 +566,116 @@ local function PowerBarOptionsTable()
                             db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
                             EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
+                    },
+                },
+            },
+            positioningSettings = {
+                type = "group",
+                name = "Positioning",
+                inline = true,
+                order = 3,
+                args = {
+                    modeSelector = {
+                        type = "select",
+                        name = "",
+                        order = 1,
+                        width = "full",
+                        dialogControl = "ECM_PositionModeSelector",
+                        values = POSITION_MODE_VALUES,
+                        get = function()
+                            return GetPositionModeFromAnchor(db.profile.powerBar.anchorMode)
+                        end,
+                        set = function(_, val)
+                            ApplyPositionModeToBar(db.profile.powerBar, val)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthDesc = {
+                        type = "description",
+                        name = "Width when custom positioning is enabled.",
+                        order = 2,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                    },
+                    width = {
+                        type = "range",
+                        name = "Width",
+                        order = 3,
+                        width = "double",
+                        min = 100,
+                        max = 600,
+                        step = 10,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                        get = function() return db.profile.powerBar.width or DEFAULT_BAR_WIDTH end,
+                        set = function(_, val)
+                            db.profile.powerBar.width = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 4,
+                        width = 0.3,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) or not IsValueChanged("powerBar.width") end,
+                        func = MakeResetHandler("powerBar.width"),
+                    },
+                    offsetXDesc = {
+                        type = "description",
+                        name = "\nHorizontal offset when custom positioning is enabled.",
+                        order = 5,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                    },
+                    offsetX = {
+                        type = "range",
+                        name = "Offset X",
+                        order = 6,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                        get = function() return db.profile.powerBar.offsetX or 0 end,
+                        set = function(_, val)
+                            db.profile.powerBar.offsetX = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetXReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 7,
+                        width = 0.3,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) or not IsValueChanged("powerBar.offsetX") end,
+                        func = MakeResetHandler("powerBar.offsetX"),
+                    },
+                    offsetYDesc = {
+                        type = "description",
+                        name = "\nVertical offset when custom positioning is enabled.",
+                        order = 8,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                    },
+                    offsetY = {
+                        type = "range",
+                        name = "Offset Y",
+                        order = 9,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) end,
+                        get = function() return db.profile.powerBar.offsetY or 0 end,
+                        set = function(_, val)
+                            db.profile.powerBar.offsetY = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetYReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 10,
+                        width = 0.3,
+                        hidden = function() return not IsIndependent(db.profile.powerBar) or not IsValueChanged("powerBar.offsetY") end,
+                        func = MakeResetHandler("powerBar.offsetY"),
                     },
                 },
             },
@@ -799,6 +941,314 @@ local function ResourceBarOptionsTable()
                     },
                 },
             },
+            positioningSettings = {
+                type = "group",
+                name = "Positioning",
+                inline = true,
+                order = 3,
+                args = {
+                    modeSelector = {
+                        type = "select",
+                        name = "",
+                        order = 1,
+                        width = "full",
+                        dialogControl = "ECM_PositionModeSelector",
+                        values = POSITION_MODE_VALUES,
+                        get = function()
+                            return GetPositionModeFromAnchor(db.profile.resourceBar.anchorMode)
+                        end,
+                        set = function(_, val)
+                            ApplyPositionModeToBar(db.profile.resourceBar, val)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthDesc = {
+                        type = "description",
+                        name = "Width when custom positioning is enabled.",
+                        order = 2,
+                    },
+                    width = {
+                        type = "range",
+                        name = "Width",
+                        order = 3,
+                        width = "double",
+                        min = 100,
+                        max = 600,
+                        step = 10,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        get = function() return db.profile.resourceBar.width or DEFAULT_BAR_WIDTH end,
+                        set = function(_, val)
+                            db.profile.resourceBar.width = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 4,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("resourceBar.width") end,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        func = MakeResetHandler("resourceBar.width"),
+                    },
+                    offsetXDesc = {
+                        type = "description",
+                        name = "\nHorizontal offset when custom positioning is enabled.",
+                        order = 5,
+                    },
+                    offsetX = {
+                        type = "range",
+                        name = "Offset X",
+                        order = 6,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        get = function() return db.profile.resourceBar.offsetX or 0 end,
+                        set = function(_, val)
+                            db.profile.resourceBar.offsetX = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetXReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 7,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("resourceBar.offsetX") end,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        func = MakeResetHandler("resourceBar.offsetX"),
+                    },
+                    offsetYDesc = {
+                        type = "description",
+                        name = "\nVertical offset when custom positioning is enabled.",
+                        order = 8,
+                    },
+                    offsetY = {
+                        type = "range",
+                        name = "Offset Y",
+                        order = 9,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        get = function() return db.profile.resourceBar.offsetY or 0 end,
+                        set = function(_, val)
+                            db.profile.resourceBar.offsetY = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetYReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 10,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("resourceBar.offsetY") end,
+                        disabled = function() return not IsIndependent(db.profile.resourceBar) end,
+                        func = MakeResetHandler("resourceBar.offsetY"),
+                    },
+                },
+            },
+        },
+    }
+end
+
+local function RuneBarOptionsTable()
+    local db = EnhancedCooldownManager.db
+    return {
+        type = "group",
+        name = "Rune Bar",
+        order = 4,
+        disabled = function() return not IsDeathKnight() end,
+        args = {
+            basicSettings = {
+                type = "group",
+                name = "Basic Settings",
+                inline = true,
+                order = 1,
+                args = {
+                    enabled = {
+                        type = "toggle",
+                        name = "Enable rune bar",
+                        order = 2,
+                        width = "full",
+                        get = function() return db.profile.runeBar.enabled end,
+                        set = function(_, val)
+                            db.profile.runeBar.enabled = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    heightDesc = {
+                        type = "description",
+                        name = "\nOverride the default bar height. Set to 0 to use the global default.",
+                        order = 3,
+                    },
+                    height = {
+                        type = "range",
+                        name = "Height Override",
+                        order = 4,
+                        width = "double",
+                        min = 0,
+                        max = 40,
+                        step = 1,
+                        get = function() return db.profile.runeBar.height or 0 end,
+                        set = function(_, val)
+                            db.profile.runeBar.height = val > 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    heightReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 5,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("runeBar.height") end,
+                        func = MakeResetHandler("runeBar.height"),
+                    },
+                },
+            },
+            displaySettings = {
+                type = "group",
+                name = "Display Options",
+                inline = true,
+                order = 2,
+                args = {
+                    color = {
+                        type = "color",
+                        name = "Rune color",
+                        order = 1,
+                        width = "double",
+                        get = function()
+                            local c = db.profile.runeBar.color
+                            return c[1], c[2], c[3]
+                        end,
+                        set = function(_, r, g, b)
+                            db.profile.runeBar.color = { r, g, b }
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    colorReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 2,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("runeBar.color") end,
+                        func = MakeResetHandler("runeBar.color"),
+                    },
+                },
+            },
+            positioningSettings = {
+                type = "group",
+                name = "Positioning",
+                inline = true,
+                order = 3,
+                args = {
+                    modeSelector = {
+                        type = "select",
+                        name = "",
+                        order = 1,
+                        width = "full",
+                        dialogControl = "ECM_PositionModeSelector",
+                        values = POSITION_MODE_VALUES,
+                        get = function()
+                            return GetPositionModeFromAnchor(db.profile.runeBar.anchorMode)
+                        end,
+                        set = function(_, val)
+                            ApplyPositionModeToBar(db.profile.runeBar, val)
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthDesc = {
+                        type = "description",
+                        name = "Width when custom positioning is enabled.",
+                        order = 2,
+                    },
+                    width = {
+                        type = "range",
+                        name = "Width",
+                        order = 3,
+                        width = "double",
+                        min = 100,
+                        max = 600,
+                        step = 10,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        get = function() return db.profile.runeBar.width or DEFAULT_BAR_WIDTH end,
+                        set = function(_, val)
+                            db.profile.runeBar.width = val
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    widthReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 4,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("runeBar.width") end,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        func = MakeResetHandler("runeBar.width"),
+                    },
+                    offsetXDesc = {
+                        type = "description",
+                        name = "\nHorizontal offset when custom positioning is enabled.",
+                        order = 5,
+                    },
+                    offsetX = {
+                        type = "range",
+                        name = "Offset X",
+                        order = 6,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        get = function() return db.profile.runeBar.offsetX or 0 end,
+                        set = function(_, val)
+                            db.profile.runeBar.offsetX = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetXReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 7,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("runeBar.offsetX") end,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        func = MakeResetHandler("runeBar.offsetX"),
+                    },
+                    offsetYDesc = {
+                        type = "description",
+                        name = "\nVertical offset when custom positioning is enabled.",
+                        order = 8,
+                    },
+                    offsetY = {
+                        type = "range",
+                        name = "Offset Y",
+                        order = 9,
+                        width = "double",
+                        min = -800,
+                        max = 800,
+                        step = 1,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        get = function() return db.profile.runeBar.offsetY or 0 end,
+                        set = function(_, val)
+                            db.profile.runeBar.offsetY = val ~= 0 and val or nil
+                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    offsetYReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 10,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("runeBar.offsetY") end,
+                        disabled = function() return not IsIndependent(db.profile.runeBar) end,
+                        func = MakeResetHandler("runeBar.offsetY"),
+                    },
+                },
+            },
         },
     }
 end
@@ -813,7 +1263,7 @@ local function AuraBarsOptionsTable()
     return {
         type = "group",
         name = "Aura Bars",
-        order = 4,
+        order = 5,
         args = {
             displaySettings = {
                 type = "group",
@@ -874,14 +1324,18 @@ local function AuraBarsOptionsTable()
                         order = 1,
                         fontSize = "medium",
                     },
-                    autoPosition = {
-                        type = "toggle",
-                        name = "Automatically Position Below Other Bars",
+                    modeSelector = {
+                        type = "select",
+                        name = "",
                         order = 2,
                         width = "full",
-                        get = function() return db.profile.buffBars.autoPosition end,
+                        dialogControl = "ECM_PositionModeSelector",
+                        values = POSITION_MODE_VALUES,
+                        get = function()
+                            return db.profile.buffBars.autoPosition and "auto" or "custom"
+                        end,
                         set = function(_, val)
-                            db.profile.buffBars.autoPosition = val
+                            db.profile.buffBars.autoPosition = (val == "auto")
                             EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -910,8 +1364,9 @@ local function AuraBarsOptionsTable()
                         name = "X",
                         order = 5,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("buffBars.barWidth") end,
-                        disabled = function() return db.profile.buffBars.autoPosition end,
+                        hidden = function()
+                            return db.profile.buffBars.autoPosition or not IsValueChanged("buffBars.barWidth")
+                        end,
                         func = MakeResetHandler("buffBars.barWidth"),
                     },
                 },
@@ -1573,6 +2028,7 @@ local function GetOptionsTable()
             general = GeneralOptionsTable(),
             powerBar = PowerBarOptionsTable(),
             resourceBar = ResourceBarOptionsTable(),
+            runeBar = RuneBarOptionsTable(),
             auraBars = AuraBarsOptionsTable(),
             profile = ProfileOptionsTable(),
             about = AboutOptionsTable(),
