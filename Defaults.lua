@@ -113,7 +113,7 @@ local defaults = {
         offsetY = 4,
         combatFade = {
             enabled = false,
-            opacity = 75,
+            opacity = 60,
             exceptIfTargetCanBeAttacked = true,
             exceptInInstance = true,
         },

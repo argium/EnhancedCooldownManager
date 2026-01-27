@@ -46,11 +46,6 @@ function Lifecycle.Setup(module, config)
         local cfg = self._lifecycleConfig
         Util.Log(cfg.name, "OnEnable - module starting")
 
-        if self._enabled then
-            return
-        end
-
-        self._enabled = true
         self._lastUpdate = GetTime()
 
         for _, eventConfig in ipairs(cfg.refreshEvents) do
@@ -64,9 +59,7 @@ function Lifecycle.Setup(module, config)
         -- Register ourselves with the viewer hook to respond to global events
         EnhancedCooldownManager.ViewerHook:RegisterBar(self)
 
-        C_Timer.After(0.1, function()
-            self:UpdateLayout()
-        end)
+        EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0.1)
     end
 
     -- Inject SetExternallyHidden method (can be overridden by modules)
@@ -108,12 +101,6 @@ function Lifecycle.Setup(module, config)
         if frame then
             frame:Hide()
         end
-
-        if not self._enabled then
-            return
-        end
-
-        self._enabled = false
 
         for _, eventName in ipairs(cfg.refreshEventNames) do
             self:UnregisterEvent(eventName)

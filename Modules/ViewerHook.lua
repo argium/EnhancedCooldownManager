@@ -482,5 +482,10 @@ end
 
 function ViewerHook:RegisterBar(module)
     Util.Log("ViewerHook", "RegisterBar", { module = module._lifecycleConfig.name })
+    for _, existing in ipairs(_registeredBars) do
+        if existing == module then
+            return
+        end
+    end
     table.insert(_registeredBars, module)
 end

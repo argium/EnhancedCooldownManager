@@ -293,37 +293,6 @@ local function GeneralOptionsTable()
                         hidden = function() return not IsValueChanged("offsetY") end,
                         func = MakeResetHandler("offsetY"),
                     },
-                    autoWidth = {
-                        type = "toggle",
-                        name = "Automatically resize to match cooldown manager",
-                        order = 5,
-                        width = "full",
-                        get = function() return db.profile.width.auto end,
-                        set = function(_, val)
-                            db.profile.width.auto = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    widthDesc = {
-                        type = "description",
-                        name = "\nWidth of bars when automatic resizing is disabled.",
-                        order = 6,
-                    },
-                    widthValue = {
-                        type = "range",
-                        name = "Width",
-                        order = 7,
-                        width = "double",
-                        min = 150,
-                        max = 600,
-                        step = 1,
-                        disabled = function() return db.profile.width.auto end,
-                        get = function() return db.profile.width.value end,
-                        set = function(_, val)
-                            db.profile.width.value = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
-                        end,
-                    },
                 },
             },
             combatFadeSettings = {

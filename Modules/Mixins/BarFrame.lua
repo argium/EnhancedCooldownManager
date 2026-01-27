@@ -409,7 +409,7 @@ function BarFrame.Create(frameName, parent, defaultHeight)
 
         local cfg = profile[configKey]
         if not (cfg and cfg.enabled) then
-            module:Disable()
+            self:Hide()
             return false
         end
 
@@ -561,7 +561,6 @@ function BarFrame.Setup(module, config)
 
     -- 3. Inject bar-specific UpdateLayout
     function module:UpdateLayout()
-        self:Enable()
         local bar = self:GetFrame()
         if bar:ApplyConfig(self) then
             bar:Show()
