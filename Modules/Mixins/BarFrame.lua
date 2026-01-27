@@ -441,13 +441,9 @@ function BarFrame.Create(frameName, parent, defaultHeight)
 
         -- 4. Calculate dimensions (uses stored defaultHeight)
         local height = BarFrame.GetBarHeight(cfg, profile, self._defaultHeight)
-        local widthCfg = profile.width or {}
         local width
         if isIndependent then
-            width = widthCfg.auto == false and Util.PixelSnap(widthCfg.value or BarFrame.DEFAULT_BAR_WIDTH) or nil
-            if width == nil then
-                width = BarFrame.DEFAULT_BAR_WIDTH
-            end
+            width = Util.PixelSnap((cfg and cfg.width) or BarFrame.DEFAULT_BAR_WIDTH)
         else
             width = nil
         end

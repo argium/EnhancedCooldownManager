@@ -57,6 +57,7 @@ local ADDON_NAME, ns = ...
 ---@field colors table<number, table<number, table<number, number[]>>> [classID][specID][barIndex] = {r, g, b}
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> [classID][specID][barIndex] = metadata
 ---@field defaultColor number[] Default RGB color for buff bars
+---@field selectedPalette string|nil Name of the currently selected palette
 
 ---@class ECM_BuffBarsConfig
 ---@field autoPosition boolean
@@ -202,6 +203,7 @@ local defaults = {
             colors = {},
             cache = {},
             defaultColor = { 228 / 255, 233 / 255, 235 / 255 },
+            selectedPalette = nil,
         },
         powerBarTicks = {
             mappings = {}, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }

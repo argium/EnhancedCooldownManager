@@ -13,9 +13,9 @@ if (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 local AUTO_ICON = "Interface\\Icons\\inv_12_profession_blacksmithing_blacksmithstoolkit_purple"
 local CUSTOM_ICON = "Interface\\Icons\\inv_blacksmithing_toolbox_02"
 
-local BUTTON_HEIGHT = 36
+local BUTTON_HEIGHT = 40
 local BUTTON_GAP = 6
-local ICON_SIZE = 20
+local ICON_SIZE = 26
 
 local function CreateOptionButton(parent)
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -120,17 +120,17 @@ function methods:UpdateVisuals()
     local function Apply(button, isSelected)
         button.selectedTex:SetShown(isSelected)
         if isSelected then
-            button:SetBackdropBorderColor(1, 0.82, 0.1, 1)
-            button:SetBackdropColor(0.35, 0.26, 0.06, 0.95) -- gold background
-            button.label:SetTextColor(1, 0.82, 0.1) -- gold text
+            button:SetBackdropBorderColor(1, 0.82, 0, 1)
+            button:SetBackdropColor(0.15, 0.12, 0.02, 0.95)
+            button.label:SetTextColor(1, 1, 1)
             button.icon:SetDesaturated(false)
             button:SetAlpha(1)
         else
-            button:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-            button:SetBackdropColor(0.08, 0.08, 0.08, 0.7)
+            button:SetBackdropBorderColor(0.45, 0.45, 0.45, 1)
+            button:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
             button.label:SetTextColor(0.8, 0.8, 0.8)
-            button.icon:SetDesaturated(true)
-            button:SetAlpha(0.85)
+            button.icon:SetDesaturated(false)
+            button:SetAlpha(1)
         end
     end
 

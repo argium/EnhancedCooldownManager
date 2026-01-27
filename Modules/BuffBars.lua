@@ -31,6 +31,53 @@ EnhancedCooldownManager.BuffBars = BuffBars
 local WHITE8 = "Interface\\Buttons\\WHITE8X8"
 local DEFAULT_BAR_COLOR = { 0.90, 0.90, 0.90 }
 
+local PALETTES = {
+    ["Default"] = {
+        { 0.90, 0.90, 0.90 },
+    },
+    ["Rainbow"] = {
+        { 0.95, 0.27, 0.27 }, -- Red
+        { 0.95, 0.65, 0.27 }, -- Orange
+        { 0.95, 0.95, 0.27 }, -- Yellow
+        { 0.27, 0.95, 0.27 }, -- Green
+        { 0.27, 0.65, 0.95 }, -- Blue
+        { 0.58, 0.27, 0.95 }, -- Purple
+        { 0.95, 0.27, 0.65 }, -- Pink
+    },
+    ["Warm"] = {
+        { 0.95, 0.35, 0.25 }, -- Red-Orange
+        { 0.95, 0.55, 0.25 }, -- Orange
+        { 0.95, 0.75, 0.30 }, -- Golden
+        { 0.90, 0.60, 0.40 }, -- Tan
+    },
+    ["Cool"] = {
+        { 0.25, 0.70, 0.95 }, -- Sky Blue
+        { 0.30, 0.85, 0.85 }, -- Cyan
+        { 0.35, 0.65, 0.90 }, -- Ocean Blue
+        { 0.40, 0.55, 0.85 }, -- Deep Blue
+    },
+    ["Pastel"] = {
+        { 0.95, 0.75, 0.80 }, -- Pink
+        { 0.80, 0.85, 0.95 }, -- Light Blue
+        { 0.85, 0.95, 0.80 }, -- Light Green
+        { 0.95, 0.90, 0.75 }, -- Cream
+        { 0.90, 0.80, 0.95 }, -- Lavender
+    },
+    ["Neon"] = {
+        { 1.00, 0.10, 0.50 }, -- Hot Pink
+        { 0.10, 1.00, 0.90 }, -- Cyan
+        { 0.90, 1.00, 0.10 }, -- Lime
+        { 1.00, 0.40, 0.10 }, -- Orange
+        { 0.50, 0.10, 1.00 }, -- Purple
+    },
+    ["Earth"] = {
+        { 0.55, 0.45, 0.35 }, -- Brown
+        { 0.40, 0.60, 0.35 }, -- Moss Green
+        { 0.65, 0.55, 0.40 }, -- Sand
+        { 0.50, 0.40, 0.30 }, -- Dark Earth
+    },
+}
+
 --- Returns current class ID and spec ID.
 ---@return number|nil classID, number|nil specID
 local function GetCurrentClassSpec()
@@ -47,6 +94,7 @@ local function EnsureColorStorage(profile)
             colors = {},
             cache = {},
             defaultColor = DEFAULT_BAR_COLOR,
+            selectedPalette = nil,
         }
     end
     if not profile.buffBarColors.colors then
@@ -58,9 +106,27 @@ local function EnsureColorStorage(profile)
     if not profile.buffBarColors.defaultColor then
         profile.buffBarColors.defaultColor = DEFAULT_BAR_COLOR
     end
+    if profile.buffBarColors.selectedPalette == nil then
+        profile.buffBarColors.selectedPalette = nil
+    end
 end
 
---- Returns color for bar at index for current class/spec, or default if not set.
+--- Gets color from palette for the given bar index.
+---@param barIndex number
+---@param paletteName string
+---@return number r, number g, number b
+local function GetPaletteColor(barIndex, paletteName)
+    local palette = PALETTES[paletteName]
+    if not palette or #palette == 0 then
+        return DEFAULT_BAR_COLOR[1], DEFAULT_BAR_COLOR[2], DEFAULT_BAR_COLOR[3]
+    end
+
+    local colorIndex = ((barIndex - 1) % #palette) + 1
+    local color = palette[colorIndex]
+    return color[1], color[2], color[3]
+end
+
+--- Returns color for bar at index for current class/spec, or palette/default if not set.
 ---@param barIndex number 1-based index in layout order
 ---@param profile table
 ---@return number r, number g, number b
@@ -78,6 +144,11 @@ local function GetBarColor(barIndex, profile)
         if c then
             return c[1], c[2], c[3]
         end
+    end
+
+    local selectedPalette = profile.buffBarColors.selectedPalette
+    if selectedPalette and PALETTES[selectedPalette] then
+        return GetPaletteColor(barIndex, selectedPalette)
     end
 
     local dc = profile.buffBarColors.defaultColor or DEFAULT_BAR_COLOR
@@ -669,6 +740,56 @@ function BuffBars:HasCustomBarColor(barIndex)
 
     local colors = profile.buffBarColors.colors
     return colors[classID] and colors[classID][specID] and colors[classID][specID][barIndex] ~= nil
+end
+
+--- Returns all available palette names.
+---@return table<string, string>
+function BuffBars:GetPaletteNames()
+    local names = {}
+    for name in pairs(PALETTES) do
+        names[name] = name
+    end
+    return names
+end
+
+--- Sets the selected palette and optionally applies it to all bars.
+---@param paletteName string|nil
+---@param applyToAllBars boolean
+function BuffBars:SetSelectedPalette(paletteName, applyToAllBars)
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    if not profile then
+        return
+    end
+
+    EnsureColorStorage(profile)
+    profile.buffBarColors.selectedPalette = paletteName
+
+    if applyToAllBars then
+        local classID, specID = GetCurrentClassSpec()
+        if classID and specID then
+            local colors = profile.buffBarColors.colors
+            if colors[classID] and colors[classID][specID] then
+                colors[classID][specID] = {}
+            end
+        end
+    end
+
+    Util.Log("BuffBars", "SetSelectedPalette", { palette = paletteName, applyToAll = applyToAllBars })
+
+    self:ResetStyledMarkers()
+    self:ScheduleLayoutUpdate()
+end
+
+--- Gets the currently selected palette name.
+---@return string|nil
+function BuffBars:GetSelectedPalette()
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    if not profile then
+        return nil
+    end
+
+    EnsureColorStorage(profile)
+    return profile.buffBarColors.selectedPalette
 end
 
 function BuffBars:OnEnable()
