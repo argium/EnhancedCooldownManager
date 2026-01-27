@@ -139,7 +139,7 @@ local defaults = {
             showText          = true,
             showManaAsPercent = true,
             border            = {
-                enabled = true,
+                enabled = false,
                 thickness = DEFAULT_BORDER_THICKNESS,
                 color = DEFAULT_BORDER_COLOR,
             },
