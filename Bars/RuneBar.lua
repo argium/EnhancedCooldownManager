@@ -22,8 +22,6 @@ local Util = ns.Util
 
 -- Mixins
 local BarFrame = ns.Mixins.BarFrame
-local Lifecycle = ns.Mixins.Lifecycle
-local TickRenderer = ns.Mixins.TickRenderer
 
 local RuneBar = EnhancedCooldownManager:NewModule("RuneBar", "AceEvent-3.0")
 EnhancedCooldownManager.RuneBar = RuneBar
@@ -34,7 +32,7 @@ EnhancedCooldownManager.RuneBar = RuneBar
 
 local function ShouldShowRuneBar()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local cfg = profile.runeBar
+    local cfg = profile and profile.runeBar
     local _, class = UnitClass("player")
     return cfg and cfg.enabled and class == "DEATHKNIGHT"
 end
@@ -180,7 +178,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         local gbl = profile and profile.global
         local tex = BarFrame.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
 
-        -- Use same positioning logic as TickRenderer to avoid sub-pixel gaps
+        -- Use same positioning logic as BarFrame tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
         for pos, runeIndex in ipairs(bar._displayOrder) do
             local frag = bar.FragmentedBars[runeIndex]
@@ -217,34 +215,26 @@ end
 -- Frame Management (uses BarFrame mixin)
 --------------------------------------------------------------------------------
 
---- Returns or creates the rune bar frame.
----@return Frame
-function RuneBar:GetFrame()
-    if self._frame then
-        return self._frame
-    end
-
+--- Creates the rune bar frame.
+---@return ECM_RuneBarFrame
+function RuneBar:CreateFrame()
     Util.Log("RuneBar", "Creating frame")
 
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
-    -- Create base bar with Background + StatusBar
-    self._frame = BarFrame.Create(
-        ADDON_NAME .. "RuneBar",
-        UIParent,
-        BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT
-    )
+    frame.FragmentedBars = {}
 
-    -- Add tick functionality for resource dividers
-    TickRenderer.AttachTo(self._frame)
+    frame:SetAppearance(profile and profile.runeBar, profile)
 
-    -- Initialize fragmented bars container
-    self._frame.FragmentedBars = {}
+    if not frame._onUpdateAttached then
+        frame._onUpdateAttached = true
+        frame:SetScript("OnUpdate", function()
+            RuneBar:OnUpdateThrottled()
+        end)
+    end
 
-    -- Apply initial appearance
-    self._frame:SetAppearance(profile and profile.runeBar, profile)
-
-    return self._frame
+    return frame
 end
 
 
@@ -252,16 +242,19 @@ end
 -- Layout and Rendering
 --------------------------------------------------------------------------------
 
--- UpdateLayout is injected by Lifecycle.Setup with onLayoutSetup hook
 
 --- Updates values: rune status and colors.
 function RuneBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if self._externallyHidden or not (profile and profile.runeBar and profile.runeBar.enabled) then
+    local cfg = profile and profile.runeBar
+    if self:IsHidden() or not (cfg and cfg.enabled) then
         return
     end
 
     if not ShouldShowRuneBar() then
+        if self._frame then
+            self._frame:Hide()
+        end
         return
     end
 
@@ -270,13 +263,29 @@ function RuneBar:Refresh()
         return
     end
 
-    local maxRunes, _, _ = GetResourceValue(profile)
+    local maxRunes = GetResourceValue(profile)
     if not maxRunes or maxRunes <= 0 then
+        bar:Hide()
         return
     end
 
+    if bar._maxResources ~= maxRunes then
+        bar._maxResources = maxRunes
+        bar._lastReadySet = nil
+        bar._displayOrder = nil
+    end
+
+    bar.StatusBar:SetMinMaxValues(0, maxRunes)
+
+    EnsureFragmentedBars(bar, maxRunes)
+
+    local tickCount = math.max(0, maxRunes - 1)
+    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
+
     UpdateFragmentedRuneDisplay(bar, maxRunes)
     bar:LayoutResourceTicks(maxRunes, { 0, 0, 0, 1 }, 1, "ticks")
+
+    bar:Show()
 end
 
 --------------------------------------------------------------------------------
@@ -284,19 +293,24 @@ end
 --------------------------------------------------------------------------------
 
 function RuneBar:OnUpdateThrottled()
-    if self._externallyHidden then
-        return
-    end
-
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if not (profile and profile.runeBar and profile.runeBar.enabled) then
+    if self:IsHidden() or not (profile and profile.runeBar and profile.runeBar.enabled) then
         return
     end
 
-    Lifecycle.ThrottledRefresh(self)
+    self:ThrottledRefresh()
 end
 
-function RuneBar:OnUnitEvent(event, unit)
+function RuneBar:OnUnitPower(_, unit)
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    if unit ~= "player" or self:IsHidden() or not (profile and profile.runeBar and profile.runeBar.enabled) then
+        return
+    end
+
+    self:OnUpdateThrottled()
+end
+
+function RuneBar:OnUnitEvent(_, unit)
     if unit == "player" then
         self:OnUpdateThrottled()
     end
@@ -306,53 +320,21 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-BarFrame.Setup(RuneBar, {
-    name = "RuneBar",
-    configKey = "runeBar",
-    shouldShow = ShouldShowRuneBar,
-    layoutEvents = {
-        "PLAYER_SPECIALIZATION_CHANGED",
-        "PLAYER_ENTERING_WORLD",
-    },
-    refreshEvents = {
+function RuneBar:OnDisable()
+    local frame = self._frame
+    if frame and frame._onUpdateAttached then
+        frame._onUpdateAttached = nil
+        frame:SetScript("OnUpdate", nil)
+    end
+end
+
+BarFrame.AddMixin(
+    RuneBar,
+    "RuneBar",
+    "runeBar",
+    nil,
+    {
         { event = "RUNE_POWER_UPDATE", handler = "OnUpdateThrottled" },
         { event = "RUNE_TYPE_UPDATE", handler = "OnUpdateThrottled" },
-    },
-    onDisable = function(self)
-        if self._frame and self._frame._onUpdateAttached then
-            self._frame._onUpdateAttached = nil
-            self._frame:SetScript("OnUpdate", nil)
-        end
-    end,
-})
-
-function RuneBar:OnLayoutComplete(bar, cfg, profile)
-    local maxRunes = GetResourceValue(profile)
-    if not maxRunes or maxRunes <= 0 then
-        bar:Hide()
-        return false
-    end
-
-    bar._maxResources = maxRunes
-    bar.StatusBar:SetMinMaxValues(0, maxRunes)
-
-    -- Set up fragmented bars for runes
-    EnsureFragmentedBars(bar, maxRunes)
-    bar._lastReadySet = nil
-    bar._displayOrder = nil
-
-    -- Set up ticks
-    local tickCount = math.max(0, maxRunes - 1)
-    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
-    bar:LayoutResourceTicks(maxRunes, { 0, 0, 0, 1 }, 1, "ticks")
-
-    -- Set up OnUpdate for continuous recharge animation
-    if not bar._onUpdateAttached then
-        bar._onUpdateAttached = true
-        bar:SetScript("OnUpdate", function()
-            RuneBar:OnUpdateThrottled()
-        end)
-    end
-
-    return true
-end
+    }
+)

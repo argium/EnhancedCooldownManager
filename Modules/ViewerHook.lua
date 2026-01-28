@@ -10,9 +10,10 @@
 ---@class ECM_BarModule
 ---@field GetFrame fun(self: ECM_BarModule): Frame
 ---@field GetFrameIfShown fun(self: ECM_BarModule): Frame|nil
----@field SetExternallyHidden fun(self: ECM_BarModule, hidden: boolean)
+---@field SetHidden fun(self: ECM_BarModule, hidden: boolean)
+---@field IsHidden fun(self: ECM_BarModule): boolean
 ---@field UpdateLayout fun(self: ECM_BarModule)
----@field _lifecycleConfig table
+---@field _name string
 
 local _, ns = ...
 local EnhancedCooldownManager = ns.Addon
@@ -168,7 +169,7 @@ local function HideAllFrames()
         end
     end)
     ForEachBarModule(function(module)
-        module:SetExternallyHidden(true)
+        module:SetHidden(true)
     end)
 end
 
@@ -180,7 +181,7 @@ local function ShowAllFrames()
         end
     end)
     ForEachBarModule(function(module)
-        module:SetExternallyHidden(false)
+        module:SetHidden(false)
     end)
 end
 
@@ -253,7 +254,7 @@ local function ApplyFadeFromHidden(duration, targetAlpha)
         if frame then
             frame:SetAlpha(0)
         end
-        module:SetExternallyHidden(false)
+        module:SetHidden(false)
     end)
 
     local fadeInfo = {
@@ -487,7 +488,7 @@ function ViewerHook:ScheduleLayoutUpdate(delay)
 end
 
 function ViewerHook:RegisterBar(module)
-    Util.Log("ViewerHook", "RegisterBar", { module = module._lifecycleConfig.name })
+    Util.Log("ViewerHook", "RegisterBar", { module = module:GetName() })
     for _, existing in ipairs(_registeredBars) do
         if existing == module then
             return

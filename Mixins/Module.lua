@@ -11,6 +11,21 @@ ns.Mixins.Module = Module
 
 local DEFAULT_REFRESH_FREQUENCY = 0.066
 
+---@class ECMModule
+---@field _name string
+---@field _config table|nil
+---@field _layoutEvents string[]
+---@field _refreshEvents RefreshEvent[]
+---@field _lastUpdate number|nil
+---@field _frame Frame|nil
+---@field GetOrCreateFrame fun(self: ECMModule): Frame
+---@field RegisterEvent fun(self: ECMModule, event: string, handler: string|fun(...))
+---@field UnregisterEvent fun(self: ECMModule, event: string)
+---@field OnEnable fun(self: ECMModule)
+---@field OnDisable fun(self: ECMModule)
+---@field UpdateLayout fun(self: ECMModule)
+---@field Refresh fun(self: ECMModule)
+
 --- Gets the name of the module.
 --- @return string Name of the module
 function Module:GetName()
@@ -22,30 +37,25 @@ function Module:GetConfig()
 end
 
 --- Refreshes the module if enough time has passed since the last update.
---- @param module table Module to refresh
 --- @return boolean True if refreshed, false if skipped due to throttling
-function Module:ThrottledRefresh(module)
-    if module._paused then
-        return false
-    end
-
+function Module:ThrottledRefresh()
     local profile = ECM.db and ECM.db.profile
     local freq = (profile and profile.updateFrequency) or DEFAULT_REFRESH_FREQUENCY
-    if GetTime() - (module._lastUpdate or 0) < freq then
+    if GetTime() - (self._lastUpdate or 0) < freq then
         return false
     end
 
-    module:Refresh()
-    module._lastUpdate = GetTime()
+    self:Refresh()
+    self._lastUpdate = GetTime()
     return true
-end
-
-function Module:SetPaused(paused)
-    self._paused = paused
 end
 
 function Module:Enable()
     self._lastUpdate = GetTime()
+
+    if self.GetOrCreateFrame then
+        self:GetOrCreateFrame()
+    end
 
     for _, eventConfig in ipairs(self._refreshEvents) do
         self:RegisterEvent(eventConfig.event, eventConfig.handler)
@@ -88,8 +98,12 @@ end
 function Module:Refresh()
 end
 
+function Module:OnConfigChanged(config)
+end
+
 function Module:SetConfig(config)
     self._config = config
+    self:OnConfigChanged(config)
 end
 
 ---@class RefreshEvent

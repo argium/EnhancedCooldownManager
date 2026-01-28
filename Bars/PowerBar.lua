@@ -19,14 +19,9 @@ local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
 
 local BarFrame = ns.Mixins.BarFrame
-local TickRenderer = ns.Mixins.TickRenderer
 
 local PowerBar = EnhancedCooldownManager:NewModule("PowerBar", "AceEvent-3.0")
 EnhancedCooldownManager.PowerBar = PowerBar
-
---------------------------------------------------------------------------------
--- Domain Logic (module-specific value/config handling)
---------------------------------------------------------------------------------
 
 --- Returns max/current/display values for primary resource formatting.
 ---@param resource Enum.PowerType|nil
@@ -98,34 +93,21 @@ end
 -- Frame Management (uses BarFrame mixin)
 --------------------------------------------------------------------------------
 
---- Returns or creates the power bar frame.
+--- Creates the power bar frame.
 ---@return ECM_PowerBarFrame
-function PowerBar:GetFrame()
-    if self._frame then
-        return self._frame
-    end
-
+function PowerBar:CreateFrame()
     Util.Log("PowerBar", "Creating frame")
 
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-
-    -- Create base bar with Background + StatusBar
-    self._frame = BarFrame.Create(
-        ADDON_NAME .. "PowerBar",
-        UIParent,
-        BarFrame.DEFAULT_POWER_BAR_HEIGHT
-    )
+    local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
     -- Add text overlay (PowerBar-specific)
-    BarFrame.AddTextOverlay(self._frame, profile)
-
-    -- Add tick functionality
-    TickRenderer.AttachTo(self._frame)
+    BarFrame.AddTextOverlay(frame, profile)
 
     -- Apply initial appearance
-    self._frame:SetAppearance(profile and profile.powerBar, profile)
+    frame:SetAppearance(profile and profile.powerBar, profile)
 
-    return self._frame
+    return frame
 end
 
 --------------------------------------------------------------------------------
@@ -156,7 +138,7 @@ end
 function PowerBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     local cfg = profile and profile.powerBar
-    if self._externallyHidden or not (cfg and cfg.enabled) then
+    if self:IsHidden() or not (cfg and cfg.enabled) then
         return
     end
 
@@ -203,7 +185,7 @@ end
 
 function PowerBar:OnUnitPower(_, unit)
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if unit ~= "player" or self._externallyHidden or not (profile and profile.powerBar and profile.powerBar.enabled) then
+    if unit ~= "player" or self:IsHidden() or not (profile and profile.powerBar and profile.powerBar.enabled) then
         return
     end
 
@@ -217,8 +199,3 @@ BarFrame.AddMixin(
     nil,
     nil
 )
-
--- function PowerBar:OnLayoutComplete(bar, cfg, profile)
---     BarFrame.ApplyFont(bar.TextValue, profile)
---     return true
--- end

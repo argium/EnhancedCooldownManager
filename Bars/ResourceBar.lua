@@ -18,8 +18,6 @@ local Util = ns.Util
 
 -- Mixins
 local BarFrame = ns.Mixins.BarFrame
-local Lifecycle = ns.Mixins.Lifecycle
-local TickRenderer = ns.Mixins.TickRenderer
 
 local ResourceBar = EnhancedCooldownManager:NewModule("ResourceBar", "AceEvent-3.0")
 EnhancedCooldownManager.ResourceBar = ResourceBar
@@ -63,7 +61,7 @@ end
 
 local function ShouldShowResourceBar()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    local cfg = profile.resourceBar
+    local cfg = profile and profile.resourceBar
     local _, class = UnitClass("player")
     local discretePower = GetDiscretePowerType()
     return cfg and cfg.enabled and ((class == "DEMONHUNTER" and GetSpecialization() ~= C_SPECID_DH_HAVOC) or discretePower ~= nil)
@@ -114,31 +112,17 @@ end
 -- Frame Management (uses BarFrame mixin)
 --------------------------------------------------------------------------------
 
---- Returns or creates the resource bar frame.
+--- Creates the resource bar frame.
 ---@return ECM_ResourceBarFrame
-function ResourceBar:GetFrame()
-    if self._frame then
-        return self._frame
-    end
-
+function ResourceBar:CreateFrame()
     Util.Log("ResourceBar", "Creating frame")
 
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
-    -- Create base bar with Background + StatusBar
-    self._frame = BarFrame.Create(
-        ADDON_NAME .. "ResourceBar",
-        UIParent,
-        BarFrame.DEFAULT_RESOURCE_BAR_HEIGHT
-    )
+    frame:SetAppearance(profile and profile.resourceBar, profile)
 
-    -- Add tick functionality for resource dividers
-    TickRenderer.AttachTo(self._frame)
-
-    -- Apply initial appearance
-    self._frame:SetAppearance(profile and profile.resourceBar, profile)
-
-    return self._frame
+    return frame
 end
 
 
@@ -146,17 +130,19 @@ end
 -- Layout and Rendering
 --------------------------------------------------------------------------------
 
--- UpdateLayout is injected by Lifecycle.Setup with onLayoutSetup hook
 
 --- Updates values: status bar value, colors.
 function ResourceBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     local cfg = profile and profile.resourceBar
-    if self._externallyHidden or not (cfg and cfg.enabled) then
+    if self:IsHidden() or not (cfg and cfg.enabled) then
         return
     end
 
     if not ShouldShowResourceBar() then
+        if self._frame then
+            self._frame:Hide()
+        end
         return
     end
 
@@ -167,67 +153,54 @@ function ResourceBar:Refresh()
 
     local maxResources, currentValue, kind = GetValues(profile)
     if not maxResources or maxResources <= 0 then
+        bar:Hide()
         return
     end
 
-    bar.StatusBar:SetValue(currentValue or 0)
-    local color = cfg.colors[kind] or {}
-    bar.StatusBar:SetStatusBarColor(color[1] or 1, color[2] or 1, color[3] or 1)
+    currentValue = currentValue or 0
 
+    local color = (cfg.colors and cfg.colors[kind]) or {}
+    bar:SetValue(0, maxResources, currentValue, color[1] or 1, color[2] or 1, color[3] or 1)
+
+    local tickCount = math.max(0, maxResources - 1)
+    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
     bar:LayoutResourceTicks(maxResources, { 0, 0, 0, 1 }, 1, "ticks")
+
+    bar:Show()
 end
 
 --------------------------------------------------------------------------------
 -- Event Handling
 --------------------------------------------------------------------------------
 
-function ResourceBar:OnUpdateThrottled()
+function ResourceBar:OnUnitPower(_, unit)
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if self._externallyHidden or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
+    if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
         return
     end
 
-    Lifecycle.ThrottledRefresh(self)
+    self:ThrottledRefresh()
 end
 
-function ResourceBar:OnUnitEvent(event, unit)
-    if unit == "player" then
-        self:OnUpdateThrottled()
+function ResourceBar:OnUnitEvent(_, unit)
+    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
+        return
     end
+
+    self:ThrottledRefresh()
 end
 
 --------------------------------------------------------------------------------
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-BarFrame.Setup(ResourceBar, {
-    name = "ResourceBar",
-    configKey = "resourceBar",
-    shouldShow = ShouldShowResourceBar,
-    layoutEvents = {
-        "PLAYER_SPECIALIZATION_CHANGED",
-        "PLAYER_ENTERING_WORLD",
-        "UPDATE_SHAPESHIFT_FORM",
-    },
-    refreshEvents = {
-        { event = "UNIT_POWER_UPDATE", handler = "OnUnitEvent" },
+BarFrame.AddMixin(
+    ResourceBar,
+    "ResourceBar",
+    "resourceBar",
+    nil,
+    {
         { event = "UNIT_AURA", handler = "OnUnitEvent" },
-    },
-})
-
-function ResourceBar:OnLayoutComplete(bar, cfg, profile)
-    local maxResources = GetValues(profile)
-    if not maxResources or maxResources <= 0 then
-        bar:Hide()
-        return false
-    end
-
-    bar._maxResources = maxResources
-    bar.StatusBar:SetMinMaxValues(0, maxResources)
-
-    local tickCount = math.max(0, maxResources - 1)
-    bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
-    bar:LayoutResourceTicks(maxResources, { 0, 0, 0, 1 }, 1, "ticks")
-
-    return true
-end
+    }
+)

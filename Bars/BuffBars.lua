@@ -6,6 +6,7 @@ local _, ns = ...
 local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
 local BarHelpers = EnhancedCooldownManager.BarHelpers
+local PositionMixin = ns.Mixins.PositionMixin
 
 ---@class Frame
 ---@class StatusBar : Frame
@@ -19,8 +20,9 @@ local BarHelpers = EnhancedCooldownManager.BarHelpers
 ---@field __ecmStyled boolean|nil
 
 ---@class ECM_BuffBarViewer : Frame
----@field _lastAnchor Frame|nil
----@field _lastOffsetY number|nil
+---@field _layoutCache table|nil
+---@field ApplyLayout fun(self: ECM_BuffBarViewer, params: table): boolean
+---@field InvalidateLayout fun(self: ECM_BuffBarViewer): nil
 ---@field __ecmHooked boolean|nil
 ---@field __ecmLayoutRunning boolean|nil
 
@@ -374,7 +376,11 @@ function BuffBars:ResetStyledMarkers()
     end
 
     -- Clear anchor cache to force re-anchor
-    viewer._lastAnchor = nil
+    if viewer.InvalidateLayout then
+        viewer:InvalidateLayout()
+    else
+        viewer._layoutCache = nil
+    end
 
     -- Clear styled markers on all children
     local children = { viewer:GetChildren() }
@@ -435,10 +441,12 @@ function BuffBars:HookViewer()
         return
     end
 
-    if viewer.__ecmHooked then
+    self._viewerLayoutCache = self._viewerLayoutCache or {}
+
+    if self._viewerHooked then
         return
     end
-    viewer.__ecmHooked = true
+    self._viewerHooked = true
 
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
@@ -446,8 +454,8 @@ function BuffBars:HookViewer()
     end)
 
     -- Hook OnSizeChanged for responsive layout
-    viewer:HookScript("OnSizeChanged", function(f)
-        if f.__ecmLayoutRunning then
+    viewer:HookScript("OnSizeChanged", function()
+        if self._layoutRunning then
             return
         end
         self:ScheduleLayoutUpdate()
@@ -549,7 +557,7 @@ function BuffBars:LayoutBars()
         return
     end
 
-    viewer.__ecmLayoutRunning = true
+    self._layoutRunning = true
 
     local visibleChildren = GetSortedVisibleChildren(viewer)
     local prev
@@ -569,7 +577,7 @@ function BuffBars:LayoutBars()
 
     Util.Log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
 
-    viewer.__ecmLayoutRunning = nil
+    self._layoutRunning = nil
 end
 
 --- Updates layout: positioning, sizing, anchoring, appearance.
@@ -582,42 +590,20 @@ function BuffBars:UpdateLayout()
 
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     local cfg = profile.buffBars or {}
-    local isChainMode = (cfg.anchorMode or "chain") == "chain"
+    self._viewerLayoutCache = self._viewerLayoutCache or {}
 
-    -- Create appropriate strategy for BuffBars
-    local PositionStrategy = ns.Mixins.PositionStrategy
-    local strategy = PositionStrategy.Create(cfg, true)
+    local params, anchorMode = PositionMixin.CalculateBuffBarsLayout(cfg, profile)
 
-    -- Get positioning parameters from strategy
-    local anchor, isAnchoredToViewer = strategy:GetAnchor(EnhancedCooldownManager, nil)
-    if not anchor then
-        Util.Log("BuffBars", "UpdateLayout skipped - no anchor")
-        return
+    local preservePosition = anchorMode == "independent"
+        and self._viewerLayoutCache.lastMode == "chain"
+
+    if preservePosition then
+        local preservedX, preservedY = PositionMixin.CaptureCurrentTopOffset(viewer)
+        params.offsetX = preservedX
+        params.offsetY = preservedY
     end
 
-    local offsetX = strategy:GetOffsetX(cfg)
-    local offsetY = strategy:GetOffsetY(cfg, profile, isAnchoredToViewer)
-    local width = strategy:GetWidth(cfg)
-
-    -- Check if layout needs updating
-    local _, rel1 = viewer:GetPoint(1)
-    local _, rel2 = viewer:GetPoint(2)
-    local layoutChanged = viewer._lastAnchor ~= anchor
-        or viewer._lastOffsetY ~= offsetY
-        or (isChainMode and (rel1 ~= anchor or rel2 ~= anchor))
-
-    if layoutChanged then
-        -- Preserve position when switching from chain to independent
-        local preservePosition = not isChainMode and viewer._lastAnchor ~= nil
-        strategy:ApplyPoints(viewer, anchor, offsetX, offsetY, { preservePosition = preservePosition })
-        viewer._lastAnchor = isChainMode and anchor or nil
-        viewer._lastOffsetY = isChainMode and offsetY or nil
-    end
-
-    -- Apply width for independent mode
-    if not isChainMode then
-        viewer:SetWidth(width)
-    end
+    PositionMixin.ApplyLayout(viewer, params, self._viewerLayoutCache)
 
     -- Hook all children for anchor change detection
     for _, child in ipairs({ viewer:GetChildren() }) do
@@ -636,10 +622,9 @@ function BuffBars:UpdateLayout()
     self:LayoutBars()
 
     Util.Log("BuffBars", "UpdateLayout complete", {
-        strategy = strategy:GetStrategyKey(),
-        anchorMode = cfg.anchorMode or "chain",
-        width = not isChainMode and width or nil,
-        offsetY = offsetY,
+        anchorMode = anchorMode,
+        width = params.width or nil,
+        offsetY = params.offsetY,
         visibleCount = #visibleChildren,
     })
 end

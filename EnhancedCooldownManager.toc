@@ -37,7 +37,6 @@ UI\Options.lua
 Mixins\Module.lua
 Mixins\PositionStrategy.lua
 Mixins\BarFrame.lua
-Mixins\TickRenderer.lua
 
 Bars\PowerBar.lua
 Bars\ResourceBar.lua

@@ -2,40 +2,70 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
+---@class Frame
+---@field ClearAllPoints fun(self: Frame)
+---@field SetPoint fun(self: Frame, point: string, relativeTo: Frame, relativePoint: string, offsetX: number, offsetY: number)
+---@field SetHeight fun(self: Frame, height: number)
+---@field SetWidth fun(self: Frame, width: number)
+---@field GetTop fun(self: Frame): number|nil
+---@field GetCenter fun(self: Frame): number|nil, number|nil
+
+---@class ECM_PositionedFrame : Frame
+---@field _layoutCache table|nil
+---@field ApplyLayout fun(self: ECM_PositionedFrame, params: ECM_LayoutParams): boolean
+---@field InvalidateLayout fun(self: ECM_PositionedFrame): nil
+
+---@class ECMPositionedModule
+---@field _configKey string
+---@field GetConfig fun(self: ECMPositionedModule): table|nil
+---@field GetName fun(self: ECMPositionedModule): string
+---@field GetFrameIfShown fun(self: ECMPositionedModule): Frame|nil
+
 local _, ns = ...
+local ECM = ns.Addon
+local Util = ns.Util
 
---- Positioning strategy interface for bar placement.
----@class PositionStrategyInterface
----@field GetAnchor fun(self: PositionStrategyInterface, addon: table, moduleName: string|nil): Frame, boolean
----@field GetOffsetX fun(self: PositionStrategyInterface, cfg: table): number
----@field GetOffsetY fun(self: PositionStrategyInterface, cfg: table, profile: table, isAnchoredToViewer: boolean): number
----@field GetWidth fun(self: PositionStrategyInterface, cfg: table): number|nil
----@field ApplyPoints fun(self: PositionStrategyInterface, frame: Frame, anchor: Frame, offsetX: number, offsetY: number, opts: table|nil): nil
----@field GetStrategyKey fun(self: PositionStrategyInterface): string
+---@class ECM_LayoutParams
+---@field anchor Frame
+---@field offsetX number
+---@field offsetY number
+---@field width number|nil
+---@field height number|nil
+---@field anchorPoint string
+---@field anchorRelativePoint string
+---@field matchAnchorWidth boolean
+---@field mode "chain"|"independent"
 
-local PositionStrategy = {}
+local PositionMixin = {}
 ns.Mixins = ns.Mixins or {}
-ns.Mixins.PositionStrategy = PositionStrategy
+ns.Mixins.PositionMixin = PositionMixin
+ns.Mixins.PositionStrategy = PositionMixin
 
---- Calculates the anchor frame for a bar module.
+local CHAIN_ORDER = { "PowerBar", "ResourceBar", "RuneBar" }
+
+local function GetBarFrame()
+    assert(ns.Mixins and ns.Mixins.BarFrame, "BarFrame mixin required")
+    return ns.Mixins.BarFrame
+end
+
+--- Calculates the anchor frame for a bar module in chain mode.
 --- Chain order: Viewer -> PowerBar -> ResourceBar -> RuneBar.
----
 --- When moduleName is nil, returns the bottom-most visible bar (for BuffBars).
---- When moduleName is provided, returns the previous visible bar in chain order
---- (to avoid circular anchoring between bar modules).
 ---@param addon table The EnhancedCooldownManager addon table
 ---@param moduleName string|nil Module name to find anchor for (nil = append to bottom)
 ---@return Frame anchor The frame to anchor to
----@return boolean isAnchoredToViewer True if anchoring directly to the viewer
-local function CalculateAnchor(addon, moduleName)
-    local viewer = BarFrame.GetViewerAnchor()
-    local chain = { "PowerBar", "ResourceBar", "RuneBar" }
-    local profile = addon and addon.db and addon.db.profile
+---@return boolean isFirstInChain True if anchoring directly to the viewer
+local function ResolveChainAnchor(addon, moduleName)
+    assert(addon, "addon required")
+    local profile = addon.db and addon.db.profile
+    assert(profile, "profile required")
 
-    -- Find the stopping point in the chain
-    local stopIndex = #chain + 1 -- Default: iterate all (for BuffBars)
+    local BarFrame = GetBarFrame()
+    local viewer = BarFrame.GetViewerAnchor()
+
+    local stopIndex = #CHAIN_ORDER + 1
     if moduleName then
-        for i, name in ipairs(chain) do
+        for i, name in ipairs(CHAIN_ORDER) do
             if name == moduleName then
                 stopIndex = i
                 break
@@ -43,18 +73,20 @@ local function CalculateAnchor(addon, moduleName)
         end
     end
 
-    -- Find the last visible bar before stopIndex
     local lastVisible
     for i = 1, stopIndex - 1 do
-        local modName = chain[i]
-        local mod = addon and addon[modName]
-        local configKey = mod and mod._barConfig and mod._barConfig.configKey
-        local cfg = configKey and profile and profile[configKey]
-        local isIndependent = cfg and cfg.anchorMode == "independent"
-        if not isIndependent and mod and mod.GetFrameIfShown then
-            local f = mod:GetFrameIfShown()
-            if f then
-                lastVisible = f
+        local modName = CHAIN_ORDER[i]
+        local mod = addon[modName]
+        if mod then
+            local configKey = mod._configKey
+            local cfg = configKey and profile[configKey]
+            local isIndependent = cfg and cfg.anchorMode == "independent"
+            if not isIndependent then
+                assert(mod.GetFrameIfShown, "module missing GetFrameIfShown")
+                local f = mod:GetFrameIfShown()
+                if f then
+                    lastVisible = f
+                end
             end
         end
     end
@@ -66,227 +98,221 @@ local function CalculateAnchor(addon, moduleName)
     return viewer, true
 end
 
-
---------------------------------------------------------------------------------
--- ChainStrategy - Automatic positioning in bar stack
---------------------------------------------------------------------------------
-
-local ChainStrategy = {}
-ChainStrategy.__index = ChainStrategy
-
-function ChainStrategy:GetStrategyKey()
-    return "chain"
+---@param cfg table|nil
+---@param profile table
+---@param anchor Frame
+---@param isFirstInChain boolean
+---@return ECM_LayoutParams
+local function BuildChainLayoutParams(cfg, profile, anchor, isFirstInChain)
+    local BarFrame = GetBarFrame()
+    return {
+        anchor = anchor,
+        offsetX = 0,
+        offsetY = isFirstInChain and -BarFrame.GetTopGapOffset(cfg, profile) or -((cfg and cfg.offsetY) or 0),
+        width = nil,
+        height = BarFrame.GetBarHeight(cfg, profile),
+        anchorPoint = "TOPLEFT",
+        anchorRelativePoint = "BOTTOMLEFT",
+        matchAnchorWidth = true,
+        mode = "chain",
+    }
 end
 
---- Returns the anchor frame for chain positioning.
---- Uses BarFrame.CalculateAnchor to find the previous visible bar or viewer.
----@param addon table The EnhancedCooldownManager addon table
----@param moduleName string|nil Module name to find anchor for (nil = bottom-most)
----@return Frame anchor The frame to anchor to
----@return boolean isAnchoredToViewer True if anchoring directly to the viewer
-function ChainStrategy:GetAnchor(addon, moduleName)
-    return CalculateAnchor(addon, moduleName)
+---@param cfg table|nil
+---@param profile table
+---@return ECM_LayoutParams
+local function BuildIndependentLayoutParams(cfg, profile)
+    assert(Util and Util.PixelSnap, "Util.PixelSnap required")
+    local BarFrame = GetBarFrame()
+    return {
+        anchor = UIParent,
+        offsetX = (cfg and cfg.offsetX) or 0,
+        offsetY = (cfg and cfg.offsetY) or 0,
+        width = Util.PixelSnap((cfg and cfg.width) or BarFrame.DEFAULT_BAR_WIDTH),
+        height = BarFrame.GetBarHeight(cfg, profile),
+        anchorPoint = "CENTER",
+        anchorRelativePoint = "CENTER",
+        matchAnchorWidth = false,
+        mode = "independent",
+    }
 end
 
---- Returns horizontal offset (always 0 for chain mode).
----@param cfg table Module-specific config
----@return number
-function ChainStrategy:GetOffsetX(cfg)
-    return 0
+---@param cfg table|nil
+---@param profile table
+---@return ECM_LayoutParams
+local function BuildBuffBarsIndependentParams(cfg, profile)
+    assert(Util and Util.PixelSnap, "Util.PixelSnap required")
+    local BarFrame = GetBarFrame()
+    return {
+        anchor = UIParent,
+        offsetX = (cfg and cfg.offsetX) or 0,
+        offsetY = (cfg and cfg.offsetY) or 0,
+        width = Util.PixelSnap((cfg and cfg.width) or BarFrame.DEFAULT_BAR_WIDTH),
+        height = nil,
+        anchorPoint = "TOP",
+        anchorRelativePoint = "TOP",
+        matchAnchorWidth = false,
+        mode = "independent",
+    }
 end
 
---- Returns vertical offset (negated to create gap below anchor).
---- For top bar (anchored to viewer): uses profile.offsetY + cfg.offsetY
---- For chain bars: uses cfg.offsetY only
----@param cfg table Module-specific config
----@param profile table Full profile table
----@param isAnchoredToViewer boolean True if anchoring to viewer
----@return number
-function ChainStrategy:GetOffsetY(cfg, profile, isAnchoredToViewer)
-    local BarFrame = ns.Mixins.BarFrame
-    if isAnchoredToViewer then
-        return -BarFrame.GetTopGapOffset(cfg, profile)
-    else
-        return -((cfg and cfg.offsetY) or 0)
+--- Captures the current top-anchored offsets for a frame relative to UIParent.
+---@param frame ECM_PositionedFrame
+---@return number offsetX, number offsetY
+function PositionMixin.CaptureCurrentTopOffset(frame)
+    assert(frame, "frame required")
+    local top = frame:GetTop()
+    local centerX = frame:GetCenter()
+    local parentCenterX = UIParent:GetCenter()
+    local parentTop = UIParent:GetTop()
+
+    if top and centerX and parentCenterX and parentTop then
+        return centerX - parentCenterX, top - parentTop
     end
+
+    return 0, 0
 end
 
---- Returns width (nil to match anchor width).
----@param cfg table Module-specific config
----@return number|nil
-function ChainStrategy:GetWidth(cfg)
-    return nil
+--- Attaches layout methods and cache to a frame.
+---@param frame ECM_PositionedFrame
+function PositionMixin.AttachTo(frame)
+    assert(frame, "frame required")
+    if not frame._layoutCache then
+        frame._layoutCache = {}
+    end
+    frame.ApplyLayout = PositionMixin.ApplyLayout
+    frame.InvalidateLayout = PositionMixin.InvalidateLayout
 end
 
---- Applies anchor points for chain positioning.
---- Uses TOPLEFT + TOPRIGHT anchoring to match anchor width.
----@param frame Frame The frame to position
----@param anchor Frame The anchor frame
----@param offsetX number Horizontal offset (ignored in chain mode)
----@param offsetY number Vertical offset
----@param opts table|nil Optional parameters (ignored for chain)
-function ChainStrategy:ApplyPoints(frame, anchor, offsetX, offsetY, opts)
-    frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offsetY)
-    frame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, offsetY)
-end
+--- Clears cached layout state for a frame.
+---@param frame ECM_PositionedFrame
+function PositionMixin.InvalidateLayout(frame, cache)
+    assert(frame, "frame required")
 
---------------------------------------------------------------------------------
--- IndependentStrategy - Custom positioning relative to screen center
---------------------------------------------------------------------------------
-
-local IndependentStrategy = {}
-IndependentStrategy.__index = IndependentStrategy
-
-function IndependentStrategy:GetStrategyKey()
-    return "independent"
-end
-
---- Returns UIParent for independent positioning.
----@param addon table The EnhancedCooldownManager addon table
----@param moduleName string|nil Module name (ignored for independent)
----@return Frame anchor Always UIParent
----@return boolean isAnchoredToViewer Always false
-function IndependentStrategy:GetAnchor(addon, moduleName)
-    return UIParent, false
-end
-
---- Returns horizontal offset from config.
----@param cfg table Module-specific config
----@return number
-function IndependentStrategy:GetOffsetX(cfg)
-    return (cfg and cfg.offsetX) or 0
-end
-
---- Returns vertical offset from config (no negation).
----@param cfg table Module-specific config
----@param profile table Full profile table
----@param isAnchoredToViewer boolean (ignored for independent)
----@return number
-function IndependentStrategy:GetOffsetY(cfg, profile, isAnchoredToViewer)
-    return (cfg and cfg.offsetY) or 0
-end
-
---- Returns width from config or default.
----@param cfg table Module-specific config
----@return number
-function IndependentStrategy:GetWidth(cfg)
-    local Util = ns.Util
-    local BarFrame = ns.Mixins.BarFrame
-    return Util.PixelSnap((cfg and cfg.width) or BarFrame.DEFAULT_BAR_WIDTH)
-end
-
---- Applies anchor points for independent positioning.
---- Uses CENTER anchoring relative to UIParent.
----@param frame Frame The frame to position
----@param anchor Frame The anchor frame (should be UIParent)
----@param offsetX number Horizontal offset
----@param offsetY number Vertical offset
----@param opts table|nil Optional parameters (ignored for independent)
-function IndependentStrategy:ApplyPoints(frame, anchor, offsetX, offsetY, opts)
-    frame:ClearAllPoints()
-    frame:SetPoint("CENTER", anchor, "CENTER", offsetX, offsetY)
-end
-
---------------------------------------------------------------------------------
--- BuffBarChainStrategy - Chain positioning with optional position preservation
---------------------------------------------------------------------------------
-
-local BuffBarChainStrategy = {}
-BuffBarChainStrategy.__index = BuffBarChainStrategy
-setmetatable(BuffBarChainStrategy, { __index = ChainStrategy })
-
-function BuffBarChainStrategy:GetStrategyKey()
-    return "buffbar_chain"
-end
-
---- BuffBars always passes moduleName = nil to get bottom-most anchor.
----@param addon table The EnhancedCooldownManager addon table
----@param moduleName string|nil Always nil for BuffBars
----@return Frame anchor The frame to anchor to
----@return boolean isAnchoredToViewer True if anchoring directly to the viewer
-function BuffBarChainStrategy:GetAnchor(addon, moduleName)
-    return CalculateAnchor(addon, nil)
-end
-
---- Applies anchor points for buff bar chain positioning.
---- Matches anchor width using TOPLEFT + TOPRIGHT anchoring.
----@param frame Frame The frame to position
----@param anchor Frame The anchor frame
----@param offsetX number Horizontal offset (ignored)
----@param offsetY number Vertical offset
----@param opts table|nil Optional: { preservePosition = boolean }
-function BuffBarChainStrategy:ApplyPoints(frame, anchor, offsetX, offsetY, opts)
-    frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offsetY)
-    frame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, offsetY)
-end
-
---------------------------------------------------------------------------------
--- BuffBarIndependentStrategy - Independent with position preservation
---------------------------------------------------------------------------------
-
-local BuffBarIndependentStrategy = {}
-BuffBarIndependentStrategy.__index = BuffBarIndependentStrategy
-setmetatable(BuffBarIndependentStrategy, { __index = IndependentStrategy })
-
-function BuffBarIndependentStrategy:GetStrategyKey()
-    return "buffbar_independent"
-end
-
---- Applies anchor points for independent buff bar positioning.
---- Uses TOP anchor (not CENTER) to preserve vertical position when switching from chain mode.
----@param frame Frame The frame to position
----@param anchor Frame The anchor frame (UIParent)
----@param offsetX number Horizontal offset
----@param offsetY number Vertical offset (calculated from current position)
----@param opts table|nil Optional: { preservePosition = boolean }
-function BuffBarIndependentStrategy:ApplyPoints(frame, anchor, offsetX, offsetY, opts)
-    local preservePosition = opts and opts.preservePosition or false
-
-    if preservePosition then
-        -- Preserve current position when switching from chain to independent
-        local top = frame:GetTop()
-        local centerX = frame:GetCenter()
-        local parentCenterX = UIParent:GetCenter()
-
-        if top and centerX and parentCenterX then
-            local calculatedOffsetX = centerX - parentCenterX
-            local calculatedOffsetY = top - UIParent:GetTop()
-            frame:ClearAllPoints()
-            frame:SetPoint("TOP", UIParent, "TOP", calculatedOffsetX, calculatedOffsetY)
-            return
+    if cache ~= nil then
+        assert(type(cache) == "table", "cache must be a table when provided")
+        for k in pairs(cache) do
+            cache[k] = nil
         end
+        return
     end
 
-    frame:ClearAllPoints()
-    frame:SetPoint("TOP", anchor, "TOP", offsetX, offsetY)
+    frame._layoutCache = {}
 end
 
---------------------------------------------------------------------------------
--- Factory Function
---------------------------------------------------------------------------------
+--- Applies layout parameters to a frame, caching state to reduce updates.
+---@param frame ECM_PositionedFrame
+---@param params ECM_LayoutParams
+---@return boolean changed True if layout changed
+function PositionMixin.ApplyLayout(frame, params, cache)
+    assert(frame, "frame required")
+    assert(params, "layout params required")
+    assert(params.anchor, "layout params missing anchor")
 
---- Creates a positioning strategy based on config.
---- For bar modules: returns ChainStrategy or IndependentStrategy based on cfg.anchorMode.
---- For BuffBars: returns BuffBarChainStrategy or BuffBarIndependentStrategy.
----@param cfg table Configuration with anchorMode field
----@param isBuffBar boolean|nil True if creating strategy for BuffBars
----@return table strategy Strategy instance
-function PositionStrategy.Create(cfg, isBuffBar)
+    if cache ~= nil then
+        assert(type(cache) == "table", "cache must be a table when provided")
+    end
+
+    local layoutCache = cache or frame._layoutCache
+    if not layoutCache then
+        layoutCache = {}
+        if not cache then
+            frame._layoutCache = layoutCache
+        end
+    elseif not cache and frame._layoutCache ~= layoutCache then
+        frame._layoutCache = layoutCache
+    end
+
+    local offsetX = params.offsetX or 0
+    local offsetY = params.offsetY or 0
+
+    local layoutChanged = layoutCache.anchor ~= params.anchor
+        or layoutCache.offsetX ~= offsetX
+        or layoutCache.offsetY ~= offsetY
+        or layoutCache.matchAnchorWidth ~= params.matchAnchorWidth
+        or layoutCache.anchorPoint ~= params.anchorPoint
+        or layoutCache.anchorRelativePoint ~= params.anchorRelativePoint
+
+    if layoutChanged then
+        frame:ClearAllPoints()
+        if params.matchAnchorWidth then
+            frame:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", offsetX, offsetY)
+            frame:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", offsetX, offsetY)
+        else
+            frame:SetPoint(params.anchorPoint, params.anchor, params.anchorRelativePoint, offsetX, offsetY)
+        end
+
+        layoutCache.anchor = params.anchor
+        layoutCache.offsetX = offsetX
+        layoutCache.offsetY = offsetY
+        layoutCache.matchAnchorWidth = params.matchAnchorWidth
+        layoutCache.anchorPoint = params.anchorPoint
+        layoutCache.anchorRelativePoint = params.anchorRelativePoint
+    end
+
+    if params.height and layoutCache.height ~= params.height then
+        frame:SetHeight(params.height)
+        layoutCache.height = params.height
+        layoutChanged = true
+    elseif params.height == nil then
+        layoutCache.height = nil
+    end
+
+    if params.width and layoutCache.width ~= params.width then
+        frame:SetWidth(params.width)
+        layoutCache.width = params.width
+        layoutChanged = true
+    elseif params.width == nil then
+        layoutCache.width = nil
+    end
+
+    if params.mode then
+        layoutCache.lastMode = params.mode
+    end
+
+    return layoutChanged
+end
+
+--- Calculates layout params for a bar module based on its config.
+---@param module ECMPositionedModule
+---@return ECM_LayoutParams params
+---@return "chain"|"independent" anchorMode
+function PositionMixin.CalculateLayout(module)
+    assert(module, "module required")
+    assert(module._configKey, "module missing _configKey")
+
+    local profile = module:GetConfig() or (ECM.db and ECM.db.profile)
+    assert(profile, "profile required")
+    local cfg = profile[module._configKey]
+
     local anchorMode = (cfg and cfg.anchorMode) or "chain"
-
-    if isBuffBar then
-        if anchorMode == "chain" then
-            return setmetatable({}, BuffBarChainStrategy)
-        else
-            return setmetatable({}, BuffBarIndependentStrategy)
-        end
-    else
-        if anchorMode == "chain" then
-            return setmetatable({}, ChainStrategy)
-        else
-            return setmetatable({}, IndependentStrategy)
-        end
+    if anchorMode == "independent" then
+        return BuildIndependentLayoutParams(cfg, profile), anchorMode
     end
+
+    local anchor, isFirstInChain = ResolveChainAnchor(ECM, module:GetName())
+    return BuildChainLayoutParams(cfg, profile, anchor, isFirstInChain), anchorMode
+end
+
+--- Calculates layout params for the BuffBarCooldownViewer.
+---@param cfg table
+---@param profile table
+---@return ECM_LayoutParams params
+---@return "chain"|"independent" anchorMode
+function PositionMixin.CalculateBuffBarsLayout(cfg, profile)
+    assert(profile, "profile required")
+
+    local anchorMode = (cfg and cfg.anchorMode) or "chain"
+    if anchorMode == "independent" then
+        return BuildBuffBarsIndependentParams(cfg, profile), anchorMode
+    end
+
+    local anchor, isFirstInChain = ResolveChainAnchor(ECM, nil)
+    local params = BuildChainLayoutParams(cfg, profile, anchor, isFirstInChain)
+
+    -- BuffBarCooldownViewer is a container whose height is determined by its children.
+    -- Avoid forcing a fixed bar height.
+    params.height = nil
+
+    return params, anchorMode
 end
