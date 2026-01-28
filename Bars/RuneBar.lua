@@ -328,13 +328,15 @@ function RuneBar:OnDisable()
     end
 end
 
-BarFrame.AddMixin(
-    RuneBar,
-    "RuneBar",
-    "runeBar",
-    nil,
-    {
-        { event = "RUNE_POWER_UPDATE", handler = "OnUpdateThrottled" },
-        { event = "RUNE_TYPE_UPDATE", handler = "OnUpdateThrottled" },
-    }
-)
+function RuneBar:OnEnable()
+    BarFrame.AddMixin(
+        RuneBar,
+        "RuneBar",
+        "runeBar",
+        nil,
+        {
+            { event = "RUNE_POWER_UPDATE", handler = "OnUpdateThrottled" },
+            { event = "RUNE_TYPE_UPDATE", handler = "OnUpdateThrottled" },
+        }
+    )
+end

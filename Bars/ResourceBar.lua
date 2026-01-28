@@ -195,12 +195,14 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-BarFrame.AddMixin(
-    ResourceBar,
-    "ResourceBar",
-    "resourceBar",
-    nil,
-    {
-        { event = "UNIT_AURA", handler = "OnUnitEvent" },
-    }
-)
+function ResourceBar:OnEnable()
+    BarFrame.AddMixin(
+        ResourceBar,
+        "ResourceBar",
+        "resourceBar",
+        nil,
+        {
+            { event = "UNIT_AURA", handler = "OnUnitEvent" },
+        }
+    )
+end

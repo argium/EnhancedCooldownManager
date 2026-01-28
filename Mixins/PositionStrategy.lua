@@ -82,10 +82,13 @@ local function ResolveChainAnchor(addon, moduleName)
             local cfg = configKey and profile[configKey]
             local isIndependent = cfg and cfg.anchorMode == "independent"
             if not isIndependent then
-                assert(mod.GetFrameIfShown, "module missing GetFrameIfShown")
-                local f = mod:GetFrameIfShown()
-                if f then
-                    lastVisible = f
+                if mod.GetFrameIfShown then
+                    local f = mod:GetFrameIfShown()
+                    if f then
+                        lastVisible = f
+                    end
+                else
+                    Util.Log("PositionStrategy", "Chain module missing GetFrameIfShown", { module = modName })
                 end
             end
         end

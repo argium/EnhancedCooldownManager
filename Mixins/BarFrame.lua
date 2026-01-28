@@ -213,6 +213,12 @@ end
 ---@param g number Green component (0-1)
 ---@param b number Blue component (0-1)
 function BarFrame:SetValue(minVal, maxVal, currentVal, r, g, b)
+    Util.Log(self:GetName(), "SetValue", {
+        minVal = minVal,
+        maxVal = maxVal,
+        currentVal = currentVal,
+        color = { r, g, b }
+    })
     self.StatusBar:SetMinMaxValues(minVal, maxVal)
     self.StatusBar:SetValue(currentVal)
     self.StatusBar:SetStatusBarColor(r, g, b)
@@ -255,6 +261,13 @@ function BarFrame:SetAppearance(cfg, profile)
     elseif border then
         border:Hide()
     end
+
+    Util.Log(self:GetName(), "SetAppearance", {
+        textureOverride = (cfg and cfg.texture) or (gbl and gbl.texture),
+        texture = tex,
+        bgColor = bgColor[1] .. "," .. bgColor[2] .. "," .. bgColor[3] .. "," .. (bgColor[4] or 1),
+        border = border and borderCfg and borderCfg.enabled
+    })
 
     return tex
 end
@@ -513,33 +526,29 @@ function BarFrame:GetFrameIfShown()
 end
 
 function BarFrame:GetFrame()
-    return self:GetOrCreateFrame()
-end
-
-function BarFrame:GetOrCreateFrame()
     if not self._frame then
         self._frame = self:CreateFrame()
     end
     return self._frame
 end
 
-function BarFrame:ApplyConfig()
-    self:UpdateLayout()
-end
-
 function BarFrame:OnConfigChanged(_)
     self:UpdateLayout()
 end
 
-function BarFrame:UpdateLayout()
-    local profile = self:GetConfig() or (ECM.db and ECM.db.profile)
-    assert(profile, "profile required")
+function BarFrame:OnDisable()
+    self._frame:Hide()
+end
+
+function BarFrame:UpdateLayout(why)
+    local profile = self:GetConfig()
     local cfg = GetConfigSection(profile, self._configKey)
-    local frame = self:GetOrCreateFrame()
+    local frame = self:GetFrame()
 
     local PositionMixin = GetPositionMixin()
     local params, anchorMode = PositionMixin.CalculateLayout(self)
     Util.Log(self:GetName(), "Applying layout", {
+        why = why,
         anchorMode = anchorMode,
         width = params.width or "auto",
     })
@@ -564,12 +573,13 @@ function BarFrame:UpdateLayout()
 end
 
 function BarFrame:CreateFrame(opts)
-    local profile = ECM.db and ECM.db.profile
-    local name = ADDON_NAME .. self:GetName()
+    local profile = self:GetConfig()
+    local cfg = GetConfigSection(profile, self._configKey)
+    local name = "ECM" .. self:GetName()
     local frame = CreateFrame("Frame", name, UIParent)
 
     frame:SetFrameStrata("MEDIUM")
-    local barHeight = BarFrame.GetBarHeight(nil, profile)
+    local barHeight = BarFrame.GetBarHeight(cfg, profile)
     frame:SetHeight(barHeight)
 
     frame.Background = frame:CreateTexture(nil, "BACKGROUND")
@@ -610,10 +620,10 @@ function BarFrame.AddMixin(module, name, configKey, extraLayoutEvents, extraRefr
     Module.AddMixin(
         module,
         name,
+        ECM.db and ECM.db.profile,
         layoutEvents,
         refreshEvents)
 
-    module.ApplyConfig = BarFrame.ApplyConfig
     module.OnConfigChanged = BarFrame.OnConfigChanged
     module.UpdateLayout = BarFrame.UpdateLayout
     module.GetFrameIfShown = BarFrame.GetFrameIfShown
@@ -621,9 +631,13 @@ function BarFrame.AddMixin(module, name, configKey, extraLayoutEvents, extraRefr
     module.GetFrame = BarFrame.GetFrame
     module.SetHidden = BarFrame.SetHidden
     module.IsHidden = BarFrame.IsHidden
+    module.OnDisable = BarFrame.OnDisable
     if not module.CreateFrame then
         module.CreateFrame = BarFrame.CreateFrame
     end
 
     module._configKey = configKey
+
+    -- Register ourselves with the viewer hook to respond to global events
+    ECM.ViewerHook:RegisterBar(module)
 end

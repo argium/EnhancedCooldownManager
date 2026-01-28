@@ -18,7 +18,7 @@ local DEFAULT_REFRESH_FREQUENCY = 0.066
 ---@field _refreshEvents RefreshEvent[]
 ---@field _lastUpdate number|nil
 ---@field _frame Frame|nil
----@field GetOrCreateFrame fun(self: ECMModule): Frame
+---@field GetFrame() fun(self: ECMModule): Frame
 ---@field RegisterEvent fun(self: ECMModule, event: string, handler: string|fun(...))
 ---@field UnregisterEvent fun(self: ECMModule, event: string)
 ---@field OnEnable fun(self: ECMModule)
@@ -33,6 +33,7 @@ function Module:GetName()
 end
 
 function Module:GetConfig()
+    assert(self._config, "config not set for module " .. self:GetName())
     return self._config
 end
 
@@ -50,12 +51,13 @@ function Module:ThrottledRefresh()
     return true
 end
 
-function Module:Enable()
+function Module:OnEnable()
     self._lastUpdate = GetTime()
 
-    if self.GetOrCreateFrame then
-        self:GetOrCreateFrame()
-    end
+    Util.Log(self:GetName(), "Enabled", {
+        layoutEvents=self._layoutEvents,
+        refreshEvents=self._refreshEvents
+    })
 
     for _, eventConfig in ipairs(self._refreshEvents) do
         self:RegisterEvent(eventConfig.event, eventConfig.handler)
@@ -64,13 +66,6 @@ function Module:Enable()
     for _, eventName in ipairs(self._layoutEvents) do
         self:RegisterEvent(eventName, "UpdateLayout")
     end
-
-    -- Register ourselves with the viewer hook to respond to global events
-    ECM.ViewerHook:RegisterBar(self)
-
-    self:OnEnable()
-
-    ECM.ViewerHook:ScheduleLayoutUpdate(0.1)
 end
 
 function Module:Disable()
@@ -80,11 +75,6 @@ function Module:Disable()
 
     for _, eventConfig in ipairs(self._refreshEvents) do
         self:UnregisterEvent(eventConfig.event)
-    end
-
-    local frame = self._frame
-    if frame then
-        frame:Hide()
     end
 
     self:OnDisable()
@@ -98,12 +88,13 @@ end
 function Module:Refresh()
 end
 
-function Module:OnConfigChanged(config)
+function Module:OnConfigChanged()
 end
 
 function Module:SetConfig(config)
+    assert(config, "config required")
     self._config = config
-    self:OnConfigChanged(config)
+    self:OnConfigChanged()
 end
 
 ---@class RefreshEvent
@@ -112,9 +103,15 @@ end
 
 --- Adds the EventListener mixin to the target module.
 --- @param target table Module to add the mixin to
+--- @param name string Name of the module
+--- @param profile table Configuration profile
 --- @param layoutEvents string[]|nil List of layout events
 --- @param refreshEvents RefreshEvent[]|nil List of refresh events
-function Module.AddMixin(target, name, layoutEvents, refreshEvents)
+function Module.AddMixin(target, name, profile, layoutEvents, refreshEvents)
+    assert(target, "target required")
+    assert(name, "name required")
+    assert(profile, "profile required")
+
     for k, v in pairs(Module) do
         if type(v) == "function" then
             target[k] = v
@@ -124,4 +121,5 @@ function Module.AddMixin(target, name, layoutEvents, refreshEvents)
     target._name = name
     target._layoutEvents = layoutEvents or {}
     target._refreshEvents = refreshEvents or {}
+    target._config = profile
 end

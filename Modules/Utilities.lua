@@ -165,17 +165,100 @@ function Util.Print(...)
 end
 
 function Util.SafeGetDebugValue(v)
-    if v == nil then
-        return "<nil>"
+    local function IsSecretValue(x)
+        return type(issecretvalue) == "function" and issecretvalue(x)
     end
 
-    -- Handle Blizzard secret values
-    if type(issecretvalue) == "function" and issecretvalue(v) then
-        return (type(canaccessvalue) == "function" and canaccessvalue(v)) and ("s|" .. tostring(v)) or "<secret>"
-    end
-    if type(issecrettable) == "function" and issecrettable(v) then
-        return (type(canaccesstable) == "function" and canaccesstable(v)) and "s|<table>" or "<secrettable>"
+    local function IsSecretTable(x)
+        return type(issecrettable) == "function" and issecrettable(x)
     end
 
-    return type(v) == "table" and "<table>" or tostring(v)
+    local function CanAccessValue(x)
+        return type(canaccessvalue) == "function" and canaccessvalue(x)
+    end
+
+    local function CanAccessTable(x)
+        return type(canaccesstable) == "function" and canaccesstable(x)
+    end
+
+    local function GetSafeScalarString(x)
+        if x == nil then
+            return "<nil>"
+        end
+
+        if IsSecretValue(x) then
+            return CanAccessValue(x) and ("s|" .. tostring(x)) or "<secret>"
+        end
+
+        if IsSecretTable(x) then
+            return CanAccessTable(x) and "s|<table>" or "<secrettable>"
+        end
+
+        return tostring(x)
+    end
+
+    ---@param tbl table
+    ---@param depth number
+    ---@param seen table
+    ---@return string
+    local function TableToString(tbl, depth, seen)
+        if IsSecretTable(tbl) then
+            return CanAccessTable(tbl) and "s|<table>" or "<secrettable>"
+        end
+
+        if seen[tbl] then
+            return "<cycle>"
+        end
+
+        if depth >= 3 then
+            return "{...}"
+        end
+
+        seen[tbl] = true
+
+        local ok, pairsOrErr = pcall(function()
+            local parts = {}
+            local count = 0
+
+            for k, x in pairs(tbl) do
+                count = count + 1
+                if count > 25 then
+                    parts[#parts + 1] = "..."
+                    break
+                end
+
+                local keyStr
+                if IsSecretValue(k) then
+                    keyStr = "<secret_key>"
+                else
+                    keyStr = tostring(k)
+                end
+
+                local valueStr
+                if type(x) == "table" then
+                    valueStr = TableToString(x, depth + 1, seen)
+                else
+                    valueStr = GetSafeScalarString(x)
+                end
+
+                parts[#parts + 1] = keyStr .. "=" .. valueStr
+            end
+
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end)
+
+        seen[tbl] = nil
+
+        if not ok then
+            return "<table_error>"
+        end
+
+        return pairsOrErr
+    end
+
+    if type(v) == "table" then
+        return TableToString(v, 0, {})
+    end
+
+    return GetSafeScalarString(v)
 end

@@ -16,11 +16,11 @@
 ---@field _name string
 
 local _, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
 
-local ViewerHook = EnhancedCooldownManager:NewModule("ViewerHook", "AceEvent-3.0")
-EnhancedCooldownManager.ViewerHook = ViewerHook
+local ViewerHook = ECM:NewModule("ViewerHook", "AceEvent-3.0")
+ECM.ViewerHook = ViewerHook
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -74,7 +74,7 @@ end
 --------------------------------------------------------------------------------
 
 local function GetCombatFadeState()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if not profile or not profile.combatFade or not profile.combatFade.enabled then
         return false, 1
     end
@@ -344,7 +344,7 @@ local function UpdateLayoutInternal()
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local hideWhenMounted = profile and profile.hideWhenMounted and IsMounted()
     local hideWhenRestingOutOfCombat = profile
         and profile.hideOutOfCombatInRestAreas
@@ -371,14 +371,23 @@ local function UpdateLayoutInternal()
         SetHidden(false, { fadeIn = shouldFadeIn, duration = fadeDuration })
     end
 
-    Util.Log("ViewerHook", "UpdateLayoutInternal - triggering module layouts")
+    local registeredBarNames = {}
+    for _, module in ipairs(_registeredBars) do
+        if module and module.GetName then
+            table.insert(registeredBarNames, module:GetName())
+        else
+            table.insert(registeredBarNames, tostring(module))
+        end
+    end
+
+    Util.Log("ViewerHook", "UpdateLayoutInternal - triggering module layouts", { bars = registeredBarNames })
 
     for _, module in ipairs(_registeredBars) do
         module:UpdateLayout()
     end
 
     -- Update BuffBars after bar chain so it repositions when bars above it change
-    local BuffBars = EnhancedCooldownManager.BuffBars
+    local BuffBars = ECM.BuffBars
     if BuffBars and BuffBars.UpdateLayout then
         BuffBars:UpdateLayout()
     end
@@ -438,7 +447,7 @@ function ViewerHook:OnEvent(event, arg1)
 
     local function doUpdate()
         if config.resetBuffBars then
-            EnhancedCooldownManager.BuffBars:ResetStyledMarkers()
+            ECM.BuffBars:ResetStyledMarkers()
         end
         ViewerHook:ScheduleLayoutUpdate(0)
     end
@@ -462,7 +471,7 @@ function ViewerHook:OnDisable()
 end
 
 function ViewerHook:UpdateCombatFade()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if not profile then
         return
     end
@@ -495,4 +504,5 @@ function ViewerHook:RegisterBar(module)
         end
     end
     table.insert(_registeredBars, module)
+    ECM.ViewerHook:ScheduleLayoutUpdate(0.1)
 end

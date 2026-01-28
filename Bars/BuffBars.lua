@@ -5,7 +5,24 @@
 local _, ns = ...
 local EnhancedCooldownManager = ns.Addon
 local Util = ns.Util
-local BarHelpers = EnhancedCooldownManager.BarHelpers
+
+-- Small shim to access BarFrame mixin helpers
+local BarHelpers = {
+    GetTexture = function(...)
+        return ns.Mixins.BarFrame.GetTexture(...)
+    end,
+    GetBgColor = function(...)
+        return ns.Mixins.BarFrame.GetBgColor(...)
+    end,
+    ApplyFont = function(...)
+        return ns.Mixins.BarFrame.ApplyFont(...)
+    end,
+    GetBarHeight = function(cfg, profile, fallback)
+        local gbl = profile and profile.global
+        local height = (cfg and cfg.height) or (gbl and gbl.barHeight) or (fallback or 13)
+        return Util.PixelSnap(height)
+    end,
+}
 local PositionMixin = ns.Mixins.PositionMixin
 
 ---@class Frame
@@ -785,7 +802,11 @@ function BuffBars:GetSelectedPalette()
 end
 
 function BuffBars:OnEnable()
-    Util.Log("BuffBars", "OnEnable - module starting")
+    self:OnModuleReady()
+end
+
+function BuffBars:OnModuleReady()
+    Util.Log("BuffBars", "OnModuleReady - module starting")
 
     C_Timer.After(0.1, function()
         self:HookViewer()

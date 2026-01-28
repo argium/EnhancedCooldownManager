@@ -278,5 +278,19 @@ end
 function EnhancedCooldownManager:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
 
-    -- AceAddon enables modules automatically; ResourceBars registers events in its OnEnable.
+    local moduleOrder = {
+        "ViewerHook",
+        "PowerBar",
+        "ResourceBar",
+        "RuneBar",
+        "BuffBars",
+    }
+
+    for _, moduleName in ipairs(moduleOrder) do
+        local module = self:GetModule(moduleName, true)
+        assert(module, "Module not found: " .. moduleName)
+        if not module:IsEnabled() then
+            self:EnableModule(moduleName)
+        end
+    end
 end

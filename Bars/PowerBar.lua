@@ -139,10 +139,12 @@ function PowerBar:Refresh()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     local cfg = profile and profile.powerBar
     if self:IsHidden() or not (cfg and cfg.enabled) then
+        Util.Log(self:GetName(), "Refresh skipped: bar is hidden or disabled")
         return
     end
 
     if not ShouldShowPowerBar() then
+        Util.Log(self:GetName(), "Refresh skipped: ShouldShowPowerBar returned false")
         if self._frame then
             self._frame:Hide()
         end
@@ -151,6 +153,7 @@ function PowerBar:Refresh()
 
     local bar = self._frame
     if not bar then
+        Util.Log(self:GetName(), "Refresh skipped: frame not created yet")
         return
     end
 
@@ -158,6 +161,7 @@ function PowerBar:Refresh()
     local max, current, displayValue, valueType = GetPrimaryResourceValue(resource, cfg)
 
     if not max then
+        Util.Log(self:GetName(), "Refresh skipped:missing max value", { resource = resource })
         bar:Hide()
         return
     end
@@ -181,7 +185,19 @@ function PowerBar:Refresh()
     self:UpdateTicks(bar, resource, max)
 
     bar:Show()
+
+    Util.Log(self:GetName(), "Refreshed", {
+        resource = resource,
+        max = max,
+        current = current,
+        displayValue = displayValue,
+        valueType = valueType
+    })
 end
+
+--------------------------------------------------------------------------------
+-- Event Handling
+--------------------------------------------------------------------------------
 
 function PowerBar:OnUnitPower(_, unit)
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
@@ -192,10 +208,10 @@ function PowerBar:OnUnitPower(_, unit)
     self:ThrottledRefresh()
 end
 
-BarFrame.AddMixin(
-    PowerBar,
-    "PowerBar",
-    "powerBar",
-    nil,
-    nil
-)
+--------------------------------------------------------------------------------
+-- Module Lifecycle
+--------------------------------------------------------------------------------
+
+function PowerBar:OnEnable()
+    BarFrame.AddMixin(PowerBar, "PowerBar","powerBar", nil, nil)
+end
