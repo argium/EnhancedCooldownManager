@@ -604,8 +604,8 @@ function BarFrame:CreateFrame(opts)
 end
 
 function BarFrame.AddMixin(module, name, configKey, extraLayoutEvents, extraRefreshEvents)
-    local layoutEvents = Util.MergeUniqueLists(LAYOUT_EVENTS, extraLayoutEvents or {})
-    local refreshEvents = Util.MergeUniqueLists(REFRESH_EVENTS, extraRefreshEvents or {})
+    local layoutEvents = Util.Concat(LAYOUT_EVENTS, extraLayoutEvents or {})
+    local refreshEvents = Util.Concat(REFRESH_EVENTS, extraRefreshEvents or {})
 
     Module.AddMixin(
         module,

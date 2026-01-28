@@ -16,10 +16,24 @@ function Util.PixelSnap(v)
     return snapped / scale
 end
 
+--- Concatenates two lists.
+---@param a any[]
+---@param b any[]
+function Util.Concat(a, b)
+    local out = {}
+    for i = 1, #a do
+        out[#out + 1] = a[i]
+    end
+    for i = 1, #b do
+        out[#out + 1] = b[i]
+    end
+    return out
+end
+
 --- Merges two lists of strings into one with unique entries.
 --- @param a string[]
 --- @param b string[]
-local function MergeUniqueLists(a, b)
+function Util.MergeUniqueLists(a, b)
     local out, seen = {}, {}
 
     local function add(v, label, i)

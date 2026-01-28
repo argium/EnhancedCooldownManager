@@ -26,12 +26,12 @@ Libs\LibSharedMedia-3.0\lib.xml
 Modules\SparkleUtil.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
+Modules\ImportExport.lua
+UI\BugReports.lua
 Defaults.lua
 EnhancedCooldownManager.lua
 
 UI\Widgets\PositionModeSelector.lua
-UI\BugReports.lua
-UI\ImportExport.lua
 UI\Options.lua
 
 Mixins\Module.lua
@@ -42,4 +42,5 @@ Bars\PowerBar.lua
 Bars\ResourceBar.lua
 Bars\RuneBar.lua
 Bars\BuffBars.lua
+
 Modules\ViewerHook.lua
