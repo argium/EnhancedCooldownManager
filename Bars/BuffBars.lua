@@ -439,7 +439,7 @@ function BuffBars:HookEditMode()
         -- the user opens Options. Edit mode exit is infrequent, so no throttling needed.
         local viewer = self:GetViewer()
         if viewer and viewer:IsShown() then
-            self:UpdateLayout()
+            self:UpdateLayoutAndRefresh("EditModeExit")
         end
     end)
 
@@ -467,7 +467,7 @@ function BuffBars:HookViewer()
 
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
-        self:UpdateLayout()
+        self:UpdateLayoutAndRefresh("ViewerOnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
@@ -510,7 +510,7 @@ function BuffBars:ScheduleLayoutUpdate()
         self._layoutPending = nil
         local viewer = self:GetViewer()
         if viewer and viewer:IsShown() then
-            self:UpdateLayout()
+            self:UpdateLayoutAndRefresh("ScheduleLayoutUpdate")
         end
     end)
 end
@@ -598,10 +598,14 @@ function BuffBars:LayoutBars()
 end
 
 --- Updates layout: positioning, sizing, anchoring, appearance.
-function BuffBars:UpdateLayout()
+---@param why string
+function BuffBars:UpdateLayoutAndRefresh(why)
+    assert(why, "why parameter required for UpdateLayoutAndRefresh")
     local viewer = self:GetViewer()
     if not viewer then
-        Util.Log("BuffBars", "UpdateLayout skipped - no viewer")
+        Util.Log("BuffBars", "UpdateLayoutAndRefresh skipped - no viewer", {
+            why = why,
+        })
         return
     end
 
@@ -638,12 +642,17 @@ function BuffBars:UpdateLayout()
 
     self:LayoutBars()
 
-    Util.Log("BuffBars", "UpdateLayout complete", {
+    Util.Log("BuffBars", "UpdateLayoutAndRefresh complete", {
         anchorMode = anchorMode,
         width = params.width or nil,
         offsetY = params.offsetY,
         visibleCount = #visibleChildren,
+        why = why,
     })
+end
+
+function BuffBars:Refresh()
+    self:UpdateLayoutAndRefresh("Refresh")
 end
 
 --- Returns cached bars for current class/spec for Options UI.
@@ -811,7 +820,7 @@ function BuffBars:OnModuleReady()
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()
-        self:UpdateLayout()
+        self:UpdateLayoutAndRefresh("ModuleReady")
     end)
 end
 

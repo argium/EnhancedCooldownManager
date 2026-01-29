@@ -225,7 +225,7 @@ function RuneBar:CreateFrame()
 
     frame.FragmentedBars = {}
 
-    frame:SetAppearance(profile and profile.runeBar, profile)
+    frame:SetAppearance()
 
     if not frame._onUpdateAttached then
         frame._onUpdateAttached = true
@@ -261,6 +261,10 @@ function RuneBar:Refresh()
     local bar = self._frame
     if not bar then
         return
+    end
+
+    if bar.RefreshAppearance then
+        bar:RefreshAppearance()
     end
 
     local maxRunes = GetResourceValue(profile)

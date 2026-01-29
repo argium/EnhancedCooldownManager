@@ -105,7 +105,7 @@ function PowerBar:CreateFrame()
     BarFrame.AddTextOverlay(frame, profile)
 
     -- Apply initial appearance
-    frame:SetAppearance(profile and profile.powerBar, profile)
+    frame:SetAppearance()
 
     return frame
 end
@@ -155,6 +155,10 @@ function PowerBar:Refresh()
     if not bar then
         Util.Log(self:GetName(), "Refresh skipped: frame not created yet")
         return
+    end
+
+    if bar.RefreshAppearance then
+        bar:RefreshAppearance()
     end
 
     local resource = UnitPowerType("player")

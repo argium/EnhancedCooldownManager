@@ -120,7 +120,7 @@ function ResourceBar:CreateFrame()
     local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
     local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
-    frame:SetAppearance(profile and profile.resourceBar, profile)
+    frame:SetAppearance()
 
     return frame
 end
@@ -149,6 +149,10 @@ function ResourceBar:Refresh()
     local bar = self._frame
     if not bar then
         return
+    end
+
+    if bar.RefreshAppearance then
+        bar:RefreshAppearance()
     end
 
     local maxResources, currentValue, kind = GetValues(profile)
