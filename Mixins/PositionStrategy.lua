@@ -2,6 +2,37 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
+---@class ECM_LayoutParams Layout parameters for frame positioning.
+---@field anchor Frame Anchor frame to position relative to.
+---@field offsetX number Horizontal offset from anchor.
+---@field offsetY number Vertical offset from anchor.
+---@field width number|nil Explicit width (nil = inherit from anchor).
+---@field height number|nil Explicit height (nil = skip height application).
+---@field anchorPoint AnchorPoint Point on the frame to attach.
+---@field anchorRelativePoint AnchorPoint Point on the anchor to attach to.
+---@field matchAnchorWidth boolean True to match anchor width using dual-point anchoring.
+---@field mode "chain"|"independent" Positioning mode identifier.
+
+
+---@class ECM_PositionedFrame : Frame Frame with layout methods attached via PositionMixin.
+---@field _layoutCache ECM_LayoutCache|nil Cached layout parameters.
+---@field ApplyLayout fun(self: ECM_PositionedFrame, params: ECM_LayoutParams, cache?: ECM_LayoutCache): boolean Applies layout parameters.
+---@field InvalidateLayout fun(self: ECM_PositionedFrame, cache?: ECM_LayoutCache) Clears cached layout state.
+
+---@class ECMPositionedModule : ECMModule Module with position calculation support.
+---@field _configKey string Configuration key for module settings.
+---@field GetConfig fun(self: ECMPositionedModule): table Gets the profile configuration.
+---@field GetName fun(self: ECMPositionedModule): string Gets the module name.
+---@field GetFrameIfShown fun(self: ECMPositionedModule): ECM_PositionedFrame|nil Gets the frame if visible.
+
+---@class PositionMixin Mixin providing frame positioning strategies for bar modules.
+---@field CaptureCurrentTopOffset fun(frame: ECM_PositionedFrame): number, number Captures current offsets for a frame.
+---@field AttachTo fun(frame: ECM_PositionedFrame) Attaches layout methods to a frame.
+---@field InvalidateLayout fun(frame: ECM_PositionedFrame, cache?: ECM_LayoutCache) Clears cached layout state.
+---@field ApplyLayout fun(frame: ECM_PositionedFrame, params: ECM_LayoutParams, cache?: ECM_LayoutCache): boolean Applies layout parameters.
+---@field CalculateLayout fun(module: ECMPositionedModule): ECM_LayoutParams, "chain"|"independent" Calculates layout for a bar module.
+---@field CalculateBuffBarsLayout fun(cfg: table, profile: table): ECM_LayoutParams, "chain"|"independent" Calculates layout for BuffBars viewer.
+
 local _, ns = ...
 local ECM = ns.Addon
 local Util = ns.Util

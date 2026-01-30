@@ -5,40 +5,46 @@
 local _, ns = ...
 local ECM = ns.Addon
 local Util = ns.Util
+
+---@class ModuleMixin : ECMModule
 local Module = {}
 ns.Mixins = ns.Mixins or {}
 ns.Mixins.Module = Module
 
+--- Default update frequency in seconds (~15 FPS)
 local DEFAULT_REFRESH_FREQUENCY = 0.066
 
----@class ECMModule
----@field _name string
----@field _config table|nil
----@field _layoutEvents string[]
----@field _refreshEvents RefreshEvent[]
----@field _lastUpdate number|nil
----@field _frame Frame|nil
----@field GetFrame() fun(self: ECMModule): Frame
----@field RegisterEvent fun(self: ECMModule, event: string, handler: string|fun(...))
----@field UnregisterEvent fun(self: ECMModule, event: string)
----@field OnEnable fun(self: ECMModule)
----@field OnDisable fun(self: ECMModule)
----@field UpdateLayout fun(self: ECMModule)
----@field Refresh fun(self: ECMModule)
+---@class RefreshEvent
+---@field event string WoW event name to listen for
+---@field handler string Name of the handler method on the module
+
+---@class ECMModule : AceModule
+---@field _name string Internal name of the module
+---@field _config table|nil Reference to the module's configuration profile section
+---@field _layoutEvents string[] List of WoW events that trigger layout updates
+---@field _refreshEvents RefreshEvent[] List of events and handlers for refresh triggers
+---@field _lastUpdate number|nil Timestamp of the last throttled refresh
+---@field _frame Frame|nil The module's main display frame
+---@field RegisterEvent fun(self: ECMModule, event: string, handler: string|fun(self: ECMModule, event: string, ...: any)) Registers an event handler (from AceEvent)
+---@field UnregisterEvent fun(self: ECMModule, event: string) Unregisters an event handler (from AceEvent)
 
 --- Gets the name of the module.
---- @return string Name of the module
+---@return string name Name of the module, or "?" if not set
 function Module:GetName()
     return self._name or "?"
 end
 
+--- Gets the configuration table for this module.
+--- Asserts if the config has not been set via `AddMixin` or `SetConfig`.
+---@return table config The module's configuration table
 function Module:GetConfig()
     assert(self._config, "config not set for module " .. self:GetName())
     return self._config
 end
 
 --- Refreshes the module if enough time has passed since the last update.
---- @return boolean True if refreshed, false if skipped due to throttling
+--- Uses the global `updateFrequency` setting to throttle refresh calls.
+---@return boolean refreshed True if Refresh() was called, false if skipped due to throttling
 function Module:ThrottledRefresh()
     local profile = ECM.db and ECM.db.profile
     local freq = (profile and profile.updateFrequency) or DEFAULT_REFRESH_FREQUENCY
@@ -51,6 +57,8 @@ function Module:ThrottledRefresh()
     return true
 end
 
+--- Called when the module is enabled.
+--- Registers all configured layout and refresh events.
 function Module:OnEnable()
     assert(self._layoutEvents, "layoutEvents not set for module " .. self:GetName())
     assert(self._refreshEvents, "refreshEvents not set for module " .. self:GetName())
@@ -71,6 +79,8 @@ function Module:OnEnable()
     })
 end
 
+--- Called when the module is disabled.
+--- Unregisters all layout and refresh events.
 function Module:OnDisable()
     assert(self._layoutEvents, "layoutEvents not set for module " .. self:GetName())
     assert(self._refreshEvents, "refreshEvents not set for module " .. self:GetName())
@@ -89,31 +99,37 @@ function Module:OnDisable()
     })
 end
 
+--- Updates the visual layout of the module.
+--- Override this method in concrete modules to handle layout changes.
 function Module:UpdateLayout()
 end
 
+--- Refreshes the module's display state.
+--- Override this method in concrete modules to update visual state.
 function Module:Refresh()
 end
 
+--- Called when the module's configuration has changed.
+--- Override this method to respond to configuration updates.
 function Module:OnConfigChanged()
 end
 
+--- Sets the configuration table for this module.
+---@param config table The configuration table to use
 function Module:SetConfig(config)
     assert(config, "config required")
     self._config = config
     self:OnConfigChanged()
 end
 
----@class RefreshEvent
----@field event string Event name
----@field handler string Handler method name
-
---- Adds the EventListener mixin to the target module.
---- @param target table Module to add the mixin to
---- @param name string Name of the module
---- @param profile table Configuration profile
---- @param layoutEvents string[]|nil List of layout events
---- @param refreshEvents RefreshEvent[]|nil List of refresh events
+--- Applies the Module mixin to a target table.
+--- Copies all mixin methods that the target doesn't already have,
+--- preserving module-specific overrides of UpdateLayout, Refresh, etc.
+---@param target table Module table to add the mixin to
+---@param name string Name of the module
+---@param profile table Configuration profile table
+---@param layoutEvents? string[] List of WoW events that trigger layout updates
+---@param refreshEvents? RefreshEvent[] List of refresh event configurations
 function Module.AddMixin(target, name, profile, layoutEvents, refreshEvents)
     assert(target, "target required")
     assert(name, "name required")
