@@ -23,6 +23,7 @@ local ADDON_NAME, ns = ...
 ---@field showManaAsPercent boolean
 ---@field colors table<ECM_ResourceType, number[]>
 ---@field border ECM_BorderConfig
+---@field ticks ECM_PowerBarTicksConfig
 
 ---@class ECM_ResourceBarConfig : ECM_BarConfigBase
 ---@field demonHunterSoulsMax number
@@ -97,11 +98,27 @@ local ADDON_NAME, ns = ...
 ---@field resourceBar ECM_ResourceBarConfig
 ---@field runeBar ECM_RuneBarConfig
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration
----@field powerBarTicks ECM_PowerBarTicksConfig
 
 local DEFAULT_BORDER_THICKNESS = 4
 local DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 }
 local DEMONHUNTER_MAX_SOULS = 6
+local DEMONHUNTER_CLASS_ID = 12
+local DEVOURER_SPEC_INDEX = 3
+local DEVOURER_SPEC_ID
+
+if type(GetSpecializationInfoForClassID) == "function" then
+    DEVOURER_SPEC_ID = select(1, GetSpecializationInfoForClassID(DEMONHUNTER_CLASS_ID, DEVOURER_SPEC_INDEX))
+end
+
+local powerBarTickMappings = {}
+if DEVOURER_SPEC_ID then
+    powerBarTickMappings[DEMONHUNTER_CLASS_ID] = {
+        [DEVOURER_SPEC_ID] = {
+            { value = 90, color = { 2 / 3, 2 / 3, 2 / 3, 0.8 } },
+            { value = 100 },
+        },
+    }
+end
 
 local defaults = {
     profile = {
@@ -137,6 +154,11 @@ local defaults = {
             anchorMode        = "chain",
             -- anchorMode        = "independent",
             showText          = true,
+            ticks             = {
+                mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
+                defaultColor = { 1, 1, 1, 0.8 },
+                defaultWidth = 1,
+            },
             showManaAsPercent = true,
             border            = {
                 enabled = false,
@@ -171,7 +193,9 @@ local defaults = {
                 color = DEFAULT_BORDER_COLOR,
             },
             colors              = {
-                souls = { 0.46, 0.98, 1.00 },
+                souls = { 0.259, 0.6, 0.91 },
+                devourerNormal = { 0.447, 0.412, 0.651 },
+                devourerMeta = { 0.275, 0.169, 1.0 },
                 [Enum.PowerType.ComboPoints] = { 0.75, 0.15, 0.15 },
                 [Enum.PowerType.Chi] = { 0.00, 1.00, 0.59 },
                 [Enum.PowerType.HolyPower] = { 0.8863, 0.8235, 0.2392 },
@@ -204,11 +228,6 @@ local defaults = {
                 defaultColor = { 228 / 255, 233 / 255, 235 / 255 },
                 selectedPalette = nil,
             },
-        },
-        powerBarTicks = {
-            mappings = {}, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
-            defaultColor = { 1, 1, 1, 0.8 },
-            defaultWidth = 1,
         },
     },
 }

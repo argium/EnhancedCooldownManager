@@ -265,7 +265,7 @@ end
 ---@param r number
 ---@param g number
 ---@param b number
----@param a number
+---@param a number|nil
 ---@return boolean
 local function IsColorMatch(color, r, g, b, a)
     if type(color) ~= "table" then
@@ -280,10 +280,8 @@ end
 --- Each migration is gated by schemaVersion to ensure it only runs once.
 ---@param profile table The profile to migrate
 function ECM:RunMigrations(profile)
-    local currentSchema = profile.schemaVersion or 1
-
     -- Migration: buffBarColors -> buffBars.colors (schema 2 -> 3)
-    if currentSchema < 3 then
+    if profile.schemaVersion < 3 then
         if profile.buffBarColors then
             Util.Log("Migration", "Migrating buffBarColors to buffBars.colors")
 
@@ -312,11 +310,28 @@ function ECM:RunMigrations(profile)
         profile.schemaVersion = 3
     end
 
-    -- Migration: powerBarTicks.defaultColor -> bold semi-transparent white (schema 3 -> 4)
-    if currentSchema < 4 then
+    if profile.schemaVersion < 4 then
+        -- Migration: powerBarTicks.defaultColor -> bold semi-transparent white (schema 3 -> 4)
         local ticksCfg = profile.powerBarTicks
         if ticksCfg and IsColorMatch(ticksCfg.defaultColor, 0, 0, 0, 0.5) then
             ticksCfg.defaultColor = { 1, 1, 1, 0.8 }
+        end
+
+        -- Migration: demon hunter souls default color update
+        local resourceCfg = profile.resourceBar
+        local colors = resourceCfg and resourceCfg.colors
+        local soulsColor = colors and colors.souls
+        if IsColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
+            colors.souls = { 0.259, 0.6, 0.91 }
+        end
+
+        -- Migration: powerBarTicks -> powerBar.ticks
+        if profile.powerBarTicks then
+            profile.powerBar = profile.powerBar or {}
+            if not profile.powerBar.ticks then
+                profile.powerBar.ticks = profile.powerBarTicks
+            end
+            profile.powerBarTicks = nil
         end
 
         profile.schemaVersion = 4

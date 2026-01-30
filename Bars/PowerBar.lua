@@ -19,6 +19,7 @@ local ECM = ns.Addon
 local Util = ns.Util
 
 local BarFrame = ns.Mixins.BarFrame
+local Module = ns.Mixins.Module
 
 local PowerBar = ECM:NewModule("PowerBar", "AceEvent-3.0")
 ECM.PowerBar = PowerBar
@@ -69,7 +70,7 @@ end
 ---@return ECM_TickMark[]|nil
 function PowerBar:GetCurrentTicks()
     local profile = ECM.db and ECM.db.profile
-    local ticksCfg = profile and profile.powerBarTicks
+    local ticksCfg = profile and profile.powerBar and profile.powerBar.ticks
     if not ticksCfg or not ticksCfg.mappings then
         return nil
     end
@@ -126,7 +127,7 @@ function PowerBar:UpdateTicks(bar, resource, max)
     end
 
     local profile = ECM.db and ECM.db.profile
-    local ticksCfg = profile and profile.powerBarTicks
+    local ticksCfg = profile and profile.powerBar and profile.powerBar.ticks
     local defaultColor = ticksCfg and ticksCfg.defaultColor or { 1, 1, 1, 0.8 }
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
@@ -218,4 +219,5 @@ end
 
 function PowerBar:OnEnable()
     BarFrame.AddMixin(PowerBar, "PowerBar","powerBar", nil, nil)
+    Module.OnEnable(self)
 end

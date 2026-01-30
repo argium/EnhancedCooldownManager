@@ -75,16 +75,18 @@ end
 --------------------------------------------------------------------------------
 -- Utility: Get nested value from table using dot-separated path
 --------------------------------------------------------------------------------
+local NormalizePathKey
+
 local function GetNestedValue(tbl, path)
     local current = tbl
     for resource in path:gmatch("[^.]+") do
         if type(current) ~= "table" then return nil end
-        current = current[resource]
+        current = current[NormalizePathKey(resource)]
     end
     return current
 end
 
-local function NormalizePathKey(key)
+NormalizePathKey = function(key)
     local numberKey = tonumber(key)
     if numberKey then
         return numberKey
@@ -919,10 +921,54 @@ local function ResourceBarOptionsTable()
                         hidden = function() return not IsValueChanged("resourceBar.colors.souls") end,
                         func = MakeResetHandler("resourceBar.colors.souls"),
                     },
+                    colorDevourerNormal = {
+                        type = "color",
+                        name = "Devourer Souls (Normal)",
+                        order = 12,
+                        width = "double",
+                        get = function()
+                            local c = db.profile.resourceBar.colors.devourerNormal
+                            return c[1], c[2], c[3]
+                        end,
+                        set = function(_, r, g, b)
+                            db.profile.resourceBar.colors.devourerNormal = { r, g, b }
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    colorDevourerNormalReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 13,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("resourceBar.colors.devourerNormal") end,
+                        func = MakeResetHandler("resourceBar.colors.devourerNormal"),
+                    },
+                    colorDevourerMeta = {
+                        type = "color",
+                        name = "Devourer Souls (Neon)",
+                        order = 14,
+                        width = "double",
+                        get = function()
+                            local c = db.profile.resourceBar.colors.devourerMeta
+                            return c[1], c[2], c[3]
+                        end,
+                        set = function(_, r, g, b)
+                            db.profile.resourceBar.colors.devourerMeta = { r, g, b }
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    colorDevourerMetaReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 15,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("resourceBar.colors.devourerMeta") end,
+                        func = MakeResetHandler("resourceBar.colors.devourerMeta"),
+                    },
                     colorComboPoints = {
                         type = "color",
                         name = "Combo Points",
-                        order = 12,
+                        order = 16,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.ComboPoints]
@@ -936,7 +982,7 @@ local function ResourceBarOptionsTable()
                     colorComboPointsReset = {
                         type = "execute",
                         name = "X",
-                        order = 13,
+                        order = 17,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.ComboPoints) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.ComboPoints),
@@ -944,7 +990,7 @@ local function ResourceBarOptionsTable()
                     colorChi = {
                         type = "color",
                         name = "Chi",
-                        order = 14,
+                        order = 18,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.Chi]
@@ -958,7 +1004,7 @@ local function ResourceBarOptionsTable()
                     colorChiReset = {
                         type = "execute",
                         name = "X",
-                        order = 15,
+                        order = 19,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.Chi) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Chi),
@@ -966,7 +1012,7 @@ local function ResourceBarOptionsTable()
                     colorHolyPower = {
                         type = "color",
                         name = "Holy Power",
-                        order = 16,
+                        order = 20,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.HolyPower]
@@ -980,7 +1026,7 @@ local function ResourceBarOptionsTable()
                     colorHolyPowerReset = {
                         type = "execute",
                         name = "X",
-                        order = 17,
+                        order = 21,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.HolyPower) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.HolyPower),
@@ -988,7 +1034,7 @@ local function ResourceBarOptionsTable()
                     colorSoulShards = {
                         type = "color",
                         name = "Soul Shards",
-                        order = 18,
+                        order = 22,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.SoulShards]
@@ -1002,7 +1048,7 @@ local function ResourceBarOptionsTable()
                     colorSoulShardsReset = {
                         type = "execute",
                         name = "X",
-                        order = 19,
+                        order = 23,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.SoulShards) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.SoulShards),
@@ -1010,7 +1056,7 @@ local function ResourceBarOptionsTable()
                     colorEssence = {
                         type = "color",
                         name = "Essence",
-                        order = 20,
+                        order = 24,
                         width = "double",
                         get = function()
                             local c = db.profile.resourceBar.colors[Enum.PowerType.Essence]
@@ -1024,7 +1070,7 @@ local function ResourceBarOptionsTable()
                     colorEssenceReset = {
                         type = "execute",
                         name = "X",
-                        order = 21,
+                        order = 25,
                         width = 0.3,
                         hidden = function() return not IsValueChanged("resourceBar.colors." .. Enum.PowerType.Essence) end,
                         func = MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Essence),
@@ -1610,7 +1656,7 @@ local function GetCurrentTicks()
         return {}
     end
 
-    local ticksCfg = db.profile.powerBarTicks
+    local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
     if not ticksCfg or not ticksCfg.mappings then
         return {}
     end
@@ -1632,10 +1678,16 @@ local function SetCurrentTicks(ticks)
         return
     end
 
-    local ticksCfg = db.profile.powerBarTicks
+    local powerBarCfg = db.profile.powerBar
+    if not powerBarCfg then
+        db.profile.powerBar = {}
+        powerBarCfg = db.profile.powerBar
+    end
+
+    local ticksCfg = powerBarCfg.ticks
     if not ticksCfg then
-        db.profile.powerBarTicks = { mappings = {}, defaultColor = { 0, 0, 0, 0.5 }, defaultWidth = 1 }
-        ticksCfg = db.profile.powerBarTicks
+        powerBarCfg.ticks = { mappings = {}, defaultColor = { 0, 0, 0, 0.5 }, defaultWidth = 1 }
+        ticksCfg = powerBarCfg.ticks
     end
     if not ticksCfg.mappings then
         ticksCfg.mappings = {}
@@ -1654,7 +1706,17 @@ end
 local function AddTick(value, color, width)
     local ticks = GetCurrentTicks()
     local db = ECM.db
-    local ticksCfg = db.profile.powerBarTicks
+    local powerBarCfg = db.profile.powerBar
+    if not powerBarCfg then
+        db.profile.powerBar = {}
+        powerBarCfg = db.profile.powerBar
+    end
+
+    local ticksCfg = powerBarCfg.ticks
+    if not ticksCfg then
+        powerBarCfg.ticks = { mappings = {}, defaultColor = { 0, 0, 0, 0.5 }, defaultWidth = 1 }
+        ticksCfg = powerBarCfg.ticks
+    end
 
     local newTick = {
         value = value,
@@ -1694,7 +1756,7 @@ TickMarksOptionsTable = function()
     local function GenerateTickArgs()
         local args = {}
         local ticks = GetCurrentTicks()
-        local ticksCfg = db.profile.powerBarTicks
+        local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
 
         for i, tick in ipairs(ticks) do
             local orderBase = i * 10
@@ -1814,11 +1876,11 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 hasAlpha = true,
                 get = function()
-                    local c = db.profile.powerBarTicks.defaultColor
+                    local c = db.profile.powerBar.ticks.defaultColor
                     return c[1] or 0, c[2] or 0, c[3] or 0, c[4] or 0.5
                 end,
                 set = function(_, r, g, b, a)
-                    db.profile.powerBarTicks.defaultColor = { r, g, b, a }
+                    db.profile.powerBar.ticks.defaultColor = { r, g, b, a }
                 end,
             },
             defaultWidth = {
@@ -1830,9 +1892,9 @@ TickMarksOptionsTable = function()
                 min = 1,
                 max = 5,
                 step = 1,
-                get = function() return db.profile.powerBarTicks.defaultWidth end,
+                get = function() return db.profile.powerBar.ticks.defaultWidth end,
                 set = function(_, val)
-                    db.profile.powerBarTicks.defaultWidth = val
+                    db.profile.powerBar.ticks.defaultWidth = val
                 end,
             },
             spacer2 = {
