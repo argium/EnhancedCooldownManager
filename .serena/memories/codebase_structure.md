@@ -5,6 +5,20 @@
 - `EnhancedCooldownManager.lua`: main addon object initialization (AceAddon) and high-level UI flows (dialogs, chat command handling, etc.).
 - `Defaults.lua`: default profile/config setup (must load before main addon file).
 
+## Config Structure
+
+Profile config is stored in `EnhancedCooldownManager.db.profile`. Key sections:
+
+- `global`: Shared bar appearance (height, font, texture, background color)
+- `powerBar`, `resourceBar`, `runeBar`: Per-bar config with `anchorMode`, `colors`, `border`
+- `buffBars`: Buff bar config including nested `colors` table:
+  - `buffBars.colors.perBar[classID][specID][barIndex]` = `{r, g, b}`
+  - `buffBars.colors.cache[classID][specID][barIndex]` = cached spell metadata
+  - `buffBars.colors.defaultColor` = default RGB
+  - `buffBars.colors.selectedPalette` = palette name or nil
+- `powerBarTicks`: Per-class/spec tick mark mappings
+- `schemaVersion`: Current schema version (3 as of this writing)
+
 ## Major folders
 - `Bars/`
   - Implements the actual bar modules (e.g., PowerBar, ResourceBar, RuneBar, BuffBars).

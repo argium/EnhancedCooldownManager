@@ -53,19 +53,20 @@ local ADDON_NAME, ns = ...
 ---@field spellName string|nil
 ---@field lastSeen number
 
----@class ECM_BuffBarColorsConfig
----@field colors table<number, table<number, table<number, number[]>>> [classID][specID][barIndex] = {r, g, b}
----@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> [classID][specID][barIndex] = metadata
+---@class ECM_BuffBarColorsConfig Buff bar color configuration
+---@field perBar table<number, table<number, table<number, number[]>>> Per-bar RGB colors by class/spec/index
+---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index
 ---@field defaultColor number[] Default RGB color for buff bars
 ---@field selectedPalette string|nil Name of the currently selected palette
 
----@class ECM_BuffBarsConfig
----@field anchor "chain"|"independent"|nil
----@field width number|nil
----@field offsetY number|nil
----@field showIcon boolean|nil
----@field showSpellName boolean|nil
----@field showDuration boolean|nil
+---@class ECM_BuffBarsConfig Buff bars configuration
+---@field anchor "chain"|"independent"|nil Anchor behavior for buff bars
+---@field width number|nil Buff bar width when independent
+---@field offsetY number|nil Vertical offset when independent
+---@field showIcon boolean|nil Whether to show buff icons
+---@field showSpellName boolean|nil Whether to show spell names
+---@field showDuration boolean|nil Whether to show durations
+---@field colors ECM_BuffBarColorsConfig Per-bar color settings
 
 ---@class ECM_TickMark
 ---@field value number
@@ -83,7 +84,7 @@ local ADDON_NAME, ns = ...
 ---@field exceptIfTargetCanBeAttacked boolean
 ---@field exceptInInstance boolean
 
----@class ECM_Profile
+---@class ECM_Profile Profile settings
 ---@field hideWhenMounted boolean
 ---@field hideOutOfCombatInRestAreas boolean
 ---@field updateFrequency number
@@ -95,8 +96,7 @@ local ADDON_NAME, ns = ...
 ---@field powerBar ECM_PowerBarConfig
 ---@field resourceBar ECM_ResourceBarConfig
 ---@field runeBar ECM_RuneBarConfig
----@field buffBars ECM_BuffBarsConfig
----@field buffBarColors ECM_BuffBarColorsConfig
+---@field buffBars ECM_BuffBarsConfig Buff bars configuration
 ---@field powerBarTicks ECM_PowerBarTicksConfig
 
 local DEFAULT_BORDER_THICKNESS = 4
@@ -109,7 +109,7 @@ local defaults = {
         hideWhenMounted = true,
         hideOutOfCombatInRestAreas = false,
         updateFrequency = 0.04,
-        schemaVersion = 2,
+        schemaVersion = 3,
         offsetY = 4,
         combatFade = {
             enabled = false,
@@ -198,12 +198,12 @@ local defaults = {
             showIcon = false,
             showSpellName = true,
             showDuration = true,
-        },
-        buffBarColors = {
-            colors = {},
-            cache = {},
-            defaultColor = { 228 / 255, 233 / 255, 235 / 255 },
-            selectedPalette = nil,
+            colors = {
+                perBar = {},
+                cache = {},
+                defaultColor = { 228 / 255, 233 / 255, 235 / 255 },
+                selectedPalette = nil,
+            },
         },
         powerBarTicks = {
             mappings = {}, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }

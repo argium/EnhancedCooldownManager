@@ -17,21 +17,21 @@
 ---@field LayoutResourceTicks fun(self: ECM_RuneBarFrame, maxResources: number, color: table|nil, tickWidth: number|nil, poolKey: string|nil)
 
 local ADDON_NAME, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
 
 -- Mixins
 local BarFrame = ns.Mixins.BarFrame
 
-local RuneBar = EnhancedCooldownManager:NewModule("RuneBar", "AceEvent-3.0")
-EnhancedCooldownManager.RuneBar = RuneBar
+local RuneBar = ECM:NewModule("RuneBar", "AceEvent-3.0")
+ECM.RuneBar = RuneBar
 
 --------------------------------------------------------------------------------
 -- Domain Logic (DK rune-specific value/config handling)
 --------------------------------------------------------------------------------
 
 local function ShouldShowRuneBar()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.runeBar
     local _, class = UnitClass("player")
     return cfg and cfg.enabled and class == "DEATHKNIGHT"
@@ -77,7 +77,7 @@ end
 ---@param maxResources number
 local function EnsureFragmentedBars(bar, maxResources)
     ---@cast bar ECM_RuneBarFrame
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.runeBar
     local gbl = profile and profile.global
     local tex = BarFrame.GetTexture((cfg and cfg.texture) or (gbl and gbl.texture))
@@ -115,7 +115,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes)
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.runeBar
 
     local barWidth = bar:GetWidth()
@@ -220,7 +220,7 @@ end
 function RuneBar:CreateFrame()
     Util.Log("RuneBar", "Creating frame")
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
     frame.FragmentedBars = {}
@@ -245,7 +245,7 @@ end
 
 --- Updates values: rune status and colors.
 function RuneBar:Refresh()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.runeBar
     if self:IsHidden() or not (cfg and cfg.enabled) then
         return
@@ -297,7 +297,7 @@ end
 --------------------------------------------------------------------------------
 
 function RuneBar:OnUpdateThrottled()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if self:IsHidden() or not (profile and profile.runeBar and profile.runeBar.enabled) then
         return
     end
@@ -306,7 +306,7 @@ function RuneBar:OnUpdateThrottled()
 end
 
 function RuneBar:OnUnitPower(_, unit)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.runeBar and profile.runeBar.enabled) then
         return
     end

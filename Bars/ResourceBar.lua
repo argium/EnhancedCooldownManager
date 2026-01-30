@@ -13,14 +13,14 @@
 ---@field LayoutResourceTicks fun(self: ECM_ResourceBarFrame, maxResources: number, color: table|nil, tickWidth: number|nil, poolKey: string|nil)
 
 local ADDON_NAME, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
 
 -- Mixins
 local BarFrame = ns.Mixins.BarFrame
 
-local ResourceBar = EnhancedCooldownManager:NewModule("ResourceBar", "AceEvent-3.0")
-EnhancedCooldownManager.ResourceBar = ResourceBar
+local ResourceBar = ECM:NewModule("ResourceBar", "AceEvent-3.0")
+ECM.ResourceBar = ResourceBar
 
 local C_SPECID_DH_HAVOC = 1
 local C_SPECID_DH_DEVOURER = 3
@@ -60,7 +60,7 @@ local function GetDiscretePowerType()
 end
 
 local function ShouldShowResourceBar()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.resourceBar
     local _, class = UnitClass("player")
     local discretePower = GetDiscretePowerType()
@@ -117,7 +117,7 @@ end
 function ResourceBar:CreateFrame()
     Util.Log("ResourceBar", "Creating frame")
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
     frame:SetAppearance()
@@ -133,7 +133,7 @@ end
 
 --- Updates values: status bar value, colors.
 function ResourceBar:Refresh()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.resourceBar
     if self:IsHidden() or not (cfg and cfg.enabled) then
         return
@@ -178,7 +178,7 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnUnitPower(_, unit)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
         return
     end
@@ -187,7 +187,7 @@ function ResourceBar:OnUnitPower(_, unit)
 end
 
 function ResourceBar:OnUnitEvent(_, unit)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
         return
     end

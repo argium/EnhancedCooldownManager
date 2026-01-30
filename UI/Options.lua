@@ -5,9 +5,9 @@
 ---@class ECMOptionsModule
 local _, ns = ...
 
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
-local Options = EnhancedCooldownManager:NewModule("Options")
+local Options = ECM:NewModule("Options")
 
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
@@ -120,7 +120,7 @@ end
 -- Utility: Check if value differs from default
 --------------------------------------------------------------------------------
 local function IsValueChanged(path)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local defaults = ns.defaults and ns.defaults.profile
     if not profile or not defaults then return false end
 
@@ -134,7 +134,7 @@ end
 -- Utility: Reset value to default
 --------------------------------------------------------------------------------
 local function ResetToDefault(path)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local defaults = ns.defaults and ns.defaults.profile
     if not profile or not defaults then return end
 
@@ -192,13 +192,13 @@ local function MakeResetHandler(path, refreshFunc)
     return function()
         ResetToDefault(path)
         if refreshFunc then refreshFunc() end
-        EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+        ECM.ViewerHook:ScheduleLayoutUpdate(0)
         AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
     end
 end
 
 local function GeneralOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     return {
         type = "group",
         name = "General",
@@ -223,7 +223,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.hideWhenMounted end,
                         set = function(_, val)
                             db.profile.hideWhenMounted = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     hideOutOfCombatInRestAreas = {
@@ -234,7 +234,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.hideOutOfCombatInRestAreas end,
                         set = function(_, val)
                             db.profile.hideOutOfCombatInRestAreas = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     texture = {
@@ -247,7 +247,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
                             db.profile.global.texture = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     textureReset = {
@@ -282,7 +282,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.offsetY end,
                         set = function(_, val)
                             db.profile.offsetY = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -315,7 +315,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.enabled end,
                         set = function(_, val)
                             db.profile.combatFade.enabled = val
-                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                            ECM.ViewerHook:UpdateCombatFade()
                         end,
                     },
                     combatFadeOpacityDesc = {
@@ -335,7 +335,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.opacity end,
                         set = function(_, val)
                             db.profile.combatFade.opacity = val
-                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                            ECM.ViewerHook:UpdateCombatFade()
                         end,
                     },
                     combatFadeOpacityReset = {
@@ -346,7 +346,7 @@ local function GeneralOptionsTable()
                         hidden = function() return not IsValueChanged("combatFade.opacity") end,
                         disabled = function() return not db.profile.combatFade.enabled end,
                         func = MakeResetHandler("combatFade.opacity", function()
-                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                            ECM.ViewerHook:UpdateCombatFade()
                         end),
                     },
                     spacer2 = {
@@ -368,7 +368,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.exceptInInstance end,
                         set = function(_, val)
                             db.profile.combatFade.exceptInInstance = val
-                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                            ECM.ViewerHook:UpdateCombatFade()
                         end,
                     },
                     exceptIfTargetCanBeAttackedEnabled ={
@@ -380,7 +380,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.combatFade.exceptIfTargetCanBeAttacked end,
                         set = function(_, val)
                             db.profile.combatFade.exceptIfTargetCanBeAttacked = val
-                            EnhancedCooldownManager.ViewerHook:UpdateCombatFade()
+                            ECM.ViewerHook:UpdateCombatFade()
                         end,
                     },
                 },
@@ -395,7 +395,7 @@ local TickMarksOptionsTable
 local ColoursOptionsTable
 
 local function PowerBarOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local tickMarks = TickMarksOptionsTable()
     tickMarks.name = "Tick Marks"
     tickMarks.inline = true
@@ -419,7 +419,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -438,7 +438,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.height or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.height = val > 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -470,7 +470,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showText end,
                         set = function(_, val)
                             db.profile.powerBar.showText = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showManaAsPercentDesc = {
@@ -486,7 +486,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showManaAsPercent end,
                         set = function(_, val)
                             db.profile.powerBar.showManaAsPercent = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     borderSpacer = {
@@ -502,7 +502,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.border.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.border.enabled = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     borderThickness = {
@@ -517,7 +517,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.border.thickness end,
                         set = function(_, val)
                             db.profile.powerBar.border.thickness = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     borderColor = {
@@ -533,7 +533,7 @@ local function PowerBarOptionsTable()
                         end,
                         set = function(_, r, g, b, a)
                             db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -562,7 +562,7 @@ local function PowerBarOptionsTable()
                         end,
                         set = function(_, val)
                             ApplyPositionModeToBar(db.profile.powerBar, val)
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     spacer1 = {
@@ -588,7 +588,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.width or DEFAULT_BAR_WIDTH end,
                         set = function(_, val)
                             db.profile.powerBar.width = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     widthReset = {
@@ -617,7 +617,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.offsetX or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.offsetX = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetXReset = {
@@ -646,7 +646,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.offsetY or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.offsetY = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -665,7 +665,7 @@ local function PowerBarOptionsTable()
 end
 
 local function ResourceBarOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     return {
         type = "group",
         name = "Resource Bar",
@@ -685,7 +685,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.enabled end,
                         set = function(_, val)
                             db.profile.resourceBar.enabled = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -704,7 +704,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.height or 0 end,
                         set = function(_, val)
                             db.profile.resourceBar.height = val > 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -741,7 +741,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, val)
                             ApplyPositionModeToBar(db.profile.resourceBar, val)
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     spacer1 = {
@@ -767,7 +767,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.width or DEFAULT_BAR_WIDTH end,
                         set = function(_, val)
                             db.profile.resourceBar.width = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     widthReset = {
@@ -796,7 +796,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.offsetX or 0 end,
                         set = function(_, val)
                             db.profile.resourceBar.offsetX = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetXReset = {
@@ -825,7 +825,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.offsetY or 0 end,
                         set = function(_, val)
                             db.profile.resourceBar.offsetY = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -852,7 +852,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.border.enabled end,
                         set = function(_, val)
                             db.profile.resourceBar.border.enabled = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     borderThickness = {
@@ -867,7 +867,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.border.thickness end,
                         set = function(_, val)
                             db.profile.resourceBar.border.thickness = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     borderColor = {
@@ -883,7 +883,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b, a)
                             db.profile.resourceBar.border.color = { r = r, g = g, b = b, a = a }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorsSpacer = {
@@ -908,7 +908,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors.souls = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorDemonHunterSoulsReset = {
@@ -930,7 +930,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.ComboPoints] = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorComboPointsReset = {
@@ -952,7 +952,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.Chi] = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorChiReset = {
@@ -974,7 +974,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.HolyPower] = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorHolyPowerReset = {
@@ -996,7 +996,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.SoulShards] = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorSoulShardsReset = {
@@ -1018,7 +1018,7 @@ local function ResourceBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.resourceBar.colors[Enum.PowerType.Essence] = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorEssenceReset = {
@@ -1036,7 +1036,7 @@ local function ResourceBarOptionsTable()
 end
 
 local function RuneBarOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     return {
         type = "group",
         name = "Rune Bar",
@@ -1057,7 +1057,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.enabled end,
                         set = function(_, val)
                             db.profile.runeBar.enabled = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightDesc = {
@@ -1076,7 +1076,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.height or 0 end,
                         set = function(_, val)
                             db.profile.runeBar.height = val > 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     heightReset = {
@@ -1103,7 +1103,7 @@ local function RuneBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.runeBar.color = { r, g, b }
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     colorReset = {
@@ -1140,7 +1140,7 @@ local function RuneBarOptionsTable()
                         end,
                         set = function(_, val)
                             ApplyPositionModeToBar(db.profile.runeBar, val)
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     spacer1 = {
@@ -1166,7 +1166,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.width or DEFAULT_BAR_WIDTH end,
                         set = function(_, val)
                             db.profile.runeBar.width = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     widthReset = {
@@ -1195,7 +1195,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.offsetX or 0 end,
                         set = function(_, val)
                             db.profile.runeBar.offsetX = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetXReset = {
@@ -1224,7 +1224,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.offsetY or 0 end,
                         set = function(_, val)
                             db.profile.runeBar.offsetY = val ~= 0 and val or nil
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     offsetYReset = {
@@ -1242,7 +1242,7 @@ local function RuneBarOptionsTable()
 end
 
 local function AuraBarsOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local colors = ColoursOptionsTable()
     colors.name = ""
     colors.inline = true
@@ -1273,7 +1273,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showIcon end,
                         set = function(_, val)
                             db.profile.buffBars.showIcon = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showSpellName = {
@@ -1284,7 +1284,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showSpellName end,
                         set = function(_, val)
                             db.profile.buffBars.showSpellName = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     showDuration = {
@@ -1295,7 +1295,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.showDuration end,
                         set = function(_, val)
                             db.profile.buffBars.showDuration = val
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -1324,7 +1324,7 @@ local function AuraBarsOptionsTable()
                         end,
                         set = function(_, val)
                             ApplyPositionModeToBar(db.profile.buffBars, val)
-                            EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                            ECM.ViewerHook:ScheduleLayoutUpdate(0)
                         end,
                     },
                     spacer1 = {
@@ -1351,7 +1351,7 @@ local function AuraBarsOptionsTable()
                         get = function() return db.profile.buffBars.width end,
                         set = function(_, val)
                             db.profile.buffBars.width = val
-                            local buffBars = EnhancedCooldownManager.BuffBars
+                            local buffBars = ECM.BuffBars
                             if buffBars then
                                 buffBars:UpdateLayout()
                             end
@@ -1378,7 +1378,7 @@ end
 -- Colours Options (top-level section for per-bar color customization)
 --------------------------------------------------------------------------------
 ColoursOptionsTable = function()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     return {
         type = "group",
         name = "Colours",
@@ -1415,12 +1415,12 @@ ColoursOptionsTable = function()
                 order = 10,
                 width = "double",
                 get = function()
-                    local c = db.profile.buffBarColors.defaultColor
+                    local c = db.profile.buffBars.colors.defaultColor
                     return c[1], c[2], c[3]
                 end,
                 set = function(_, r, g, b)
-                    db.profile.buffBarColors.defaultColor = { r, g, b }
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    db.profile.buffBars.colors.defaultColor = { r, g, b }
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             },
             defaultColorReset = {
@@ -1429,8 +1429,8 @@ ColoursOptionsTable = function()
                 desc = "Reset to default",
                 order = 11,
                 width = 0.3,
-                hidden = function() return not IsValueChanged("buffBarColors.defaultColor") end,
-                func = MakeResetHandler("buffBarColors.defaultColor"),
+                hidden = function() return not IsValueChanged("buffBars.colors.defaultColor") end,
+                func = MakeResetHandler("buffBars.colors.defaultColor"),
             },
 
             refreshBarList = {
@@ -1440,7 +1440,7 @@ ColoursOptionsTable = function()
                 order = 21,
                 width = "normal",
                 func = function()
-                    local buffBars = EnhancedCooldownManager.BuffBars
+                    local buffBars = ECM.BuffBars
                     if buffBars then
                         buffBars:ResetStyledMarkers()
                         buffBars:RescanBars()
@@ -1463,7 +1463,7 @@ end
 ---@return table args
 local function GenerateBarColorArgs()
     local args = {}
-    local buffBars = EnhancedCooldownManager.BuffBars
+    local buffBars = ECM.BuffBars
     if not buffBars then
         return args
     end
@@ -1540,7 +1540,7 @@ end
 
 
 local function ProfileOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     -- Use AceDBOptions to generate a full profile management UI
     local profileOptions = AceDBOptions:GetOptionsTable(db)
     profileOptions.order = 7
@@ -1569,11 +1569,11 @@ local function ProfileOptionsTable()
                 func = function()
                     local exportString, err = ns.ImportExport.ExportCurrentProfile()
                     if not exportString then
-                        EnhancedCooldownManager:Print("Export failed: " .. (err or "Unknown error"))
+                        ECM:Print("Export failed: " .. (err or "Unknown error"))
                         return
                     end
 
-                    EnhancedCooldownManager:ShowExportDialog(exportString)
+                    ECM:ShowExportDialog(exportString)
                 end,
             },
             importButton = {
@@ -1584,11 +1584,11 @@ local function ProfileOptionsTable()
                 width = "normal",
                 func = function()
                     if InCombatLockdown() then
-                        EnhancedCooldownManager:Print("Cannot import during combat (reload blocked)")
+                        ECM:Print("Cannot import during combat (reload blocked)")
                         return
                     end
 
-                    EnhancedCooldownManager:ShowImportDialog()
+                    ECM:ShowImportDialog()
                 end,
             },
         },
@@ -1604,7 +1604,7 @@ end
 --- Gets tick marks for the current class/spec.
 ---@return ECM_TickMark[]
 local function GetCurrentTicks()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return {}
@@ -1626,7 +1626,7 @@ end
 --- Sets tick marks for the current class/spec.
 ---@param ticks ECM_TickMark[]
 local function SetCurrentTicks(ticks)
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return
@@ -1653,7 +1653,7 @@ end
 ---@param width number|nil
 local function AddTick(value, color, width)
     local ticks = GetCurrentTicks()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local ticksCfg = db.profile.powerBarTicks
 
     local newTick = {
@@ -1688,7 +1688,7 @@ local function UpdateTick(index, field, value)
 end
 
 TickMarksOptionsTable = function()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
 
     --- Generates per-tick options dynamically.
     local function GenerateTickArgs()
@@ -1720,7 +1720,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "value", val)
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1739,7 +1739,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "width", val)
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1757,7 +1757,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, r, g, b, a)
                     UpdateTick(i, "color", { r, g, b, a })
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1771,7 +1771,7 @@ TickMarksOptionsTable = function()
                 confirmText = "Remove tick mark at value " .. (tick.value or "?") .. "?",
                 func = function()
                     RemoveTick(i)
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1860,7 +1860,7 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 func = function()
                     AddTick(50, nil, nil)
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1894,7 +1894,7 @@ TickMarksOptionsTable = function()
                 end,
                 func = function()
                     SetCurrentTicks({})
-                    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+                    ECM.ViewerHook:ScheduleLayoutUpdate(0)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1904,7 +1904,7 @@ TickMarksOptionsTable = function()
 end
 
 local function AboutOptionsTable()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     local authorColored = "|cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r"
     local version = C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "unknown"
     return {
@@ -2055,14 +2055,14 @@ function Options:OnInitialize()
     end
 
     -- Register callbacks for profile changes to refresh bars
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
 end
 
 function Options:OnProfileChanged()
-    EnhancedCooldownManager.ViewerHook:ScheduleLayoutUpdate(0)
+    ECM.ViewerHook:ScheduleLayoutUpdate(0)
     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
 end
 

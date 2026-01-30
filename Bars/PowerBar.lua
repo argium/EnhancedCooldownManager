@@ -15,13 +15,13 @@
 ---@field LayoutValueTicks fun(self: ECM_PowerBarFrame, statusBar: StatusBar, ticks: table, maxValue: number, defaultColor: table, defaultWidth: number)
 
 local ADDON_NAME, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
 
 local BarFrame = ns.Mixins.BarFrame
 
-local PowerBar = EnhancedCooldownManager:NewModule("PowerBar", "AceEvent-3.0")
-EnhancedCooldownManager.PowerBar = PowerBar
+local PowerBar = ECM:NewModule("PowerBar", "AceEvent-3.0")
+ECM.PowerBar = PowerBar
 
 --- Returns max/current/display values for primary resource formatting.
 ---@param resource Enum.PowerType|nil
@@ -47,7 +47,7 @@ end
 
 
 local function ShouldShowPowerBar()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if not (profile and profile.powerBar and profile.powerBar.enabled) then
         return false
     end
@@ -68,7 +68,7 @@ end
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil
 function PowerBar:GetCurrentTicks()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local ticksCfg = profile and profile.powerBarTicks
     if not ticksCfg or not ticksCfg.mappings then
         return nil
@@ -98,7 +98,7 @@ end
 function PowerBar:CreateFrame()
     Util.Log("PowerBar", "Creating frame")
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local frame = BarFrame.CreateFrame(self, { withTicks = true })
 
     -- Add text overlay (PowerBar-specific)
@@ -125,7 +125,7 @@ function PowerBar:UpdateTicks(bar, resource, max)
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local ticksCfg = profile and profile.powerBarTicks
     local defaultColor = ticksCfg and ticksCfg.defaultColor or { 0, 0, 0, 0.5 }
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
@@ -136,7 +136,7 @@ end
 
 --- Updates values: status bar value, text, colors, ticks.
 function PowerBar:Refresh()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     local cfg = profile and profile.powerBar
     if self:IsHidden() or not (cfg and cfg.enabled) then
         Util.Log(self:GetName(), "Refresh skipped: bar is hidden or disabled")
@@ -204,7 +204,7 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnUnitPower(_, unit)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.powerBar and profile.powerBar.enabled) then
         return
     end

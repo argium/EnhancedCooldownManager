@@ -4,8 +4,8 @@
 
 local ADDON_NAME, ns = ...
 
-local EnhancedCooldownManager = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
-ns.Addon = EnhancedCooldownManager
+local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
+ns.Addon = ECM
 local Util = ns.Util
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
@@ -13,16 +13,16 @@ local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
-assert(ns.defaults, "Defaults.lua must be loaded before EnhancedCooldownManager.lua")
-assert(ns.AddToTraceLog and ns.GetTraceLog, "TraceLog.lua must be loaded before EnhancedCooldownManager.lua")
-assert(ns.ShowBugReportPopup, "BugReports.lua must be loaded before EnhancedCooldownManager.lua")
+assert(ns.defaults, "Defaults.lua must be loaded before ECM.lua")
+assert(ns.AddToTraceLog and ns.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
+assert(ns.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
 
 --- Shows a confirmation popup and reloads the UI on accept.
 --- ReloadUI is blocked in combat.
 ---@param text string
 ---@param onAccept fun()|nil
 ---@param onCancel fun()|nil
-function EnhancedCooldownManager:ConfirmReloadUI(text, onAccept, onCancel)
+function ECM:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
         Util.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
@@ -98,7 +98,7 @@ end
 
 --- Shows a dialog with the export string for copying.
 ---@param exportString string
-function EnhancedCooldownManager:ShowExportDialog(exportString)
+function ECM:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
         Util.Print("Invalid export string provided")
         return
@@ -121,7 +121,7 @@ function EnhancedCooldownManager:ShowExportDialog(exportString)
 end
 
 --- Shows a dialog to paste an import string and handles the import process.
-function EnhancedCooldownManager:ShowImportDialog()
+function ECM:ShowImportDialog()
     EnsureEditBoxDialog(POPUP_IMPORT_PROFILE, {
         text = "Paste your import string:",
         button1 = OKAY or "Import",
@@ -146,14 +146,14 @@ function EnhancedCooldownManager:ShowImportDialog()
         local input = editBox:GetText() or ""
 
         if input:trim() == "" then
-            EnhancedCooldownManager:Print("Import cancelled: no string provided")
+            ECM:Print("Import cancelled: no string provided")
             return
         end
 
         -- Validate first WITHOUT applying
         local data, errorMsg = ns.ImportExport.ValidateImportString(input)
         if not data then
-            EnhancedCooldownManager:Print("Import failed: " .. (errorMsg or "unknown error"))
+            ECM:Print("Import failed: " .. (errorMsg or "unknown error"))
             return
         end
 
@@ -164,10 +164,10 @@ function EnhancedCooldownManager:ShowImportDialog()
         )
 
         -- Only apply the import AFTER user confirms reload
-        EnhancedCooldownManager:ConfirmReloadUI(confirmText, function()
+        ECM:ConfirmReloadUI(confirmText, function()
             local success, applyErr = ns.ImportExport.ApplyImportData(data)
             if not success then
-                EnhancedCooldownManager:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                ECM:Print("Import apply failed: " .. (applyErr or "unknown error"))
             end
         end, nil)
     end
@@ -192,7 +192,7 @@ end
 
 --- Handles slash command input for toggling ECM bars.
 ---@param input string|nil
-function EnhancedCooldownManager:ChatCommand(input)
+function ECM:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
@@ -246,7 +246,7 @@ function EnhancedCooldownManager:ChatCommand(input)
     Util.Print("Unknown command. Use /ecm help")
 end
 
-function EnhancedCooldownManager:HandleOpenOptionsAfterCombat()
+function ECM:HandleOpenOptionsAfterCombat()
     if not self._openOptionsAfterCombat then
         return
     end
@@ -261,8 +261,50 @@ function EnhancedCooldownManager:HandleOpenOptionsAfterCombat()
 end
 
 --- Initializes saved variables, runs migrations, and registers slash commands.
-function EnhancedCooldownManager:OnInitialize()
+--- Runs profile migrations for schema version upgrades.
+--- Each migration is gated by schemaVersion to ensure it only runs once.
+---@param profile table The profile to migrate
+function ECM:RunMigrations(profile)
+    local currentSchema = profile.schemaVersion or 1
+
+    -- Migration: buffBarColors -> buffBars.colors (schema 2 -> 3)
+    if currentSchema < 3 then
+        if profile.buffBarColors then
+            Util.Log("Migration", "Migrating buffBarColors to buffBars.colors")
+
+            profile.buffBars = profile.buffBars or {}
+            profile.buffBars.colors = profile.buffBars.colors or {}
+
+            local src = profile.buffBarColors
+            local dst = profile.buffBars.colors
+
+            dst.perBar = dst.perBar or src.colors or {}
+            dst.cache = dst.cache or src.cache or {}
+            dst.defaultColor = dst.defaultColor or src.defaultColor
+            dst.selectedPalette = dst.selectedPalette or src.selectedPalette
+
+            profile.buffBarColors = nil
+        end
+
+        -- Migration: colors.colors -> colors.perBar (rename within buffBars.colors)
+        local colorsConfig = profile.buffBars and profile.buffBars.colors
+        if colorsConfig and colorsConfig.colors and not colorsConfig.perBar then
+            Util.Log("Migration", "Renaming buffBars.colors.colors to buffBars.colors.perBar")
+            colorsConfig.perBar = colorsConfig.colors
+            colorsConfig.colors = nil
+        end
+
+        profile.schemaVersion = 3
+    end
+end
+
+function ECM:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("EnhancedCooldownManagerDB", ns.defaults, true)
+
+    local profile = self.db and self.db.profile
+    if profile then
+        self:RunMigrations(profile)
+    end
 
     -- Register bundled font with LibSharedMedia if present.
     if LSM and LSM.Register then
@@ -275,7 +317,7 @@ function EnhancedCooldownManager:OnInitialize()
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
-function EnhancedCooldownManager:OnEnable()
+function ECM:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
 
     local moduleOrder = {

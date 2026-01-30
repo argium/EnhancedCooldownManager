@@ -2,9 +2,31 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
+---@class Frame Base UI frame type
+
+---@class StatusBar : Frame Status bar frame type
+
+---@class ECM_BuffBarChild : Frame Buff bar child frame
+---@field Bar StatusBar Status bar region for the buff bar
+---@field Icon Frame Icon texture frame
+---@field IconFrame Frame Icon container frame
+---@field IconButton Frame Icon button frame
+---@field __ecmAnchorHooked boolean|nil True when anchor hooks are installed
+---@field __ecmStyled boolean|nil True when ECM styling is applied
+
+---@class ECM_BuffBarViewer : Frame Buff bar viewer frame
+---@field _layoutCache table|nil Cached layout parameters
+---@field ApplyLayout fun(self: ECM_BuffBarViewer, params: table): boolean Applies layout parameters
+---@field InvalidateLayout fun(self: ECM_BuffBarViewer): nil Invalidates cached layout
+---@field __ecmHooked boolean|nil True when viewer hooks are installed
+---@field __ecmLayoutRunning boolean|nil True while ECM layout is running
+
+---@class ECM_BuffBarsModule Buff bars module
+
 local _, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 local Util = ns.Util
+local Module = ns.Mixins.Module
 
 -- Small shim to access BarFrame mixin helpers
 local BarHelpers = {
@@ -24,28 +46,8 @@ local BarHelpers = {
     end,
 }
 local PositionMixin = ns.Mixins.PositionMixin
-
----@class Frame
----@class StatusBar : Frame
-
----@class ECM_BuffBarChild : Frame
----@field Bar StatusBar
----@field Icon Frame
----@field IconFrame Frame
----@field IconButton Frame
----@field __ecmAnchorHooked boolean|nil
----@field __ecmStyled boolean|nil
-
----@class ECM_BuffBarViewer : Frame
----@field _layoutCache table|nil
----@field ApplyLayout fun(self: ECM_BuffBarViewer, params: table): boolean
----@field InvalidateLayout fun(self: ECM_BuffBarViewer): nil
----@field __ecmHooked boolean|nil
----@field __ecmLayoutRunning boolean|nil
-
----@class ECM_BuffBarsModule
-local BuffBars = EnhancedCooldownManager:NewModule("BuffBars", "AceEvent-3.0")
-EnhancedCooldownManager.BuffBars = BuffBars
+local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
+ECM.BuffBars = BuffBars
 
 local WHITE8 = "Interface\\Buttons\\WHITE8X8"
 local DEFAULT_BAR_COLOR = { 0.90, 0.90, 0.90 }
@@ -105,28 +107,44 @@ local function GetCurrentClassSpec()
     return classID, specID
 end
 
---- Ensures nested tables exist for buffBarColors storage.
----@param profile table
-local function EnsureColorStorage(profile)
-    if not profile.buffBarColors then
-        profile.buffBarColors = {
-            colors = {},
+--- Gets the active profile for the module.
+---@param module ECM_BuffBarsModule
+---@return table|nil profile
+local function GetProfile(module)
+    if module and module._config then
+        return module._config
+    end
+    return ECM.db and ECM.db.profile
+end
+
+--- Ensures nested tables exist for buff bar color storage.
+---@param cfg table|nil
+local function EnsureColorStorage(cfg)
+    if not cfg then
+        return
+    end
+
+    if not cfg.colors then
+        cfg.colors = {
+            perBar = {},
             cache = {},
             defaultColor = DEFAULT_BAR_COLOR,
             selectedPalette = nil,
         }
     end
-    if not profile.buffBarColors.colors then
-        profile.buffBarColors.colors = {}
+
+    local colors = cfg.colors
+    if not colors.perBar then
+        colors.perBar = {}
     end
-    if not profile.buffBarColors.cache then
-        profile.buffBarColors.cache = {}
+    if not colors.cache then
+        colors.cache = {}
     end
-    if not profile.buffBarColors.defaultColor then
-        profile.buffBarColors.defaultColor = DEFAULT_BAR_COLOR
+    if not colors.defaultColor then
+        colors.defaultColor = DEFAULT_BAR_COLOR
     end
-    if profile.buffBarColors.selectedPalette == nil then
-        profile.buffBarColors.selectedPalette = nil
+    if colors.selectedPalette == nil then
+        colors.selectedPalette = nil
     end
 end
 
@@ -147,17 +165,17 @@ end
 
 --- Returns color for bar at index for current class/spec, or palette/default if not set.
 ---@param barIndex number 1-based index in layout order
----@param profile table
+---@param cfg table|nil
 ---@return number r, number g, number b
-local function GetBarColor(barIndex, profile)
-    if not profile then
+local function GetBarColor(barIndex, cfg)
+    if not cfg then
         return DEFAULT_BAR_COLOR[1], DEFAULT_BAR_COLOR[2], DEFAULT_BAR_COLOR[3]
     end
 
-    EnsureColorStorage(profile)
+    EnsureColorStorage(cfg)
 
     local classID, specID = GetCurrentClassSpec()
-    local colors = profile.buffBarColors.colors
+    local colors = cfg.colors.perBar
     if classID and specID and colors[classID] and colors[classID][specID] then
         local c = colors[classID][specID][barIndex]
         if c then
@@ -165,32 +183,32 @@ local function GetBarColor(barIndex, profile)
         end
     end
 
-    local selectedPalette = profile.buffBarColors.selectedPalette
+    local selectedPalette = cfg.colors.selectedPalette
     if selectedPalette and PALETTES[selectedPalette] then
         return GetPaletteColor(barIndex, selectedPalette)
     end
 
-    local dc = profile.buffBarColors.defaultColor or DEFAULT_BAR_COLOR
+    local dc = cfg.colors.defaultColor or DEFAULT_BAR_COLOR
     return dc[1], dc[2], dc[3]
 end
 
 --- Updates bar cache with current bar metadata for Options UI.
 ---@param barIndex number
 ---@param spellName string|nil
----@param profile table
-local function UpdateBarCache(barIndex, spellName, profile)
-    if not profile or not barIndex or barIndex < 1 then
+---@param cfg table|nil
+local function UpdateBarCache(barIndex, spellName, cfg)
+    if not cfg or not barIndex or barIndex < 1 then
         return
     end
 
-    EnsureColorStorage(profile)
+    EnsureColorStorage(cfg)
 
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return
     end
 
-    local cache = profile.buffBarColors.cache
+    local cache = cfg.colors.cache
     cache[classID] = cache[classID] or {}
     cache[classID][specID] = cache[classID][specID] or {}
 
@@ -300,8 +318,9 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
     bar:SetStatusBarTexture(tex)
 
     -- Apply bar color from per-bar settings or default
+    local cfg = profile.buffBars or {}
     if bar.SetStatusBarColor and barIndex then
-        local r, g, b = GetBarColor(barIndex, profile)
+        local r, g, b = GetBarColor(barIndex, cfg)
         bar:SetStatusBarColor(r, g, b, 1.0)
     end
 
@@ -316,7 +335,7 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
                 spellName = text
             end
         end
-        UpdateBarCache(barIndex, spellName, profile)
+        UpdateBarCache(barIndex, spellName, cfg)
     end
 
     local bgColor = BarHelpers.GetBgColor(nil, profile)
@@ -344,7 +363,6 @@ local function ApplyCooldownBarStyle(child, profile, barIndex)
     local iconFrame = child.Icon or child.IconFrame or child.IconButton
 
     -- Apply visibility settings from buffBars config (default to shown)
-    local cfg = profile.buffBars or {}
     if iconFrame then
         iconFrame:SetShown(cfg.showIcon ~= false)
     end
@@ -409,11 +427,12 @@ function BuffBars:ResetStyledMarkers()
 
     -- Clear bar cache for current class/spec so it gets rebuilt fresh.
     -- This ensures the Options UI shows correct spell names after reordering.
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if profile and profile.buffBarColors and profile.buffBarColors.cache then
+    local profile = GetProfile(self)
+    local cfg = profile and profile.buffBars
+    if cfg and cfg.colors and cfg.colors.cache then
         local classID, specID = GetCurrentClassSpec()
         if classID and specID then
-            local cache = profile.buffBarColors.cache
+            local cache = cfg.colors.cache
             if cache[classID] then
                 cache[classID][specID] = {}
             end
@@ -478,17 +497,6 @@ function BuffBars:HookViewer()
         self:ScheduleLayoutUpdate()
     end)
 
-    -- Register for UNIT_AURA to catch buff changes
-    if not self._auraEventFrame then
-        self._auraEventFrame = CreateFrame("Frame")
-        self._auraEventFrame:RegisterEvent("UNIT_AURA")
-        self._auraEventFrame:SetScript("OnEvent", function(_, event, unit)
-            if unit == "player" then
-                self:ScheduleRescan()
-            end
-        end)
-    end
-
     -- Hook edit mode transitions
     self:HookEditMode()
 
@@ -501,7 +509,7 @@ function BuffBars:ScheduleLayoutUpdate()
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     self._layoutPending = true
 
     assert(profile and profile.updateFrequency, "ECM: profile.updateFrequency missing")
@@ -521,7 +529,7 @@ function BuffBars:ScheduleRescan()
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     self._rescanPending = true
 
     assert(profile and profile.updateFrequency, "ECM: profile.updateFrequency missing")
@@ -542,7 +550,7 @@ function BuffBars:RescanBars()
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
 
     -- Hook all children for anchor change detection
     for _, child in ipairs({ viewer:GetChildren() }) do
@@ -609,7 +617,7 @@ function BuffBars:UpdateLayoutAndRefresh(why)
         return
     end
 
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     local cfg = profile.buffBars or {}
     self._viewerLayoutCache = self._viewerLayoutCache or {}
 
@@ -651,6 +659,10 @@ function BuffBars:UpdateLayoutAndRefresh(why)
     })
 end
 
+function BuffBars:UpdateLayout()
+    self:UpdateLayoutAndRefresh("UpdateLayout")
+end
+
 function BuffBars:Refresh()
     self:UpdateLayoutAndRefresh("Refresh")
 end
@@ -658,19 +670,20 @@ end
 --- Returns cached bars for current class/spec for Options UI.
 ---@return table<number, ECM_BarCacheEntry> bars Indexed by bar position
 function BuffBars:GetCachedBars()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     if not profile then
         return {}
     end
 
-    EnsureColorStorage(profile)
+    local cfg = profile.buffBars
+    EnsureColorStorage(cfg)
 
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return {}
     end
 
-    local cache = profile.buffBarColors.cache
+    local cache = cfg.colors.cache
     if cache[classID] and cache[classID][specID] then
         return cache[classID][specID]
     end
@@ -684,19 +697,20 @@ end
 ---@param g number
 ---@param b number
 function BuffBars:SetBarColor(barIndex, r, g, b)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     if not profile then
         return
     end
 
-    EnsureColorStorage(profile)
+    local cfg = profile.buffBars
+    EnsureColorStorage(cfg)
 
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return
     end
 
-    local colors = profile.buffBarColors.colors
+    local colors = cfg.colors.perBar
     colors[classID] = colors[classID] or {}
     colors[classID][specID] = colors[classID][specID] or {}
     colors[classID][specID][barIndex] = { r, g, b }
@@ -710,19 +724,20 @@ end
 --- Resets color for bar at index to default.
 ---@param barIndex number
 function BuffBars:ResetBarColor(barIndex)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     if not profile then
         return
     end
 
-    EnsureColorStorage(profile)
+    local cfg = profile.buffBars
+    EnsureColorStorage(cfg)
 
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return
     end
 
-    local colors = profile.buffBarColors.colors
+    local colors = cfg.colors.perBar
     if colors[classID] and colors[classID][specID] then
         colors[classID][specID][barIndex] = nil
     end
@@ -738,16 +753,18 @@ end
 ---@param barIndex number
 ---@return number r, number g, number b
 function BuffBars:GetBarColor(barIndex)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    return GetBarColor(barIndex, profile)
+    local profile = GetProfile(self)
+    local cfg = profile and profile.buffBars
+    return GetBarColor(barIndex, cfg)
 end
 
 --- Checks if bar at index has a custom color set.
 ---@param barIndex number
 ---@return boolean
 function BuffBars:HasCustomBarColor(barIndex)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
-    if not profile or not profile.buffBarColors or not profile.buffBarColors.colors then
+    local profile = GetProfile(self)
+    local cfg = profile and profile.buffBars
+    if not cfg or not cfg.colors or not cfg.colors.perBar then
         return false
     end
 
@@ -756,7 +773,7 @@ function BuffBars:HasCustomBarColor(barIndex)
         return false
     end
 
-    local colors = profile.buffBarColors.colors
+    local colors = cfg.colors.perBar
     return colors[classID] and colors[classID][specID] and colors[classID][specID][barIndex] ~= nil
 end
 
@@ -774,18 +791,19 @@ end
 ---@param paletteName string|nil
 ---@param applyToAllBars boolean
 function BuffBars:SetSelectedPalette(paletteName, applyToAllBars)
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     if not profile then
         return
     end
 
-    EnsureColorStorage(profile)
-    profile.buffBarColors.selectedPalette = paletteName
+    local cfg = profile.buffBars
+    EnsureColorStorage(cfg)
+    cfg.colors.selectedPalette = paletteName
 
     if applyToAllBars then
         local classID, specID = GetCurrentClassSpec()
         if classID and specID then
-            local colors = profile.buffBarColors.colors
+            local colors = cfg.colors.perBar
             if colors[classID] and colors[classID][specID] then
                 colors[classID][specID] = {}
             end
@@ -801,16 +819,37 @@ end
 --- Gets the currently selected palette name.
 ---@return string|nil
 function BuffBars:GetSelectedPalette()
-    local profile = EnhancedCooldownManager.db and EnhancedCooldownManager.db.profile
+    local profile = GetProfile(self)
     if not profile then
         return nil
     end
 
-    EnsureColorStorage(profile)
-    return profile.buffBarColors.selectedPalette
+    local cfg = profile.buffBars
+    EnsureColorStorage(cfg)
+    return cfg.colors.selectedPalette
+end
+
+function BuffBars:OnUnitAura(_, unit)
+    if unit == "player" then
+        self:ScheduleRescan()
+    end
+end
+
+local function InitializeModuleMixin(module)
+    if module._mixinInitialized then
+        return
+    end
+
+    Module.AddMixin(module, "BuffBars", ECM.db.profile, nil, {
+        { event = "UNIT_AURA", handler = "OnUnitAura" },
+    })
+
+    module._mixinInitialized = true
 end
 
 function BuffBars:OnEnable()
+    InitializeModuleMixin(self)
+    Module.OnEnable(self)
     self:OnModuleReady()
 end
 
@@ -825,8 +864,6 @@ function BuffBars:OnModuleReady()
 end
 
 function BuffBars:OnDisable()
-    Util.Log("BuffBars", "OnDisable - module stopping")
-    if self._auraEventFrame then
-        self._auraEventFrame:UnregisterAllEvents()
-    end
+    self:_UnregisterEvents()
+    Util.Log("BuffBars", "Disabled")
 end

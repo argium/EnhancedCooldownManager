@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local EnhancedCooldownManager = ns.Addon
+local ECM = ns.Addon
 
 local ImportExport = {}
 ns.ImportExport = ImportExport
@@ -24,7 +24,7 @@ assert(LibDeflate, "ImportExport: LibDeflate not loaded")
 
 --- Deep copies a table, excluding specified paths.
 ---@param source table The table to copy
----@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBarColors.cache"})
+---@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBars.colors.cache"})
 ---@param currentPath string|nil Current path in recursion (internal use)
 ---@return table copy The deep copy
 local function DeepCopyExcluding(source, excludePaths, currentPath)
@@ -77,7 +77,7 @@ end
 --------------------------------------------------------------------------------
 
 --- Encodes data into a compressed, shareable string.
---- Format: "EnhancedCooldownManager:1:{encoded}"
+--- Format: "ECM:1:{encoded}"
 ---@param data table The data to encode
 ---@return string|nil exportString The encoded string, or nil on failure
 ---@return string|nil errorMessage Error message if encoding failed
@@ -162,7 +162,7 @@ local function PrepareProfileForExport(profile)
     assert(profile, "profile is nil")
 
     -- Exclude runtime cache data
-    local excludePaths = {"buffBarColors.cache"}
+    local excludePaths = {"buffBars.colors.cache"}
     local cleanedProfile = DeepCopyExcluding(profile, excludePaths)
 
     return {
@@ -175,7 +175,7 @@ end
 ---@return string|nil exportString The export string, or nil on failure
 ---@return string|nil errorMessage Error message if export failed
 function ImportExport.ExportCurrentProfile()
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     if not db or not db.profile then
         return nil, "No active profile found"
     end
@@ -213,13 +213,15 @@ function ImportExport.ApplyImportData(data)
         return false, "Invalid import data"
     end
 
-    local db = EnhancedCooldownManager.db
+    local db = ECM.db
     if not db or not db.profile then
         return false, "No active profile to import into"
     end
 
     -- Preserve the cache if it exists (deep copy to avoid shared references)
-    local existingCache = db.profile.buffBarColors and db.profile.buffBarColors.cache
+    local existingCache = db.profile.buffBars
+        and db.profile.buffBars.colors
+        and db.profile.buffBars.colors.cache
     if existingCache then
         existingCache = DeepCopyExcluding(existingCache)
     end
@@ -234,8 +236,8 @@ function ImportExport.ApplyImportData(data)
     end
 
     -- Restore cache
-    if existingCache and db.profile.buffBarColors then
-        db.profile.buffBarColors.cache = existingCache
+    if existingCache and db.profile.buffBars and db.profile.buffBars.colors then
+        db.profile.buffBars.colors.cache = existingCache
     end
 
     return true

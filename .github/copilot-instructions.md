@@ -8,6 +8,24 @@ WoW addon: customizable resource bars anchored to Blizzard's Cooldown Manager vi
 - Config: `EnhancedCooldownManager.db.profile` with module subsections
 - Follow WoW UI performance best practices. Avoid unnecessary updates, use frame pooling, and minimize CPU/memory usage.
 
+## Config Structure
+
+Profile config key sections:
+
+- `global`: Shared bar appearance (height, font, texture, background color)
+- `powerBar`, `resourceBar`, `runeBar`: Per-bar config with `anchorMode`, `colors`, `border`
+- `buffBars`: Buff bar config including nested `colors` table:
+  - `buffBars.colors.perBar[classID][specID][barIndex]` = `{r, g, b}`
+  - `buffBars.colors.cache[classID][specID][barIndex]` = cached spell metadata
+  - `buffBars.colors.defaultColor` = default RGB
+  - `buffBars.colors.selectedPalette` = palette name or nil
+- `powerBarTicks`: Per-class/spec tick mark mappings
+- `schemaVersion`: Current schema version (3)
+
+## Migrations
+
+Migrations run in `ECM:RunMigrations()` gated by `schemaVersion`. Always increment schema version when restructuring saved variables.
+
 ## Architecture
 
 Blizzard frames: `EssentialCooldownViewer`, `UtilityCooldownViewer`, `BuffIconCooldownViewer`, `BuffBarCooldownViewer`

@@ -23,6 +23,7 @@ local DEFAULT_REFRESH_FREQUENCY = 0.066
 ---@field UnregisterEvent fun(self: ECMModule, event: string)
 ---@field OnEnable fun(self: ECMModule)
 ---@field OnDisable fun(self: ECMModule)
+---@field _UnregisterEvents fun(self: ECMModule)
 ---@field UpdateLayout fun(self: ECMModule)
 ---@field Refresh fun(self: ECMModule)
 
@@ -68,18 +69,16 @@ function Module:OnEnable()
     end
 end
 
-function Module:Disable()
-    for _, eventName in ipairs(self._layoutEvents) do
+function Module:_UnregisterEvents()
+    for _, eventName in ipairs(self._layoutEvents or {}) do
         self:UnregisterEvent(eventName)
     end
 
-    for _, eventConfig in ipairs(self._refreshEvents) do
+    for _, eventConfig in ipairs(self._refreshEvents or {}) do
         self:UnregisterEvent(eventConfig.event)
     end
 
-    self:OnDisable()
-
-    Util.Log(self:GetName(), "Disabled")
+    Util.Log(self:GetName(), "Events unregistered")
 end
 
 function Module:UpdateLayout()
@@ -112,8 +111,10 @@ function Module.AddMixin(target, name, profile, layoutEvents, refreshEvents)
     assert(name, "name required")
     assert(profile, "profile required")
 
+    -- Only copy methods that the target doesn't already have.
+    -- This preserves module-specific overrides of UpdateLayout, Refresh, etc.
     for k, v in pairs(Module) do
-        if type(v) == "function" then
+        if type(v) == "function" and target[k] == nil then
             target[k] = v
         end
     end
