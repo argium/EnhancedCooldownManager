@@ -24,22 +24,22 @@ Libs\LibEQOL\LibEQOL.xml
 Libs\LibSharedMedia-3.0\lib.xml
 
 Constants.lua
+Defaults.lua
+
 Modules\SparkleUtil.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
 Modules\ImportExport.lua
 UI\BugReports.lua
-Defaults.lua
 EnhancedCooldownManager.lua
 
 UI\Widgets\PositionModeSelector.lua
 UI\Options.lua
 
 Mixins\ECMFrame.lua
+Mixins\BarFrame.lua
 
-Bars\TestBar.lua
-
-#Bars\PowerBar.lua
+Bars\PowerBar.lua
 #Bars\ResourceBar.lua
 #Bars\RuneBar.lua
 #Bars\BuffBars.lua

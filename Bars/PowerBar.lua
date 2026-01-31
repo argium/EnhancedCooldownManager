@@ -12,6 +12,7 @@ local Module = ns.Mixins.Module
 local PowerBar = ECM:NewModule("PowerBar", "AceEvent-3.0")
 ECM.PowerBar = PowerBar
 
+
 --- Returns max/current/display values for primary resource formatting.
 ---@param resource Enum.PowerType|nil
 ---@param cfg table|nil
@@ -19,7 +20,20 @@ ECM.PowerBar = PowerBar
 ---@return number|nil current
 ---@return number|nil displayValue
 ---@return string|nil valueType
+local function GetPrimaryResourceValue(resource, cfg)
+    if not resource then
+        return nil, nil, nil, nil
+    end
 
+    local current = UnitPower("player", resource)
+    local max = UnitPowerMax("player", resource)
+
+    if cfg and cfg.showManaAsPercent and resource == Enum.PowerType.Mana then
+        return max, current, UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100), "percent"
+    end
+
+    return max, current, current, "number"
+end
 
 
 local function ShouldShowPowerBar()
@@ -179,10 +193,6 @@ function PowerBar:Refresh()
     })
 end
 
---------------------------------------------------------------------------------
--- Event Handling
---------------------------------------------------------------------------------
-
 function PowerBar:OnUnitPower(_, unit)
     local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.powerBar and profile.powerBar.enabled) then
@@ -192,11 +202,15 @@ function PowerBar:OnUnitPower(_, unit)
     self:ThrottledRefresh()
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
 
 function PowerBar:OnEnable()
-    BarFrame.AddMixin(PowerBar, "PowerBar","powerBar", nil, nil)
-    Module.OnEnable(self)
+    BarFrame.AddMixin(PowerBar, "PowerBar")
+
+    -- call parent OnEnable
+    BarFrame.OnEnable(self)
 end
+
+
+local REFRESH_EVENTS = {
+    { event = "UNIT_POWER_UPDATE", handler = "OnUnitPower" },
+}

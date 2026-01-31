@@ -6,7 +6,45 @@ local _, ns = ...
 
 local Util = ns.Util or {}
 ns.Util = Util
-local SparkleUtil = ns.SparkleUtil
+local C = ns.Constants
+local LSM = LibStub("LibSharedMedia-3.0", true)
+
+local function FetchLSM(mediaType, key)
+    if LSM and LSM.Fetch and key and type(key) == "string" then
+        return LSM:Fetch(mediaType, key, true)
+    end
+    return nil
+end
+
+
+--- Returns a statusbar texture path (LSM-resolved when available).
+---@param texture string|nil Name of the texture in LSM or a file path.
+---@return string
+function Util.GetTexture(texture)
+    if texture and type(texture) == "string" then
+        local fetched = FetchLSM("statusbar", texture)
+        if fetched then
+            return fetched
+        end
+
+        -- Treat it as a file path
+        if texture:find("\\") then
+            return texture
+        end
+    end
+
+    return FetchLSM("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
+end
+
+--- Returns a font file path (LSM-resolved when available).
+---@param fontKey string|nil
+---@param fallback string|nil
+---@return string
+function Util.GetFont(fontKey, fallback)
+    local fallbackPath = fallback or "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+
+    return FetchLSM("font", fontKey) or fallbackPath
+end
 
 --- Pixel-snaps a number to the nearest pixel for the current UI scale.
 ---@param v number|nil
