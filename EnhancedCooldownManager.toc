@@ -31,7 +31,9 @@ Modules\TraceLog.lua
 Modules\Utilities.lua
 Modules\ImportExport.lua
 UI\BugReports.lua
+
 EnhancedCooldownManager.lua
+Modules\Layout.lua
 
 UI\Widgets\PositionModeSelector.lua
 UI\Options.lua
@@ -44,4 +46,4 @@ Bars\PowerBar.lua
 #Bars\RuneBar.lua
 #Bars\BuffBars.lua
 
-Modules\ViewerHook.lua
+#Modules\ViewerHook.lua

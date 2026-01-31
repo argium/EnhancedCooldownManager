@@ -8,6 +8,8 @@ local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceCon
 ns.Addon = ECM
 local Util = ns.Util
 local LSM = LibStub("LibSharedMedia-3.0", true)
+ECM.Log = Util.Log
+ECM.Print = Util.Print
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
@@ -475,9 +477,8 @@ function ECM:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
 
     local moduleOrder = {
-        "TestBar",
         -- "ViewerHook",
-        -- "PowerBar",
+        "PowerBar",
         -- "ResourceBar",
         -- "RuneBar",
         -- "BuffBars",

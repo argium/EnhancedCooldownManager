@@ -5,15 +5,15 @@ local LAYOUT_EVENTS = {
     "PLAYER_ENTERING_WORLD",
 }
 
-local _ecmFrames = {}
-
 local _, ns = ...
 local ECM = ns.Addon
+local _ecmFrames = {}
 
 local function RegisterFrame(frame)
     assert(frame and type(frame) == "table" and frame.IsECMFrame, "RegisterFrame: invalid ECMFrame")
-    assert(_ecmFrames[frame:GetName()] == nil, "RegisterFrame: frame with name '" .. frame._name .. "' is already registered")
-    _ecmFrames[frame:GetName()] = frame
+    assert(_ecmFrames[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
+    _ecmFrames[frame.Name] = frame
+    ECM.Log("Layout", "Frame registered", frame.Name)
 end
 
 ECM.RegisterFrame = RegisterFrame

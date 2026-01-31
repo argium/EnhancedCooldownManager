@@ -65,7 +65,7 @@ end
 
 
 function BarFrame:SetValue(minVal, maxVal, currentVal, r, g, b)
-    Util.Log(self.Name, "SetValue", {
+    ECM.Log(self.Name, "SetValue", {
         minVal = minVal,
         maxVal = maxVal,
         currentVal = currentVal,
@@ -122,7 +122,7 @@ function BarFrame:RefreshAppearance()
     -- end
 
     local logR, logG, logB, logA = RequireColor(bgColor, 1)
-    Util.Log(self.Name, "SetAppearance", {
+    ECM.Log(self.Name, "SetAppearance", {
         textureOverride = (cfg and cfg.texture) or (globalConfig and globalConfig.texture),
         texture = tex,
         bgColor = table.concat({ tostring(logR), tostring(logG), tostring(logB), tostring(logA) }, ","),
@@ -375,6 +375,10 @@ function BarFrame:ThrottledRefresh()
     return true
 end
 
+function BarFrame:Refresh(...)
+    return
+end
+
 
 function BarFrame:Refresh(event, unitID, powerType)
     if unitID ~= "player" then
@@ -383,10 +387,8 @@ function BarFrame:Refresh(event, unitID, powerType)
 
     ---@type ECM_BarConfigBase
     local configSection = self:GetConfigSection()
-
     local frame = self:GetInnerFrame()
     local resource = UnitPowerType("player")
-
     ---@type ECM_Color|nil
     local color = configSection and configSection.colors[resource]
     assert(color, "color not defined in config for frame " .. self.Name)
@@ -398,7 +400,7 @@ function BarFrame:Refresh(event, unitID, powerType)
         frame:SetText(tostring(displayValue))
     end
 
-    Util.Log(self:GetName(), "Refresh", {
+    ECM.Log(self:GetName(), "Refresh", {
         resource = resource,
         max = max,
         current = current,
@@ -416,7 +418,7 @@ function BarFrame:Refresh(event, unitID, powerType)
 
     self:RefreshAppearance()
 
-    Util.Log(self:GetName(), "Refreshed")
+    ECM.Log(self:GetName(), "Refreshed")
 end
 
 function BarFrame:CreateFrame()
@@ -426,48 +428,30 @@ function BarFrame:CreateFrame()
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
     frame.StatusBar:SetAllPoints()
     frame.StatusBar:SetFrameLevel(frame:GetFrameLevel() + 1)
-    Util.Log(self.Name, "CreateFrame", "Success")
+    ECM.Log(self.Name, "CreateFrame", "Success")
     return frame
 end
 
 function BarFrame:OnEnable()
-    ECMFrame.AddMixin(self, "PowerBar")
-
-    self:RegisterEvent("UNIT_POWER_UPDATE", "Refresh")
-
-    Util.Log(self.Name, "Enabled")
 end
 
 function BarFrame:OnDisable()
-    self:UnregisterAllEvents()
-    Util.Log(self.Name, "Disabled")
 end
 
 function BarFrame.AddMixin(module, name)
     assert(module, "module required")
     assert(name, "name required")
+
+    -- Copy BarFrame methods to module if not already defined
+    for k, v in pairs(BarFrame) do
+        if type(v) == "function" and module[k] == nil then
+            module[k] = v
+        end
+    end
+
     ECMFrame.AddMixin(module, name)
 
     -- Register refresh events
     module:RegisterEvent("UNIT_POWER_UPDATE", "ThrottledRefresh")
     module._lastUpdate = GetTime()
-
-    Util.Log(module.Name, "Enabled", {
-        layoutEvents = module._layoutEvents,
-        refreshEvents = module._refreshEvents
-    })
-
-
-
-    -- module.OnConfigChanged = BarFrame.OnConfigChanged
-    -- module.UpdateLayout = BarFrame.UpdateLayout
-    -- module.GetFrameIfShown = BarFrame.GetFrameIfShown
-    -- module.GetOrCreateFrame = BarFrame.GetOrCreateFrame
-    -- module.GetFrame = BarFrame.GetFrame
-    -- module.SetHidden = BarFrame.SetHidden
-    -- module.IsHidden = BarFrame.IsHidden
-    -- module.OnDisable = BarFrame.OnDisable
-    -- if not module.CreateFrame then
-    --     module.CreateFrame = BarFrame.CreateFrame
-    -- end
 end

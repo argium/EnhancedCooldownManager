@@ -4,14 +4,9 @@
 
 local ADDON_NAME, ns = ...
 local ECM = ns.Addon
-local Util = ns.Util
-
 local BarFrame = ns.Mixins.BarFrame
-local Module = ns.Mixins.Module
-
 local PowerBar = ECM:NewModule("PowerBar", "AceEvent-3.0")
 ECM.PowerBar = PowerBar
-
 
 --- Returns max/current/display values for primary resource formatting.
 ---@param resource Enum.PowerType|nil
@@ -79,26 +74,6 @@ function PowerBar:GetCurrentTicks()
     return classMappings[specID]
 end
 
---------------------------------------------------------------------------------
--- Frame Management (uses BarFrame mixin)
---------------------------------------------------------------------------------
-
---- Creates the power bar frame.
----@return ECM_PowerBarFrame
-function PowerBar:CreateFrame()
-    Util.Log("PowerBar", "Creating frame")
-
-    local profile = ECM.db and ECM.db.profile
-    local frame = BarFrame.CreateFrame(self, { withTicks = true })
-
-    -- Add text overlay (PowerBar-specific)
-    BarFrame.AddTextOverlay(frame, profile)
-
-    -- Apply initial appearance
-    frame:SetAppearance()
-
-    return frame
-end
 
 --------------------------------------------------------------------------------
 -- Layout and Rendering
@@ -125,75 +100,76 @@ function PowerBar:UpdateTicks(bar, resource, max)
 end
 
 --- Updates values: status bar value, text, colors, ticks.
-function PowerBar:Refresh()
-    local profile = ECM.db and ECM.db.profile
-    local cfg = profile and profile.powerBar
-    if self:IsHidden() or not (cfg and cfg.enabled) then
-        Util.Log(self:GetName(), "Refresh skipped: bar is hidden or disabled")
-        return
-    end
+-- function PowerBar:Refresh()
+--     local profile = ECM.db and ECM.db.profile
+--     local cfg = profile and profile.powerBar
+--     if self:IsHidden() or not (cfg and cfg.enabled) then
+--         ECM.Log(self:GetName(), "Refresh skipped: bar is hidden or disabled")
+--         return
+--     end
 
-    if not ShouldShowPowerBar() then
-        Util.Log(self:GetName(), "Refresh skipped: ShouldShowPowerBar returned false")
-        if self._frame then
-            self._frame:Hide()
-        end
-        return
-    end
+--     if not ShouldShowPowerBar() then
+--         ECM.Log(self:GetName(), "Refresh skipped: ShouldShowPowerBar returned false")
+--         if self._frame then
+--             self._frame:Hide()
+--         end
+--         return
+--     end
 
-    local bar = self._frame
-    if not bar then
-        Util.Log(self:GetName(), "Refresh skipped: frame not created yet")
-        return
-    end
+--     local bar = self._frame
+--     if not bar then
+--         ECM.Log(self:GetName(), "Refresh skipped: frame not created yet")
+--         return
+--     end
 
-    if bar.RefreshAppearance then
-        bar:RefreshAppearance()
-    end
+--     if bar.RefreshAppearance then
+--         bar:RefreshAppearance()
+--     end
 
-    local resource = UnitPowerType("player")
-    local max, current, displayValue, valueType = GetPrimaryResourceValue(resource, cfg)
+--     local resource = UnitPowerType("player")
+--     local max, current, displayValue, valueType = GetPrimaryResourceValue(resource, cfg)
 
-    if not max then
-        Util.Log(self:GetName(), "Refresh skipped:missing max value", { resource = resource })
-        bar:Hide()
-        return
-    end
+--     if not max then
+--         ECM.Log(self:GetName(), "Refresh skipped:missing max value", { resource = resource })
+--         bar:Hide()
+--         return
+--     end
 
-    current = current or 0
-    displayValue = displayValue or 0
+--     current = current or 0
+--     displayValue = displayValue or 0
 
-    local color = cfg.colors[resource]
-    local r, g, b = 1, 1, 1
-    if color then
-        r, g, b = color.r, color.g, color.b
-    end
-    bar:SetValue(0, max, current, r, g, b)
+--     local color = cfg.colors[resource]
+--     local r, g, b = 1, 1, 1
+--     if color then
+--         r, g, b = color.r, color.g, color.b
+--     end
+--     bar:SetValue(0, max, current, r, g, b)
 
-    -- Update text
-    if valueType == "percent" then
-        bar:SetText(string.format("%.0f%%", displayValue))
-    else
-        bar:SetText(tostring(displayValue))
-    end
+--     -- Update text
+--     if valueType == "percent" then
+--         bar:SetText(string.format("%.0f%%", displayValue))
+--     else
+--         bar:SetText(tostring(displayValue))
+--     end
 
-    bar:SetTextVisible(cfg.showText ~= false)
+--     bar:SetTextVisible(cfg.showText ~= false)
 
-    -- Update ticks
-    self:UpdateTicks(bar, resource, max)
+--     -- Update ticks
+--     -- self:UpdateTicks(bar, resource, max)
 
-    bar:Show()
+--     bar:Show()
 
-    Util.Log(self:GetName(), "Refreshed", {
-        resource = resource,
-        max = max,
-        current = current,
-        displayValue = displayValue,
-        valueType = valueType
-    })
-end
+--     ECM.Log(self:GetName(), "Refreshed", {
+--         resource = resource,
+--         max = max,
+--         current = current,
+--         displayValue = displayValue,
+--         valueType = valueType
+--     })
+-- end
 
 function PowerBar:OnUnitPower(_, unit)
+    self:RegisterEvent("UNIT_POWER_UPDATE", "Refresh")
     local profile = ECM.db and ECM.db.profile
     if unit ~= "player" or self:IsHidden() or not (profile and profile.powerBar and profile.powerBar.enabled) then
         return
@@ -208,8 +184,15 @@ function PowerBar:OnEnable()
 
     -- call parent OnEnable
     BarFrame.OnEnable(self)
+
+    ECM.Log(self.Name, "Enabled")
 end
 
+function PowerBar:OnDisable()
+    self:UnregisterAllEvents()
+    BarFrame.OnDisable(self)
+    ECM.Log(self.Name, "Disabled")
+end
 
 local REFRESH_EVENTS = {
     { event = "UNIT_POWER_UPDATE", handler = "OnUnitPower" },
