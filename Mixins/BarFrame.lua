@@ -271,7 +271,7 @@ end
 function BarFrame:ThrottledRefresh()
     -- TODO: should this move into ECMFrame?
     local config = self:GetGlobalConfig()
-    local freq = (config and tonumber(config.updateFrequency)) or C.Defaults.global.updateFrequency
+    local freq = (config and config.updateFrequency and tonumber(config.updateFrequency)) or C.Defaults.global.updateFrequency
     if GetTime() - (self._lastUpdate or 0) < freq then
         return false
     end
@@ -281,11 +281,13 @@ function BarFrame:ThrottledRefresh()
     return true
 end
 
-function BarFrame:Refresh(event, unitID, powerType)
+function BarFrame:Refresh(force)  -- TODO: Refresh needs to be decoupled from the event handler. The check below is for the Power Bar, too.
     local continue = ECMFrame.Refresh(self)
     if not continue or unitID ~= "player" then
+        Util.Log(self.Name, "BarFrame:Refresh", "Skipping refresh due to event/unitID", { event = event, unitID = unitID })
         return false
     end
+    Util.Log(self.Name, "BarFrame:Refresh", "Starting refresh")
 
     local frame = self:GetInnerFrame()
     local globalConfig = self:GetGlobalConfig()

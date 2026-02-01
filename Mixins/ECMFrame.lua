@@ -268,7 +268,7 @@ function ECMFrame:UpdateLayout()
 
     ECM.Log(self.Name, "ECMFrame:UpdateLayout", {
         layoutChanged = layoutChanged,
-        anchor = anchor,
+        anchor = anchor:GetName(),
         offsetX = offsetX,
         offsetY = offsetY,
         widthChanged = widthChanged,
@@ -282,6 +282,8 @@ function ECMFrame:UpdateLayout()
         bgColorChanged = bgColorChanged,
         bgColor = bgColor,
     })
+
+    self:Refresh(force
 end
 
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.
@@ -291,10 +293,16 @@ function ECMFrame:ShouldShow()
 end
 
 --- Handles common refresh logic for ECMFrame-derived frames.
+--- @param force boolean|nil Whether to force a refresh, bypassing throttling and state checks.
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
-function ECMFrame:Refresh()
+function ECMFrame:Refresh(force)
+    if force then
+        return true
+    end
+
     local config = self:GetConfigSection()
     if self._hidden or not (config and config.enabled) then
+        Util.Log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
         return false
     end
 

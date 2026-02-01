@@ -36,8 +36,8 @@ function Util.AreColorsEqual(c1, c2)
     if c1 == nil or c2 == nil then
         return false
     end
-    local c1m = ColorMixin.CreateColor(c1.r, c1.g, c1.b, c1.a)
-    local c2m = ColorMixin.CreateColor(c2.r, c2.g, c2.b, c2.a)
+    local c1m = CreateColor(c1.r, c1.g, c1.b, c1.a)
+    local c2m = CreateColor(c2.r, c2.g, c2.b, c2.a)
     return c1m:IsEqualTo(c2m)
 end
 
