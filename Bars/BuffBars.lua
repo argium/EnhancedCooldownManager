@@ -26,18 +26,27 @@
 local _, ns = ...
 local ECM = ns.Addon
 local Util = ns.Util
-local Module = ns.Mixins.Module
+local ECMFrame = ns.Mixins.ECMFrame
 
--- Small shim to access BarFrame mixin helpers
+-- Helper functions for accessing texture/color utilities
 local BarHelpers = {
-    GetTexture = function(...)
-        return ns.Mixins.BarFrame.GetTexture(...)
+    GetTexture = function(texKey)
+        return Util.GetTexture(texKey)
     end,
-    GetBgColor = function(...)
-        return ns.Mixins.BarFrame.GetBgColor(...)
+    GetBgColor = function(cfg, profile)
+        local globalConfig = profile and profile.global
+        local bgColor = (cfg and cfg.bgColor) or (globalConfig and globalConfig.barBgColor)
+        return bgColor or { r = 0, g = 0, b = 0, a = 1 }
     end,
-    ApplyFont = function(...)
-        return ns.Mixins.BarFrame.ApplyFont(...)
+    ApplyFont = function(fontString, profile)
+        if not fontString or not fontString.SetFont then
+            return
+        end
+        local globalConfig = profile and profile.global
+        local font = globalConfig and globalConfig.font
+        if font then
+            fontString:SetFont(font, fontString:GetStringHeight() or 10)
+        end
     end,
     GetBarHeight = function(cfg, profile, fallback)
         local gbl = profile and profile.global
@@ -45,7 +54,7 @@ local BarHelpers = {
         return Util.PixelSnap(height)
     end,
 }
-local PositionMixin = ns.Mixins.PositionMixin
+
 local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
 ECM.BuffBars = BuffBars
 
@@ -160,6 +169,66 @@ local function GetPaletteColor(barIndex, paletteName)
 
     local colorIndex = ((barIndex - 1) % #palette) + 1
     return palette[colorIndex]
+end
+
+--- Calculates positioning parameters for BuffBarViewer based on chain/independent mode.
+---@param module BuffBars module instance
+---@return table params, string mode
+local function CalculateBuffBarsLayout(module)
+    local cfg = module:GetConfigSection()
+    local mode = cfg.anchorMode or "chain"
+    local params = {}
+
+    if mode == "chain" then
+        -- Chain mode: Find the previous frame in the chain order
+        -- BuffBars typically comes after the resource bars, so we need to walk backward
+        local anchor = _G["BuffBarCooldownViewer"] -- Fallback
+
+        -- Try to find the previous enabled/visible frame in the chain
+        local C = ns.Constants
+        if C and C.CHAIN_ORDER then
+            local stopIndex = #C.CHAIN_ORDER + 1
+            for i, name in ipairs(C.CHAIN_ORDER) do
+                if name == "BuffBars" then
+                    stopIndex = i
+                    break
+                end
+            end
+
+            for i = stopIndex - 1, 1, -1 do
+                local barName = C.CHAIN_ORDER[i]
+                local barModule = ECM:GetModule(barName, true)
+                if barModule and barModule:IsEnabled() then
+                    local barFrame = barModule:GetInnerFrame and barModule:GetInnerFrame()
+                    if barFrame and barFrame:IsVisible() then
+                        anchor = barFrame
+                        break
+                    end
+                end
+            end
+
+            -- If no previous frame, use the viewer as base
+            if anchor == _G["BuffBarCooldownViewer"] then
+                anchor = _G[C.VIEWER] or UIParent
+            end
+        end
+
+        params.anchor = anchor
+        params.anchorPoint = "TOPLEFT"
+        params.relativePoint = "BOTTOMLEFT"
+        params.offsetX = 0
+        params.offsetY = cfg.offsetY and -cfg.offsetY or 0
+    else
+        -- Independent mode: use custom anchoring
+        params.anchor = UIParent
+        params.anchorPoint = cfg.anchorPoint or "CENTER"
+        params.relativePoint = cfg.relativePoint or "CENTER"
+        params.offsetX = cfg.offsetX or 0
+        params.offsetY = cfg.offsetY or 0
+        params.width = cfg.width
+    end
+
+    return params, mode
 end
 
 --- Returns color for bar at index for current class/spec, or palette/default if not set.
@@ -401,6 +470,83 @@ function BuffBars:GetViewer()
     return _G["BuffBarCooldownViewer"]
 end
 
+--------------------------------------------------------------------------------
+-- ECMFrame Overrides
+--------------------------------------------------------------------------------
+
+--- Override CreateFrame to return the Blizzard BuffBarCooldownViewer instead of creating a new one.
+function BuffBars:CreateFrame()
+    local viewer = _G["BuffBarCooldownViewer"]
+    if not viewer then
+        Util.Log("BuffBars", "CreateFrame", "BuffBarCooldownViewer not found, creating placeholder")
+        -- Fallback: create a placeholder frame if Blizzard viewer doesn't exist
+        viewer = CreateFrame("Frame", "ECMBuffBarPlaceholder", UIParent)
+        viewer:SetSize(200, 20)
+    end
+    return viewer
+end
+
+--- Override ShouldShow to check buffBars.enabled config.
+function BuffBars:ShouldShow()
+    local config = self:GetConfigSection()
+    return not self._hidden and config.enabled ~= false
+end
+
+--- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
+function BuffBars:UpdateLayout()
+    local viewer = self:GetInnerFrame()
+    if not viewer then
+        return false
+    end
+
+    local globalConfig = self:GetGlobalConfig()
+    local cfg = self:GetConfigSection()
+
+    if not self:ShouldShow() then
+        Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
+        viewer:Hide()
+        return false
+    end
+
+    -- Calculate positioning parameters
+    local params, mode = CalculateBuffBarsLayout(self)
+
+    -- Apply positioning
+    viewer:ClearAllPoints()
+    if params.width then
+        viewer:SetWidth(params.width)
+    end
+    viewer:SetPoint(params.anchorPoint, params.anchor, params.relativePoint, params.offsetX, params.offsetY)
+
+    -- Style all visible children
+    local visibleChildren = GetSortedVisibleChildren(viewer)
+    for barIndex, entry in ipairs(visibleChildren) do
+        ApplyCooldownBarStyle(entry.frame, ECM.db.profile, barIndex)
+        HookChildAnchoring(entry.frame, self)
+    end
+
+    -- Layout bars vertically
+    self:LayoutBars()
+
+    viewer:Show()
+    Util.Log(self.Name, "BuffBars:UpdateLayout", {
+        mode = mode,
+        childCount = #visibleChildren,
+    })
+
+    return true
+end
+
+--- Override Refresh to update layout and styling.
+function BuffBars:Refresh(force)
+    local continue = ECMFrame.Refresh(self, force)
+    if not continue then
+        return false
+    end
+
+    self:UpdateLayout()
+end
+
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
     local viewer = self:GetViewer()
@@ -603,66 +749,11 @@ function BuffBars:LayoutBars()
     self._layoutRunning = nil
 end
 
---- Updates layout: positioning, sizing, anchoring, appearance.
+--- Legacy method for compatibility - now delegates to UpdateLayout.
 ---@param why string
 function BuffBars:UpdateLayoutAndRefresh(why)
-    assert(why, "why parameter required for UpdateLayoutAndRefresh")
-    local viewer = self:GetViewer()
-    if not viewer then
-        Util.Log("BuffBars", "UpdateLayoutAndRefresh skipped - no viewer", {
-            why = why,
-        })
-        return
-    end
-
-    local profile = GetProfile(self)
-    local cfg = profile.buffBars or {}
-    self._viewerLayoutCache = self._viewerLayoutCache or {}
-
-    local params, anchorMode = PositionMixin.CalculateBuffBarsLayout(cfg, profile)
-
-    local preservePosition = anchorMode == "independent"
-        and self._viewerLayoutCache.lastMode == "chain"
-
-    if preservePosition then
-        local preservedX, preservedY = PositionMixin.CaptureCurrentTopOffset(viewer)
-        params.offsetX = preservedX
-        params.offsetY = preservedY
-    end
-
-    PositionMixin.ApplyLayout(viewer, params, self._viewerLayoutCache)
-
-    -- Hook all children for anchor change detection
-    for _, child in ipairs({ viewer:GetChildren() }) do
-        if child and child.Bar then
-            HookChildAnchoring(child, self)
-        end
-    end
-
-    -- Style visible bars in sorted order so bar indices match display order
-    local visibleChildren = GetSortedVisibleChildren(viewer)
-
-    for barIndex, entry in ipairs(visibleChildren) do
-        ApplyCooldownBarStyle(entry.frame, profile, barIndex)
-    end
-
-    self:LayoutBars()
-
-    Util.Log("BuffBars", "UpdateLayoutAndRefresh complete", {
-        anchorMode = anchorMode,
-        width = params.width or nil,
-        offsetY = params.offsetY,
-        visibleCount = #visibleChildren,
-        why = why,
-    })
-end
-
-function BuffBars:UpdateLayout()
-    self:UpdateLayoutAndRefresh("UpdateLayout")
-end
-
-function BuffBars:Refresh()
-    self:UpdateLayoutAndRefresh("Refresh")
+    Util.Log("BuffBars", "UpdateLayoutAndRefresh (legacy)", { why = why })
+    self:UpdateLayout()
 end
 
 --- Returns cached bars for current class/spec for Options UI.
@@ -834,35 +925,27 @@ function BuffBars:OnUnitAura(_, unit)
     end
 end
 
-local function InitializeModuleMixin(module)
-    if module._mixinInitialized then
-        return
-    end
-
-    Module.AddMixin(module, "BuffBars", ECM.db.profile, nil, {
-        { event = "UNIT_AURA", handler = "OnUnitAura" },
-    })
-
-    module._mixinInitialized = true
-end
+--------------------------------------------------------------------------------
+-- Module Lifecycle
+--------------------------------------------------------------------------------
 
 function BuffBars:OnEnable()
-    InitializeModuleMixin(self)
-    Module.OnEnable(self)
-    self:OnModuleReady()
-end
+    ECMFrame.AddMixin(self, "BuffBars")
 
-function BuffBars:OnModuleReady()
-    Util.Log("BuffBars", "OnModuleReady - module starting")
+    -- Register events with dedicated handlers
+    self:RegisterEvent("UNIT_AURA", "OnUnitAura")
 
+    -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()
-        self:UpdateLayoutAndRefresh("ModuleReady")
+        self:UpdateLayout()
     end)
+
+    Util.Log("BuffBars", "OnEnable - module enabled")
 end
 
 function BuffBars:OnDisable()
-    self:_UnregisterEvents()
+    self:UnregisterAllEvents()
     Util.Log("BuffBars", "Disabled")
 end

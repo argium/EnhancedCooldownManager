@@ -235,7 +235,7 @@ function Util.Log(moduleName, message, data)
     end
 
     prefix = "|cffaaaaaa[" .. moduleName .. "]:|r" .. " " .. message
-    Util.Print(prefix, data)
+    Util.Print(prefix,  Util.SafeGetDebugValue(data))
 end
 
 --- Prints a chat message with a colorful ECM prefix.

@@ -18,15 +18,15 @@ local C = ns.Constants
 --  Text overlay
 --  Tick marks
 
--- local function GetTickPool(self, poolKey)
---     poolKey = poolKey or "tickPool"
---     local pool = self[poolKey]
---     if not pool then
---         pool = {}
---         self[poolKey] = pool
---     end
---     return pool
--- end
+local function GetTickPool(self, poolKey)
+    poolKey = poolKey or "tickPool"
+    local pool = self[poolKey]
+    if not pool then
+        pool = {}
+        self[poolKey] = pool
+    end
+    return pool
+end
 
 
 
@@ -36,214 +36,215 @@ local C = ns.Constants
 ---@param bar ECMBarFrame Bar frame to add text overlay to
 ---@param profile table|nil Profile for font settings
 ---@return FontString textValue The created FontString
--- function BarFrame.AddTextOverlay(bar, profile)
---     assert(bar, "bar frame required")
+function BarFrame.AddTextOverlay(bar, profile)
+    assert(bar, "bar frame required")
 
---     ---@cast bar ECMBarFrame
+    ---@cast bar ECMBarFrame
 
---     local textFrame = CreateFrame("Frame", nil, bar)
---     textFrame:SetAllPoints(bar)
---     textFrame:SetFrameLevel(bar.StatusBar:GetFrameLevel() + 10)
---     bar.TextFrame = textFrame
+    local textFrame = CreateFrame("Frame", nil, bar)
+    textFrame:SetAllPoints(bar)
+    textFrame:SetFrameLevel(bar.StatusBar:GetFrameLevel() + 10)
+    bar.TextFrame = textFrame
 
---     local textValue = textFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
---     textValue:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
---     textValue:SetJustifyH("CENTER")
---     textValue:SetJustifyV("MIDDLE")
---     textValue:SetText("0")
---     bar.TextValue = textValue
+    local textValue = textFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    textValue:SetPoint("CENTER", textFrame, "CENTER", 0, 0)
+    textValue:SetJustifyH("CENTER")
+    textValue:SetJustifyV("MIDDLE")
+    textValue:SetText("0")
+    bar.TextValue = textValue
 
---     if profile then
---         BarFrame.ApplyFont(bar.TextValue, profile)
---     end
+    if profile then
+        BarFrame.ApplyFont(bar.TextValue, profile)
+    end
 
---     -- Attach text methods
+    -- Attach text methods
 
---     --- Sets the text value on a bar with text overlay.
---     ---@param self ECMBarFrame
---     ---@param text string Text to display
---     function bar:SetText(text)
---         if self.TextValue then
---             self.TextValue:SetText(text)
---         end
---     end
+    --- Sets the text value on a bar with text overlay.
+    ---@param self ECMBarFrame
+    ---@param text string Text to display
+    function bar:SetText(text)
+        if self.TextValue then
+            self.TextValue:SetText(text)
+        end
+    end
 
---     --- Shows or hides the text overlay.
---     ---@param self ECMBarFrame
---     ---@param shown boolean Whether to show the text
---     function bar:SetTextVisible(shown)
---         if self.TextFrame then
---             self.TextFrame:SetShown(shown)
---         end
---     end
+    --- Shows or hides the text overlay.
+    ---@param self ECMBarFrame
+    ---@param shown boolean Whether to show the text
+    function bar:SetTextVisible(shown)
+        if self.TextFrame then
+            self.TextFrame:SetShown(shown)
+        end
+    end
 
---     return bar.TextValue
--- end
+    return bar.TextValue
+end
 
 --------------------------------------------------------------------------------
 -- Tick Helpers
 --------------------------------------------------------------------------------
 
--- --- Attaches tick functionality to a bar frame.
--- --- Creates the tick container frame if needed.
--- ---@param bar ECMBarFrame Bar frame to attach ticks to
--- ---@return Frame ticksFrame Tick container frame
--- function BarFrame.AttachTicks(bar)
---     assert(bar, "bar frame required")
+--- Attaches tick functionality to a bar frame.
+--- Creates the tick container frame if needed.
+---@param bar ECMBarFrame Bar frame to attach ticks to
+---@return Frame ticksFrame Tick container frame
+function BarFrame.AttachTicks(bar)
+    assert(bar, "bar frame required")
 
---     ---@cast bar ECMBarFrame
+    ---@cast bar ECMBarFrame
 
---     if bar.TicksFrame then
---         return bar.TicksFrame
---     end
+    if bar.TicksFrame then
+        return bar.TicksFrame
+    end
 
---     bar.TicksFrame = CreateFrame("Frame", nil, bar)
---     bar.TicksFrame:SetAllPoints(bar)
---     bar.TicksFrame:SetFrameLevel(bar:GetFrameLevel() + 2)
---     bar.ticks = bar.ticks or {}
+    bar.TicksFrame = CreateFrame("Frame", nil, bar)
+    bar.TicksFrame:SetAllPoints(bar)
+    bar.TicksFrame:SetFrameLevel(bar:GetFrameLevel() + 2)
+    bar.ticks = bar.ticks or {}
 
---     return bar.TicksFrame
--- end
+    return bar.TicksFrame
+end
 
--- --- Ensures the tick pool has the required number of ticks.
--- --- Creates new ticks as needed, shows required ticks, hides extras.
--- ---@param self ECMBarFrame
--- ---@param count number Number of ticks needed
--- ---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
--- ---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
--- function BarFrame:EnsureTicks(count, parentFrame, poolKey)
---     assert(parentFrame, "parentFrame required for tick creation")
+--- Ensures the tick pool has the required number of ticks.
+--- Creates new ticks as needed, shows required ticks, hides extras.
+---@param self ECMBarFrame
+---@param count number Number of ticks needed
+---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
+---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
+function BarFrame:EnsureTicks(count, parentFrame, poolKey)
+    assert(parentFrame, "parentFrame required for tick creation")
 
---     local pool = GetTickPool(self, poolKey)
+    local pool = GetTickPool(self, poolKey)
 
---     for i = 1, count do
---         if not pool[i] then
---             local tick = parentFrame:CreateTexture(nil, "OVERLAY")
---             pool[i] = tick
---         end
---         pool[i]:Show()
---     end
+    for i = 1, count do
+        if not pool[i] then
+            local tick = parentFrame:CreateTexture(nil, "OVERLAY")
+            pool[i] = tick
+        end
+        pool[i]:Show()
+    end
 
---     for i = count + 1, #pool do
---         local tick = pool[i]
---         if tick then
---             tick:Hide()
---         end
---     end
--- end
+    for i = count + 1, #pool do
+        local tick = pool[i]
+        if tick then
+            tick:Hide()
+        end
+    end
+end
 
--- --- Hides all ticks in the pool.
--- ---@param self ECMBarFrame
--- ---@param poolKey string|nil Key for tick pool (default "tickPool")
--- function BarFrame:HideAllTicks(poolKey)
---     local pool = self[poolKey or "tickPool"]
---     if not pool then
---         return
---     end
+--- Hides all ticks in the pool.
+---@param self ECMBarFrame
+---@param poolKey string|nil Key for tick pool (default "tickPool")
+function BarFrame:HideAllTicks(poolKey)
+    local pool = self[poolKey or "tickPool"]
+    if not pool then
+        return
+    end
 
---     for i = 1, #pool do
---         pool[i]:Hide()
---     end
--- end
+    for i = 1, #pool do
+        pool[i]:Hide()
+    end
+end
 
--- --- Positions ticks evenly as resource dividers.
--- --- Used by ResourceBar to show divisions between resources.
--- ---@param self ECMBarFrame
--- ---@param maxResources number Number of resources (ticks = maxResources - 1)
--- ---@param color ECM_Color|table|nil RGBA color (default black)
--- ---@param tickWidth number|nil Width of each tick (default 1)
--- ---@param poolKey string|nil Key for tick pool (default "tickPool")
--- function BarFrame:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
---     maxResources = tonumber(maxResources) or 0
---     if maxResources <= 1 then
---         self:HideAllTicks(poolKey)
---         return
---     end
+--- Positions ticks evenly as resource dividers.
+--- Used by ResourceBar to show divisions between resources.
+---@param self ECMBarFrame
+---@param maxResources number Number of resources (ticks = maxResources - 1)
+---@param color ECM_Color|table|nil RGBA color (default black)
+---@param tickWidth number|nil Width of each tick (default 1)
+---@param poolKey string|nil Key for tick pool (default "tickPool")
+function BarFrame:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
+    maxResources = tonumber(maxResources) or 0
+    if maxResources <= 1 then
+        self:HideAllTicks(poolKey)
+        return
+    end
 
---     local barWidth = self:GetWidth()
---     local barHeight = self:GetHeight()
---     if barWidth <= 0 or barHeight <= 0 then
---         return
---     end
+    local barWidth = self:GetWidth()
+    local barHeight = self:GetHeight()
+    if barWidth <= 0 or barHeight <= 0 then
+        return
+    end
 
---     local pool = self[poolKey or "tickPool"]
---     if not pool then
---         return
---     end
+    local pool = self[poolKey or "tickPool"]
+    if not pool then
+        return
+    end
 
---     color = color or { r = 0, g = 0, b = 0, a = 1 }
---     tickWidth = tickWidth or 1
+    color = color or { r = 0, g = 0, b = 0, a = 1 }
+    tickWidth = tickWidth or 1
 
---     local step = barWidth / maxResources
---     local tr, tg, tb, ta = RequireColor(color, 1)
+    local step = barWidth / maxResources
+    local tr, tg, tb, ta = color.r, color.g, color.b, color.a
 
---     for i = 1, #pool do
---         local tick = pool[i]
---         if tick and tick:IsShown() then
---             tick:ClearAllPoints()
---             local x = Util.PixelSnap(step * i)
---             tick:SetPoint("LEFT", self, "LEFT", x, 0)
---             tick:SetSize(math.max(1, Util.PixelSnap(tickWidth)), barHeight)
---             tick:SetColorTexture(tr, tg, tb, ta)
---         end
---     end
--- end
+    for i = 1, #pool do
+        local tick = pool[i]
+        if tick and tick:IsShown() then
+            tick:ClearAllPoints()
+            local x = Util.PixelSnap(step * i)
+            tick:SetPoint("LEFT", self, "LEFT", x, 0)
+            tick:SetSize(math.max(1, Util.PixelSnap(tickWidth)), barHeight)
+            tick:SetColorTexture(tr, tg, tb, ta)
+        end
+    end
+end
 
--- --- Positions ticks at specific resource values.
--- --- Used by PowerBar for breakpoint markers (e.g., energy thresholds).
--- ---@param self ECMBarFrame
--- ---@param statusBar StatusBar StatusBar to position ticks on
--- ---@param ticks table Array of tick definitions { { value = number, color = ECM_Color, width = number }, ... }
--- ---@param maxValue number Maximum resource value
--- ---@param defaultColor ECM_Color Default RGBA color
--- ---@param defaultWidth number Default tick width
--- ---@param poolKey string|nil Key for tick pool (default "tickPool")
--- function BarFrame:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
---     if not statusBar then
---         return
---     end
+--- Positions ticks at specific resource values.
+--- Used by PowerBar for breakpoint markers (e.g., energy thresholds).
+---@param self ECMBarFrame
+---@param statusBar StatusBar StatusBar to position ticks on
+---@param ticks table Array of tick definitions { { value = number, color = ECM_Color, width = number }, ... }
+---@param maxValue number Maximum resource value
+---@param defaultColor ECM_Color Default RGBA color
+---@param defaultWidth number Default tick width
+---@param poolKey string|nil Key for tick pool (default "tickPool")
+function BarFrame:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
+    if not statusBar then
+        return
+    end
 
---     if not ticks or #ticks == 0 or maxValue <= 0 then
---         self:HideAllTicks(poolKey)
---         return
---     end
+    if not ticks or #ticks == 0 or maxValue <= 0 then
+        self:HideAllTicks(poolKey)
+        return
+    end
 
---     local barWidth = statusBar:GetWidth()
---     local barHeight = self:GetHeight()
---     if barWidth <= 0 or barHeight <= 0 then
---         return
---     end
+    local barWidth = statusBar:GetWidth()
+    local barHeight = self:GetHeight()
+    if barWidth <= 0 or barHeight <= 0 then
+        return
+    end
 
---     local pool = self[poolKey or "tickPool"]
---     if not pool then
---         return
---     end
+    local pool = self[poolKey or "tickPool"]
+    if not pool then
+        return
+    end
 
---     defaultColor = defaultColor or { r = 0, g = 0, b = 0, a = 0.5 }
---     defaultWidth = defaultWidth or 1
+    defaultColor = defaultColor or { r = 0, g = 0, b = 0, a = 0.5 }
+    defaultWidth = defaultWidth or 1
 
---     for i = 1, #ticks do
---         local tick = pool[i]
---         local tickData = ticks[i]
---         if tick and tickData then
---             local value = tickData.value
---             if value and value > 0 and value < maxValue then
---                 local tickColor = tickData.color or defaultColor
---                 local tickWidthVal = tickData.width or defaultWidth
---                 local tr, tg, tb, ta = RequireColor(tickColor, defaultColor.a or 0.5)
+    for i = 1, #ticks do
+        local tick = pool[i]
+        local tickData = ticks[i]
+        if tick and tickData then
+            local value = tickData.value
+            if value and value > 0 and value < maxValue then
+                local tickColor = tickData.color or defaultColor
+                local tickWidthVal = tickData.width or defaultWidth
+                local tr, tg, tb = tickColor.r, tickColor.g, tickColor.b
+                local ta = tickColor.a or (defaultColor.a or 0.5)
 
---                 local x = math.floor((value / maxValue) * barWidth)
---                 tick:ClearAllPoints()
---                 tick:SetPoint("LEFT", statusBar, "LEFT", x, 0)
---                 tick:SetSize(math.max(1, Util.PixelSnap(tickWidthVal)), barHeight)
---                 tick:SetColorTexture(tr, tg, tb, ta)
---                 tick:Show()
---             else
---                 tick:Hide()
---             end
---         end
---     end
--- end
+                local x = math.floor((value / maxValue) * barWidth)
+                tick:ClearAllPoints()
+                tick:SetPoint("LEFT", statusBar, "LEFT", x, 0)
+                tick:SetSize(math.max(1, Util.PixelSnap(tickWidthVal)), barHeight)
+                tick:SetColorTexture(tr, tg, tb, ta)
+                tick:Show()
+            else
+                tick:Hide()
+            end
+        end
+    end
+end
 
 --- Gets the color for the player's resource from config.
 --- @param configSection table|nil Configuration section for the bar
@@ -331,6 +332,12 @@ function BarFrame:CreateFrame()
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
     frame.StatusBar:SetAllPoints()
     frame.StatusBar:SetFrameLevel(frame:GetFrameLevel() + 1)
+
+    -- TicksFrame for tick marks
+    frame.TicksFrame = CreateFrame("Frame", nil, frame)
+    frame.TicksFrame:SetAllPoints(frame)
+    frame.TicksFrame:SetFrameLevel(frame:GetFrameLevel() + 2)
+
     ECM.Log(self.Name, "BarFrame:CreateFrame", "Success")
     return frame
 end

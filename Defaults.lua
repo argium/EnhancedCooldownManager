@@ -37,8 +37,12 @@ local ADDON_NAME, ns = ...
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
 ---@class ECM_GlobalConfig Global configuration.
+---@field hideWhenMounted boolean Whether to hide when mounted.
+---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
+---@field updateFrequency number Update frequency in seconds.
 ---@field barHeight number Default bar height.
 ---@field barBgColor ECM_Color Default bar background color.
+---@field offsetY number Global vertical offset.
 ---@field texture string|nil Default bar texture.
 ---@field font string Font face.
 ---@field fontSize number Font size.
@@ -86,12 +90,8 @@ local ADDON_NAME, ns = ...
 ---@field exceptInInstance boolean Skip fade in instances.
 
 ---@class ECM_Profile Profile settings.
----@field hideWhenMounted boolean Whether to hide when mounted.
----@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
----@field updateFrequency number Update frequency in seconds.
 ---@field schemaVersion number Saved variables schema version.
 ---@field debug boolean Whether debug logging is enabled.
----@field offsetY number Global vertical offset.
 ---@field combatFade ECM_CombatFadeConfig Combat fade settings.
 ---@field global ECM_GlobalConfig Global appearance settings.
 ---@field powerBar ECM_PowerBarConfig Power bar settings.
@@ -123,11 +123,7 @@ end
 local defaults = {
     profile = {
         debug = false,
-        hideWhenMounted = true,
-        hideOutOfCombatInRestAreas = false,
-        updateFrequency = 0.04,
         schemaVersion = 4,
-        offsetY = 4,
         combatFade = {
             enabled = false,
             opacity = 60,
@@ -135,8 +131,12 @@ local defaults = {
             exceptInInstance = true,
         },
         global = {
+            hideWhenMounted = true,
+            hideOutOfCombatInRestAreas = false,
+            updateFrequency = 0.04,
             barHeight = 22,
             barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
+            offsetY = 4,
             texture = "Solid",
             font = "Expressway",
             fontSize = 11,

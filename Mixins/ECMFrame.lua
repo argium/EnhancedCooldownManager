@@ -167,7 +167,7 @@ function ECMFrame:UpdateLayout()
     if mode == "chain" then
         anchor = GetNextChainAnchor(self.Name, configSection)
         offsetX = 0
-        offsetY = configSection.offsetY and -configSection.offsetY or 0
+        offsetY = (configSection.offsetY and -configSection.offsetY) or -globalConfig.offsetY
         height = configSection.height or globalConfig.barHeight
         width = nil -- Width will be set by anchoring
     elseif mode == "independent" then
@@ -228,9 +228,9 @@ function ECMFrame:UpdateLayout()
             or borderConfig.thickness ~= layoutCache.borderThickness
             or not Util.AreColorsEqual(borderConfig.color, layoutCache.borderColor)
 
-        -- Update the border
+        -- Update the border (nil-safe for frames without borders)
         local border = frame.Border
-        if borderChanged then
+        if border and borderChanged then
             if borderConfig.enabled then
                 border:Show()
                 ECM.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
@@ -261,7 +261,7 @@ function ECMFrame:UpdateLayout()
     local bgColor = configSection.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
     local bgColorChanged = not Util.AreColorsEqual(bgColor, layoutCache.bgColor)
 
-    if bgColorChanged then
+    if bgColorChanged and frame.Background then
         frame.Background:SetColorTexture(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
         layoutCache.bgColor = bgColor
     end

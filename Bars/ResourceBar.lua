@@ -57,14 +57,6 @@ local function GetDiscretePowerType()
     return nil
 end
 
-local function ShouldShowResourceBar()
-    local profile = ECM.db and ECM.db.profile
-    local cfg = profile and profile.resourceBar
-    local _, class = UnitClass("player")
-    local discretePower = GetDiscretePowerType()
-    return cfg and cfg.enabled and (class == "DEMONHUNTER" or discretePower ~= nil)
-end
-
 --- Returns whether the Devourer DH is in void meta form.
 ---@return boolean|nil isVoidMeta
 local function GetDevourerVoidMetaState()
@@ -130,63 +122,54 @@ local function GetValues(profile)
 end
 
 --------------------------------------------------------------------------------
--- Frame Management (uses BarFrame mixin)
+-- ECMFrame/BarFrame Overrides
 --------------------------------------------------------------------------------
 
---- Creates the resource bar frame.
----@return ECM_ResourceBarFrame
-function ResourceBar:CreateFrame()
-    Util.Log("ResourceBar", "Creating frame")
-
-    local profile = ECM.db and ECM.db.profile
-    local frame = BarFrame.CreateFrame(self, { withTicks = true })
-
-    BarFrame.AddTextOverlay(frame, profile)
-
-    frame:SetAppearance()
-
-    return frame
+function ResourceBar:ShouldShow()
+    local config = self:GetConfigSection()
+    local _, class = UnitClass("player")
+    local discretePower = GetDiscretePowerType()
+    return not self._hidden and config.enabled and (class == "DEMONHUNTER" or discretePower ~= nil)
 end
 
+function ResourceBar:GetStatusBarValues()
+    local profile = ECM.db and ECM.db.profile
+    local maxResources, currentValue, kind, isVoidMeta = GetValues(profile)
+
+    if not maxResources or maxResources <= 0 then
+        return 0, 1, 0, false
+    end
+
+    currentValue = currentValue or 0
+    return currentValue, maxResources, currentValue, false
+end
 
 --------------------------------------------------------------------------------
 -- Layout and Rendering
 --------------------------------------------------------------------------------
 
+--- Updates values: status bar value, colors, ticks, text.
+function ResourceBar:Refresh(force)
+    local continue = BarFrame.Refresh(self, force)
+    if not continue then
+        Util.Log(self.Name, "ResourceBar:Refresh", "Skipping refresh")
+        return false
+    end
 
---- Updates values: status bar value, colors.
-function ResourceBar:Refresh()
     local profile = ECM.db and ECM.db.profile
-    local cfg = profile and profile.resourceBar
-    if self:IsHidden() or not (cfg and cfg.enabled) then
-        return
-    end
-
-    if not ShouldShowResourceBar() then
-        if self._frame then
-            self._frame:Hide()
-        end
-        return
-    end
-
-    local bar = self._frame
-    if not bar then
-        return
-    end
-
-    if bar.RefreshAppearance then
-        bar:RefreshAppearance()
-    end
+    local cfg = self:GetConfigSection()
+    local frame = self:GetInnerFrame()
 
     local maxResources, currentValue, kind, isVoidMeta = GetValues(profile)
     if not maxResources or maxResources <= 0 then
-        bar:Hide()
+        frame:Hide()
         return
     end
 
     currentValue = currentValue or 0
-
     local isDevourer = (kind == "souls" and GetSpecialization() == C_SPECID_DH_DEVOURER)
+
+    -- Determine color
     local color = cfg.colors and cfg.colors[kind]
     if isDevourer then
         if isVoidMeta then
@@ -195,6 +178,8 @@ function ResourceBar:Refresh()
             color = cfg.colors and cfg.colors.devourerNormal
         end
     end
+
+    -- Track void meta state changes
     if isDevourer then
         self._lastVoidMeta = not not isVoidMeta
     else
@@ -205,31 +190,50 @@ function ResourceBar:Refresh()
     if color then
         r, g, b = color.r, color.g, color.b
     end
-    bar:SetValue(0, maxResources, currentValue, r, g, b)
 
+    -- Set status bar values
+    frame.StatusBar:SetMinMaxValues(0, maxResources)
+    frame.StatusBar:SetValue(currentValue)
+    frame.StatusBar:SetStatusBarColor(r, g, b)
+
+    -- Handle ticks and text for Devourer vs normal resources
     if isDevourer then
+        -- Devourer shows value as text, no ticks
         local displayValue = math.floor(currentValue * 5)
-        bar:SetText(tostring(displayValue))
-        bar:SetTextVisible(true)
-        bar:HideAllTicks("ticks")
+        if frame.SetText then
+            frame:SetText(tostring(displayValue))
+        end
+        if frame.SetTextVisible then
+            frame:SetTextVisible(true)
+        end
+        self:HideAllTicks("tickPool")
     else
-        bar:SetTextVisible(false)
+        -- Normal resources show ticks, no text
+        if frame.SetTextVisible then
+            frame:SetTextVisible(false)
+        end
 
         local tickCount = math.max(0, maxResources - 1)
-        bar:EnsureTicks(tickCount, bar.TicksFrame, "ticks")
-        bar:LayoutResourceTicks(maxResources, { r = 0, g = 0, b = 0, a = 1 }, 1, "ticks")
+        self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
+        self:LayoutResourceTicks(maxResources, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
     end
 
-    bar:Show()
+    frame:Show()
+    Util.Log(self.Name, "ResourceBar:Refresh", {
+        maxResources = maxResources,
+        currentValue = currentValue,
+        kind = kind,
+        isVoidMeta = isVoidMeta,
+        r = r, g = g, b = b,
+    })
 end
 
 --------------------------------------------------------------------------------
 -- Event Handling
 --------------------------------------------------------------------------------
 
-function ResourceBar:OnUnitPower(_, unit)
-    local profile = ECM.db and ECM.db.profile
-    if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
+function ResourceBar:OnUnitAura(event, unit)
+    if unit ~= "player" then
         return
     end
 
@@ -240,9 +244,8 @@ function ResourceBar:OnUnitPower(_, unit)
     self:ThrottledRefresh()
 end
 
-function ResourceBar:OnUnitEvent(_, unit)
-    local profile = ECM.db and ECM.db.profile
-    if unit ~= "player" or self:IsHidden() or not (profile and profile.resourceBar and profile.resourceBar.enabled) then
+function ResourceBar:OnUnitPower(event, unit)
+    if unit ~= "player" then
         return
     end
 
@@ -268,7 +271,7 @@ function ResourceBar:_MaybeRefreshForVoidMetaStateChange()
 
     if isVoidMeta ~= self._lastVoidMeta then
         self._lastVoidMeta = isVoidMeta
-        self:Refresh()
+        self:Refresh(true)
         self._lastUpdate = GetTime()
         return true
     end
@@ -281,13 +284,13 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
-    BarFrame.AddMixin(
-        ResourceBar,
-        "ResourceBar",
-        "resourceBar",
-        nil,
-        {
-            { event = "UNIT_AURA", handler = "OnUnitEvent" },
-        }
-    )
+    BarFrame.AddMixin(self, "ResourceBar")
+
+    -- Register events with dedicated handlers
+    self:RegisterEvent("UNIT_AURA", "OnUnitAura")
+    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPower")
+end
+
+function ResourceBar:OnDisable()
+    self:UnregisterAllEvents()
 end
