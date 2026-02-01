@@ -7,10 +7,6 @@ local _, ns = ...
 local SparkleUtil = ns.SparkleUtil or {}
 ns.SparkleUtil = SparkleUtil
 
---------------------------------------------------------------------------------
--- Text / RGB helpers
---------------------------------------------------------------------------------
-
 local function Clamp(v, minV, maxV)
     return math.max(minV, math.min(maxV, v))
 end

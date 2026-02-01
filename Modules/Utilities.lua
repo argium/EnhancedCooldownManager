@@ -4,10 +4,12 @@
 
 local _, ns = ...
 
-local Util = ns.Util or {}
-ns.Util = Util
 local ECM = ns.Addon
 local C = ns.Constants
+
+local Util = ns.Util or {}
+ns.Util = Util
+
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local function FetchLSM(mediaType, key)

@@ -276,7 +276,7 @@ end
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.
 function ECMFrame:ShouldShow()
     local config = self:GetConfigSection()
-    return not self._hidden and not (config and config.enabled == false)
+    return not self._hidden and not (config and config.rd == false)
 end
 
 --- Handles common refresh logic for ECMFrame-derived frames.
