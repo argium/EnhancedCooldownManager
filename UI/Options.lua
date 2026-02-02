@@ -170,15 +170,15 @@ end
 --------------------------------------------------------------------------------
 
 --- Gets current class and spec IDs.
----@return number|nil classID, number|nil specID, string className, string specName
+---@return number|nil classID, number|nil specIndex, string className, string specName
 local function GetCurrentClassSpec()
     local localisedClassName, className, classID = UnitClass("player")
     local specIndex = GetSpecialization()
-    local specID, specName
+    local specName
     if specIndex then
-        specID, specName = GetSpecializationInfo(specIndex)
+        _, specName = GetSpecializationInfo(specIndex)
     end
-    return classID, specID, localisedClassName or "Unknown", specName or "None"
+    return classID, specIndex, localisedClassName or "Unknown", specName or "None"
 end
 
 local function IsDeathKnight()
@@ -1651,8 +1651,8 @@ end
 ---@return ECM_TickMark[]
 local function GetCurrentTicks()
     local db = ECM.db
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
+    local classID, specIndex = GetCurrentClassSpec()
+    if not classID or not specIndex then
         return {}
     end
 
@@ -1666,15 +1666,15 @@ local function GetCurrentTicks()
         return {}
     end
 
-    return classMappings[specID] or {}
+    return classMappings[specIndex] or {}
 end
 
 --- Sets tick marks for the current class/spec.
 ---@param ticks ECM_TickMark[]
 local function SetCurrentTicks(ticks)
     local db = ECM.db
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
+    local classID, specIndex = GetCurrentClassSpec()
+    if not classID or not specIndex then
         return
     end
 
@@ -1696,7 +1696,7 @@ local function SetCurrentTicks(ticks)
         ticksCfg.mappings[classID] = {}
     end
 
-    ticksCfg.mappings[classID][specID] = ticks
+    ticksCfg.mappings[classID][specIndex] = ticks
 end
 
 --- Adds a new tick mark for the current class/spec.

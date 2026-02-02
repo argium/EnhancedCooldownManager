@@ -2,6 +2,8 @@
 
 local ADDON_NAME, ns = ...
 
+local C = ns.Constants
+
 ---@class ECM_Color RGBA color definition.
 ---@field r number Red channel (0-1).
 ---@field g number Green channel (0-1).
@@ -101,24 +103,15 @@ local ADDON_NAME, ns = ...
 
 local DEFAULT_BORDER_THICKNESS = 4
 local DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 }
-local DEMONHUNTER_MAX_SOULS = 6
-local DEMONHUNTER_CLASS_ID = 12
-local DEVOURER_SPEC_INDEX = 3
-local DEVOURER_SPEC_ID
 
-if type(GetSpecializationInfoForClassID) == "function" then
-    DEVOURER_SPEC_ID = select(1, GetSpecializationInfoForClassID(DEMONHUNTER_CLASS_ID, DEVOURER_SPEC_INDEX))
-end
-
+-- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
-if DEVOURER_SPEC_ID then
-    powerBarTickMappings[DEMONHUNTER_CLASS_ID] = {
-        [DEVOURER_SPEC_ID] = {
-            { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
-            { value = 100 },
-        },
-    }
-end
+powerBarTickMappings[C.DEMONHUNTER_CLASS_ID] = {
+    [C.DEMONHUNTER_DEVOURER_SPEC_INDEX] = {
+        { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
+        { value = 100 },
+    },
+}
 
 local defaults = {
     profile = {
@@ -187,7 +180,6 @@ local defaults = {
             -- texture             = nil,
             -- bgColor             = nil,
             anchorMode          = "chain",
-            demonHunterSoulsMax = DEMONHUNTER_MAX_SOULS,
             border              = {
                 enabled = false,
                 thickness = DEFAULT_BORDER_THICKNESS,

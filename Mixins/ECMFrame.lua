@@ -280,7 +280,7 @@ function ECMFrame:ShouldShow()
 end
 
 --- Handles common refresh logic for ECMFrame-derived frames.
---- @param force boolean|nil Whether to force a refresh, bypassing throttling and state checks.
+--- @param force boolean|nil Whether to force a refresh, even if the bar is hidden.
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
 function ECMFrame:Refresh(force)
     if force then

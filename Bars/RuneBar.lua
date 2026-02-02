@@ -48,15 +48,15 @@ end
 --------------------------------------------------------------------------------
 
 --- Creates or returns fragmented sub-bars for runes.
----@param bar ECM_RuneBarFrame
+---@param bar Frame
 ---@param maxResources number
 local function EnsureFragmentedBars(bar, maxResources)
-    ---@cast bar ECM_RuneBarFrame
-    local profile = ECM.db and ECM.db.profile
-    local cfg = profile and profile.runeBar
-    local gbl = profile and profile.global
-    local globalConfig = ECM.db and ECM.db.profile and ECM.db.profile.global
-    local configSection = cfg
+    -- TODO: use methods to get config
+    -- local profile = ECM.db and ECM.db.profile
+    -- local cfg = profile and profile.runeBar
+    -- local gbl = self:GetGlobalConfig()
+    -- local globalConfig = ECM.db and ECM.db.profile and ECM.db.profile.global
+    -- local configSection = cfg
 
     -- Get texture
     local texKey = (configSection and configSection.texture) or (globalConfig and globalConfig.texture)
@@ -83,10 +83,9 @@ end
 
 --- Updates fragmented rune display (individual bars per rune).
 --- Only repositions bars when rune ready states change to avoid flickering.
----@param bar ECM_RuneBarFrame
+---@param bar Frame
 ---@param maxRunes number
 local function UpdateFragmentedRuneDisplay(bar, maxRunes)
-    ---@cast bar ECM_RuneBarFrame
     if not GetRuneCooldown then
         return
     end
@@ -244,7 +243,7 @@ end
 --------------------------------------------------------------------------------
 
 function RuneBar:Refresh(force)
-    local continue = ECMFrame.Refresh(self, force)
+    local continue = BarFrame.Refresh(self, force)
     if not continue then
         Util.Log(self.Name, "RuneBar:Refresh", "Skipping refresh")
         return false

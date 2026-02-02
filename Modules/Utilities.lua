@@ -74,22 +74,21 @@ end
 
 --- Applies font settings to a FontString.
 ---@param fontString FontString
----@param profile table|nil Full profile table
-function Util.ApplyFont(fontString, profile)
+---@param globalConfig table|nil Full global configuration table
+function Util.ApplyFont(fontString, globalConfig)
     if not fontString then
         return
     end
 
-    local gbl = profile and profile.global
-    local fontPath = Util.GetFontPath(gbl and gbl.font)
-    local fontSize = (gbl and gbl.fontSize) or 11
-    local fontOutline = (gbl and gbl.fontOutline) or "OUTLINE"
+    local fontPath = Util.GetFontPath(globalConfig and globalConfig.font)
+    local fontSize = (globalConfig and globalConfig.fontSize) or 11
+    local fontOutline = (globalConfig and globalConfig.fontOutline) or "OUTLINE"
 
     if fontOutline == "NONE" then
         fontOutline = ""
     end
 
-    local hasShadow = gbl and gbl.fontShadow
+    local hasShadow = globalConfig and globalConfig.fontShadow
     local fontKey = table.concat({ fontPath, tostring(fontSize), fontOutline, tostring(hasShadow) }, "|")
 
     fontString:SetFont(fontPath, fontSize, fontOutline)

@@ -224,6 +224,9 @@ function BarFrame:ThrottledRefresh()
     return true
 end
 
+--- Refreshes the bar frame layout and values.
+---@param force boolean|nil If true, forces a refresh even if not needed.
+---@return boolean continue True if refresh completed, false if skipped
 function BarFrame:Refresh(force)
     local continue = ECMFrame.Refresh(self, force)
     if not continue then

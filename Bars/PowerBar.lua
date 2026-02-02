@@ -14,16 +14,15 @@ ECM.PowerBar = PowerBar
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil
 function PowerBar:GetCurrentTicks()
-    local profile = ECM.db and ECM.db.profile
-    local ticksCfg = profile and profile.powerBar and profile.powerBar.ticks
+    local config = self:GetConfigSection()
+    local ticksCfg = config and config.ticks
     if not ticksCfg or not ticksCfg.mappings then
         return nil
     end
 
     local classID = select(3, UnitClass("player"))
     local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
-    if not classID or not specID then
+    if not classID or not specIndex then
         return nil
     end
 
@@ -32,7 +31,7 @@ function PowerBar:GetCurrentTicks()
         return nil
     end
 
-    return classMappings[specID]
+    return classMappings[specIndex]
 end
 
 --- Updates tick markers on the power bar based on per-class/spec configuration.
@@ -46,8 +45,8 @@ function PowerBar:UpdateTicks(frame, resource, max)
         return
     end
 
-    local profile = ECM.db and ECM.db.profile
-    local ticksCfg = profile and profile.powerBar and profile.powerBar.ticks
+    local config = self:GetConfigSection()
+    local ticksCfg = config and config.ticks
     local defaultColor = ticksCfg and ticksCfg.defaultColor or { r = 1, g = 1, b = 1, a = 0.8 }
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
@@ -78,7 +77,6 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:Refresh(force)
-    -- Call base BarFrame refresh to handle standard updates
     local result = BarFrame.Refresh(self, force)
     if not result then
         return false
@@ -95,7 +93,6 @@ end
 
 
 function PowerBar:ShouldShow()
-    -- Base handles hidden and enabled checks
     local show = BarFrame.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
@@ -104,7 +101,7 @@ function PowerBar:ShouldShow()
         -- Hide mana bar for DPS specs, except mage/warlock/caster-form druid
         local role = GetSpecializationRole(GetSpecialization())
         if role == "DAMAGER" and powerType == Enum.PowerType.Mana then
-            return C.SHOW_MANABAR_FOR_DPS_CLASSES[class] or false
+            return C.POWER_BAR_SHOW_MANA[class] or false
         end
 
         return true
@@ -118,7 +115,6 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
-    -- Filter events - only refresh for player unit
     if unitID and unitID ~= "player" then
         return
     end
@@ -133,7 +129,7 @@ end
 function PowerBar:OnEnable()
     BarFrame.AddMixin(PowerBar, "PowerBar")
     BarFrame.OnEnable(self)
-    self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
+    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPowerUpdate")
     ECM.Log(self.Name, "PowerBar:Enabled")
 end
 

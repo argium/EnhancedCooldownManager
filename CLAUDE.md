@@ -32,6 +32,12 @@ BarFrame should work with any bar-style frame the addon is resposnible for drawi
 
 These responsibilities can change over time so update this document if so however responsibilities should not cross mixins by reaching into the internals of another. Always use public interfaces. Internal fields are prefixed by an underscore.
 
+MANDATORY: Modules that derive from ECMFrame, must use the config accessors and never `ECM.db` or `ECM.db.profile` directly.
+- `self:GetGlobalConfig()` for the `global` config block
+- `self:GetConfigSection()` for the module's specific block
+
+MANDATORY: Modules should call methods in the immediate parent's mixin, if present. For example, `PowerBar:Refresh` must call `BarFrame.Refresh(self)` and never `ECMFrame.Refresh(self)`
+
 [Modules\Layout.lua](Modules\Layout.lua) owns
 - Registering events that affect every ECMFrame such as hiding when the player mounts.
 - Tells ECMFrames when to show/hide themselves, or when to refresh in response to global events.
