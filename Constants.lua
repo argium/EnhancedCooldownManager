@@ -1,12 +1,14 @@
 local _,  ns = ...
 
 local constants = {
+    TRACE_LOG_MAX = 200,
+
     -- Internal module names
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
     RUNEBAR = "RuneBar",
 
-    -- Frame names
+    -- Blizzard frame names
     VIEWER = "EssentialCooldownViewer",
 
     -- Default or fallback values for configuration
@@ -16,7 +18,7 @@ local constants = {
     DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
     DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
 
-    -- Colors
+    -- Color constants
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
     COLOR_WHITE = { r = 1, g = 1, b = 1, a = 1 },
 

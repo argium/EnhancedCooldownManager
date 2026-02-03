@@ -1,8 +1,8 @@
--- Trace log buffer (circular buffer for last 100 debug messages)
+-- Trace log buffer (circular buffer for last 200 debug messages)
 
 local _, ns = ...
+local C = ns.Constants
 
-local TRACE_LOG_MAX = 100
 local traceLogBuffer = {}
 local traceLogIndex = 0
 local traceLogCount = 0
@@ -10,9 +10,9 @@ local traceLogCount = 0
 --- Adds a message to the trace log buffer.
 ---@param message string
 local function AddToTraceLog(message)
-    traceLogIndex = (traceLogIndex % TRACE_LOG_MAX) + 1
+    traceLogIndex = (traceLogIndex % C.TRACE_LOG_MAX) + 1
     traceLogBuffer[traceLogIndex] = string.format("[%s] %s", date("%H:%M:%S"), message)
-    if traceLogCount < TRACE_LOG_MAX then
+    if traceLogCount < C.TRACE_LOG_MAX then
         traceLogCount = traceLogCount + 1
     end
 end
@@ -25,9 +25,9 @@ local function GetTraceLog()
     end
 
     local lines = {}
-    local startIdx = (traceLogCount < TRACE_LOG_MAX) and 1 or (traceLogIndex + 1)
+    local startIdx = (traceLogCount < C.TRACE_LOG_MAX) and 1 or (traceLogIndex + 1)
     for i = 1, traceLogCount do
-        local idx = ((startIdx - 2 + i) % TRACE_LOG_MAX) + 1
+        local idx = ((startIdx - 2 + i) % C.TRACE_LOG_MAX) + 1
         lines[i] = traceLogBuffer[idx]
     end
     return table.concat(lines, "\n")

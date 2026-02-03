@@ -16,6 +16,21 @@ The intention is to use mixins as a kind of class hierarchy:
 - Refresh throttling
 - Hiding
 
+| Field         | Type            | Description |
+|--------------|------------------|-------------|
+| IsHidden      | boolean\|nil      | Whether the frame is currently hidden. |
+| IsECMFrame    | boolean           | True to identify this as an ECMFrame mixin instance. |
+| InnerFrame    | Frame\|nil        | Inner WoW frame owned by this mixin. |
+| GlobalConfig  | table\|nil        | Cached reference to the global config section. |
+| ModuleConfig  | table\|nil        | Cached reference to this module's config section. |
+| Name          | string            | Name of the frame. |
+| GetInnerFrame | fun(self: ECMFrame): Frame | Gets the inner frame. |
+| ShouldShow    | fun(self: ECMFrame): boolean | Determines whether the frame should be shown at this moment. |
+| CreateFrame   | fun(self: ECMFrame): Frame | Creates the inner frame. |
+| SetHidden     | fun(self: ECMFrame, hide: boolean) | Sets whether the frame is hidden. |
+| UpdateLayout  | fun(self: ECMFrame): boolean | Updates the visual layout of the frame. |
+| AddMixin      | fun(target: table, name: string) | Adds ECMFrame methods and initializes state on target. |
+
 ECMFrame should work with _any_ frame the addon needs to position or hide.
 
 [BarFrame](Mixins\BarFrame.lua) owns:
@@ -44,6 +59,18 @@ MANDATORY: Modules should call methods in the immediate parent's mixin, if prese
 
 The goal is to replace ViewerHook and then remove it.
 
+## Secret Values
+
+Do not perform any operations except nil checking (including reads) on the following secret values except for passing them into other built-in functions:
+- UnitPowerMax
+- UnitPower
+- UnitPowerPercent
+- C_UnitAuras.GetUnitAuraBySpellID
+
+Most functions have a CurveConstant parameter that will return an adjusted value. eg.
+```lua
+UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
+```
 ## Rewrite/Refactor
 
 The following files have been mostly rewritten, but not everything is implemented:

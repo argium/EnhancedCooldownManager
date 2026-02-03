@@ -117,96 +117,43 @@ function ResourceBar:GetStatusBarValues()
     return currentValue, maxResources, currentValue, false
 end
 
+--- Gets the color for the resource bar based on resource type.
+--- Handles DH souls (Vengeance, Devourer normal/meta).
+---@return ECM_Color
+function ResourceBar:GetStatusBarColor()
+    local cfg = self.ModuleConfig
+    local _, _, kind = GetValues(cfg)
+    local color = cfg.colors and cfg.colors[kind]
+    return color or C.COLOR_WHITE
+end
+
 --------------------------------------------------------------------------------
 -- Layout and Refresh
 --------------------------------------------------------------------------------
 
 function ResourceBar:Refresh(force)
-    -- Use ECMFrame.Refresh instead of BarFrame.Refresh since we manage
-    -- our own StatusBar with custom color logic for DH souls
-    local continue = ECMFrame.Refresh(self, force)
+    local continue = BarFrame.Refresh(self, force)
     if not continue then
-        Util.Log(self.Name, "ResourceBar:Refresh", "Skipping refresh (base checks)")
         return false
     end
 
-    local globalConfig = self.GlobalConfig
-    local cfg = self.ModuleConfig
-    local frame = self.InnerFrame
+    -- Handle ticks (Devourer has no ticks, others have dividers)
+    local _, _, kind = GetValues(self.ModuleConfig)
+    local isDevourer = (kind == "devourerMeta" or kind == "devourerNormal")
 
-    -- Get resource values
-    local maxResources, currentValue, kind, isVoidMeta = GetValues(cfg)
-    if not maxResources or maxResources <= 0 then
-        Util.Log(self.Name, "ResourceBar:Refresh", "No resources available, hiding")
-        frame:Hide()
-        return false
-    end
-
-    currentValue = currentValue or 0
-    local isDevourer = (kind == "souls" and GetSpecialization() == C.DEMONHUNTER_DEVOURER_SPEC_INDEX)
-
-    -- Determine color (ResourceBar-specific logic for DH souls)
-    local color = cfg.colors and cfg.colors[kind]
     if isDevourer then
-        if isVoidMeta then
-            color = cfg.colors and cfg.colors.devourerMeta
-        else
-            color = cfg.colors and cfg.colors.devourerNormal
-        end
-    end
-
-    color = color or C.COLOR_WHITE
-    Util.Log(self.Name, "ResourceBar:Refresh", {
-        cfgColors = cfg.colors,
-        color = color,
-    })
-
-    -- Update StatusBar
-    frame.StatusBar:SetMinMaxValues(0, maxResources)
-    frame.StatusBar:SetValue(currentValue)
-    frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b, color.a)
-
-    -- Set texture
-    local tex = Util.GetTexture((cfg and cfg.texture) or (globalConfig and globalConfig.texture))
-    if tex then
-        frame.StatusBar:SetStatusBarTexture(tex)
-    end
-
-    -- Handle text and ticks based on resource type
-    local showText = cfg.showText ~= false
-    if isDevourer then
-        -- Devourer shows value as text (multiply by 5 for fragment count), no ticks
-        if showText and frame.TextValue then
-            local displayValue = math.floor(currentValue * 5)
-            frame:SetText(tostring(displayValue))
-            Util.ApplyFont(frame.TextValue, cfg)
-        end
-        frame:SetTextVisible(showText)
         self:HideAllTicks("tickPool")
     else
-        -- Normal resources show ticks (dividers), optionally show numeric value as text
-        if showText and frame.TextValue then
-            frame:SetText(tostring(math.floor(currentValue)))
-            Util.ApplyFont(frame.TextValue, cfg)
+        local frame = self.InnerFrame
+        local maxResources = select(2, self:GetStatusBarValues())
+        if maxResources > 1 then
+            local tickCount = maxResources - 1
+            self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
+            self:LayoutResourceTicks(maxResources, C.COLOR_BLACK, 1, "tickPool")
+        else
+            self:HideAllTicks("tickPool")
         end
-        frame:SetTextVisible(showText)
-
-        -- Render tick dividers between resources
-        local tickCount = math.max(0, maxResources - 1)
-        self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
-        self:LayoutResourceTicks(maxResources, C.COLOR_BLACK, 1, "tickPool")
     end
-
-    frame:Show()
-    Util.Log(self.Name, "ResourceBar:Refresh", {
-        maxResources = maxResources,
-        currentValue = currentValue,
-        kind = kind,
-        isDevourer = isDevourer,
-        isVoidMeta = isVoidMeta,
-        showText = showText,
-        color = color,
-    })
 
     return true
 end

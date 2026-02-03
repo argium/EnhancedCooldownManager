@@ -175,16 +175,6 @@ function BarFrame:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, def
     end
 end
 
---- Gets the color for the player's resource from config.
---- @param moduleConfig table|nil Module configuration table
---- @return ECM_Color Color table
-local function GetColorForPlayerResource(moduleConfig)
-    local resource = UnitPowerType("player")
-    local color = moduleConfig and moduleConfig.colors[resource]
-    Util.DebugAssert(color, "Color for resource " .. tostring(resource) .. " not defined in config")
-    return color or C.COLOR_WHITE
-end
-
 --- Gets the current value for the bar.
 ---@return number|nil current
 ---@return number|nil max
@@ -193,6 +183,14 @@ end
 function BarFrame:GetStatusBarValues()
     Util.DebugAssert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
+end
+
+--- Gets the color for the status bar. Override for custom color logic.
+---@return ECM_Color Color table with r, g, b, a fields
+function BarFrame:GetStatusBarColor()
+    local resource = UnitPowerType("player")
+    local color = self.ModuleConfig and self.ModuleConfig.colors and self.ModuleConfig.colors[resource]
+    return color or C.COLOR_WHITE
 end
 
 --------------------------------------------------------------------------------
@@ -259,7 +257,7 @@ function BarFrame:Refresh(force)
     frame.StatusBar:SetStatusBarTexture(tex)
 
     -- Status bar color
-    local statusBarColor = GetColorForPlayerResource(moduleConfig)
+    local statusBarColor = self:GetStatusBarColor()
     frame.StatusBar:SetStatusBarColor(statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
@@ -270,8 +268,10 @@ function BarFrame:Refresh(force)
         isFraction = isFraction,
         showText = showText,
         texture = tex,
-        color = statusBarColor,
+        statusBarColor = statusBarColor,
     })
+
+    return true
 end
 
 function BarFrame:CreateFrame()

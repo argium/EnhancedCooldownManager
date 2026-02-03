@@ -33,10 +33,8 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field bgColor ECM_Color|nil Last background color table.
 
 ---@class ECMFrame : AceModule Frame mixin that owns layout and config access.
----@field _name string Internal name of the frame.
----@field _config table|nil Reference to the frame's configuration profile section.
 ---@field _configKey string|nil Config key for this frame's section.
----@field _layoutCache ECM_LayoutCache|nil Cached layout parameters.
+---@field _lastLayout ECM_LayoutCache|nil The last layout settings that were applied. Used to avoid redundant updates.
 ---@field IsHidden boolean|nil Whether the frame is currently hidden.
 ---@field IsECMFrame boolean True to identify this as an ECMFrame mixin instance.
 ---@field InnerFrame Frame|nil Inner WoW frame owned by this mixin.
@@ -74,7 +72,7 @@ local function GetNextChainAnchor(frameName)
         if barModule and barModule:IsEnabled() then
             local barFrame = barModule.InnerFrame
             if barFrame and barFrame:IsVisible() then
-                return barFrame, i == 1
+                return barFrame, false
             end
         end
     end
@@ -296,7 +294,6 @@ function ECMFrame.AddMixin(target, name)
 
     local configRoot = ECM.db and ECM.db.profile
     target.Name = name
-    target._config = configRoot
     target._configKey = name:sub(1,1):lower() .. name:sub(2) -- camelCase-ish
     target._layoutCache = {}
     target.IsHidden = false
