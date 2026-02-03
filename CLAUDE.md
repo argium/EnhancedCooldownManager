@@ -1,8 +1,8 @@
-**NOTE: **The code is undergoing a signficant refactor. Try to align with the new design.
+**NOTE:** The code is undergoing a signficant refactor. Try to align with the new design.
 
 ## Design
 
-**All constants** are to be stored in Constants.lua.
+MANDATORY: **ALL constants** are to be stored in Constants.lua.
 
 The profile is split into GLOBAL and a SECTION specific to the module (typically matching the file name, in camel case).  See [Defaults.lua](Defaults.lua)
 
@@ -47,11 +47,17 @@ BarFrame should work with any bar-style frame the addon is resposnible for drawi
 
 These responsibilities can change over time so update this document if so however responsibilities should not cross mixins by reaching into the internals of another. Always use public interfaces. Internal fields are prefixed by an underscore.
 
-MANDATORY: Modules that derive from ECMFrame, must use the config accessors and never `ECM.db` or `ECM.db.profile` directly.
+MANDATORY: Modules that derive from ECMFrame, must use the config accessors and never `ECM.db` or `ECM.db.profile` directly. NEVER create an intermediate table for profile/config.
 - `self:GetGlobalConfig()` for the `global` config block
 - `self:GetConfigSection()` for the module's specific block
 
 MANDATORY: Modules should call methods in the immediate parent's mixin, if present. For example, `PowerBar:Refresh` must call `BarFrame.Refresh(self)` and never `ECMFrame.Refresh(self)`
+
+MANDATORY: Any and all layout updates MUST be triggered from a call to `UpdateLayout()`. No cheeky workarounds, no funny business. MUST. Any change that modifies the layout outside of this function will be rejected.
+
+MANDATORY: Any and all value-related updates should be triggered from a call to `Refresh()`.
+
+MANDATORY: Files should have the following comment headings: "Helpers" -> "Options UI" -> "ECMFrame|BarFrame Overrides" -> "Event Handling" -> "Module Lifecycle". Place fields under the correct heading.
 
 [Modules\Layout.lua](Modules\Layout.lua) owns
 - Registering events that affect every ECMFrame such as hiding when the player mounts.
@@ -76,11 +82,11 @@ UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 The following files have been mostly rewritten, but not everything is implemented:
 - [Mixins\BarFrame.lua](Mixins\BarFrame.lua)
 - [Mixins\ECMFrame.lua](Mixins\ECMFrame.lua)
+- [Bars\ResourceBar.lua](Bars\ResourceBar.lua)
+- [Bars\RuneBar.lua](Bars\RuneBar.lua)
 
 The following files are partially rewritten:
 - [Bars\BuffBars.lua](Bars\BuffBars.lua)
-- [Bars\ResourceBar.lua](Bars\ResourceBar.lua)
-- [Bars\RuneBar.lua](Bars\RuneBar.lua)
 
 The following file will probably be removed:
 - [Mixins\PositionStrategy.lua](Mixins\PositionStrategy.lua)

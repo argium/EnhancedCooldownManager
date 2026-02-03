@@ -59,7 +59,7 @@ local methods = {}
 function methods:OnAcquire()
     self:SetDisabled(false)
     if not self.value then
-        self:SetValue("auto")
+        self:SetValue("chain")
     else
         self:UpdateVisuals()
     end
@@ -72,7 +72,7 @@ end
 
 function methods:SetList(list)
     self.list = list
-    local autoLabel = list and list.auto or "Position Automatically"
+    local autoLabel = list and list.chain or "Position Automatically"
     local customLabel = list and list.custom or "Custom Positioning"
     self.autoButton.label:SetText(autoLabel)
     self.customButton.label:SetText(customLabel)
@@ -90,8 +90,8 @@ function methods:SetLabel(text)
 end
 
 function methods:SetValue(value)
-    if value ~= "auto" and value ~= "custom" then
-        value = "auto"
+    if value ~= "chain" and value ~= "custom" then
+        value = "chain"
     end
     self.value = value
     self:UpdateVisuals()
@@ -128,7 +128,7 @@ function methods:UpdateVisuals()
         end
     end
 
-    Apply(self.autoButton, self.value == "auto")
+    Apply(self.autoButton, self.value == "chain")
     Apply(self.customButton, self.value == "custom")
 end
 
@@ -169,9 +169,9 @@ local function Constructor()
 
     autoButton:SetScript("OnClick", function()
         if widget.disabled then return end
-        if widget.value ~= "auto" then
-            widget:SetValue("auto")
-            widget:Fire("OnValueChanged", "auto")
+        if widget.value ~= "chain" then
+            widget:SetValue("chain")
+            widget:Fire("OnValueChanged", "chain")
         end
     end)
 

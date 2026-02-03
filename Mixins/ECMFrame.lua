@@ -26,7 +26,7 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field height number|nil Last applied height.
 ---@field anchorPoint AnchorPoint|nil Last anchor point.
 ---@field anchorRelativePoint AnchorPoint|nil Last relative anchor point.
----@field mode "chain"|"independent"|nil Last positioning mode.
+---@field mode string|nil Last anchor mode.
 ---@field borderEnabled boolean|nil Last border enabled state.
 ---@field borderThickness number|nil Last border thickness.
 ---@field borderColor ECM_Color|nil Last border color table.
@@ -41,6 +41,7 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field GlobalConfig table|nil Cached reference to the global config section.
 ---@field ModuleConfig table|nil Cached reference to this module's config section.
 ---@field Name string  Name of the frame.
+---@field GetNextChainAnchor fun(self: ECMFrame, frameName: string|nil): (Frame, boolean) Gets the next valid anchor in the chain.
 ---@field GetInnerFrame fun(self: ECMFrame): Frame Gets the inner frame.
 ---@field ShouldShow fun(self: ECMFrame): boolean Determines whether the frame should be shown at this moment.
 ---@field CreateFrame fun(self: ECMFrame): Frame Creates the inner frame.
@@ -52,7 +53,7 @@ ns.Mixins.ECMFrame = ECMFrame
 --- @param frameName string|nil The name of the current frame, or nil if first in chain.
 --- @return Frame The frame to anchor to.
 --- @return boolean isFirst True if this is the first frame in the chain.
-local function GetNextChainAnchor(frameName)
+function ECMFrame:GetNextChainAnchor(frameName)
     -- Find the ideal position
     local stopIndex = #C.CHAIN_ORDER + 1
     if frameName then
@@ -130,13 +131,13 @@ function ECMFrame:UpdateLayout()
     -- Determine the layout parameters based on the anchor mode. Chain mode will
     -- append this frame to the previous in the chain and inherit its width.
     local anchor, isFirst, offsetX, offsetY, width, height
-    if mode == "chain" then
-        anchor, isFirst = GetNextChainAnchor(self.Name)
+    if mode == C.ANCHORMODE_CHAIN then
+        anchor, isFirst = _GetNextChainAnchor(self.Name)
         offsetX = 0
         offsetY = (moduleConfig.offsetY and -moduleConfig.offsetY) or (isFirst and -globalConfig.offsetY) or 0
         height = moduleConfig.height or globalConfig.barHeight
         width = nil -- Width will be set by anchoring
-    elseif mode == "independent" then
+    elseif mode == C.ANCHORMODE_FREE then
         assert(false, "NYI")
     end
 
@@ -154,11 +155,11 @@ function ECMFrame:UpdateLayout()
 
     if layoutChanged then
         frame:ClearAllPoints()
-        if mode == "chain" then
+        if mode == C.ANCHORMODE_CHAIN then
             frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY)
             frame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY)
         else
-            assert(anchor ~= nil, "anchor required for independent mode")
+            assert(anchor ~= nil, "anchor required for free anchor mode")
             frame:SetPoint(anchorPoint, anchor, anchorRelativePoint, offsetX, offsetY)
         end
 
@@ -257,7 +258,7 @@ end
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.
 function ECMFrame:ShouldShow()
     local config = self.ModuleConfig
-    return not self.IsHidden and not (config and config.rd == false)
+    return not self.IsHidden and (config == nil or config.enabled ~= false)
 end
 
 --- Handles common refresh logic for ECMFrame-derived frames.
@@ -275,6 +276,43 @@ function ECMFrame:Refresh(force)
     end
 
     return true
+end
+
+--- Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
+---@param flagName string Key for the pending flag on self
+---@param callback function Function to call after delay
+function ECMFrame:ScheduleDebounced(flagName, callback)
+    if self[flagName] then
+        return
+    end
+    self[flagName] = true
+
+    local freq = self.GlobalConfig and self.GlobalConfig.updateFrequency or C.DEFAULT_REFRESH_FREQUENCY
+    C_Timer.After(freq, function()
+        self[flagName] = nil
+        callback()
+    end)
+end
+
+--- Rate-limited refresh. Skips if called within updateFrequency window.
+---@return boolean refreshed True if Refresh() was called
+function ECMFrame:ThrottledRefresh()
+    local config = self.GlobalConfig
+    local freq = (config and config.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
+    if GetTime() - (self._lastUpdate or 0) < freq then
+        return false
+    end
+    self:Refresh()
+    self._lastUpdate = GetTime()
+    return true
+end
+
+--- Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
+--- This is the canonical way to request layout updates from event handlers or callbacks.
+function ECMFrame:ScheduleLayoutUpdate()
+    self:ScheduleDebounced("_layoutPending", function()
+        self:UpdateLayout()
+    end)
 end
 
 --------------------------------------------------------------------------------

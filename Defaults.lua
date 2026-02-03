@@ -12,14 +12,14 @@ local C = ns.Constants
 
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
----@field offsetX number|nil Horizontal offset when independent.
----@field offsetY number|nil Vertical offset when independent.
+---@field offsetX number|nil Horizontal offset when free anchor.
+---@field offsetY number|nil Vertical offset when free anchor.
 ---@field width number|nil Bar width override.
 ---@field height number|nil Bar height override.
 ---@field texture string|nil Bar texture override.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
----@field anchorMode "chain"|"independent"|nil Anchor mode for the bar.
+---@field anchorMode C.ANCHORMODE_CHAIN|C.ANCHORMODE_FREE|nil Anchor mode for the bar.
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase Power bar configuration.
 ---@field showManaAsPercent boolean Whether to show mana as a percent.
@@ -67,9 +67,9 @@ local C = ns.Constants
 ---@field selectedPalette string|nil Name of the currently selected palette.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
----@field anchor "chain"|"independent"|nil Anchor behavior for buff bars.
----@field width number|nil Buff bar width when independent.
----@field offsetY number|nil Vertical offset when independent.
+---@field anchor C.ANCHORMODE_CHAIN|C.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field width number|nil Buff bar width when free anchor.
+---@field offsetY number|nil Vertical offset when free anchor.
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
@@ -144,8 +144,8 @@ local defaults = {
             -- offsetY           = 200,
             -- texture           = nil,
             -- bgColor           = nil,
-            anchorMode        = "chain",
-            -- anchorMode        = "independent",
+            anchorMode        = C.ANCHORMODE_CHAIN,
+            -- anchorMode        = C.ANCHORMODE_FREE,
             showText          = true,
             ticks             = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
@@ -179,7 +179,7 @@ local defaults = {
             -- offsetY             = nil,
             -- texture             = nil,
             -- bgColor             = nil,
-            anchorMode          = "chain",
+            anchorMode          = C.ANCHORMODE_CHAIN,
             border              = {
                 enabled = false,
                 thickness = DEFAULT_BORDER_THICKNESS,
@@ -204,11 +204,12 @@ local defaults = {
             -- offsetY    = nil,
             -- texture    = nil,
             -- bgColor    = nil,
-            anchorMode = "chain",
+            anchorMode = C.ANCHORMODE_CHAIN,
             color      = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, -- DK class colour red
         },
         buffBars = {
-            anchorMode = "chain",
+            enabled = true,
+            anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
             offsetY = 0,
             showIcon = false,
