@@ -1,491 +1,227 @@
-# Refactor Progress and Design Decisions
+# Refactor Status and Architecture Notes
 
-## Overview
+## Current Status (2026-02-03)
 
-This document tracks the ongoing refactor to establish a mixin-based architecture for Enhanced Cooldown Manager. The goal is to separate concerns cleanly across three layers:
+The addon is undergoing a significant refactor to introduce a mixin-based architecture that separates concerns and reduces code duplication.
 
-- **ECMFrame**: Frame lifecycle, layout, positioning, borders, config access
-- **BarFrame**: StatusBar management, values, colors, textures, ticks, text overlays
-- **Concrete Modules** (PowerBar, ResourceBar, RuneBar, BuffBars): Event handling, domain logic
+### Completed Refactoring
 
-## Architecture
+#### ECMFrame Mixin (Mixins\ECMFrame.lua)
+**Status:** Fully implemented
+
+**Responsibilities:**
+- Frame lifecycle (creation, hiding, showing)
+- Layout management (positioning, anchoring, sizing)
+- Border and background rendering
+- Config access through `self.GlobalConfig` and `self.ModuleConfig`
+- Chain anchoring logic via `GetNextChainAnchor`
+- Throttling and debouncing for layout updates
+
+**Key Design Decisions:**
+- Uses direct field access (`self.GlobalConfig`, `self.ModuleConfig`) rather than getter methods for simplicity
+- Layout caching in `_layoutCache` prevents redundant frame operations
+- `UpdateLayout()` is the single entry point for all layout changes
+- Supports two anchor modes: CHAIN (auto-stacking) and FREE (manual positioning)
+- Debouncing via `ScheduleLayoutUpdate()` prevents excessive updates during rapid events
+
+#### BarFrame Mixin (Mixins\BarFrame.lua)
+**Status:** Fully implemented
+
+**Responsibilities:**
+- StatusBar creation and management
+- Value display (current/max with optional text overlay)
+- Texture and color management
+- Tick mark system with multiple positioning strategies:
+  - Resource dividers (even spacing)
+  - Value-based markers (e.g., ability cost thresholds)
+- Font application
+
+**Key Design Decisions:**
+- `GetStatusBarValues()` is abstract - must be implemented by derived modules
+- Tick pools are reusable to avoid creating/destroying textures
+- Two tick layout methods: `LayoutResourceTicks` (evenly spaced) and `LayoutValueTicks` (positioned at specific values)
+- `Refresh()` calls parent `ECMFrame.Refresh()` for base logic, then updates bar-specific elements
+
+#### PowerBar (Bars\PowerBar.lua)
+**Status:** Fully migrated to new architecture
+
+**Implements:**
+- `GetStatusBarValues()` - returns UnitPower, UnitPowerMax
+- `ShouldShow()` - hides mana bars for non-caster DPS specs
+- `UpdateTicks()` - positions class/spec-specific ability cost markers
+- Mana percent display option
+
+**Event Handling:**
+- UNIT_POWER_UPDATE
+- UNIT_DISPLAYPOWER
+- Various class-specific events
+
+#### ResourceBar (Bars\ResourceBar.lua)
+**Status:** Fully migrated to new architecture
+
+**Implements:**
+- `GetStatusBarValues()` - handles combo points, chi, holy power, soul shards, essence
+- Special handling for Demon Hunter soul fragments (vengeance/devourer specs)
+- `ShouldShow()` - only shows when player has active discrete resource
+- Resource tick dividers
+
+**Event Handling:**
+- UNIT_POWER_UPDATE
+- Class/spec-specific events for soul fragments
+
+#### RuneBar (Bars\RuneBar.lua)
+**Status:** Mostly complete
+
+**Implements:**
+- Death Knight rune display
+- Individual rune cooldowns
+- Custom CreateFrame with 6 StatusBars (one per rune)
+
+**Notes:**
+- Doesn't fully fit the standard BarFrame pattern due to multiple StatusBars
+- May need further refinement
+
+### Partially Refactored
+
+#### BuffBars (Bars\BuffBars.lua)
+**Status:** Partially complete - uses ECMFrame but not BarFrame
+
+**Current State:**
+- Uses ECMFrame mixin for positioning and config access
+- Wraps Blizzard's BuffBarCooldownViewer instead of creating its own bars
+- Hooks Blizzard frames to apply custom styling
+- Implements per-bar color customization with class/spec persistence
+
+**Design Decisions:**
+- Does NOT use BarFrame because it manages Blizzard-created child bars, not a single StatusBar
+- Override `CreateFrame()` to return existing Blizzard viewer
+- Override `UpdateLayout()` to position viewer and style all visible children
+- Color system supports:
+  - Per-bar custom colors (stored per class/spec)
+  - Palette-based coloring
+  - Default fallback color
+
+**Known Issues:**
+- Blizzard frequently resets visibility settings when cooldowns update
+- Requires aggressive re-application of visibility settings via hooks
+- Edit mode reordering requires cache invalidation via `ResetStyledMarkers()`
+
+**Future Work:**
+- Consider extracting color management to a separate module
+- Improve hook reliability
+- Better handling of dynamic bar creation/destruction
+
+### Not Yet Refactored
+
+#### Mixins\PositionStrategy.lua
+**Status:** Likely to be removed
+
+**Reason:** The new ECMFrame mixin handles positioning directly with chain anchoring and free positioning. The PositionStrategy abstraction appears redundant.
+
+## Architecture Patterns
 
 ### Mixin Hierarchy
 
 ```
-ECMFrame (base) -> BarFrame (bar specialization) -> PowerBar/ResourceBar/RuneBar (concrete bars)
-ECMFrame (base) -> BuffBars (specialized, no BarFrame, uses Blizzard viewer)
+ECMFrame (base)
+├─> BarFrame (adds StatusBar management)
+│   ├─> PowerBar (player power: mana, energy, rage, etc.)
+│   ├─> ResourceBar (discrete resources: combo points, chi, etc.)
+│   └─> RuneBar (death knight runes)
+└─> BuffBars (wraps Blizzard viewer, doesn't use BarFrame)
 ```
 
-### Responsibility Separation
+### Method Override Pattern
 
-**ECMFrame** (`Mixins/ECMFrame.lua`)
-- Owns: Inner WoW frame, layout (positioning, anchor, border, background), config access, visibility control
-- Public API: `GetInnerFrame()`, `GetGlobalConfig()`, `GetConfigSection()`, `ShouldShow()`, `UpdateLayout()`, `SetHidden()`, `Refresh(force)`
-- Internal state: `_innerFrame`, `_config`, `_configKey`, `_layoutCache`, `_hidden`
-- **New:** Nil-safe for Border/Background (supports BuffBars which doesn't have these)
+Derived modules must call their immediate parent's implementation:
 
-**BarFrame** (`Mixins/BarFrame.lua`)
-- Owns: StatusBar creation, value updates, appearance (texture, colors), tick marks, text overlays
-- Public API: `CreateFrame()`, `GetStatusBarValues()` (abstract), `ThrottledRefresh()`, `Refresh(force)`
-- Public API (Ticks): `EnsureTicks()`, `HideAllTicks()`, `LayoutResourceTicks()`, `LayoutValueTicks()`
-- Public API (Text): Frame methods `SetText()`, `SetTextVisible()` (created in CreateFrame)
-- Internal state: `_lastUpdate`, tick pools (`tickPool`, etc.)
-- **Implemented:** Text overlay with font support, tick rendering
-
-**PowerBar** (`Bars/PowerBar.lua`)
-- Owns: Event registration, power-specific value calculations, class/spec visibility rules
-- Implements: `GetStatusBarValues()`, `ShouldShow()`, event handlers
-- Events: `UNIT_POWER_UPDATE` -> `OnUnitPowerUpdate` -> `ThrottledRefresh`
-
-**ResourceBar** (`Bars/ResourceBar.lua`)
-- Owns: Discrete resource tracking (combo points, chi, soul shards, DH souls), Devourer void meta state
-- Implements: `GetStatusBarValues()`, `ShouldShow()`, `Refresh()` (custom tick/text logic)
-- Events: `UNIT_AURA`, `UNIT_POWER_FREQUENT` -> dedicated handlers -> `ThrottledRefresh`
-- **Refactored:** Now uses new ECMFrame/BarFrame pattern
-
-**RuneBar** (`Bars/RuneBar.lua`)
-- Owns: DK rune tracking, fragmented bar display (one bar per rune), OnUpdate script
-- Implements: `CreateFrame()` (override, adds FragmentedBars), `ShouldShow()`, `Refresh()` (custom fragmented logic)
-- Events: `RUNE_POWER_UPDATE`, `RUNE_TYPE_UPDATE` -> dedicated handlers -> `OnUpdateThrottled`
-- **Refactored:** Now uses new ECMFrame pattern with BarFrame methods, custom CreateFrame
-
-**BuffBars** (`Bars/BuffBars.lua`)
-- Owns: Blizzard BuffBarCooldownViewer integration, child bar styling, color palettes, per-bar colors
-- Implements: `CreateFrame()` (override, returns Blizzard viewer), `ShouldShow()`, `UpdateLayout()` (custom child layout)
-- Events: `UNIT_AURA` -> `OnUnitAura` -> `ScheduleRescan`
-- **Refactored:** Now uses ECMFrame pattern, no BarFrame (uses Blizzard's built-in StatusBars)
-
-### Configuration Access Pattern
-
-Modules access config through ECMFrame methods:
-- `self:GetGlobalConfig()` - Returns `db.profile.global`
-- `self:GetConfigSection()` - Returns `db.profile[configKey]` (e.g., `db.profile.powerBar`)
-- Config key derived from module name: "PowerBar" -> "powerBar" (camelCase)
-
-### Chain Anchoring
-
-Bars anchor in fixed order: PowerBar -> ResourceBar -> RuneBar -> BuffBars
-
-- First visible bar anchors to `EssentialCooldownViewer`
-- Subsequent bars anchor to previous visible bar in chain
-- `GetNextChainAnchor()` (local in ECMFrame) walks backwards to find first visible predecessor
-- Chain mode uses dual-point anchoring (TOPLEFT/TOPRIGHT) to inherit width
-
-## Refactor Completion Status (2026-02-01)
-
-### Phase 1: Foundation ✅ Complete
-
-**ECMFrame Enhancements:**
-1. ✅ Made Border/Background access nil-safe (lines 232, 265)
-   - Allows BuffBars to use ECMFrame without Border/Background frames
-   - Pattern: `if frame.Border and borderChanged then`
-
-**BarFrame Restoration:**
-1. ✅ Restored tick helper function `GetTickPool()` (lines 21-29)
-2. ✅ Restored text overlay methods (lines 33-81)
-   - `AddTextOverlay(bar, profile)` - Creates TextFrame and TextValue FontString
-   - `bar:SetText(text)` - Sets text value
-   - `bar:SetTextVisible(shown)` - Shows/hides text overlay
-3. ✅ Restored tick methods (lines 87-246)
-   - `AttachTicks(bar)` - Creates TicksFrame container
-   - `EnsureTicks(count, parentFrame, poolKey)` - Manages tick pool
-   - `HideAllTicks(poolKey)` - Hides all ticks
-   - `LayoutResourceTicks(maxResources, color, tickWidth, poolKey)` - Even spacing for resources
-   - `LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)` - Specific value markers
-4. ✅ Added TicksFrame to `BarFrame:CreateFrame()` (lines 219-222)
-
-### Phase 2: ResourceBar ✅ Complete & Working
-
-**Full refactor to new mixin pattern:**
-1. ✅ Converted `ShouldShowResourceBar()` -> `ResourceBar:ShouldShow()` method override
-2. ✅ Created `ResourceBar:OnUnitAura(event, unit)` event handler with unit filtering
-3. ✅ Created `ResourceBar:OnUnitPower(event, unit)` event handler with unit filtering
-4. ✅ Registered events in OnEnable: `UNIT_AURA`, `UNIT_POWER_FREQUENT`
-5. ✅ Kept void meta state tracking (`_lastVoidMeta`, `_MaybeRefreshForVoidMetaStateChange()`)
-6. ✅ Simplified AddMixin call: `BarFrame.AddMixin(self, "ResourceBar")`
-7. ✅ Implemented `GetStatusBarValues()` override (returns current, max, displayValue, isFraction)
-8. ✅ Custom `Refresh()` with Devourer-specific text/tick logic
-
-**Additional Fixes (2026-02-01):**
-1. ✅ Fixed `Refresh()` to call `ECMFrame.Refresh()` instead of `BarFrame.Refresh()`
-   - Avoids duplicate value/color updates
-   - Prevents wrong colors from `GetColorForPlayerResource()` (doesn't know about DH souls)
-2. ✅ Added texture setting in `Refresh()`
-   - Calls `Util.GetTexture()` with config/global texture key
-3. ✅ Enhanced text overlay handling
-   - Normal resources: show current count
-   - Devourer: multiply by 5 for fragment count (0-30 or 0-35)
-   - Applies font settings via `Util.ApplyFont()`
-4. ✅ Added `showText = true` to defaults (Defaults.lua:182)
-   - Consistent with PowerBar settings
-5. ✅ Created `RESOURCEBAR_STATUS.md` documentation
-   - Complete API reference
-   - Configuration details
-   - Testing checklist
-
-**Key Features:**
-- Discrete power types: ComboPoints, Chi, HolyPower, SoulShards, Essence
-- DH soul fragment tracking (Havoc/Vengeance vs Devourer)
-- Devourer void meta state detection and color changes
-- Text overlay shows resource count (Devourer: multiply by 5)
-- Tick dividers between resources
-- Instant color change on void meta transitions
-
-### Phase 3: RuneBar ✅ Complete
-
-**Full refactor with CreateFrame override:**
-1. ✅ Overrode `RuneBar:CreateFrame()` to:
-   - Call `ECMFrame.CreateFrame(self)` for base frame
-   - Add StatusBar, TicksFrame, FragmentedBars array
-   - Attach OnUpdate script for continuous rune updates
-2. ✅ Implemented `RuneBar:ShouldShow()` - checks DK class
-3. ✅ Implemented `RuneBar:GetStatusBarValues()` - returns aggregated rune value
-4. ✅ Custom `Refresh()` manages fragmented bars and ticks
-5. ✅ Created dedicated event handlers: `OnRunePowerUpdate()`, `OnRuneTypeUpdate()`
-6. ✅ Cleanup OnUpdate script in `OnDisable()`
-7. ✅ Kept custom fragmented bar logic (one StatusBar per rune, sorted by ready/cooldown)
-
-**Key Features:**
-- Individual bars per rune (fragmented display)
-- Smart positioning: ready runes first, then sorting by cooldown remaining
-- Half-brightness for runes on cooldown
-- Pixel-perfect positioning to avoid sub-pixel gaps
-- OnUpdate-driven for smooth cooldown animations
-
-### Phase 4: BuffBars ✅ Complete
-
-**Refactor to ECMFrame pattern (no BarFrame):**
-1. ✅ Overrode `BuffBars:CreateFrame()` to return `_G["BuffBarCooldownViewer"]`
-2. ✅ Implemented `BuffBars:ShouldShow()` - checks `buffBars.enabled`
-3. ✅ Implemented `BuffBars:UpdateLayout()`:
-   - Calculates chain/independent positioning
-   - Applies positioning to viewer
-   - Styles all visible children with per-bar colors
-   - Calls `LayoutBars()` for vertical stacking
-4. ✅ Implemented `BuffBars:Refresh()` - delegates to UpdateLayout
-5. ✅ Converted config access to `self:GetConfigSection()`, `self:GetGlobalConfig()`
-6. ✅ Simplified OnEnable: `ECMFrame.AddMixin(self, "BuffBars")`
-7. ✅ Created `CalculateBuffBarsLayout(module)` for chain anchor logic
-8. ✅ Legacy method `UpdateLayoutAndRefresh(why)` now delegates to `UpdateLayout()`
-
-**Key Features:**
-- Uses Blizzard's BuffBarCooldownViewer (no frame creation)
-- Per-bar colors per class/spec with cache
-- Color palettes (Rainbow, Warm, Cool, Pastel, Neon, Earth)
-- Child bar styling (texture, colors, height, visibility)
-- Edit mode integration (re-layout on edit mode exit)
-- Automatic rescan for new buffs/debuffs
-
-### Phase 5: Text Overlay and Tick Implementation ✅ Complete
-
-**BarFrame Text Overlay:**
-1. ✅ Text overlay created in `BarFrame:CreateFrame()` (lines 281-302)
-   - TextFrame container with proper z-order (level +10 above StatusBar)
-   - TextValue FontString with center alignment
-   - `frame:SetText(text)` and `frame:SetTextVisible(shown)` methods attached to frame
-2. ✅ Text updated in `BarFrame:Refresh()` (lines 231-246)
-   - Format based on `isFraction` from `GetStatusBarValues()`: percentage vs integer
-   - Apply font settings using `Util.ApplyFont(frame.TextValue, profile)`
-   - Respect `configSection.showText` setting (defaults to true)
-3. ✅ Removed deprecated `AddTextOverlay()` helper function
-4. ✅ Removed deprecated `AttachTicks()` helper function (TicksFrame now created in CreateFrame)
-5. ✅ Removed leftover TODO comments about font application
-
-**PowerBar Tick Implementation:**
-1. ✅ Restored `UpdateTicks()` method (lines 41-57)
-   - Uses `LayoutValueTicks()` for class/spec-specific tick marks
-   - Respects tick configuration (color, width, mappings)
-   - Creates ticks on `frame.TicksFrame` for proper organization
-2. ✅ Added `PowerBar:Refresh()` override (lines 70-84)
-   - Calls `BarFrame.Refresh()` for standard updates
-   - Calls `UpdateTicks()` for class/spec tick rendering
-3. ✅ Removed large commented-out Refresh implementation
-
-**BarFrame Tick Method Fixes:**
-1. ✅ Fixed `LayoutResourceTicks()` to use `self:GetInnerFrame()`
-   - Now gets frame width/height from actual frame, not module
-   - Anchors ticks to frame instead of module
-   - Fixes bug where module was used instead of frame
-2. ✅ Fixed `LayoutValueTicks()` to use `self:GetInnerFrame()`
-   - Gets frame height from actual frame for proper sizing
-   - Maintains statusBar parameter for positioning (ticks anchor to StatusBar)
-3. ✅ Created `TICK_API.md` documentation
-   - Comprehensive API reference for tick rendering
-   - Examples for ResourceBar (even spacing) and PowerBar (value-based)
-   - Migration notes and implementation details
-
-**Key Features:**
-- Text displays current/max or percentage based on power type
-- Font respects global settings (font, fontSize, fontOutline, fontShadow)
-- Uses LibSharedMedia-3.0 for font resolution
-- Text visibility controlled by `showText` config (per-module)
-- PowerBar can show tick marks at specific power values (e.g., energy thresholds)
-
-## Design Decisions
-
-### 1. Nil-Safe Border/Background in ECMFrame
-
-**Decision:** Check for `frame.Border` and `frame.Background` existence before accessing them.
-
-**Rationale:**
-- BuffBars uses Blizzard's existing viewer frame, which doesn't have our custom Border/Background
-- ECMFrame should be flexible enough to work with any frame type
-- Allows ECMFrame to be truly generic
-
-**Implementation:**
 ```lua
--- ECMFrame.lua:232
-local border = frame.Border
-if border and borderChanged then
-    -- border logic
+-- CORRECT
+function PowerBar:Refresh(force)
+    local result = BarFrame.Refresh(self, force)
+    if not result then return false end
+
+    -- PowerBar-specific refresh logic
+    self:UpdateTicks(...)
+    return true
 end
 
--- ECMFrame.lua:265
-if bgColorChanged and frame.Background then
-    frame.Background:SetColorTexture(...)
+-- WRONG - skipping BarFrame
+function PowerBar:Refresh(force)
+    local result = ECMFrame.Refresh(self, force)  -- SKIP
+    -- ...
 end
 ```
 
-### 2. Tick and Text Methods Restored to BarFrame
+### Config Access Pattern
 
-**Decision:** Uncomment and restore all tick and text overlay methods in BarFrame.
-
-**Rationale:**
-- ResourceBar needs ticks for resource dividers
-- RuneBar needs ticks for rune dividers
-- ResourceBar (Devourer) needs text overlay for fragment count
-- These are core BarFrame features, not optional extras
-
-**Trade-offs:**
-- ✅ ResourceBar and RuneBar can now work properly
-- ✅ DRY - shared tick logic instead of per-module duplication
-- ❌ Increased complexity in BarFrame
-- ❌ Modules must manage tick pools themselves
-
-### 3. CreateFrame Override Pattern for Special Cases
-
-**Decision:** Allow modules to override `CreateFrame()` when they need custom frame structure.
-
-**Examples:**
-- **RuneBar:** Adds FragmentedBars array and OnUpdate script
-- **BuffBars:** Returns existing Blizzard frame instead of creating new one
-
-**Rationale:**
-- Not all modules fit the standard BarFrame pattern
-- Overriding CreateFrame gives maximum flexibility
-- Still get benefits of ECMFrame (layout, config, visibility)
-
-**Implementation:**
 ```lua
--- RuneBar.lua
-function RuneBar:CreateFrame()
-    local frame = ECMFrame.CreateFrame(self)  -- Get base frame
-    -- Add custom elements
-    frame.FragmentedBars = {}
-    frame:SetScript("OnUpdate", ...)
-    return frame
-end
+-- CORRECT
+local height = self.ModuleConfig.height or self.GlobalConfig.barHeight
+
+-- WRONG
+local profile = ECM.db.profile
+local height = profile.powerBar.height or profile.global.barHeight
 ```
 
-### 4. Event Handler Pattern
+### Layout vs Refresh Separation
 
-**Decision:** Dedicated event handlers with event-specific filtering, then delegate to ThrottledRefresh.
+**UpdateLayout()** handles:
+- Positioning (SetPoint)
+- Sizing (SetWidth, SetHeight)
+- Border/background styling
+- Anchor chain resolution
+- Calls Refresh() at the end
 
+**Refresh()** handles:
+- StatusBar min/max/value
+- StatusBar color and texture
+- Text overlay content and visibility
+- Tick positioning (values may change without layout changing)
+
+This separation allows:
+- Layout changes without recalculating values
+- Value updates without repositioning frames
+- Better performance through caching
+
+## Trade-offs and Decisions
+
+### Direct Field Access vs Getters
+**Decision:** Use direct field access (`self.GlobalConfig`)
 **Rationale:**
-- Keeps Refresh method signature clean (no event params)
-- Event filtering is domain logic (belongs in module)
-- Different events may need different filtering (unit, source, etc.)
+- Simpler, less boilerplate
+- Config is read-only during normal operation
+- Performance (no function call overhead)
+**Trade-off:** Less encapsulation, but configs are simple tables
 
-**Implementation:**
-```lua
-function ResourceBar:OnUnitAura(event, unit)
-    if unit ~= "player" then return end
-    -- Special logic for state changes
-    if self:_MaybeRefreshForVoidMetaStateChange() then return end
-    self:ThrottledRefresh()
-end
-```
-
-### 5. Text Overlay in CreateFrame
-
-**Decision:** Create text overlay directly in `BarFrame:CreateFrame()` instead of using a separate `AddTextOverlay()` helper.
-
+### Layout Caching
+**Decision:** Cache layout parameters in `_layoutCache` and compare before applying
 **Rationale:**
-- Text overlay is a core feature of BarFrame, not an optional add-on
-- Creating it in CreateFrame ensures it's always available
-- Simplifies the API - no need to call separate setup methods
-- Methods (`SetText`, `SetTextVisible`) attached to frame, not module
+- SetPoint/ClearAllPoints are expensive
+- Layout rarely changes compared to value updates
+- Prevents visual flickering
+**Trade-off:** More memory, more complex code, but significant performance gain
 
-**Implementation:**
-```lua
--- BarFrame.lua:CreateFrame
-frame.TextFrame = CreateFrame("Frame", nil, frame)
-frame.TextFrame:SetFrameLevel(frame.StatusBar:GetFrameLevel() + 10)
-frame.TextValue = frame.TextFrame:CreateFontString(...)
-
-function frame:SetText(text)
-    if self.TextValue then
-        self.TextValue:SetText(text)
-    end
-end
-```
-
-**Font Application:**
-- Uses `Util.ApplyFont(fontString, profile)` which handles LSM resolution
-- Applied every refresh to respect dynamic config changes
-- Global settings: `font`, `fontSize`, `fontOutline`, `fontShadow`
-
-### 6. BuffBars Integration
-
-**Decision:** Use ECMFrame directly, skip BarFrame, override UpdateLayout for child management.
-
+### Debouncing vs Throttling
+**Decision:** Use debouncing for layout, throttling for refresh
 **Rationale:**
-- BuffBars doesn't manage its own StatusBar (Blizzard does)
-- BuffBars is about positioning and styling children, not updating a single bar
-- Still benefits from ECMFrame (chain anchoring, config access, visibility)
+- Layout changes should settle before applying (debounce)
+- Value refreshes should update regularly but not spam (throttle)
+**Trade-off:** Slight delay in layout response, but cleaner event handling
 
-**Trade-offs:**
-- ✅ Aligns with new architecture
-- ✅ Registered in ECM.RegisterFrame for global layout updates
-- ✅ Can participate in chain anchoring
-- ❌ More complex than standard bars (child management, edit mode hooks)
-- ❌ Can't use BarFrame utilities (but doesn't need them)
+### BuffBars Hook Pattern
+**Decision:** Hook Blizzard frames rather than recreating
+**Rationale:**
+- Blizzard handles buff tracking and cooldown math
+- Avoids reimplementing complex aura logic
+- Respects user's edit mode configuration
+**Trade-off:** Hook reliability issues, requires defensive coding
 
-### Phase 6: Layout.lua (ViewerHook Replacement) ✅ Complete
+## Future Considerations
 
-**Migrated all ViewerHook functionality to Layout.lua:**
-1. ✅ Created comprehensive event handling system
-   - 11 events: mount, rest, combat, zone, spec, target, shapeshift
-   - Event-specific delays (0-0.4s) for smooth transitions
-   - Combat state tracking for rest-area hiding logic
-2. ✅ Implemented global hidden state management
-   - `SetGloballyHidden(hidden, reason)` controls all frames
-   - Hide reasons: "mounted", "rest", "cvar"
-   - Priority: CVar check -> mounted check -> rest check
-3. ✅ Dual frame type management
-   - ECMFrames: Uses `frame:SetHidden()` for clean integration
-   - Blizzard frames: Direct show/hide on 4 viewers
-4. ✅ Debounced layout updates
-   - `ScheduleLayoutUpdate(delay)` prevents redundant updates
-   - `UpdateAllLayouts()` calls `UpdateLayout()` on all registered ECMFrames
-5. ✅ Removed ViewerHook.lua entirely
-   - Updated Options.lua to use `ECM.ScheduleLayoutUpdate()`
-   - Removed TOC entry for ViewerHook
-   - Combat fade feature deferred (can be added later)
-6. ✅ Updated documentation
-   - CLAUDE.md reflects new Layout.lua responsibilities
-   - Removed ViewerHook from "files to be removed" list
-
-**Key Features:**
-- Hide when mounted (configurable)
-- Hide when resting out of combat (configurable)
-- Hide when cooldownViewerEnabled CVar is false
-- Event-driven updates with appropriate delays
-- Automatic registration via ECMFrame.AddMixin
-- Clean separation: Layout.lua handles global state, ECMFrame handles per-frame logic
-
-**Configuration:**
-- `profile.hideWhenMounted` - Hide all frames when mounted
-- `profile.hideOutOfCombatInRestAreas` - Hide when resting and not in combat
-- Settings accessed directly from profile (not profile.global)
-
-**Design Notes:**
-- ViewerHook was 509 lines, Layout.lua is ~200 lines (cleaner, focused)
-- Combat fade feature not migrated (visual polish, can be added later)
-- No dependency on AceEvent-3.0 (uses plain event frame)
-- Blizzard frames managed alongside ECMFrames for consistency
-
-## Next Steps
-
-### Immediate Testing
-1. Test PowerBar in-game - validate basic functionality
-2. Test ResourceBar in-game:
-   - Combo points for Rogue/Feral
-   - Soul shards for Warlock
-   - DH soul fragments (Havoc/Vengeance)
-   - Devourer void meta state changes
-3. Test RuneBar in-game:
-   - DK rune display
-   - Fragmented bar positioning
-   - Cooldown animations
-4. Test BuffBars in-game:
-   - Blizzard viewer integration
-   - Chain anchoring after RuneBar
-   - Per-bar colors
-   - Edit mode compatibility
-
-### Short-term
-1. Remove deprecated files:
-   - `Mixins/PositionStrategy.lua` (replaced by ECMFrame layout)
-2. Optional enhancements:
-   - Add combat fade feature to Layout.lua (visual polish)
-   - Extract chain anchor logic to ECMFrame (currently local function)
-
-### Long-term
-1. Consider extracting chain anchor logic to ECMFrame (currently local function)
-2. Design font application pattern (LSM integration)
-3. Consider tick renderer as separate mixin vs inline BarFrame methods
-4. Evaluate if `GetStatusBarValues()` abstraction is worth the complexity
-
-## Open Questions
-
-1. **Font Application:** Where should fonts be configured and applied?
-   - Current: BarHelpers have placeholder, not implemented
-   - Need LSM integration for texture/font selection
-   - Should fonts be per-module or global only?
-
-2. **Chain Order Management:**
-   - Currently hardcoded in Constants.CHAIN_ORDER
-   - Should modules be able to register themselves in order?
-   - How to handle dynamic enabling/disabling?
-
-3. **Layout.lua Design:**
-   - How to trigger global layout updates (mounted, settings change, etc.)?
-   - Should Layout.lua own ECM.RegisterFrame() or vice versa?
-   - Event registration pattern for global state changes?
-
-## Known Issues
-
-None at this time. All modules have been successfully refactored to the new pattern.
-
-## Testing Checklist
-
-**PowerBar:**
-- [ ] Appears when entering world
-- [ ] Updates when power changes
-- [ ] Hides for DPS mana users (except Mage/Warlock/Druid)
-- [ ] Anchors correctly to EssentialCooldownViewer
-- [ ] Respects global updateFrequency throttling
-- [ ] Shows correct colors for different power types
-- [ ] Text overlay displays current power value in center
-- [ ] Text shows percentage for mana when showManaAsPercent enabled
-- [ ] Text respects global font settings
-- [ ] Text visibility controlled by showText config
-- [ ] Tick marks appear at configured power thresholds (if configured)
-
-**ResourceBar:**
-- [ ] Shows combo points for Rogue/Feral
-- [ ] Shows chi for Monk
-- [ ] Shows soul shards for Warlock
-- [ ] Shows DH soul fragments (Havoc/Vengeance)
-- [ ] Shows Devourer fragments with void meta color change
-- [ ] Tick marks appear between resources
-- [ ] Text overlay shows for Devourer
-
-**RuneBar:**
-- [ ] Shows for Death Knight only
-- [ ] Displays 6 fragmented bars
-- [ ] Ready runes appear first (left side)
-- [ ] Cooldown runes sorted by time remaining
-- [ ] Cooldown animation is smooth
-- [ ] Half-brightness for runes on cooldown
-- [ ] Tick marks appear between runes
-
-**BuffBars:**
-- [ ] Uses Blizzard BuffBarCooldownViewer
-- [ ] Anchors in chain after RuneBar
-- [ ] Per-bar colors apply correctly
-- [ ] Edit mode changes persist
-- [ ] New buffs/debuffs trigger rescan
-- [ ] Child bars stack vertically
+1. **Extract color management** - BuffBars color system could be generalized for other modules
+2. **Tick system refinement** - Consider separating tick layout from BarFrame into a dedicated helper
+3. **Layout.lua integration** - Ensure Layout.lua properly coordinates all ECMFrames
+4. **PositionStrategy removal** - Verify no dependencies before deleting
+5. **Error handling** - Add more defensive nil checks in hooks
+6. **Documentation** - Add inline examples for complex methods (e.g., GetNextChainAnchor)
