@@ -412,7 +412,7 @@ function BuffBars:UpdateLayout()
 
     -- Check visibility first
     if not self:ShouldShow() then
-        Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
+        -- Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
         viewer:Hide()
         return false
     end

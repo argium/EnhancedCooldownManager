@@ -208,10 +208,10 @@ end
 function BarFrame:Refresh(force)
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
-        Util.Log(self.Name, "BarFrame:Refresh", "Skipping refresh")
+        -- Util.Log(self.Name, "BarFrame:Refresh", "Skipping refresh")
         return false
     end
-    Util.Log(self.Name, "BarFrame:Refresh", "Starting refresh")
+    Util.Log(self.Name, "BarFrame:Refresh", "Start")
 
     local frame = self.InnerFrame
     local globalConfig = self.GlobalConfig

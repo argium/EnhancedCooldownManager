@@ -157,7 +157,7 @@ end
 --- @return table|nil params Layout params if shown, nil if hidden
 function ECMFrame:ApplyFramePosition(frame)
     if not self:ShouldShow() then
-        Util.Log(self.Name, "ECMFrame:ApplyFramePosition", "ShouldShow returned false, hiding frame")
+        -- Util.Log(self.Name, "ECMFrame:ApplyFramePosition", "ShouldShow returned false, hiding frame")
         frame:Hide()
         return nil
     end
@@ -295,7 +295,7 @@ end
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
 function ECMFrame:Refresh(force)
     if not force and not self:ShouldShow() then
-        Util.Log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
+        -- Util.Log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
         return false
     end
 
