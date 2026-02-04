@@ -66,11 +66,11 @@ function ECMFrame:GetNextChainAnchor(frameName)
     end
 
     -- Work backwards to identify the first valid frame to anchor to.
-    -- Valid frames are those that are enabled, visible, and using chain anchor mode.
+    -- Valid frames are those that are enabled, visible, should be shown, and using chain anchor mode.
     for i = stopIndex - 1, 1, -1 do
         local barName = C.CHAIN_ORDER[i]
         local barModule = ECM:GetModule(barName, true)
-        if barModule and barModule:IsEnabled() then
+        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local moduleConfig = barModule.ModuleConfig
             local isChainMode = moduleConfig and moduleConfig.anchorMode == C.ANCHORMODE_CHAIN
             local barFrame = barModule.InnerFrame
@@ -280,7 +280,7 @@ function ECMFrame:UpdateLayout()
         bgColor = bgColor,
     })
 
-    self:Refresh()
+    self:ThrottledRefresh()
     return true
 end
 
