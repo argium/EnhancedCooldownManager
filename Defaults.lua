@@ -228,7 +228,7 @@ local defaults = {
             },
         },
         trinketIcons = {
-            enabled = true,
+            enabled = false,
             showTrinket1 = true,
             showTrinket2 = true,
         },

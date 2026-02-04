@@ -149,29 +149,57 @@ local function RestoreViewerPosition(self)
     utilityViewer:SetPoint(orig[1], orig[2], orig[3], orig[4], orig[5])
 end
 
---- Gets the icon size from UtilityCooldownViewer's children.
---- Falls back to DEFAULT_TRINKET_ICON_SIZE if viewer is unavailable.
---- The Blizzard icons use a border overlay, so we measure the visual size
---- (including overlay) and derive the base icon size from that.
----@return number iconSize The icon size in pixels.
-local function GetUtilityViewerIconSize()
+--- Gets the icon size, spacing, and scale from UtilityCooldownViewer.
+--- Falls back to defaults if viewer is unavailable.
+--- Measures actual icon frames to respect Edit Mode settings.
+--- Returns base (unscaled) sizes - caller should apply scale separately.
+---@return number iconSize The base icon size in pixels (unscaled).
+---@return number spacing The base spacing between icons in pixels (unscaled).
+---@return number scale The viewer's scale factor from Edit Mode.
+local function GetUtilityViewerLayout()
     local viewer = _G[C.VIEWER_UTILITY]
     if not viewer or not viewer:IsShown() then
-        return C.DEFAULT_TRINKET_ICON_SIZE
+        return C.DEFAULT_TRINKET_ICON_SIZE, C.DEFAULT_TRINKET_ICON_SPACING, 1.0
     end
 
+    -- Get the viewer's scale (affected by Edit Mode "Icon Size" setting)
+    local viewerScale = viewer:GetScale() or 1.0
+
     local children = { viewer:GetChildren() }
+    local iconSize = nil
+    local spacing = C.DEFAULT_TRINKET_ICON_SPACING
+
+    -- Find first visible icon to get size (this is the scaled size)
     for _, child in ipairs(children) do
         if child and child:IsShown() then
             local size = child:GetWidth()
             if size and size > 0 then
-                -- Blizzard's overlay extends beyond the base frame, making icons
-                -- appear larger. Scale up to match the visual appearance.
-                return size * C.TRINKET_ICON_BORDER_SCALE
+                -- Divide by scale to get the base size
+                iconSize = size / viewerScale
+                break
             end
         end
     end
-    return C.DEFAULT_TRINKET_ICON_SIZE
+
+    -- Calculate spacing by measuring gap between first two icons
+    if #children >= 2 then
+        local child1 = children[1]
+        local child2 = children[2]
+        if child1 and child2 and child1:IsShown() and child2:IsShown() then
+            local left1 = child1:GetLeft()
+            local left2 = child2:GetLeft()
+            local width1 = child1:GetWidth()
+            if left1 and left2 and width1 then
+                -- Gap is in screen coordinates, so divide by scale to get base spacing
+                local gap = (left2 - (left1 + width1)) / viewerScale
+                if gap > 0 then
+                    spacing = gap
+                end
+            end
+        end
+    end
+
+    return iconSize or C.DEFAULT_TRINKET_ICON_SIZE, spacing, viewerScale
 end
 
 --------------------------------------------------------------------------------
@@ -239,8 +267,10 @@ function TrinketIcons:UpdateLayout()
     -- Get usable trinkets
     local trinkets = GetUsableTrinkets(moduleConfig)
     local numTrinkets = #trinkets
-    local iconSize = GetUtilityViewerIconSize()
-    local spacing = C.DEFAULT_TRINKET_ICON_SPACING
+    local iconSize, spacing, viewerScale = GetUtilityViewerLayout()
+
+    -- Apply the same scale as the viewer to match Edit Mode settings
+    frame:SetScale(viewerScale)
 
     -- Hide all existing icons first
     for _, icon in ipairs(frame._iconPool) do
@@ -254,7 +284,7 @@ function TrinketIcons:UpdateLayout()
         return false
     end
 
-    -- Calculate container size
+    -- Calculate container size (using base sizes, scale is applied separately)
     local totalWidth = (numTrinkets * iconSize) + ((numTrinkets - 1) * spacing)
     local totalHeight = iconSize
     frame:SetSize(totalWidth, totalHeight)
