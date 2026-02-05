@@ -56,7 +56,7 @@ local function EnsureColorStorage(cfg)
 
     if not cfg.colors then
         cfg.colors = {
-            perBar = {},
+            perSpell = {},
             cache = {},
             defaultColor = C.BUFFBARS_DEFAULT_COLOR,
             selectedPalette = nil,
@@ -64,8 +64,8 @@ local function EnsureColorStorage(cfg)
     end
 
     local colors = cfg.colors
-    if not colors.perBar then
-        colors.perBar = {}
+    if not colors.perSpell then
+        colors.perSpell = {}
     end
     if not colors.cache then
         colors.cache = {}
@@ -128,6 +128,32 @@ local function GetBarColor(barIndex, cfg)
     return cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
 end
 
+--- Returns color for bar at index for current class/spec, or palette/default if not set.
+---@param spellName string
+---@param cfg table|nil
+---@return ECM_Color
+local function GetSpellColor(spellName, cfg)
+    if not cfg or not cfg.colors.perSpell then
+        return C.BUFFBARS_DEFAULT_COLOR
+    end
+
+    local classID, specID = GetCurrentClassSpec()
+    local colors = cfg.colors.perSpell
+    if classID and specID and colors[classID] and colors[classID][specID] then
+        local c = colors[classID][specID][spellName]
+        if c then
+            return c
+        end
+    end
+
+    local selectedPalette = cfg.colors.selectedPalette
+    if selectedPalette and PALETTES[selectedPalette] then
+        return GetPaletteColor(barIndex, selectedPalette)
+    end
+
+    return cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
+end
+
 --- Updates bar cache with current bar metadata for Options UI.
 ---@param barIndex number
 ---@param spellName string|nil
@@ -147,6 +173,7 @@ local function UpdateBarCache(barIndex, spellName, cfg)
     cache[classID][specID] = cache[classID][specID] or {}
 
     cache[classID][specID][barIndex] = {
+        color = GetSpellColor(spellName, cfg),
         spellName = spellName,
         lastSeen = GetTime(),
     }
@@ -729,6 +756,8 @@ end
 function BuffBars:OnEnable()
     ECMFrame.AddMixin(self, "BuffBars")
 
+    self:MigrateToPerSpellColorsIfNeeded()
+
     -- Register events with dedicated handlers
     self:RegisterEvent("UNIT_AURA", "OnUnitAura")
 
@@ -746,4 +775,62 @@ end
 function BuffBars:OnDisable()
     self:UnregisterAllEvents()
     Util.Log("BuffBars", "Disabled")
+end
+
+--------------------------------------------------------------------------------
+-- Module Lifecycle
+--------------------------------------------------------------------------------
+
+function BuffBars:MigrateToPerSpellColorsIfNeeded()
+    local cfg, classID, specID = GetColorContext(self)
+    if not cfg or not classID or not specID then
+        return
+    end
+
+    local perBar = cfg.colors.perBar
+    local cache = cfg.colors.cache
+
+    if not cfg.colors.perSpell then
+        cfg.colors.perSpell = {}
+    end
+
+    if not cfg.colors.perSpell[classID] then
+    cfg.colors.perSpell[classID] = {}
+    end
+
+    if not cfg.colors.perSpell[classID][specID] then
+        cfg.colors.perSpell[classID][specID] = {}
+    end
+
+    if not cache[classID] or not cache[classID][specID] or not perBar[classID] or not perBar[classID][specID] then
+        return
+    end
+
+    for i,v in ipairs(cache[classID][specID]) do
+        if v.color then
+            return
+        end
+
+        print("Migrating cached bar to per-spell colors", i,v.spellName)
+
+        local bc = perBar[classID][specID][i]
+
+        cfg.colors.perSpell[classID][specID][v.spellName] = bc
+
+        cache[classID][specID][i] = {
+            lastSeen = v.lastSeen,
+            spellName = v.spellName,
+            color = {
+                a = bc.a,
+                r = bc.r,
+                g = bc.g,
+                b = bc.b
+            }
+        }
+     end
+
+     perBar[classID][specID] = nil
+     if not perBar[classID][1] then
+        perBar[classID] = nil
+    end
 end
