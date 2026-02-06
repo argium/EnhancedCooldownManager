@@ -240,8 +240,12 @@ local function GetUtilityViewerLayout()
             if prev then
                 local gap = child:GetLeft() - prev:GetRight()
                 if gap > 0 then
-                    -- Convert screen-space gap to base coords
-                    spacing = gap / (child:GetEffectiveScale())
+                    -- Convert screen-space gap to icon-local coords.
+                    -- Using effective scale here over-inflates spacing due to UI/root scale.
+                    local iconScale = child:GetScale() or 1.0
+                    if iconScale > 0 then
+                        spacing = gap / iconScale
+                    end
                 end
                 break
             end
