@@ -217,10 +217,18 @@ function BarFrame:Refresh(force)
     local globalConfig = self.GlobalConfig
     local moduleConfig = self.ModuleConfig
 
-    -- Values
+    -- Values: apply min/max before value so startup/transient states do not
+    -- render full when current is zero.
     local current, max, displayValue, isFraction = self:GetStatusBarValues()
-    frame.StatusBar:SetValue(current)
+    if max == nil then
+        max = 1
+    end
+    if current == nil then
+        current = 0
+    end
+
     frame.StatusBar:SetMinMaxValues(0, max)
+    frame.StatusBar:SetValue(current)
 
     -- Text overlay
     local showText = moduleConfig.showText ~= false
@@ -228,7 +236,7 @@ function BarFrame:Refresh(force)
         frame:SetText(displayValue)
 
         -- Apply font settings
-        Util.ApplyFont(frame.TextValue, ECM.db and ECM.db.profile)
+        Util.ApplyFont(frame.TextValue, globalConfig)
     end
     frame:SetTextVisible(showText)
 

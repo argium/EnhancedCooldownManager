@@ -7,6 +7,7 @@ local ADDON_NAME, ns = ...
 local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
 ns.Addon = ECM
 local Util = ns.Util
+local C = ns.Constants
 local LSM = LibStub("LibSharedMedia-3.0", true)
 ECM.Log = Util.Log
 ECM.Print = Util.Print
@@ -19,6 +20,35 @@ local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 assert(ns.defaults, "Defaults.lua must be loaded before ECM.lua")
 assert(ns.AddToTraceLog and ns.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
 assert(ns.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
+
+local function RegisterAddonCompartmentEntry()
+    if ECM._addonCompartmentRegistered then
+        return
+    end
+
+    if not (AddonCompartmentFrame and type(AddonCompartmentFrame.RegisterAddon) == "function") then
+        return
+    end
+
+    local text = ADDON_NAME
+    local sparkle = ns.SparkleUtil
+    if sparkle and sparkle.GetText then
+        text = sparkle.GetText(text)
+    end
+
+    local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
+        text = text,
+        icon = C.ADDON_ICON_TEXTURE,
+        notCheckable = true,
+        func = function()
+            ECM:ChatCommand("options")
+        end,
+    })
+
+    if ok then
+        ECM._addonCompartmentRegistered = true
+    end
+end
 
 --- Shows a confirmation popup and reloads the UI on accept.
 --- ReloadUI is blocked in combat.
@@ -148,7 +178,7 @@ function ECM:ShowImportDialog()
         local editBox = GetDialogEditBox(self)
         local input = editBox:GetText() or ""
 
-        if input:trim() == "" then
+        if strtrim(input) == "" then
             ECM:Print("Import cancelled: no string provided")
             return
         end
@@ -193,13 +223,13 @@ local function ParseToggleArg(arg, current)
     return nil, "Usage: expected on|off|toggle"
 end
 
---- Handles slash command input for toggling ECM bars.
+--- Handles slash command input.
 ---@param input string|nil
 function ECM:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        Util.Print("Commands: /ecm on|off|toggle | /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
+        Util.Print("Commands: /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
         return
     end
 
@@ -367,8 +397,6 @@ function ECM:RunMigrations(profile)
             dst.perBar = dst.perBar or src.colors or {}
             dst.cache = dst.cache or src.cache or {}
             dst.defaultColor = dst.defaultColor or src.defaultColor
-            dst.selectedPalette = dst.selectedPalette or src.selectedPalette
-
             profile.buffBarColors = nil
         end
 
@@ -453,6 +481,33 @@ function ECM:RunMigrations(profile)
 
         profile.schemaVersion = 4
     end
+
+    if profile.schemaVersion < 5 then
+        -- Migration: combatFade -> global.outOfCombatFade
+        local legacyCombatFade = profile.combatFade
+        if legacyCombatFade then
+            profile.global = profile.global or {}
+            profile.global.outOfCombatFade = profile.global.outOfCombatFade or {}
+
+            local fadeConfig = profile.global.outOfCombatFade
+            if legacyCombatFade.enabled ~= nil then
+                fadeConfig.enabled = legacyCombatFade.enabled
+            end
+            if legacyCombatFade.opacity ~= nil then
+                fadeConfig.opacity = legacyCombatFade.opacity
+            end
+            if legacyCombatFade.exceptInInstance ~= nil then
+                fadeConfig.exceptInInstance = legacyCombatFade.exceptInInstance
+            end
+            if legacyCombatFade.exceptIfTargetCanBeAttacked ~= nil then
+                fadeConfig.exceptIfTargetCanBeAttacked = legacyCombatFade.exceptIfTargetCanBeAttacked
+            end
+
+            profile.combatFade = nil
+        end
+
+        profile.schemaVersion = 5
+    end
 end
 
 function ECM:OnInitialize()
@@ -476,19 +531,34 @@ end
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
 function ECM:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
+    RegisterAddonCompartmentEntry()
+    local profile = self.db and self.db.profile
 
     local moduleOrder = {
         "PowerBar",
         "ResourceBar",
         "RuneBar",
         "BuffBars",
+        "ItemIcons",
     }
 
     for _, moduleName in ipairs(moduleOrder) do
         local module = self:GetModule(moduleName, true)
         assert(module, "Module not found: " .. moduleName)
-        if not module:IsEnabled() then
-            self:EnableModule(moduleName)
+
+        local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
+        local moduleConfig = profile and profile[configKey]
+        local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
+        if moduleName == C.ITEMICONS then
+            shouldEnable = moduleConfig and moduleConfig.enabled == true
+        end
+
+        if shouldEnable then
+            if not module:IsEnabled() then
+                self:EnableModule(moduleName)
+            end
+        elseif module:IsEnabled() then
+            self:DisableModule(moduleName)
         end
     end
 end

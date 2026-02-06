@@ -244,14 +244,21 @@ function RuneBar:OnEnable()
         return
     end
 
-    BarFrame.AddMixin(self, "RuneBar")
+    if not self.IsECMFrame then
+        BarFrame.AddMixin(self, "RuneBar")
+    elseif ECM.RegisterFrame then
+        ECM.RegisterFrame(self)
+    end
     self:RegisterEvent("RUNE_POWER_UPDATE", "ThrottledRefresh")
 end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
+    if self.IsECMFrame and ECM.UnregisterFrame then
+        ECM.UnregisterFrame(self)
+    end
 
-    local frame = self._innerFrame
+    local frame = self.InnerFrame
     if frame then
         frame:SetScript("OnUpdate", nil)
     end

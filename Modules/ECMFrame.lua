@@ -66,21 +66,49 @@ function ECMFrame:GetNextChainAnchor(frameName)
     end
 
     -- Work backwards to identify the first valid frame to anchor to.
-    -- Valid frames are those that are enabled, visible, should be shown, and using chain anchor mode.
+    -- Valid frames are those that are enabled, should be shown, in chain mode,
+    -- and have an inner frame available. Visibility is intentionally not required
+    -- because layout updates can occur while frames are transitioning hide/show.
+    local debugCandidates = {}
     for i = stopIndex - 1, 1, -1 do
         local barName = C.CHAIN_ORDER[i]
         local barModule = ECM:GetModule(barName, true)
-        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
-            local moduleConfig = barModule.ModuleConfig
-            local isChainMode = moduleConfig and moduleConfig.anchorMode == C.ANCHORMODE_CHAIN
-            local barFrame = barModule.InnerFrame
-            if isChainMode and barFrame and barFrame:IsVisible() then
-                return barFrame, false
-            end
+        local isEnabled = barModule and barModule:IsEnabled() or false
+        local shouldShow = barModule and barModule:ShouldShow() or false
+        local moduleConfig = barModule and barModule.ModuleConfig
+        local isChainMode = moduleConfig and moduleConfig.anchorMode == C.ANCHORMODE_CHAIN
+        local barFrame = barModule and barModule.InnerFrame
+        local hasFrame = barFrame ~= nil
+        local isVisible = barFrame and barFrame:IsVisible() or false
+
+        debugCandidates[#debugCandidates + 1] = {
+            barName = barName,
+            isEnabled = isEnabled,
+            shouldShow = shouldShow,
+            isChainMode = isChainMode,
+            hasFrame = hasFrame,
+            isVisible = isVisible,
+        }
+
+        if isEnabled and shouldShow and isChainMode and hasFrame then
+            Util.Log(self.Name, "GetNextChainAnchor selected", {
+                frameName = frameName,
+                stopIndex = stopIndex,
+                selected = barName,
+                selectedVisible = isVisible,
+                candidates = debugCandidates,
+            })
+            return barFrame, false
         end
     end
 
     -- If none of the preceeding frames in the chain are valid, anchor to the viewer as the first.
+    Util.Log(self.Name, "GetNextChainAnchor fallback first", {
+        frameName = frameName,
+        stopIndex = stopIndex,
+        selected = C.VIEWER,
+        candidates = debugCandidates,
+    })
     return _G[C.VIEWER] or UIParent, true
 end
 

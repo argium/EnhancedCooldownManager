@@ -109,7 +109,7 @@ end
 ---@return table|nil data The decoded data, or nil on failure
 ---@return string|nil errorMessage Error message if decoding failed
 function ImportExport.DecodeData(importString)
-    if not importString or importString:trim() == "" then
+    if not importString or strtrim(importString) == "" then
         return nil, "Import string is empty"
     end
 

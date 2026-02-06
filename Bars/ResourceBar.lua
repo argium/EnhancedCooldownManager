@@ -159,7 +159,11 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
-    BarFrame.AddMixin(self, "ResourceBar")
+    if not self.IsECMFrame then
+        BarFrame.AddMixin(self, "ResourceBar")
+    elseif ECM.RegisterFrame then
+        ECM.RegisterFrame(self)
+    end
 
     self:RegisterEvent("UNIT_AURA", "ThrottledRefresh")
     self:RegisterEvent("UNIT_POWER_FREQUENT", "ThrottledRefresh")
@@ -167,4 +171,7 @@ end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
+    if self.IsECMFrame and ECM.UnregisterFrame then
+        ECM.UnregisterFrame(self)
+    end
 end

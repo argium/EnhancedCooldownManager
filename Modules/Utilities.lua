@@ -80,6 +80,12 @@ function Util.ApplyFont(fontString, globalConfig)
         return
     end
 
+    Util.DebugAssert(type(globalConfig) == "table" or globalConfig == nil, "Util.ApplyFont: globalConfig must be a table or nil")
+    Util.DebugAssert(
+        not (type(globalConfig) == "table" and globalConfig.global ~= nil and globalConfig.font == nil),
+        "Util.ApplyFont: expected global config block, received profile root"
+    )
+
     local fontPath = Util.GetFontPath(globalConfig and globalConfig.font)
     local fontSize = (globalConfig and globalConfig.fontSize) or 11
     local fontOutline = (globalConfig and globalConfig.fontOutline) or "OUTLINE"

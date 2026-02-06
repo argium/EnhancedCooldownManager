@@ -17,6 +17,7 @@ Standalone resource bars anchored to Blizzard's Cooldown Manager viewers for Wor
 ## ⚙️ Configuration
 
 Type `/ecm` in-game to open the options panel.
+The addon also registers an entry in the AddOn compartment near the minimap; clicking it opens the options.
 
 👤 **Author:** Solär
 📄 **License:** [GPL-3.0](LICENSE)

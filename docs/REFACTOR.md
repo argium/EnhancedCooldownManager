@@ -23,6 +23,8 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - `UpdateLayout()` is the single entry point for all layout changes
 - Supports two anchor modes: CHAIN (auto-stacking) and FREE (manual positioning)
 - Debouncing via `ScheduleLayoutUpdate()` prevents excessive updates during rapid events
+- Chain predecessor selection in `GetNextChainAnchor` does not require predecessor visibility; it uses enabled state, `ShouldShow()`, chain mode, and existing `InnerFrame`
+- Global layout passes run chain modules in `C.CHAIN_ORDER` first to keep anchor resolution deterministic
 
 #### BarFrame Mixin (Mixins\BarFrame.lua)
 **Status:** Fully implemented
@@ -96,9 +98,9 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - Does NOT use BarFrame because it manages Blizzard-created child bars, not a single StatusBar
 - Override `CreateFrame()` to return existing Blizzard viewer
 - Override `UpdateLayout()` to position viewer and style all visible children
+- BuffBars icon container is treated as deterministic (`child.Icon`); no cross-object fallback probing
 - Color system supports:
   - Per-bar custom colors (stored per class/spec)
-  - Palette-based coloring
   - Default fallback color
 
 **Known Issues:**
@@ -202,6 +204,13 @@ This separation allows:
 - Prevents visual flickering
 **Trade-off:** More memory, more complex code, but significant performance gain
 
+### Module Lifecycle From Config
+**Decision:** Module `enabled` flags now map to actual module enable/disable, not only `ShouldShow()` visibility checks.
+**Rationale:**
+- Disabled modules unregister their ECMFrames from Layout event fanout.
+- Removes unnecessary event handlers and refresh/layout work when a feature is disabled.
+**Trade-off:** Slightly more lifecycle complexity (must support re-register on re-enable).
+
 ### Debouncing vs Throttling
 **Decision:** Use debouncing for layout, throttling for refresh
 **Rationale:**
@@ -222,6 +231,7 @@ This separation allows:
 1. **Extract color management** - BuffBars color system could be generalized for other modules
 2. **Tick system refinement** - Consider separating tick layout from BarFrame into a dedicated helper
 3. **Layout.lua integration** - Ensure Layout.lua properly coordinates all ECMFrames
+   - Includes lifecycle registration and unregistration (`ECM.RegisterFrame` / `ECM.UnregisterFrame`) for modules that are toggled on/off at runtime.
 4. **PositionStrategy removal** - Verify no dependencies before deleting
 5. **Error handling** - Add more defensive nil checks in hooks
 6. **Documentation** - Add inline examples for complex methods (e.g., GetNextChainAnchor)

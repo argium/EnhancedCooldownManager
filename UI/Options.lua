@@ -36,6 +36,23 @@ local function IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
 end
 
+local function SetModuleEnabled(moduleName, enabled)
+    local module = ECM:GetModule(moduleName, true)
+    if not module then
+        return
+    end
+
+    if enabled then
+        if not module:IsEnabled() then
+            ECM:EnableModule(moduleName)
+        end
+    else
+        if module:IsEnabled() then
+            ECM:DisableModule(moduleName)
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
 -- Utility: Deep compare for detecting changes from defaults
 --------------------------------------------------------------------------------
@@ -346,12 +363,12 @@ local function GeneralOptionsTable()
                 args = {
                     hideWhenMountedDesc = {
                         type = "description",
-                        name = "Automatically hide icons and bars when mounted and show them when dismounted.",
+                        name = "Automatically hide icons and bars when mounted or in a vehicle, and show them when dismounted or out of vehicle.",
                         order = 3,
                     },
                     hideWhenMounted = {
                         type = "toggle",
-                        name = "Hide when mounted",
+                        name = "Hide when mounted or in vehicle",
                         order = 4,
                         width = "full",
                         get = function() return db.profile.global.hideWhenMounted end,
@@ -446,10 +463,10 @@ local function GeneralOptionsTable()
                         name = "Fade when out of combat",
                         order = 2,
                         width = "full",
-                        get = function() return db.profile.combatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.enabled end,
                         set = function(_, val)
-                            db.profile.combatFade.enabled = val
-                            -- TODO: Combat fade not yet migrated to Layout.lua
+                            db.profile.global.outOfCombatFade.enabled = val
+                            ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
                     combatFadeOpacityDesc = {
@@ -465,11 +482,11 @@ local function GeneralOptionsTable()
                         min = 0,
                         max = 100,
                         step = 5,
-                        disabled = function() return not db.profile.combatFade.enabled end,
-                        get = function() return db.profile.combatFade.opacity end,
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.opacity end,
                         set = function(_, val)
-                            db.profile.combatFade.opacity = val
-                            -- TODO: Combat fade not yet migrated to Layout.lua
+                            db.profile.global.outOfCombatFade.opacity = val
+                            ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
                     combatFadeOpacityReset = {
@@ -477,11 +494,9 @@ local function GeneralOptionsTable()
                         name = "X",
                         order = 5,
                         width = 0.3,
-                        hidden = function() return not IsValueChanged("combatFade.opacity") end,
-                        disabled = function() return not db.profile.combatFade.enabled end,
-                        func = MakeResetHandler("combatFade.opacity", function()
-                            -- TODO: Combat fade not yet migrated to Layout.lua
-                        end),
+                        hidden = function() return not IsValueChanged("global.outOfCombatFade.opacity") end,
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        func = MakeResetHandler("global.outOfCombatFade.opacity"),
                     },
                     spacer2 = {
                         type = "description",
@@ -498,11 +513,11 @@ local function GeneralOptionsTable()
                         name = "Except inside instances",
                         order = 8,
                         width = "full",
-                        disabled = function() return not db.profile.combatFade.enabled end,
-                        get = function() return db.profile.combatFade.exceptInInstance end,
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.exceptInInstance end,
                         set = function(_, val)
-                            db.profile.combatFade.exceptInInstance = val
-                            -- TODO: Combat fade not yet migrated to Layout.lua
+                            db.profile.global.outOfCombatFade.exceptInInstance = val
+                            ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
                     exceptIfTargetCanBeAttackedEnabled ={
@@ -510,11 +525,11 @@ local function GeneralOptionsTable()
                         name = "Except if current target can be attacked",
                         order = 9,
                         width = "full",
-                        disabled = function() return not db.profile.combatFade.enabled end,
-                        get = function() return db.profile.combatFade.exceptIfTargetCanBeAttacked end,
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked end,
                         set = function(_, val)
-                            db.profile.combatFade.exceptIfTargetCanBeAttacked = val
-                            -- TODO: Combat fade not yet migrated to Layout.lua
+                            db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked = val
+                            ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
                 },
@@ -553,6 +568,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
+                            SetModuleEnabled("PowerBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -742,6 +758,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.enabled end,
                         set = function(_, val)
                             db.profile.resourceBar.enabled = val
+                            SetModuleEnabled("ResourceBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -1081,6 +1098,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.enabled end,
                         set = function(_, val)
                             db.profile.runeBar.enabled = val
+                            SetModuleEnabled("RuneBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -1219,6 +1237,18 @@ local function AuraBarsOptionsTable()
                         name = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
                         order = 1,
                         fontSize = "medium",
+                    },
+                    enabled = {
+                        type = "toggle",
+                        name = "Enable aura bars",
+                        order = 2,
+                        width = "full",
+                        get = function() return db.profile.buffBars.enabled end,
+                        set = function(_, val)
+                            db.profile.buffBars.enabled = val
+                            SetModuleEnabled("BuffBars", val)
+                            ECM.ScheduleLayoutUpdate(0)
+                        end,
                     },
                     showIcon = {
                         type = "toggle",
@@ -1581,11 +1611,11 @@ ColoursOptionsTable = function()
 end
 
 
-local function TrinketIconsOptionsTable()
+local function ItemIconsOptionsTable()
     local db = ECM.db
     return {
         type = "group",
-        name = "Trinket Icons",
+        name = "Item Icons",
         order = 6,
         args = {
             basicSettings = {
@@ -1596,18 +1626,28 @@ local function TrinketIconsOptionsTable()
                 args = {
                     desc = {
                         type = "description",
-                        name = "Displays icons for equipped trinkets with on-use effects next to the Utility Cooldown Viewer. Icon size automatically matches the viewer's Edit Mode settings.",
+                        name = "Displays icons for equipped trinkets with on-use effects and combat consumables next to the Utility Cooldown Viewer. Icon size automatically matches the viewer's Edit Mode settings.",
                         order = 1,
                         fontSize = "medium",
                     },
                     enabled = {
                         type = "toggle",
-                        name = "Enable trinket icons",
+                        name = "Enable item icons",
                         order = 2,
                         width = "full",
-                        get = function() return db.profile.trinketIcons.enabled end,
+                        get = function() return db.profile.itemIcons.enabled end,
                         set = function(_, val)
-                            db.profile.trinketIcons.enabled = val
+                            db.profile.itemIcons.enabled = val
+                            local module = ECM:GetModule("ItemIcons", true)
+                            if val then
+                                if module and not module:IsEnabled() then
+                                    ECM:EnableModule("ItemIcons")
+                                end
+                            else
+                                if module and module:IsEnabled() then
+                                    ECM:DisableModule("ItemIcons")
+                                end
+                            end
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -1629,9 +1669,9 @@ local function TrinketIconsOptionsTable()
                         name = "Show Trinket 1 (top slot)",
                         order = 2,
                         width = "full",
-                        get = function() return db.profile.trinketIcons.showTrinket1 end,
+                        get = function() return db.profile.itemIcons.showTrinket1 end,
                         set = function(_, val)
-                            db.profile.trinketIcons.showTrinket1 = val
+                            db.profile.itemIcons.showTrinket1 = val
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -1640,9 +1680,55 @@ local function TrinketIconsOptionsTable()
                         name = "Show Trinket 2 (bottom slot)",
                         order = 3,
                         width = "full",
-                        get = function() return db.profile.trinketIcons.showTrinket2 end,
+                        get = function() return db.profile.itemIcons.showTrinket2 end,
                         set = function(_, val)
-                            db.profile.trinketIcons.showTrinket2 = val
+                            db.profile.itemIcons.showTrinket2 = val
+                            ECM.ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                },
+            },
+            consumableSettings = {
+                type = "group",
+                name = "Consumables",
+                inline = true,
+                order = 3,
+                args = {
+                    consumableDesc = {
+                        type = "description",
+                        name = "Display combat consumables you have in your bags. Only the best quality of each type is shown.",
+                        order = 1,
+                    },
+                    showCombatPotion = {
+                        type = "toggle",
+                        name = "Show Combat Potion (Tempered Potion)",
+                        order = 2,
+                        width = "full",
+                        get = function() return db.profile.itemIcons.showCombatPotion end,
+                        set = function(_, val)
+                            db.profile.itemIcons.showCombatPotion = val
+                            ECM.ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    showHealthPotion = {
+                        type = "toggle",
+                        name = "Show Health Potion (Algari/Cavedweller's)",
+                        order = 3,
+                        width = "full",
+                        get = function() return db.profile.itemIcons.showHealthPotion end,
+                        set = function(_, val)
+                            db.profile.itemIcons.showHealthPotion = val
+                            ECM.ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    showHealthstone = {
+                        type = "toggle",
+                        name = "Show Healthstone",
+                        order = 4,
+                        width = "full",
+                        get = function() return db.profile.itemIcons.showHealthstone end,
+                        set = function(_, val)
+                            db.profile.itemIcons.showHealthstone = val
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -2157,7 +2243,7 @@ local function GetOptionsTable()
             resourceBar = ResourceBarOptionsTable(),
             runeBar = RuneBarOptionsTable(),
             auraBars = AuraBarsOptionsTable(),
-            trinketIcons = TrinketIconsOptionsTable(),
+            itemIcons = ItemIconsOptionsTable(),
             profile = ProfileOptionsTable(),
             about = AboutOptionsTable(),
         },

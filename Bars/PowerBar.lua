@@ -123,7 +123,12 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnEnable()
-    BarFrame.AddMixin(PowerBar, "PowerBar")
+    if not self.IsECMFrame then
+        BarFrame.AddMixin(self, "PowerBar")
+    elseif ECM.RegisterFrame then
+        ECM.RegisterFrame(self)
+    end
+
     BarFrame.OnEnable(self)
     self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPowerUpdate")
     ECM.Log(self.Name, "PowerBar:Enabled")
@@ -131,6 +136,9 @@ end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
+    if self.IsECMFrame and ECM.UnregisterFrame then
+        ECM.UnregisterFrame(self)
+    end
     BarFrame.OnDisable(self)
     ECM.Log(self.Name, "PowerBar:Disabled")
 end

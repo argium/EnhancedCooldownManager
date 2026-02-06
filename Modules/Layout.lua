@@ -11,15 +11,11 @@ local Util = ns.Util
 -- Constants
 --------------------------------------------------------------------------------
 
-local BLIZZARD_FRAMES = {
-    "EssentialCooldownViewer",
-    "UtilityCooldownViewer",
-    "BuffIconCooldownViewer",
-    "BuffBarCooldownViewer",
-}
-
 local LAYOUT_EVENTS = {
     PLAYER_MOUNT_DISPLAY_CHANGED = { delay = 0 },
+    UNIT_ENTERED_VEHICLE = { delay = 0 },
+    UNIT_EXITED_VEHICLE = { delay = 0 },
+    VEHICLE_UPDATE = { delay = 0 },
     PLAYER_UPDATE_RESTING = { delay = 0 },
     PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
     PLAYER_ENTERING_WORLD = { delay = 0.4 },
@@ -41,6 +37,7 @@ local _globallyHidden = false
 local _hideReason = nil
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
+local _lastAlpha = 1
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -49,7 +46,7 @@ local _layoutPending = false
 --- Iterates over all Blizzard cooldown viewer frames.
 --- @param fn fun(frame: Frame, name: string)
 local function ForEachBlizzardFrame(fn)
-    for _, name in ipairs(BLIZZARD_FRAMES) do
+    for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
             fn(frame, name)
@@ -87,9 +84,29 @@ local function SetGloballyHidden(hidden, reason)
     end
 end
 
---- Checks all hide conditions and updates global hidden state.
-local function UpdateHiddenState()
-    local profile = ECM.db and ECM.db.profile
+
+local function SetAlpha(alpha)
+    if _lastAlpha == alpha then
+        return
+    end
+
+    ForEachBlizzardFrame(function(frame)
+        frame:SetAlpha(alpha)
+    end)
+
+    for _, ecmFrame in pairs(_ecmFrames) do
+        ecmFrame.InnerFrame:SetAlpha(alpha)
+    end
+
+    _lastAlpha = alpha
+end
+
+--- Checks all fade and hide conditions and updates global state.
+local function UpdateFadeAndHiddenStates()
+    local globalConfig = ECM.db and ECM.db.profile and ECM.db.profile.global
+    if not globalConfig then
+        return
+    end
 
     -- Check CVar first
     if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
@@ -97,33 +114,64 @@ local function UpdateHiddenState()
         return
     end
 
-    -- Check mounted
-    if profile and profile.global.hideWhenMounted and IsMounted() then
+    -- Check mounted or in vehicle
+    if globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player")) then
         SetGloballyHidden(true, "mounted")
         return
     end
 
-    -- Check resting (only out of combat)
-    if profile and profile.global.hideOutOfCombatInRestAreas
-       and not _inCombat and IsResting() then
+    if not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting() then
         SetGloballyHidden(true, "rest")
         return
     end
 
     -- No hide reason, show everything
     SetGloballyHidden(false, nil)
+
+    local alpha = 1
+    local fadeConfig = globalConfig.outOfCombatFade
+    if not _inCombat and fadeConfig and fadeConfig.enabled then
+        local shouldSkipFade = false
+
+        if fadeConfig.exceptInInstance then
+            local inInstance, instanceType = IsInInstance()
+            if inInstance and C.GROUP_INSTANCE_TYPES[instanceType] then
+                shouldSkipFade = true
+            end
+        end
+
+        if not shouldSkipFade and fadeConfig.exceptIfTargetCanBeAttacked and UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
+            shouldSkipFade = true
+        end
+
+        if not shouldSkipFade then
+            local opacity = fadeConfig.opacity or 100
+            alpha = math.max(0, math.min(1, opacity / 100))
+        end
+    end
+
+    SetAlpha(alpha)
 end
 
 --- Calls UpdateLayout on all registered ECMFrames.
 local function UpdateAllLayouts()
-    for _, ecmFrame in pairs(_ecmFrames) do
-        ecmFrame:UpdateLayout()
+    local updated = {}
+
+    -- Chain frames must update in deterministic order so downstream bars can
+    -- resolve anchors against already-laid-out predecessors.
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+        local ecmFrame = _ecmFrames[moduleName]
+        if ecmFrame then
+            ecmFrame:UpdateLayout()
+            updated[moduleName] = true
+        end
     end
 
-    -- BuffBars may need to update after other bars reposition
-    local BuffBars = ECM.BuffBars
-    if BuffBars and BuffBars.UpdateLayout then
-        BuffBars:UpdateLayout()
+    -- Update all remaining frames (non-chain modules).
+    for frameName, ecmFrame in pairs(_ecmFrames) do
+        if not updated[frameName] then
+            ecmFrame:UpdateLayout()
+        end
     end
 end
 
@@ -137,7 +185,7 @@ local function ScheduleLayoutUpdate(delay)
     _layoutPending = true
     C_Timer.After(delay or 0, function()
         _layoutPending = false
-        UpdateHiddenState()
+        UpdateFadeAndHiddenStates()
         UpdateAllLayouts()
     end)
 end
@@ -155,6 +203,22 @@ local function RegisterFrame(frame)
     ECM.Log("Layout", "Frame registered", frame.Name)
 end
 
+--- Unregisters an ECMFrame from layout update events.
+--- @param frame ECMFrame The frame to unregister
+local function UnregisterFrame(frame)
+    if not frame or type(frame) ~= "table" then
+        return
+    end
+
+    local name = frame.Name
+    if not name or _ecmFrames[name] ~= frame then
+        return
+    end
+
+    _ecmFrames[name] = nil
+    ECM.Log("Layout", "Frame unregistered", name)
+end
+
 --------------------------------------------------------------------------------
 -- Event Handling
 --------------------------------------------------------------------------------
@@ -168,9 +232,13 @@ end
 eventFrame:RegisterEvent("CVAR_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
+    if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
+        return
+    end
+
     -- Handle CVAR_UPDATE specially
     if event == "CVAR_UPDATE" then
-        if arg1 == "cooldownManager" then
+        if arg1 == "cooldownViewerEnabled" then
             ScheduleLayoutUpdate(0)
         end
         return
@@ -189,11 +257,11 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
     -- Schedule update with delay
     if config.delay and config.delay > 0 then
         C_Timer.After(config.delay, function()
-            UpdateHiddenState()
+            UpdateFadeAndHiddenStates()
             UpdateAllLayouts()
         end)
     else
-        UpdateHiddenState()
+        UpdateFadeAndHiddenStates()
         UpdateAllLayouts()
     end
 end)
@@ -203,4 +271,5 @@ end)
 --------------------------------------------------------------------------------
 
 ECM.RegisterFrame = RegisterFrame
+ECM.UnregisterFrame = UnregisterFrame
 ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate

@@ -39,7 +39,7 @@ local C = ns.Constants
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
 ---@class ECM_GlobalConfig Global configuration.
----@field hideWhenMounted boolean Whether to hide when mounted.
+---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
 ---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
 ---@field updateFrequency number Update frequency in seconds.
 ---@field barHeight number Default bar height.
@@ -50,6 +50,7 @@ local C = ns.Constants
 ---@field fontSize number Font size.
 ---@field fontOutline "NONE"|"OUTLINE"|"THICKOUTLINE"|"MONOCHROME" Font outline style.
 ---@field fontShadow boolean Whether font shadow is enabled.
+---@field outOfCombatFade ECM_CombatFadeConfig Out of combat fade configuration.
 
 ---@class ECM_BorderConfig Border configuration.
 ---@field enabled boolean Whether border is enabled.
@@ -64,7 +65,6 @@ local C = ns.Constants
 ---@field perBar table<number, table<number, table<number, ECM_Color>>> Per-bar colors by class/spec/index.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
 ---@field defaultColor ECM_Color Default color for buff bars.
----@field selectedPalette string|nil Name of the currently selected palette.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field anchor C.ANCHORMODE_CHAIN|C.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
@@ -75,10 +75,13 @@ local C = ns.Constants
 ---@field showDuration boolean|nil Whether to show durations.
 ---@field colors ECM_BuffBarColorsConfig Per-bar color settings.
 
----@class ECM_TrinketIconsConfig Trinket icons configuration.
----@field enabled boolean Whether trinket icons are enabled.
+---@class ECM_ItemIconsConfig Item icons configuration.
+---@field enabled boolean Whether item icons are enabled.
 ---@field showTrinket1 boolean Whether to show trinket slot 1 (if on-use).
 ---@field showTrinket2 boolean Whether to show trinket slot 2 (if on-use).
+---@field showCombatPotion boolean Whether to show combat potions.
+---@field showHealthPotion boolean Whether to show health potions.
+---@field showHealthstone boolean Whether to show healthstone.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -99,13 +102,12 @@ local C = ns.Constants
 ---@class ECM_Profile Profile settings.
 ---@field schemaVersion number Saved variables schema version.
 ---@field debug boolean Whether debug logging is enabled.
----@field combatFade ECM_CombatFadeConfig Combat fade settings.
 ---@field global ECM_GlobalConfig Global appearance settings.
 ---@field powerBar ECM_PowerBarConfig Power bar settings.
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
----@field trinketIcons ECM_TrinketIconsConfig Trinket icons configuration.
+---@field itemIcons ECM_ItemIconsConfig Item icons configuration.
 
 local DEFAULT_BORDER_THICKNESS = 4
 local DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 }
@@ -122,13 +124,7 @@ powerBarTickMappings[C.DEMONHUNTER_CLASS_ID] = {
 local defaults = {
     profile = {
         debug = false,
-        schemaVersion = 4,
-        combatFade = {
-            enabled = false,
-            opacity = 60,
-            exceptIfTargetCanBeAttacked = true,
-            exceptInInstance = true,
-        },
+        schemaVersion = 5,
         global = {
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
@@ -141,6 +137,12 @@ local defaults = {
             fontSize = 11,
             fontOutline = "OUTLINE",
             fontShadow = false,
+            outOfCombatFade = {
+                enabled = false,
+                opacity = 60,
+                exceptIfTargetCanBeAttacked = true,
+                exceptInInstance = true,
+            },
         },
         powerBar = {
             enabled           = true,
@@ -224,13 +226,15 @@ local defaults = {
                 perSpell = {},
                 cache = {},
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
-                selectedPalette = nil,
             },
         },
-        trinketIcons = {
-            enabled = false,
+        itemIcons = {
+            enabled = true,
             showTrinket1 = true,
             showTrinket2 = true,
+            showCombatPotion = true,
+            showHealthPotion = true,
+            showHealthstone = true,
         },
     },
 }

@@ -9,7 +9,7 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
 The intention is to use mixins as a kind of class hierarchy:
  ECMFrame -> BarFrame -> PowerBar|ResourceBar|RuneBar
  ECMFrame -> BuffBars
- ECMFrame -> TrinketIcons
+ ECMFrame -> ItemIcons
 
 [ECMFrame](Mixins\ECMFrame.lua) owns:
 - The "inner" Blizzard Frame
@@ -42,6 +42,7 @@ The intention is to use mixins as a kind of class hierarchy:
 | AddMixin      | fun(target: table, name: string) | Adds ECMFrame methods and initializes state on target. |
 
 ECMFrame should work with _any_ frame the addon needs to position or hide.
+For chain anchoring, predecessor visibility (`InnerFrame:IsVisible()`) must not be required; rely on module enabled state, `ShouldShow()`, chain mode, and existing `InnerFrame`.
 
 [BarFrame](Mixins\BarFrame.lua) owns:
 - StatusBar (values, color, texture)
@@ -68,16 +69,19 @@ BarFrame should work with any bar-style frame the addon is responsible for drawi
 - Concrete implementations of GetStatusBarValues
 - Custom ShouldShow logic
 - Class/spec-specific behavior (ticks, colors, visibility rules)
+- BuffBars icon handling is deterministic: use `child.Icon` only (no `IconFrame`/`IconButton` fallback probing, no dynamic atlas/region discovery loops).
 
 These responsibilities can change over time so update this document if so however responsibilities should not cross mixins by reaching into the internals of another. Always use public interfaces. Internal fields are prefixed by an underscore.
 
-[Icons\TrinketIcons.lua](Icons\TrinketIcons.lua) owns:
+[Modules\ItemIcons.lua](Modules\ItemIcons.lua) owns:
 - Displaying equipped trinkets with on-use effects as icons
+- Displaying combat consumables (combat potions, health potions, healthstones) from bags
+- Priority-based consumable selection (best quality per type)
 - Positioning relative to UtilityCooldownViewer (right side)
 - Cooldown sweep display using CooldownFrameTemplate
 - Icon creation and pooling
 
-TrinketIcons uses ECMFrame directly (does not use BarFrame) since it displays icons, not bars.
+ItemIcons uses ECMFrame directly (does not use BarFrame) since it displays icons, not bars.
 
 ### Method Call Chains
 
@@ -85,7 +89,7 @@ When a derived class calls a parent mixin method, it must call the immediate par
 - `PowerBar:Refresh` calls `BarFrame.Refresh(self)` which calls `ECMFrame.Refresh(self)`
 - `PowerBar:ShouldShow` calls `BarFrame.ShouldShow(self)` which calls `ECMFrame.ShouldShow(self)`
 - `BuffBars:UpdateLayout` calls `ECMFrame` methods directly (BuffBars does not use BarFrame)
-- `TrinketIcons:ShouldShow` calls `ECMFrame.ShouldShow(self)` directly (TrinketIcons does not use BarFrame)
+- `ItemIcons:ShouldShow` calls `ECMFrame.ShouldShow(self)` directly (ItemIcons does not use BarFrame)
 
 ### Layout Update Flow
 
@@ -99,12 +103,15 @@ When a derived class calls a parent mixin method, it must call the immediate par
 MANDATORY: Modules that derive from ECMFrame, must use the config fields and never `ECM.db` or `ECM.db.profile` directly. NEVER create an intermediate table for profile/config.
 - `self.GlobalConfig` for the `global` config block
 - `self.ModuleConfig` for the module's specific block
+- Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
 
 MANDATORY: Modules should call methods in the immediate parent's mixin, if present. For example, `PowerBar:Refresh` must call `BarFrame.Refresh(self)` and never `ECMFrame.Refresh(self)`
 
 MANDATORY: Any and all layout updates MUST be triggered from a call to `UpdateLayout()`. No cheeky workarounds, no funny business. MUST. Any change that modifies the layout outside of this function will be rejected.
 
 MANDATORY: Any and all value-related updates should be triggered from a call to `Refresh()`.
+
+MANDATORY: Use WoW's built-in `strtrim(...)` for string trimming. Do not use `:trim()` or custom trim helpers.
 
 MANDATORY: Files should have section headings to organize code. Use these headings in order as applicable (skip sections that don't apply):
 - "Helpers" (or "Helper Methods" for non-static helpers)
@@ -116,10 +123,12 @@ MANDATORY: Files should have section headings to organize code. Use these headin
 Not all files will have all sections. For example, mixins don't have event handlers.
 
 [Modules\Layout.lua](Modules\Layout.lua) owns
-- Registering events that affect every ECMFrame such as hiding when the player mounts.
+- Registering events that affect every ECMFrame such as hiding when the player mounts or enters a vehicle.
 - Tells ECMFrames when to show/hide themselves, or when to refresh in response to global events.
 - Managing both ECMFrames and Blizzard cooldown viewer frames.
-- Global hidden state based on mount, rest area, and CVar conditions.
+- Global hidden state based on mount/vehicle, rest area, and CVar conditions.
+- Registering and unregistering ECMFrames via `ECM.RegisterFrame(frame)` / `ECM.UnregisterFrame(frame)` so module-level enable/disable can fully opt frames in/out.
+- Running deterministic layout passes: chain modules in `C.CHAIN_ORDER` first, then remaining modules.
 
 ## Secret Values
 
