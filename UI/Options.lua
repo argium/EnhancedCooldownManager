@@ -1498,7 +1498,9 @@ local function GenerateSpellColorArgs()
         end
 
         for i, c in ipairs(cachedBars) do
-            spells[c.spellName] = {}
+            if c and c.spellName then
+                spells[c.spellName] = {}
+            end
         end
 
         local i = 1
