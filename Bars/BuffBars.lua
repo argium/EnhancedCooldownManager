@@ -143,13 +143,20 @@ local function UpdateBarCache(barIndex, spellName, cfg)
     end
 
     local cache = cfg.colors.cache
+
+    if cache[classID] and cache[classID][specID] and cache[classID][specID][barIndex] and not spellName then
+        -- if this bar is already cached and we aren't able to get the spellName then exit
+        -- we don't want to overwrite a value by mistake
+        return
+    end
+
     cache[classID] = cache[classID] or {}
     cache[classID][specID] = cache[classID][specID] or {}
 
-    local spellColor = GetSpellColor(spellName, cfg)
+    local spellColor = GetSpellColor(spellName or C.BUFFBARS_DEFAULT_SPELLNAME, cfg)
     cache[classID][specID][barIndex] = {
         color = spellColor,
-        spellName = spellName,
+        spellName = spellName or C.BUFFBARS_DEFAULT_SPELLNAME,
         lastSeen = GetTime(),
     }
 end
@@ -422,9 +429,9 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
             -- Check if we can access the value before using it
             if ok and text and (type(canaccessvalue) ~= "function" or canaccessvalue(text)) then
                 spellName = text
-
-                UpdateBarCache(barIndex, spellName, moduleConfig)
             end
+
+            UpdateBarCache(barIndex, spellName, moduleConfig)
         end
     end
 

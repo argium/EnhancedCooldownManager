@@ -625,7 +625,9 @@ function ECM:MigrateToPerSpellColorsIfNeeded(profile)
                 perSpell[classID][specID] = {}
             end
 
-            DoSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
+            if cache[classID] and cache[classID][specID] then
+                DoSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
+            end
         end
     end
 
