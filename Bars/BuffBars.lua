@@ -808,6 +808,10 @@ function BuffBars:MigrateToPerSpellColorsIfNeeded()
     local perBar = cfg.colors.perBar
     local cache = cfg.colors.cache
 
+    if not perBar then
+        return
+    end
+
     if not cfg.colors.perSpell then
         cfg.colors.perSpell = {}
     end
@@ -833,22 +837,24 @@ function BuffBars:MigrateToPerSpellColorsIfNeeded()
 
         local bc = perBar[classID][specID][i]
 
-        cfg.colors.perSpell[classID][specID][v.spellName] = bc
+        if bc then
+            cfg.colors.perSpell[classID][specID][v.spellName] = bc
 
-        cache[classID][specID][i] = {
-            lastSeen = v.lastSeen,
-            spellName = v.spellName,
-            color = {
-                a = bc.a,
-                r = bc.r,
-                g = bc.g,
-                b = bc.b
+            cache[classID][specID][i] = {
+                lastSeen = v.lastSeen,
+                spellName = v.spellName,
+                color = bc
             }
-        }
+        end
      end
 
-     perBar[classID][specID] = nil
-     if not perBar[classID][1] then
-        perBar[classID] = nil
+     if perBar[classID] and perBar[classID][specID] then
+        perBar[classID][specID] = nil
+     end
+
+     if perBar[classID] then
+        if not perBar[classID][1] then
+            perBar[classID] = nil
+        end
     end
 end
