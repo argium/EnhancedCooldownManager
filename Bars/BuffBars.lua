@@ -37,6 +37,10 @@ local BarHelpers = {
         local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
         return Util.PixelSnap(height)
     end,
+    GetBarWidth = function(moduleConfig, globalConfig, fallback)
+        local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
+        return Util.PixelSnap(width)
+    end,
 }
 
 --- Returns current class ID and spec ID.
@@ -568,6 +572,12 @@ function BuffBars:UpdateLayout()
         viewer:ClearAllPoints()
         viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
         viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
+    elseif params.mode == C.ANCHORMODE_FREE then
+        local width = BarHelpers.GetBarWidth(cfg, globalConfig, 300)
+
+        if width and width > 0 then
+            viewer:SetWidth(width)
+        end
     end
 
     -- Style all visible children (skip already-styled unless markers were reset)
