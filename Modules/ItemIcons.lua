@@ -362,6 +362,173 @@ local function GetUtilityViewerLayout()
 end
 
 --------------------------------------------------------------------------------
+-- Options UI
+--------------------------------------------------------------------------------
+
+--- Gets a module config value for options with a fallback default.
+---@param self ECM_ItemIconsModule
+---@param key string
+---@param defaultValue boolean
+---@return boolean
+local function GetOptionValue(self, key, defaultValue)
+    local moduleConfig = self.ModuleConfig
+    if moduleConfig and moduleConfig[key] ~= nil then
+        return moduleConfig[key]
+    end
+
+    return defaultValue
+end
+
+--- Requests a layout update from options setters.
+---@param self ECM_ItemIconsModule
+local function RequestLayoutUpdate(self)
+    if self.IsECMFrame then
+        self:ScheduleLayoutUpdate()
+    else
+        ECM.ScheduleLayoutUpdate(0)
+    end
+end
+
+--- Builds Item Icons options UI args.
+---@return table args AceConfig args for Item Icons options.
+function ItemIcons:GetOptionsArgs()
+    return {
+        description = {
+            type = "description",
+            name = "Displays icons for equipped on-use trinkets and selected consumables next to the Utility Cooldown Viewer.",
+            order = 0,
+            fontSize = "medium",
+        },
+        enabled = {
+            type = "toggle",
+            name = "Enable item icons",
+            order = 1,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "enabled", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.enabled = val
+                end
+
+                if val then
+                    if not self:IsEnabled() then
+                        ECM:EnableModule(C.ITEMICONS)
+                    end
+                else
+                    if self:IsEnabled() then
+                        ECM:DisableModule(C.ITEMICONS)
+                    end
+                end
+
+                ECM.ScheduleLayoutUpdate(0)
+            end,
+        },
+        showTrinket1 = {
+            type = "toggle",
+            name = "Show first trinket",
+            order = 2,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "showTrinket1", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.showTrinket1 = val
+                end
+                RequestLayoutUpdate(self)
+            end,
+        },
+        showTrinket2 = {
+            type = "toggle",
+            name = "Show second trinket",
+            order = 3,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "showTrinket2", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.showTrinket2 = val
+                end
+                RequestLayoutUpdate(self)
+            end,
+        },
+        showHealthPotion = {
+            type = "toggle",
+            name = "Show health potions",
+            order = 4,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "showHealthPotion", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.showHealthPotion = val
+                end
+                RequestLayoutUpdate(self)
+            end,
+        },
+        showCombatPotion = {
+            type = "toggle",
+            name = "Show combat potions",
+            order = 5,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "showCombatPotion", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.showCombatPotion = val
+                end
+                RequestLayoutUpdate(self)
+            end,
+        },
+        showHealthstone = {
+            type = "toggle",
+            name = "Show healthstone",
+            order = 6,
+            width = "full",
+            get = function()
+                return GetOptionValue(self, "showHealthstone", true)
+            end,
+            set = function(_, val)
+                local moduleConfig = self.ModuleConfig
+                if moduleConfig then
+                    moduleConfig.showHealthstone = val
+                end
+                RequestLayoutUpdate(self)
+            end,
+        },
+    }
+end
+
+--- Builds the Item Icons options group.
+---@return table itemIconsOptions AceConfig group for Item Icons section.
+function ItemIcons:GetOptionsTable()
+    return {
+        type = "group",
+        name = "Item Icons",
+        order = 6,
+        args = {
+            mainOptions = {
+                type = "group",
+                name = "Main Options",
+                inline = true,
+                order = 1,
+                args = self:GetOptionsArgs(),
+            },
+        },
+    }
+end
+
+--------------------------------------------------------------------------------
 -- ECMFrame Overrides
 --------------------------------------------------------------------------------
 

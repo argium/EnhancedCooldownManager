@@ -25,6 +25,7 @@ Enhanced Cooldown Manager (root)
 ├── Resource Bar
 ├── Rune Bar
 ├── Buff Bars
+├── Item Icons
 ├── Profile (Import/Export, Profile Management)
 └── About
 ```
@@ -34,7 +35,7 @@ Enhanced Cooldown Manager (root)
 1. **Option Tables**: Each section has a generator function (e.g., `PowerBarOptionsTable()`) that returns an AceConfig-compatible table
 2. **Main Table**: `GetOptionsTable()` combines all sections into a tree structure
 3. **Registration**: Options are registered with AceConfigRegistry and linked to Blizzard's settings UI
-4. **Database Access**: All options use `ECM.db.profile` to read/write settings
+4. **Database Access**: Options write profile settings either directly in `UI/Options.lua` or through module-owned options builders (for example `Modules/ItemIcons.lua`)
 
 ---
 
@@ -56,6 +57,8 @@ local function MakeResetHandler(path, refreshFunc) ... end
 -- 4. Section Generator Functions
 local function PowerBarOptionsTable() ... end
 local function ResourceBarOptionsTable() ... end
+-- Item Icons options are built in Modules/ItemIcons.lua:
+-- ItemIcons:GetOptionsTable(db.profile.itemIcons)
 
 -- 5. Main Options Table
 local function GetOptionsTable() ... end
@@ -549,8 +552,9 @@ args = {
     resourceBar = ResourceBarOptionsTable(), -- order = 3
     runeBar = RuneBarOptionsTable(),      -- order = 4
     auraBars = AuraBarsOptionsTable(),    -- order = 5
-    profile = ProfileOptionsTable(),      -- order = 6
-    about = AboutOptionsTable(),          -- order = 7
+    itemIcons = ItemIconsOptionsTable(),  -- order = 6
+    profile = ProfileOptionsTable(),      -- order = 7
+    about = AboutOptionsTable(),          -- order = 8
 }
 ```
 
