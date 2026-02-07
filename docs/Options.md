@@ -61,19 +61,11 @@ local function ResourceBarOptionsTable() ... end
 -- ItemIcons:GetOptionsTable(db.profile.itemIcons)
 
 -- Item Icons options behavior:
--- - "Enable item icons" disables/enables all other controls in the section.
--- - Trinket 1/2 and Healthstone rows include right-side 30x30 preview icons.
--- - Trinket preview icon IDs are fixed:
---   - Trinket 1: 7137585 (inv_112_raidtrinkets_trinkettechnomancer_ritualengine)
---   - Trinket 2: 7137586 (inv_112_raidtrinkets_voidprism)
--- - A spacer row is inserted after Trinket 2 and after Combat Potions.
--- - Health/Combat potion rows render icons inline with the toggle, with arrows (→) between icons.
--- - Potion options icons come from options-only metadata lists
---   (`HEALTH_POTIONS_OPTIONS`, `COMBAT_POTIONS_OPTIONS`) and only entries with `showInOptions=true` are shown.
--- - Runtime selection still uses `HEALTH_POTIONS`/`COMBAT_POTIONS` priority arrays.
--- - Active potion icon uses full opacity; non-active previews use 0.7 opacity.
--- - If no potion is owned, the top-priority icon is treated as active.
--- - Failed icon lookups fall back to "Interface\\Icons\\INV_Misc_QuestionMark".
+-- - Options are split into three groups:
+--   - Basic Settings: Enable item icons
+--   - Items: Show first trinket, Show second trinket
+--   - Consumables: Show health potions, Show combat potions, Show healthstone
+-- - "Enable item icons" disables/enables all other controls in the Item Icons section.
 
 -- 5. Main Options Table
 local function GetOptionsTable() ... end

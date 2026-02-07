@@ -7,7 +7,6 @@ local _, ns = ...
 local ECM = ns.Addon
 local Util = ns.Util
 local C = ns.Constants
-local AceGUI = LibStub("AceGUI-3.0", true)
 
 local ECMFrame = ns.Mixins.ECMFrame
 
@@ -403,82 +402,6 @@ end
 -- Options UI
 --------------------------------------------------------------------------------
 
-local PREVIEW_CONTROL_TYPE = "ECM_ItemIconPreview"
-local PREVIEW_CONTROL_VERSION = 1
-local _previewControlRegistered = false
-
---- Registers a lightweight icon-only AceGUI control for options previews.
-local function EnsurePreviewControlRegistered()
-    if _previewControlRegistered or not AceGUI then
-        return
-    end
-
-    local currentVersion = AceGUI:GetWidgetVersion(PREVIEW_CONTROL_TYPE) or 0
-    if currentVersion >= PREVIEW_CONTROL_VERSION then
-        _previewControlRegistered = true
-        return
-    end
-
-    local methods = {
-        OnAcquire = function(widget)
-            local size = C.ITEM_ICONS_OPTIONS_PREVIEW_SIZE
-            widget.frame:SetHeight(size)
-            widget.frame.height = size
-            widget:SetImage(nil)
-            widget:SetImageSize(size, size)
-            widget:SetDisabled(false)
-        end,
-        SetText = function()
-        end,
-        SetFontObject = function()
-        end,
-        SetImage = function(widget, texture, ...)
-            local image = widget.image
-            image:SetTexture(texture)
-            local n = select("#", ...)
-            if n == 4 or n == 8 then
-                image:SetTexCoord(...)
-            else
-                image:SetTexCoord(0, 1, 0, 1)
-            end
-        end,
-        SetImageSize = function(widget, width, height)
-            widget.image:SetSize(width, height)
-            widget.frame:SetHeight(height)
-            widget.frame.height = height
-        end,
-        SetDisabled = function(widget, disabled)
-            if disabled then
-                widget.image:SetAlpha(C.ITEM_ICONS_OPTIONS_INACTIVE_ALPHA)
-            else
-                widget.image:SetAlpha(1)
-            end
-        end,
-    }
-
-    local function Constructor()
-        local frame = CreateFrame("Frame", nil, UIParent)
-        frame:Hide()
-        local image = frame:CreateTexture(nil, "BACKGROUND")
-        image:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-
-        local widget = {
-            frame = frame,
-            image = image,
-            type = PREVIEW_CONTROL_TYPE,
-        }
-
-        for method, func in pairs(methods) do
-            widget[method] = func
-        end
-
-        return AceGUI:RegisterAsWidget(widget)
-    end
-
-    AceGUI:RegisterWidgetType(PREVIEW_CONTROL_TYPE, Constructor, PREVIEW_CONTROL_VERSION)
-    _previewControlRegistered = true
-end
-
 --- Gets a module config value for options with a fallback default.
 ---@param self ECM_ItemIconsModule
 ---@param key string
@@ -510,158 +433,38 @@ local function IsOptionsDisabled(self)
     return not GetOptionValue(self, "enabled", true)
 end
 
---- Gets the first currently-owned item from a priority list, falling back to top priority.
----@param priorityList number[]
----@return number|nil
-local function GetActivePriorityItemId(priorityList)
-    local firstItemId = priorityList and priorityList[1]
-    if not priorityList then
-        return nil
-    end
-
-    for _, itemId in ipairs(priorityList) do
-        if C_Item.GetItemCount(itemId) > 0 then
-            return itemId
-        end
-    end
-
-    return firstItemId
+--- Builds a standard Item Icons module toggle option.
+---@param self ECM_ItemIconsModule
+---@param key string
+---@param label string
+---@param order number
+---@return table
+local function BuildModuleToggleOption(self, key, label, order)
+    return {
+        type = "toggle",
+        name = label,
+        order = order,
+        width = "full",
+        disabled = function()
+            return IsOptionsDisabled(self)
+        end,
+        get = function()
+            return GetOptionValue(self, key, true)
+        end,
+        set = function(_, val)
+            local moduleConfig = self.ModuleConfig
+            if moduleConfig then
+                moduleConfig[key] = val
+            end
+            RequestLayoutUpdate(self)
+        end,
+    }
 end
 
---- Gets a display texture for an item icon preview.
----@param itemId number|nil
----@return string|number
-local function GetItemPreviewTexture(itemId)
-    if itemId then
-        local texture = C_Item.GetItemIconByID(itemId)
-        if texture then
-            return texture
-        end
-    end
-
-    return C.ITEM_ICONS_OPTIONS_FALLBACK_TEXTURE
-end
-
---- Gets alpha value for a potion preview icon.
----@param itemId number
----@param activeItemId number|nil
----@return number
-local function GetPotionIconAlpha(itemId, activeItemId)
-    if itemId == activeItemId then
-        return 1
-    end
-
-    return C.ITEM_ICONS_OPTIONS_INACTIVE_ALPHA
-end
-
---- Returns potion item IDs that are enabled for options display.
----@param optionsList table[]|nil
----@return number[]
-local function GetOptionsPreviewItemIds(optionsList)
-    local itemIds = {}
-    if not optionsList then
-        return itemIds
-    end
-
-    for _, entry in ipairs(optionsList) do
-        if entry and entry.showInOptions and entry.itemId then
-            itemIds[#itemIds + 1] = entry.itemId
-        end
-    end
-
-    return itemIds
-end
-
---- Builds Item Icons options UI args.
----@return table args AceConfig args for Item Icons options.
-function ItemIcons:GetOptionsArgs()
-    EnsurePreviewControlRegistered()
-
-    local orderStep = C.ITEM_ICONS_OPTIONS_ROW_SPACER_ORDER_STEP
-    local rowWidth = C.ITEM_ICONS_OPTIONS_ROW_WIDTH
-    local toggleWidth = C.ITEM_ICONS_OPTIONS_TOGGLE_WIDTH
-    local previewWidth = C.ITEM_ICONS_OPTIONS_PREVIEW_WIDTH
-    local staticPreviewWidth = C.ITEM_ICONS_OPTIONS_STATIC_PREVIEW_WIDTH
-    local arrowWidth = C.ITEM_ICONS_OPTIONS_ARROW_WIDTH
-
-    local function BuildRowSpacer(order)
-        return {
-            type = "description",
-            name = " ",
-            order = order,
-            width = "full",
-        }
-    end
-
-    local function BuildRowFiller(order, width)
-        if width <= 0 then
-            return nil
-        end
-
-        return {
-            type = "description",
-            name = " ",
-            order = order,
-            width = width,
-        }
-    end
-
-    local function BuildArrow(order)
-        return {
-            type = "description",
-            name = C.ITEM_ICONS_OPTIONS_ARROW_TEXT,
-            order = order,
-            width = arrowWidth,
-            fontSize = "medium",
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-        }
-    end
-
-    local function BuildStaticPreview(order, textureProvider)
-        return {
-            type = "description",
-            name = " ",
-            order = order,
-            width = staticPreviewWidth,
-            dialogControl = PREVIEW_CONTROL_TYPE,
-            image = function()
-                return textureProvider()
-            end,
-            imageWidth = C.ITEM_ICONS_OPTIONS_PREVIEW_SIZE,
-            imageHeight = C.ITEM_ICONS_OPTIONS_PREVIEW_SIZE,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-        }
-    end
-
-    local function BuildPriorityPreview(order, itemId, runtimePriorityList)
-        return {
-            type = "description",
-            name = " ",
-            order = order,
-            width = previewWidth,
-            dialogControl = PREVIEW_CONTROL_TYPE,
-            image = function()
-                return GetItemPreviewTexture(itemId)
-            end,
-            imageWidth = C.ITEM_ICONS_OPTIONS_PREVIEW_SIZE,
-            imageHeight = C.ITEM_ICONS_OPTIONS_PREVIEW_SIZE,
-            disabled = function()
-                if IsOptionsDisabled(self) then
-                    return true
-                end
-
-                local activeItemId = GetActivePriorityItemId(runtimePriorityList)
-                return GetPotionIconAlpha(itemId, activeItemId) < 1
-            end,
-        }
-    end
-
-    local staticFillerWidth = math.max(0, rowWidth - toggleWidth - staticPreviewWidth)
-    local args = {
+--- Builds Item Icons basic settings options.
+---@return table
+function ItemIcons:GetBasicOptionsArgs()
+    return {
         description = {
             type = "description",
             name = "Displays icons for equipped on-use trinkets and selected consumables next to the Utility Cooldown Viewer.",
@@ -695,145 +498,26 @@ function ItemIcons:GetOptionsArgs()
                 ECM.ScheduleLayoutUpdate(0)
             end,
         },
-        showTrinket1 = {
-            type = "toggle",
-            name = "Show first trinket",
-            order = 2,
-            width = toggleWidth,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-            get = function()
-                return GetOptionValue(self, "showTrinket1", true)
-            end,
-            set = function(_, val)
-                local moduleConfig = self.ModuleConfig
-                if moduleConfig then
-                    moduleConfig.showTrinket1 = val
-                end
-                RequestLayoutUpdate(self)
-            end,
-        },
-        showTrinket1Filler = BuildRowFiller(2 + orderStep, staticFillerWidth),
-        showTrinket1Preview = BuildStaticPreview(2.1, function()
-            return GetItemPreviewTexture(C.ITEM_ICONS_OPTIONS_TRINKET1_ICON_ID)
-        end),
-        showTrinket2 = {
-            type = "toggle",
-            name = "Show second trinket",
-            order = 3,
-            width = toggleWidth,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-            get = function()
-                return GetOptionValue(self, "showTrinket2", true)
-            end,
-            set = function(_, val)
-                local moduleConfig = self.ModuleConfig
-                if moduleConfig then
-                    moduleConfig.showTrinket2 = val
-                end
-                RequestLayoutUpdate(self)
-            end,
-        },
-        showTrinket2Filler = BuildRowFiller(3 + orderStep, staticFillerWidth),
-        showTrinket2Preview = BuildStaticPreview(3.1, function()
-            return GetItemPreviewTexture(C.ITEM_ICONS_OPTIONS_TRINKET2_ICON_ID)
-        end),
-        trinketSpacer = BuildRowSpacer(3.2),
-        showHealthPotion = {
-            type = "toggle",
-            name = "Show health potions",
-            order = 4,
-            width = toggleWidth,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-            get = function()
-                return GetOptionValue(self, "showHealthPotion", true)
-            end,
-            set = function(_, val)
-                local moduleConfig = self.ModuleConfig
-                if moduleConfig then
-                    moduleConfig.showHealthPotion = val
-                end
-                RequestLayoutUpdate(self)
-            end,
-        },
-        showCombatPotion = {
-            type = "toggle",
-            name = "Show combat potions",
-            order = 5,
-            width = toggleWidth,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-            get = function()
-                return GetOptionValue(self, "showCombatPotion", true)
-            end,
-            set = function(_, val)
-                local moduleConfig = self.ModuleConfig
-                if moduleConfig then
-                    moduleConfig.showCombatPotion = val
-                end
-                RequestLayoutUpdate(self)
-            end,
-        },
-        combatSpacer = BuildRowSpacer(5.9),
-        showHealthstone = {
-            type = "toggle",
-            name = "Show healthstone",
-            order = 6,
-            width = toggleWidth,
-            disabled = function()
-                return IsOptionsDisabled(self)
-            end,
-            get = function()
-                return GetOptionValue(self, "showHealthstone", true)
-            end,
-            set = function(_, val)
-                local moduleConfig = self.ModuleConfig
-                if moduleConfig then
-                    moduleConfig.showHealthstone = val
-                end
-                RequestLayoutUpdate(self)
-            end,
-        },
-        showHealthstoneFiller = BuildRowFiller(6 + orderStep, staticFillerWidth),
-        showHealthstonePreview = BuildStaticPreview(6.1, function()
-            return GetItemPreviewTexture(C.HEALTHSTONE_ITEM_ID)
-        end),
     }
+end
 
-    local function AddPotionPreviewRow(prefix, baseOrder, runtimePriorityList, optionsList)
-        local shownItemIds = GetOptionsPreviewItemIds(optionsList)
-        local shownCount = #shownItemIds
-        local chainWidth = (shownCount * previewWidth) + (math.max(0, shownCount - 1) * arrowWidth)
-        local fillerWidth = math.max(0, rowWidth - toggleWidth - chainWidth)
-        local order = baseOrder + orderStep
+--- Builds Item Icons item toggles options.
+---@return table
+function ItemIcons:GetItemOptionsArgs()
+    return {
+        showTrinket1 = BuildModuleToggleOption(self, "showTrinket1", "Show first trinket", 1),
+        showTrinket2 = BuildModuleToggleOption(self, "showTrinket2", "Show second trinket", 2),
+    }
+end
 
-        local filler = BuildRowFiller(order, fillerWidth)
-        if filler then
-            args[prefix .. "PreviewFiller"] = filler
-            order = order + orderStep
-        end
-
-        for index, itemId in ipairs(shownItemIds) do
-            args[prefix .. "Preview" .. index] = BuildPriorityPreview(order, itemId, runtimePriorityList)
-            order = order + orderStep
-
-            if index < shownCount then
-                args[prefix .. "Arrow" .. index] = BuildArrow(order)
-                order = order + orderStep
-            end
-        end
-    end
-
-    AddPotionPreviewRow("healthPotion", 4, C.HEALTH_POTIONS, C.HEALTH_POTIONS_OPTIONS)
-    AddPotionPreviewRow("combatPotion", 5, C.COMBAT_POTIONS, C.COMBAT_POTIONS_OPTIONS)
-
-    return args
+--- Builds Item Icons consumable toggles options.
+---@return table
+function ItemIcons:GetConsumableOptionsArgs()
+    return {
+        showHealthPotion = BuildModuleToggleOption(self, "showHealthPotion", "Show health potions", 1),
+        showCombatPotion = BuildModuleToggleOption(self, "showCombatPotion", "Show combat potions", 2),
+        showHealthstone = BuildModuleToggleOption(self, "showHealthstone", "Show healthstone", 3),
+    }
 end
 
 --- Builds the Item Icons options group.
@@ -844,12 +528,26 @@ function ItemIcons:GetOptionsTable()
         name = "Item Icons",
         order = 6,
         args = {
-            mainOptions = {
+            basicSettings = {
                 type = "group",
-                name = "Main Options",
+                name = "Basic Settings",
                 inline = true,
                 order = 1,
-                args = self:GetOptionsArgs(),
+                args = self:GetBasicOptionsArgs(),
+            },
+            itemSettings = {
+                type = "group",
+                name = "Items",
+                inline = true,
+                order = 2,
+                args = self:GetItemOptionsArgs(),
+            },
+            consumableSettings = {
+                type = "group",
+                name = "Consumables",
+                inline = true,
+                order = 3,
+                args = self:GetConsumableOptionsArgs(),
             },
         },
     }
