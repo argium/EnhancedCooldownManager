@@ -2,7 +2,6 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
----@class ECMOptionsModule Options module.
 local _, ns = ...
 
 local ECM = ns.Addon
@@ -15,8 +14,6 @@ local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDBOptions = LibStub("AceDBOptions-3.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
--- Constants
-local SIDEBAR_BG_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.9 }
 local POSITION_MODE_TEXT = {
     [C.ANCHORMODE_CHAIN] = "Position Automatically",
     [C.ANCHORMODE_FREE] = "Free Positioning",
@@ -53,39 +50,22 @@ local function SetModuleEnabled(moduleName, enabled)
     end
 end
 
---------------------------------------------------------------------------------
--- Utility: Deep compare for detecting changes from defaults
---------------------------------------------------------------------------------
-local function DeepEquals(a, b)
-    if a == b then return true end
-    if type(a) ~= type(b) then return false end
-    if type(a) ~= "table" then return a == b end
-    for k, v in pairs(a) do
-        if not DeepEquals(v, b[k]) then return false end
+--- Normalize a path key by converting numeric strings to numbers, leaving other strings unchanged.
+--- This allows config paths to use either numeric indices or string keys interchangeably.
+--- @param key string The path key to normalize
+--- @return number|string The normalized key, as a number if it was a numeric string, or unchanged if not
+local function NormalizePathKey(key)
+    local numberKey = tonumber(key)
+    if numberKey then
+        return numberKey
     end
-    for k in pairs(b) do
-        if a[k] == nil then return false end
-    end
-    return true
+    return key
 end
 
---------------------------------------------------------------------------------
--- Utility: Deep copy a value (handles nested tables)
---------------------------------------------------------------------------------
-local function DeepCopy(val)
-    if type(val) ~= "table" then return val end
-    local copy = {}
-    for k, v in pairs(val) do
-        copy[k] = DeepCopy(v)
-    end
-    return copy
-end
-
---------------------------------------------------------------------------------
--- Utility: Get nested value from table using dot-separated path
---------------------------------------------------------------------------------
-local NormalizePathKey
-
+--- Gets the nested value from table using dot-separated path
+--- @param tbl table The table to get the value from
+--- @param path string The dot-separated path to the value (e.g., "powerBar.width")
+--- @return any The value at the specified path, or nil if any part of the path is invalid
 local function GetNestedValue(tbl, path)
     local current = tbl
     for resource in path:gmatch("[^.]+") do
@@ -95,14 +75,10 @@ local function GetNestedValue(tbl, path)
     return current
 end
 
-NormalizePathKey = function(key)
-    local numberKey = tonumber(key)
-    if numberKey then
-        return numberKey
-    end
-    return key
-end
-
+--- Splits a dot-separated path into its individual components.
+--- For example, "powerBar.width" would be split into {"powerBar", "width"}.
+--- @param path string The dot-separated path to split
+--- @return table An array of path components
 local function SplitPath(path)
     local resources = {}
     for resource in path:gmatch("[^.]+") do
@@ -111,9 +87,12 @@ local function SplitPath(path)
     return resources
 end
 
---------------------------------------------------------------------------------
--- Utility: Set nested value in table using dot-separated path
---------------------------------------------------------------------------------
+--- Sets a nested value in a table using a dot-separated path, creating intermediate tables as needed.
+--- For example, setting the path "powerBar.width" to 200 would create the tables if they don't exist and set powerBar.width = 200.
+--- @param tbl table The table to set the value in
+--- @param path string The dot-separated path to the value (e.g., "powerBar.width")
+--- @param value any The value to set at the specified path
+--- @return nil
 local function SetNestedValue(tbl, path, value)
     local resources = SplitPath(path)
     local current = tbl
@@ -127,9 +106,9 @@ local function SetNestedValue(tbl, path, value)
     current[NormalizePathKey(resources[#resources])] = value
 end
 
---------------------------------------------------------------------------------
--- Utility: Check if value differs from default
---------------------------------------------------------------------------------
+--- Checks if value differs from default
+--- @param path string The dot-separated config path to check (e.g., "powerBar.width")
+--- @return boolean True if the current value differs from the default value, false otherwise
 local function IsValueChanged(path)
     local profile = ECM.db and ECM.db.profile
     local defaults = ECM.db and ECM.db.defaults and ECM.db.defaults.profile
@@ -143,12 +122,12 @@ local function IsValueChanged(path)
         currentVal = currentVal,
         defaultVal = defaultVal,
     })
-    return not DeepEquals(currentVal, defaultVal)
+    return not Util.DeepEquals(currentVal, defaultVal)
 end
 
---------------------------------------------------------------------------------
--- Utility: Reset value to default
---------------------------------------------------------------------------------
+--- Resets the value at the specified config path to its default value.
+--- @param path string The dot-separated config path to reset (e.g., "powerBar.width")
+--- @return nil
 local function ResetToDefault(path)
     local profile = ECM.db and ECM.db.profile
     local defaults = ns.defaults and ns.defaults.profile
@@ -156,12 +135,13 @@ local function ResetToDefault(path)
 
     local defaultVal = GetNestedValue(defaults, path)
     -- Deep copy for tables (recursive to handle nested tables)
-    SetNestedValue(profile, path, DeepCopy(defaultVal))
+    SetNestedValue(profile, path, Util.DeepCopy(defaultVal))
 end
 
---------------------------------------------------------------------------------
--- Build LibSharedMedia dropdown values
---------------------------------------------------------------------------------
+--- Generates LibSharedMedia dropdown values
+--- @param mediaType string The type of media to retrieve (e.g., "statusbar", "font")
+--- @param fallback string The fallback value to use if no media of the specified type is found
+--- @return table A table of media names keyed by name, suitable for use as values in an AceConfig select option
 local function GetLSMValues(mediaType, fallback)
     local values = {}
     if LSM and LSM.List then
@@ -179,12 +159,12 @@ local function GetLSMStatusbarValues()
     return GetLSMValues("statusbar", "Blizzard")
 end
 
---------------------------------------------------------------------------------
--- Utility: Get current class and spec, localised.
---------------------------------------------------------------------------------
 
---- Gets current class and spec IDs.
----@return number|nil classID, number|nil specIndex, string className, string specName
+--- Gets the current player's class and specialization information.
+--- @return classID number The player's class ID (e.g., 1 for Warrior, 2 for Paladin, etc.)
+--- @return specIndex number The player's current specialization index (1-based), or nil if not applicable
+--- @return localisedClassName string The localized name of the player's class (e.g., "Warrior", "Paladin")
+--- @return specName string The name of the player's current specialization (e.g., "Arms", "Holy"), or "None" if not applicable
 local function GetCurrentClassSpec()
     local localisedClassName, className, classID = UnitClass("player")
     local specIndex = GetSpecialization()
@@ -200,10 +180,10 @@ local function IsDeathKnight()
     return className == "DEATHKNIGHT"
 end
 
-
---------------------------------------------------------------------------------
--- Options table generators for each section
---------------------------------------------------------------------------------
+--- Generates a reset handler function for a specific config path, which resets that path to its default value and optionally calls a refresh function.
+--- @param path string The dot-separated config path to reset (e.g., "powerBar.width")
+--- @param refreshFunc function|nil An optional function to call after resetting the value, for refreshing the UI or performing additional updates
+--- @return function A function that, when called, will reset the specified config path to its default value and call the refresh function if provided
 local function MakeResetHandler(path, refreshFunc)
     return function()
         ResetToDefault(path)
@@ -554,6 +534,13 @@ local function PowerBarOptionsTable()
         name = "Power Bar",
         order = 2,
         args = {
+            notShownNotice = {
+                type = "description",
+                name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
+                order = 0,
+                fontSize = "medium",
+                hidden = function() return ECM.PowerBar:ShouldShow() end,
+            },
             basicSettings = {
                 type = "group",
                 name = "Basic Settings",
@@ -563,7 +550,7 @@ local function PowerBarOptionsTable()
                     enabled = {
                         type = "toggle",
                         name = "Enable power bar",
-                        order = 2,
+                        order = 1,
                         width = "full",
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
@@ -744,6 +731,13 @@ local function ResourceBarOptionsTable()
         name = "Resource Bar",
         order = 3,
         args = {
+            notShownNotice = {
+                type = "description",
+                name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
+                order = 0,
+                fontSize = "medium",
+                hidden = function() return ECM.ResourceBar:ShouldShow() end,
+            },
             basicSettings = {
                 type = "group",
                 name = "Basic Settings",
@@ -753,7 +747,7 @@ local function ResourceBarOptionsTable()
                     enabled = {
                         type = "toggle",
                         name = "Enable resource bar",
-                        order = 3,
+                        order = 1,
                         width = "full",
                         get = function() return db.profile.resourceBar.enabled end,
                         set = function(_, val)
@@ -765,7 +759,7 @@ local function ResourceBarOptionsTable()
                     heightDesc = {
                         type = "description",
                         name = "\nOverride the default bar height. Set to 0 to use the global default.",
-                        order = 4,
+                        order = 3,
                     },
                     height = {
                         type = "range",
@@ -1644,7 +1638,7 @@ local function AddTick(value, color, width)
 
     local newTick = {
         value = value,
-        color = color or DeepCopy(ticksCfg.defaultColor),
+        color = color or Util.DeepCopy(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
     table.insert(ticks, newTick)
@@ -1979,7 +1973,7 @@ local function AboutOptionsTable()
                 args = {
                     resetDesc = {
                         type = "description",
-                        name = "Reset all Enhanced Cooldown Manager settings to their default values and reload the UI. This action cannot be undone.",
+                        name = "Reset all settings to their default values and reload the UI. This action cannot be undone.",
                         order = 1,
                     },
                     resetAll = {
@@ -1988,7 +1982,7 @@ local function AboutOptionsTable()
                         order = 2,
                         width = "full",
                         confirm = true,
-                        confirmText = "This will reset ALL Enhanced Cooldown Manager settings to their defaults and reload the UI. This cannot be undone. Are you sure?",
+                        confirmText = "This will reset ALL settings to their defaults and reload the UI. This cannot be undone. Are you sure?",
                         func = function()
                             db:ResetProfile()
                             ReloadUI()
@@ -2034,13 +2028,6 @@ function Options:OnInitialize()
         "Enhanced Cooldown Manager"
     )
 
-    -- Apply custom styling to the options frame when shown
-    if self.optionsFrame then
-        self.optionsFrame:HookScript("OnShow", function(frame)
-            self:StyleOptionsFrame(frame)
-        end)
-    end
-
     -- Register callbacks for profile changes to refresh bars
     local db = ECM.db
     db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
@@ -2062,46 +2049,6 @@ end
 
 function Options:OnDisable()
     -- Nothing special needed
-end
-
---------------------------------------------------------------------------------
--- Apply custom styling to AceConfigDialog frame
---------------------------------------------------------------------------------
-function Options:StyleOptionsFrame(frame)
-    -- Find the tree group and style the sidebar
-    C_Timer.After(0.05, function()
-        self:ApplySidebarStyling()
-    end)
-end
-
-function Options:ApplySidebarStyling()
-    -- The tree is inside the options container
-    local container = self.optionsFrame and self.optionsFrame.obj
-    if not container then return end
-
-    -- Try to find the tree frame
-    local treeframe = container.treeframe
-    if not treeframe then return end
-
-    -- Apply dark background with rounded borders using backdrop
-    if not treeframe.ecmStyled then
-        treeframe.ecmStyled = true
-
-        -- Create a backdrop frame for rounded corners
-        local backdropFrame = CreateFrame("Frame", nil, treeframe, "BackdropTemplate")
-        backdropFrame:SetAllPoints()
-        backdropFrame:SetFrameLevel(treeframe:GetFrameLevel() - 1)
-        backdropFrame:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true,
-            tileSize = 16,
-            edgeSize = 12,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 },
-        })
-        backdropFrame:SetBackdropColor(SIDEBAR_BG_COLOR.r, SIDEBAR_BG_COLOR.g, SIDEBAR_BG_COLOR.b, SIDEBAR_BG_COLOR.a)
-        backdropFrame:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
-    end
 end
 
 --------------------------------------------------------------------------------

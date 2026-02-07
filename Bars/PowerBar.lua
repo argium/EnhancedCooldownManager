@@ -87,7 +87,6 @@ function PowerBar:Refresh(force)
     return true
 end
 
-
 function PowerBar:ShouldShow()
     local show = BarFrame.ShouldShow(self)
     if show then

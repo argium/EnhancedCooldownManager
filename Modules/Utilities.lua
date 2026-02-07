@@ -162,6 +162,23 @@ local function SafeCopyValue(v)
     return v
 end
 
+--- Performs a deep equality check between two values
+--- @param a any
+--- @param b any
+--- @return boolean
+function Util.DeepEquals(a, b)
+    if a == b then return true end
+    if type(a) ~= type(b) then return false end
+    if type(a) ~= "table" then return a == b end
+    for k, v in pairs(a) do
+        if not Util.DeepEquals(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
 --- Creates a deep copy of a table with cycle detection and depth limit.
 ---@param tbl any
 ---@param seen table|nil
