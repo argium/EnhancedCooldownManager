@@ -1204,10 +1204,16 @@ end
 
 local function AuraBarsOptionsTable()
     local db = ECM.db
+
+    local spells = SpellOptionsTable()
+    spells.name = ""
+    spells.inline = true
+    spells.order = 5
+
     local colors = ColoursOptionsTable()
     colors.name = ""
     colors.inline = true
-    colors.order = 5
+    colors.order = 6
 
     return {
         type = "group",
@@ -1271,6 +1277,33 @@ local function AuraBarsOptionsTable()
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
+                    heightDesc = {
+                        type = "description",
+                        name = "\nOverride the default bar height. Set to 0 to use the global default.",
+                        order = 8,
+                    },
+                    height = {
+                        type = "range",
+                        name = "Height Override",
+                        order = 9,
+                        width = "double",
+                        min = 0,
+                        max = 40,
+                        step = 1,
+                        get = function() return db.profile.buffBars.height or 0 end,
+                        set = function(_, val)
+                            db.profile.buffBars.height = val > 0 and val or nil
+                            ECM.ScheduleLayoutUpdate(0)
+                        end,
+                    },
+                    heightReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 10,
+                        width = 0.3,
+                        hidden = function() return not IsValueChanged("buffBars.height") end,
+                        func = MakeResetHandler("buffBars.height"),
+                    },
                 },
             },
             positioningSettings = (function()
@@ -1319,7 +1352,78 @@ local function AuraBarsOptionsTable()
                     args = positioningArgs,
                 }
             end)(),
+            spells = spells,
             colors = colors,
+        },
+    }
+end
+
+--------------------------------------------------------------------------------
+-- Spell Options (top-level section for per-spell color customization)
+--------------------------------------------------------------------------------
+SpellOptionsTable = function()
+    local db = ECM.db
+    return {
+        type = "group",
+        name = "Spells",
+        order = 3,
+        args = {
+            header = {
+                type = "header",
+                name = "Per-spell Colors",
+                order = 1,
+            },
+            desc = {
+                type = "description",
+                name = "Customize colors for individual spells. Colors are saved per class and spec. Spells will appear here after they've been visible at least once.\n\n",
+                order = 2,
+                fontSize = "medium",
+            },
+            currentSpec = {
+                type = "description",
+                name = function()
+                    local _, _, className, specName = GetCurrentClassSpec()
+                    return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
+                end,
+                order = 3,
+            },
+            spacer1 = {
+                type = "description",
+                name = " ",
+                order = 4,
+            },
+            defaultColor = {
+                type = "color",
+                name = "Default color",
+                desc = "Default color for spells without a custom color.",
+                order = 10,
+                width = "double",
+                get = function()
+                    local c = db.profile.buffBars.colors.defaultColor
+                    return c.r, c.g, c.b
+                end,
+                set = function(_, r, g, b)
+                    db.profile.buffBars.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
+                    ECM.ScheduleLayoutUpdate(0)
+                end,
+            },
+            defaultColorReset = {
+                type = "execute",
+                name = "X",
+                desc = "Reset to default",
+                order = 11,
+                width = 0.3,
+                hidden = function() return not IsValueChanged("buffBars.colors.defaultColor") end,
+                func = MakeResetHandler("buffBars.colors.defaultColor"),
+            },
+
+            spellColorsGroup = {
+                type = "group",
+                name = "",
+                order = 30,
+                inline = true,
+                args = {},
+            },
         },
     }
 end
@@ -1358,31 +1462,6 @@ ColoursOptionsTable = function()
                 name = " ",
                 order = 4,
             },
-            defaultColor = {
-                type = "color",
-                name = "Default color",
-                desc = "Default color for bars without a custom color.",
-                order = 10,
-                width = "double",
-                get = function()
-                    local c = db.profile.buffBars.colors.defaultColor
-                    return c.r, c.g, c.b
-                end,
-                set = function(_, r, g, b)
-                    db.profile.buffBars.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
-                    ECM.ScheduleLayoutUpdate(0)
-                end,
-            },
-            defaultColorReset = {
-                type = "execute",
-                name = "X",
-                desc = "Reset to default",
-                order = 11,
-                width = 0.3,
-                hidden = function() return not IsValueChanged("buffBars.colors.defaultColor") end,
-                func = MakeResetHandler("buffBars.colors.defaultColor"),
-            },
-
             refreshBarList = {
                 type = "execute",
                 name = "Refresh Bar List",
@@ -1409,11 +1488,100 @@ ColoursOptionsTable = function()
     }
 end
 
+--- Generates dynamic per-spell color options.
+---@return table args
+local function GenerateSpellColorArgs()
+    local args = {}
+    local buffBars = ECM.BuffBars
+    local db = ECM.db
+    if not buffBars then
+        return args
+    end
+
+    local cachedBars = buffBars:GetCachedBars()
+    if not cachedBars or not next(cachedBars) then
+        args.noData = {
+            type = "description",
+            name = "|cffaaaaaa(No buff bars cached yet. Cast a buff and click 'Refresh Bar List'.)|r",
+            order = 1,
+        }
+        return args
+    end
+
+    local spellSettings = buffBars:GetSpellSettings()
+
+    if spellSettings then
+
+        local spells = {}
+
+        for spellName, v in pairs(spellSettings) do
+            spells[spellName] = {}
+        end
+
+        for i, c in ipairs(cachedBars) do
+            if c and c.spellName then
+                spells[c.spellName] = {}
+            end
+        end
+
+        local i = 1
+        for spellName, v in pairs(spells) do
+            local colorKey = "spellColor" .. i
+            local resetKey = "spellColor" .. i .. "Reset"
+
+            args[colorKey] = {
+                type = "color",
+                name = spellName,
+                desc = "Color for " .. spellName,
+                order = i * 10,
+                width = "double",
+                get = function()
+                    return buffBars:GetSpellColor(spellName)
+                end,
+                set = function(_, r, g, b)
+                    buffBars:SetSpellColor(spellName, r, g, b)
+                end,
+            }
+
+            args[resetKey] = {
+                type = "execute",
+                name = "X",
+                desc = "Reset to default",
+                order = i * 10 + 1,
+                width = 0.3,
+                hidden = function()
+                    return not buffBars:HasCustomSpellColor(spellName)
+                end,
+                func = function()
+                    buffBars:ResetSpellColor(spellName)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+                end,
+            }
+
+            i = i + 1
+        end
+    end
+
+    return args
+end
+
+-- Hook into options refresh to update bar color list
+local _originalSpellOptionsTable = SpellOptionsTable
+SpellOptionsTable = function()
+    local result = _originalSpellOptionsTable()
+    -- Inject dynamic bar color args
+    if result.args and result.args.spellColorsGroup then
+        result.args.spellColorsGroup.args = GenerateSpellColorArgs()
+    end
+    return result
+end
+
 --- Generates dynamic per-bar color options based on cached bars.
 ---@return table args
 local function GenerateBarColorArgs()
     local args = {}
     local buffBars = ECM.BuffBars
+    local db = ECM.db
     if not buffBars then
         return args
     end
@@ -1446,32 +1614,9 @@ local function GenerateBarColorArgs()
         local resetKey = "barColor" .. barIndex .. "Reset"
 
         args[colorKey] = {
-            type = "color",
+            type = "description",
             name = displayName,
-            desc = "Color for bar at position " .. barIndex,
-            order = i * 10,
-            width = "double",
-            get = function()
-                return buffBars:GetBarColor(barIndex)
-            end,
-            set = function(_, r, g, b)
-                buffBars:SetBarColor(barIndex, r, g, b)
-            end,
-        }
-
-        args[resetKey] = {
-            type = "execute",
-            name = "X",
-            desc = "Reset to default",
-            order = i * 10 + 1,
-            width = 0.3,
-            hidden = function()
-                return not buffBars:HasCustomBarColor(barIndex)
-            end,
-            func = function()
-                buffBars:ResetBarColor(barIndex)
-                AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-            end,
+            order = i * 100,
         }
     end
 

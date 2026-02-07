@@ -508,6 +508,13 @@ function ECM:RunMigrations(profile)
 
         profile.schemaVersion = 5
     end
+
+    if profile.schemaVersion < 6 then
+        -- Migration: perBar -> perSpell
+        self:MigrateToPerSpellColorsIfNeeded(profile)
+
+        profile.schemaVersion = 6
+    end
 end
 
 function ECM:OnInitialize()
@@ -561,4 +568,68 @@ function ECM:OnEnable()
             self:DisableModule(moduleName)
         end
     end
+end
+
+--------------------------------------------------------------------------------
+-- Migrations
+--------------------------------------------------------------------------------
+
+--- Migrates profiles from the per-bar color settings to per-spell
+---@param profile table The profile to migrate
+function ECM:MigrateToPerSpellColorsIfNeeded(profile)
+
+    local cfg = profile.buffBars
+
+    if not cfg then
+        return
+    end
+
+    local perBar = cfg.colors.perBar
+    local cache = cfg.colors.cache
+
+    if not perBar then
+        return
+    end
+
+    if not cfg.colors.perSpell then
+        cfg.colors.perSpell = {}
+    end
+
+    local perSpell = cfg.colors.perSpell
+
+    local function DoSpellMigration(perBar, perSpell, cache)
+        for i,v in ipairs(cache) do
+            if not v.color and v.spellName then
+                local bc = perBar[i]
+
+                if bc then
+                    perSpell[v.spellName] = bc
+
+                    cache[i] = {
+                        lastSeen = v.lastSeen,
+                        spellName = v.spellName,
+                        color = bc
+                    }
+                end
+            end
+        end
+    end
+
+    for classID, spec in pairs(perBar) do
+          for specID, colors in pairs(spec) do
+            if not perSpell[classID] then
+                perSpell[classID] = {}
+            end
+
+            if not perSpell[classID][specID] then
+                perSpell[classID][specID] = {}
+            end
+
+            if cache[classID] and cache[classID][specID] then
+                DoSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
+            end
+        end
+    end
+
+    cfg.colors.perBar = nil
 end

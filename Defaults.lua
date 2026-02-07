@@ -223,7 +223,7 @@ local defaults = {
             showSpellName = true,
             showDuration = true,
             colors = {
-                perBar = {},
+                perSpell = {},
                 cache = {},
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
             },

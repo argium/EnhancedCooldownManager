@@ -37,6 +37,10 @@ local BarHelpers = {
         local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
         return Util.PixelSnap(height)
     end,
+    GetBarWidth = function(moduleConfig, globalConfig, fallback)
+        local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
+        return Util.PixelSnap(width)
+    end,
 }
 
 --- Returns current class ID and spec ID.
@@ -56,15 +60,15 @@ local function EnsureColorStorage(cfg)
 
     if not cfg.colors then
         cfg.colors = {
-            perBar = {},
+            perSpell = {},
             cache = {},
             defaultColor = C.BUFFBARS_DEFAULT_COLOR,
         }
     end
 
     local colors = cfg.colors
-    if not colors.perBar then
-        colors.perBar = {}
+    if not colors.perSpell then
+        colors.perSpell = {}
     end
     if not colors.cache then
         colors.cache = {}
@@ -86,25 +90,46 @@ local function GetColorContext(module)
     return cfg, classID, specID
 end
 
---- Returns color for bar at index for current class/spec, or palette/default if not set.
+--- Returns cached color for bar at index for current class/spec, or default if not set.
 ---@param barIndex number 1-based index in layout order
 ---@param cfg table|nil
 ---@return ECM_Color
-local function GetBarColor(barIndex, cfg)
+local function GetCachedBarColor(barIndex, cfg)
     if not cfg then
         return C.BUFFBARS_DEFAULT_COLOR
     end
 
     local classID, specID = GetCurrentClassSpec()
-    local colors = cfg.colors.perBar
-    if classID and specID and colors[classID] and colors[classID][specID] then
-        local c = colors[classID][specID][barIndex]
+    local cache = cfg.colors.cache
+    if classID and specID and cache[classID] and cache[classID][specID] and cache[classID][specID][barIndex] then
+        local c = cache[classID][specID][barIndex].color
         if c then
             return c
         end
     end
 
     return cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
+end
+
+--- Returns color for spell with name spellName for current class/spec, or nil if not set.
+---@param spellName string
+---@param cfg table|nil
+---@return ECM_Color
+local function GetSpellColor(spellName, cfg)
+    if not cfg or not cfg.colors.perSpell then
+        return C.BUFFBARS_DEFAULT_COLOR
+    end
+
+    local classID, specID = GetCurrentClassSpec()
+    local colors = cfg.colors.perSpell
+    if classID and specID and colors[classID] and colors[classID][specID] then
+        local c = colors[classID][specID][spellName]
+        if c then
+            return c
+        end
+    end
+
+    return nil
 end
 
 --- Updates bar cache with current bar metadata for Options UI.
@@ -122,11 +147,20 @@ local function UpdateBarCache(barIndex, spellName, cfg)
     end
 
     local cache = cfg.colors.cache
+
+    if cache[classID] and cache[classID][specID] and cache[classID][specID][barIndex] and not spellName then
+        -- if this bar is already cached and we aren't able to get the spellName then exit
+        -- we don't want to overwrite a value by mistake
+        return
+    end
+
     cache[classID] = cache[classID] or {}
     cache[classID][specID] = cache[classID][specID] or {}
 
+    local spellColor = GetSpellColor(spellName or C.BUFFBARS_DEFAULT_SPELLNAME, cfg)
     cache[classID][specID][barIndex] = {
-        spellName = spellName,
+        color = spellColor,
+        spellName = spellName or C.BUFFBARS_DEFAULT_SPELLNAME,
         lastSeen = GetTime(),
     }
 end
@@ -390,12 +424,6 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     local tex = BarHelpers.GetTexture(texKey)
     bar:SetStatusBarTexture(tex)
 
-    -- Apply bar color from per-bar settings or default
-    if bar.SetStatusBarColor and barIndex then
-        local color = GetBarColor(barIndex, moduleConfig)
-        bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
-    end
-
     -- Update bar cache for Options UI (extract spell name safely)
     -- NOTE: Spell names from GetText() can be secret values - cannot compare them
     if barIndex then
@@ -406,8 +434,15 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
             if ok and text and (type(canaccessvalue) ~= "function" or canaccessvalue(text)) then
                 spellName = text
             end
+
+            UpdateBarCache(barIndex, spellName, moduleConfig)
         end
-        UpdateBarCache(barIndex, spellName, moduleConfig)
+    end
+
+    -- Apply bar color from per-bar settings or default
+    if bar.SetStatusBarColor and barIndex then
+        local color = GetCachedBarColor(barIndex, moduleConfig)
+        bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
     end
 
     local bgColor = BarHelpers.GetBgColor(moduleConfig, globalConfig)
@@ -537,6 +572,12 @@ function BuffBars:UpdateLayout()
         viewer:ClearAllPoints()
         viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
         viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
+    elseif params.mode == C.ANCHORMODE_FREE then
+        local width = BarHelpers.GetBarWidth(cfg, globalConfig, 300)
+
+        if width and width > 0 then
+            viewer:SetWidth(width)
+        end
     end
 
     -- Style all visible children (skip already-styled unless markers were reset)
@@ -718,68 +759,85 @@ function BuffBars:GetCachedBars()
     return {}
 end
 
---- Sets color for bar at index for current class/spec.
----@param barIndex number
+--- Returns configured spell colors for current class/spec for Options UI.
+---@return table<string, ECM_Color> per-spell colors Indexed by spell name
+function BuffBars:GetSpellSettings()
+    local cfg, classID, specID = GetColorContext(self)
+    if not cfg or not classID or not specID then
+        return {}
+    end
+
+    local cache = cfg.colors.perSpell
+    if cache[classID] and cache[classID][specID] then
+        return cache[classID][specID]
+    end
+
+    return {}
+end
+
+--- Sets color for named spell for current class/spec.
+---@param spellName string
 ---@param r number
 ---@param g number
 ---@param b number
-function BuffBars:SetBarColor(barIndex, r, g, b)
+function BuffBars:SetSpellColor(spellName, r, g, b)
     local cfg, classID, specID = GetColorContext(self)
     if not cfg or not classID or not specID then
         return
     end
 
-    local colors = cfg.colors.perBar
+    local colors = cfg.colors.perSpell
     colors[classID] = colors[classID] or {}
     colors[classID][specID] = colors[classID][specID] or {}
-    colors[classID][specID][barIndex] = { r = r, g = g, b = b, a = 1 }
+    colors[classID][specID][spellName] = { r = r, g = g, b = b, a = 1 }
 
-    Util.Log("BuffBars", "SetBarColor", { barIndex = barIndex, r = r, g = g, b = b })
+    Util.Log("BuffBars", "SetSpellColor", { spellName = spellName, r = r, g = g, b = b })
 
     self:ResetStyledMarkers()
     self:ScheduleLayoutUpdate()
 end
 
---- Resets color for bar at index to default.
----@param barIndex number
-function BuffBars:ResetBarColor(barIndex)
+--- Resets color for named spell to default.
+---@param spellName string
+function BuffBars:ResetSpellColor(spellName)
     local cfg, classID, specID = GetColorContext(self)
     if not cfg or not classID or not specID then
         return
     end
 
-    local colors = cfg.colors.perBar
+    local colors = cfg.colors.perSpell
     if colors[classID] and colors[classID][specID] then
-        colors[classID][specID][barIndex] = nil
+        colors[classID][specID][spellName] = nil
     end
 
-    Util.Log("BuffBars", "ResetBarColor", { barIndex = barIndex })
+    Util.Log("BuffBars", "ResetSpellColor", { spellName = spellName })
 
     -- Refresh bars to apply default color
     self:ResetStyledMarkers()
     self:ScheduleLayoutUpdate()
 end
 
---- Returns color for bar at index (wrapper for Options UI).
----@param barIndex number
+--- Returns color for named spell (wrapper for Options UI).
+---@param spellName string
 ---@return number r, number g, number b
-function BuffBars:GetBarColor(barIndex)
+function BuffBars:GetSpellColor(spellName)
     local cfg = self.ModuleConfig
-    local color = GetBarColor(barIndex, cfg)
+    local color = GetSpellColor(spellName, cfg) or cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
+
     return color.r, color.g, color.b
 end
 
---- Checks if bar at index has a custom color set.
----@param barIndex number
+--- Checks if a named spell has a custom color set.
+---@param spellName string
 ---@return boolean
-function BuffBars:HasCustomBarColor(barIndex)
+function BuffBars:HasCustomSpellColor(spellName)
     local cfg, classID, specID = GetColorContext(self)
     if not cfg or not classID or not specID then
         return false
     end
 
-    local colors = cfg.colors.perBar
-    return colors[classID] and colors[classID][specID] and colors[classID][specID][barIndex] ~= nil
+    local spells = cfg.colors.perSpell
+    return spells[classID] and spells[classID][specID] and spells[classID][specID][spellName] ~= nil
 end
 
 --------------------------------------------------------------------------------
