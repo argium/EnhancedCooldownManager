@@ -92,7 +92,7 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - Uses ECMFrame mixin for positioning and config access
 - Wraps Blizzard's BuffBarCooldownViewer instead of creating its own bars
 - Hooks Blizzard frames to apply custom styling
-- Implements per-bar color customization with class/spec persistence
+- Implements per-spell color customization with class/spec persistence
 
 **Design Decisions:**
 - Does NOT use BarFrame because it manages Blizzard-created child bars, not a single StatusBar
@@ -100,8 +100,9 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - Override `UpdateLayout()` to position viewer and style all visible children
 - BuffBars icon container is treated as deterministic (`child.Icon`); no cross-object fallback probing
 - Color system supports:
-  - Per-bar custom colors (stored per class/spec)
+  - Per-spell custom colors (stored per class/spec)
   - Default fallback color
+  - Metadata cache for discovered bars (no color snapshots, no unknown entries)
 
 **Known Issues:**
 - Blizzard frequently resets visibility settings when cooldowns update

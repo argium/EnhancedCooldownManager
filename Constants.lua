@@ -38,7 +38,6 @@ local constants = {
     RESOURCEBAR_VENGEANCE_SOULS_MAX = 6 ,
     RUNEBAR_MAX_RUNES = 6,
     BUFFBARS_DEFAULT_COLOR = { r = 0.9, g = 0.9, b = 0.9, a = 1 },
-    BUFFBARS_DEFAULT_SPELLNAME = "Unknown",
     BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,  -- TODO: this and the following line might need to go.
     BUFFBARS_ICON_OVERLAY_REGION_INDEX = 3,
     BUFFBARS_TEXT_PADDING = 4,

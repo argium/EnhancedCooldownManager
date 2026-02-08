@@ -118,11 +118,6 @@ local function IsValueChanged(path)
     local currentVal = GetNestedValue(profile, path)
     local defaultVal = GetNestedValue(defaults, path)
 
-    Util.Log("Options", "IsValueChanged", {
-        path = path,
-        currentVal = currentVal,
-        defaultVal = defaultVal,
-    })
     return not Util.DeepEquals(currentVal, defaultVal)
 end
 
@@ -372,7 +367,6 @@ local function GeneralOptionsTable()
                         name = "Bar Texture",
                         order = 8,
                         width = "double",
-                        dialogControl = "LSM30_Statusbar",
                         values = GetLSMStatusbarValues,
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
@@ -520,7 +514,6 @@ end
 
 -- Forward declarations (these are defined later, but referenced by option-table builders)
 local TickMarksOptionsTable
-local ColoursOptionsTable
 
 local function PowerBarOptionsTable()
     local db = ECM.db
@@ -1209,11 +1202,6 @@ local function AuraBarsOptionsTable()
     spells.inline = true
     spells.order = 5
 
-    local colors = ColoursOptionsTable()
-    colors.name = ""
-    colors.inline = true
-    colors.order = 6
-
     return {
         type = "group",
         name = "Aura Bars",
@@ -1352,7 +1340,6 @@ local function AuraBarsOptionsTable()
                 }
             end)(),
             spells = spells,
-            colors = colors,
         },
     }
 end
@@ -1374,7 +1361,7 @@ SpellOptionsTable = function()
             },
             desc = {
                 type = "description",
-                name = "Customize colors for individual spells. Colors are saved per class and spec. Spells will appear here after they've been visible at least once.\n\n",
+                name = "Customize colors for individual spells. Colors are saved per class and spec. Use 'Refresh Spell List' to rescan active aura bars.\n\n",
                 order = 2,
                 fontSize = "medium",
             },
@@ -1415,82 +1402,37 @@ SpellOptionsTable = function()
                 hidden = function() return not IsValueChanged("buffBars.colors.defaultColor") end,
                 func = MakeResetHandler("buffBars.colors.defaultColor"),
             },
-
             spellColorsGroup = {
                 type = "group",
                 name = "",
-                order = 30,
+                order = 20,
                 inline = true,
                 args = {},
             },
-        },
-    }
-end
-
---------------------------------------------------------------------------------
--- Colours Options (top-level section for per-bar color customization)
---------------------------------------------------------------------------------
-ColoursOptionsTable = function()
-    local db = ECM.db
-    return {
-        type = "group",
-        name = "Colours",
-        order = 3,
-        args = {
-            header = {
-                type = "header",
-                name = "Per-bar Colors",
-                order = 1,
-            },
-            desc = {
-                type = "description",
-                name = "Customize colors for individual buff bars. Colors are saved per class and spec. Bars appear here after they've been visible at least once.\n\n",
-                order = 2,
-                fontSize = "medium",
-            },
-            currentSpec = {
-                type = "description",
-                name = function()
-                    local _, _, className, specName = GetCurrentClassSpec()
-                    return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
-                end,
-                order = 3,
-            },
-            spacer1 = {
-                type = "description",
-                name = " ",
-                order = 4,
-            },
-            refreshBarList = {
+            refreshSpellList = {
                 type = "execute",
-                name = "Refresh Bar List",
-                desc = "Scan current buffs to update the bar list below.",
-                order = 21,
+                name = "Refresh Spell List",
+                desc = "Scan current buffs to refresh discovered spell names.",
+                order = 100,
                 width = "normal",
                 func = function()
                     local buffBars = ECM.BuffBars
                     if buffBars then
-                        buffBars:ResetStyledMarkers()
-
-                        -- Must syncrhonously update layout here to ensure the options UI doesn't receive an empty bar list
-                        buffBars:UpdateLayout()
+                        buffBars:RefreshBarCache()
                     end
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
-            },
-            barColorsGroup = {
-                type = "group",
-                name = "",
-                order = 30,
-                inline = true,
-                args = {},
             },
         },
     }
 end
 
 --- Generates dynamic per-spell color options.
----@return table args
+--- Generates dynamic AceConfig args for per-spell color pickers.
+--- Merges spells from perSpell settings (persisted custom colors) and the bar
+--- metadata cache (recently discovered bars) so that both customized and
+--- newly-seen spells appear in the options panel.
+---@return table args AceConfig args table with color pickers and reset buttons
 local function GenerateSpellColorArgs()
     local args = {}
     local buffBars = ECM.BuffBars
@@ -1503,7 +1445,7 @@ local function GenerateSpellColorArgs()
     if not cachedBars or not next(cachedBars) then
         args.noData = {
             type = "description",
-            name = "|cffaaaaaa(No buff bars cached yet. Cast a buff and click 'Refresh Bar List'.)|r",
+            name = "|cffaaaaaa(No buff bars cached yet. Cast a buff and click 'Refresh Spell List'.)|r",
             order = 1,
         }
         return args
@@ -1519,7 +1461,14 @@ local function GenerateSpellColorArgs()
             spells[spellName] = {}
         end
 
-        for i, c in ipairs(cachedBars) do
+        local cacheIndices = {}
+        for index in pairs(cachedBars) do
+            cacheIndices[#cacheIndices + 1] = index
+        end
+        table.sort(cacheIndices)
+
+        for _, index in ipairs(cacheIndices) do
+            local c = cachedBars[index]
             if c and c.spellName then
                 spells[c.spellName] = {}
             end
@@ -1572,63 +1521,6 @@ SpellOptionsTable = function()
     -- Inject dynamic bar color args
     if result.args and result.args.spellColorsGroup then
         result.args.spellColorsGroup.args = GenerateSpellColorArgs()
-    end
-    return result
-end
-
---- Generates dynamic per-bar color options based on cached bars.
----@return table args
-local function GenerateBarColorArgs()
-    local args = {}
-    local buffBars = ECM.BuffBars
-    local db = ECM.db
-    if not buffBars then
-        return args
-    end
-
-    local cachedBars = buffBars:GetCachedBars()
-    if not cachedBars or not next(cachedBars) then
-        args.noData = {
-            type = "description",
-            name = "|cffaaaaaa(No buff bars cached yet. Cast a buff and click 'Refresh Bar List'.)|r",
-            order = 1,
-        }
-        return args
-    end
-
-    -- Sort bar indices
-    local indices = {}
-    for idx in pairs(cachedBars) do
-        table.insert(indices, idx)
-    end
-    table.sort(indices)
-
-    for i, barIndex in ipairs(indices) do
-        local metadata = cachedBars[barIndex]
-        local displayName = "Bar " .. barIndex
-        if metadata and metadata.spellName then
-            displayName = "Bar " .. barIndex .. ": " .. metadata.spellName
-        end
-
-        local colorKey = "barColor" .. barIndex
-        local resetKey = "barColor" .. barIndex .. "Reset"
-
-        args[colorKey] = {
-            type = "description",
-            name = displayName,
-            order = i * 100,
-        }
-    end
-
-    return args
-end
--- Hook into options refresh to update bar color list
-local _originalColoursOptionsTable = ColoursOptionsTable
-ColoursOptionsTable = function()
-    local result = _originalColoursOptionsTable()
-    -- Inject dynamic bar color args
-    if result.args and result.args.barColorsGroup then
-        result.args.barColorsGroup.args = GenerateBarColorArgs()
     end
     return result
 end

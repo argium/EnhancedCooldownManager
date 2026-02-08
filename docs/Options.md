@@ -898,7 +898,7 @@ local function MyBarOptionsTable()
 end
 ```
 
-### Example 3: Dynamic Options (BuffBars Color List)
+### Example 3: Dynamic Options (BuffBars Spell Color List)
 
 For options that must be generated at runtime based on data:
 

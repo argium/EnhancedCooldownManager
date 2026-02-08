@@ -379,6 +379,40 @@ local function NormalizeBarConfig(cfg)
     end
 end
 
+local function NormalizeBuffBarsCache(cfg)
+    if not (cfg and cfg.colors and type(cfg.colors.cache) == "table") then
+        return
+    end
+
+    local cache = cfg.colors.cache
+    for _, classMap in pairs(cache) do
+        if type(classMap) == "table" then
+            for _, specMap in pairs(classMap) do
+                if type(specMap) == "table" then
+                    for index, entry in pairs(specMap) do
+                        if type(entry) ~= "table" then
+                            specMap[index] = nil
+                        else
+                            entry.color = nil
+                            local spellName = entry.spellName
+                            if type(spellName) ~= "string" then
+                                specMap[index] = nil
+                            else
+                                spellName = strtrim(spellName)
+                                if spellName == "" or spellName == "Unknown" then
+                                    specMap[index] = nil
+                                else
+                                    entry.spellName = spellName
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 --- Initializes saved variables, runs migrations, and registers slash commands.
 --- Runs profile migrations for schema version upgrades.
 --- Each migration is gated by schemaVersion to ensure it only runs once.
@@ -516,6 +550,16 @@ function ECM:RunMigrations(profile)
 
         profile.schemaVersion = 6
     end
+
+    if profile.schemaVersion < 7 then
+        -- Migration: normalize buff bar cache entries (remove legacy cache.color and unknown names)
+        local buffBars = profile.buffBars
+        if buffBars then
+            NormalizeBuffBarsCache(buffBars)
+        end
+
+        profile.schemaVersion = 7
+    end
 end
 
 function ECM:OnInitialize()
@@ -609,7 +653,6 @@ function ECM:MigrateToPerSpellColorsIfNeeded(profile)
                     cache[i] = {
                         lastSeen = v.lastSeen,
                         spellName = v.spellName,
-                        color = bc
                     }
                 end
             end
