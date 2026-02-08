@@ -760,6 +760,43 @@ function BuffBars:GetCachedBars()
     return {}
 end
 
+--- Rebuilds current class/spec cache from the viewer's existing children.
+--- Useful for Options refresh when a full layout pass is not available.
+---@return boolean rebuilt True when at least one bar was cached
+function BuffBars:RebuildCacheFromViewer()
+    local viewer = _G[C.VIEWER_BUFFBAR]
+    if not viewer then
+        return false
+    end
+
+    local cfg = self.ModuleConfig
+    if not cfg or not cfg.colors then
+        return false
+    end
+
+    local rebuilt = false
+    local children = { viewer:GetChildren() }
+    local barIndex = 1
+    for _, child in ipairs(children) do
+        if child and child:IsVisible() then
+            local spellName
+            local textObj = child.GetText and child:GetText()
+            if textObj and textObj.GetText then
+                local ok, text = pcall(textObj.GetText, textObj)
+                if ok and text and (type(canaccessvalue) ~= "function" or canaccessvalue(text)) then
+                    spellName = text
+                end
+            end
+
+            UpdateBarCache(barIndex, spellName, cfg)
+            rebuilt = true
+            barIndex = barIndex + 1
+        end
+    end
+
+    return rebuilt
+end
+
 --- Returns configured spell colors for current class/spec for Options UI.
 ---@return table<string, ECM_Color> per-spell colors Indexed by spell name
 function BuffBars:GetSpellSettings()

@@ -210,8 +210,6 @@ local function MakePositioningSettingsArgs(configPath, options)
     local offsetYDesc = options.offsetYDesc or "\nVertical offset when free positioning is enabled."
 
     local db = ECM.db
-    local configTable = GetNestedValue(db.profile, configPath)
-
     local args = {
         widthDesc = {
             type = "description",
@@ -1474,6 +1472,9 @@ ColoursOptionsTable = function()
                     if buffBars then
                         buffBars:ResetStyledMarkers()
                         buffBars:UpdateLayout()
+                        if not next(buffBars:GetCachedBars()) then
+                            buffBars:RebuildCacheFromViewer()
+                        end
                     end
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
@@ -1846,6 +1847,7 @@ TickMarksOptionsTable = function()
                 set = function(_, val)
                     UpdateTick(i, "value", val)
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
 
@@ -1865,6 +1867,7 @@ TickMarksOptionsTable = function()
                 set = function(_, val)
                     UpdateTick(i, "width", val)
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
 
@@ -1883,6 +1886,7 @@ TickMarksOptionsTable = function()
                 set = function(_, r, g, b, a)
                     UpdateTick(i, "color", { r = r, g = g, b = b, a = a })
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
 
@@ -1897,6 +1901,7 @@ TickMarksOptionsTable = function()
                 func = function()
                     RemoveTick(i)
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
         end
@@ -1938,11 +1943,22 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 hasAlpha = true,
                 get = function()
-                    local c = db.profile.powerBar.ticks.defaultColor
+                    local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
+                    local c = (ticksCfg and ticksCfg.defaultColor) or { r = 0, g = 0, b = 0, a = 0.5 }
                     return c.r or 0, c.g or 0, c.b or 0, c.a or 0.5
                 end,
                 set = function(_, r, g, b, a)
-                    db.profile.powerBar.ticks.defaultColor = { r = r, g = g, b = b, a = a }
+                    local powerBarCfg = db.profile.powerBar
+                    if not powerBarCfg then
+                        db.profile.powerBar = {}
+                        powerBarCfg = db.profile.powerBar
+                    end
+                    local ticksCfg = powerBarCfg.ticks
+                    if not ticksCfg then
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = { r = 0, g = 0, b = 0, a = 0.5 }, defaultWidth = 1 }
+                        ticksCfg = powerBarCfg.ticks
+                    end
+                    ticksCfg.defaultColor = { r = r, g = g, b = b, a = a }
                 end,
             },
             defaultWidth = {
@@ -1954,9 +1970,22 @@ TickMarksOptionsTable = function()
                 min = 1,
                 max = 5,
                 step = 1,
-                get = function() return db.profile.powerBar.ticks.defaultWidth end,
+                get = function()
+                    local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
+                    return (ticksCfg and ticksCfg.defaultWidth) or 1
+                end,
                 set = function(_, val)
-                    db.profile.powerBar.ticks.defaultWidth = val
+                    local powerBarCfg = db.profile.powerBar
+                    if not powerBarCfg then
+                        db.profile.powerBar = {}
+                        powerBarCfg = db.profile.powerBar
+                    end
+                    local ticksCfg = powerBarCfg.ticks
+                    if not ticksCfg then
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = { r = 0, g = 0, b = 0, a = 0.5 }, defaultWidth = 1 }
+                        ticksCfg = powerBarCfg.ticks
+                    end
+                    ticksCfg.defaultWidth = val
                 end,
             },
             spacer2 = {
@@ -1985,6 +2014,7 @@ TickMarksOptionsTable = function()
                 func = function()
                     AddTick(50, nil, nil)
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
             spacer3 = {
@@ -2018,6 +2048,7 @@ TickMarksOptionsTable = function()
                 func = function()
                     SetCurrentTicks({})
                     ECM.ScheduleLayoutUpdate(0)
+                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
         },
