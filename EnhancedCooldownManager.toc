@@ -30,11 +30,11 @@ Modules\SparkleUtil.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
 Modules\ImportExport.lua
-UI\BugReports.lua
+Modules\BugReports.lua
 
 EnhancedCooldownManager.lua
-Modules\Layout.lua
 
+Modules\Layout.lua
 Modules\ECMFrame.lua
 Modules\BarFrame.lua
 Bars\PowerBar.lua
@@ -46,4 +46,4 @@ Modules\ItemIcons.lua
 Options\Widgets\PositionModeSelector.lua
 Options\OptionHelpers.lua
 Options\ItemIconsOptions.lua
-UI\Options.lua
+Options\Options.lua
