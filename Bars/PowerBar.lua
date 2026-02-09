@@ -93,10 +93,14 @@ function PowerBar:ShouldShow()
         local _, class = UnitClass("player")
         local powerType = UnitPowerType("player")
 
-        -- Hide mana bar for DPS specs, except mage/warlock/caster-form druid
+        -- Hide mana bar for DPS specs (except mage/warlock/druid) and all tank specs
         local role = GetSpecializationRole(GetSpecialization())
-        if role == "DAMAGER" and powerType == Enum.PowerType.Mana then
-            return C.POWERBAR_SHOW_MANABAR[class] or false
+        if powerType == Enum.PowerType.Mana then
+            if role == "TANK" then
+                return false
+            elseif role == "DAMAGER" then
+                return C.POWERBAR_SHOW_MANABAR[class] or false
+            end
         end
 
         return true
