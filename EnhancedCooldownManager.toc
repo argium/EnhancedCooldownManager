@@ -48,4 +48,5 @@ Modules\ItemIcons.lua
 Options\Widgets\PositionModeSelector.lua
 Options\OptionHelpers.lua
 Options\ItemIconsOptions.lua
+Options\BuffBarsOptions.lua
 Options\Options.lua

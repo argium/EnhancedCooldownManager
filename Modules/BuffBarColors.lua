@@ -9,6 +9,7 @@
 
 local _, ns = ...
 
+local ECM = ns.Addon
 local Util = ns.Util
 local C = ns.Constants
 
@@ -27,25 +28,9 @@ local C = ns.Constants
 local BuffBarColors = {}
 ns.BuffBarColors = BuffBarColors
 
---- Internal config reference, set via Init(). Points to the active buffBars
---- config section. Re-set on profile switch via Init().
----@type table|nil
-local _cfg = nil
-
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
-
---- Returns current class ID and spec ID, or nil, nil if either is unavailable.
----@return number|nil classID, number|nil specID
-local function GetCurrentClassSpec()
-    local _, _, classID = UnitClass("player")
-    local specID = GetSpecialization()
-    if not classID or not specID then
-        return nil, nil
-    end
-    return classID, specID
-end
 
 --- Ensures nested tables exist for buff bar color storage.
 ---@param cfg table
@@ -73,14 +58,33 @@ local function EnsureColorStorage(cfg)
     end
 end
 
+local function GetConfig()
+    local cfg = ECM.db.profile.buffBars
+    Util.DebugAssert(cfg, "BuffBarColors.GetConfig - missing config")
+    EnsureColorStorage(cfg)
+    return cfg
+end
+
+--- Returns current class ID and spec ID, or nil, nil if either is unavailable.
+---@return number|nil classID, number|nil specID
+local function GetCurrentClassSpec()
+    local _, _, classID = UnitClass("player")
+    local specID = GetSpecialization()
+    if not classID or not specID then
+        return nil, nil
+    end
+    return classID, specID
+end
+
 --- Returns cfg, classID, specID or nil if any is unavailable.
 ---@return table|nil cfg, number|nil classID, number|nil specID
 local function GetColorContext()
-    if not _cfg then
+    local cfg = GetConfig()
+    if not cfg then
         return nil, nil, nil
     end
     local classID, specID = GetCurrentClassSpec()
-    return _cfg, classID, specID
+    return cfg, classID, specID
 end
 
 --- Compares old/new bar metadata to detect repaint-relevant changes.
@@ -108,7 +112,9 @@ local function HasCacheChanged(oldCache, newCache, oldTextureMap, newTextureMap)
         if not oldEntry then
             return true
         end
-        if newEntry.spellName ~= oldEntry.spellName then
+        local newName = newEntry.spellName
+        local oldName = oldEntry.spellName
+        if issecretvalue(newName) or issecretvalue(oldName) or newName ~= oldName then
             return true
         end
         local oldTextureID = oldTextureMap and oldTextureMap[index] or nil
@@ -124,16 +130,6 @@ end
 --------------------------------------------------------------------------------
 -- Public API
 --------------------------------------------------------------------------------
-
---- Initializes (or re-initializes) the color module with a config reference.
---- Must be called before any other method. Called from BuffBars:OnEnable() and
---- again on profile switch when ModuleConfig is rebound.
----@param cfg table The buffBars module config section (self.ModuleConfig)
-function BuffBarColors.Init(cfg)
-    Util.DebugAssert(cfg ~= nil, "BuffBarColors.Init called with nil config")
-    _cfg = cfg
-    EnsureColorStorage(_cfg)
-end
 
 --- Returns the color lookup key for a bar: spell name if known, or textureFileID fallback.
 --- When Blizzard marks spell names as secret (via canaccessvalue), the icon texture file ID
@@ -156,7 +152,8 @@ end
 ---@param colorKey string|number|nil
 ---@return ECM_Color|nil
 function BuffBarColors.LookupSpellColor(colorKey)
-    if not _cfg or not _cfg.colors or not _cfg.colors.perSpell then
+    local cfg = GetConfig()
+    if not cfg or not cfg.colors or not cfg.colors.perSpell then
         Util.DebugAssert(false, "BuffBarColors.LookupSpellColor called before Init or with missing perSpell")
         return C.BUFFBARS_DEFAULT_COLOR
     end
@@ -168,7 +165,7 @@ function BuffBarColors.LookupSpellColor(colorKey)
     end
 
     local classID, specID = GetCurrentClassSpec()
-    local colors = _cfg.colors.perSpell
+    local colors = cfg.colors.perSpell
     if classID and specID and colors[classID] and colors[classID][specID] then
         local c = colors[classID][specID][colorKey]
         if c then
@@ -184,8 +181,9 @@ end
 ---@param colorKey string|number|nil
 ---@return number r, number g, number b
 function BuffBarColors.GetSpellColor(colorKey)
+    local cfg = GetConfig()
     local color = BuffBarColors.LookupSpellColor(colorKey)
-        or (_cfg and _cfg.colors and _cfg.colors.defaultColor)
+        or (cfg and cfg.colors and cfg.colors.defaultColor)
         or C.BUFFBARS_DEFAULT_COLOR
     return color.r, color.g, color.b
 end
@@ -193,7 +191,8 @@ end
 --- Gets the default bar color as r, g, b components.
 ---@return number r, number g, number b
 function BuffBarColors.GetDefaultColor()
-    local c = (_cfg and _cfg.colors and _cfg.colors.defaultColor)
+    local cfg = GetConfig()
+    local c = (cfg and cfg.colors and cfg.colors.defaultColor)
         or C.BUFFBARS_DEFAULT_COLOR
     return c.r, c.g, c.b
 end
@@ -203,9 +202,10 @@ end
 ---@param g number
 ---@param b number
 function BuffBarColors.SetDefaultColor(r, g, b)
-    Util.DebugAssert(_cfg and _cfg.colors, "BuffBarColors.SetDefaultColor called before Init")
-    if _cfg and _cfg.colors then
-        _cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
+    local cfg = GetConfig()
+    Util.DebugAssert(cfg and cfg.colors, "BuffBarColors.SetDefaultColor called before Init")
+    if cfg and cfg.colors then
+        cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
     end
 end
 
@@ -218,6 +218,9 @@ end
 function BuffBarColors.SetSpellColor(colorKey, r, g, b)
     local cfg, classID, specID = GetColorContext()
     if not cfg or not classID or not specID then
+        return false
+    end
+    if issecretvalue(colorKey) then
         return false
     end
 
@@ -324,11 +327,6 @@ end
 ---@param scanEntries ECM_BarScanEntry[] Array of scanned bar data
 ---@return boolean changed True if cache contents changed or color migration occurred
 function BuffBarColors.RefreshMaps(scanEntries)
-    if not _cfg then
-        Util.DebugAssert(false, "BuffBarColors.RefreshMaps called before Init")
-        return false
-    end
-
     local classID, specID = GetCurrentClassSpec()
     if not classID or not specID then
         return false
@@ -375,10 +373,11 @@ function BuffBarColors.RefreshMaps(scanEntries)
         nextBarIndexToTextureIdMap[index] = textureFileID
     end
 
-    local barIndexToSpellNameMap = _cfg.colors.cache
+    local cfg = GetConfig()
+    local barIndexToSpellNameMap = cfg.colors.cache
     barIndexToSpellNameMap[classID] = barIndexToSpellNameMap[classID] or {}
 
-    local barIndexToTextureIdMap = _cfg.colors.textureMap
+    local barIndexToTextureIdMap = cfg.colors.textureMap
     barIndexToTextureIdMap[classID] = barIndexToTextureIdMap[classID] or {}
 
     -- Texture file ID resolution and color migration:
@@ -399,7 +398,7 @@ function BuffBarColors.RefreshMaps(scanEntries)
             end
         end
 
-        local perSpell = _cfg.colors.perSpell
+        local perSpell = cfg.colors.perSpell
         local classSpells = perSpell and perSpell[classID]
         local specSpells = classSpells and classSpells[specID]
 

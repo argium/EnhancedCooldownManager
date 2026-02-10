@@ -20,30 +20,31 @@ ECM.BuffBars = BuffBars
 ---@field __ecmAnchorHooked boolean
 ---@field __ecmStyled boolean
 
--- Helper functions for accessing texture/color utilities
-local BarHelpers = {
-    GetTexture = function(texKey)
-        return Util.GetTexture(texKey)
-    end,
-    GetBgColor = function(moduleConfig, globalConfig)
-        local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor)
-        return bgColor or C.COLOR_BLACK
-    end,
-    ApplyFont = function(fontString, globalConfig)
-        if not fontString then
-            return
-        end
-        Util.ApplyFont(fontString, globalConfig)
-    end,
-    GetBarHeight = function(moduleConfig, globalConfig, fallback)
-        local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
-        return Util.PixelSnap(height)
-    end,
-    GetBarWidth = function(moduleConfig, globalConfig, fallback)
-        local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
-        return Util.PixelSnap(width)
-    end,
-}
+local function GetTexture(texKey)
+    return Util.GetTexture(texKey)
+end
+
+local function GetBgColor(moduleConfig, globalConfig)
+    local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor)
+    return bgColor or C.COLOR_BLACK
+end
+
+local function ApplyBarFont(fontString, globalConfig)
+    if not fontString then
+        return
+    end
+    Util.ApplyFont(fontString, globalConfig)
+end
+
+local function GetBarHeight(moduleConfig, globalConfig, fallback)
+    local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
+    return Util.PixelSnap(height)
+end
+
+local function GetBarWidth(moduleConfig, globalConfig, fallback)
+    local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
+    return Util.PixelSnap(width)
+end
 
 --- Returns normalized spell name for a buff bar child, or nil if unavailable.
 ---@param child ECM_BuffBarChild|nil
@@ -205,21 +206,6 @@ local function HookChildAnchoring(child, module)
     end)
 end
 
---- Enforces visibility settings for icon, spell name, and duration.
---- This must be called frequently because Blizzard resets these when cooldowns update.
----@param child ECM_BuffBarChild
----@param moduleConfig table
-local function HidePandemicGlows(child)
-    if not child then
-        return
-    end
-
-    -- Hide() doesn't work because Blizzard keeps showing it again
-    if child.DebuffBorder then
-        child.DebuffBorder:SetAlpha(0)
-    end
-end
-
 ---@param child ECM_BuffBarChild
 ---@param iconFrame Frame|nil
 ---@param iconHeight number|nil
@@ -289,8 +275,13 @@ local function ApplyVisibilitySettings(child, moduleConfig)
         end
     end
 
-    if not showIcon then
-        HidePandemicGlows(child)
+    local alpha = showIcon and 1 or 0
+    if child.DebuffBorder then
+        child.DebuffBorder:SetAlpha(alpha)
+    end
+
+    if child.Applications then
+        child.Applications:SetAlpha(alpha)
     end
 
     local bar = child.Bar
@@ -321,7 +312,7 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     end
 
     local texKey = globalConfig and globalConfig.texture
-    local tex = BarHelpers.GetTexture(texKey)
+    local tex = GetTexture(texKey)
     bar:SetStatusBarTexture(tex)
 
     -- Resolve the color lookup key: spell name if available, otherwise the icon
@@ -333,7 +324,7 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
         bar:SetStatusBarColor(r, g, b, 1.0)
     end
 
-    local bgColor = BarHelpers.GetBgColor(moduleConfig, globalConfig)
+    local bgColor = GetBgColor(moduleConfig, globalConfig)
     local barBG = GetBuffBarBackground(bar)
     if barBG then
         barBG:SetTexture(C.FALLBACK_TEXTURE)
@@ -349,7 +340,7 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
         bar.Pip:SetTexture(nil)
     end
 
-    local height = BarHelpers.GetBarHeight(moduleConfig, globalConfig, 13)
+    local height = GetBarHeight(moduleConfig, globalConfig, 13)
     if height and height > 0 then
         bar:SetHeight(height)
         child:SetHeight(height)
@@ -364,8 +355,8 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
         iconFrame:SetSize(height, height)
     end
 
-    BarHelpers.ApplyFont(bar.Name, globalConfig)
-    BarHelpers.ApplyFont(bar.Duration, globalConfig)
+    ApplyBarFont(bar.Name, globalConfig)
+    ApplyBarFont(bar.Duration, globalConfig)
 
     if iconFrame then
         iconFrame:ClearAllPoints()
@@ -392,14 +383,6 @@ end
 --------------------------------------------------------------------------------
 -- ECMFrame Overrides
 --------------------------------------------------------------------------------
-
---- Re-initializes BuffBarColors when the profile changes.
-function BuffBars:SetConfig(config)
-    ECMFrame.SetConfig(self, config)
-    if self.ModuleConfig then
-        BuffBarColors.Init(self.ModuleConfig)
-    end
-end
 
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
@@ -457,7 +440,7 @@ function BuffBars:UpdateLayout()
     -- Refresh cache independently from visibility so options can discover bars in hidden states.
     self:RefreshBarCache()
 
-    -- Check visibility first
+    -- Check visibility
     if not self:ShouldShow() then
         -- Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
         viewer:Hide()
@@ -472,7 +455,7 @@ function BuffBars:UpdateLayout()
         viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
         viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
     elseif params.mode == C.ANCHORMODE_FREE then
-        local width = BarHelpers.GetBarWidth(cfg, globalConfig, 300)
+        local width = GetBarWidth(cfg, globalConfig, 300)
 
         if width and width > 0 then
             viewer:SetWidth(width)
@@ -671,7 +654,6 @@ function BuffBars:OnEnable()
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
-        BuffBarColors.Init(self.ModuleConfig)
         self:HookViewer()
         self:HookEditMode()
         self:ScheduleLayoutUpdate()
