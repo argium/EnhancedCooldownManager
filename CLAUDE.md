@@ -70,13 +70,22 @@ BarFrame should work with any bar-style frame the addon is responsible for drawi
 - Custom ShouldShow logic
 - Class/spec-specific behavior (ticks, colors, visibility rules)
 - BuffBars icon handling is deterministic: use `child.Icon` only (no `IconFrame`/`IconButton` fallback probing, no dynamic atlas/region discovery loops).
-- BuffBars uses the icon texture file ID (`GetTextureFileID()`) as a stable secondary identifier
-  for bars whose spell names are temporarily secret (via `canaccessvalue`). When a spell name is
-  unavailable, the texture file ID is used as the color key in `perSpell` (number key, naturally
-  separated from string spell name keys). `RefreshBarCache` resolves secret names by matching
-  texture file IDs against previously cached entries, and migrates colors from texture file ID
-  keys to real spell name keys when the name becomes available. The same key resolution is shared
-  across `GetColorKey`, `ApplyCooldownBarStyle`, `GenerateSpellColorArgs`, and the Options UI.
+- BuffBars delegates all per-spell color storage, cache management, texture map tracking, and
+  secret-name resolution to `BuffBarColors`. BuffBars scans the viewer's children and passes
+  `{spellName, textureFileID}` tuples to `BuffBarColors.RefreshMaps()`. Color lookups in
+  `ApplyCooldownBarStyle` use `BuffBarColors.GetColorKey()` and `BuffBarColors.GetSpellColor()`.
+
+[Modules\BuffBarColors.lua](Modules\BuffBarColors.lua) owns:
+- Per-spell color storage (`perSpell` in config, keyed by class/spec)
+- Bar metadata cache (`cache` in config) and texture map (`textureMap` in config)
+- Secret spell name resolution via texture file ID fallback
+- Color migration from texture file ID keys to resolved spell name keys
+- Default color get/set
+- All color query/mutation methods called by Options UI directly
+
+BuffBarColors is a stateful singleton. Call `BuffBarColors.Init(cfg)` before use, and re-call on
+profile switch. BuffBars calls `Init` from `OnEnable` and `SetConfig`. Options calls
+`BuffBarColors` methods directly (no proxy through BuffBars).
 
 These responsibilities can change over time so update this document if so however responsibilities should not cross mixins by reaching into the internals of another. Always use public interfaces. Internal fields are prefixed by an underscore.
 
@@ -147,7 +156,7 @@ Not all files will have all sections. For example, mixins don't have event handl
 - Rollback between any two versioned builds works seamlessly — each version's data is isolated in its own `_versions` sub-table. The legacy top-level data is never modified, so pre-versioning builds also work.
 - The TOC never changes for schema bumps. Just increment `C.CURRENT_SCHEMA_VERSION` and add a new migration step in `Migration.Run`.
 
-## Secret Values
+# Secret Values
 
 Do not perform any operations except nil checking (including reads) on the following secret values except for passing them into other built-in functions:
 - UnitPowerMax
@@ -159,3 +168,33 @@ Most functions have a CurveConstant parameter that will return an adjusted value
 ```lua
 UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 ```
+
+## Restrictions
+
+**The full list of technical restrictions for tainted code is as follows.**
+
+- When an operation that is not allowed is performed, the result will be an immediate Lua error.
+- Tainted code is allowed to store secret values in variables, upvalues, or as values in tables.
+- Tainted code is allowed to pass secret values to Lua functions.
+  - For C functions, an API must be explicitly marked up as accepting secrets from tainted callers.
+- Tainted code is allowed to concatenate secret values that are strings or numbers.
+  - Tainted code is additionally allowed to call APIs such as string.concat, string.format, and string.join with secret values.
+- Tainted code is not allowed to perform arithmetic on secret values.
+- Tainted code is not allowed to compare or perform boolean tests on secret values.
+- Tainted code is not allowed to use the length operator (#) on secret values.
+- Tainted code is not allowed to store secret values as keys in tables.
+- Tainted code is not allowed to perform indexed access or assignment (secret["foo"] = 1) on secret values.
+- Tainted code is not allowed to call secret values as-if they were functions.
+- Querying the type of a secret value type(secret) returns its real type (ie. "string", "number", etc.).
+
+### Secret tables
+
+**For Lua tables, a few additional restrictions apply.**
+
+- A table can be flagged such that indexed access of it will always yield a secret value.
+- A table can be flagged as inaccessible to tainted code; any attempt to index, assign, measure, or iterate over such a table will trigger an immediate Lua error ("attempted to index a forbidden table").
+- When untainted code stores a secret value as a table key, the table itself is irrevocably marked with both of the aforementioned flags.
+
+**A few additional APIs exist to handle table secrecy.**
+
+- canaccesstable(table) returns true if the calling function would not error if attempting to access the table.

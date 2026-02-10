@@ -8,6 +8,7 @@ local ECM = ns.Addon
 local Util = ns.Util
 local C = ns.Constants
 local Sparkle = ns.SparkleUtil
+local BuffBarColors = ns.BuffBarColors
 local Options = ECM:NewModule("Options")
 
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
@@ -1385,11 +1386,14 @@ SpellOptionsTable = function()
                 order = 10,
                 width = "double",
                 get = function()
-                    local c = db.profile.buffBars.colors.defaultColor
-                    return c.r, c.g, c.b
+                    return BuffBarColors.GetDefaultColor()
                 end,
                 set = function(_, r, g, b)
-                    db.profile.buffBars.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
+                    BuffBarColors.SetDefaultColor(r, g, b)
+                    local buffBars = ECM.BuffBars
+                    if buffBars then
+                        buffBars:ResetStyledMarkers()
+                    end
                     ECM.ScheduleLayoutUpdate(0)
                 end,
             },
@@ -1433,16 +1437,18 @@ end
 --- metadata cache (recently discovered bars) so that both customized and
 --- newly-seen spells appear in the options panel.
 ---@return table args AceConfig args table with color pickers and reset buttons
+local function ResetStyledMarkers()
+    local buffBars = ECM.BuffBars
+    if buffBars then
+        buffBars:ResetStyledMarkers()
+    end
+end
+
 local function GenerateSpellColorArgs()
     local args = {}
-    local buffBars = ECM.BuffBars
-    local db = ECM.db
-    if not buffBars then
-        return args
-    end
 
-    local cachedBars = buffBars:GetCachedBars()
-    local cachedTextures = buffBars:GetCachedTextures()
+    local cachedBars = BuffBarColors.GetBarCache()
+    local cachedTextures = BuffBarColors.GetBarTextureMap()
     if not cachedBars or not next(cachedBars) then
         args.noData = {
             type = "description",
@@ -1452,7 +1458,7 @@ local function GenerateSpellColorArgs()
         return args
     end
 
-    local spellSettings = buffBars:GetSpellSettings()
+    local spellSettings = BuffBarColors.GetPerSpellColors()
 
     if spellSettings then
 
@@ -1494,10 +1500,12 @@ local function GenerateSpellColorArgs()
                 order = i * 10,
                 width = "double",
                 get = function()
-                    return buffBars:GetSpellColor(colorKey)
+                    return BuffBarColors.GetSpellColor(colorKey)
                 end,
                 set = function(_, r, g, b)
-                    buffBars:SetSpellColor(colorKey, r, g, b)
+                    BuffBarColors.SetSpellColor(colorKey, r, g, b)
+                    ResetStyledMarkers()
+                    ECM.ScheduleLayoutUpdate(0)
                 end,
             }
 
@@ -1508,10 +1516,12 @@ local function GenerateSpellColorArgs()
                 order = i * 10 + 1,
                 width = 0.3,
                 hidden = function()
-                    return not buffBars:HasCustomSpellColor(colorKey)
+                    return not BuffBarColors.HasCustomSpellColor(colorKey)
                 end,
                 func = function()
-                    buffBars:ResetSpellColor(colorKey)
+                    BuffBarColors.ResetSpellColor(colorKey)
+                    ResetStyledMarkers()
+                    ECM.ScheduleLayoutUpdate(0)
                 end,
             }
 

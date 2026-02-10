@@ -41,6 +41,7 @@ Modules\BarFrame.lua
 Bars\PowerBar.lua
 Bars\ResourceBar.lua
 Bars\RuneBar.lua
+Modules\BuffBarColors.lua
 Bars\BuffBars.lua
 Modules\ItemIcons.lua
 

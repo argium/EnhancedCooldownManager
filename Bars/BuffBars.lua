@@ -9,6 +9,7 @@ local Util = ns.Util
 local C = ns.Constants
 
 local ECMFrame = ns.Mixins.ECMFrame
+local BuffBarColors = ns.BuffBarColors
 
 local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
 ECM.BuffBars = BuffBars
@@ -18,9 +19,6 @@ ECM.BuffBars = BuffBars
 ---@class ECM_BuffBarChild : Frame
 ---@field __ecmAnchorHooked boolean
 ---@field __ecmStyled boolean
-
-local GetSortedChildren
-local GetChildTextureFileID
 
 -- Helper functions for accessing texture/color utilities
 local BarHelpers = {
@@ -47,56 +45,6 @@ local BarHelpers = {
     end,
 }
 
---- Returns current class ID and spec ID.
----@return number|nil classID, number|nil specID
-local function GetCurrentClassSpec()
-    local _, _, classID = UnitClass("player")
-    local specID = GetSpecialization()
-    return classID, specID
-end
-
---- Ensures nested tables exist for buff bar color storage.
----@param cfg table|nil
-local function EnsureColorStorage(cfg)
-    if not cfg then
-        return
-    end
-
-    if not cfg.colors then
-        cfg.colors = {
-            perSpell = {},
-            cache = {},
-            defaultColor = C.BUFFBARS_DEFAULT_COLOR,
-        }
-    end
-
-    local colors = cfg.colors
-    if not colors.perSpell then
-        colors.perSpell = {}
-    end
-    if not colors.cache then
-        colors.cache = {}
-    end
-    if not colors.defaultColor then
-        colors.defaultColor = C.BUFFBARS_DEFAULT_COLOR
-    end
-    if not colors.textureMap then
-        colors.textureMap = {}
-    end
-end
-
---- Gets color context for current class/spec.
----@param module ECM_BuffBarsModule
----@return table|nil cfg, number|nil classID, number|nil specID
-local function GetColorContext(module)
-    local cfg = module.ModuleConfig
-    if not cfg then
-        return nil, nil, nil
-    end
-    local classID, specID = GetCurrentClassSpec()
-    return cfg, classID, specID
-end
-
 --- Returns normalized spell name for a buff bar child, or nil if unavailable.
 ---@param child ECM_BuffBarChild|nil
 ---@return string|nil
@@ -107,7 +55,7 @@ local function GetChildSpellName(child)
     end
 
     local text = bar.Name:GetText()
-    if type(canaccessvalue) == "function" and not canaccessvalue(text) then
+    if issecretvalue(text) then
         Util.Log("BuffBars", "GetChildSpellName", {
             message = "Spell name is secret",
             childName = child:GetName() or "nil",
@@ -124,179 +72,6 @@ local function GetChildSpellName(child)
     end
 
     return text
-end
-
---- Returns the color lookup key for a bar: spell name if known, or textureFileID fallback.
---- When Blizzard marks spell names as secret (via `canaccessvalue`), the icon texture file ID
---- serves as a stable identifier for color customization. textureFileID is a number, creating
---- natural key-type separation from string spell names in perSpell storage.
----@param spellName string|nil
----@param textureFileID number|nil
----@return string|number|nil
-local function GetColorKey(spellName, textureFileID)
-    return spellName or textureFileID
-end
-
---- Returns color for spell with name spellName for current class/spec, or nil if not set.
----@param spellName string|nil
----@param cfg table|nil
----@return ECM_Color|nil
-local function GetSpellColor(spellName, cfg)
-    if not cfg or not cfg.colors.perSpell then
-        Util.DebugAssert(false, "GetSpellColor called with nil cfg or missing perSpell colors")
-        return C.BUFFBARS_DEFAULT_COLOR
-    end
-
-    local classID, specID = GetCurrentClassSpec()
-    local colors = cfg.colors.perSpell
-    if classID and specID and colors[classID] and colors[classID][specID] then
-        local c = colors[classID][specID][spellName]
-        if c then
-            return c
-        end
-    end
-
-    return nil
-end
-
---- Builds a cache snapshot for current class/spec from current viewer children.
----@param viewer Frame
----@param cfg table|nil
----@return table|nil
-local function BuildBarCacheSnapshot(viewer, cfg)
-    if not cfg then
-        return nil
-    end
-
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
-        return nil
-    end
-
-    local children = GetSortedChildren(viewer, false)
-    local nextCache = {}
-    local validCount = 0
-
-    -- Store all entries, including those with nil spellName (secret/unavailable names).
-    -- textureFileIDs are stored in a separate table (not in cache entries) to prevent
-    -- taint propagation from secret spell names to texture IDs.
-    local nextTextures = {}
-    for index, entry in ipairs(children) do
-        local spellName = GetChildSpellName(entry.frame)
-        nextCache[index] = {
-            spellName = spellName,  -- nil is allowed
-            lastSeen = GetTime(),
-        }
-        nextTextures[index] = GetChildTextureFileID(entry.frame)
-        if spellName then
-            validCount = validCount + 1
-        end
-    end
-
-    Util.Log("BuffBars", "BuildBarCacheSnapshot", {
-        totalChildren = #children,
-        validCount = validCount,
-    })
-
-    return {
-        classID = classID,
-        specID = specID,
-        cache = nextCache,
-        textures = nextTextures,
-        validCount = validCount,
-    }
-end
-
---- Rebuilds the bar cache for the current class/spec from current viewer children.
---- Scans both shown and hidden bars. If no valid bars are found, keeps existing cache.
----@param viewer Frame
----@param moduleConfig table
----@return boolean updated
-local function RefreshBarCache(viewer, moduleConfig)
-    local snapshot = BuildBarCacheSnapshot(viewer, moduleConfig)
-    if not snapshot then
-        return false
-    end
-
-    if not next(snapshot.cache) then
-        Util.Log("BuffBars", "RefreshBarCache", {
-            message = "No children at all; preserving existing cache",
-            classID = snapshot.classID,
-            specID = snapshot.specID,
-        })
-        return false
-    end
-
-    local cache = moduleConfig.colors.cache
-    cache[snapshot.classID] = cache[snapshot.classID] or {}
-
-    local textureMap = moduleConfig.colors.textureMap
-    textureMap[snapshot.classID] = textureMap[snapshot.classID] or {}
-
-    -- Texture file ID resolution and color migration:
-    -- textureFileIDs are stored in a separate table (textureMap) from cache entries
-    -- to prevent taint propagation from secret spell names to texture IDs.
-    -- 1. Build textureFileID → spellName mapping from old textureMap + old cache
-    -- 2. Resolve nil spellNames in new cache via textureFileID lookup
-    -- 3. Migrate perSpell colors from textureFileID (number) key to resolved spell name
-    local oldCache = cache[snapshot.classID][snapshot.specID]
-    local oldTextures = textureMap[snapshot.classID] and textureMap[snapshot.classID][snapshot.specID]
-    if oldCache and oldTextures then
-        local texIdToName = {}
-        for index, entry in pairs(oldCache) do
-            local texId = oldTextures[index]
-            if entry.spellName and texId then
-                texIdToName[texId] = entry.spellName
-            end
-        end
-        Util.Log("BuffBars", "RefreshBarCache", {
-            message = "Built textureFileID to spellName mapping from old cache",
-            mappingCount = #texIdToName,
-            map = texIdToName,
-        })
-
-        local perSpell = moduleConfig.colors.perSpell
-        local classSpells = perSpell and perSpell[snapshot.classID]
-        local specSpells = classSpells and classSpells[snapshot.specID]
-
-        for index, newEntry in pairs(snapshot.cache) do
-            local newTexId = snapshot.textures[index]
-            if not newEntry.spellName and newTexId then
-                local resolvedName = texIdToName[newTexId]
-                if resolvedName then
-                    Util.Log("BuffBars", "RefreshBarCache", {
-                        message = "Resolved spell name from texture ID",
-                        resolvedName = resolvedName,
-                        textureFileID = newTexId,
-                    })
-                    newEntry.spellName = resolvedName
-                end
-            end
-
-            -- Migrate colors from textureFileID key to real spell name
-            if specSpells and newEntry.spellName and newTexId then
-                if specSpells[newTexId] and specSpells[newEntry.spellName] == nil then
-                    Util.Log("BuffBars", "RefreshBarCache", {
-                        message = "Migrating color from texture ID to resolved spell name",
-                        spellName = newEntry.spellName,
-                        textureFileID = newTexId,
-                    })
-                    specSpells[newEntry.spellName] = specSpells[newTexId]
-                end
-                specSpells[newTexId] = nil
-            end
-        end
-    end
-
-    Util.Log("BuffBars", "RefreshBarCache", {
-        message = "Updating bar cache with new snapshot",
-        current = cache[snapshot.classID] and cache[snapshot.classID][snapshot.specID] or "nil",
-        new = snapshot.cache,
-    })
-
-    cache[snapshot.classID][snapshot.specID] = snapshot.cache
-    textureMap[snapshot.classID][snapshot.specID] = snapshot.textures
-    return true
 end
 
 local function GetBuffBarBackground(statusBar)
@@ -361,7 +136,7 @@ end
 --- Used as a stable secondary identifier when the spell name is secret.
 ---@param child ECM_BuffBarChild|nil
 ---@return number|nil
-GetChildTextureFileID = function(child)
+local function GetChildTextureFileID(child)
     local iconFrame = GetBuffBarIconFrame(child)
     if not iconFrame then
         return nil
@@ -378,7 +153,7 @@ end
 ---@param viewer Frame The BuffBarCooldownViewer frame
 ---@param onlyVisible boolean|nil If true, only include visible children
 ---@return table[] Array of {frame, top, order} sorted top-to-bottom
-GetSortedChildren = function(viewer, onlyVisible)
+local function GetSortedChildren(viewer, onlyVisible)
     local result = {}
 
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
@@ -446,9 +221,49 @@ local function HidePandemicGlows(child)
 end
 
 ---@param child ECM_BuffBarChild
----@param moduleConfig table
-local ApplyStatusBarAnchors
-local ApplyBarNameInset
+---@param iconFrame Frame|nil
+---@param iconHeight number|nil
+local function ApplyStatusBarAnchors(child, iconFrame, iconHeight)
+    local bar = child and child.Bar
+    if not (bar and child) then
+        return
+    end
+
+    bar:ClearAllPoints()
+    if iconFrame and iconFrame:IsShown() then
+        bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 0, 0)
+    else
+        bar:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
+    end
+    bar:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
+end
+
+---@param child ECM_BuffBarChild
+---@param iconFrame Frame|nil
+---@param iconHeight number|nil
+local function ApplyBarNameInset(child, iconFrame, iconHeight)
+    local bar = child and child.Bar
+    if not (bar and bar.Name) then
+        return
+    end
+
+    local leftInset = C.BUFFBARS_TEXT_PADDING
+    if iconFrame and iconFrame:IsShown() then
+        local resolvedIconHeight = iconHeight
+        if not resolvedIconHeight or resolvedIconHeight <= 0 then
+            resolvedIconHeight = iconFrame:GetHeight() or 0
+        end
+        leftInset = resolvedIconHeight + C.BUFFBARS_TEXT_PADDING
+    end
+
+    bar.Name:ClearAllPoints()
+    bar.Name:SetPoint("LEFT", bar, "LEFT", leftInset, 0)
+    if bar.Duration and bar.Duration:IsShown() then
+        bar.Name:SetPoint("RIGHT", bar.Duration, "LEFT", -C.BUFFBARS_TEXT_PADDING, 0)
+    else
+        bar.Name:SetPoint("RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0)
+    end
+end
 
 ---@param child ECM_BuffBarChild
 ---@param moduleConfig table
@@ -490,51 +305,6 @@ local function ApplyVisibilitySettings(child, moduleConfig)
     ApplyBarNameInset(child, iconFrame, nil)
 end
 
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-ApplyStatusBarAnchors = function(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and child) then
-        return
-    end
-
-    bar:ClearAllPoints()
-    if iconFrame and iconFrame:IsShown() then
-        bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 0, 0)
-    else
-        bar:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
-    end
-    bar:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
-end
-
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-ApplyBarNameInset = function(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and bar.Name) then
-        return
-    end
-
-    local leftInset = C.BUFFBARS_TEXT_PADDING
-    if iconFrame and iconFrame:IsShown() then
-        local resolvedIconHeight = iconHeight
-        if not resolvedIconHeight or resolvedIconHeight <= 0 then
-            resolvedIconHeight = iconFrame:GetHeight() or 0
-        end
-        leftInset = resolvedIconHeight + C.BUFFBARS_TEXT_PADDING
-    end
-
-    bar.Name:ClearAllPoints()
-    bar.Name:SetPoint("LEFT", bar, "LEFT", leftInset, 0)
-    if bar.Duration and bar.Duration:IsShown() then
-        bar.Name:SetPoint("RIGHT", bar.Duration, "LEFT", -C.BUFFBARS_TEXT_PADDING, 0)
-    else
-        bar.Name:SetPoint("RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0)
-    end
-end
-
 --- Applies styling to a single cooldown bar child.
 ---@param child ECM_BuffBarChild
 ---@param moduleConfig table
@@ -558,9 +328,9 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     -- texture file ID as a stable fallback for bars with secret/unavailable names.
     if bar.SetStatusBarColor then
         local spellName = GetChildSpellName(child)
-        local colorKey = GetColorKey(spellName, GetChildTextureFileID(child))
-        local color = GetSpellColor(colorKey, moduleConfig) or moduleConfig.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
-        bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
+        local colorKey = BuffBarColors.GetColorKey(spellName, GetChildTextureFileID(child))
+        local r, g, b = BuffBarColors.GetSpellColor(colorKey)
+        bar:SetStatusBarColor(r, g, b, 1.0)
     end
 
     local bgColor = BarHelpers.GetBgColor(moduleConfig, globalConfig)
@@ -623,6 +393,14 @@ end
 -- ECMFrame Overrides
 --------------------------------------------------------------------------------
 
+--- Re-initializes BuffBarColors when the profile changes.
+function BuffBars:SetConfig(config)
+    ECMFrame.SetConfig(self, config)
+    if self.ModuleConfig then
+        BuffBarColors.Init(self.ModuleConfig)
+    end
+end
+
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
 function BuffBars:CalculateLayoutParams()
@@ -677,7 +455,7 @@ function BuffBars:UpdateLayout()
     local cfg = self.ModuleConfig
 
     -- Refresh cache independently from visibility so options can discover bars in hidden states.
-    RefreshBarCache(viewer, cfg)
+    self:RefreshBarCache()
 
     -- Check visibility first
     if not self:ShouldShow() then
@@ -789,15 +567,19 @@ function BuffBars:ResetStyledMarkers()
 
 end
 
---- Public helper for options and hooks to rebuild bar metadata cache.
+--- Scans the viewer's children and delegates cache/texture map refresh to BuffBarColors.
 function BuffBars:RefreshBarCache()
     local viewer = self.InnerFrame
-    local cfg = self.ModuleConfig
-    if not (viewer and cfg and cfg.colors and cfg.colors.cache) then
-        return false
+    if not viewer then return false end
+    local children = GetSortedChildren(viewer, false)
+    local scanEntries = {}
+    for _, entry in ipairs(children) do
+        scanEntries[#scanEntries + 1] = {
+            spellName = GetChildSpellName(entry.frame),
+            textureFileID = GetChildTextureFileID(entry.frame),
+        }
     end
-
-    return RefreshBarCache(viewer, cfg)
+    return BuffBarColors.RefreshMaps(scanEntries)
 end
 
 --- Hooks the BuffBarCooldownViewer for automatic updates.
@@ -864,124 +646,6 @@ function BuffBars:HookEditMode()
 end
 
 --------------------------------------------------------------------------------
--- Options UI / Color Management
---------------------------------------------------------------------------------
-
---- Returns cached bars for current class/spec for Options UI.
----@return table<number, ECM_BarCacheEntry> bars Indexed by bar position
-function BuffBars:GetCachedBars()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local cache = cfg.colors.cache
-    if cache[classID] and cache[classID][specID] then
-        return cache[classID][specID]
-    end
-
-    return {}
-end
-
---- Returns cached texture file IDs for current class/spec for Options UI.
---- Stored separately from cache entries to avoid taint propagation.
----@return table<number, number> textures Indexed by bar position, values are texture file IDs
-function BuffBars:GetCachedTextures()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local textureMap = cfg.colors.textureMap
-    if textureMap and textureMap[classID] and textureMap[classID][specID] then
-        return textureMap[classID][specID]
-    end
-
-    return {}
-end
-
---- Returns configured spell colors for current class/spec for Options UI.
----@return table<string, ECM_Color> per-spell colors Indexed by spell name
-function BuffBars:GetSpellSettings()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local cache = cfg.colors.perSpell
-    if cache[classID] and cache[classID][specID] then
-        return cache[classID][specID]
-    end
-
-    return {}
-end
-
---- Sets color for named spell for current class/spec.
----@param spellName string
----@param r number
----@param g number
----@param b number
-function BuffBars:SetSpellColor(spellName, r, g, b)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return
-    end
-
-    local colors = cfg.colors.perSpell
-    colors[classID] = colors[classID] or {}
-    colors[classID][specID] = colors[classID][specID] or {}
-    colors[classID][specID][spellName] = { r = r, g = g, b = b, a = 1 }
-
-    Util.Log("BuffBars", "SetSpellColor", { spellName = spellName, r = r, g = g, b = b })
-
-    self:ResetStyledMarkers()
-    self:ScheduleLayoutUpdate()
-end
-
---- Resets color for named spell to default.
----@param spellName string
-function BuffBars:ResetSpellColor(spellName)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return
-    end
-
-    local colors = cfg.colors.perSpell
-    if colors[classID] and colors[classID][specID] then
-        colors[classID][specID][spellName] = nil
-    end
-
-    Util.Log("BuffBars", "ResetSpellColor", { spellName = spellName })
-
-    -- Refresh bars to apply default color
-    self:ResetStyledMarkers()
-    self:ScheduleLayoutUpdate()
-end
-
---- Returns color for named spell (wrapper for Options UI).
----@param spellName string
----@return number r, number g, number b
-function BuffBars:GetSpellColor(spellName)
-    local cfg = self.ModuleConfig
-    local color = GetSpellColor(spellName, cfg) or cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
-
-    return color.r, color.g, color.b
-end
-
---- Checks if a named spell has a custom color set.
----@param spellName string
----@return boolean
-function BuffBars:HasCustomSpellColor(spellName)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return false
-    end
-
-    local spells = cfg.colors.perSpell
-    return spells[classID] and spells[classID][specID] and spells[classID][specID][spellName] ~= nil
-end
-
---------------------------------------------------------------------------------
 -- Event Handlers
 --------------------------------------------------------------------------------
 
@@ -1007,7 +671,7 @@ function BuffBars:OnEnable()
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
-        EnsureColorStorage(self.ModuleConfig)
+        BuffBarColors.Init(self.ModuleConfig)
         self:HookViewer()
         self:HookEditMode()
         self:ScheduleLayoutUpdate()
