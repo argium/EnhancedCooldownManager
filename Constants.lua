@@ -9,6 +9,7 @@ local constants = {
     RUNEBAR = "RuneBar",
     BUFFBARS = "BuffBars",
     ITEMICONS = "ItemIcons",
+    SCANNER_BUFFBARS_DISCOVERY = "BuffBarsDiscovery",
 
     -- Blizzard frame names
     VIEWER = "EssentialCooldownViewer",

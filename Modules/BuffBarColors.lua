@@ -2,24 +2,18 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 --
--- BuffBarColors: Manages per-spell color customization and bar metadata caching
--- for buff bars. This is a stateful singleton — call Init(cfg) before use,
--- and re-call Init() when the profile changes. BuffBars calls RefreshMaps()
--- with scanned bar entries; Options reads the maps and color data directly.
+-- BuffBarColors: Manages per-spell color customization for buff bars.
+-- Discovery cache ownership (cache/textureMap refresh) lives in Layout.
 
 local _, ns = ...
 
-local ECM = ns.Addon
 local Util = ns.Util
 local C = ns.Constants
+local SecretedStore = ns.SecretedStore
 
 ---@class ECM_BarCacheEntry
 ---@field spellName string|nil  Spell name, or nil if secret/unavailable
 ---@field lastSeen number       GetTime() timestamp of when the bar was last scanned
-
----@class ECM_BarScanEntry
----@field spellName string|nil
----@field textureFileID number|nil
 
 --------------------------------------------------------------------------------
 -- Module Table
@@ -38,30 +32,31 @@ local function EnsureColorStorage(cfg)
     if not cfg.colors then
         cfg.colors = {
             perSpell = {},
-            cache = {},
             defaultColor = C.BUFFBARS_DEFAULT_COLOR,
         }
     end
 
     local colors = cfg.colors
-    if not colors.perSpell then
+    if type(colors.perSpell) ~= "table" then
         colors.perSpell = {}
-    end
-    if not colors.cache then
-        colors.cache = {}
     end
     if not colors.defaultColor then
         colors.defaultColor = C.BUFFBARS_DEFAULT_COLOR
     end
-    if not colors.textureMap then
-        colors.textureMap = {}
-    end
 end
 
+---@return table|nil
 local function GetConfig()
-    local cfg = ECM.db.profile.buffBars
-    Util.DebugAssert(cfg, "BuffBarColors.GetConfig - missing config")
-    EnsureColorStorage(cfg)
+    local cfg = SecretedStore and SecretedStore.GetPath and SecretedStore.GetPath({ "buffBars" }, true) or nil
+    if type(cfg) ~= "table" then
+        Util.DebugAssert(false, "BuffBarColors.GetConfig - missing or invalid buffBars config")
+        return nil
+    end
+
+    if cfg then
+        EnsureColorStorage(cfg)
+    end
+
     return cfg
 end
 
@@ -73,6 +68,7 @@ local function GetCurrentClassSpec()
     if not classID or not specID then
         return nil, nil
     end
+
     return classID, specID
 end
 
@@ -83,48 +79,9 @@ local function GetColorContext()
     if not cfg then
         return nil, nil, nil
     end
+
     local classID, specID = GetCurrentClassSpec()
     return cfg, classID, specID
-end
-
---- Compares old/new bar metadata to detect repaint-relevant changes.
----@param oldCache table<number, ECM_BarCacheEntry>|nil
----@param newCache table<number, ECM_BarCacheEntry>
----@param oldTextureMap table<number, number>|nil
----@param newTextureMap table<number, number>
----@return boolean changed True if spell names, texture IDs, or entry count changed
-local function HasCacheChanged(oldCache, newCache, oldTextureMap, newTextureMap)
-    if not oldCache then
-        return true
-    end
-
-    -- Check if entry counts differ
-    local oldCount, newCount = 0, 0
-    for _ in pairs(oldCache) do oldCount = oldCount + 1 end
-    for _ in pairs(newCache) do newCount = newCount + 1 end
-    if oldCount ~= newCount then
-        return true
-    end
-
-    -- Compare spell names and texture IDs at each index.
-    for index, newEntry in pairs(newCache) do
-        local oldEntry = oldCache[index]
-        if not oldEntry then
-            return true
-        end
-        local newName = newEntry.spellName
-        local oldName = oldEntry.spellName
-        if issecretvalue(newName) or issecretvalue(oldName) or newName ~= oldName then
-            return true
-        end
-        local oldTextureID = oldTextureMap and oldTextureMap[index] or nil
-        local newTextureID = newTextureMap and newTextureMap[index] or nil
-        if oldTextureID ~= newTextureID then
-            return true
-        end
-    end
-
-    return false
 end
 
 --------------------------------------------------------------------------------
@@ -132,19 +89,24 @@ end
 --------------------------------------------------------------------------------
 
 --- Returns the color lookup key for a bar: spell name if known, or textureFileID fallback.
---- When Blizzard marks spell names as secret (via canaccessvalue), the icon texture file ID
---- serves as a stable identifier for color customization. textureFileID is a number, creating
---- natural key-type separation from string spell names in perSpell storage.
 ---@param spellName string|nil
 ---@param textureFileID number|nil
 ---@return string|number|nil
 function BuffBarColors.GetColorKey(spellName, textureFileID)
-    if type(spellName) == "string" and not issecretvalue(spellName) then
-        return spellName
+    local normalizedName = SecretedStore and SecretedStore.NormalizeString and SecretedStore.NormalizeString(
+        spellName,
+        { trim = true, emptyToNil = true }
+    ) or nil
+
+    if normalizedName then
+        return normalizedName
     end
-    if type(textureFileID) == "number" then
-        return textureFileID
+
+    local normalizedTexture = SecretedStore and SecretedStore.NormalizeNumber and SecretedStore.NormalizeNumber(textureFileID) or nil
+    if normalizedTexture ~= nil then
+        return normalizedTexture
     end
+
     return nil
 end
 
@@ -154,11 +116,11 @@ end
 function BuffBarColors.LookupSpellColor(colorKey)
     local cfg = GetConfig()
     if not cfg or not cfg.colors or not cfg.colors.perSpell then
-        Util.DebugAssert(false, "BuffBarColors.LookupSpellColor called before Init or with missing perSpell")
+        Util.DebugAssert(false, "BuffBarColors.LookupSpellColor called before config is available")
         return C.BUFFBARS_DEFAULT_COLOR
     end
 
-    if type(colorKey) == "string" and issecretvalue(colorKey) then
+    if type(colorKey) == "string" and SecretedStore and SecretedStore.IsSecretValue and SecretedStore.IsSecretValue(colorKey) then
         -- Secret keys can occur transiently when Blizzard marks aura data as protected.
         -- Treat this as "no custom color" so callers fall back to defaults.
         return nil
@@ -176,7 +138,7 @@ function BuffBarColors.LookupSpellColor(colorKey)
     return nil
 end
 
---- Resolves a full color for a bar: per-spell color → default color → constant fallback.
+--- Resolves a full color for a bar: per-spell color -> default color -> constant fallback.
 --- Returns r, g, b for direct use in color pickers and SetStatusBarColor.
 ---@param colorKey string|number|nil
 ---@return number r, number g, number b
@@ -203,13 +165,13 @@ end
 ---@param b number
 function BuffBarColors.SetDefaultColor(r, g, b)
     local cfg = GetConfig()
-    Util.DebugAssert(cfg and cfg.colors, "BuffBarColors.SetDefaultColor called before Init")
+    Util.DebugAssert(cfg and cfg.colors, "BuffBarColors.SetDefaultColor called before config is available")
     if cfg and cfg.colors then
         cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
     end
 end
 
---- Sets a custom color for the given spell/texture key for current class/spec.
+--- Sets a custom color for the given key for current class/spec.
 ---@param colorKey string|number
 ---@param r number
 ---@param g number
@@ -220,7 +182,8 @@ function BuffBarColors.SetSpellColor(colorKey, r, g, b)
     if not cfg or not classID or not specID then
         return false
     end
-    if issecretvalue(colorKey) then
+
+    if SecretedStore and SecretedStore.IsSecretValue and SecretedStore.IsSecretValue(colorKey) then
         return false
     end
 
@@ -233,7 +196,7 @@ function BuffBarColors.SetSpellColor(colorKey, r, g, b)
     return true
 end
 
---- Removes the custom color for the given spell/texture key for current class/spec.
+--- Removes the custom color for the given key for current class/spec.
 ---@param colorKey string|number
 ---@return boolean changed True if a color was actually removed
 function BuffBarColors.ResetSpellColor(colorKey)
@@ -254,7 +217,7 @@ function BuffBarColors.ResetSpellColor(colorKey)
     return hadColor
 end
 
---- Checks if the given spell/texture key has a custom color set for current class/spec.
+--- Checks if the given key has a custom color set for current class/spec.
 ---@param colorKey string|number
 ---@return boolean
 function BuffBarColors.HasCustomSpellColor(colorKey)
@@ -267,40 +230,7 @@ function BuffBarColors.HasCustomSpellColor(colorKey)
     return spells[classID] and spells[classID][specID] and spells[classID][specID][colorKey] ~= nil
 end
 
---- Gets cached bar entries for current class/spec (for Options UI).
----@return table<number, ECM_BarCacheEntry> cache Indexed by bar position
-function BuffBarColors.GetBarCache()
-    local cfg, classID, specID = GetColorContext()
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local cache = cfg.colors.cache
-    if cache[classID] and cache[classID][specID] then
-        return cache[classID][specID]
-    end
-
-    return {}
-end
-
---- Gets cached texture file IDs for current class/spec (for Options UI).
---- Stored separately from cache entries to avoid taint propagation.
----@return table<number, number> textures Indexed by bar position, values are texture file IDs
-function BuffBarColors.GetBarTextureMap()
-    local cfg, classID, specID = GetColorContext()
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local textureMap = cfg.colors.textureMap
-    if textureMap and textureMap[classID] and textureMap[classID][specID] then
-        return textureMap[classID][specID]
-    end
-
-    return {}
-end
-
---- Gets configured per-spell colors for current class/spec (for Options UI).
+--- Gets configured per-key colors for current class/spec (for Options UI).
 ---@return table<string|number, ECM_Color> perSpell Indexed by spell name or texture file ID
 function BuffBarColors.GetPerSpellColors()
     local cfg, classID, specID = GetColorContext()
@@ -316,133 +246,78 @@ function BuffBarColors.GetPerSpellColors()
     return {}
 end
 
---- Refreshes bar metadata cache and texture map from scanned bar entries.
---- Accepts an array of {spellName, textureFileID} tuples produced by BuffBars
---- after scanning the viewer's children. Handles secret-name resolution and
---- textureID→spellName color migration.
----
---- TODO: Orphaned color cleanup — colors for removed/unobtainable spells persist
---- indefinitely in perSpell storage. Cleaning requires comparing perSpell keys
---- against the cache, risking deletion of colors for temporarily-unequipped buffs.
----@param scanEntries ECM_BarScanEntry[] Array of scanned bar data
----@return boolean changed True if cache contents changed or color migration occurred
-function BuffBarColors.RefreshMaps(scanEntries)
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
-        return false
-    end
-
-    if not scanEntries or #scanEntries == 0 then
-        Util.Log("BuffBarColors", "RefreshMaps - no scan entries.", {
-            classID = classID,
-            specID = specID,
-        })
-        return false
-    end
-
-    -- Build the new cache and texture maps from scan entries
-    local nextBarIndexToSpellNameMap = {}
-    local nextBarIndexToTextureIdMap = {}
-    for index, entry in ipairs(scanEntries) do
-        local spellName = nil
-        local textureFileID = nil
-
-        if issecrettable(entry) then
-            Util.Log("BuffBarColors", "RefreshMaps", {
-                message = "scan entry table is secret, skipping values",
-            })
-        else
-            local rawSpellName = type(entry) == "table" and entry.spellName or nil
-            if type(rawSpellName) == "string" and not issecretvalue(rawSpellName) then
-                rawSpellName = strtrim(rawSpellName)
-                if rawSpellName ~= "" then
-                    spellName = rawSpellName
-                end
-            end
-
-            local rawTextureID = type(entry) == "table" and entry.textureFileID or nil
-            if type(rawTextureID) == "number" and not issecretvalue(rawTextureID) then
-                textureFileID = rawTextureID
-            end
-        end
-
-        nextBarIndexToSpellNameMap[index] = {
-            spellName = spellName,
-            lastSeen = GetTime(),
-        }
-        nextBarIndexToTextureIdMap[index] = textureFileID
-    end
-
+--- Resolves discovery spell names and migrates custom colors from secondary keys to spell names.
+--- Called by Layout after it builds the next discovery maps and before those maps are written.
+---@param classID number
+---@param specID number
+---@param oldCache table<number, ECM_BarCacheEntry>|nil
+---@param oldTextureMap table<number, number>|nil
+---@param nextCache table<number, ECM_BarCacheEntry>
+---@param nextTextureMap table<number, number|nil>
+---@return boolean changed True if a name was resolved or a color key was migrated
+function BuffBarColors.ResolveDiscoveryColors(classID, specID, oldCache, oldTextureMap, nextCache, nextTextureMap)
     local cfg = GetConfig()
-    local barIndexToSpellNameMap = cfg.colors.cache
-    barIndexToSpellNameMap[classID] = barIndexToSpellNameMap[classID] or {}
+    if not cfg then
+        return false
+    end
 
-    local barIndexToTextureIdMap = cfg.colors.textureMap
-    barIndexToTextureIdMap[classID] = barIndexToTextureIdMap[classID] or {}
+    local perSpell = cfg.colors.perSpell
+    local classSpells = perSpell and perSpell[classID]
+    local specSpells = classSpells and classSpells[specID]
 
-    -- Texture file ID resolution and color migration:
-    -- textureFileIDs are stored in a separate table (textureMap) from cache entries
-    -- to prevent taint propagation from secret spell names to texture IDs.
-    -- 1. Build textureFileID → spellName mapping from old textureMap + old cache
-    -- 2. Resolve nil spellNames in new cache via textureFileID lookup
-    -- 3. Migrate perSpell colors from textureFileID (number) key to resolved spell name
-    local spellNameMapExists = barIndexToSpellNameMap[classID][specID]
-    local textureIdMapExists = barIndexToTextureIdMap[classID] and barIndexToTextureIdMap[classID][specID]
-    local didMigrateColor = false
-    if spellNameMapExists and textureIdMapExists then
-        local texIdToName = {}
-        for index, entry in pairs(spellNameMapExists) do
-            local texId = textureIdMapExists[index]
-            if entry.spellName and texId and not issecretvalue(texId) and not issecretvalue(entry.spellName) then
-                texIdToName[texId] = entry.spellName
-            end
-        end
-
-        local perSpell = cfg.colors.perSpell
-        local classSpells = perSpell and perSpell[classID]
-        local specSpells = classSpells and classSpells[specID]
-
-        for index, newEntry in pairs(nextBarIndexToSpellNameMap) do
-            local newTexId = nextBarIndexToTextureIdMap[index]
-            if not newEntry.spellName and newTexId and not issecretvalue(newTexId) then
-                local resolvedName = texIdToName[newTexId]
-                if resolvedName and not issecretvalue(resolvedName) then
-                    Util.Log("BuffBarColors", "RefreshMaps - resolved spell name", {
-                        resolvedName = resolvedName,
-                        textureFileID = newTexId,
-                    })
-                    newEntry.spellName = resolvedName
-                end
-            end
-
-            -- Migrate colors from textureFileID key to real spell name
-            if specSpells and newEntry.spellName and newTexId and not issecretvalue(newTexId) then
-                if specSpells[newTexId] then
-                    if specSpells[newEntry.spellName] == nil then
-                        Util.Log("BuffBarColors", "RefreshMaps - migrating color from texture ID to spell name", {
-                            spellName = newEntry.spellName,
-                            textureFileID = newTexId,
-                        })
-                        specSpells[newEntry.spellName] = specSpells[newTexId]
-                    end
-                    didMigrateColor = true
-                end
-                specSpells[newTexId] = nil
+    local textureToSpellName = {}
+    if type(oldCache) == "table" and type(oldTextureMap) == "table" then
+        for index, entry in pairs(oldCache) do
+            local textureID = oldTextureMap[index]
+            local spellName = type(entry) == "table" and entry.spellName or nil
+            local normalizedName = SecretedStore and SecretedStore.NormalizeString and SecretedStore.NormalizeString(
+                spellName,
+                { trim = true, emptyToNil = true }
+            ) or nil
+            local normalizedTexture = SecretedStore and SecretedStore.NormalizeNumber and SecretedStore.NormalizeNumber(textureID) or nil
+            if normalizedName and normalizedTexture ~= nil then
+                textureToSpellName[normalizedTexture] = normalizedName
             end
         end
     end
 
-    -- Detect whether anything actually changed before overwriting
-    local oldCache = barIndexToSpellNameMap[classID][specID]
-    local oldTextureMap = barIndexToTextureIdMap[classID] and barIndexToTextureIdMap[classID][specID]
-    local changed = HasCacheChanged(oldCache, nextBarIndexToSpellNameMap, oldTextureMap, nextBarIndexToTextureIdMap)
+    local didChange = false
 
-    barIndexToSpellNameMap[classID][specID] = nextBarIndexToSpellNameMap
-    barIndexToTextureIdMap[classID][specID] = nextBarIndexToTextureIdMap
+    for index, nextEntry in pairs(nextCache or {}) do
+        local nextTexture = nextTextureMap and nextTextureMap[index] or nil
+        local normalizedTexture = SecretedStore and SecretedStore.NormalizeNumber and SecretedStore.NormalizeNumber(nextTexture) or nil
 
-    if changed or didMigrateColor then
-        Util.Log("BuffBarColors", "RefreshMaps - cache updated")
+        local spellName = type(nextEntry) == "table" and nextEntry.spellName or nil
+        spellName = SecretedStore and SecretedStore.NormalizeString and SecretedStore.NormalizeString(
+            spellName,
+            { trim = true, emptyToNil = true }
+        ) or nil
+
+        if not spellName and normalizedTexture ~= nil then
+            local resolved = textureToSpellName[normalizedTexture]
+            if resolved then
+                nextEntry.spellName = resolved
+                spellName = resolved
+                didChange = true
+                Util.Log("BuffBarColors", "ResolveDiscoveryColors - resolved spell name", {
+                    spellName = resolved,
+                    textureFileID = normalizedTexture,
+                })
+            end
+        end
+
+        if specSpells and spellName and normalizedTexture ~= nil and specSpells[normalizedTexture] then
+            if specSpells[spellName] == nil then
+                specSpells[spellName] = specSpells[normalizedTexture]
+            end
+            specSpells[normalizedTexture] = nil
+            didChange = true
+            Util.Log("BuffBarColors", "ResolveDiscoveryColors - migrated color key", {
+                spellName = spellName,
+                textureFileID = normalizedTexture,
+            })
+        end
     end
 
-    return changed or didMigrateColor
+    return didChange
 end

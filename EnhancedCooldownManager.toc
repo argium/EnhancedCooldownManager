@@ -29,6 +29,7 @@ Defaults.lua
 Modules\SparkleUtil.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
+Modules\SecretedStore.lua
 Modules\Migration.lua
 Modules\ImportExport.lua
 Modules\BugReports.lua

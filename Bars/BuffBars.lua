@@ -7,6 +7,7 @@ local _, ns = ...
 local ECM = ns.Addon
 local Util = ns.Util
 local C = ns.Constants
+local SecretedStore = ns.SecretedStore
 
 local ECMFrame = ns.Mixins.ECMFrame
 local BuffBarColors = ns.BuffBarColors
@@ -56,7 +57,7 @@ local function GetChildSpellName(child)
     end
 
     local text = bar.Name:GetText()
-    if issecretvalue(text) then
+    if SecretedStore and SecretedStore.IsSecretValue and SecretedStore.IsSecretValue(text) then
         Util.Log("BuffBars", "GetChildSpellName", {
             message = "Spell name is secret",
             childName = child:GetName() or "nil",
@@ -437,9 +438,6 @@ function BuffBars:UpdateLayout()
     local globalConfig = self.GlobalConfig
     local cfg = self.ModuleConfig
 
-    -- Refresh cache independently from visibility so options can discover bars in hidden states.
-    self:RefreshBarCache()
-
     -- Check visibility
     if not self:ShouldShow() then
         -- Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
@@ -550,10 +548,14 @@ function BuffBars:ResetStyledMarkers()
 
 end
 
---- Scans the viewer's children and delegates cache/texture map refresh to BuffBarColors.
-function BuffBars:RefreshBarCache()
+--- Scans the viewer's children and returns entries used by Layout discovery scanning.
+---@return table[] scanEntries Array of { spellName, textureFileID }
+function BuffBars:CollectScanEntries()
     local viewer = self.InnerFrame
-    if not viewer then return false end
+    if not viewer then
+        return {}
+    end
+
     local children = GetSortedChildren(viewer, false)
     local scanEntries = {}
     for _, entry in ipairs(children) do
@@ -562,7 +564,7 @@ function BuffBars:RefreshBarCache()
             textureFileID = GetChildTextureFileID(entry.frame),
         }
     end
-    return BuffBarColors.RefreshMaps(scanEntries)
+    return scanEntries
 end
 
 --- Hooks the BuffBarCooldownViewer for automatic updates.
@@ -612,8 +614,11 @@ function BuffBars:HookEditMode()
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         self:ResetStyledMarkers()
-        -- Use immediate update (not scheduled) so the cache is rebuilt before
-        -- the user opens Options. Edit mode exit is infrequent, so no throttling needed.
+        if ECM.RefreshBuffBarDiscovery then
+            ECM.RefreshBuffBarDiscovery("edit_mode_exit")
+        end
+
+        -- Edit mode exit is infrequent, so perform an immediate restyle pass.
         local viewer = _G[C.VIEWER_BUFFBAR]
         if viewer and viewer:IsShown() then
             self:UpdateLayout()

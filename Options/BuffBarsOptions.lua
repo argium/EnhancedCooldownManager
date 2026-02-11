@@ -33,8 +33,8 @@ end
 local function GenerateSpellColorArgs()
     local args = {}
 
-    local cachedBars = BuffBarColors.GetBarCache()
-    local cachedTextures = BuffBarColors.GetBarTextureMap()
+    local cachedBars = ECM.GetBuffBarDiscoveryCache and ECM.GetBuffBarDiscoveryCache() or {}
+    local cachedTextures = ECM.GetBuffBarDiscoverySecondaryKeyMap and ECM.GetBuffBarDiscoverySecondaryKeyMap() or {}
     if not cachedBars or not next(cachedBars) then
         args.noData = {
             type = "description",
@@ -187,9 +187,8 @@ local function SpellOptionsTable()
                 order = 100,
                 width = "normal",
                 func = function()
-                    local buffBars = ECM.BuffBars
-                    if buffBars then
-                        buffBars:RefreshBarCache()
+                    if ECM.RefreshBuffBarDiscovery then
+                        ECM.RefreshBuffBarDiscovery("options_refresh")
                     end
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,

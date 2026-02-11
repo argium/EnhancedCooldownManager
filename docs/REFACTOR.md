@@ -102,7 +102,7 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - Color system supports:
   - Per-spell custom colors (stored per class/spec)
   - Default fallback color
-  - Metadata cache for discovered bars (no color snapshots, no unknown entries)
+  - Metadata cache for discovered bars (owned by `Layout` scanner; no color snapshots, no unknown entries)
 
 **Known Issues:**
 - Blizzard frequently resets visibility settings when cooldowns update
@@ -110,7 +110,6 @@ The addon is undergoing a significant refactor to introduce a mixin-based archit
 - Edit mode reordering requires cache invalidation via `ResetStyledMarkers()`
 
 **Future Work:**
-- Consider extracting color management to a separate module
 - Improve hook reliability
 - Better handling of dynamic bar creation/destruction
 

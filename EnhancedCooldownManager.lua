@@ -300,6 +300,9 @@ function ECM:OnInitialize()
     ns.Migration.PrepareDatabase()
 
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
+    if ns.SecretedStore and ns.SecretedStore.RegisterProfileCallbacks then
+        ns.SecretedStore.RegisterProfileCallbacks(self.db)
+    end
 
     local profile = self.db and self.db.profile
     Util.Log("ECM", "OnInitialize", {

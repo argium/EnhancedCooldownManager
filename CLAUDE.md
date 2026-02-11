@@ -70,22 +70,25 @@ BarFrame should work with any bar-style frame the addon is responsible for drawi
 - Custom ShouldShow logic
 - Class/spec-specific behavior (ticks, colors, visibility rules)
 - BuffBars icon handling is deterministic: use `child.Icon` only (no `IconFrame`/`IconButton` fallback probing, no dynamic atlas/region discovery loops).
-- BuffBars delegates all per-spell color storage, cache management, texture map tracking, and
-  secret-name resolution to `BuffBarColors`. BuffBars scans the viewer's children and passes
-  `{spellName, textureFileID}` tuples to `BuffBarColors.RefreshMaps()`. Color lookups in
-  `ApplyCooldownBarStyle` use `BuffBarColors.GetColorKey()` and `BuffBarColors.GetSpellColor()`.
+- BuffBars provides scan data via `CollectScanEntries()` (array of `{ spellName, textureFileID }`)
+  and does not own cache persistence/orchestration.
+- Color lookups in `ApplyCooldownBarStyle` use `BuffBarColors.GetColorKey()` and
+  `BuffBarColors.GetSpellColor()`.
 
 [Modules\BuffBarColors.lua](Modules\BuffBarColors.lua) owns:
 - Per-spell color storage (`perSpell` in config, keyed by class/spec)
-- Bar metadata cache (`cache` in config) and texture map (`textureMap` in config)
-- Secret spell name resolution via texture file ID fallback
-- Color migration from texture file ID keys to resolved spell name keys
+- Buff bar color key policy (`spellName` primary, `textureFileID` fallback key)
+- Color-key migration from secondary numeric keys to resolved spell-name keys
 - Default color get/set
-- All color query/mutation methods called by Options UI directly
+- All color query/mutation methods called by Options UI directly.
 
-BuffBarColors is a stateful singleton. Call `BuffBarColors.Init(cfg)` before use, and re-call on
-profile switch. BuffBars calls `Init` from `OnEnable` and `SetConfig`. Options calls
-`BuffBarColors` methods directly (no proxy through BuffBars).
+[Modules\SecretedStore.lua](Modules\SecretedStore.lua) owns:
+- Generic secret-safe normalization helpers (string/number/record).
+- Secret API wrappers (`IsSecretValue`, `IsSecretTable`, `CanAccessValue`, `CanAccessTable`).
+- Generic indexed-map change detection helper.
+- Profile callback registration (`OnProfileChanged`, `OnProfileCopied`, `OnProfileReset`) and
+  active profile rebinding.
+- Direct `ECM.db.profile` access as an intentional infrastructure exception (non-bar module).
 
 These responsibilities can change over time so update this document if so however responsibilities should not cross mixins by reaching into the internals of another. Always use public interfaces. Internal fields are prefixed by an underscore.
 
@@ -147,6 +150,11 @@ Not all files will have all sections. For example, mixins don't have event handl
 - Global hidden state based on mount/vehicle, rest area, and CVar conditions.
 - Registering and unregistering ECMFrames via `ECM.RegisterFrame(frame)` / `ECM.UnregisterFrame(frame)` so module-level enable/disable can fully opt frames in/out.
 - Running deterministic layout passes: chain modules in `C.CHAIN_ORDER` first, then remaining modules.
+- Owning scanner orchestration (`ECM.RegisterScanner` / `ECM.UnregisterScanner`) for non-layout
+  discovery flows.
+- Owning BuffBars discovery cache/secondary-key map refresh via scanner and exposing read APIs:
+  `ECM.GetBuffBarDiscoveryCache()`, `ECM.GetBuffBarDiscoverySecondaryKeyMap()`,
+  `ECM.RefreshBuffBarDiscovery(reason)`.
 
 [Modules\Migration.lua](Modules\Migration.lua) owns:
 - Versioned SavedVariable namespacing for rollback-safe schema upgrades within a single SV (`EnhancedCooldownManagerDB`).
