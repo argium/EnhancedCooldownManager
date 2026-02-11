@@ -21,9 +21,5 @@
         "Lua.workspace.library": [
             "~\\.vscode\\extensions\\ketho.wow-api-0.22.1\\Annotations\\Core"
         ],
-        "Lua.diagnostics.globals": [
-            "AddonCompartmentFrame",
-            "ADD"
-        ]
 	}
 }
