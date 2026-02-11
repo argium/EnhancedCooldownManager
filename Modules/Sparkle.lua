@@ -112,11 +112,11 @@ end
 --- - Designed for 4..60 characters; longer strings are mapped onto a 60-step gradient.
 --- - Colors can be provided as "RRGGBB" / "#RRGGBB" strings, ECM_Color tables, or {r,g,b} arrays (0..1 or 0..255).
 ---@param text string
----@param startColor string|table
----@param midColor string|table
----@param endColor string|table
+---@param startColor string|table|nil
+---@param midColor string|table|nil
+---@param endColor string|table|nil
 ---@return string
-ECM_sparkle = function(text, startColor, midColor, endColor)
+function ECM_sparkle(text, startColor, midColor, endColor)
     assert(type(text) == "string", "text must be a string")
     startColor = startColor or { r = 0.25, g = 0.82, b = 1.00, a = 1 }
     midColor = midColor or { r = 0.62, g = 0.45, b = 1.00, a = 1 }

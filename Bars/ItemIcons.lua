@@ -235,7 +235,7 @@ local function RestoreViewerPosition(self)
         return
     end
 
-    local utilityViewer = _G[C.VIEWER_UTILITY]
+    local utilityViewer = _G["UtilityCooldownViewer"]
     if not utilityViewer then
         return
     end
@@ -292,7 +292,7 @@ end
 ---@return boolean isStable True when spacing was measured from valid live geometry.
 ---@return table debugInfo Measurement debug payload for logs.
 local function GetUtilityViewerLayout()
-    local viewer = _G[C.VIEWER_UTILITY]
+    local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
         return C.DEFAULT_ITEM_ICON_SIZE, C.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
             reason = "viewer_hidden_or_missing",
@@ -426,7 +426,7 @@ function ItemIcons:ShouldShow()
     end
 
     -- Also hide if UtilityCooldownViewer is not visible
-    local utilityViewer = _G[C.VIEWER_UTILITY]
+    local utilityViewer = _G["UtilityCooldownViewer"]
     if not utilityViewer or not utilityViewer:IsShown() then
         return false
     end
@@ -462,7 +462,7 @@ function ItemIcons:UpdateLayout()
         return false
     end
 
-    local utilityViewer = _G[C.VIEWER_UTILITY]
+    local utilityViewer = _G["UtilityCooldownViewer"]
     if not utilityViewer then
         RestoreViewerPosition(self)
         frame:Hide()
@@ -532,7 +532,7 @@ function ItemIcons:UpdateLayout()
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM_log(self.Name, "ItemIcons:UpdateLayout", {
+    ECM_log(C.SYS.Layout, self.Name, "ItemIcons:UpdateLayout", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -579,6 +579,7 @@ function ItemIcons:Refresh()
         end
     end
 
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
     return true
 end
 
@@ -638,7 +639,7 @@ end
 
 --- Hook the UtilityCooldownViewer to update when it shows/hides or resizes.
 function ItemIcons:HookUtilityViewer()
-    local utilityViewer = _G[C.VIEWER_UTILITY]
+    local utilityViewer = _G["UtilityCooldownViewer"]
     if not utilityViewer or self._viewerHooked then
         return
     end
@@ -689,7 +690,7 @@ function ItemIcons:OnEnable()
         self:ScheduleLayoutUpdate()
     end)
 
-    ECM_log(self.Name, "OnEnable - module enabled")
+    ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")
 end
 
 function ItemIcons:OnDisable()
@@ -710,5 +711,5 @@ function ItemIcons:OnDisable()
         self.InnerFrame:Hide()
     end
 
-    ECM_log(self.Name, "Disabled")
+    ECM_log(C.SYS.Core, self.Name, "Disabled")
 end

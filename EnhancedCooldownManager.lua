@@ -28,12 +28,7 @@ local function RegisterAddonCompartmentEntry()
         return
     end
 
-    local text = C.ADDON_NAME
-    local sparkle = ns.SparkleUtil
-    if sparkle and sparkle.GetText then
-        text = sparkle.GetText(text)
-    end
-
+    local text = ECM_sparkle(C.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
         icon = C.ADDON_ICON_TEXTURE,
@@ -296,13 +291,14 @@ function ECM:OnInitialize()
     ns.Migration.PrepareDatabase()
 
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
-    ns.SecretedStore.RegisterProfileCallbacks(self.db)
+    -- ns.BuffBarColors.RegisterProfileCallbacks(self.db)
 
     local profile = self.db and self.db.profile
-    ECM_log("ECM", "OnInitialize", {
+    ECM_log(C.SYS.Core, nil, "Initialize", {
         schemaVersion = profile and profile.schemaVersion or "nil",
-        currentSchemaVersion = C.CURRENT_SCHEMA_VERSION,
+        currentSchemaVersion = C.CURRENT_SCHEMA_VERSION
     })
+
     if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
         ns.Migration.Run(profile)
     end
@@ -326,11 +322,11 @@ function ECM:OnEnable()
     local profile = self.db and self.db.profile
 
     local moduleOrder = {
-        "PowerBar",
-        "ResourceBar",
-        "RuneBar",
-        "BuffBars",
-        "ItemIcons",
+        C.POWERBAR,
+        C.RESOURCEBAR,
+        C.RUNEBAR,
+        C.BUFFBARS,
+        C.ITEMICONS,
     }
 
     for _, moduleName in ipairs(moduleOrder) do
@@ -340,10 +336,6 @@ function ECM:OnEnable()
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
-        if moduleName == C.ITEMICONS then
-            shouldEnable = moduleConfig and moduleConfig.enabled == true
-        end
-
         if shouldEnable then
             if not module:IsEnabled() then
                 self:EnableModule(moduleName)

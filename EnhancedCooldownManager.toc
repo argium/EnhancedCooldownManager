@@ -29,9 +29,9 @@ Defaults.lua
 Modules\Sparkle.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
-Modules\Migration.lua
-Modules\ImportExport.lua
 Modules\BugReports.lua
+Options\Migration.lua
+Options\ImportExport.lua
 
 EnhancedCooldownManager.lua
 

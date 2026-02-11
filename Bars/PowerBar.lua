@@ -47,7 +47,7 @@ function PowerBar:UpdateTicks(frame, resource, max)
 
     local config = self.ModuleConfig
     local ticksCfg = config and config.ticks
-    local defaultColor = ticksCfg and ticksCfg.defaultColor or C.POWERBAR_DEFAULT_TICK_COLOR
+    local defaultColor = ticksCfg and ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
     -- Create tick textures on TicksFrame, but position them relative to StatusBar
@@ -84,6 +84,7 @@ function PowerBar:Refresh(force)
     local max = UnitPowerMax("player", resource)
     self:UpdateTicks(frame, resource, max)
 
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
     return true
 end
 
@@ -134,7 +135,7 @@ function PowerBar:OnEnable()
 
     BarFrame.OnEnable(self)
     self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPowerUpdate")
-    ECM.Log(self.Name, "PowerBar:Enabled")
+    ECM_log(C.SYS.Core, self.Name, "Enabled")
 end
 
 function PowerBar:OnDisable()
@@ -143,5 +144,5 @@ function PowerBar:OnDisable()
         ECM.UnregisterFrame(self)
     end
     BarFrame.OnDisable(self)
-    ECM.Log(self.Name, "PowerBar:Disabled")
+    ECM_log(C.SYS.Core, self.Name, "Disabled")
 end

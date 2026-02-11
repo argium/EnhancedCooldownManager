@@ -61,7 +61,7 @@ local function SetGloballyHidden(hidden, reason)
         return
     end
 
-    Util.Log("Layout", "SetGloballyHidden", { hidden = hidden, reason = reason })
+    ECM_log(C.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
 
     _globallyHidden = hidden
     _hideReason = reason
@@ -94,7 +94,8 @@ local function SetAlpha(alpha)
     end)
 
     for _, ecmFrame in pairs(_ecmFrames) do
-        ecmFrame.InnerFrame:SetAlpha(alpha)
+        --- @type ECMFrame
+        ecmFrame:SetAlpha(alpha)
     end
 
     _lastAlpha = alpha
@@ -199,7 +200,7 @@ local function RegisterFrame(frame)
     assert(frame and type(frame) == "table" and frame.IsECMFrame, "RegisterFrame: invalid ECMFrame")
     assert(_ecmFrames[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
     _ecmFrames[frame.Name] = frame
-    ECM.Log("Layout", "Frame registered", frame.Name)
+    ECM_log(C.SYS.Layout, nil, "Frame registered: " .. frame.Name)
 end
 
 --- Unregisters an ECMFrame from layout update events.
@@ -215,7 +216,7 @@ local function UnregisterFrame(frame)
     end
 
     _ecmFrames[name] = nil
-    ECM.Log("Layout", "Frame unregistered", name)
+    ECM_log(C.SYS.Layout, nil, "Frame unregistered: " .. name)
 end
 
 --- Rebinds config references for all registered ECMFrames.

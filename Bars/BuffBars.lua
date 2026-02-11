@@ -8,7 +8,7 @@ local ECM = ns.Addon
 local C = ns.Constants
 
 local ECMFrame = ns.Mixins.ECMFrame
-local BuffBarColors = ns.BuffBarColors
+local BBC = ns.BuffBarColors
 
 local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
 ECM.BuffBars = BuffBars
@@ -84,7 +84,7 @@ local function HookChildAnchoring(child, module)
     -- Hook SetPoint to detect when Blizzard re-anchors this child
     hooksecurefunc(child, "SetPoint", function()
         -- Only re-layout if we're not already running a layout
-        local viewer = _G[C.VIEWER_BUFFBAR]
+        local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
         if viewer and not module._layoutRunning then
             module:ScheduleLayoutUpdate()
         end
@@ -210,7 +210,7 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     bar:SetStatusBarTexture(tex)
 
     if bar.SetStatusBarColor then
-        local color = BuffBarColors.GetColorForBar(bar)
+        local color = BBC.GetColorForBar(bar)
         if color then
             bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
         end
@@ -246,8 +246,8 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
         iconFrame:SetSize(height, height)
     end
 
-    ECM_ApplyFont(bar.Name, globalConfig)
-    ECM_ApplyFont(bar.Duration, globalConfig)
+    ECM_ApplyFont(bar.Name)
+    ECM_ApplyFont(bar.Duration)
 
     if iconFrame then
         iconFrame:ClearAllPoints()
@@ -262,7 +262,7 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     -- Mark as styled
     child.__ecmStyled = true
 
-    ECM_log("BuffBars", "Applied style to bar", {
+    ECM_log(C.SYS.Styling, C.BUFFBARS, "Applied style to bar", {
         barIndex = barIndex,
         showIcon = moduleConfig and moduleConfig.showIcon ~= false,
         showSpellName = moduleConfig and moduleConfig.showSpellName ~= false,
@@ -274,7 +274,7 @@ end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
 local function layout_bars(self)
-    local viewer = _G[C.VIEWER_BUFFBAR]
+    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
     if not viewer then
         return
     end
@@ -297,7 +297,7 @@ local function layout_bars(self)
         prev = child
     end
 
-    ECM_log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
+    ECM_log(C.SYS.Layout, C.BUFFBARS, "LayoutBars complete. Found: " .. #visibleChildren .. " visible bars.")
 
     self._layoutRunning = nil
 end
@@ -339,14 +339,8 @@ end
 
 --- Override CreateFrame to return the Blizzard BuffBarCooldownViewer instead of creating a new one.
 function BuffBars:CreateFrame()
-    local viewer = _G[C.VIEWER_BUFFBAR]
-    if not viewer then
-        ECM_log("BuffBars", "CreateFrame", "BuffBarCooldownViewer not found, creating placeholder")
-        -- Fallback: create a placeholder frame if Blizzard viewer doesn't exist
-        viewer = CreateFrame("Frame", "ECMBuffBarPlaceholder", UIParent)
-        viewer:SetSize(200, 20)
-    end
-    return viewer
+    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
+    return _G["EssentialCooldownViewer"_BUFFBAR]  -- TODO: this is a dummy frame I guess. I don't like it.
 end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
@@ -361,7 +355,6 @@ function BuffBars:UpdateLayout()
 
     -- Check visibility
     if not self:ShouldShow() then
-        -- ECM_log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
         viewer:Hide()
         return false
     end
@@ -397,7 +390,7 @@ function BuffBars:UpdateLayout()
     layout_bars(self)
 
     viewer:Show()
-    ECM_log(self.Name, "BuffBars:UpdateLayout", {
+    ECM_log(C.SYS.Layout, C.BUFFBARS, "BuffBars:UpdateLayout", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -417,7 +410,7 @@ end
 
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
-    local viewer = _G[C.VIEWER_BUFFBAR]
+    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
     if not viewer then
         return
     end
@@ -429,10 +422,6 @@ function BuffBars:ResetStyledMarkers()
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
         if child and child.__ecmStyled then
-            ECM_log("BuffBars", "ResetStyledMarkers", {
-                message = "Clearing styled marker for child",
-                childName = child:GetName() or "nil",
-            })
             child.__ecmStyled = nil
         end
     end
@@ -460,7 +449,7 @@ end
 
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
-    local viewer = _G[C.VIEWER_BUFFBAR]
+    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
     if not viewer then
         return
     end
@@ -488,7 +477,7 @@ function BuffBars:HookViewer()
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    ECM_log("BuffBars", "Hooked BuffBarCooldownViewer")
+    ECM_log(C.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -510,7 +499,7 @@ function BuffBars:HookEditMode()
         end
 
         -- Edit mode exit is infrequent, so perform an immediate restyle pass.
-        local viewer = _G[C.VIEWER_BUFFBAR]
+        local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
         if viewer and viewer:IsShown() then
             self:UpdateLayout()
         end
@@ -521,7 +510,7 @@ function BuffBars:HookEditMode()
         self:ScheduleLayoutUpdate()
     end)
 
-    ECM_log("BuffBars", "Hooked EditModeManagerFrame")
+    ECM_log(C.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
 end
 
 --------------------------------------------------------------------------------
@@ -555,7 +544,7 @@ function BuffBars:OnEnable()
         self:ScheduleLayoutUpdate()
     end)
 
-    ECM_log("BuffBars", "OnEnable - module enabled")
+    ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")
 end
 
 function BuffBars:OnDisable()
@@ -563,5 +552,5 @@ function BuffBars:OnDisable()
     if self.IsECMFrame and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
-    ECM_log("BuffBars", "Disabled")
+    ECM_log(C.SYS.Core, self.Name, "OnDisable - module disabled")
 end

@@ -179,7 +179,7 @@ function RuneBar:CreateFrame()
         self:ThrottledRefresh()
     end)
 
-    ECM.Log(self.Name, "RuneBar:CreateFrame", "Success")
+    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
 
@@ -197,7 +197,6 @@ function RuneBar:Refresh(force)
     -- our own fragmented bars and don't use the standard StatusBar
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
-        ECM_log(self.Name, "RuneBar:Refresh", "Skipping refresh")
         return false
     end
 
@@ -228,9 +227,8 @@ function RuneBar:Refresh(force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    ECM_log(self.Name, "RuneBar:Refresh", {
-        maxRunes = maxRunes,
-    })
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
+    return true
 end
 
 --------------------------------------------------------------------------------

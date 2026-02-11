@@ -18,7 +18,7 @@ local migrationLog = {}
 ---@param message string
 local function Log(message)
     migrationLog[#migrationLog + 1] = date("%Y-%m-%d %H:%M:%S") .. "  " .. message
-    ECM_log("Migration", message)
+    ECM_log(C.SYS.Migration, nil, message)
 end
 
 --------------------------------------------------------------------------------

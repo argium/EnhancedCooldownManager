@@ -207,10 +207,9 @@ end
 function BarFrame:Refresh(force)
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
-        -- ECM_log(self.Name, "BarFrame:Refresh", "Skipping refresh")
         return false
     end
-    ECM_log(self.Name, "BarFrame:Refresh", "Start")
+    ECM_log(C.SYS.Styling, self.Name, "Starting refresh")
 
     local frame = self.InnerFrame
     local globalConfig = self.GlobalConfig
@@ -235,7 +234,7 @@ function BarFrame:Refresh(force)
         frame:SetText(displayValue)
 
         -- Apply font settings
-        ECM_ApplyFont(frame.TextValue, globalConfig)
+        ECM_ApplyFont(frame.TextValue)
     end
     frame:SetTextVisible(showText)
 
@@ -248,7 +247,7 @@ function BarFrame:Refresh(force)
     frame.StatusBar:SetStatusBarColor(statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
-    -- ECM_log(self.Name, "BarFrame:Refresh", {
+    -- ECM_log(C.SYS.Styling, self.Name, "BarFrame:Refresh", {
     --     current = current,
     --     max = max,
     --     displayValue = displayValue,
@@ -258,6 +257,7 @@ function BarFrame:Refresh(force)
     --     statusBarColor = statusBarColor,
     -- })
 
+    ECM_log(C.SYS.Styling, self.Name, "Bar frame refresh complete.")
     return true
 end
 
@@ -301,7 +301,7 @@ function BarFrame:CreateFrame()
         end
     end
 
-    ECM.Log(self.Name, "BarFrame:CreateFrame", "Success")
+    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
 

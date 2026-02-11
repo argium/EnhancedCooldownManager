@@ -117,7 +117,7 @@ Use base `IsReady()` + required frame parts:
 ### BuffBars
 Override `IsReady()` to additionally require:
 
-- `_G[C.VIEWER_BUFFBAR]` exists
+- `_G["EssentialCooldownViewer"_BUFFBAR]` exists
 - Viewer supports `GetChildren` or `GetItemFrames`
 - Current attach state is valid for child enumeration and layout
 

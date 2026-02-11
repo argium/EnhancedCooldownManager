@@ -9,6 +9,10 @@ local C = ns.Constants
 -- String helpers
 ---------------------------------------------------------------------------
 
+
+--- Converts a string to a readable format handling nil and secret values.
+--- @param x string|nil
+--- @return string
 local function safe_str_tostring(x)
     if x == nil then
         return "nil"
@@ -19,6 +23,11 @@ local function safe_str_tostring(x)
     end
 end
 
+--- Converts a table to a string with cycle detection, depth limit, and secret value handling.
+--- @param tbl table
+--- @param depth number
+--- @param seen table
+--- @return string
 local function safe_table_tostring(tbl, depth, seen)
     if issecrettable(tbl) then
         return "[secrettable]"
@@ -62,7 +71,10 @@ local function safe_table_tostring(tbl, depth, seen)
     return pairsOrErr
 end
 
-ECM_tostring = function(v)
+--- Converts a value to a string.
+--- @param v any
+--- @return string
+function ECM_tostring(v)
     if type(v) == "table" then
         return safe_table_tostring(v, 0, {})
     end
@@ -74,19 +86,21 @@ end
 -- Debug helpers
 ---------------------------------------------------------------------------
 
-ECM_SYS = {
-    Layout = "Layout",
-    Bars = "Bars",
-    SecretedStore = "SecretedStore",
-}
+--- Logs a debug message to the console, internal buffer, and DevTool.
+--- @param subsystem SUBSYSTEM Subsystem name for categorization
+--- @param module string|nil Module name
+--- @param message string Debug message
+--- @param data any|nil Optional additional data to log (will be stringified)
+function ECM_log(subsystem, module, message, data)
+    ECM_debug_assert(subsystem and type(subsystem) == "string", "ECM_log: subsystem must be a string")
+    ECM_debug_assert(message and type(message) == "string", "ECM_log: message must be a string")
+    ECM_debug_assert(module == nil or type(module) == "string", "ECM_log: module must be a string or nil")
 
-ECM_log = function (subsystem, message, data)
-    local prefix = "ECM:" .. subsystem .. ":"
-    message = prefix .. " " .. message
+    local prefix = "[" .. C.ADDON_ABRV .. " " .. subsystem ..  (module and " " .. module or "") .. "]"
 
     -- Add to trace log buffer for /ecm bug
     if ns.AddToTraceLog then
-        local logLine = message
+        local logLine = prefix .. " " .. message
         if data ~= nil then
             if type(data) == "table" then
                 local parts = {}
@@ -101,21 +115,25 @@ ECM_log = function (subsystem, message, data)
         ns.AddToTraceLog(logLine)
     end
 
-    prefix = ECM_sparkle(
-        prefix,
-        { r = 0.25, g = 0.82, b = 1.00, a = 1 },
-        { r = 0.62, g = 0.45, b = 1.00, a = 1 },
-        { r = 0.13, g = 0.77, b = 0.37, a = 1 })
+    if DevTool and DevTool.AddData then
+        local payload = {
+            subsystem = subsystem,
+            module = module or "nil",
+            message = message,
+            timestamp = GetTime(),
+            data = ECM_tostring(data),
+        }
+        pcall(DevTool.AddData, DevTool, payload, "|cff".. C.DEBUG_COLOR ..  prefix .. "|r " .. message)
+    end
 
-    message = prefix .. " " .. message
-    print(message)
+    print("|cff".. C.DEBUG_COLOR ..  prefix .. "|r " .. message)
 end
 
-ECM_is_debug_enabled  = function()
+function ECM_is_debug_enabled()
     return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
 end
 
-ECM_debug_assert = function(condition, message)
+function ECM_debug_assert(condition, message)
     if not ECM_is_debug_enabled() then
         return
     end
@@ -135,16 +153,14 @@ local function get_lsm_media(mediaType, key)
     return nil
 end
 
-local function get_font_path(fontKey, fallback)
-    ECM_debug_assert(fallback, "fallback cannot be nil")
-    local fallbackPath = fallback or "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
-    return get_lsm_media("font", fontKey) or fallbackPath
+local function get_font_path(fontKey)
+    return get_lsm_media("font", fontKey) or C.DEFAULT
 end
 
 --- Returns a statusbar texture path (LSM-resolved when available).
 ---@param texture string|nil Name of the texture in LSM or a file path.
 ---@return string
-ECM_GetTexture = function(texture)
+function ECM_GetTexture(texture)
     if texture and type(texture) == "string" then
         local fetched = get_lsm_media("statusbar", texture)
         if fetched then
@@ -162,27 +178,25 @@ end
 
 --- Applies font settings to a FontString.
 ---@param fontString FontString
----@param globalConfig table|nil Full global configuration table
-ECM_ApplyFont = function(fontString, globalConfig)
+function ECM_ApplyFont(fontString)
     if not fontString then
         return
     end
 
-    ECM_debug_assert(type(globalConfig) == "table" or globalConfig == nil, "ECM_ApplyFont: globalConfig must be a table or nil")
-    ECM_debug_assert(
-        not (type(globalConfig) == "table" and globalConfig.global ~= nil and globalConfig.font == nil),
-        "ECM_ApplyFont: expected global config block, received profile root"
-    )
-
+    local globalConfig = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global
     local fontPath = get_font_path(globalConfig and globalConfig.font)
-    local fontSize = (globalConfig and globalConfig.fontSize) or 11
-    local fontOutline = (globalConfig and globalConfig.fontOutline) or "OUTLINE"
+    local fontSize = (globalConfig and globalConfig.fontSize)
+    local fontOutline = (globalConfig and globalConfig.fontOutline)
 
     if fontOutline == "NONE" then
         fontOutline = ""
     end
 
     local hasShadow = globalConfig and globalConfig.fontShadow
+
+    ECM_debug_assert(fontPath, "Font path cannot be nil")
+    ECM_debug_assert(fontSize, "Font size cannot be nil")
+    ECM_debug_assert(fontOutline, "Font outline cannot be nil")
 
     fontString:SetFont(fontPath, fontSize, fontOutline)
 
@@ -198,7 +212,7 @@ end
 --- @param c1 ECM_Color|nil
 --- @param c2 ECM_Color|nil
 --- @return boolean
-ECM_AreColorsEqual = function(c1, c2)
+function ECM_AreColorsEqual(c1, c2)
     if c1 == nil and c2 == nil then
         return true
     end
@@ -219,7 +233,7 @@ end
 --- Pixel-snaps a number to the nearest pixel for the current UI scale.
 ---@param v number|nil
 ---@return number
-ECM_PixelSnap = function(v)
+function ECM_PixelSnap(v)
     local scale = UIParent:GetEffectiveScale()
     local snapped = math.floor(((tonumber(v) or 0) * scale) + 0.5)
     return snapped / scale
@@ -228,7 +242,7 @@ end
 --- Concatenates two lists.
 ---@param a any[]
 ---@param b any[]
-ECM_Concat = function(a, b)
+function ECM_Concat(a, b)
     local out = {}
     for i = 1, #a do
         out[#out + 1] = a[i]
@@ -248,7 +262,7 @@ end
 --- Merges two lists of strings into one with unique entries.
 --- @param a string[]
 --- @param b string[]
-ECM_MergeUniqueLists = function(a, b)
+function ECM_MergeUniqueLists(a, b)
     local out, seen = {}, {}
 
     local function add(v, label, i)
@@ -269,7 +283,7 @@ end
 --- @param a any
 --- @param b any
 --- @return boolean
-ECM_DeepEquals = function(a, b)
+function ECM_DeepEquals(a, b)
     if a == b then return true end
     if type(a) ~= type(b) then return false end
     if type(a) ~= "table" then return a == b end
@@ -287,7 +301,7 @@ end
 ---@param seen table|nil
 ---@param depth number|nil
 ---@return any
-ECM_DeepCopy = function(tbl, seen, depth)
+function ECM_DeepCopy(tbl, seen, depth)
     if type(tbl) ~= "table" then
         return tbl
     end
@@ -319,55 +333,9 @@ ECM_DeepCopy = function(tbl, seen, depth)
     return copy
 end
 
---- Unified debug logging: sends to DevTool and trace buffer when debug mode is ON.
----@param moduleName string
----@param message string
----@param data any|nil
-function ECM_log(moduleName, message, data)
-    return
-    -- local addon = ns.Addon
-    -- local profile = addon and addon.db and addon.db.profile
-    -- if not profile or not profile.debug then
-    --     return
-    -- end
-
-    -- local prefix = "ECM:" .. moduleName .. " - " .. message
-
-    -- -- Add to trace log buffer for /ecm bug
-    -- if ns.AddToTraceLog then
-    --     local logLine = prefix
-    --     if data ~= nil then
-    --         if type(data) == "table" then
-    --             local parts = {}
-    --             for k, v in pairs(data) do
-    --                 parts[#parts + 1] = tostring(k) .. "=" .. ECM_safe_tostring(v)
-    --             end
-    --             logLine = logLine .. ": {" .. table.concat(parts, ", ") .. "}"
-    --         else
-    --             logLine = logLine .. ": " .. ECM_safe_tostring(data)
-    --         end
-    --     end
-    --     ns.AddToTraceLog(logLine)
-    -- end
-
-    -- -- Send to DevTool when available
-    -- if DevTool and DevTool.AddData then
-    --     local payload = {
-    --         module = moduleName,
-    --         message = message,
-    --         timestamp = GetTime(),
-    --         data = type(data) == "table" and ECM_DeepCopy(data) or ECM_safe_tostring(data),
-    --     }
-    --     pcall(DevTool.AddData, DevTool, payload, prefix)
-    -- end
-
-    -- prefix = "|cffaaaaaa[" .. moduleName .. "]:|r" .. " " .. message
-    -- ECM_print(prefix,  ECM_safe_tostring(data))
-end
-
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
-ECM_print = function (...)
+function ECM_print(...)
     local parts = {}
     for i = 1, select("#", ...) do
         parts[i] = tostring(select(i, ...))

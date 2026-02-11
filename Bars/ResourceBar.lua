@@ -150,6 +150,7 @@ function ResourceBar:Refresh(force)
         end
     end
 
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
     return true
 end
 

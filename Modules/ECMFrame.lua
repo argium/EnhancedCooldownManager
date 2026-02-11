@@ -45,6 +45,13 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field ShouldShow fun(self: ECMFrame): boolean Determines whether the frame should be shown at this moment.
 ---@field CreateFrame fun(self: ECMFrame): Frame Creates the inner frame.
 ---@field SetHidden fun(self: ECMFrame, hide: boolean) Sets whether the frame is hidden.
+---@field SetAlpha fun(self: ECMFrame, alpha: number) Sets the alpha of the inner frame.
+---@field SetConfig fun(self: ECMFrame, config: table) Sets the config for this frame and caches relevant sections.
+---@field CalculateLayoutParams fun(self: ECMFrame): table Calculates layout parameters based on anchor mode and config.
+---@field ApplyFramePosition fun(self: ECMFrame, frame: Frame): table|nil Applies layout positioning to the frame based on current config. Returns layout params if shown, nil if hidden.
+---@field Refresh fun(self: ECMFrame, force: boolean|nil): boolean Handles common refresh logic. Returns true if the frame should continue refreshing, false to skip.
+---@field ScheduleDebounced fun(self: ECMFrame, flagName: string, callback: function) Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
+---@field ThrottledRefresh fun(self: ECMFrame): boolean Rate-limited refresh. Sk
 ---@field UpdateLayout fun(self: ECMFrame): boolean Updates the visual layout of the frame.
 ---@field AddMixin fun(target: table, name: string) Adds ECMFrame methods and initializes state on target.
 
@@ -90,7 +97,7 @@ function ECMFrame:GetNextChainAnchor(frameName)
         }
 
         if isEnabled and shouldShow and isChainMode and hasFrame then
-            ECM_log(self.Name, "GetNextChainAnchor selected", {
+            ECM_log(C.SYS.Layout, self.Name, "GetNextChainAnchor selected", {
                 frameName = frameName,
                 stopIndex = stopIndex,
                 selected = barName,
@@ -102,17 +109,23 @@ function ECMFrame:GetNextChainAnchor(frameName)
     end
 
     -- If none of the preceeding frames in the chain are valid, anchor to the viewer as the first.
-    ECM_log(self.Name, "GetNextChainAnchor fallback first", {
+    ECM_log(C.SYS.Layout, self.Name, "GetNextChainAnchor fallthrough; treating as first anchor", {
         frameName = frameName,
         stopIndex = stopIndex,
-        selected = C.VIEWER,
+        selected = "EssentialCooldownViewer",
         candidates = debugCandidates,
     })
-    return _G[C.VIEWER] or UIParent, true
+    return _G["EssentialCooldownViewer"] or UIParent, true
 end
 
 function ECMFrame:SetHidden(hide)
     self.IsHidden = hide
+end
+
+function ECMFrame:SetAlpha(alpha)
+    if self.InnerFrame then
+        self.InnerFrame:SetAlpha(alpha)
+    end
 end
 
 function ECMFrame:SetConfig(config)
@@ -290,7 +303,7 @@ function ECMFrame:UpdateLayout()
         layoutCache.bgColor = bgColor
     end
 
-    ECM.Log(self.Name, "ECMFrame:UpdateLayout", {
+    ECM_log(C.SYS.Layout, self.Name, "ECMFrame UpdateLayout complete.", {
         anchor = anchor:GetName(),
         isFirst = isFirst,
         widthChanged = widthChanged,

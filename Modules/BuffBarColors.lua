@@ -105,10 +105,16 @@ function BuffBarColors.GetColor(spellName, textureFileID)
     return get(cfg, key)
 end
 
+
+
+---------------------------------------------------------------------------
+-- Public interface
+---------------------------------------------------------------------------
+
 function BuffBarColors.GetColorForBar(bar)
     ECM_debug_assert(bar, "Expected bar frame")
     ECM_debug_assert(bar.Name and bar.Name.GetText, "Expected bar.Name with GetText method")
-    ECM_debug_assert(bar.Icon and bar.Icon.GetRegions, "Expected bar.Icon frame with GetRegions method")
+    ECM_debug_assert(bar.Icon and bar.Icon.GetRegions, "Expected bar.Icon frame with GetRegions method. " .. (bar:GetName() or "nil") .. " " .. (bar.Name and bar.Name:GetText() or "nil"))
     local spellName = bar and bar.Name and bar.Name.GetText and bar.Name:GetText() or nil
     local iconFrame = bar and bar.Icon
     local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
@@ -157,20 +163,6 @@ end
 
 
 
-
-
---- Sets the default bar color.
----@param r number
----@param g number
----@param b number
-function BuffBarColors.SetDefaultColor(r, g, b)
-    local cfg = GetConfig()
-    ECM_debug_assert(cfg and cfg.colors, "BuffBarColors.SetDefaultColor called before config is available")
-    if cfg and cfg.colors then
-        cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
-    end
-end
-
 --- Gets configured per-key colors for current class/spec (for Options UI).
 ---@return table<string|number, ECM_Color> perSpell Indexed by spell name or texture file ID
 -- function BuffBarColors.GetPerSpellColors()
@@ -196,122 +188,122 @@ end
 ---@param nextCache table<number, ECM_BarCacheEntry>
 ---@param nextTextureMap table<number, number|nil>
 ---@return boolean changed True if a name was resolved or a color key was migrated
-function BuffBarColors.ResolveDiscoveryColors(classID, specID, oldCache, oldTextureMap, nextCache, nextTextureMap)
-    local cfg = GetConfig()
-    if not cfg then
-        return false
-    end
+-- function BuffBarColors.ResolveDiscoveryColors(classID, specID, oldCache, oldTextureMap, nextCache, nextTextureMap)
+--     local cfg = GetConfig()
+--     if not cfg then
+--         return false
+--     end
 
-    local perSpell = cfg.colors.perSpell
-    local classSpells = perSpell and perSpell[classID]
-    local specSpells = classSpells and classSpells[specID]
+--     local perSpell = cfg.colors.perSpell
+--     local classSpells = perSpell and perSpell[classID]
+--     local specSpells = classSpells and classSpells[specID]
 
-    local textureToSpellName = {}
-    if type(oldCache) == "table" and type(oldTextureMap) == "table" then
-        for index, entry in pairs(oldCache) do
-            local textureID = oldTextureMap[index]
-            local spellName = type(entry) == "table" and entry.spellName or nil
-            local normalizedName = Util.NormalizeString(
-                spellName,
-                { trim = true, emptyToNil = true }
-            )
-            local normalizedTexture = Util.NormalizeNumber(textureID)
-            if normalizedName and normalizedTexture ~= nil then
-                textureToSpellName[normalizedTexture] = normalizedName
-            end
-        end
-    end
+--     local textureToSpellName = {}
+--     if type(oldCache) == "table" and type(oldTextureMap) == "table" then
+--         for index, entry in pairs(oldCache) do
+--             local textureID = oldTextureMap[index]
+--             local spellName = type(entry) == "table" and entry.spellName or nil
+--             local normalizedName = Util.NormalizeString(
+--                 spellName,
+--                 { trim = true, emptyToNil = true }
+--             )
+--             local normalizedTexture = Util.NormalizeNumber(textureID)
+--             if normalizedName and normalizedTexture ~= nil then
+--                 textureToSpellName[normalizedTexture] = normalizedName
+--             end
+--         end
+--     end
 
-    local didChange = false
+--     local didChange = false
 
-    for index, nextEntry in pairs(nextCache or {}) do
-        local nextTexture = nextTextureMap and nextTextureMap[index] or nil
-        local normalizedTexture = Util.NormalizeNumber(nextTexture)
+--     for index, nextEntry in pairs(nextCache or {}) do
+--         local nextTexture = nextTextureMap and nextTextureMap[index] or nil
+--         local normalizedTexture = Util.NormalizeNumber(nextTexture)
 
-        local spellName = type(nextEntry) == "table" and nextEntry.spellName or nil
-        spellName = Util.NormalizeString(
-            spellName,
-            { trim = true, emptyToNil = true }
-        )
+--         local spellName = type(nextEntry) == "table" and nextEntry.spellName or nil
+--         spellName = Util.NormalizeString(
+--             spellName,
+--             { trim = true, emptyToNil = true }
+--         )
 
-        if not spellName and normalizedTexture ~= nil then
-            local resolved = textureToSpellName[normalizedTexture]
-            if resolved then
-                nextEntry.spellName = resolved
-                spellName = resolved
-                didChange = true
-                ECM_log("BuffBarColors", "ResolveDiscoveryColors - resolved spell name", {
-                    spellName = resolved,
-                    textureFileID = normalizedTexture,
-                })
-            end
-        end
+--         if not spellName and normalizedTexture ~= nil then
+--             local resolved = textureToSpellName[normalizedTexture]
+--             if resolved then
+--                 nextEntry.spellName = resolved
+--                 spellName = resolved
+--                 didChange = true
+--                 ECM_log("BuffBarColors", "ResolveDiscoveryColors - resolved spell name", {
+--                     spellName = resolved,
+--                     textureFileID = normalizedTexture,
+--                 })
+--             end
+--         end
 
-        if specSpells and spellName and normalizedTexture ~= nil and specSpells[normalizedTexture] then
-            if specSpells[spellName] == nil then
-                specSpells[spellName] = specSpells[normalizedTexture]
-            end
-            specSpells[normalizedTexture] = nil
-            didChange = true
-            ECM_log("BuffBarColors", "ResolveDiscoveryColors - migrated color key", {
-                spellName = spellName,
-                textureFileID = normalizedTexture,
-            })
-        end
-    end
+--         if specSpells and spellName and normalizedTexture ~= nil and specSpells[normalizedTexture] then
+--             if specSpells[spellName] == nil then
+--                 specSpells[spellName] = specSpells[normalizedTexture]
+--             end
+--             specSpells[normalizedTexture] = nil
+--             didChange = true
+--             ECM_log("BuffBarColors", "ResolveDiscoveryColors - migrated color key", {
+--                 spellName = spellName,
+--                 textureFileID = normalizedTexture,
+--             })
+--         end
+--     end
 
-    return didChange
-end
+--     return didChange
+-- end
 
 --- Ensures buff-bar discovery storage exists in profile.
 ---@return table|nil colors
-local function EnsureBuffBarStorage()
-    local profile = ECM.db and ECM.db.profile
-    if not profile then
-        return nil
-    end
+-- local function EnsureBuffBarStorage()
+--     local profile = ECM.db and ECM.db.profile
+--     if not profile then
+--         return nil
+--     end
 
-    if not profile.buffBars then
-        profile.buffBars = {}
-    end
+--     if not profile.buffBars then
+--         profile.buffBars = {}
+--     end
 
-    local buffBars = profile.buffBars
-    if not buffBars.colors then
-        buffBars.colors = {}
-    end
+--     local buffBars = profile.buffBars
+--     if not buffBars.colors then
+--         buffBars.colors = {}
+--     end
 
-    local colors = buffBars.colors
-    if type(colors) ~= "table" then
-        return nil
-    end
+--     local colors = buffBars.colors
+--     if type(colors) ~= "table" then
+--         return nil
+--     end
 
-    if type(colors.cache) ~= "table" then
-        colors.cache = {}
-    end
-    if type(colors.textureMap) ~= "table" then
-        colors.textureMap = {}
-    end
+--     if type(colors.cache) ~= "table" then
+--         colors.cache = {}
+--     end
+--     if type(colors.textureMap) ~= "table" then
+--         colors.textureMap = {}
+--     end
 
-    return colors
-end
+--     return colors
+-- end
 
----@return table|nil colors, number|nil classID, number|nil specID
-local function GetBuffBarDiscoveryContext()
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
-        return nil, nil, nil
-    end
+-- ---@return table|nil colors, number|nil classID, number|nil specID
+-- local function GetBuffBarDiscoveryContext()
+--     local classID, specID = GetCurrentClassSpec()
+--     if not classID or not specID then
+--         return nil, nil, nil
+--     end
 
-    local colors = EnsureBuffBarStorage()
-    if not colors then
-        return nil, nil, nil
-    end
+--     local colors = EnsureBuffBarStorage()
+--     if not colors then
+--         return nil, nil, nil
+--     end
 
-    colors.cache[classID] = colors.cache[classID] or {}
-    colors.textureMap[classID] = colors.textureMap[classID] or {}
+--     colors.cache[classID] = colors.cache[classID] or {}
+--     colors.textureMap[classID] = colors.textureMap[classID] or {}
 
-    return colors, classID, specID
-end
+--     return colors, classID, specID
+-- end
 
 local function RegisterProfileCallbacks(db)
     -- if _callbacksRegistered or not db or type(db.RegisterCallback) ~= "function" then

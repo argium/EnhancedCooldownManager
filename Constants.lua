@@ -1,7 +1,12 @@
 local _, ns = ...
 
 local constants = {
+    ADDON_NAME = "Enhanced Cooldown Manager",
+    ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
+    ADDON_ABRV = "ECM",
+
     TRACE_LOG_MAX = 200,
+    DEBUG_COLOR = "C6654D",
 
     -- Internal module names
     POWERBAR = "PowerBar",
@@ -9,15 +14,14 @@ local constants = {
     RUNEBAR = "RuneBar",
     BUFFBARS = "BuffBars",
     ITEMICONS = "ItemIcons",
-    SCANNER_BUFFBARS_DISCOVERY = "BuffBarsDiscovery",
 
-    -- Blizzard frame names
-    VIEWER = "EssentialCooldownViewer",
-    VIEWER_BUFFBAR = "BuffBarCooldownViewer",
-    VIEWER_UTILITY = "UtilityCooldownViewer",
-    ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
+    -- Configuration
+    CONFIG_SECTION_GLOBAL = "global",
+    ANCHORMODE_CHAIN = "chain",
+    ANCHORMODE_FREE = "free",
 
     -- Default or fallback values for configuration
+    DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
     DEFAULT_REFRESH_FREQUENCY = 0.066,
     DEFAULT_BAR_HEIGHT = 20,
     DEFAULT_BAR_WIDTH = 250,
@@ -25,11 +29,11 @@ local constants = {
     DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
     DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
     FALLBACK_TEXTURE = "Interface\\Buttons\\WHITE8X8",
+    DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
 
     -- Color constants
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
     COLOR_WHITE = { r = 1, g = 1, b = 1, a = 1 },
-    POWERBAR_DEFAULT_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
 
     -- Module-specific constants and configuration
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
@@ -70,30 +74,33 @@ local constants = {
     ITEM_ICON_LAYOUT_REMEASURE_DELAY = 0.1,
     ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS = 2,
 
-    -- Configuration section names
-    CONFIG_SECTION_GLOBAL = "global",
-
-    ANCHORMODE_CHAIN = "chain",
-    ANCHORMODE_FREE = "free",
-
     -- Schema migration
     CURRENT_SCHEMA_VERSION = 8,
     SV_NAME = "EnhancedCooldownManagerDB",
     ACTIVE_SV_KEY = "_ECM_DB",
 
-    ADDON_NAME = "Enhanced Cooldown Manager",
     ME = "Solar"
 }
 
+--- @enum SUBSYSTEM
+local SYS = {
+    Core = "Core",
+    Migration = "Migration",
+    Layout = "Layout",
+    Styling = "Styling",
+    BuffBarColors = "BuffBarColors",
+}
+
 local BLIZZARD_FRAMES = {
-    constants.VIEWER,
-    constants.VIEWER_UTILITY,
+    "EssentialCooldownViewer",
+    "UtilityCooldownViewer",
     "BuffIconCooldownViewer",
-    constants.VIEWER_BUFFBAR,
+    "BuffBarCooldownViewer",
 }
 
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
+constants.SYS = SYS
 
 ns.Constants = constants
