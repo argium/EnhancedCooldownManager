@@ -56,9 +56,9 @@ function SecretedStore.RegisterProfileCallbacks(db)
         return
     end
 
-    db:RegisterCallback(SecretedStore, "OnProfileChanged", "OnProfileChanged")
-    db:RegisterCallback(SecretedStore, "OnProfileCopied", "OnProfileChanged")
-    db:RegisterCallback(SecretedStore, "OnProfileReset", "OnProfileChanged")
+    db.RegisterCallback(SecretedStore, "OnProfileChanged", "OnProfileChanged")
+    db.RegisterCallback(SecretedStore, "OnProfileCopied", "OnProfileChanged")
+    db.RegisterCallback(SecretedStore, "OnProfileReset", "OnProfileChanged")
     _callbacksRegistered = true
 
     SecretedStore.OnProfileChanged()
