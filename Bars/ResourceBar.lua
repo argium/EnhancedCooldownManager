@@ -4,7 +4,6 @@
 
 local ADDON_NAME, ns = ...
 local ECM = ns.Addon
-local Util = ns.Util
 
 local C = ns.Constants
 local BarFrame = ns.Mixins.BarFrame

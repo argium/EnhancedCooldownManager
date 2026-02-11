@@ -5,7 +5,6 @@
 local ADDON_NAME, ns = ...
 
 local ECM = ns.Addon
-local Util = ns.Util
 local C = ns.Constants
 local Sparkle = ns.SparkleUtil
 local Options = ECM:NewModule("Options")
@@ -1065,7 +1064,7 @@ local function AddTick(value, color, width)
 
     local newTick = {
         value = value,
-        color = color or Util.DeepCopy(ticksCfg.defaultColor),
+        color = color or ECM_DeepCopy(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
     table.insert(ticks, newTick)

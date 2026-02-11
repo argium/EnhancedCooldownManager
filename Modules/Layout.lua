@@ -5,7 +5,6 @@
 local _, ns = ...
 local ECM = ns.Addon
 local C = ns.Constants
-local Util = ns.Util
 
 --------------------------------------------------------------------------------
 -- Constants

@@ -5,9 +5,7 @@
 local _, ns = ...
 
 local ECM = ns.Addon
-local Util = ns.Util
 local C = ns.Constants
-local SecretedStore = ns.SecretedStore
 
 local ECMFrame = ns.Mixins.ECMFrame
 local BuffBarColors = ns.BuffBarColors
@@ -21,62 +19,7 @@ ECM.BuffBars = BuffBars
 ---@field __ecmAnchorHooked boolean
 ---@field __ecmStyled boolean
 
-local function GetTexture(texKey)
-    return Util.GetTexture(texKey)
-end
-
-local function GetBgColor(moduleConfig, globalConfig)
-    local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor)
-    return bgColor or C.COLOR_BLACK
-end
-
-local function ApplyBarFont(fontString, globalConfig)
-    if not fontString then
-        return
-    end
-    Util.ApplyFont(fontString, globalConfig)
-end
-
-local function GetBarHeight(moduleConfig, globalConfig, fallback)
-    local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
-    return Util.PixelSnap(height)
-end
-
-local function GetBarWidth(moduleConfig, globalConfig, fallback)
-    local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
-    return Util.PixelSnap(width)
-end
-
---- Returns normalized spell name for a buff bar child, or nil if unavailable.
----@param child ECM_BuffBarChild|nil
----@return string|nil
-local function GetChildSpellName(child)
-    local bar = child and child.Bar
-    if not (bar and bar.Name and bar.Name.GetText) then
-        return nil
-    end
-
-    local text = bar.Name:GetText()
-    if SecretedStore and SecretedStore.IsSecretValue and SecretedStore.IsSecretValue(text) then
-        Util.Log("BuffBars", "GetChildSpellName", {
-            message = "Spell name is secret",
-            childName = child:GetName() or "nil",
-        })
-        return nil
-    end
-
-    if type(text) ~= "string" then
-        return nil
-    end
-
-    if text == "" then
-        return nil
-    end
-
-    return text
-end
-
-local function GetBuffBarBackground(statusBar)
+local function get_statusbar_background(statusBar)
     if not statusBar or not statusBar.GetRegions then
         return nil
     end
@@ -99,63 +42,13 @@ local function GetBuffBarBackground(statusBar)
     return nil
 end
 
---- Gets a deterministic icon region by index.
----@param iconFrame Frame|nil
----@param index number
----@return Texture|nil
-local function GetIconRegion(iconFrame, index)
-    if not iconFrame or not iconFrame.GetRegions then
-        return nil
-    end
-
-    local region = select(index, iconFrame:GetRegions())
-    if region and region.IsObjectType and region:IsObjectType("Texture") then
-        return region
-    end
-
-    return nil
-end
-
----@param iconFrame Frame|nil
----@return Texture|nil
-local function GetBuffBarIconTexture(iconFrame)
-    return GetIconRegion(iconFrame, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX)
-end
-
----@param iconFrame Frame|nil
----@return Texture|nil
-local function GetBuffBarIconOverlay(iconFrame)
-    return GetIconRegion(iconFrame, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX)
-end
-
----@param child ECM_BuffBarChild
----@return Frame|nil
-local function GetBuffBarIconFrame(child)
-    return child and child.Icon or nil
-end
-
---- Returns the icon texture file ID for a buff bar child, or nil if unavailable.
---- Used as a stable secondary identifier when the spell name is secret.
----@param child ECM_BuffBarChild|nil
----@return number|nil
-local function GetChildTextureFileID(child)
-    local iconFrame = GetBuffBarIconFrame(child)
-    if not iconFrame then
-        return nil
-    end
-    local iconTexture = GetBuffBarIconTexture(iconFrame)
-    if not (iconTexture and iconTexture.GetTextureFileID) then
-        return nil
-    end
-    return iconTexture:GetTextureFileID()
-end
 
 --- Returns visible bar children sorted by Y position (top to bottom) to preserve edit mode order.
 --- GetChildren() returns in creation order, not visual order, so we must sort by position.
 ---@param viewer Frame The BuffBarCooldownViewer frame
 ---@param onlyVisible boolean|nil If true, only include visible children
 ---@return table[] Array of {frame, top, order} sorted top-to-bottom
-local function GetSortedChildren(viewer, onlyVisible)
+local function get_sorted_children(viewer, onlyVisible)
     local result = {}
 
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
@@ -270,7 +163,7 @@ local function ApplyVisibilitySettings(child, moduleConfig)
             iconTexture:SetShown(showIcon)
         end
 
-        local iconOverlay = GetBuffBarIconOverlay(iconFrame)
+        local iconOverlay = select(C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, iconFrame:GetRegions())
         if iconOverlay and iconOverlay.SetShown then
             iconOverlay:SetShown(showIcon)
         end
@@ -313,20 +206,18 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     end
 
     local texKey = globalConfig and globalConfig.texture
-    local tex = GetTexture(texKey)
+    local tex = ECM_GetTexture(texKey)
     bar:SetStatusBarTexture(tex)
 
-    -- Resolve the color lookup key: spell name if available, otherwise the icon
-    -- texture file ID as a stable fallback for bars with secret/unavailable names.
     if bar.SetStatusBarColor then
-        local spellName = GetChildSpellName(child)
-        local colorKey = BuffBarColors.GetColorKey(spellName, GetChildTextureFileID(child))
-        local r, g, b = BuffBarColors.GetSpellColor(colorKey)
-        bar:SetStatusBarColor(r, g, b, 1.0)
+        local color = BuffBarColors.GetColorForBar(bar)
+        if color then
+            bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
+        end
     end
 
-    local bgColor = GetBgColor(moduleConfig, globalConfig)
-    local barBG = GetBuffBarBackground(bar)
+    local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
+    local barBG = get_statusbar_background(bar)
     if barBG then
         barBG:SetTexture(C.FALLBACK_TEXTURE)
         barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
@@ -341,23 +232,22 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
         bar.Pip:SetTexture(nil)
     end
 
-    local height = GetBarHeight(moduleConfig, globalConfig, 13)
+    local height =  (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or 15
     if height and height > 0 then
         bar:SetHeight(height)
         child:SetHeight(height)
     end
 
-    local iconFrame = GetBuffBarIconFrame(child)
-
     -- Apply visibility settings (extracted to separate function for frequent reapplication)
     ApplyVisibilitySettings(child, moduleConfig)
 
+    local iconFrame = bar.Icon
     if iconFrame and height and height > 0 then
         iconFrame:SetSize(height, height)
     end
 
-    ApplyBarFont(bar.Name, globalConfig)
-    ApplyBarFont(bar.Duration, globalConfig)
+    ECM_ApplyFont(bar.Name, globalConfig)
+    ECM_ApplyFont(bar.Duration, globalConfig)
 
     if iconFrame then
         iconFrame:ClearAllPoints()
@@ -372,13 +262,44 @@ local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex
     -- Mark as styled
     child.__ecmStyled = true
 
-    Util.Log("BuffBars", "Applied style to bar", {
+    ECM_log("BuffBars", "Applied style to bar", {
         barIndex = barIndex,
         showIcon = moduleConfig and moduleConfig.showIcon ~= false,
         showSpellName = moduleConfig and moduleConfig.showSpellName ~= false,
         showDuration = moduleConfig and moduleConfig.showDuration ~= false,
         height = height,
     })
+end
+
+
+--- Positions all bar children in a vertical stack, preserving edit mode order.
+local function layout_bars(self)
+    local viewer = _G[C.VIEWER_BUFFBAR]
+    if not viewer then
+        return
+    end
+
+    self._layoutRunning = true
+
+    local visibleChildren = get_sorted_children(viewer, true)
+    local prev
+
+    for _, entry in ipairs(visibleChildren) do
+        local child = entry.frame
+        child:ClearAllPoints()
+        if not prev then
+            child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
+            child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
+        else
+            child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
+            child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
+        end
+        prev = child
+    end
+
+    ECM_log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
+
+    self._layoutRunning = nil
 end
 
 --------------------------------------------------------------------------------
@@ -420,7 +341,7 @@ end
 function BuffBars:CreateFrame()
     local viewer = _G[C.VIEWER_BUFFBAR]
     if not viewer then
-        Util.Log("BuffBars", "CreateFrame", "BuffBarCooldownViewer not found, creating placeholder")
+        ECM_log("BuffBars", "CreateFrame", "BuffBarCooldownViewer not found, creating placeholder")
         -- Fallback: create a placeholder frame if Blizzard viewer doesn't exist
         viewer = CreateFrame("Frame", "ECMBuffBarPlaceholder", UIParent)
         viewer:SetSize(200, 20)
@@ -440,7 +361,7 @@ function BuffBars:UpdateLayout()
 
     -- Check visibility
     if not self:ShouldShow() then
-        -- Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
+        -- ECM_log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
         viewer:Hide()
         return false
     end
@@ -453,7 +374,7 @@ function BuffBars:UpdateLayout()
         viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
         viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
     elseif params.mode == C.ANCHORMODE_FREE then
-        local width = GetBarWidth(cfg, globalConfig, 300)
+        local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
             viewer:SetWidth(width)
@@ -461,7 +382,7 @@ function BuffBars:UpdateLayout()
     end
 
     -- Style all visible children (skip already-styled unless markers were reset)
-    local visibleChildren = GetSortedChildren(viewer, true)
+    local visibleChildren = get_sorted_children(viewer, true)
     for barIndex, entry in ipairs(visibleChildren) do
         if not entry.frame.__ecmStyled then
             ApplyCooldownBarStyle(entry.frame, cfg, globalConfig, barIndex)
@@ -473,10 +394,10 @@ function BuffBars:UpdateLayout()
     end
 
     -- Layout bars vertically
-    self:LayoutBars()
+    layout_bars(self)
 
     viewer:Show()
-    Util.Log(self.Name, "BuffBars:UpdateLayout", {
+    ECM_log(self.Name, "BuffBars:UpdateLayout", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -494,36 +415,6 @@ end
 -- Helper Methods
 --------------------------------------------------------------------------------
 
---- Positions all bar children in a vertical stack, preserving edit mode order.
-function BuffBars:LayoutBars()
-    local viewer = _G[C.VIEWER_BUFFBAR]
-    if not viewer then
-        return
-    end
-
-    self._layoutRunning = true
-
-    local visibleChildren = GetSortedChildren(viewer, true)
-    local prev
-
-    for _, entry in ipairs(visibleChildren) do
-        local child = entry.frame
-        child:ClearAllPoints()
-        if not prev then
-            child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
-        else
-            child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
-        end
-        prev = child
-    end
-
-    Util.Log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
-
-    self._layoutRunning = nil
-end
-
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
     local viewer = _G[C.VIEWER_BUFFBAR]
@@ -538,7 +429,7 @@ function BuffBars:ResetStyledMarkers()
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
         if child and child.__ecmStyled then
-            Util.Log("BuffBars", "ResetStyledMarkers", {
+            ECM_log("BuffBars", "ResetStyledMarkers", {
                 message = "Clearing styled marker for child",
                 childName = child:GetName() or "nil",
             })
@@ -556,11 +447,11 @@ function BuffBars:CollectScanEntries()
         return {}
     end
 
-    local children = GetSortedChildren(viewer, false)
+    local children = get_sorted_children(viewer, false)
     local scanEntries = {}
     for _, entry in ipairs(children) do
         scanEntries[#scanEntries + 1] = {
-            spellName = GetChildSpellName(entry.frame),
+            spellName = GetChildRawSpellText(entry.frame),
             textureFileID = GetChildTextureFileID(entry.frame),
         }
     end
@@ -597,7 +488,7 @@ function BuffBars:HookViewer()
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    Util.Log("BuffBars", "Hooked BuffBarCooldownViewer")
+    ECM_log("BuffBars", "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -630,7 +521,7 @@ function BuffBars:HookEditMode()
         self:ScheduleLayoutUpdate()
     end)
 
-    Util.Log("BuffBars", "Hooked EditModeManagerFrame")
+    ECM_log("BuffBars", "Hooked EditModeManagerFrame")
 end
 
 --------------------------------------------------------------------------------
@@ -664,7 +555,7 @@ function BuffBars:OnEnable()
         self:ScheduleLayoutUpdate()
     end)
 
-    Util.Log("BuffBars", "OnEnable - module enabled")
+    ECM_log("BuffBars", "OnEnable - module enabled")
 end
 
 function BuffBars:OnDisable()
@@ -672,5 +563,5 @@ function BuffBars:OnDisable()
     if self.IsECMFrame and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
-    Util.Log("BuffBars", "Disabled")
+    ECM_log("BuffBars", "Disabled")
 end

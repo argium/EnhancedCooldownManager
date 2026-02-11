@@ -3,52 +3,150 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
-local ECM = ns.Addon
 local C = ns.Constants
 
-local Util = ns.Util or {}
-ns.Util = Util
+---------------------------------------------------------------------------
+-- String helpers
+---------------------------------------------------------------------------
+
+local function safe_str_tostring(x)
+    if x == nil then
+        return "nil"
+    elseif issecretvalue(x) then
+        return "[secret]"
+    else
+        return tostring(x)
+    end
+end
+
+local function safe_table_tostring(tbl, depth, seen)
+    if issecrettable(tbl) then
+        return "[secrettable]"
+    end
+
+    if seen[tbl] then
+        return "<cycle>"
+    end
+
+    if depth >= 3 then
+        return "{...}"
+    end
+
+    seen[tbl] = true
+
+    local ok, pairsOrErr = pcall(function()
+        local parts = {}
+        local count = 0
+
+        for k, x in pairs(tbl) do
+            count = count + 1
+            if count > 25 then
+                parts[#parts + 1] = "..."
+                break
+            end
+
+            local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
+            local valueStr = type(x) == "table" and safe_table_tostring(x, depth + 1, seen) or safe_str_tostring(x)
+            parts[#parts + 1] = keyStr .. "=" .. valueStr
+        end
+
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end)
+
+    seen[tbl] = nil
+
+    if not ok then
+        return "<table_error>"
+    end
+
+    return pairsOrErr
+end
+
+ECM_tostring = function(v)
+    if type(v) == "table" then
+        return safe_table_tostring(v, 0, {})
+    end
+
+    return safe_str_tostring(v)
+end
+
+---------------------------------------------------------------------------
+-- Debug helpers
+---------------------------------------------------------------------------
+
+ECM_SYS = {
+    Layout = "Layout",
+    Bars = "Bars",
+    SecretedStore = "SecretedStore",
+}
+
+ECM_log = function (subsystem, message, data)
+    local prefix = "ECM:" .. subsystem .. ":"
+    message = prefix .. " " .. message
+
+    -- Add to trace log buffer for /ecm bug
+    if ns.AddToTraceLog then
+        local logLine = message
+        if data ~= nil then
+            if type(data) == "table" then
+                local parts = {}
+                for k, v in pairs(data) do
+                    parts[#parts + 1] = tostring(k) .. "=" .. ECM_tostring(v)
+                end
+                logLine = logLine .. ": {" .. table.concat(parts, ", ") .. "}"
+            else
+                logLine = logLine .. ": " .. ECM_tostring(data)
+            end
+        end
+        ns.AddToTraceLog(logLine)
+    end
+
+    prefix = ECM_sparkle(
+        prefix,
+        { r = 0.25, g = 0.82, b = 1.00, a = 1 },
+        { r = 0.62, g = 0.45, b = 1.00, a = 1 },
+        { r = 0.13, g = 0.77, b = 0.37, a = 1 })
+
+    message = prefix .. " " .. message
+    print(message)
+end
+
+ECM_is_debug_enabled  = function()
+    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
+end
+
+ECM_debug_assert = function(condition, message)
+    if not ECM_is_debug_enabled() then
+        return
+    end
+    assert(condition, message)
+end
+
+---------------------------------------------------------------------------
+-- Media helpers
+---------------------------------------------------------------------------
 
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
-local function FetchLSM(mediaType, key)
+local function get_lsm_media(mediaType, key)
     if LSM and LSM.Fetch and key and type(key) == "string" then
         return LSM:Fetch(mediaType, key, true)
     end
     return nil
 end
 
-function Util.DebugAssert(condition, message)
-    local debug = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
-    if not debug then
-        return
-    end
-    assert(condition, message)
-end
-
---- Compares two ECM_Color tables for equality.
---- @param c1 ECM_Color|nil
---- @param c2 ECM_Color|nil
---- @return boolean
-function Util.AreColorsEqual(c1, c2)
-    if c1 == nil and c2 == nil then
-        return true
-    end
-    if c1 == nil or c2 == nil then
-        return false
-    end
-    local c1m = CreateColor(c1.r, c1.g, c1.b, c1.a)
-    local c2m = CreateColor(c2.r, c2.g, c2.b, c2.a)
-    return c1m:IsEqualTo(c2m)
+local function get_font_path(fontKey, fallback)
+    ECM_debug_assert(fallback, "fallback cannot be nil")
+    local fallbackPath = fallback or "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+    return get_lsm_media("font", fontKey) or fallbackPath
 end
 
 --- Returns a statusbar texture path (LSM-resolved when available).
 ---@param texture string|nil Name of the texture in LSM or a file path.
 ---@return string
-function Util.GetTexture(texture)
+ECM_GetTexture = function(texture)
     if texture and type(texture) == "string" then
-        local fetched = FetchLSM("statusbar", texture)
+        local fetched = get_lsm_media("statusbar", texture)
         if fetched then
             return fetched
         end
@@ -59,34 +157,24 @@ function Util.GetTexture(texture)
         end
     end
 
-    return FetchLSM("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
-end
-
---- Returns a font file path (LSM-resolved when available).
----@param fontKey string|nil
----@param fallback string|nil
----@return string
-function Util.GetFontPath(fontKey, fallback)
-    local fallbackPath = fallback or "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
-
-    return FetchLSM("font", fontKey) or fallbackPath
+    return get_lsm_media("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
 end
 
 --- Applies font settings to a FontString.
 ---@param fontString FontString
 ---@param globalConfig table|nil Full global configuration table
-function Util.ApplyFont(fontString, globalConfig)
+ECM_ApplyFont = function(fontString, globalConfig)
     if not fontString then
         return
     end
 
-    Util.DebugAssert(type(globalConfig) == "table" or globalConfig == nil, "Util.ApplyFont: globalConfig must be a table or nil")
-    Util.DebugAssert(
+    ECM_debug_assert(type(globalConfig) == "table" or globalConfig == nil, "ECM_ApplyFont: globalConfig must be a table or nil")
+    ECM_debug_assert(
         not (type(globalConfig) == "table" and globalConfig.global ~= nil and globalConfig.font == nil),
-        "Util.ApplyFont: expected global config block, received profile root"
+        "ECM_ApplyFont: expected global config block, received profile root"
     )
 
-    local fontPath = Util.GetFontPath(globalConfig and globalConfig.font)
+    local fontPath = get_font_path(globalConfig and globalConfig.font)
     local fontSize = (globalConfig and globalConfig.fontSize) or 11
     local fontOutline = (globalConfig and globalConfig.fontOutline) or "OUTLINE"
 
@@ -106,10 +194,32 @@ function Util.ApplyFont(fontString, globalConfig)
     end
 end
 
+--- Compares two ECM_Color tables for equality.
+--- @param c1 ECM_Color|nil
+--- @param c2 ECM_Color|nil
+--- @return boolean
+ECM_AreColorsEqual = function(c1, c2)
+    if c1 == nil and c2 == nil then
+        return true
+    end
+    if c1 == nil or c2 == nil then
+        return false
+    end
+    local c1m = CreateColor(c1.r, c1.g, c1.b, c1.a)
+    local c2m = CreateColor(c2.r, c2.g, c2.b, c2.a)
+    return c1m:IsEqualTo(c2m)
+end
+
+
+
+---------------------------------------------------------------------------
+-- Layout helpers
+---------------------------------------------------------------------------
+
 --- Pixel-snaps a number to the nearest pixel for the current UI scale.
 ---@param v number|nil
 ---@return number
-function Util.PixelSnap(v)
+ECM_PixelSnap = function(v)
     local scale = UIParent:GetEffectiveScale()
     local snapped = math.floor(((tonumber(v) or 0) * scale) + 0.5)
     return snapped / scale
@@ -118,7 +228,7 @@ end
 --- Concatenates two lists.
 ---@param a any[]
 ---@param b any[]
-function Util.Concat(a, b)
+ECM_Concat = function(a, b)
     local out = {}
     for i = 1, #a do
         out[#out + 1] = a[i]
@@ -129,10 +239,16 @@ function Util.Concat(a, b)
     return out
 end
 
+
+
+---------------------------------------------------------------------------
+-- List helpers
+---------------------------------------------------------------------------
+
 --- Merges two lists of strings into one with unique entries.
 --- @param a string[]
 --- @param b string[]
-function Util.MergeUniqueLists(a, b)
+ECM_MergeUniqueLists = function(a, b)
     local out, seen = {}, {}
 
     local function add(v, label, i)
@@ -149,29 +265,16 @@ function Util.MergeUniqueLists(a, b)
     return out
 end
 
---- Safely converts a value to a copyable form, handling WoW secret values.
----@param v any
----@return any
-local function SafeCopyValue(v)
-    if type(issecretvalue) == "function" and issecretvalue(v) then
-        return (type(canaccessvalue) == "function" and canaccessvalue(v)) and ("s|" .. tostring(v)) or "<secret>"
-    end
-    if type(issecrettable) == "function" and issecrettable(v) then
-        return (type(canaccesstable) == "function" and canaccesstable(v)) and "s|<table>" or "<secrettable>"
-    end
-    return v
-end
-
 --- Performs a deep equality check between two values
 --- @param a any
 --- @param b any
 --- @return boolean
-function Util.DeepEquals(a, b)
+ECM_DeepEquals = function(a, b)
     if a == b then return true end
     if type(a) ~= type(b) then return false end
     if type(a) ~= "table" then return a == b end
     for k, v in pairs(a) do
-        if not Util.DeepEquals(v, b[k]) then return false end
+        if not ECM_DeepEquals(v, b[k]) then return false end
     end
     for k in pairs(b) do
         if a[k] == nil then return false end
@@ -184,7 +287,7 @@ end
 ---@param seen table|nil
 ---@param depth number|nil
 ---@return any
-function Util.DeepCopy(tbl, seen, depth)
+ECM_DeepCopy = function(tbl, seen, depth)
     if type(tbl) ~= "table" then
         return tbl
     end
@@ -203,12 +306,12 @@ function Util.DeepCopy(tbl, seen, depth)
     local copy = {}
     for k, v in pairs(tbl) do
         -- Handle secret keys
-        if type(issecretvalue) == "function" and issecretvalue(k) then
-            copy["<secret_key>"] = "<secret>"
+        if issecretvalue(k) then
+            copy["[secret]"] = "[secret]"
         elseif type(v) == "table" then
-            copy[k] = Util.DeepCopy(v, seen, depth)
+            copy[k] = ECM_DeepCopy(v, seen, depth)
         else
-            copy[k] = SafeCopyValue(v)
+            copy[k] = safe_str_tostring(v)
         end
     end
 
@@ -220,50 +323,51 @@ end
 ---@param moduleName string
 ---@param message string
 ---@param data any|nil
-function Util.Log(moduleName, message, data)
-    local addon = ns.Addon
-    local profile = addon and addon.db and addon.db.profile
-    if not profile or not profile.debug then
-        return
-    end
+function ECM_log(moduleName, message, data)
+    return
+    -- local addon = ns.Addon
+    -- local profile = addon and addon.db and addon.db.profile
+    -- if not profile or not profile.debug then
+    --     return
+    -- end
 
-    local prefix = "ECM:" .. moduleName .. " - " .. message
+    -- local prefix = "ECM:" .. moduleName .. " - " .. message
 
-    -- Add to trace log buffer for /ecm bug
-    if ns.AddToTraceLog then
-        local logLine = prefix
-        if data ~= nil then
-            if type(data) == "table" then
-                local parts = {}
-                for k, v in pairs(data) do
-                    parts[#parts + 1] = tostring(k) .. "=" .. Util.SafeGetDebugValue(v)
-                end
-                logLine = logLine .. ": {" .. table.concat(parts, ", ") .. "}"
-            else
-                logLine = logLine .. ": " .. Util.SafeGetDebugValue(data)
-            end
-        end
-        ns.AddToTraceLog(logLine)
-    end
+    -- -- Add to trace log buffer for /ecm bug
+    -- if ns.AddToTraceLog then
+    --     local logLine = prefix
+    --     if data ~= nil then
+    --         if type(data) == "table" then
+    --             local parts = {}
+    --             for k, v in pairs(data) do
+    --                 parts[#parts + 1] = tostring(k) .. "=" .. ECM_safe_tostring(v)
+    --             end
+    --             logLine = logLine .. ": {" .. table.concat(parts, ", ") .. "}"
+    --         else
+    --             logLine = logLine .. ": " .. ECM_safe_tostring(data)
+    --         end
+    --     end
+    --     ns.AddToTraceLog(logLine)
+    -- end
 
-    -- Send to DevTool when available
-    if DevTool and DevTool.AddData then
-        local payload = {
-            module = moduleName,
-            message = message,
-            timestamp = GetTime(),
-            data = type(data) == "table" and Util.DeepCopy(data) or SafeCopyValue(data),
-        }
-        pcall(DevTool.AddData, DevTool, payload, prefix)
-    end
+    -- -- Send to DevTool when available
+    -- if DevTool and DevTool.AddData then
+    --     local payload = {
+    --         module = moduleName,
+    --         message = message,
+    --         timestamp = GetTime(),
+    --         data = type(data) == "table" and ECM_DeepCopy(data) or ECM_safe_tostring(data),
+    --     }
+    --     pcall(DevTool.AddData, DevTool, payload, prefix)
+    -- end
 
     -- prefix = "|cffaaaaaa[" .. moduleName .. "]:|r" .. " " .. message
-    -- Util.Print(prefix,  Util.SafeGetDebugValue(data))
+    -- ECM_print(prefix,  ECM_safe_tostring(data))
 end
 
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
-function Util.Print(...)
+ECM_print = function (...)
     local parts = {}
     for i = 1, select("#", ...) do
         parts[i] = tostring(select(i, ...))
@@ -288,111 +392,47 @@ function Util.Print(...)
     end
 end
 
-function Util.SafeGetDebugValue(v)
-    local function IsSecretValue(x)
-        return type(issecretvalue) == "function" and issecretvalue(x)
-    end
 
-    local function IsSecretTable(x)
-        return type(issecrettable) == "function" and issecrettable(x)
-    end
 
-    local function CanAccessValue(x)
-        return type(canaccessvalue) == "function" and canaccessvalue(x)
-    end
+-- ---@param oldA table|nil
+-- ---@param newA table|nil
+-- ---@param oldB table|nil
+-- ---@param newB table|nil
+-- ---@param comparer fun(oldValue:any, newValue:any, index:any, oldB:table|nil, newB:table|nil):boolean|nil
+-- ---@return boolean
+-- function Util.HasIndexedMapsChanged(oldA, newA, oldB, newB, comparer)
+--     if type(oldA) ~= "table" then
+--         return true
+--     end
 
-    local function CanAccessTable(x)
-        return type(canaccesstable) == "function" and canaccesstable(x)
-    end
+--     local resolvedNewA = type(newA) == "table" and newA or {}
+--     if CountEntries(oldA) ~= CountEntries(resolvedNewA) then
+--         return true
+--     end
 
-    local function GetSafeScalarString(x)
-        if x == nil then
-            return "<nil>"
-        end
+--     for index, newValue in pairs(resolvedNewA) do
+--         local oldValue = oldA[index]
+--         if oldValue == nil then
+--             return true
+--         end
 
-        if IsSecretValue(x) then
-            return CanAccessValue(x) and ("s|" .. tostring(x)) or "<secret>"
-        end
+--         local equivalent = nil
+--         if type(comparer) == "function" then
+--             equivalent = comparer(oldValue, newValue, index, oldB, newB)
+--         else
+--             equivalent = oldValue == newValue
+--         end
 
-        if IsSecretTable(x) then
-            return CanAccessTable(x) and "s|<table>" or "<secrettable>"
-        end
+--         if not equivalent then
+--             return true
+--         end
 
-        return tostring(x)
-    end
+--         local oldSecond = type(oldB) == "table" and oldB[index] or nil
+--         local newSecond = type(newB) == "table" and newB[index] or nil
+--         if oldSecond ~= newSecond then
+--             return true
+--         end
+--     end
 
-    ---@param tbl table
-    ---@param depth number
-    ---@param seen table
-    ---@return string
-    local function TableToString(tbl, depth, seen)
-        if IsSecretTable(tbl) then
-            return CanAccessTable(tbl) and "s|<table>" or "<secrettable>"
-        end
-
-        if seen[tbl] then
-            return "<cycle>"
-        end
-
-        if depth >= 3 then
-            return "{...}"
-        end
-
-        seen[tbl] = true
-
-        local ok, pairsOrErr = pcall(function()
-            local parts = {}
-            local count = 0
-
-            for k, x in pairs(tbl) do
-                count = count + 1
-                if count > 25 then
-                    parts[#parts + 1] = "..."
-                    break
-                end
-
-                local keyStr
-                if IsSecretValue(k) then
-                    keyStr = "<secret_key>"
-                else
-                    keyStr = tostring(k)
-                end
-
-                local valueStr
-                if type(x) == "table" then
-                    valueStr = TableToString(x, depth + 1, seen)
-                else
-                    valueStr = GetSafeScalarString(x)
-                end
-
-                parts[#parts + 1] = keyStr .. "=" .. valueStr
-            end
-
-            return "{" .. table.concat(parts, ", ") .. "}"
-        end)
-
-        seen[tbl] = nil
-
-        if not ok then
-            return "<table_error>"
-        end
-
-        return pairsOrErr
-    end
-
-    if type(v) == "table" then
-        return TableToString(v, 0, {})
-    end
-
-    return GetSafeScalarString(v)
-end
-
---- Creates an ECM_Color table from channels.
----@param r number
----@param g number
----@param b number
----@param a number|nil
----@return ECM_Color
-function Util.Color(r, g, b, a)
-    return { r = r, g = g, b = b, a = a or 1 }
-end
+--     return false
+-- end

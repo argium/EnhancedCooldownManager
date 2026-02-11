@@ -5,7 +5,6 @@
 local _, ns = ...
 
 local ECM = ns.Addon
-local Util = ns.Util
 local C = ns.Constants
 
 local ECMFrame = ns.Mixins.ECMFrame
@@ -533,7 +532,7 @@ function ItemIcons:UpdateLayout()
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    Util.Log(self.Name, "ItemIcons:UpdateLayout", {
+    ECM_log(self.Name, "ItemIcons:UpdateLayout", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -663,7 +662,7 @@ function ItemIcons:HookUtilityViewer()
         self:ScheduleLayoutUpdate()
     end)
 
-    Util.Log(self.Name, "Hooked UtilityCooldownViewer")
+    ECM_log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
 --------------------------------------------------------------------------------
@@ -690,7 +689,7 @@ function ItemIcons:OnEnable()
         self:ScheduleLayoutUpdate()
     end)
 
-    Util.Log(self.Name, "OnEnable - module enabled")
+    ECM_log(self.Name, "OnEnable - module enabled")
 end
 
 function ItemIcons:OnDisable()
@@ -711,5 +710,5 @@ function ItemIcons:OnDisable()
         self.InnerFrame:Hide()
     end
 
-    Util.Log(self.Name, "Disabled")
+    ECM_log(self.Name, "Disabled")
 end

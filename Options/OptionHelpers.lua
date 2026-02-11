@@ -3,7 +3,6 @@ local _, ns = ...
 
 local ECM = ns.Addon
 local C = ns.Constants
-local Util = ns.Util
 
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
@@ -135,7 +134,7 @@ local function IsValueChanged(path)
     local currentVal = GetNestedValue(profile, path)
     local defaultVal = GetNestedValue(defaults, path)
 
-    return not Util.DeepEquals(currentVal, defaultVal)
+    return not ECM_DeepEquals(currentVal, defaultVal)
 end
 
 --- Resets the value at the specified config path to its default value.
@@ -148,7 +147,7 @@ local function ResetToDefault(path)
 
     local defaultVal = GetNestedValue(defaults, path)
     -- Deep copy for tables (recursive to handle nested tables)
-    SetNestedValue(profile, path, Util.DeepCopy(defaultVal))
+    SetNestedValue(profile, path, ECM_DeepCopy(defaultVal))
 end
 
 --- Generates a reset handler function for a specific config path, which resets that path to its default value and optionally calls a refresh function.

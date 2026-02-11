@@ -2,18 +2,13 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local _, ns = ...
-
-local SparkleUtil = ns.SparkleUtil or {}
-ns.SparkleUtil = SparkleUtil
-
-local function Clamp(v, minV, maxV)
+local function clamp(v, minV, maxV)
     return math.max(minV, math.min(maxV, v))
 end
 
 ---@param v number|string
 ---@return number
-local function ToNumberOrError(v)
+local function tonumber_or_assert(v)
     local n = tonumber(v)
     assert(n, "ECM.Util: expected number")
     return n
@@ -23,7 +18,7 @@ end
 ---@return number r 0..1
 ---@return number g 0..1
 ---@return number b 0..1
-local function NormalizeRGB(color)
+local function normalize_rgb(color)
     assert(color ~= nil, "ECM.Util: color is required")
 
     if type(color) == "string" then
@@ -46,15 +41,15 @@ local function NormalizeRGB(color)
         local g = color.g or color[2]
         local b = color.b or color[3]
 
-        r = ToNumberOrError(r)
-        g = ToNumberOrError(g)
-        b = ToNumberOrError(b)
+        r = tonumber_or_assert(r)
+        g = tonumber_or_assert(g)
+        b = tonumber_or_assert(b)
 
         -- Treat values > 1 as 0..255.
         if r > 1 or g > 1 or b > 1 then
-            return Clamp(r / 255, 0, 1), Clamp(g / 255, 0, 1), Clamp(b / 255, 0, 1)
+            return clamp(r / 255, 0, 1), clamp(g / 255, 0, 1), clamp(b / 255, 0, 1)
         end
-        return Clamp(r, 0, 1), Clamp(g, 0, 1), Clamp(b, 0, 1)
+        return clamp(r, 0, 1), clamp(g, 0, 1), clamp(b, 0, 1)
     end
 
     error("ECM.Util: unsupported color type: " .. type(color))
@@ -68,7 +63,7 @@ end
 ---@param g2 number
 ---@param b2 number
 ---@return number r, number g, number b
-local function LerpRGB(t, r1, g1, b1, r2, g2, b2)
+local function lerp_rgb(t, r1, g1, b1, r2, g2, b2)
     return (r1 + (r2 - r1) * t), (g1 + (g2 - g1) * t), (b1 + (b2 - b1) * t)
 end
 
@@ -83,7 +78,7 @@ end
 ---@param eg number
 ---@param eb number
 ---@return number r, number g, number b
-local function ThreeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
+local function three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
     if t <= 0 then
         return sr, sg, sb
     end
@@ -92,19 +87,19 @@ local function ThreeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
     end
 
     if t <= 0.5 then
-        return LerpRGB(t * 2, sr, sg, sb, mr, mg, mb)
+        return lerp_rgb(t * 2, sr, sg, sb, mr, mg, mb)
     end
-    return LerpRGB((t - 0.5) * 2, mr, mg, mb, er, eg, eb)
+    return lerp_rgb((t - 0.5) * 2, mr, mg, mb, er, eg, eb)
 end
 
 ---@param r number 0..1
 ---@param g number 0..1
 ---@param b number 0..1
 ---@return string hex
-local function RGBToHex(r, g, b)
-    local ri = Clamp(math.floor((r * 255) + 0.5), 0, 255)
-    local gi = Clamp(math.floor((g * 255) + 0.5), 0, 255)
-    local bi = Clamp(math.floor((b * 255) + 0.5), 0, 255)
+local function rgb_to_hex(r, g, b)
+    local ri = clamp(math.floor((r * 255) + 0.5), 0, 255)
+    local gi = clamp(math.floor((g * 255) + 0.5), 0, 255)
+    local bi = clamp(math.floor((b * 255) + 0.5), 0, 255)
     return string.format("%02x%02x%02x", ri, gi, bi)
 end
 
@@ -121,8 +116,8 @@ end
 ---@param midColor string|table
 ---@param endColor string|table
 ---@return string
-function SparkleUtil.GetText(text, startColor, midColor, endColor)
-    assert(type(text) == "string", "ECM.Util.GetText: text must be a string")
+ECM_sparkle = function(text, startColor, midColor, endColor)
+    assert(type(text) == "string", "text must be a string")
     startColor = startColor or { r = 0.25, g = 0.82, b = 1.00, a = 1 }
     midColor = midColor or { r = 0.62, g = 0.45, b = 1.00, a = 1 }
     endColor = endColor or { r = 0.13, g = 0.77, b = 0.37, a = 1 }
@@ -132,11 +127,11 @@ function SparkleUtil.GetText(text, startColor, midColor, endColor)
         return ""
     end
 
-    local sr, sg, sb = NormalizeRGB(startColor)
-    local mr, mg, mb = NormalizeRGB(midColor )
-    local er, eg, eb = NormalizeRGB(endColor)
+    local sr, sg, sb = normalize_rgb(startColor)
+    local mr, mg, mb = normalize_rgb(midColor )
+    local er, eg, eb = normalize_rgb(endColor)
 
-    local effectiveLen = Clamp(charCount, 4, 60)
+    local effectiveLen = clamp(charCount, 4, 60)
     local parts = {}
 
     for i = 1, charCount do
@@ -144,8 +139,8 @@ function SparkleUtil.GetText(text, startColor, midColor, endColor)
             or (1 + math.floor(((i - 1) * (effectiveLen - 1) / (charCount - 1)) + 0.5))
 
         local t = (effectiveLen == 1) and 0 or ((pos - 1) / (effectiveLen - 1))
-        local r, g, b = ThreeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
-        parts[i] = "|cff" .. RGBToHex(r, g, b) .. text:sub(i, i) .. "|r"
+        local r, g, b = three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
+        parts[i] = "|cff" .. rgb_to_hex(r, g, b) .. text:sub(i, i) .. "|r"
     end
 
     return table.concat(parts)

@@ -4,7 +4,6 @@
 local _, ns = ...
 
 local C = ns.Constants
-local Util = ns.Util
 
 local Migration = {}
 ns.Migration = Migration
@@ -19,7 +18,7 @@ local migrationLog = {}
 ---@param message string
 local function Log(message)
     migrationLog[#migrationLog + 1] = date("%Y-%m-%d %H:%M:%S") .. "  " .. message
-    Util.Log("Migration", message)
+    ECM_log("Migration", message)
 end
 
 --------------------------------------------------------------------------------

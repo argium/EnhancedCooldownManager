@@ -6,12 +6,8 @@ local ADDON_NAME, ns = ...
 
 local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
 ns.Addon = ECM
-local Util = ns.Util
 local C = ns.Constants
 local LSM = LibStub("LibSharedMedia-3.0", true)
-ECM.Log = Util.Log
-ECM.Print = Util.Print
-ECM.DebugAssert = Util.DebugAssert
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
@@ -59,12 +55,12 @@ end
 ---@param onCancel fun()|nil
 function ECM:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        Util.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        ECM_print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
     end
 
     if not StaticPopupDialogs or not StaticPopup_Show then
-        Util.Print("Unable to show confirmation dialog (StaticPopup API unavailable).")
+        ECM_print("Unable to show confirmation dialog (StaticPopup API unavailable).")
         return
     end
 
@@ -135,7 +131,7 @@ end
 ---@param exportString string
 function ECM:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        Util.Print("Invalid export string provided")
+        ECM_print("Invalid export string provided")
         return
     end
 
@@ -231,14 +227,14 @@ function ECM:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        Util.Print("Commands: /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
+        ECM_print("Commands: /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
         return
     end
 
     if cmd == "bug" then
         local profile = self.db and self.db.profile
         if not profile or not profile.debug then
-            Util.Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
+            ECM_print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
             return
         end
         ns.ShowBugReportPopup()
@@ -247,7 +243,7 @@ function ECM:ChatCommand(input)
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
-            Util.Print("Options cannot be opened during combat. They will open when combat ends.")
+            ECM_print("Options cannot be opened during combat. They will open when combat ends.")
             if not self._openOptionsAfterCombat then
                 self._openOptionsAfterCombat = true
                 self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
@@ -270,15 +266,15 @@ function ECM:ChatCommand(input)
     if cmd == "debug" then
         local newVal, err = ParseToggleArg(arg, profile.debug)
         if err then
-            Util.Print(err)
+            ECM_print(err)
             return
         end
         profile.debug = newVal
-        Util.Print("Debug:", profile.debug and "ON" or "OFF")
+        ECM_print("Debug:", profile.debug and "ON" or "OFF")
         return
     end
 
-    Util.Print("Unknown command. Use /ecm help")
+    ECM_print("Unknown command. Use /ecm help")
 end
 
 function ECM:HandleOpenOptionsAfterCombat()
@@ -300,12 +296,10 @@ function ECM:OnInitialize()
     ns.Migration.PrepareDatabase()
 
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
-    if ns.SecretedStore and ns.SecretedStore.RegisterProfileCallbacks then
-        ns.SecretedStore.RegisterProfileCallbacks(self.db)
-    end
+    ns.SecretedStore.RegisterProfileCallbacks(self.db)
 
     local profile = self.db and self.db.profile
-    Util.Log("ECM", "OnInitialize", {
+    ECM_log("ECM", "OnInitialize", {
         schemaVersion = profile and profile.schemaVersion or "nil",
         currentSchemaVersion = C.CURRENT_SCHEMA_VERSION,
     })

@@ -5,7 +5,6 @@
 local _, ns = ...
 local ECM = ns.Addon
 local C = ns.Constants
-local Util = ns.Util
 
 local ECMFrame = {}
 ns.Mixins = ns.Mixins or {}
@@ -91,7 +90,7 @@ function ECMFrame:GetNextChainAnchor(frameName)
         }
 
         if isEnabled and shouldShow and isChainMode and hasFrame then
-            Util.Log(self.Name, "GetNextChainAnchor selected", {
+            ECM_log(self.Name, "GetNextChainAnchor selected", {
                 frameName = frameName,
                 stopIndex = stopIndex,
                 selected = barName,
@@ -103,7 +102,7 @@ function ECMFrame:GetNextChainAnchor(frameName)
     end
 
     -- If none of the preceeding frames in the chain are valid, anchor to the viewer as the first.
-    Util.Log(self.Name, "GetNextChainAnchor fallback first", {
+    ECM_log(self.Name, "GetNextChainAnchor fallback first", {
         frameName = frameName,
         stopIndex = stopIndex,
         selected = C.VIEWER,
@@ -185,7 +184,7 @@ end
 --- @return table|nil params Layout params if shown, nil if hidden
 function ECMFrame:ApplyFramePosition(frame)
     if not self:ShouldShow() then
-        -- Util.Log(self.Name, "ECMFrame:ApplyFramePosition", "ShouldShow returned false, hiding frame")
+        -- ECM_log(self.Name, "ECMFrame:ApplyFramePosition", "ShouldShow returned false, hiding frame")
         frame:Hide()
         return nil
     end
@@ -251,7 +250,7 @@ function ECMFrame:UpdateLayout()
     if borderConfig then
         borderChanged = borderConfig.enabled ~= layoutCache.borderEnabled
             or borderConfig.thickness ~= layoutCache.borderThickness
-            or not Util.AreColorsEqual(borderConfig.color, layoutCache.borderColor)
+            or not ECM_AreColorsEqual(borderConfig.color, layoutCache.borderColor)
 
         -- Update the border (nil-safe for frames without borders)
         local border = frame.Border
@@ -259,7 +258,7 @@ function ECMFrame:UpdateLayout()
             local thickness = borderConfig.thickness or 1
             if borderConfig.enabled then
                 border:Show()
-                ECM.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
+                ECM_debug_assert(borderConfig.thickness, "border thickness required when enabled")
                 if layoutCache.borderThickness ~= thickness then
                     border:SetBackdrop({
                         edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -282,9 +281,9 @@ function ECMFrame:UpdateLayout()
         end
     end
 
-    ECM.DebugAssert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
+    ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
-    local bgColorChanged = not Util.AreColorsEqual(bgColor, layoutCache.bgColor)
+    local bgColorChanged = not ECM_AreColorsEqual(bgColor, layoutCache.bgColor)
 
     if bgColorChanged and frame.Background then
         frame.Background:SetColorTexture(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
@@ -321,7 +320,7 @@ end
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
 function ECMFrame:Refresh(force)
     if not force and not self:ShouldShow() then
-        -- Util.Log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
+        -- ECM_log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
         return false
     end
 

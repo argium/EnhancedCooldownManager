@@ -1,4 +1,4 @@
-local _,  ns = ...
+local _, ns = ...
 
 local constants = {
     TRACE_LOG_MAX = 200,
@@ -34,12 +34,12 @@ local constants = {
     -- Module-specific constants and configuration
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
     RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
-    RESOURCEBAR_VOID_FRAGMENTS_SPELLID = 1225789, -- tracks progress towards void meta form (35 fragments)
+    RESOURCEBAR_VOID_FRAGMENTS_SPELLID = 1225789,  -- tracks progress towards void meta form (35 fragments)
     RESOURCEBAR_COLLAPSING_STAR_SPELLID = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
-    RESOURCEBAR_VENGEANCE_SOULS_MAX = 6 ,
+    RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
     RUNEBAR_MAX_RUNES = 6,
     BUFFBARS_DEFAULT_COLOR = { r = 0.9, g = 0.9, b = 0.9, a = 1 },
-    BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,  -- TODO: this and the following line might need to go.
+    BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,
     BUFFBARS_ICON_OVERLAY_REGION_INDEX = 3,
     BUFFBARS_TEXT_PADDING = 4,
     GROUP_INSTANCE_TYPES = { party = true, raid = true, arena = true, pvp = true, delve = true }, -- keyed by IsInInstance()[2]
@@ -53,9 +53,9 @@ local constants = {
     TRINKET_SLOT_2 = 14,
 
     -- Consumable item IDs (priority-ordered: best first)
-    COMBAT_POTIONS = { 212265, 212264, 212263 },           -- Tempered Potion R3, R2, R1
-    HEALTH_POTIONS = { 211880, 211879, 211878,             -- Algari Healing Potion R3, R2, R1
-                       212244, 212243, 212242 },            -- Cavedweller's Delight R3, R2, R1
+    COMBAT_POTIONS = { 212265, 212264, 212263 }, -- Tempered Potion R3, R2, R1
+    HEALTH_POTIONS = { 211880, 211879, 211878,   -- Algari Healing Potion R3, R2, R1
+        212244, 212243, 212242 },                -- Cavedweller's Delight R3, R2, R1
     HEALTHSTONE_ITEM_ID = 5512,
     ITEM_ICONS_MAX = 5,
 

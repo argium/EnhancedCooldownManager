@@ -86,10 +86,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10,
                 width = "double",
                 get = function()
-                    return BuffBarColors.GetSpellColor(colorKey)
+                    return BuffBarColors.GetSpellColor(colorKey, colorKey)
                 end,
                 set = function(_, r, g, b)
-                    BuffBarColors.SetSpellColor(colorKey, r, g, b)
+                    BuffBarColors.SetSpellColor(colorKey, colorKey, r, g, b)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -102,10 +102,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10 + 1,
                 width = 0.3,
                 hidden = function()
-                    return not BuffBarColors.HasCustomSpellColor(colorKey)
+                    return not BuffBarColors.HasCustomSpellColor(colorKey, colorKey)
                 end,
                 func = function()
-                    BuffBarColors.ResetSpellColor(colorKey)
+                    BuffBarColors.ResetSpellColor(colorKey, colorKey)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,

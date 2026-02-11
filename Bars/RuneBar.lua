@@ -4,7 +4,6 @@
 
 local ADDON_NAME, ns = ...
 local ECM = ns.Addon
-local Util = ns.Util
 local C = ns.Constants
 
 local BarFrame = ns.Mixins.BarFrame
@@ -25,7 +24,7 @@ ECM.RuneBar = RuneBar
 local function EnsureFragmentedBars(bar, maxResources, moduleConfig, globalConfig)
     -- Get texture
     local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
-    local tex = Util.GetTexture(texKey)
+    local tex = ECM_GetTexture(texKey)
 
     for i = 1, maxResources do
         if not bar.FragmentedBars[i] then
@@ -119,7 +118,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         end
 
         local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
-        local tex = Util.GetTexture(texKey)
+        local tex = ECM_GetTexture(texKey)
 
         -- Use same positioning logic as BarFrame tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
@@ -128,8 +127,8 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
             if frag then
                 frag:SetStatusBarTexture(tex)
                 frag:ClearAllPoints()
-                local leftX = Util.PixelSnap((pos - 1) * step)
-                local rightX = Util.PixelSnap(pos * step)
+                local leftX = ECM_PixelSnap((pos - 1) * step)
+                local rightX = ECM_PixelSnap(pos * step)
                 local w = rightX - leftX
                 frag:SetSize(w, barHeight)
                 frag:SetPoint("LEFT", bar, "LEFT", leftX, 0)
@@ -198,7 +197,7 @@ function RuneBar:Refresh(force)
     -- our own fragmented bars and don't use the standard StatusBar
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
-        Util.Log(self.Name, "RuneBar:Refresh", "Skipping refresh")
+        ECM_log(self.Name, "RuneBar:Refresh", "Skipping refresh")
         return false
     end
 
@@ -229,7 +228,7 @@ function RuneBar:Refresh(force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    Util.Log(self.Name, "RuneBar:Refresh", {
+    ECM_log(self.Name, "RuneBar:Refresh", {
         maxRunes = maxRunes,
     })
 end

@@ -44,7 +44,6 @@ Enhanced Cooldown Manager (root)
 ```lua
 -- 1. Dependencies and Constants
 local ECM = ns.Addon
-local Util = ns.Util
 local C = ns.Constants
 
 -- 2. Constants

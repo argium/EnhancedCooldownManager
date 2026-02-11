@@ -9,7 +9,6 @@ ns.Mixins = ns.Mixins or {}
 ns.Mixins.BarFrame = BarFrame
 local ECM = ns.Addon
 local ECMFrame = ns.Mixins.ECMFrame
-local Util = ns.Util
 local C = ns.Constants
 
 -- owns:
@@ -109,9 +108,9 @@ function BarFrame:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
         local tick = pool[i]
         if tick and tick:IsShown() then
             tick:ClearAllPoints()
-            local x = Util.PixelSnap(step * i)
+            local x = ECM_PixelSnap(step * i)
             tick:SetPoint("LEFT", frame, "LEFT", x, 0)
-            tick:SetSize(math.max(1, Util.PixelSnap(tickWidth)), barHeight)
+            tick:SetSize(math.max(1, ECM_PixelSnap(tickWidth)), barHeight)
             tick:SetColorTexture(tr, tg, tb, ta)
         end
     end
@@ -165,7 +164,7 @@ function BarFrame:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, def
                 local x = math.floor((value / maxValue) * barWidth)
                 tick:ClearAllPoints()
                 tick:SetPoint("LEFT", statusBar, "LEFT", x, 0)
-                tick:SetSize(math.max(1, Util.PixelSnap(tickWidthVal)), barHeight)
+                tick:SetSize(math.max(1, ECM_PixelSnap(tickWidthVal)), barHeight)
                 tick:SetColorTexture(tr, tg, tb, ta)
                 tick:Show()
             else
@@ -181,7 +180,7 @@ end
 ---@return number|nil displayValue
 ---@return boolean isFraction valueType
 function BarFrame:GetStatusBarValues()
-    Util.DebugAssert(false, "GetStatusBarValues not implemented in derived class")
+    ECM_debug_assert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
 end
 
@@ -208,10 +207,10 @@ end
 function BarFrame:Refresh(force)
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
-        -- Util.Log(self.Name, "BarFrame:Refresh", "Skipping refresh")
+        -- ECM_log(self.Name, "BarFrame:Refresh", "Skipping refresh")
         return false
     end
-    Util.Log(self.Name, "BarFrame:Refresh", "Start")
+    ECM_log(self.Name, "BarFrame:Refresh", "Start")
 
     local frame = self.InnerFrame
     local globalConfig = self.GlobalConfig
@@ -236,12 +235,12 @@ function BarFrame:Refresh(force)
         frame:SetText(displayValue)
 
         -- Apply font settings
-        Util.ApplyFont(frame.TextValue, globalConfig)
+        ECM_ApplyFont(frame.TextValue, globalConfig)
     end
     frame:SetTextVisible(showText)
 
     -- Texture
-    local tex = Util.GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or C.DEFAULT_STATUSBAR_TEXTURE
+    local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or C.DEFAULT_STATUSBAR_TEXTURE
     frame.StatusBar:SetStatusBarTexture(tex)
 
     -- Status bar color
@@ -249,7 +248,7 @@ function BarFrame:Refresh(force)
     frame.StatusBar:SetStatusBarColor(statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
-    -- Util.Log(self.Name, "BarFrame:Refresh", {
+    -- ECM_log(self.Name, "BarFrame:Refresh", {
     --     current = current,
     --     max = max,
     --     displayValue = displayValue,

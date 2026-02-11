@@ -6,15 +6,8 @@ local _, ns = ...
 
 local ECM = ns.Addon
 local C = ns.Constants
-local AceGUI = LibStub("AceGUI-3.0", true)
-
 local ItemIcons = ECM.ItemIcons
 local OptionHelpers = ECM.OptionHelpers
-
-local PREVIEW_CONTROL_TYPE = "ECM_ItemIconPreview"
-local PREVIEW_CONTROL_VERSION = 1
-local _previewControlRegistered = false
-
 
 
 --- Builds a standard Item Icons module toggle option.
