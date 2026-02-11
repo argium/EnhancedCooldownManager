@@ -262,6 +262,13 @@ local function RefreshBarCache(viewer, moduleConfig)
         for index, newEntry in pairs(snapshot.cache) do
             local newTexId = snapshot.textures[index]
             if not newEntry.spellName and newTexId then
+                if issecrettable(texIdToName) or issecretvalue(newTexId) then
+                    Util.Log("BuffBars", "RefreshBarCache", {
+                        message = "Cannot resolve spell name due to secret value",
+                        textureFileID = newTexId,
+                    })
+                    return false
+                end
                 local resolvedName = texIdToName[newTexId]
                 if resolvedName then
                     Util.Log("BuffBars", "RefreshBarCache", {
