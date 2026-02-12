@@ -2,13 +2,75 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
---- Lazy: a global table of change-detection-aware setter functions for WoW frames.
---- Each function compares the desired value against a per-frame `__ecm_state`
---- table and only calls the underlying WoW API when the value differs.
+--- FrameHelpers: a global table of static helper methods for WoW frames.
+---
+--- Includes:
+---   - Buff-bar inspection (GetSpellName, GetIconTexture, etc.)
+---   - Change-detection-aware "Lazy" setters that compare desired values
+---     against a per-frame `__ecm_state` cache and only call the underlying
+---     WoW API when the value actually differs.
 ---
 --- Usage:
----   Lazy.SetHeight(frame, 20)         -- only calls SetHeight if height changed
----   Lazy.ResetState(frame)            -- wipe cache so next call always applies
+---   FrameHelpers.GetSpellName(frame)
+---   FrameHelpers.GetIconTexture(frame)
+---   FrameHelpers.LazySetHeight(frame, 20)
+---   FrameHelpers.LazyResetState(frame)
+
+local _, ns = ...
+local C = ns.Constants
+
+FrameHelpers = {}
+
+--- Returns the region at the given index if it exists and matches the expected type.
+---@param frame Frame
+---@param index number
+---@param regionType string
+---@return Region|nil
+local function TryGetRegion(frame, index, regionType)
+    if not frame or not frame.GetRegions then
+        return nil
+    end
+
+    local region = select(index, frame:GetRegions())
+    if region and region.IsObjectType and region:IsObjectType(regionType) then
+        return region
+    end
+
+    return nil
+end
+
+--- Returns the spell name shown on the bar, or nil.
+---@param frame ECM_BuffBarFrame
+---@return string|nil
+function FrameHelpers.GetSpellName(frame)
+    return frame.Bar.Name and frame.Bar.Name:GetText() or nil
+end
+
+--- Returns the icon overlay texture region, or nil.
+---@param frame ECM_BuffBarFrame
+---@return Texture|nil
+function FrameHelpers.GetIconOverlay(frame)
+    return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
+end
+
+--- Returns the icon texture region, or nil.
+---@param frame ECM_BuffBarFrame
+---@return Texture|nil
+function FrameHelpers.GetIconTexture(frame)
+    return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+end
+
+--- Returns the texture file ID of the icon, or nil.
+---@param frame ECM_BuffBarFrame
+---@return number|nil
+function FrameHelpers.GetIconTextureFileID(frame)
+    local iconTexture = FrameHelpers.GetIconTexture(frame)
+    return iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
+end
+
+--------------------------------------------------------------------------------
+-- Lazy Setters — change-detection-aware frame property setters
+--------------------------------------------------------------------------------
 
 --- Serializes a list of anchor specs into a comparable string key.
 --- Each spec is { point, relativeTo, relativePoint, x, y }.
@@ -41,14 +103,11 @@ local function get_state(frame)
     return s
 end
 
----@class Lazy
-Lazy = {}
-
 --- Sets height only if it differs from the cached value.
 ---@param frame Frame
 ---@param h number
 ---@return boolean changed
-function Lazy.SetHeight(frame, h)
+function FrameHelpers.LazySetHeight(frame, h)
     local s = get_state(frame)
     if s.height == h then return false end
     frame:SetHeight(h)
@@ -60,7 +119,7 @@ end
 ---@param frame Frame
 ---@param w number
 ---@return boolean changed
-function Lazy.SetWidth(frame, w)
+function FrameHelpers.LazySetWidth(frame, w)
     local s = get_state(frame)
     if s.width == w then return false end
     frame:SetWidth(w)
@@ -72,7 +131,7 @@ end
 ---@param frame Frame
 ---@param alpha number
 ---@return boolean changed
-function Lazy.SetAlpha(frame, alpha)
+function FrameHelpers.LazySetAlpha(frame, alpha)
     local s = get_state(frame)
     if s.alpha == alpha then return false end
     frame:SetAlpha(alpha)
@@ -85,7 +144,7 @@ end
 ---@param frame Frame
 ---@param anchors table[] Array of anchor specifications
 ---@return boolean changed
-function Lazy.SetAnchors(frame, anchors)
+function FrameHelpers.LazySetAnchors(frame, anchors)
     local s = get_state(frame)
     local key = serialize_anchors(anchors)
     if s.anchors == key then return false end
@@ -103,7 +162,7 @@ end
 ---@param frame Frame
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
-function Lazy.SetBackgroundColor(frame, color)
+function FrameHelpers.LazySetBackgroundColor(frame, color)
     local s = get_state(frame)
     if ECM_AreColorsEqual(s.bgColor, color) then return false end
     if frame.Background then
@@ -120,7 +179,7 @@ end
 ---@param cacheKey string Unique key for this texture in the state cache
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
-function Lazy.SetVertexColor(frame, texture, cacheKey, color)
+function FrameHelpers.LazySetVertexColor(frame, texture, cacheKey, color)
     local s = get_state(frame)
     if ECM_AreColorsEqual(s[cacheKey], color) then return false end
     texture:SetVertexColor(color.r, color.g, color.b, color.a)
@@ -133,7 +192,7 @@ end
 ---@param bar StatusBar The status bar frame
 ---@param texturePath string Texture path or LSM key
 ---@return boolean changed
-function Lazy.SetStatusBarTexture(frame, bar, texturePath)
+function FrameHelpers.LazySetStatusBarTexture(frame, bar, texturePath)
     local s = get_state(frame)
     if s.statusBarTexture == texturePath then return false end
     bar:SetStatusBarTexture(texturePath)
@@ -149,7 +208,7 @@ end
 ---@param b number Blue component
 ---@param a number|nil Alpha component (default 1)
 ---@return boolean changed
-function Lazy.SetStatusBarColor(frame, bar, r, g, b, a)
+function FrameHelpers.LazySetStatusBarColor(frame, bar, r, g, b, a)
     local s = get_state(frame)
     a = a or 1
     local cached = s.statusBarColor
@@ -166,7 +225,7 @@ end
 ---@param frame Frame
 ---@param borderConfig table Table with enabled, thickness, color fields
 ---@return boolean changed
-function Lazy.SetBorder(frame, borderConfig)
+function FrameHelpers.LazySetBorder(frame, borderConfig)
     local s = get_state(frame)
     local border = frame.Border
     if not border then return false end
@@ -210,7 +269,7 @@ end
 ---@param cacheKey string Unique key for this text in the state cache
 ---@param text string|nil The text to set
 ---@return boolean changed
-function Lazy.SetText(frame, fontString, cacheKey, text)
+function FrameHelpers.LazySetText(frame, fontString, cacheKey, text)
     local s = get_state(frame)
     if s[cacheKey] == text then return false end
     fontString:SetText(text)
@@ -220,7 +279,7 @@ end
 
 --- Wipes the __ecm_state cache so every Lazy method will re-apply on next call.
 ---@param frame table Any frame with __ecm_state
-function Lazy.ResetState(frame)
+function FrameHelpers.LazyResetState(frame)
     if frame then
         frame.__ecm_state = nil
     end

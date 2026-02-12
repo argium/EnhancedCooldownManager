@@ -12,6 +12,8 @@ local C = ns.Constants
 local BuffBarColors = {}
 ns.BuffBarColors = BuffBarColors
 
+-- TODO: when setting a spellName, if the texture id was set more recently, then migrate it?
+
 local function get_table_for_spec(cfg)
     local _, _, classID = UnitClass("player")
     local specID = GetSpecialization()
@@ -100,7 +102,6 @@ end
 -- Public interface
 ---------------------------------------------------------------------------
 
-
 function BuffBarColors.GetColor(spellName, textureFileID)
     local cfg = config()
     local key = compute_key(spellName, textureFileID)
@@ -109,7 +110,6 @@ function BuffBarColors.GetColor(spellName, textureFileID)
     end
     return get(cfg, key)
 end
-
 
 function BuffBarColors.GetColorForBar(frame)
     ECM_debug_assert(frame, "Expected bar frame")
@@ -125,10 +125,10 @@ function BuffBarColors.GetColorForBar(frame)
     -- ECM_debug_assert(frame.Name and frame.Name.GetText, "Expected frame.Name with GetText method", frame)
     -- ECM_debug_assert(bar.Icon and bar.Icon.GetRegions, "Expected bar.Icon frame with GetRegions method. " .. (bar:GetName() or "nil") .. " " .. (bar.Name and bar.Name:GetText() or "nil"), bar)
     local spellName = frame and frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
-    local iconFrame = frame and frame.Icon
+    -- local iconFrame = frame and frame.Icon
     -- local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
     -- local textureFileID = iconTexture and iconTexture.GetIconTextureFileID and iconTexture:GetIconTextureFileID() or nil
-    local textureFileID = frame:GetIconTextureFileID() or nil
+    local textureFileID = FrameHelpers.GetIconTextureFileID(frame) or nil
     ECM_debug_assert(not textureFileID or not issecretvalue(textureFileID), "Texture file ID is a secret value, cannot use as color key")
     return BuffBarColors.GetColor(spellName, textureFileID)
 end
@@ -136,7 +136,7 @@ end
 function BuffBarColors.GetAllColors()
     local cfg = config()
     local spec_colors = get_table_for_spec(cfg)
-    return spec_colors.perSpell or {}
+    return spec_colors or {}
 end
 
 function BuffBarColors.SetColor(spellName, textureId, color)

@@ -202,7 +202,7 @@ function ECMFrame:ApplyFramePosition(frame)
         }
     end
 
-    Lazy.SetAnchors(frame, anchors)
+    FrameHelpers.LazySetAnchors(frame, anchors)
 
     return params
 end
@@ -225,19 +225,19 @@ function ECMFrame:UpdateLayout(why)
     local height = params.height
 
     -- Apply dimensions via lazy setters (no-ops when unchanged)
-    local heightChanged = height and Lazy.SetHeight(frame, height) or false
-    local widthChanged = width and Lazy.SetWidth(frame, width) or false
+    local heightChanged = height and FrameHelpers.LazySetHeight(frame, height) or false
+    local widthChanged = width and FrameHelpers.LazySetWidth(frame, width) or false
 
     -- Apply border via lazy setter
     local borderChanged = false
     if borderConfig then
-        borderChanged = Lazy.SetBorder(frame, borderConfig)
+        borderChanged = FrameHelpers.LazySetBorder(frame, borderConfig)
     end
 
     -- Apply background color via lazy setter
     ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
-    local bgColorChanged = Lazy.SetBackgroundColor(frame, bgColor)
+    local bgColorChanged = FrameHelpers.LazySetBackgroundColor(frame, bgColor)
 
     ECM_log(C.SYS.Layout, self.Name, "ECMFrame UpdateLayout complete (" .. (why or "") .. ")", {
         anchor = anchor:GetName(),

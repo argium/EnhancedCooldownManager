@@ -241,11 +241,11 @@ function BarFrame:Refresh(why, force)
 
     -- Texture
     local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or C.DEFAULT_STATUSBAR_TEXTURE
-    Lazy.SetStatusBarTexture(frame, frame.StatusBar, tex)
+    FrameHelpers.LazySetStatusBarTexture(frame, frame.StatusBar, tex)
 
     -- Status bar color
     local statusBarColor = self:GetStatusBarColor()
-    Lazy.SetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
+    FrameHelpers.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
     -- ECM_log(C.SYS.Styling, self.Name, "BarFrame:Refresh", {
