@@ -435,8 +435,9 @@ function ItemIcons:ShouldShow()
 end
 
 --- Override UpdateLayout to position icons relative to UtilityCooldownViewer.
----@return boolean success Whether the layout was applied.
-function ItemIcons:UpdateLayout()
+--- @param why string|nil Reason for layout update (for logging/debugging).
+--- @return boolean success Whether the layout was applied.
+function ItemIcons:UpdateLayout(why)
     local frame = self.InnerFrame
     if not frame then
         return false
@@ -532,7 +533,7 @@ function ItemIcons:UpdateLayout()
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM_log(C.SYS.Layout, self.Name, "ItemIcons:UpdateLayout", {
+    ECM_log(C.SYS.Layout, self.Name, "UpdateLayout (" .. (why or "") .. ")", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -550,19 +551,19 @@ function ItemIcons:UpdateLayout()
         C_Timer.After(C.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()
             self._layoutRetryPending = nil
             if self:IsEnabled() then
-                self:ScheduleLayoutUpdate()
+                self:ScheduleLayoutUpdate("UpdateLayout")
             end
         end)
     end
 
     -- Update cooldowns after layout is complete (CLAUDE.md mandate)
-    self:ThrottledRefresh()
+    self:ThrottledRefresh("UpdateLayout")
 
     return true
 end
 
 --- Override Refresh to update cooldown states.
-function ItemIcons:Refresh()
+function ItemIcons:Refresh(why)
     if not ECMFrame.Refresh(self) then
         return false
     end
@@ -579,7 +580,7 @@ function ItemIcons:Refresh()
         end
     end
 
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -589,24 +590,24 @@ end
 
 function ItemIcons:OnBagUpdateCooldown()
     if self.InnerFrame then
-        self:ThrottledRefresh()
+        self:ThrottledRefresh("OnBagUpdateCooldown")
     end
 end
 
 function ItemIcons:OnBagUpdateDelayed()
     -- Bag contents changed, which consumables to show may have changed
-    self:ScheduleLayoutUpdate()
+    self:ScheduleLayoutUpdate("OnBagUpdateDelayed")
 end
 
 function ItemIcons:OnPlayerEquipmentChanged(_, slotId)
     -- Only update if a trinket slot changed
     if slotId == C.TRINKET_SLOT_1 or slotId == C.TRINKET_SLOT_2 then
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnPlayerEquipmentChanged")
     end
 end
 
 function ItemIcons:OnPlayerEnteringWorld()
-    self:ScheduleLayoutUpdate()
+    self:ScheduleLayoutUpdate("OnPlayerEnteringWorld")
 end
 
 --- Hook EditModeManagerFrame to pause ItemIcons layout while edit mode is active.
@@ -625,14 +626,14 @@ function ItemIcons:HookEditMode()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate()
+            self:ScheduleLayoutUpdate("EnterEditMode")
         end
     end)
 
     editModeManager:HookScript("OnHide", function()
         self._isEditModeActive = false
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate()
+            self:ScheduleLayoutUpdate("ExitEditMode")
         end
     end)
 end
@@ -647,7 +648,7 @@ function ItemIcons:HookUtilityViewer()
     self._viewerHooked = true
 
     utilityViewer:HookScript("OnShow", function()
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnShow")
     end)
 
     utilityViewer:HookScript("OnHide", function()
@@ -655,15 +656,15 @@ function ItemIcons:HookUtilityViewer()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate()
+            self:ScheduleLayoutUpdate("OnHide")
         end
     end)
 
     utilityViewer:HookScript("OnSizeChanged", function()
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnSizeChanged")
     end)
 
-    ECM_log(self.Name, "Hooked UtilityCooldownViewer")
+    ECM_log(C.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
 end
 
 --------------------------------------------------------------------------------
@@ -678,7 +679,7 @@ function ItemIcons:OnEnable()
     end
 
     -- Register events
-    self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown")
+    -- self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy
     self:RegisterEvent("BAG_UPDATE_DELAYED", "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnPlayerEquipmentChanged")
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
@@ -687,7 +688,7 @@ function ItemIcons:OnEnable()
     C_Timer.After(0.1, function()
         self:HookEditMode()
         self:HookUtilityViewer()
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnEnable")
     end)
 
     ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")
@@ -696,7 +697,7 @@ end
 function ItemIcons:OnDisable()
     self:UnregisterAllEvents()
 
-    self:UpdateLayout()
+    self:UpdateLayout("OnDisable")
 
     if self.IsECMFrame and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)

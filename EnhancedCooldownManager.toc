@@ -29,6 +29,7 @@ Defaults.lua
 Modules\Sparkle.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
+Modules\LazyFrameSetters.lua
 Modules\BugReports.lua
 Options\Migration.lua
 Options\ImportExport.lua

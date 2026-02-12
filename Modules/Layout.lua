@@ -162,7 +162,7 @@ local function UpdateAllLayouts()
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
         local ecmFrame = _ecmFrames[moduleName]
         if ecmFrame then
-            ecmFrame:UpdateLayout()
+            ecmFrame:UpdateLayout("UpdateAllLayouts")
             updated[moduleName] = true
         end
     end
@@ -170,7 +170,7 @@ local function UpdateAllLayouts()
     -- Update all remaining frames (non-chain modules).
     for frameName, ecmFrame in pairs(_ecmFrames) do
         if not updated[frameName] then
-            ecmFrame:UpdateLayout()
+            ecmFrame:UpdateLayout("UpdateAllLayouts")
         end
     end
 end

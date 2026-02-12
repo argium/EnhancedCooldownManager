@@ -22,7 +22,14 @@
             "~\\.vscode\\extensions\\ketho.wow-api-0.22.2\\Annotations\\Core"
         ],
         "Lua.diagnostics.globals": [
-            "DEFAULT"
+            "DEFAULT",
+            "SlashCmdList",
+            "STANDARD_TEXT_FONT",
+            "Settings",
+            "EssentialCooldownViewer",
+            "UtilityCooldownViewer",
+            "RAID_CLASS_COLORS",
+            "ColorPickerFrame"
         ],
 	}
 }

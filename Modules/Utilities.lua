@@ -126,16 +126,22 @@ function ECM_log(subsystem, module, message, data)
         pcall(DevTool.AddData, DevTool, payload, "|cff".. C.DEBUG_COLOR ..  prefix .. "|r " .. message)
     end
 
-    print("|cff".. C.DEBUG_COLOR ..  prefix .. "|r " .. message)
+    if ECM_is_debug_enabled() then
+        print("|cff".. C.DEBUG_COLOR ..  prefix .. "|r " .. message)
+    end
 end
 
 function ECM_is_debug_enabled()
     return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
 end
 
-function ECM_debug_assert(condition, message)
+function ECM_debug_assert(condition, message, data)
     if not ECM_is_debug_enabled() then
         return
+    end
+
+    if data and not condition and DevTool and DevTool.AddData then
+        pcall(DevTool.AddData, DevTool, data, "|cff".. C.DEBUG_COLOR .. "[ASSERT]|r " .. message)
     end
     assert(condition, message)
 end

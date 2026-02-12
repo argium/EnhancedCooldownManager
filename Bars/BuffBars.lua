@@ -13,46 +13,16 @@ local BBC = ns.BuffBarColors
 local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
 ECM.BuffBars = BuffBars
 
----@class ECM_BuffBarsModule : ECMFrame
+---@class ECM_BuffBarFrame : Frame
+---@field __ecmBuffBarFrame boolean
+---@field Bar StatusBar
+---@field DebuffBorder any
+---@field Icon Frame
 
----@class ECM_BuffBarChild : Frame
----@field __ecmAnchorHooked boolean
----@field __ecmStyled boolean
-
-local function get_statusbar_background(statusBar)
-    if not statusBar or not statusBar.GetRegions then
-        return nil
-    end
-
-    local cached = statusBar.__ecmBarBG
-    if cached and cached.IsObjectType and cached:IsObjectType("Texture") then
-        return cached
-    end
-
-    for _, region in ipairs({ statusBar:GetRegions() }) do
-        if region and region.IsObjectType and region:IsObjectType("Texture") then
-            local atlas = region.GetAtlas and region:GetAtlas()
-            if atlas == "UI-HUD-CoolDownManager-Bar-BG" or atlas == "UI-HUD-CooldownManager-Bar-BG" then
-                statusBar.__ecmBarBG = region
-                return region
-            end
-        end
-    end
-
-    return nil
-end
-
-
---- Returns visible bar children sorted by Y position (top to bottom) to preserve edit mode order.
---- GetChildren() returns in creation order, not visual order, so we must sort by position.
----@param viewer Frame The BuffBarCooldownViewer frame
----@param onlyVisible boolean|nil If true, only include visible children
----@return table[] Array of {frame, top, order} sorted top-to-bottom
-local function get_sorted_children(viewer, onlyVisible)
+local function get_children_ordered(viewer)
     local result = {}
-
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
-        if child and child.Bar and (not onlyVisible or child:IsShown()) then
+        if child and child.Bar then
             local top = child.GetTop and child:GetTop()
             result[#result + 1] = { frame = child, top = top, order = insertOrder }
         end
@@ -72,232 +42,259 @@ local function get_sorted_children(viewer, onlyVisible)
     return result
 end
 
---- Hooks a child frame to re-layout when Blizzard changes its anchors.
----@param child ECM_BuffBarChild
----@param module ECM_BuffBarsModule
-local function HookChildAnchoring(child, module)
-    if child.__ecmAnchorHooked then
+local function hook_child_frame(child, module)
+    if child.__ecmBuffBarFrame then
         return
     end
-    child.__ecmAnchorHooked = true
+    child.__ecmBuffBarFrame = true
+
+    -- Stamp lazy setters on the child frame and its Bar sub-frame
+    ECM_ApplyLazySetters(child)
+    ECM_ApplyLazySetters(child.Bar)
+    ECM_ApplyLazySetters(child.Bar.Name)
+    ECM_ApplyLazySetters(child.Bar.Duration)
+    ECM_ApplyLazySetters(child.Bar.Pip)
+    ECM_ApplyLazySetters(child.DebuffBorder)
+    ECM_ApplyLazySetters(child.Icon)
+    ECM_ApplyLazySetters(child.Icon.Applications)
 
     -- Hook SetPoint to detect when Blizzard re-anchors this child
     hooksecurefunc(child, "SetPoint", function()
-        -- Only re-layout if we're not already running a layout
-        local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
-        if viewer and not module._layoutRunning then
-            module:ScheduleLayoutUpdate()
-        end
+        -- module:ScheduleLayoutUpdate("SetPoint")
     end)
 
     -- Hook OnShow to ensure newly shown bars get positioned
     child:HookScript("OnShow", function()
-        module:ScheduleLayoutUpdate()
+        module:ScheduleLayoutUpdate("OnShow")
     end)
 
     child:HookScript("OnHide", function()
-        module:ScheduleLayoutUpdate()
+        module:ScheduleLayoutUpdate("OnHide")
     end)
-end
 
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-local function ApplyStatusBarAnchors(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and child) then
-        return
+    child.GetSpellName = function(self)
+        return self.Bar.Name and self.Bar.Name:GetText() or nil
     end
 
-    bar:ClearAllPoints()
-    if iconFrame and iconFrame:IsShown() then
-        bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 0, 0)
-    else
-        bar:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
-    end
-    bar:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
-end
-
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-local function ApplyBarNameInset(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and bar.Name) then
-        return
-    end
-
-    local leftInset = C.BUFFBARS_TEXT_PADDING
-    if iconFrame and iconFrame:IsShown() then
-        local resolvedIconHeight = iconHeight
-        if not resolvedIconHeight or resolvedIconHeight <= 0 then
-            resolvedIconHeight = iconFrame:GetHeight() or 0
+    child.GetTextureFileID = function(self)
+        local iconTexture = self.Icon and self.Icon.GetTexture and self.Icon:GetTexture()
+        if iconTexture and iconTexture.GetTexture then
+            return iconTexture:GetTexture()
         end
-        leftInset = resolvedIconHeight + C.BUFFBARS_TEXT_PADDING
+        return nil
     end
 
-    bar.Name:ClearAllPoints()
-    bar.Name:SetPoint("LEFT", bar, "LEFT", leftInset, 0)
-    if bar.Duration and bar.Duration:IsShown() then
-        bar.Name:SetPoint("RIGHT", bar.Duration, "LEFT", -C.BUFFBARS_TEXT_PADDING, 0)
-    else
-        bar.Name:SetPoint("RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0)
-    end
 end
 
----@param child ECM_BuffBarChild
----@param moduleConfig table
-local function ApplyVisibilitySettings(child, moduleConfig)
-    if not (child and child.Bar) then
+--- Applies all sizing, styling, visibility, and anchoring to a single buff bar
+--- child frame. Lazy setters ensure no-ops when values haven't changed.
+---@param frame ECM_BuffBarFrame
+---@param config table Module config
+---@param globalConfig table Global config
+---@param barIndex number Index of the bar (for logging)
+local function style_child_frame(frame, config, globalConfig, barIndex)
+    if not (frame and frame.__ecmBuffBarFrame) then
+        ECM_debug_assert(false, "Attempted to style a child frame that is not a BuffBarFrame", { frame = frame })
         return
     end
 
-    -- Apply visibility settings from buffBars config (default to shown)
-    local showIcon = moduleConfig and moduleConfig.showIcon ~= false
-    local iconFrame = GetBuffBarIconFrame(child)
-    if iconFrame then
-        iconFrame:SetShown(showIcon)
-        local iconTexture = GetBuffBarIconTexture(iconFrame)
+    local bar = frame.Bar
+    local iconFrame = frame.Icon
+    local barBG = bar.BarBG
+    -- DevTool:AddData(frame)
+    -- DevTool:AddData(iconFrame.Applications)
 
+    -- frame
+    --  - Bar
+    --     - Name
+    --     - Duration
+    --     - Pip
+    --     - BarBG
+    --  - Icon
+    --    - Applications
+    --  - DebuffBorder
+
+    --------------------------------------------------------------------------
+    -- Heights
+    --------------------------------------------------------------------------
+    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
+    if height > 0 then
+        frame:LazySetHeight(height)
+        bar:LazySetHeight(height)
+        if iconFrame then
+            iconFrame:LazySetHeight(height)
+            iconFrame:LazySetWidth(height)
+        end
+    end
+
+    --------------------------------------------------------------------------
+    -- Pip — always hidden
+    --------------------------------------------------------------------------
+    bar.Pip:Hide()
+    bar.Pip:SetTexture(nil)
+
+    --------------------------------------------------------------------------
+    -- Bar background (BarBG texture)
+    --------------------------------------------------------------------------
+    local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
+    barBG:SetTexture(C.FALLBACK_TEXTURE)
+    frame:LazySetVertexColor(barBG, "barBgColor", bgColor)
+    barBG:ClearAllPoints()
+    barBG:SetPoint("TOPLEFT", frame, "TOPLEFT")
+    barBG:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT")
+    barBG:SetDrawLayer("BACKGROUND", 0)
+
+    --------------------------------------------------------------------------
+    -- StatusBar texture & color
+    --------------------------------------------------------------------------
+    local textureName = globalConfig and globalConfig.texture
+    local texture = ECM_GetTexture(textureName)
+    bar:LazySetStatusBarTexture(bar, texture)
+
+    local barColor = BBC.GetColorForBar(frame)
+    if barColor then
+        bar:LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
+    end
+
+    --------------------------------------------------------------------------
+    -- Fonts (before visibility/positioning — font changes affect layout)
+    --------------------------------------------------------------------------
+    ECM_ApplyFont(bar.Name)
+    ECM_ApplyFont(bar.Duration)
+
+    --------------------------------------------------------------------------
+    -- Icon anchor
+    --------------------------------------------------------------------------
+    if iconFrame then
+        iconFrame:LazySetAnchors({
+            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
+        })
+    end
+
+    --------------------------------------------------------------------------
+    -- Visibility — icon, name, duration, debuff border, applications
+    --------------------------------------------------------------------------
+    local showIcon = config and config.showIcon ~= false
+    if iconFrame then
+        iconFrame:LazySetShown(showIcon)
+        local iconTexture = frame:GetTextureFileID()
         if iconTexture and iconTexture.SetShown then
             iconTexture:SetShown(showIcon)
         end
-
         local iconOverlay = select(C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, iconFrame:GetRegions())
         if iconOverlay and iconOverlay.SetShown then
             iconOverlay:SetShown(showIcon)
         end
     end
 
-    local alpha = showIcon and 1 or 0
-    if child.DebuffBorder then
-        child.DebuffBorder:SetAlpha(alpha)
+    local iconAlpha = showIcon and 1 or 0
+    if frame.DebuffBorder then
+        frame.DebuffBorder:LazySetAlpha(iconAlpha)
+    end
+    if iconFrame.Applications then
+        iconFrame.Applications:LazySetAlpha(iconAlpha)
     end
 
-    if child.Applications then
-        child.Applications:SetAlpha(alpha)
-    end
-
-    local bar = child.Bar
+    local showSpellName = config and config.showSpellName ~= false
+    local showDuration = config and config.showDuration ~= false
     if bar.Name then
-        bar.Name:SetShown(moduleConfig and moduleConfig.showSpellName ~= false)
+        bar.Name:LazySetShown(showSpellName)
     end
     if bar.Duration then
-        bar.Duration:SetShown(moduleConfig and moduleConfig.showDuration ~= false)
+        bar.Duration:LazySetShown(showDuration)
     end
 
-    ApplyStatusBarAnchors(child, iconFrame, nil)
-    ApplyBarNameInset(child, iconFrame, nil)
-end
-
---- Applies styling to a single cooldown bar child.
----@param child ECM_BuffBarChild
----@param moduleConfig table
----@param globalConfig table
----@param barIndex number|nil 1-based index in current layout order (metadata/logging only)
-local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex)
-    if not (child and child.Bar) then
-        return
+    --------------------------------------------------------------------------
+    -- Bar anchors (relative to icon visibility)
+    --------------------------------------------------------------------------
+    local iconVisible = iconFrame and iconFrame:IsShown()
+    if iconVisible then
+        bar:LazySetAnchors({
+            { "TOPLEFT", iconFrame, "TOPRIGHT", 0, 0 },
+            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+        })
+    else
+        bar:LazySetAnchors({
+            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
+            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+        })
     end
 
-    local bar = child.Bar
-    if not (bar and bar.SetStatusBarTexture) then
-        return
+    --------------------------------------------------------------------------
+    -- Name
+    --------------------------------------------------------------------------
+    bar.Name:LazySetAnchors({
+        { "LEFT", bar, "LEFT", C.BUFFBARS_TEXT_PADDING, 0 },
+        { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
+    })
+
+    if bar.Duration then
+        bar.Duration:LazySetAnchors({
+            { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
+        })
     end
-
-    local texKey = globalConfig and globalConfig.texture
-    local tex = ECM_GetTexture(texKey)
-    bar:SetStatusBarTexture(tex)
-
-    if bar.SetStatusBarColor then
-        local color = BBC.GetColorForBar(bar)
-        if color then
-            bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
-        end
-    end
-
-    local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
-    local barBG = get_statusbar_background(bar)
-    if barBG then
-        barBG:SetTexture(C.FALLBACK_TEXTURE)
-        barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
-        barBG:ClearAllPoints()
-        barBG:SetPoint("TOPLEFT", child, "TOPLEFT")
-        barBG:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT")
-        barBG:SetDrawLayer("BACKGROUND", 0)
-    end
-
-    if bar.Pip then
-        bar.Pip:Hide()
-        bar.Pip:SetTexture(nil)
-    end
-
-    local height =  (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or 15
-    if height and height > 0 then
-        bar:SetHeight(height)
-        child:SetHeight(height)
-    end
-
-    -- Apply visibility settings (extracted to separate function for frequent reapplication)
-    ApplyVisibilitySettings(child, moduleConfig)
-
-    local iconFrame = bar.Icon
-    if iconFrame and height and height > 0 then
-        iconFrame:SetSize(height, height)
-    end
-
-    ECM_ApplyFont(bar.Name)
-    ECM_ApplyFont(bar.Duration)
-
-    if iconFrame then
-        iconFrame:ClearAllPoints()
-        iconFrame:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
-    end
-
-    ApplyStatusBarAnchors(child, iconFrame, height)
-
-    -- Keep the bar/background full-width (under icon), but inset spell text when icon is shown.
-    ApplyBarNameInset(child, iconFrame, height)
-
-    -- Mark as styled
-    child.__ecmStyled = true
 
     ECM_log(C.SYS.Styling, C.BUFFBARS, "Applied style to bar", {
         barIndex = barIndex,
-        showIcon = moduleConfig and moduleConfig.showIcon ~= false,
-        showSpellName = moduleConfig and moduleConfig.showSpellName ~= false,
-        showDuration = moduleConfig and moduleConfig.showDuration ~= false,
         height = height,
+        pipHidden = true,
+        pipTexture = nil,
+        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK)) or nil,
+        barBgTexture = barBG and C.FALLBACK_TEXTURE or nil,
+        barBgLayer = barBG and "BACKGROUND" or nil,
+        barBgSubLayer = barBG and 0 or nil,
+        textureName = textureName,
+        statusBarTexture = texture,
+        statusBarColor = barColor,
+        showIcon = showIcon,
+        showSpellName = showSpellName,
+        showDuration = showDuration,
+        iconAlpha = iconAlpha,
+        iconVisible = iconVisible,
+        iconShown = iconFrame and iconFrame:IsShown() or false,
+        iconSize = iconVisible and (iconFrame:GetHeight() or frame:GetHeight() or 0) or 0,
+        debuffBorderAlpha = frame.DebuffBorder and iconAlpha or nil,
+        applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
+        nameShown = showSpellName,
+        durationShown = showDuration,
+        nameLeftInset = C.BUFFBARS_TEXT_PADDING,
+        nameRightPadding = C.BUFFBARS_TEXT_PADDING,
+        barAnchorMode = iconVisible and "icon" or "frame",
     })
 end
 
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
 local function layout_bars(self)
-    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
     end
 
     self._layoutRunning = true
 
-    local visibleChildren = get_sorted_children(viewer, true)
+    local children = get_children_ordered(viewer)
     local prev
 
-    for _, entry in ipairs(visibleChildren) do
+    for _, entry in ipairs(children) do
         local child = entry.frame
-        child:ClearAllPoints()
-        if not prev then
-            child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
-        else
-            child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
+        if child:IsShown() then
+            if not prev then
+                child:LazySetAnchors({
+                    { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
+                    { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
+                })
+            else
+                child:LazySetAnchors({
+                    { "TOPLEFT", prev, "BOTTOMLEFT", 0, 0 },
+                    { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0 },
+                })
+            end
+            prev = child
         end
-        prev = child
     end
 
-    ECM_log(C.SYS.Layout, C.BUFFBARS, "LayoutBars complete. Found: " .. #visibleChildren .. " visible bars.")
+    ECM_log(C.SYS.Layout, C.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
 
     self._layoutRunning = nil
 end
@@ -339,58 +336,45 @@ end
 
 --- Override CreateFrame to return the Blizzard BuffBarCooldownViewer instead of creating a new one.
 function BuffBars:CreateFrame()
-    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
-    return _G["EssentialCooldownViewer"_BUFFBAR]  -- TODO: this is a dummy frame I guess. I don't like it.
+    return _G["BuffBarCooldownViewer"]
 end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
-function BuffBars:UpdateLayout()
+function BuffBars:UpdateLayout(why)
     local viewer = self.InnerFrame
-    if not viewer then
-        return false
-    end
-
     local globalConfig = self.GlobalConfig
     local cfg = self.ModuleConfig
 
-    -- Check visibility
     if not self:ShouldShow() then
         viewer:Hide()
         return false
     end
 
-    local params = self:CalculateLayoutParams()
-
     -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
+    local params = self:CalculateLayoutParams()
     if params.mode == C.ANCHORMODE_CHAIN then
-        viewer:ClearAllPoints()
-        viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
-        viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
+        viewer:LazySetAnchors({
+            { "TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY },
+            { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
+        })
     elseif params.mode == C.ANCHORMODE_FREE then
         local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
-            viewer:SetWidth(width)
+            viewer:LazySetWidth(width)
         end
     end
 
-    -- Style all visible children (skip already-styled unless markers were reset)
-    local visibleChildren = get_sorted_children(viewer, true)
+    -- Style all visible children (lazy setters make redundant calls no-ops)
+    local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
-        if not entry.frame.__ecmStyled then
-            ApplyCooldownBarStyle(entry.frame, cfg, globalConfig, barIndex)
-        else
-            -- Always reapply visibility settings because Blizzard resets them on cooldown updates
-            ApplyVisibilitySettings(entry.frame, cfg)
-        end
-        HookChildAnchoring(entry.frame, self)
+        hook_child_frame(entry.frame, self)
+        style_child_frame(entry.frame, cfg, globalConfig, barIndex)
     end
 
-    -- Layout bars vertically
     layout_bars(self)
-
     viewer:Show()
-    ECM_log(C.SYS.Layout, C.BUFFBARS, "BuffBars:UpdateLayout", {
+    ECM_log(C.SYS.Layout, C.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -400,7 +384,6 @@ function BuffBars:UpdateLayout()
         offsetX = params.offsetX,
         offsetY = params.offsetY,
     })
-
     return true
 end
 
@@ -410,60 +393,39 @@ end
 
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
-    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
     end
 
-    -- Clear anchor cache to force re-anchor
-    viewer._layoutCache = nil
-
-    -- Clear styled markers on all children
+    -- Clear lazy state on all children to force full re-style
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
-        if child and child.__ecmStyled then
-            child.__ecmStyled = nil
+        child:ResetLazyMarkers()
+        if child.Bar then
+            child.Bar:ResetLazyMarkers()
         end
     end
 
 end
 
---- Scans the viewer's children and returns entries used by Layout discovery scanning.
----@return table[] scanEntries Array of { spellName, textureFileID }
-function BuffBars:CollectScanEntries()
-    local viewer = self.InnerFrame
-    if not viewer then
-        return {}
-    end
-
-    local children = get_sorted_children(viewer, false)
-    local scanEntries = {}
-    for _, entry in ipairs(children) do
-        scanEntries[#scanEntries + 1] = {
-            spellName = GetChildRawSpellText(entry.frame),
-            textureFileID = GetChildTextureFileID(entry.frame),
-        }
-    end
-    return scanEntries
-end
-
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
-    local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
     end
-
-    self._viewerLayoutCache = self._viewerLayoutCache or {}
 
     if self._viewerHooked then
         return
     end
     self._viewerHooked = true
 
+    ECM_ApplyLazySetters(viewer)
+
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
-        self:UpdateLayout()
+        self:UpdateLayout("OnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
@@ -471,7 +433,7 @@ function BuffBars:HookViewer()
         if self._layoutRunning then
             return
         end
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnSizeChanged")
     end)
 
     -- Hook edit mode transitions
@@ -499,15 +461,15 @@ function BuffBars:HookEditMode()
         end
 
         -- Edit mode exit is infrequent, so perform an immediate restyle pass.
-        local viewer = _G["EssentialCooldownViewer"_BUFFBAR]
+        local viewer = _G["BuffBarCooldownViewer"]
         if viewer and viewer:IsShown() then
-            self:UpdateLayout()
+            self:UpdateLayout("ExitEditMode")
         end
     end)
 
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
         -- Re-apply style during edit mode so bars look correct while editing
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("EnterEditMode")
     end)
 
     ECM_log(C.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
@@ -519,7 +481,7 @@ end
 
 function BuffBars:OnUnitAura(_, unit)
     if unit == "player" then
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnUnitAura")
     end
 end
 
@@ -541,7 +503,7 @@ function BuffBars:OnEnable()
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()
-        self:ScheduleLayoutUpdate()
+        self:ScheduleLayoutUpdate("OnEnable")
     end)
 
     ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")

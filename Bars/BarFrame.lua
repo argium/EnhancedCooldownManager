@@ -202,14 +202,15 @@ function BarFrame:ShouldShow()
 end
 
 --- Refreshes the bar frame layout and values.
----@param force boolean|nil If true, forces a refresh even if not needed.
----@return boolean continue True if refresh completed, false if skipped
-function BarFrame:Refresh(force)
+--- @param why string|nil Reason for refresh (for logging/debugging).
+--- @param force boolean|nil If true, forces a refresh even if not needed.
+--- @return boolean continue True if refresh completed, false if skipped
+function BarFrame:Refresh(why, force)
     local continue = ECMFrame.Refresh(self, force)
     if not continue then
         return false
     end
-    ECM_log(C.SYS.Styling, self.Name, "Starting refresh")
+    ECM_log(C.SYS.Styling, self.Name, "Starting refresh (" .. (why or "") .. ")")
 
     local frame = self.InnerFrame
     local globalConfig = self.GlobalConfig
@@ -240,11 +241,11 @@ function BarFrame:Refresh(force)
 
     -- Texture
     local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or C.DEFAULT_STATUSBAR_TEXTURE
-    frame.StatusBar:SetStatusBarTexture(tex)
+    frame:LazySetStatusBarTexture(frame.StatusBar, tex)
 
     -- Status bar color
     local statusBarColor = self:GetStatusBarColor()
-    frame.StatusBar:SetStatusBarColor(statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
+    frame:LazySetStatusBarColor(frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
     -- ECM_log(C.SYS.Styling, self.Name, "BarFrame:Refresh", {
@@ -257,7 +258,7 @@ function BarFrame:Refresh(force)
     --     statusBarColor = statusBarColor,
     -- })
 
-    ECM_log(C.SYS.Styling, self.Name, "Bar frame refresh complete.")
+    ECM_log(C.SYS.Styling, self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
     return true
 end
 
@@ -300,6 +301,9 @@ function BarFrame:CreateFrame()
             self.TextFrame:SetShown(shown)
         end
     end
+
+    ECM_ApplyLazySetters(frame)
+    ECM_ApplyLazySetters(frame.StatusBar)
 
     ECM_log(C.SYS.Layout, self.Name, "Frame created.")
     return frame

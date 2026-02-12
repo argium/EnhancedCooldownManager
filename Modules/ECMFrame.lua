@@ -17,23 +17,8 @@ ns.Mixins.ECMFrame = ECMFrame
 
 ---@alias AnchorPoint string
 
----@class ECM_LayoutCache Cached layout state for change detection.
----@field anchor Frame|nil Last anchor frame.
----@field offsetX number|nil Last horizontal offset.
----@field offsetY number|nil Last vertical offset.
----@field width number|nil Last applied width.
----@field height number|nil Last applied height.
----@field anchorPoint AnchorPoint|nil Last anchor point.
----@field anchorRelativePoint AnchorPoint|nil Last relative anchor point.
----@field mode string|nil Last anchor mode.
----@field borderEnabled boolean|nil Last border enabled state.
----@field borderThickness number|nil Last border thickness.
----@field borderColor ECM_Color|nil Last border color table.
----@field bgColor ECM_Color|nil Last background color table.
-
 ---@class ECMFrame : AceModule Frame mixin that owns layout and config access.
 ---@field _configKey string|nil Config key for this frame's section.
----@field _lastLayout ECM_LayoutCache|nil The last layout settings that were applied. Used to avoid redundant updates.
 ---@field IsHidden boolean|nil Whether the frame is currently hidden.
 ---@field IsECMFrame boolean True to identify this as an ECMFrame mixin instance.
 ---@field InnerFrame Frame|nil Inner WoW frame owned by this mixin.
@@ -49,11 +34,25 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field SetConfig fun(self: ECMFrame, config: table) Sets the config for this frame and caches relevant sections.
 ---@field CalculateLayoutParams fun(self: ECMFrame): table Calculates layout parameters based on anchor mode and config.
 ---@field ApplyFramePosition fun(self: ECMFrame, frame: Frame): table|nil Applies layout positioning to the frame based on current config. Returns layout params if shown, nil if hidden.
----@field Refresh fun(self: ECMFrame, force: boolean|nil): boolean Handles common refresh logic. Returns true if the frame should continue refreshing, false to skip.
+---@field Refresh fun(self: ECMFrame, why: string|nil, force: boolean|nil): boolean Handles common refresh logic. Returns true if the frame should continue refreshing, false to skip.
 ---@field ScheduleDebounced fun(self: ECMFrame, flagName: string, callback: function) Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
----@field ThrottledRefresh fun(self: ECMFrame): boolean Rate-limited refresh. Sk
----@field UpdateLayout fun(self: ECMFrame): boolean Updates the visual layout of the frame.
+---@field ThrottledRefresh fun(self: ECMFrame, why: string|nil): boolean Rate-limited refresh. Skips if called within updateFrequency window.
+---@field UpdateLayout fun(self: ECMFrame, why: string|nil): boolean Updates the visual layout of the frame.
 ---@field AddMixin fun(target: table, name: string) Adds ECMFrame methods and initializes state on target.
+---@field ScheduleLayoutUpdate fun(self: ECMFrame, why: string|nil) Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
+--- Lazy setter methods stamped by ECM_ApplyLazySetters (via CreateFrame). Change-detection-aware; only call underlying WoW API when value differs.
+---@field LazySetHeight fun(self: ECMFrame, h: number): boolean Sets height only if changed.
+---@field LazySetWidth fun(self: ECMFrame, w: number): boolean Sets width only if changed.
+---@field LazySetShown fun(self: ECMFrame, shown: boolean): boolean Sets shown state only if changed.
+---@field LazySetAlpha fun(self: ECMFrame, alpha: number): boolean Sets alpha only if changed.
+---@field LazySetAnchors fun(self: ECMFrame, anchors: table[]): boolean Clears and re-applies anchor points only if changed.
+---@field LazySetBackgroundColor fun(self: ECMFrame, color: ECM_Color): boolean Sets background color texture only if changed.
+---@field LazySetVertexColor fun(self: ECMFrame, texture: Texture, cacheKey: string, color: ECM_Color): boolean Sets vertex color on a texture only if changed.
+---@field LazySetStatusBarTexture fun(self: ECMFrame, bar: StatusBar, texturePath: string): boolean Sets status bar texture only if changed.
+---@field LazySetStatusBarColor fun(self: ECMFrame, bar: StatusBar, r: number, g: number, b: number, a: number|nil): boolean Sets status bar color only if changed.
+---@field LazySetBorder fun(self: ECMFrame, borderConfig: table): boolean Applies border configuration only if changed.
+---@field LazySetText fun(self: ECMFrame, fontString: FontString, cacheKey: string, text: string|nil): boolean Sets text on a FontString only if changed.
+---@field ResetLazyMarkers fun(self: ECM_BuffBarFrame): nil Resets all lazy setter state to force re-application on next update.
 
 --- Determine the correct anchor for this specific frame in the fixed order.
 --- @param frameName string|nil The name of the current frame, or nil if first in chain.
@@ -187,17 +186,18 @@ function ECMFrame:CreateFrame()
     frame.Border:SetFrameLevel(frame:GetFrameLevel() + 3)
     frame.Border:Hide()
 
+    ECM_ApplyLazySetters(frame)
+
     return frame
 end
 
 --- Applies positioning to a frame based on layout parameters.
 --- Handles ShouldShow check, layout calculation, and anchor positioning.
---- Does not handle caching - callers manage their own _layoutCache.
+--- Uses LazySetAnchors for change detection when available.
 --- @param frame Frame The frame to position
 --- @return table|nil params Layout params if shown, nil if hidden
 function ECMFrame:ApplyFramePosition(frame)
     if not self:ShouldShow() then
-        -- ECM_log(self.Name, "ECMFrame:ApplyFramePosition", "ShouldShow returned false, hiding frame")
         frame:Hide()
         return nil
     end
@@ -209,19 +209,25 @@ function ECMFrame:ApplyFramePosition(frame)
     local anchorPoint = params.anchorPoint
     local anchorRelativePoint = params.anchorRelativePoint
 
-    frame:ClearAllPoints()
+    local anchors
     if mode == C.ANCHORMODE_CHAIN then
-        frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY)
-        frame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY)
+        anchors = {
+            { "TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY },
+            { "TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY },
+        }
     else
         assert(anchor ~= nil, "anchor required for free anchor mode")
-        frame:SetPoint(anchorPoint, anchor, anchorRelativePoint, offsetX, offsetY)
+        anchors = {
+            { anchorPoint, anchor, anchorRelativePoint, offsetX, offsetY },
+        }
     end
+
+    frame:LazySetAnchors(anchors)
 
     return params
 end
 
-function ECMFrame:UpdateLayout()
+function ECMFrame:UpdateLayout(why)
     local globalConfig = self.GlobalConfig
     local moduleConfig = self.ModuleConfig
     local frame = self.InnerFrame
@@ -233,77 +239,27 @@ function ECMFrame:UpdateLayout()
         return false
     end
 
-    local mode = params.mode
     local anchor = params.anchor
     local isFirst = params.isFirst
     local width = params.width
     local height = params.height
 
-    local layoutCache = self._layoutCache or {}
+    -- Apply dimensions via lazy setters (no-ops when unchanged)
+    local heightChanged = height and frame:LazySetHeight(height) or false
+    local widthChanged = width and frame:LazySetWidth(width) or false
 
-    -- Apply height if specified
-    local heightChanged = height and layoutCache.height ~= height
-    if heightChanged then
-        frame:SetHeight(height)
-        layoutCache.height = height
-    elseif height == nil then
-        layoutCache.height = nil
-    end
-
-    -- Apply width if specified
-    local widthChanged = width and layoutCache.width ~= width
-    if widthChanged then
-        frame:SetWidth(width)
-        layoutCache.width = width
-    elseif width == nil then
-        layoutCache.width = nil
-    end
-
-    local borderChanged = nil
+    -- Apply border via lazy setter
+    local borderChanged = false
     if borderConfig then
-        borderChanged = borderConfig.enabled ~= layoutCache.borderEnabled
-            or borderConfig.thickness ~= layoutCache.borderThickness
-            or not ECM_AreColorsEqual(borderConfig.color, layoutCache.borderColor)
-
-        -- Update the border (nil-safe for frames without borders)
-        local border = frame.Border
-        if border and borderChanged then
-            local thickness = borderConfig.thickness or 1
-            if borderConfig.enabled then
-                border:Show()
-                ECM_debug_assert(borderConfig.thickness, "border thickness required when enabled")
-                if layoutCache.borderThickness ~= thickness then
-                    border:SetBackdrop({
-                        edgeFile = "Interface\\Buttons\\WHITE8X8",
-                        edgeSize = thickness,
-                    })
-                end
-                border:ClearAllPoints()
-                border:SetPoint("TOPLEFT", -thickness, thickness)
-                border:SetPoint("BOTTOMRIGHT", thickness, -thickness)
-                border:SetBackdropBorderColor(borderConfig.color.r, borderConfig.color.g, borderConfig.color.b, borderConfig.color.a)
-                border:Show()
-            else
-                border:Hide()
-            end
-
-            -- Update cached value
-            layoutCache.borderEnabled = borderConfig.enabled
-            layoutCache.borderThickness = thickness
-            layoutCache.borderColor = borderConfig.color
-        end
+        borderChanged = frame:LazySetBorder(borderConfig)
     end
 
+    -- Apply background color via lazy setter
     ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
-    local bgColorChanged = not ECM_AreColorsEqual(bgColor, layoutCache.bgColor)
+    local bgColorChanged = frame:LazySetBackgroundColor(bgColor)
 
-    if bgColorChanged and frame.Background then
-        frame.Background:SetColorTexture(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
-        layoutCache.bgColor = bgColor
-    end
-
-    ECM_log(C.SYS.Layout, self.Name, "ECMFrame UpdateLayout complete.", {
+    ECM_log(C.SYS.Layout, self.Name, "ECMFrame UpdateLayout complete (" .. (why or "") .. ")", {
         anchor = anchor:GetName(),
         isFirst = isFirst,
         widthChanged = widthChanged,
@@ -318,7 +274,7 @@ function ECMFrame:UpdateLayout()
         bgColor = bgColor,
     })
 
-    self:ThrottledRefresh()
+    self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
     return true
 end
 
@@ -329,11 +285,12 @@ function ECMFrame:ShouldShow()
 end
 
 --- Handles common refresh logic for ECMFrame-derived frames.
+--- @param why string|nil Optional debug string for why the refresh was triggered.
 --- @param force boolean|nil Whether to force a refresh, even if the bar is hidden.
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
-function ECMFrame:Refresh(force)
+function ECMFrame:Refresh(why, force)
     if not force and not self:ShouldShow() then
-        -- ECM_log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh")
+        -- ECM_log(self.Name, "ECMFrame:Refresh", "Frame is hidden or disabled, skipping refresh (" .. (why or "") .. ")")
         return false
     end
 
@@ -357,23 +314,24 @@ function ECMFrame:ScheduleDebounced(flagName, callback)
 end
 
 --- Rate-limited refresh. Skips if called within updateFrequency window.
----@return boolean refreshed True if Refresh() was called
-function ECMFrame:ThrottledRefresh()
+--- @param why string|nil Optional debug string for why the refresh was triggered.
+--- @return boolean refreshed True if Refresh() was called
+function ECMFrame:ThrottledRefresh(why)
     local config = self.GlobalConfig
     local freq = (config and config.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
     if GetTime() - (self._lastUpdate or 0) < freq then
         return false
     end
-    self:Refresh()
+    self:Refresh(why)
     self._lastUpdate = GetTime()
     return true
 end
 
 --- Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
 --- This is the canonical way to request layout updates from event handlers or callbacks.
-function ECMFrame:ScheduleLayoutUpdate()
+function ECMFrame:ScheduleLayoutUpdate(why)
     self:ScheduleDebounced("_layoutPending", function()
-        self:UpdateLayout()
+        self:UpdateLayout(why)
     end)
 end
 
@@ -395,7 +353,6 @@ function ECMFrame.AddMixin(target, name)
     local configRoot = ECM.db and ECM.db.profile
     target.Name = name
     target._configKey = name:sub(1,1):lower() .. name:sub(2) -- camelCase-ish
-    target._layoutCache = {}
     target.IsHidden = false
     target.InnerFrame = target:CreateFrame()
     target.IsECMFrame = true
@@ -405,6 +362,6 @@ function ECMFrame.AddMixin(target, name)
     ECM.RegisterFrame(target)
 
     C_Timer.After(0, function()
-        target:UpdateLayout()
+        target:UpdateLayout("AddMixin")
     end)
 end

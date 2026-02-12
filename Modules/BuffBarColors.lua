@@ -96,6 +96,11 @@ local function remove(cfg, key)
     return exists
 end
 
+---------------------------------------------------------------------------
+-- Public interface
+---------------------------------------------------------------------------
+
+
 function BuffBarColors.GetColor(spellName, textureFileID)
     local cfg = config()
     local key = compute_key(spellName, textureFileID)
@@ -106,19 +111,24 @@ function BuffBarColors.GetColor(spellName, textureFileID)
 end
 
 
+function BuffBarColors.GetColorForBar(frame)
+    ECM_debug_assert(frame, "Expected bar frame")
 
----------------------------------------------------------------------------
--- Public interface
----------------------------------------------------------------------------
-
-function BuffBarColors.GetColorForBar(bar)
-    ECM_debug_assert(bar, "Expected bar frame")
-    ECM_debug_assert(bar.Name and bar.Name.GetText, "Expected bar.Name with GetText method")
-    ECM_debug_assert(bar.Icon and bar.Icon.GetRegions, "Expected bar.Icon frame with GetRegions method. " .. (bar:GetName() or "nil") .. " " .. (bar.Name and bar.Name:GetText() or "nil"))
-    local spellName = bar and bar.Name and bar.Name.GetText and bar.Name:GetText() or nil
-    local iconFrame = bar and bar.Icon
-    local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
-    local textureFileID = iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
+    if not (frame and frame.__ecmBuffBarFrame) then
+        ECM_log(C.SYS.Styling, "BuffBarColors", "GetColorForBar - invalid bar frame", {
+            frame = frame,
+            nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
+            iconExists = frame and type(frame.Icon) == "table" and type(frame.Icon.GetRegions) == "function",
+        })
+        return nil
+    end
+    -- ECM_debug_assert(frame.Name and frame.Name.GetText, "Expected frame.Name with GetText method", frame)
+    -- ECM_debug_assert(bar.Icon and bar.Icon.GetRegions, "Expected bar.Icon frame with GetRegions method. " .. (bar:GetName() or "nil") .. " " .. (bar.Name and bar.Name:GetText() or "nil"), bar)
+    local spellName = frame and frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
+    local iconFrame = frame and frame.Icon
+    -- local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
+    -- local textureFileID = iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
+    local textureFileID = frame:GetTextureFileID() or nil
     ECM_debug_assert(not textureFileID or not issecretvalue(textureFileID), "Texture file ID is a secret value, cannot use as color key")
     return BuffBarColors.GetColor(spellName, textureFileID)
 end

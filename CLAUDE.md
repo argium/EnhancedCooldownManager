@@ -11,7 +11,7 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
 - Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
 - Modules should call methods in the immediate parent's mixin, if present. For example, `PowerBar:Refresh` must call `BarFrame.Refresh(self)` and never `ECMFrame.Refresh(self)`
 - Any and all layout updates MUST be triggered from a call to `UpdateLayout()`. No cheeky workarounds, no funny business. MUST. Any change that modifies the layout outside of this function will be rejected.
-- Any and all value-related updates should be triggered from a call to `Refresh()`.
+- Any and all value-related updates should be triggered from a call to `Refresh(why)`.
 - Use WoW's built-in `strtrim(...)` for string trimming. Do not use `:trim()` or custom trim helpers.
 
 # Secret Values

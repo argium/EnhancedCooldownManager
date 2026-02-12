@@ -6,7 +6,7 @@ local constants = {
     ADDON_ABRV = "ECM",
 
     TRACE_LOG_MAX = 200,
-    DEBUG_COLOR = "C6654D",
+    DEBUG_COLOR = "F17934",
 
     -- Internal module names
     POWERBAR = "PowerBar",

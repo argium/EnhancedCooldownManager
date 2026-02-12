@@ -72,8 +72,8 @@ function PowerBar:GetStatusBarValues()
     return current, max, current, false
 end
 
-function PowerBar:Refresh(force)
-    local result = BarFrame.Refresh(self, force)
+function PowerBar:Refresh(why, force)
+    local result = BarFrame.Refresh(self, why, force)
     if not result then
         return false
     end
@@ -84,7 +84,7 @@ function PowerBar:Refresh(force)
     local max = UnitPowerMax("player", resource)
     self:UpdateTicks(frame, resource, max)
 
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -119,7 +119,7 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
         return
     end
 
-    self:ThrottledRefresh()
+    self:ThrottledRefresh("OnUnitPowerUpdate")
 end
 
 --------------------------------------------------------------------------------
