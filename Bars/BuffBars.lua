@@ -47,25 +47,6 @@ local function hook_child_frame(child, module)
         return
     end
 
-    local bar = child.Bar
-    if bar and bar.BarBG and not bar.__ecmBgHooked then
-        bar.__ecmBgHooked = true
-
-        bar:HookScript("OnSizeChanged", function(self)
-            if self.BarBG then
-                self.BarBG:ClearAllPoints()
-                self.BarBG:SetAllPoints(self)
-            end
-        end)
-
-        hooksecurefunc(bar, "SetPoint", function(self)
-            if self.BarBG then
-                self.BarBG:ClearAllPoints()
-                self.BarBG:SetAllPoints(self)
-            end
-        end)
-    end
-
     -- Hook SetPoint to detect when Blizzard re-anchors this child
     hooksecurefunc(child, "SetPoint", function()
         -- module:ScheduleLayoutUpdate("SetPoint")
@@ -97,7 +78,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
 
     local bar = frame.Bar
     local iconFrame = frame.Icon
-    local barBG = bar.BarBG
+    local barBG = FrameHelpers.GetBarBackground(bar)
     -- DevTool:AddData(frame)
     -- DevTool:AddData(iconFrame.Applications)
 
@@ -133,12 +114,15 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     -- Bar background (BarBG texture)
     --------------------------------------------------------------------------
-    local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
-    barBG:SetTexture(C.FALLBACK_TEXTURE)
-    FrameHelpers.LazySetVertexColor(frame, barBG, "barBgColor", bgColor)
-    barBG:ClearAllPoints()
-    barBG:SetAllPoints(bar)
-    barBG:SetDrawLayer("BACKGROUND", 0)
+    if barBG then
+        local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
+        barBG:SetTexture(C.FALLBACK_TEXTURE)
+        barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
+        barBG:ClearAllPoints()
+        barBG:SetPoint("TOPLEFT", frame, "TOPLEFT")
+        barBG:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT")
+        barBG:SetDrawLayer("BACKGROUND", 0)
+    end
 
     --------------------------------------------------------------------------
     -- StatusBar texture & color
@@ -390,6 +374,9 @@ function BuffBars:ResetStyledMarkers()
         return
     end
 
+    -- Clear lazy state on the viewer itself so chain anchoring is re-applied
+    FrameHelpers.LazyResetState(viewer)
+
     -- Clear lazy state on all children to force full re-style
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
@@ -471,6 +458,11 @@ function BuffBars:OnUnitAura(_, unit)
     end
 end
 
+--- Invalidates lazy state so the next layout pass re-applies chain anchoring.
+function BuffBars:OnZoneChanged()
+    self:ResetStyledMarkers()
+end
+
 function BuffBars:OnEnable()
     if not self.IsECMFrame then
         ECMFrame.AddMixin(self, "BuffBars")
@@ -479,6 +471,10 @@ function BuffBars:OnEnable()
     end
 
     self:RegisterEvent("UNIT_AURA", "OnUnitAura")
+    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
+    self:RegisterEvent("ZONE_CHANGED", "OnZoneChanged")
+    self:RegisterEvent("ZONE_CHANGED_INDOORS", "OnZoneChanged")
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnZoneChanged")
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()

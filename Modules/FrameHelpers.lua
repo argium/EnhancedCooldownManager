@@ -68,6 +68,33 @@ function FrameHelpers.GetIconTextureFileID(frame)
     return iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
 end
 
+--- Discovers the bar background texture by scanning regions for the known atlas.
+--- Caches result on statusBar.__ecmBarBG for subsequent calls.
+---@param statusBar any
+---@return any barBG The background texture region, or nil
+function FrameHelpers.GetBarBackground(statusBar)
+    if not statusBar or not statusBar.GetRegions then
+        return nil
+    end
+
+    local cached = statusBar.__ecmBarBG
+    if cached and cached.IsObjectType and cached:IsObjectType("Texture") then
+        return cached
+    end
+
+    for _, region in ipairs({ statusBar:GetRegions() }) do
+        if region and region.IsObjectType and region:IsObjectType("Texture") then
+            local atlas = region.GetAtlas and region:GetAtlas()
+            if atlas == "UI-HUD-CoolDownManager-Bar-BG" or atlas == "UI-HUD-CooldownManager-Bar-BG" then
+                statusBar.__ecmBarBG = region
+                return region
+            end
+        end
+    end
+
+    return nil
+end
+
 --------------------------------------------------------------------------------
 -- Lazy Setters — change-detection-aware frame property setters
 --------------------------------------------------------------------------------
