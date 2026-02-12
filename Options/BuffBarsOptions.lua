@@ -244,8 +244,16 @@ function BuffBarsOptions.GetOptionsTable()
                         get = function() return db.profile.buffBars.enabled end,
                         set = function(_, val)
                             db.profile.buffBars.enabled = val
-                            OH.SetModuleEnabled("BuffBars", val)
-                            ECM.ScheduleLayoutUpdate(0)
+                            if val then
+                                OH.SetModuleEnabled("BuffBars", true)
+                                ECM.ScheduleLayoutUpdate(0)
+                            else
+                                ECM:ConfirmReloadUI(
+                                    "Disabling aura bars requires a UI reload. Reload now?",
+                                    nil,
+                                    function() db.profile.buffBars.enabled = true end
+                                )
+                            end
                         end,
                     },
                     showIcon = {

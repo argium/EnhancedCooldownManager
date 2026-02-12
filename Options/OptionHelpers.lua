@@ -51,18 +51,26 @@ local function IsAnchorModeFree(cfg)
 end
 
 local function SetModuleEnabled(moduleName, enabled)
-    local module = ECM:GetModule(moduleName, true)
+    local module = ECM[moduleName]
     if not module then
         return
     end
 
     if enabled then
         if not module:IsEnabled() then
-            ECM:EnableModule(moduleName)
+            if module.Enable then
+                module:Enable()
+            else
+                ECM:EnableModule(moduleName)
+            end
         end
     else
         if module:IsEnabled() then
-            ECM:DisableModule(moduleName)
+            if module.Disable then
+                module:Disable()
+            elseif ECM.DisableModule then
+                ECM:DisableModule(moduleName)
+            end
         end
     end
 end

@@ -59,7 +59,7 @@ function ECMFrame:GetNextChainAnchor(frameName)
     local debugCandidates = {}
     for i = stopIndex - 1, 1, -1 do
         local barName = C.CHAIN_ORDER[i]
-        local barModule = ECM:GetModule(barName, true)
+        local barModule = ECM[barName]
         local isEnabled = barModule and barModule:IsEnabled() or false
         local shouldShow = barModule and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule.ModuleConfig
@@ -180,6 +180,15 @@ function ECMFrame:ApplyFramePosition(frame)
     if not self:ShouldShow() then
         frame:Hide()
         return nil
+    end
+
+    -- Ensure the frame is visible. ApplyFramePosition hides the frame when
+    -- ShouldShow() returns false, so we must re-show it here. This cannot
+    -- be deferred to Refresh() because ThrottledRefresh may suppress the
+    -- call, leaving the frame hidden after a quick hide→show transition
+    -- (e.g. rapid mount/dismount).
+    if not frame:IsShown() then
+        frame:Show()
     end
 
     local params = self:CalculateLayoutParams()

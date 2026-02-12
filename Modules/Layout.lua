@@ -281,6 +281,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
         UpdateFadeAndHiddenStates()
         UpdateAllLayouts()
     end
+
 end)
 
 --------------------------------------------------------------------------------

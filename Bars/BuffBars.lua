@@ -10,7 +10,7 @@ local C = ns.Constants
 local ECMFrame = ns.Mixins.ECMFrame
 local BBC = ns.BuffBarColors
 
-local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
+local BuffBars = {}
 ECM.BuffBars = BuffBars
 
 ---@class ECM_BuffBarFrame : Frame
@@ -47,9 +47,13 @@ local function hook_child_frame(child, module)
         return
     end
 
-    -- Hook SetPoint to detect when Blizzard re-anchors this child
+    -- Hook SetPoint to detect when Blizzard re-anchors this child.
+    -- When triggered outside our own layout pass, invalidate the lazy
+    -- anchor cache so the next layout re-applies the correct anchors.
     hooksecurefunc(child, "SetPoint", function()
-        -- module:ScheduleLayoutUpdate("SetPoint")
+        if module._layoutRunning then return end
+        FrameHelpers.LazyResetState(child)
+        module:ScheduleLayoutUpdate("SetPoint")
     end)
 
     -- Hook OnShow to ensure newly shown bars get positioned
@@ -115,12 +119,23 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     -- Bar background (BarBG texture)
     --------------------------------------------------------------------------
     if barBG then
+        -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
+        -- so Blizzard cannot override our anchors. SetAllPoints does not fire
+        -- SetPoint hooks, so no re-entrancy guard is needed.
+        if not barBG.__ecmBGHooked then
+            barBG.__ecmBGHooked = true
+            barBG:SetParent(frame)
+            hooksecurefunc(barBG, "SetPoint", function()
+                barBG:ClearAllPoints()
+                barBG:SetAllPoints(frame)
+            end)
+        end
+
         local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
         barBG:SetTexture(C.FALLBACK_TEXTURE)
         barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
         barBG:ClearAllPoints()
-        barBG:SetPoint("TOPLEFT", frame, "TOPLEFT")
-        barBG:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT")
+        barBG:SetAllPoints(frame)
         barBG:SetDrawLayer("BACKGROUND", 0)
     end
 
@@ -247,8 +262,6 @@ local function layout_bars(self)
         return
     end
 
-    self._layoutRunning = true
-
     local children = get_children_ordered(viewer)
     local prev
 
@@ -271,8 +284,6 @@ local function layout_bars(self)
     end
 
     ECM_log(C.SYS.Layout, C.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
-
-    self._layoutRunning = nil
 end
 
 --------------------------------------------------------------------------------
@@ -341,6 +352,10 @@ function BuffBars:UpdateLayout(why)
         end
     end
 
+    -- Guard against child SetPoint hooks scheduling redundant layout updates
+    -- while we are actively styling and positioning bars.
+    self._layoutRunning = true
+
     -- Style all visible children (lazy setters make redundant calls no-ops)
     local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
@@ -349,6 +364,8 @@ function BuffBars:UpdateLayout(why)
     end
 
     layout_bars(self)
+
+    self._layoutRunning = nil
     viewer:Show()
     ECM_log(C.SYS.Layout, C.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
@@ -362,10 +379,6 @@ function BuffBars:UpdateLayout(why)
     })
     return true
 end
-
---------------------------------------------------------------------------------
--- Helper Methods
---------------------------------------------------------------------------------
 
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
@@ -458,38 +471,44 @@ function BuffBars:OnUnitAura(_, unit)
     end
 end
 
---- Invalidates lazy state so the next layout pass re-applies chain anchoring.
 function BuffBars:OnZoneChanged()
+    --- Invalidates lazy state so the next layout pass re-applies chain anchoring.
     self:ResetStyledMarkers()
+    self:ScheduleLayoutUpdate("OnZoneChanged")
 end
 
-function BuffBars:OnEnable()
+
+local _eventFrame = CreateFrame("Frame")
+function BuffBars:Enable()
+    if self._enabled then return end
+    self._enabled = true
+
     if not self.IsECMFrame then
         ECMFrame.AddMixin(self, "BuffBars")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
 
-    self:RegisterEvent("UNIT_AURA", "OnUnitAura")
-    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
-    self:RegisterEvent("ZONE_CHANGED", "OnZoneChanged")
-    self:RegisterEvent("ZONE_CHANGED_INDOORS", "OnZoneChanged")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnZoneChanged")
+    _eventFrame:RegisterEvent("UNIT_AURA")
+    _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    _eventFrame:RegisterEvent("ZONE_CHANGED")
+    _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
+    _eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()
-        self:ScheduleLayoutUpdate("OnEnable")
+        self:ScheduleLayoutUpdate("Enable")
     end)
 
-    ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")
+    ECM_log(C.SYS.Core, self.Name, "Enable - module enabled")
 end
 
-function BuffBars:OnDisable()
-    self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
+_eventFrame:SetScript("OnEvent", function(_, event, ...)
+    if event == "UNIT_AURA" then
+        BuffBars:OnUnitAura(event, ...)
+    else
+        BuffBars:OnZoneChanged()
     end
-    ECM_log(C.SYS.Core, self.Name, "OnDisable - module disabled")
-end
+end)

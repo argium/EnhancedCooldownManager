@@ -330,17 +330,20 @@ function ECM:OnEnable()
     }
 
     for _, moduleName in ipairs(moduleOrder) do
-        local module = self:GetModule(moduleName, true)
+        local module = self[moduleName]
         assert(module, "Module not found: " .. moduleName)
 
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
         if shouldEnable then
-            if not module:IsEnabled() then
+            -- Call the correct methods for Ace modules.
+            if module.Enable then
+                module:Enable()
+            else
                 self:EnableModule(moduleName)
             end
-        elseif module:IsEnabled() then
+        else
             self:DisableModule(moduleName)
         end
     end
