@@ -342,28 +342,9 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)
-    local parts = {}
-    for i = 1, select("#", ...) do
-        parts[i] = tostring(select(i, ...))
-    end
-
-    local message = table.concat(parts, " ")
-    local prefixText = "Enhanced Cooldown Manager:"
-    local sparkle = ns.SparkleUtil
-    local coloredPrefix = (sparkle and sparkle.GetText)
-        and sparkle.GetText(
-            prefixText,
-            { r = 0.25, g = 0.82, b = 1.00, a = 1 },
-            { r = 0.62, g = 0.45, b = 1.00, a = 1 },
-            { r = 0.13, g = 0.77, b = 0.37, a = 1 }
-        )
-        or prefixText
-
-    if message ~= "" then
-        print(coloredPrefix .. " " .. message)
-    else
-        print(coloredPrefix)
-    end
+    local prefix = ECM_sparkle(C.ADDON_NAME .. ":")
+    local message = table.concat({...}, " ")
+    print(prefix .. " " .. message)
 end
 
 

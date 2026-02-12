@@ -33,20 +33,8 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field ScheduleDebounced fun(self: ECMFrame, flagName: string, callback: function) Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
 ---@field ThrottledRefresh fun(self: ECMFrame, why: string|nil): boolean Rate-limited refresh. Skips if called within updateFrequency window.
 ---@field UpdateLayout fun(self: ECMFrame, why: string|nil): boolean Updates the visual layout of the frame.
----@field AddMixin fun(target: table, name: string) Adds ECMFrame methods and initializes state on target.
 ---@field ScheduleLayoutUpdate fun(self: ECMFrame, why: string|nil) Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
----@field LazySetHeight fun(self: ECMFrame, h: number): boolean Sets height only if changed.
----@field LazySetWidth fun(self: ECMFrame, w: number): boolean Sets width only if changed.
----@field LazySetShown fun(self: ECMFrame, shown: boolean): boolean Sets shown state only if changed.
----@field LazySetAlpha fun(self: ECMFrame, alpha: number): boolean Sets alpha only if changed.
----@field LazySetAnchors fun(self: ECMFrame, anchors: table[]): boolean Clears and re-applies anchor points only if changed.
----@field LazySetBackgroundColor fun(self: ECMFrame, color: ECM_Color): boolean Sets background color texture only if changed.
----@field LazySetVertexColor fun(self: ECMFrame, texture: Texture, cacheKey: string, color: ECM_Color): boolean Sets vertex color on a texture only if changed.
----@field LazySetStatusBarTexture fun(self: ECMFrame, bar: StatusBar, texturePath: string): boolean Sets status bar texture only if changed.
----@field LazySetStatusBarColor fun(self: ECMFrame, bar: StatusBar, r: number, g: number, b: number, a: number|nil): boolean Sets status bar color only if changed.
----@field LazySetBorder fun(self: ECMFrame, borderConfig: table): boolean Applies border configuration only if changed.
----@field LazySetText fun(self: ECMFrame, fontString: FontString, cacheKey: string, text: string|nil): boolean Sets text on a FontString only if changed.
----@field ResetLazyMarkers fun(self: ECM_BuffBarFrame): nil Resets all lazy setter state to force re-application on next update.
+---@field AddMixin fun(target: table, name: string) Adds ECMFrame methods and initializes state on target.
 
 --- Determine the correct anchor for this specific frame in the fixed order.
 --- @param frameName string|nil The name of the current frame, or nil if first in chain.
@@ -180,8 +168,6 @@ function ECMFrame:CreateFrame()
     frame.Border:SetFrameLevel(frame:GetFrameLevel() + 3)
     frame.Border:Hide()
 
-    ECM_ApplyLazySetters(frame)
-
     return frame
 end
 
@@ -216,7 +202,7 @@ function ECMFrame:ApplyFramePosition(frame)
         }
     end
 
-    frame:LazySetAnchors(anchors)
+    Lazy.SetAnchors(frame, anchors)
 
     return params
 end
@@ -239,19 +225,19 @@ function ECMFrame:UpdateLayout(why)
     local height = params.height
 
     -- Apply dimensions via lazy setters (no-ops when unchanged)
-    local heightChanged = height and frame:LazySetHeight(height) or false
-    local widthChanged = width and frame:LazySetWidth(width) or false
+    local heightChanged = height and Lazy.SetHeight(frame, height) or false
+    local widthChanged = width and Lazy.SetWidth(frame, width) or false
 
     -- Apply border via lazy setter
     local borderChanged = false
     if borderConfig then
-        borderChanged = frame:LazySetBorder(borderConfig)
+        borderChanged = Lazy.SetBorder(frame, borderConfig)
     end
 
     -- Apply background color via lazy setter
     ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
-    local bgColorChanged = frame:LazySetBackgroundColor(bgColor)
+    local bgColorChanged = Lazy.SetBackgroundColor(frame, bgColor)
 
     ECM_log(C.SYS.Layout, self.Name, "ECMFrame UpdateLayout complete (" .. (why or "") .. ")", {
         anchor = anchor:GetName(),

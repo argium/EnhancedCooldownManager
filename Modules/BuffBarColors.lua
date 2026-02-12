@@ -81,18 +81,18 @@ end
 
 local function get(cfg, key)
     local spec_colors = get_table_for_spec(cfg)
-    return spec_colors.perSpell[key] or nil
+    return spec_colors[key] or nil
 end
 
 local function set(cfg, key, value)
     local spec_colors = get_table_for_spec(cfg)
-    spec_colors.perSpell[key] = value
+    spec_colors[key] = value
 end
 
 local function remove(cfg, key)
     local spec_colors = get_table_for_spec(cfg)
-    local exists = spec_colors.perSpell[key] ~= nil
-    spec_colors.perSpell[key] = nil
+    local exists = spec_colors[key] ~= nil
+    spec_colors[key] = nil
     return exists
 end
 
@@ -114,7 +114,7 @@ end
 function BuffBarColors.GetColorForBar(frame)
     ECM_debug_assert(frame, "Expected bar frame")
 
-    if not (frame and frame.__ecmBuffBarFrame) then
+    if not (frame and frame.__ecmHooked) then
         ECM_log(C.SYS.Styling, "BuffBarColors", "GetColorForBar - invalid bar frame", {
             frame = frame,
             nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
@@ -127,8 +127,8 @@ function BuffBarColors.GetColorForBar(frame)
     local spellName = frame and frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
     local iconFrame = frame and frame.Icon
     -- local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
-    -- local textureFileID = iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
-    local textureFileID = frame:GetTextureFileID() or nil
+    -- local textureFileID = iconTexture and iconTexture.GetIconTextureFileID and iconTexture:GetIconTextureFileID() or nil
+    local textureFileID = frame:GetIconTextureFileID() or nil
     ECM_debug_assert(not textureFileID or not issecretvalue(textureFileID), "Texture file ID is a secret value, cannot use as color key")
     return BuffBarColors.GetColor(spellName, textureFileID)
 end

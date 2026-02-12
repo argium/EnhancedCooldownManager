@@ -4,7 +4,7 @@
 
 local _, ns = ...
 
-local ECM = ns.Addon
+ECM = ns.Addon
 local C = ns.Constants
 
 local ECMFrame = ns.Mixins.ECMFrame
@@ -14,7 +14,7 @@ local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
 ECM.BuffBars = BuffBars
 
 ---@class ECM_BuffBarFrame : Frame
----@field __ecmBuffBarFrame boolean
+---@field __ecmHooked boolean
 ---@field Bar StatusBar
 ---@field DebuffBorder any
 ---@field Icon Frame
@@ -42,21 +42,23 @@ local function get_children_ordered(viewer)
     return result
 end
 
+local function TryGetRegion(frame, index, type)
+    if not frame or not frame.GetRegions then
+        return nil
+    end
+
+    local region = select(index, frame:GetRegions())
+    if region and region.IsObjectType and region:IsObjectType(type) then
+        return region
+    end
+
+    return nil
+end
+
 local function hook_child_frame(child, module)
-    if child.__ecmBuffBarFrame then
+    if child.__ecmHooked then
         return
     end
-    child.__ecmBuffBarFrame = true
-
-    -- Stamp lazy setters on the child frame and its Bar sub-frame
-    ECM_ApplyLazySetters(child)
-    ECM_ApplyLazySetters(child.Bar)
-    ECM_ApplyLazySetters(child.Bar.Name)
-    ECM_ApplyLazySetters(child.Bar.Duration)
-    ECM_ApplyLazySetters(child.Bar.Pip)
-    ECM_ApplyLazySetters(child.DebuffBorder)
-    ECM_ApplyLazySetters(child.Icon)
-    ECM_ApplyLazySetters(child.Icon.Applications)
 
     -- Hook SetPoint to detect when Blizzard re-anchors this child
     hooksecurefunc(child, "SetPoint", function()
@@ -76,14 +78,20 @@ local function hook_child_frame(child, module)
         return self.Bar.Name and self.Bar.Name:GetText() or nil
     end
 
-    child.GetTextureFileID = function(self)
-        local iconTexture = self.Icon and self.Icon.GetTexture and self.Icon:GetTexture()
-        if iconTexture and iconTexture.GetTexture then
-            return iconTexture:GetTexture()
-        end
-        return nil
+    child.GetIconOverlay = function(self)
+        return TryGetRegion(self.Icon, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
     end
 
+    child.GetIconTexture = function(self)
+        return TryGetRegion(self.Icon, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+    end
+
+    child.GetIconTextureFileID = function(self)
+        local iconTexture = self:GetIconTexture()
+        return iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
+    end
+
+    child.__ecmHooked = true
 end
 
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
@@ -93,8 +101,8 @@ end
 ---@param globalConfig table Global config
 ---@param barIndex number Index of the bar (for logging)
 local function style_child_frame(frame, config, globalConfig, barIndex)
-    if not (frame and frame.__ecmBuffBarFrame) then
-        ECM_debug_assert(false, "Attempted to style a child frame that is not a BuffBarFrame", { frame = frame })
+    if not (frame and frame.__ecmHooked) then
+        ECM_debug_assert(false, "Attempted to style a child frame that has not been hooked", { frame = frame })
         return
     end
 
@@ -119,11 +127,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
     if height > 0 then
-        frame:LazySetHeight(height)
-        bar:LazySetHeight(height)
+        Lazy.SetHeight(frame, height)
+        Lazy.SetHeight(bar, height)
         if iconFrame then
-            iconFrame:LazySetHeight(height)
-            iconFrame:LazySetWidth(height)
+            Lazy.SetHeight(iconFrame, height)
+            Lazy.SetWidth(iconFrame, height)
         end
     end
 
@@ -138,7 +146,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
     barBG:SetTexture(C.FALLBACK_TEXTURE)
-    frame:LazySetVertexColor(barBG, "barBgColor", bgColor)
+    Lazy.SetVertexColor(frame, barBG, "barBgColor", bgColor)
     barBG:ClearAllPoints()
     barBG:SetPoint("TOPLEFT", frame, "TOPLEFT")
     barBG:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT")
@@ -149,11 +157,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     local textureName = globalConfig and globalConfig.texture
     local texture = ECM_GetTexture(textureName)
-    bar:LazySetStatusBarTexture(bar, texture)
+    Lazy.SetStatusBarTexture(bar, bar, texture)
 
     local barColor = BBC.GetColorForBar(frame)
     if barColor then
-        bar:LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
+        Lazy.SetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
 
     --------------------------------------------------------------------------
@@ -166,7 +174,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     -- Icon anchor
     --------------------------------------------------------------------------
     if iconFrame then
-        iconFrame:LazySetAnchors({
+        Lazy.SetAnchors(iconFrame, {
             { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
         })
     end
@@ -176,32 +184,28 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     local showIcon = config and config.showIcon ~= false
     if iconFrame then
-        iconFrame:LazySetShown(showIcon)
-        local iconTexture = frame:GetTextureFileID()
-        if iconTexture and iconTexture.SetShown then
-            iconTexture:SetShown(showIcon)
-        end
-        local iconOverlay = select(C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, iconFrame:GetRegions())
-        if iconOverlay and iconOverlay.SetShown then
-            iconOverlay:SetShown(showIcon)
-        end
+        local iconTexture = frame:GetIconTexture()
+        local iconOverlay = frame:GetIconOverlay()
+        iconFrame:SetShown(showIcon)
+        iconTexture:SetShown(showIcon)
+        iconOverlay:SetShown(showIcon)
     end
 
     local iconAlpha = showIcon and 1 or 0
     if frame.DebuffBorder then
-        frame.DebuffBorder:LazySetAlpha(iconAlpha)
+        Lazy.SetAlpha(frame.DebuffBorder, iconAlpha)
     end
     if iconFrame.Applications then
-        iconFrame.Applications:LazySetAlpha(iconAlpha)
+        Lazy.SetAlpha(iconFrame.Applications, iconAlpha)
     end
 
     local showSpellName = config and config.showSpellName ~= false
     local showDuration = config and config.showDuration ~= false
     if bar.Name then
-        bar.Name:LazySetShown(showSpellName)
+        bar.Name:SetShown(showSpellName)
     end
     if bar.Duration then
-        bar.Duration:LazySetShown(showDuration)
+        bar.Duration:SetShown(showDuration)
     end
 
     --------------------------------------------------------------------------
@@ -209,12 +213,12 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     local iconVisible = iconFrame and iconFrame:IsShown()
     if iconVisible then
-        bar:LazySetAnchors({
+        Lazy.SetAnchors(bar, {
             { "TOPLEFT", iconFrame, "TOPRIGHT", 0, 0 },
             { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
         })
     else
-        bar:LazySetAnchors({
+        Lazy.SetAnchors(bar, {
             { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
             { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
         })
@@ -223,13 +227,13 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     --------------------------------------------------------------------------
     -- Name
     --------------------------------------------------------------------------
-    bar.Name:LazySetAnchors({
+    Lazy.SetAnchors(bar.Name, {
         { "LEFT", bar, "LEFT", C.BUFFBARS_TEXT_PADDING, 0 },
         { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
     })
 
     if bar.Duration then
-        bar.Duration:LazySetAnchors({
+        Lazy.SetAnchors(bar.Duration, {
             { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
         })
     end
@@ -280,12 +284,12 @@ local function layout_bars(self)
         local child = entry.frame
         if child:IsShown() then
             if not prev then
-                child:LazySetAnchors({
+                Lazy.SetAnchors(child, {
                     { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
                     { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
                 })
             else
-                child:LazySetAnchors({
+                Lazy.SetAnchors(child, {
                     { "TOPLEFT", prev, "BOTTOMLEFT", 0, 0 },
                     { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0 },
                 })
@@ -353,7 +357,7 @@ function BuffBars:UpdateLayout(why)
     -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
     local params = self:CalculateLayoutParams()
     if params.mode == C.ANCHORMODE_CHAIN then
-        viewer:LazySetAnchors({
+        Lazy.SetAnchors(viewer, {
             { "TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY },
             { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
         })
@@ -361,7 +365,7 @@ function BuffBars:UpdateLayout(why)
         local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
-            viewer:LazySetWidth(width)
+            Lazy.SetWidth(viewer, width)
         end
     end
 
@@ -401,9 +405,9 @@ function BuffBars:ResetStyledMarkers()
     -- Clear lazy state on all children to force full re-style
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
-        child:ResetLazyMarkers()
+        Lazy.ResetState(child)
         if child.Bar then
-            child.Bar:ResetLazyMarkers()
+            Lazy.ResetState(child.Bar)
         end
     end
 
@@ -420,8 +424,6 @@ function BuffBars:HookViewer()
         return
     end
     self._viewerHooked = true
-
-    ECM_ApplyLazySetters(viewer)
 
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
