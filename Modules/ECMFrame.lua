@@ -10,11 +10,6 @@ local ECMFrame = {}
 ns.Mixins = ns.Mixins or {}
 ns.Mixins.ECMFrame = ECMFrame
 
--- Owns:
---  The inner frame
---  Layout incl. border.
---  Config access
-
 ---@alias AnchorPoint string
 
 ---@class ECMFrame : AceModule Frame mixin that owns layout and config access.
@@ -40,7 +35,6 @@ ns.Mixins.ECMFrame = ECMFrame
 ---@field UpdateLayout fun(self: ECMFrame, why: string|nil): boolean Updates the visual layout of the frame.
 ---@field AddMixin fun(target: table, name: string) Adds ECMFrame methods and initializes state on target.
 ---@field ScheduleLayoutUpdate fun(self: ECMFrame, why: string|nil) Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
---- Lazy setter methods stamped by ECM_ApplyLazySetters (via CreateFrame). Change-detection-aware; only call underlying WoW API when value differs.
 ---@field LazySetHeight fun(self: ECMFrame, h: number): boolean Sets height only if changed.
 ---@field LazySetWidth fun(self: ECMFrame, w: number): boolean Sets width only if changed.
 ---@field LazySetShown fun(self: ECMFrame, shown: boolean): boolean Sets shown state only if changed.

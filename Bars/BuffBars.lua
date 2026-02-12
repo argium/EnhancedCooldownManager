@@ -475,19 +475,11 @@ function BuffBars:HookEditMode()
     ECM_log(C.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
 end
 
---------------------------------------------------------------------------------
--- Event Handlers
---------------------------------------------------------------------------------
-
 function BuffBars:OnUnitAura(_, unit)
     if unit == "player" then
         self:ScheduleLayoutUpdate("OnUnitAura")
     end
 end
-
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
 
 function BuffBars:OnEnable()
     if not self.IsECMFrame then
@@ -496,7 +488,6 @@ function BuffBars:OnEnable()
         ECM.RegisterFrame(self)
     end
 
-    -- Register events with dedicated handlers
     self:RegisterEvent("UNIT_AURA", "OnUnitAura")
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
