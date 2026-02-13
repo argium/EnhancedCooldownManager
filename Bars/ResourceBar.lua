@@ -155,6 +155,14 @@ function ResourceBar:Refresh(why, force)
 end
 
 --------------------------------------------------------------------------------
+-- Event Handling
+--------------------------------------------------------------------------------
+
+function ResourceBar:OnEventUpdate(event, ...)
+    self:ThrottledUpdateLayout(event or "OnEventUpdate")
+end
+
+--------------------------------------------------------------------------------
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
@@ -165,8 +173,9 @@ function ResourceBar:OnEnable()
         ECM.RegisterFrame(self)
     end
 
-    self:RegisterEvent("UNIT_AURA", "ThrottledRefresh")
-    self:RegisterEvent("UNIT_POWER_FREQUENT", "ThrottledRefresh")
+    self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
+    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnEventUpdate")
+end
 end
 
 function ResourceBar:OnDisable()

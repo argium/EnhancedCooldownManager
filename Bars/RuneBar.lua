@@ -176,7 +176,7 @@ function RuneBar:CreateFrame()
 
     -- Attach OnUpdate script for continuous rune updates
     frame:SetScript("OnUpdate", function()
-        self:ThrottledRefresh("FrameOnUpdate")
+        self:ThrottledUpdateLayout("FrameOnUpdate")
     end)
 
     ECM_log(C.SYS.Layout, self.Name, "Frame created.")
@@ -229,9 +229,9 @@ function RuneBar:Refresh(why, force)
     return true
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
+function RuneBar:OnRunePowerUpdate()
+    self:ThrottledUpdateLayout("OnRunePowerUpdate")
+end
 
 function RuneBar:OnEnable()
     local _, class = UnitClass("player")
@@ -244,7 +244,7 @@ function RuneBar:OnEnable()
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
-    self:RegisterEvent("RUNE_POWER_UPDATE", function(...) self:ThrottledRefresh("RunePowerUpdate") end)
+    self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
 end
 
 function RuneBar:OnDisable()

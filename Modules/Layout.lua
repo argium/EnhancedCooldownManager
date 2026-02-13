@@ -153,31 +153,31 @@ local function UpdateFadeAndHiddenStates()
     SetAlpha(alpha)
 end
 
---- Calls UpdateLayout on all registered ModuleMixins.
-local function UpdateAllLayouts()
-    local updated = {}
+local _chainSet = {}
+for _, name in ipairs(C.CHAIN_ORDER) do _chainSet[name] = true end
 
+local function UpdateAllLayouts(reason)
     -- Chain frames must update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
         local module = _modules[moduleName]
         if module then
-            module:UpdateLayout("UpdateAllLayouts")
-            updated[moduleName] = true
+            module:ThrottledUpdateLayout(reason)
         end
     end
 
     -- Update all remaining frames (non-chain modules).
     for frameName, module in pairs(_modules) do
-        if not updated[frameName] then
-            module:UpdateLayout("UpdateAllLayouts")
+        if not _chainSet[frameName] then
+            module:ThrottledUpdateLayout(reason)
         end
     end
 end
 
 --- Schedules a layout update after a delay (debounced).
 --- @param delay number Delay in seconds
-local function ScheduleLayoutUpdate(delay)
+--- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
+local function ScheduleLayoutUpdate(delay, reason)
     if _layoutPending then
         return
     end
@@ -186,7 +186,7 @@ local function ScheduleLayoutUpdate(delay)
     C_Timer.After(delay or 0, function()
         _layoutPending = false
         UpdateFadeAndHiddenStates()
-        UpdateAllLayouts()
+        UpdateAllLayouts(reason)
     end)
 end
 
@@ -239,7 +239,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
     -- Handle CVAR_UPDATE specially
     if event == "CVAR_UPDATE" then
         if arg1 == "cooldownViewerEnabled" then
-            ScheduleLayoutUpdate(0)
+            ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
         end
         return
     end
@@ -254,15 +254,14 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
         _inCombat = (event == "PLAYER_REGEN_DISABLED")
     end
 
-    -- Schedule update with delay
     if config.delay and config.delay > 0 then
         C_Timer.After(config.delay, function()
             UpdateFadeAndHiddenStates()
-            UpdateAllLayouts()
+            UpdateAllLayouts(event)
         end)
     else
         UpdateFadeAndHiddenStates()
-        UpdateAllLayouts()
+        UpdateAllLayouts(event)
     end
 
 end)

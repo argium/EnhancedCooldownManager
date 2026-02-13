@@ -119,7 +119,7 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
         return
     end
 
-    self:ThrottledRefresh("OnUnitPowerUpdate")
+    self:ThrottledUpdateLayout(event or "OnUnitPowerUpdate")
 end
 
 --------------------------------------------------------------------------------

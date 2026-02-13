@@ -79,6 +79,8 @@ local constants = {
     SV_NAME = "EnhancedCooldownManagerDB",
     ACTIVE_SV_KEY = "_ECM_DB",
 
+    LIFECYCLE_SECOND_PASS_DELAY = 0.05,
+
     ME = "Solar"
 }
 

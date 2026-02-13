@@ -53,16 +53,16 @@ local function hook_child_frame(child, module)
     hooksecurefunc(child, "SetPoint", function()
         if module._layoutRunning then return end
         FrameUtil.LazyResetState(child)
-        module:ScheduleLayoutUpdate("SetPoint")
+        module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
 
     -- Hook OnShow to ensure newly shown bars get positioned
     child:HookScript("OnShow", function()
-        module:ScheduleLayoutUpdate("OnShow")
+        module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
 
     child:HookScript("OnHide", function()
-        module:ScheduleLayoutUpdate("OnHide")
+        module:ThrottledUpdateLayout("OnHide:child", { secondPass = true })
     end)
 
     child.__ecmHooked = true
@@ -326,6 +326,26 @@ function BuffBars:CreateFrame()
     return _G["BuffBarCooldownViewer"]
 end
 
+--- Override IsReady to require viewer existence and valid attach state.
+function BuffBars:IsReady()
+    if not ModuleMixin.IsReady(self) then
+        return false
+    end
+
+    local viewer = _G["BuffBarCooldownViewer"]
+    if not viewer then
+        return false
+    end
+
+    -- Check if the viewer is in a state where we can enumerate children
+    local canGetChildren = pcall(function() viewer:GetChildren() end)
+    if not canGetChildren then
+        return false
+    end
+
+    return true
+end
+
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
 function BuffBars:UpdateLayout(why)
     local viewer = self.InnerFrame
@@ -415,7 +435,7 @@ function BuffBars:HookViewer()
 
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
-        self:UpdateLayout("OnShow")
+        self:ThrottledUpdateLayout("viewer:OnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
@@ -423,7 +443,7 @@ function BuffBars:HookViewer()
         if self._layoutRunning then
             return
         end
-        self:ScheduleLayoutUpdate("OnSizeChanged")
+        self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
     end)
 
     -- Hook edit mode transitions
@@ -453,13 +473,13 @@ function BuffBars:HookEditMode()
         -- Edit mode exit is infrequent, so perform an immediate restyle pass.
         local viewer = _G["BuffBarCooldownViewer"]
         if viewer and viewer:IsShown() then
-            self:UpdateLayout("ExitEditMode")
+            self:ThrottledUpdateLayout("EditModeExit")
         end
     end)
 
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
         -- Re-apply style during edit mode so bars look correct while editing
-        self:ScheduleLayoutUpdate("EnterEditMode")
+        self:ThrottledUpdateLayout("EditModeEnter")
     end)
 
     ECM_log(C.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
@@ -467,14 +487,14 @@ end
 
 function BuffBars:OnUnitAura(_, unit)
     if unit == "player" then
-        self:ScheduleLayoutUpdate("OnUnitAura")
+        self:ThrottledUpdateLayout("OnUnitAura")
     end
 end
 
 function BuffBars:OnZoneChanged()
     --- Invalidates lazy state so the next layout pass re-applies chain anchoring.
     self:ResetStyledMarkers()
-    self:ScheduleLayoutUpdate("OnZoneChanged")
+    self:ThrottledUpdateLayout("OnZoneChanged")
 end
 
 
@@ -499,7 +519,7 @@ function BuffBars:Enable()
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()
-        self:ScheduleLayoutUpdate("Enable")
+        self:ThrottledUpdateLayout("ModuleInit")
     end)
 
     ECM_log(C.SYS.Core, self.Name, "Enable - module enabled")

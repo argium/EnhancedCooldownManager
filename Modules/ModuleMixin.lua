@@ -86,7 +86,7 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         end
     end
 
-    -- If none of the preceeding frames in the chain are valid, anchor to the viewer as the first.
+    -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
     ECM_log(C.SYS.Layout, self.Name, "GetNextChainAnchor fallthrough; treating as first anchor", {
         frameName = frameName,
         stopIndex = stopIndex,
@@ -160,15 +160,80 @@ function ModuleMixin:ThrottledRefresh(why)
     return FrameUtil.ThrottledRefresh(self, why)
 end
 
---- Schedules a throttled layout update. Multiple calls within updateFrequency coalesce into one.
---- This is the canonical way to request layout updates from event handlers or callbacks.
-function ModuleMixin:ScheduleLayoutUpdate(why)
-    FrameUtil.ScheduleLayoutUpdate(self, why)
+--- Checks if the module is ready for layout updates.
+--- Base implementation checks: module enabled, InnerFrame exists, config exists.
+--- @return boolean ready True if the module is ready for updates.
+function ModuleMixin:IsReady()
+    if not self:IsEnabled() then
+        return false
+    end
+    if not self.InnerFrame then
+        return false
+    end
+    if not self:GetGlobalConfig() then
+        return false
+    end
+    if not self:GetModuleConfig() then
+        return false
+    end
+    return true
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
+--- Internal: checks readiness and runs the coalesced layout update.
+local function update_layout_deferred(self)
+    if not self:IsReady() then
+        ECM_log(C.SYS.Core, self.Name, "Layout update skipped (not ready)")
+        self._updateLayoutPending = false
+        self._pendingWhy = nil
+        return
+    end
+
+    -- Clear pending state to allow re-entry.
+    local why = self._pendingWhy
+    self._updateLayoutPending = false
+    self._pendingWhy = nil
+
+    self:UpdateLayout(why)
+
+    -- Schedule second-pass if requested.
+    if self._secondPassPending then
+        self._secondPassPending = false
+        C_Timer.After(C.LIFECYCLE_SECOND_PASS_DELAY, function()
+            self:ThrottledUpdateLayout("SecondPass")
+        end)
+    end
+end
+
+--- Requests a layout update for this module.
+--- @param reason string Debug trace string identifying the caller.
+--- @param opts table|nil Optional parameters: { secondPass = boolean }
+function ModuleMixin:ThrottledUpdateLayout(reason, opts)
+    ECM_debug_assert(reason, "ScheduleLayoutUpdate: reason is required")
+
+    -- Bail immediately if the module is disabled (safe for plain-table modules
+    -- like BuffBars that lack IsEnabled).
+    if self.IsEnabled and not self:IsEnabled() then
+        return
+    end
+
+    -- Request second-pass if needed.
+    if opts and opts.secondPass then
+        self._secondPassPending = true
+    end
+
+    -- Keep the first reason that triggered this batch for tracing.
+    if not self._updateLayoutPending then
+        self._pendingWhy = reason
+    end
+
+    -- Queue exactly once if not already queued.
+    if not self._updateLayoutPending then
+        self._updateLayoutPending = true
+        C_Timer.After(0, function()
+            update_layout_deferred(self)
+        end)
+    end
+end
 
 function ModuleMixin.AddMixin(target, name)
     assert(target, "target required")
@@ -191,6 +256,6 @@ function ModuleMixin.AddMixin(target, name)
     ECM.RegisterFrame(target)
 
     C_Timer.After(0, function()
-        target:UpdateLayout("AddMixin")
+        target:ThrottledUpdateLayout("ModuleInit")
     end)
 end
