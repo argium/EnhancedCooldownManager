@@ -8,7 +8,7 @@ ECM = ns.Addon
 local C = ns.Constants
 
 local ModuleMixin = ns.Mixins.ModuleMixin
-local BBC = ns.BuffBarColors
+local SpellColors = ns.SpellColors
 
 local BuffBars = {}
 ECM.BuffBars = BuffBars
@@ -146,7 +146,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     local texture = ECM_GetTexture(textureName)
     FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
 
-    local barColor = BBC.GetColorForBar(frame)
+    local barColor = SpellColors.GetColorForBar(frame)
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end

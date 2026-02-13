@@ -88,7 +88,7 @@ local SYS = {
     Migration = "Migration",
     Layout = "Layout",
     Styling = "Styling",
-    BuffBarColors = "BuffBarColors",
+    SpellColors = "SpellColors",
 }
 
 local BLIZZARD_FRAMES = {

@@ -61,8 +61,9 @@ local C = ns.Constants
 ---@field spellName string|nil Spell name.
 ---@field lastSeen number Last seen timestamp.
 
----@class ECM_BuffBarColorsConfig Buff bar color configuration.
----@field perBar table<number, table<number, table<number, ECM_Color>>> Per-bar colors by class/spec/index.
+---@class ECM_SpellColorsConfig Spell color configuration.
+---@field byName table<number, table<number, table<string, table>>> Per-name colors by class/spec/spellName.
+---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
 ---@field defaultColor ECM_Color Default color for buff bars.
 
@@ -73,7 +74,7 @@ local C = ns.Constants
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
----@field colors ECM_BuffBarColorsConfig Per-bar color settings.
+---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
 ---@class ECM_ItemIconsConfig Item icons configuration.
 ---@field enabled boolean Whether item icons are enabled.
@@ -223,7 +224,8 @@ local defaults = {
             showSpellName = true,
             showDuration = true,
             colors = {
-                perSpell = {},
+                byName = {},
+                byTexture = {},
                 cache = {},
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
             },

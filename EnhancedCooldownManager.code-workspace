@@ -30,7 +30,11 @@
             "UtilityCooldownViewer",
             "RAID_CLASS_COLORS",
             "ColorPickerFrame",
-            "FrameUtil"
+            "FrameUtil",
+            "EditModeManagerFrame"
+        ],
+        "Lua.diagnostics.disable": [
+            "assign-type-mismatch"
         ],
 	}
 }

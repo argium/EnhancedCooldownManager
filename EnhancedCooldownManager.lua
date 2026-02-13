@@ -291,7 +291,6 @@ function ECM:OnInitialize()
     ns.Migration.PrepareDatabase()
 
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
-    -- ns.BuffBarColors.RegisterProfileCallbacks(self.db)
 
     local profile = self.db and self.db.profile
     ECM_log(C.SYS.Core, nil, "Initialize", {

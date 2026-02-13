@@ -5,7 +5,7 @@
 local _, ns = ...
 
 local ECM = ns.Addon
-local BuffBarColors = ns.BuffBarColors
+local SpellColors = ns.SpellColors
 local OH = ECM.OptionHelpers
 
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
@@ -44,7 +44,7 @@ local function GenerateSpellColorArgs()
         return args
     end
 
-    local spellSettings = BuffBarColors.GetPerSpellColors()
+    local spellSettings = SpellColors.GetPerSpellColors()
 
     if spellSettings then
 
@@ -86,10 +86,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10,
                 width = "double",
                 get = function()
-                    return BuffBarColors.GetSpellColor(colorKey, colorKey)
+                    return SpellColors.GetSpellColor(colorKey, colorKey)
                 end,
                 set = function(_, r, g, b)
-                    BuffBarColors.SetSpellColor(colorKey, colorKey, r, g, b)
+                    SpellColors.SetSpellColor(colorKey, colorKey, r, g, b)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -102,10 +102,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10 + 1,
                 width = 0.3,
                 hidden = function()
-                    return not BuffBarColors.HasCustomSpellColor(colorKey, colorKey)
+                    return not SpellColors.HasCustomSpellColor(colorKey, colorKey)
                 end,
                 func = function()
-                    BuffBarColors.ResetSpellColor(colorKey, colorKey)
+                    SpellColors.ResetSpellColor(colorKey, colorKey)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -156,10 +156,10 @@ local function SpellOptionsTable()
                 order = 10,
                 width = "double",
                 get = function()
-                    return BuffBarColors.GetDefaultColor()
+                    return SpellColors.GetDefaultColor()
                 end,
                 set = function(_, r, g, b)
-                    BuffBarColors.SetDefaultColor(r, g, b)
+                    SpellColors.SetDefaultColor(r, g, b)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,

@@ -385,6 +385,54 @@ function Migration.Run(profile)
         profile.schemaVersion = 7
     end
 
+    if profile.schemaVersion < 8 then
+        -- Migration: split flat perSpell map into separate byName / byTexture tables.
+        -- String keys go to byName, number keys go to byTexture.
+        -- Each entry is wrapped as { value = color, t = 0 } so that any fresh
+        -- write will win during FallbackKeyMap reconciliation.
+        local buffBars = profile.buffBars
+        if buffBars and type(buffBars.colors) == "table" then
+            local colors = buffBars.colors
+            local perSpell = colors.perSpell
+
+            if type(perSpell) == "table" then
+                if type(colors.byName) ~= "table" then
+                    colors.byName = {}
+                end
+                if type(colors.byTexture) ~= "table" then
+                    colors.byTexture = {}
+                end
+
+                for classID, specTable in pairs(perSpell) do
+                    if type(specTable) == "table" then
+                        for specID, entries in pairs(specTable) do
+                            if type(entries) == "table" then
+                                colors.byName[classID] = colors.byName[classID] or {}
+                                colors.byName[classID][specID] = colors.byName[classID][specID] or {}
+                                colors.byTexture[classID] = colors.byTexture[classID] or {}
+                                colors.byTexture[classID][specID] = colors.byTexture[classID][specID] or {}
+
+                                for key, color in pairs(entries) do
+                                    local wrapped = { value = color, t = 0 }
+                                    if type(key) == "string" then
+                                        colors.byName[classID][specID][key] = wrapped
+                                    elseif type(key) == "number" then
+                                        colors.byTexture[classID][specID][key] = wrapped
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                colors.perSpell = nil
+            end
+        end
+
+        Log("Migrated to V8")
+        profile.schemaVersion = 8
+    end
+
     Log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
 end
 

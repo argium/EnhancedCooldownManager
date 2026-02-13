@@ -38,7 +38,8 @@ EnhancedCooldownManager.lua
 
 Modules\Layout.lua
 Modules\ModuleMixin.lua
-Modules\BuffBarColors.lua
+Modules\FallbackKeyMap.lua
+Modules\SpellColors.lua
 
 Bars\BarFrame.lua
 Bars\PowerBar.lua
