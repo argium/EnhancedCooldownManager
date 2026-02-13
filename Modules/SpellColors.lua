@@ -134,7 +134,7 @@ function SpellColors.GetColor(spellName, textureFileID)
 end
 
 --- Gets the custom color for a bar frame.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@return ECM_Color|nil
 function SpellColors.GetColorForBar(frame)
     ECM_debug_assert(frame, "Expected bar frame")
@@ -194,7 +194,7 @@ function SpellColors.ResetColor(spellName, textureId)
 end
 
 --- Reconciles the color entry for a single bar frame.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 function SpellColors.ReconcileBar(frame)
     if not (frame and frame.__ecmHooked) then
         return
@@ -209,7 +209,7 @@ function SpellColors.ReconcileBar(frame)
 end
 
 --- Reconciles color entries for a list of bar frames.
----@param frames ECM_BuffBarFrame[]
+---@param frames ECM_BuffBarMixin[]
 ---@return number changed  Count of reconciled entries.
 function SpellColors.ReconcileAllBars(frames)
     local map = get_map()

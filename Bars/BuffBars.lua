@@ -5,7 +5,7 @@
 local BuffBars = {}
 ECM.BuffBars = BuffBars
 
----@class ECM_BuffBarFrame : Frame
+---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
 ---@field Bar StatusBar
 ---@field DebuffBorder any
@@ -62,7 +62,7 @@ end
 
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
 --- child frame. Lazy setters ensure no-ops when values haven't changed.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@param config table Module config
 ---@param globalConfig table Global config
 ---@param barIndex number Index of the bar (for logging)

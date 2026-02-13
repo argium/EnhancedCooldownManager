@@ -58,9 +58,9 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local shouldShow = barModule and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule:GetModuleConfig()
         local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
-        local barFrame = barModule and barModule.InnerFrame
-        local hasFrame = barFrame ~= nil
-        local isVisible = barFrame and barFrame:IsVisible() or false
+        local BarMixin = barModule and barModule.InnerFrame
+        local hasFrame = BarMixin ~= nil
+        local isVisible = BarMixin and BarMixin:IsVisible() or false
 
         debugCandidates[#debugCandidates + 1] = {
             barName = barName,
@@ -79,7 +79,7 @@ function ModuleMixin:GetNextChainAnchor(frameName)
                 selectedVisible = isVisible,
                 candidates = debugCandidates,
             })
-            return barFrame, false
+            return BarMixin, false
         end
     end
 

@@ -80,11 +80,11 @@ local function GetValues(moduleConfig)
 end
 
 --------------------------------------------------------------------------------
--- ModuleMixin/BarFrame Overrides
+-- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 
 function ResourceBar:ShouldShow()
-    local shouldShow = ECM.BarFrame.ShouldShow(self)
+    local shouldShow = ECM.BarMixin.ShouldShow(self)
 
     if not shouldShow then
         return false
@@ -123,7 +123,7 @@ function ResourceBar:GetStatusBarColor()
 end
 
 function ResourceBar:Refresh(why, force)
-    local continue = ECM.BarFrame.Refresh(self, why, force)
+    local continue = ECM.BarMixin.Refresh(self, why, force)
     if not continue then
         return false
     end
@@ -164,7 +164,7 @@ end
 
 function ResourceBar:OnEnable()
     if not self.IsModuleMixin then
-        ECM.BarFrame.AddMixin(self, "ResourceBar")
+        ECM.BarMixin.AddMixin(self, "ResourceBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end

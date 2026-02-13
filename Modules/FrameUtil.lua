@@ -37,28 +37,28 @@ local function TryGetRegion(frame, index, regionType)
 end
 
 --- Returns the spell name shown on the bar, or nil.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@return string|nil
 function FrameUtil.GetSpellName(frame)
     return frame.Bar.Name and frame.Bar.Name:GetText() or nil
 end
 
 --- Returns the icon overlay texture region, or nil.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconOverlay(frame)
     return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconTexture(frame)
     return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
----@param frame ECM_BuffBarFrame
+---@param frame ECM_BuffBarMixin
 ---@return number|nil
 function FrameUtil.GetIconTextureFileID(frame)
     local iconTexture = FrameUtil.GetIconTexture(frame)

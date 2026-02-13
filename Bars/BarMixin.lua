@@ -2,8 +2,8 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local BarFrame = {}
-ECM.BarFrame = BarFrame
+local BarMixin = {}
+ECM.BarMixin = BarMixin
 
 -- owns:
 --  StatusBar
@@ -27,11 +27,11 @@ end
 
 --- Ensures the tick pool has the required number of ticks.
 --- Creates new ticks as needed, shows required ticks, hides extras.
----@param self ECMBarFrame
+---@param self ECMBarMixin
 ---@param count number Number of ticks needed
 ---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
 ---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
-function BarFrame:EnsureTicks(count, parentFrame, poolKey)
+function BarMixin:EnsureTicks(count, parentFrame, poolKey)
     assert(parentFrame, "parentFrame required for tick creation")
 
     local pool = GetTickPool(self, poolKey)
@@ -53,9 +53,9 @@ function BarFrame:EnsureTicks(count, parentFrame, poolKey)
 end
 
 --- Hides all ticks in the pool.
----@param self ECMBarFrame
+---@param self ECMBarMixin
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarFrame:HideAllTicks(poolKey)
+function BarMixin:HideAllTicks(poolKey)
     local pool = self[poolKey or "tickPool"]
     if not pool then
         return
@@ -68,12 +68,12 @@ end
 
 --- Positions ticks evenly as resource dividers.
 --- Used by ResourceBar to show divisions between resources.
----@param self ECMBarFrame
+---@param self ECMBarMixin
 ---@param maxResources number Number of resources (ticks = maxResources - 1)
 ---@param color ECM_Color|table|nil RGBA color (default black)
 ---@param tickWidth number|nil Width of each tick (default 1)
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarFrame:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
+function BarMixin:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
     maxResources = tonumber(maxResources) or 0
     if maxResources <= 1 then
         self:HideAllTicks(poolKey)
@@ -112,14 +112,14 @@ end
 
 --- Positions ticks at specific resource values.
 --- Used by PowerBar for breakpoint markers (e.g., energy thresholds).
----@param self ECMBarFrame
+---@param self ECMBarMixin
 ---@param statusBar StatusBar StatusBar to position ticks on
 ---@param ticks table Array of tick definitions { { value = number, color = ECM_Color, width = number }, ... }
 ---@param maxValue number Maximum resource value
 ---@param defaultColor ECM_Color Default RGBA color
 ---@param defaultWidth number Default tick width
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarFrame:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
+function BarMixin:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
     if not statusBar then
         return
     end
@@ -173,14 +173,14 @@ end
 ---@return number|nil max
 ---@return number|nil displayValue
 ---@return boolean isFraction valueType
-function BarFrame:GetStatusBarValues()
+function BarMixin:GetStatusBarValues()
     ECM_debug_assert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
 end
 
 --- Gets the color for the status bar. Override for custom color logic.
 ---@return ECM_Color Color table with r, g, b, a fields
-function BarFrame:GetStatusBarColor()
+function BarMixin:GetStatusBarColor()
     local resource = UnitPowerType("player")
     local moduleConfig = self:GetModuleConfig()
     local color = moduleConfig and moduleConfig.colors and moduleConfig.colors[resource]
@@ -191,7 +191,7 @@ end
 -- ModuleMixin Overrides
 --------------------------------------------------------------------------------
 
-function BarFrame:ShouldShow()
+function BarMixin:ShouldShow()
     -- Pass through so derived classes don't have to override ModuleMixin
     return ECM.ModuleMixin.ShouldShow(self)
 end
@@ -200,7 +200,7 @@ end
 --- @param why string|nil Reason for refresh (for logging/debugging).
 --- @param force boolean|nil If true, forces a refresh even if not needed.
 --- @return boolean continue True if refresh completed, false if skipped
-function BarFrame:Refresh(why, force)
+function BarMixin:Refresh(why, force)
     if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
@@ -242,7 +242,7 @@ function BarFrame:Refresh(why, force)
     FrameUtil.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
-    -- ECM_log(ECM.Constants.SYS.Styling, self.Name, "BarFrame:Refresh", {
+    -- ECM_log(ECM.Constants.SYS.Styling, self.Name, "BarMixin:Refresh", {
     --     current = current,
     --     max = max,
     --     displayValue = displayValue,
@@ -260,7 +260,7 @@ end
 -- Layout and Refresh
 --------------------------------------------------------------------------------
 
-function BarFrame:CreateFrame()
+function BarMixin:CreateFrame()
     local frame = ECM.ModuleMixin.CreateFrame(self)
 
     -- StatusBar for value display
@@ -304,18 +304,18 @@ end
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-function BarFrame:OnEnable()
+function BarMixin:OnEnable()
 end
 
-function BarFrame:OnDisable()
+function BarMixin:OnDisable()
 end
 
-function BarFrame.AddMixin(module, name)
+function BarMixin.AddMixin(module, name)
     assert(module, "module required")
     assert(name, "name required")
 
-    -- Copy BarFrame methods to module if not already defined
-    for k, v in pairs(BarFrame) do
+    -- Copy BarMixin methods to module if not already defined
+    for k, v in pairs(BarMixin) do
         if type(v) == "function" and module[k] == nil then
             module[k] = v
         end

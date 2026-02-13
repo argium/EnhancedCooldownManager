@@ -52,7 +52,7 @@ function PowerBar:UpdateTicks(frame, resource, max)
 end
 
 --------------------------------------------------------------------------------
--- ModuleMixin/BarFrame Overrides
+-- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 
 function PowerBar:GetStatusBarValues()
@@ -69,7 +69,7 @@ function PowerBar:GetStatusBarValues()
 end
 
 function PowerBar:Refresh(why, force)
-    local result = ECM.BarFrame.Refresh(self, why, force)
+    local result = ECM.BarMixin.Refresh(self, why, force)
     if not result then
         return false
     end
@@ -85,7 +85,7 @@ function PowerBar:Refresh(why, force)
 end
 
 function PowerBar:ShouldShow()
-    local show = ECM.BarFrame.ShouldShow(self)
+    local show = ECM.BarMixin.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
         local powerType = UnitPowerType("player")
@@ -124,7 +124,7 @@ end
 
 function PowerBar:OnEnable()
     if not self.IsModuleMixin then
-        ECM.BarFrame.AddMixin(self, "PowerBar")
+        ECM.BarMixin.AddMixin(self, "PowerBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end

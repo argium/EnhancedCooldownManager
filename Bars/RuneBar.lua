@@ -115,7 +115,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
         local tex = ECM_GetTexture(texKey)
 
-        -- Use same positioning logic as BarFrame tick layout to avoid sub-pixel gaps
+        -- Use same positioning logic as BarMixin tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
         for pos, runeIndex in ipairs(bar._displayOrder) do
             local frag = bar.FragmentedBars[runeIndex]
@@ -149,11 +149,11 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
 end
 
 --------------------------------------------------------------------------------
--- ModuleMixin/BarFrame Overrides
+-- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 
 function RuneBar:CreateFrame()
-    -- Create base frame using ModuleMixin (not BarFrame, since we manage StatusBar ourselves)
+    -- Create base frame using ModuleMixin (not BarMixin, since we manage StatusBar ourselves)
     local frame = ECM.ModuleMixin.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
@@ -187,7 +187,7 @@ function RuneBar:Refresh(why, force)
     local _, class = UnitClass("player")
     assert(class == "DEATHKNIGHT", "RuneBar should only be enabled for Death Knights")
 
-    -- Use BaseRefresh instead of BarFrame.Refresh since we manage
+    -- Use BaseRefresh instead of BarMixin.Refresh since we manage
     -- our own fragmented bars and don't use the standard StatusBar
     if not FrameUtil.BaseRefresh(self, why, force) then
         return false
@@ -235,7 +235,7 @@ function RuneBar:OnEnable()
     end
 
     if not self.IsModuleMixin then
-        ECM.BarFrame.AddMixin(self, "RuneBar")
+        ECM.BarMixin.AddMixin(self, "RuneBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
