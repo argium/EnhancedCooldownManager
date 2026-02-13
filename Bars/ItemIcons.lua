@@ -3,14 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
-local ECM = ns.Addon
-local C = ns.Constants
-
-local ModuleMixin = ns.Mixins.ModuleMixin
-
-local ItemIcons = ECM:NewModule("ItemIcons", "AceEvent-3.0")
-ECM.ItemIcons = ItemIcons
+local mod = ns.Addon
+local ItemIcons = mod:NewModule("ItemIcons", "AceEvent-3.0")
+mod.ItemIcons = ItemIcons
 ItemIcons:SetEnabledState(false)
 
 ---@class ECM_ItemIconsModule : ModuleMixin
@@ -77,14 +72,14 @@ local function GetDisplayItems(moduleConfig)
 
     -- Trinkets first
     if moduleConfig.showTrinket1 then
-        local data = GetTrinketData(C.TRINKET_SLOT_1)
+        local data = GetTrinketData(ECM.Constants.TRINKET_SLOT_1)
         if data then
             items[#items + 1] = data
         end
     end
 
     if moduleConfig.showTrinket2 then
-        local data = GetTrinketData(C.TRINKET_SLOT_2)
+        local data = GetTrinketData(ECM.Constants.TRINKET_SLOT_2)
         if data then
             items[#items + 1] = data
         end
@@ -92,7 +87,7 @@ local function GetDisplayItems(moduleConfig)
 
     -- Combat potion
     if moduleConfig.showCombatPotion then
-        local data = GetBestConsumable(C.COMBAT_POTIONS)
+        local data = GetBestConsumable(ECM.Constants.COMBAT_POTIONS)
         if data then
             items[#items + 1] = data
         end
@@ -100,7 +95,7 @@ local function GetDisplayItems(moduleConfig)
 
     -- Health potion
     if moduleConfig.showHealthPotion then
-        local data = GetBestConsumable(C.HEALTH_POTIONS)
+        local data = GetBestConsumable(ECM.Constants.HEALTH_POTIONS)
         if data then
             items[#items + 1] = data
         end
@@ -108,10 +103,10 @@ local function GetDisplayItems(moduleConfig)
 
     -- Healthstone
     if moduleConfig.showHealthstone then
-        if C_Item.GetItemCount(C.HEALTHSTONE_ITEM_ID) > 0 then
-            local texture = C_Item.GetItemIconByID(C.HEALTHSTONE_ITEM_ID)
+        if C_Item.GetItemCount(ECM.Constants.HEALTHSTONE_ITEM_ID) > 0 then
+            local texture = C_Item.GetItemIconByID(ECM.Constants.HEALTHSTONE_ITEM_ID)
             items[#items + 1] = {
-                itemId = C.HEALTHSTONE_ITEM_ID,
+                itemId = ECM.Constants.HEALTHSTONE_ITEM_ID,
                 texture = texture,
                 slotId = nil,
             }
@@ -154,7 +149,7 @@ local function CreateItemIcon(parent, size)
     icon.Border = icon:CreateTexture(nil, "OVERLAY")
     icon.Border:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
     icon.Border:SetPoint("CENTER")
-    icon.Border:SetSize(size * C.ITEM_ICON_BORDER_SCALE, size * C.ITEM_ICON_BORDER_SCALE)
+    icon.Border:SetSize(size * ECM.Constants.ITEM_ICON_BORDER_SCALE, size * ECM.Constants.ITEM_ICON_BORDER_SCALE)
 
     -- Shadow overlay
     icon.Shadow = icon:CreateTexture(nil, "OVERLAY")
@@ -294,7 +289,7 @@ end
 local function GetUtilityViewerLayout()
     local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
-        return C.DEFAULT_ITEM_ICON_SIZE, C.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
+        return ECM.Constants.DEFAULT_ITEM_ICON_SIZE, ECM.Constants.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
             reason = "viewer_hidden_or_missing",
             measuredSpacing = nil,
             gap = nil,
@@ -304,9 +299,9 @@ local function GetUtilityViewerLayout()
     end
 
     local children = { viewer:GetChildren() }
-    local iconSize = C.DEFAULT_ITEM_ICON_SIZE
+    local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
     local iconScale = 1.0
-    local spacing = C.DEFAULT_ITEM_ICON_SPACING
+    local spacing = ECM.Constants.DEFAULT_ITEM_ICON_SPACING
     local isStable = false
     local debugInfo = {
         reason = "no_pair",
@@ -347,14 +342,14 @@ local function GetUtilityViewerLayout()
 
     if #measuredIcons < 2 then
         debugInfo.reason = "no_pair"
-        return iconSize or C.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
+        return iconSize or ECM.Constants.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
     end
 
     table.sort(measuredIcons, function(a, b)
         return a.left < b.left
     end)
 
-    local maxSpacing = iconSize * C.ITEM_ICON_MAX_SPACING_FACTOR
+    local maxSpacing = iconSize * ECM.Constants.ITEM_ICON_MAX_SPACING_FACTOR
     debugInfo.maxSpacing = maxSpacing
 
     local bestSpacing = nil
@@ -394,11 +389,11 @@ local function GetUtilityViewerLayout()
         debugInfo.reason = "no_valid_adjacent_gap"
     end
 
-    return iconSize or C.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
+    return iconSize or ECM.Constants.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
 end
 
 --------------------------------------------------------------------------------
--- ModuleMixin Overrides
+-- ECM.ModuleMixin Overrides
 --------------------------------------------------------------------------------
 
 --- Override CreateFrame to create the container for item icons.
@@ -410,8 +405,8 @@ function ItemIcons:CreateFrame()
 
     -- Pool of icon frames (pre-allocate for max items)
     frame._iconPool = {}
-    local initialSize = C.DEFAULT_ITEM_ICON_SIZE
-    for i = 1, C.ITEM_ICONS_MAX do
+    local initialSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
+    for i = 1, ECM.Constants.ITEM_ICONS_MAX do
         frame._iconPool[i] = CreateItemIcon(frame, initialSize)
     end
 
@@ -421,7 +416,7 @@ end
 --- Override ShouldShow to check module enabled state and item availability.
 ---@return boolean shouldShow Whether the frame should be shown.
 function ItemIcons:ShouldShow()
-    if not ModuleMixin.ShouldShow(self) then
+    if not ECM.ModuleMixin.ShouldShow(self) then
         return false
     end
 
@@ -505,7 +500,7 @@ function ItemIcons:UpdateLayout(why)
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
-        icon.Border:SetSize(iconSize * C.ITEM_ICON_BORDER_SCALE, iconSize * C.ITEM_ICON_BORDER_SCALE)
+        icon.Border:SetSize(iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE, iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE)
         icon.slotId = iconData.slotId
         icon.itemId = iconData.itemId
 
@@ -533,7 +528,7 @@ function ItemIcons:UpdateLayout(why)
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM_log(C.SYS.Layout, self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "UpdateLayout (" .. (why or "") .. ")", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -545,10 +540,10 @@ function ItemIcons:UpdateLayout(why)
     -- TODO: there really must be a better way to handling this. I doubt this level of shit-hackery is required.
     if layoutStable then
         self._layoutRetryCount = 0
-    elseif not self._layoutRetryPending and (self._layoutRetryCount or 0) < C.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS then
+    elseif not self._layoutRetryPending and (self._layoutRetryCount or 0) < ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS then
         self._layoutRetryPending = true
         self._layoutRetryCount = (self._layoutRetryCount or 0) + 1
-        C_Timer.After(C.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()
+        C_Timer.After(ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()
             self._layoutRetryPending = nil
             if self:IsEnabled() then
                 self:ScheduleLayoutUpdate("UpdateLayout")
@@ -580,7 +575,7 @@ function ItemIcons:Refresh(why)
         end
     end
 
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -601,7 +596,7 @@ end
 
 function ItemIcons:OnPlayerEquipmentChanged(_, slotId)
     -- Only update if a trinket slot changed
-    if slotId == C.TRINKET_SLOT_1 or slotId == C.TRINKET_SLOT_2 then
+    if slotId == ECM.Constants.TRINKET_SLOT_1 or slotId == ECM.Constants.TRINKET_SLOT_2 then
         self:ScheduleLayoutUpdate("OnPlayerEquipmentChanged")
     end
 end
@@ -664,7 +659,7 @@ function ItemIcons:HookUtilityViewer()
         self:ScheduleLayoutUpdate("OnSizeChanged")
     end)
 
-    ECM_log(C.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
 end
 
 --------------------------------------------------------------------------------
@@ -673,7 +668,7 @@ end
 
 function ItemIcons:OnEnable()
     if not self.IsModuleMixin then
-        ModuleMixin.AddMixin(self, "ItemIcons")
+        ECM.ModuleMixin.AddMixin(self, "ItemIcons")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
@@ -691,7 +686,7 @@ function ItemIcons:OnEnable()
         self:ScheduleLayoutUpdate("OnEnable")
     end)
 
-    ECM_log(C.SYS.Core, self.Name, "OnEnable - module enabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "OnEnable - module enabled")
 end
 
 function ItemIcons:OnDisable()
@@ -712,5 +707,5 @@ function ItemIcons:OnDisable()
         self.InnerFrame:Hide()
     end
 
-    ECM_log(C.SYS.Core, self.Name, "Disabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Disabled")
 end

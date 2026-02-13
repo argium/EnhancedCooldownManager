@@ -3,12 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local ECM = ns.Addon
-local C = ns.Constants
-
+local mod = ns.Addon
 local ModuleMixin = {}
-ns.Mixins = ns.Mixins or {}
-ns.Mixins.ModuleMixin = ModuleMixin
+ECM.ModuleMixin = ModuleMixin
 
 ---@alias AnchorPoint string
 
@@ -22,14 +19,14 @@ ns.Mixins.ModuleMixin = ModuleMixin
 --- Returns the global config section (live from AceDB profile).
 ---@return table|nil
 function ModuleMixin:GetGlobalConfig()
-    local profile = ECM.db and ECM.db.profile
-    return profile and profile[C.CONFIG_SECTION_GLOBAL]
+    local profile = mod.db and mod.db.profile
+    return profile and profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
 end
 
 --- Returns this module's config section (live from AceDB profile).
 ---@return table|nil
 function ModuleMixin:GetModuleConfig()
-    local profile = ECM.db and ECM.db.profile
+    local profile = mod.db and mod.db.profile
     return profile and profile[self._configKey]
 end
 
@@ -39,9 +36,9 @@ end
 --- @return boolean isFirst True if this is the first frame in the chain.
 function ModuleMixin:GetNextChainAnchor(frameName)
     -- Find the ideal position
-    local stopIndex = #C.CHAIN_ORDER + 1
+    local stopIndex = #ECM.Constants.CHAIN_ORDER + 1
     if frameName then
-        for i, name in ipairs(C.CHAIN_ORDER) do
+        for i, name in ipairs(ECM.Constants.CHAIN_ORDER) do
             if name == frameName then
                 stopIndex = i
                 break
@@ -55,12 +52,12 @@ function ModuleMixin:GetNextChainAnchor(frameName)
     -- because layout updates can occur while frames are transitioning hide/show.
     local debugCandidates = {}
     for i = stopIndex - 1, 1, -1 do
-        local barName = C.CHAIN_ORDER[i]
-        local barModule = ECM[barName]
+        local barName = ECM.Constants.CHAIN_ORDER[i]
+        local barModule = mod[barName]
         local isEnabled = barModule and barModule:IsEnabled() or false
         local shouldShow = barModule and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule:GetModuleConfig()
-        local isChainMode = moduleConfig and moduleConfig.anchorMode == C.ANCHORMODE_CHAIN
+        local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
         local barFrame = barModule and barModule.InnerFrame
         local hasFrame = barFrame ~= nil
         local isVisible = barFrame and barFrame:IsVisible() or false
@@ -75,7 +72,7 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         }
 
         if isEnabled and shouldShow and isChainMode and hasFrame then
-            ECM_log(C.SYS.Layout, self.Name, "GetNextChainAnchor selected", {
+            ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor selected", {
                 frameName = frameName,
                 stopIndex = stopIndex,
                 selected = barName,
@@ -87,7 +84,7 @@ function ModuleMixin:GetNextChainAnchor(frameName)
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
-    ECM_log(C.SYS.Layout, self.Name, "GetNextChainAnchor fallthrough; treating as first anchor", {
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor fallthrough; treating as first anchor", {
         frameName = frameName,
         stopIndex = stopIndex,
         selected = "EssentialCooldownViewer",
@@ -120,7 +117,7 @@ function ModuleMixin:CreateFrame()
 
     local barHeight = (moduleConfig and moduleConfig.height)
         or (globalConfig and globalConfig.barHeight)
-        or C.DEFAULT_BAR_HEIGHT
+        or ECM.Constants.DEFAULT_BAR_HEIGHT
 
     frame:SetFrameStrata("MEDIUM")
     frame:SetHeight(barHeight)
@@ -182,7 +179,7 @@ end
 --- Internal: checks readiness and runs the coalesced layout update.
 local function update_layout_deferred(self)
     if not self:IsReady() then
-        ECM_log(C.SYS.Core, self.Name, "Layout update skipped (not ready)")
+        ECM_log(ECM.Constants.SYS.Core, self.Name, "Layout update skipped (not ready)")
         self._updateLayoutPending = false
         self._pendingWhy = nil
         return
@@ -198,7 +195,7 @@ local function update_layout_deferred(self)
     -- Schedule second-pass if requested.
     if self._secondPassPending then
         self._secondPassPending = false
-        C_Timer.After(C.LIFECYCLE_SECOND_PASS_DELAY, function()
+        C_Timer.After(ECM.Constants.LIFECYCLE_SECOND_PASS_DELAY, function()
             self:ThrottledUpdateLayout("SecondPass")
         end)
     end

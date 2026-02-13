@@ -4,23 +4,22 @@
 
 local ADDON_NAME, ns = ...
 
-local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
-ns.Addon = ECM
-local C = ns.Constants
+local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
+ns.Addon = mod
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
-assert(ns.defaults, "Defaults.lua must be loaded before ECM.lua")
-assert(ns.AddToTraceLog and ns.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
-assert(ns.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
-assert(ns.Constants, "Constants.lua must be loaded before ECM.lua")
-assert(ns.Migration, "Migration.lua must be loaded before ECM.lua")
+assert(ECM.defaults, "Defaults.lua must be loaded before ECM.lua")
+assert(ECM.AddToTraceLog and ECM.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
+assert(ECM.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
+assert(ECM.Constants, "Constants.lua must be loaded before ECM.lua")
+assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 
 local function RegisterAddonCompartmentEntry()
-    if ECM._addonCompartmentRegistered then
+    if mod._addonCompartmentRegistered then
         return
     end
 
@@ -28,18 +27,18 @@ local function RegisterAddonCompartmentEntry()
         return
     end
 
-    local text = Argi.Sparkle(C.ADDON_NAME)
+    local text = Argi.Sparkle(ECM.Constants.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
-        icon = C.ADDON_ICON_TEXTURE,
+        icon = ECM.Constants.ADDON_ICON_TEXTURE,
         notCheckable = true,
         func = function()
-            ECM:ChatCommand("options")
+            mod:ChatCommand("options")
         end,
     })
 
     if ok then
-        ECM._addonCompartmentRegistered = true
+        mod._addonCompartmentRegistered = true
     end
 end
 
@@ -48,7 +47,7 @@ end
 ---@param text string
 ---@param onAccept fun()|nil
 ---@param onCancel fun()|nil
-function ECM:ConfirmReloadUI(text, onAccept, onCancel)
+function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
         ECM_print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
@@ -124,7 +123,7 @@ end
 
 --- Shows a dialog with the export string for copying.
 ---@param exportString string
-function ECM:ShowExportDialog(exportString)
+function mod:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
         ECM_print("Invalid export string provided")
         return
@@ -147,7 +146,7 @@ function ECM:ShowExportDialog(exportString)
 end
 
 --- Shows a dialog to paste an import string and handles the import process.
-function ECM:ShowImportDialog()
+function mod:ShowImportDialog()
     EnsureEditBoxDialog(POPUP_IMPORT_PROFILE, {
         text = "Paste your import string:",
         button1 = OKAY or "Import",
@@ -172,14 +171,14 @@ function ECM:ShowImportDialog()
         local input = editBox:GetText() or ""
 
         if strtrim(input) == "" then
-            ECM:Print("Import cancelled: no string provided")
+            mod:Print("Import cancelled: no string provided")
             return
         end
 
         -- Validate first WITHOUT applying
-        local data, errorMsg = ns.ImportExport.ValidateImportString(input)
+        local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
         if not data then
-            ECM:Print("Import failed: " .. (errorMsg or "unknown error"))
+            mod:Print("Import failed: " .. (errorMsg or "unknown error"))
             return
         end
 
@@ -190,10 +189,10 @@ function ECM:ShowImportDialog()
         )
 
         -- Only apply the import AFTER user confirms reload
-        ECM:ConfirmReloadUI(confirmText, function()
-            local success, applyErr = ns.ImportExport.ApplyImportData(data)
+        mod:ConfirmReloadUI(confirmText, function()
+            local success, applyErr = ECM.ImportExport.ApplyImportData(data)
             if not success then
-                ECM:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
             end
         end, nil)
     end
@@ -218,7 +217,7 @@ end
 
 --- Handles slash command input.
 ---@param input string|nil
-function ECM:ChatCommand(input)
+function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
@@ -232,7 +231,7 @@ function ECM:ChatCommand(input)
             ECM_print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
             return
         end
-        ns.ShowBugReportPopup()
+        ECM.ShowBugReportPopup()
         return
     end
 
@@ -272,7 +271,7 @@ function ECM:ChatCommand(input)
     ECM_print("Unknown command. Use /ecm help")
 end
 
-function ECM:HandleOpenOptionsAfterCombat()
+function mod:HandleOpenOptionsAfterCombat()
     if not self._openOptionsAfterCombat then
         return
     end
@@ -286,23 +285,23 @@ function ECM:HandleOpenOptionsAfterCombat()
     end
 end
 
-function ECM:OnInitialize()
+function mod:OnInitialize()
     -- Set up versioned SV store and point the active key at the current version.
-    ns.Migration.PrepareDatabase()
+    ECM.Migration.PrepareDatabase()
 
-    self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
+    self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM_log(C.SYS.Core, nil, "Initialize", {
+    ECM_log(ECM.Constants.SYS.Core, nil, "Initialize", {
         schemaVersion = profile and profile.schemaVersion or "nil",
-        currentSchemaVersion = C.CURRENT_SCHEMA_VERSION
+        currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
     })
 
-    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ns.Migration.Run(profile)
+    if profile and profile.schemaVersion and profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
+        ECM.Migration.Run(profile)
     end
 
-    ns.Migration.FlushLog()
+    ECM.Migration.FlushLog()
 
     -- Register bundled font with LibSharedMedia if present.
     if LSM and LSM.Register then
@@ -315,17 +314,17 @@ function ECM:OnInitialize()
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
-function ECM:OnEnable()
+function mod:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
     RegisterAddonCompartmentEntry()
     local profile = self.db and self.db.profile
 
     local moduleOrder = {
-        C.POWERBAR,
-        C.RESOURCEBAR,
-        C.RUNEBAR,
-        C.BUFFBARS,
-        C.ITEMICONS,
+        ECM.Constants.POWERBAR,
+        ECM.Constants.RESOURCEBAR,
+        ECM.Constants.RUNEBAR,
+        ECM.Constants.BUFFBARS,
+        ECM.Constants.ITEMICONS,
     }
 
     for _, moduleName in ipairs(moduleOrder) do

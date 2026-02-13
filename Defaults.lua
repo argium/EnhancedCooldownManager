@@ -1,8 +1,8 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Solär
+-- Licensed under the GNU General Public License v3.0
+
 -- Defaults for Enhanced Cooldown Manager
-
-local ADDON_NAME, ns = ...
-
-local C = ns.Constants
 
 ---@class ECM_Color RGBA color definition.
 ---@field r number Red channel (0-1).
@@ -19,7 +19,7 @@ local C = ns.Constants
 ---@field texture string|nil Bar texture override.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
----@field anchorMode C.ANCHORMODE_CHAIN|C.ANCHORMODE_FREE|nil Anchor mode for the bar.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase Power bar configuration.
 ---@field showManaAsPercent boolean Whether to show mana as a percent.
@@ -68,7 +68,7 @@ local C = ns.Constants
 ---@field defaultColor ECM_Color Default color for buff bars.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
----@field anchor C.ANCHORMODE_CHAIN|C.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field anchor ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field width number|nil Buff bar width when free anchor.
 ---@field offsetY number|nil Vertical offset when free anchor.
 ---@field showIcon boolean|nil Whether to show buff icons.
@@ -110,13 +110,10 @@ local C = ns.Constants
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
 ---@field itemIcons ECM_ItemIconsConfig Item icons configuration.
 
-local DEFAULT_BORDER_THICKNESS = 4
-local DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 }
-
 -- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
-powerBarTickMappings[C.DEMONHUNTER_CLASS_ID] = {
-    [C.DEMONHUNTER_DEVOURER_SPEC_INDEX] = {
+powerBarTickMappings[ECM.Constants.DEMONHUNTER_CLASS_ID] = {
+    [ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX] = {
         { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
         { value = 100 },
     },
@@ -125,7 +122,7 @@ powerBarTickMappings[C.DEMONHUNTER_CLASS_ID] = {
 local defaults = {
     profile = {
         debug = false,
-        schemaVersion = C.CURRENT_SCHEMA_VERSION,
+        schemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION,
         global = {
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
@@ -147,7 +144,7 @@ local defaults = {
         },
         powerBar = {
             enabled           = true,
-            anchorMode        = C.ANCHORMODE_CHAIN,
+            anchorMode        = ECM.Constants.ANCHORMODE_CHAIN,
             width             = 300,
             -- height            = nil,
             -- offsetX           = nil,
@@ -157,14 +154,14 @@ local defaults = {
             showText          = true,
             ticks             = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
-                defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR,
                 defaultWidth = 1,
             },
             showManaAsPercent = true,
             border            = {
                 enabled = false,
-                thickness = DEFAULT_BORDER_THICKNESS,
-                color = DEFAULT_BORDER_COLOR,
+                thickness = ECM.Constants.DEFAULT_BORDER_THICKNESS,
+                color = ECM.Constants.DEFAULT_BORDER_COLOR,
             },
             colors            = {
                 [Enum.PowerType.Mana] = { r = 0.00, g = 0.00, b = 1.00, a = 1 },
@@ -181,7 +178,7 @@ local defaults = {
         resourceBar = {
             enabled             = true,
             showText            = true,
-            anchorMode          = C.ANCHORMODE_CHAIN,
+            anchorMode          = ECM.Constants.ANCHORMODE_CHAIN,
             width               = 300,
             -- height              = nil,
             -- offsetX             = nil,
@@ -190,8 +187,8 @@ local defaults = {
             -- bgColor             = nil,
             border              = {
                 enabled = false,
-                thickness = DEFAULT_BORDER_THICKNESS,
-                color = DEFAULT_BORDER_COLOR,
+                thickness = ECM.Constants.DEFAULT_BORDER_THICKNESS,
+                color = ECM.Constants.DEFAULT_BORDER_COLOR,
             },
             colors              = {
                 souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
@@ -206,7 +203,7 @@ local defaults = {
         },
         runeBar = {
             enabled    = true,
-            anchorMode = C.ANCHORMODE_CHAIN,
+            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
             width      = 300,
             -- height     = nil,
             -- offsetX    = nil,
@@ -217,7 +214,7 @@ local defaults = {
         },
         buffBars = {
             enabled = true,
-            anchorMode = C.ANCHORMODE_CHAIN,
+            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
             width = 300,
             offsetY = -350,
             showIcon = false,
@@ -242,4 +239,4 @@ local defaults = {
 }
 
 -- Export defaults for Options module to access
-ns.defaults = defaults
+ECM.defaults = defaults

@@ -44,7 +44,6 @@ Enhanced Cooldown Manager (root)
 ```lua
 -- 1. Dependencies and Constants
 local ECM = ns.Addon
-local C = ns.Constants
 
 -- 2. Constants
 local SIDEBAR_BG_COLOR = { r = 0.1, g = 0.1, b = 0.1, a = 0.9 }
@@ -145,8 +144,8 @@ mySelect = {
 **Values as table:**
 ```lua
 values = {
-    [C.ANCHORMODE_CHAIN] = "Position Automatically",
-    [C.ANCHORMODE_FREE] = "Free Positioning",
+    [ECM.Constants.ANCHORMODE_CHAIN] = "Position Automatically",
+    [ECM.Constants.ANCHORMODE_FREE] = "Free Positioning",
 }
 ```
 
@@ -314,7 +313,7 @@ width = {
     max = 600,
     step = 10,
     hidden = function() return not IsAnchorModeFree(db.profile.myModule) end,
-    get = function() return db.profile.myModule.width or C.DEFAULT_BAR_WIDTH end,
+    get = function() return db.profile.myModule.width or ECM.Constants.DEFAULT_BAR_WIDTH end,
     set = function(_, val)
         db.profile.myModule.width = val
         ECM.ScheduleLayoutUpdate(0)
@@ -874,7 +873,7 @@ local function MyBarOptionsTable()
                         max = 600,
                         step = 10,
                         hidden = function() return not IsAnchorModeFree(db.profile.myBar) end,
-                        get = function() return db.profile.myBar.width or C.DEFAULT_BAR_WIDTH end,
+                        get = function() return db.profile.myBar.width or ECM.Constants.DEFAULT_BAR_WIDTH end,
                         set = function(_, val)
                             db.profile.myBar.width = val
                             ECM.ScheduleLayoutUpdate(0)

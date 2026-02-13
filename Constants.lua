@@ -1,4 +1,4 @@
-local _, ns = ...
+ECM = ECM or {} -- this file is probably loaded before everything else so this initializes the global table.
 
 local constants = {
     ADDON_NAME = "Enhanced Cooldown Manager",
@@ -28,8 +28,10 @@ local constants = {
     DEFAULT_FREE_ANCHOR_OFFSET_Y = -300,
     DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
     DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
-    FALLBACK_TEXTURE = "Interface\\Buttons\\WHITE8X8",
+    DEFAULT_BORDER_THICKNESS = 4,
+    DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
     DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
+    FALLBACK_TEXTURE = "Interface\\Buttons\\WHITE8X8",
 
     -- Color constants
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
@@ -105,4 +107,4 @@ constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.SYS = SYS
 
-ns.Constants = constants
+ECM.Constants = constants

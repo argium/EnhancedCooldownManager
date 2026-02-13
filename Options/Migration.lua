@@ -1,12 +1,8 @@
 -- Schema migration for Enhanced Cooldown Manager
 -- Handles versioned SavedVariable namespacing and profile migrations (V2 → V7).
 
-local _, ns = ...
-
-local C = ns.Constants
-
 local Migration = {}
-ns.Migration = Migration
+ECM.Migration = Migration
 
 --- Migration log buffer. Entries are collected during migration and persisted
 --- into the new version's SV slot so they survive across sessions.
@@ -18,7 +14,7 @@ local migrationLog = {}
 ---@param message string
 local function Log(message)
     migrationLog[#migrationLog + 1] = date("%Y-%m-%d %H:%M:%S") .. "  " .. message
-    ECM_log(C.SYS.Migration, nil, message)
+    ECM_log(ECM.Constants.SYS.Migration, nil, message)
 end
 
 --------------------------------------------------------------------------------
@@ -235,7 +231,7 @@ function Migration.Run(profile)
     end
 
     local startVersion = profile.schemaVersion
-    Log("Starting migration from V" .. startVersion .. " to V" .. C.CURRENT_SCHEMA_VERSION)
+    Log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
 
     -- Migration: buffBarColors -> buffBars.colors (schema 2 -> 3)
     if profile.schemaVersion < 3 then
@@ -473,12 +469,12 @@ end
 ---
 --- Must be called BEFORE AceDB:New().
 function Migration.PrepareDatabase()
-    local sv = _G[C.SV_NAME] or {}
-    _G[C.SV_NAME] = sv
+    local sv = _G[ECM.Constants.SV_NAME] or {}
+    _G[ECM.Constants.SV_NAME] = sv
 
     sv._versions = sv._versions or {}
     local versions = sv._versions
-    local version = C.CURRENT_SCHEMA_VERSION
+    local version = ECM.Constants.CURRENT_SCHEMA_VERSION
 
     -- Seed the current version's slot if it doesn't exist yet
     if not versions[version] then
@@ -513,7 +509,7 @@ function Migration.PrepareDatabase()
     -- Point the temporary global at the current version's sub-table.
     -- AceDB modifies this table in place, so changes are persisted when WoW
     -- serializes SV_NAME on logout.
-    rawset(_G, C.ACTIVE_SV_KEY, versions[version])
+    rawset(_G, ECM.Constants.ACTIVE_SV_KEY, versions[version])
 end
 
 --- Persists collected migration log entries into the current version's SV slot.
@@ -523,9 +519,9 @@ function Migration.FlushLog()
         return
     end
 
-    local sv = _G[C.SV_NAME]
+    local sv = _G[ECM.Constants.SV_NAME]
     local versions = sv and sv._versions
-    local slot = versions and versions[C.CURRENT_SCHEMA_VERSION]
+    local slot = versions and versions[ECM.Constants.CURRENT_SCHEMA_VERSION]
     if not slot then
         return
     end

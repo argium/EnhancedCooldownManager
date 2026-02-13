@@ -3,8 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local ECM = ns.Addon
-local C = ns.Constants
+local mod = ns.Addon
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -45,7 +44,7 @@ local _lastAlpha = 1
 --- Iterates over all Blizzard cooldown viewer frames.
 --- @param fn fun(frame: Frame, name: string)
 local function ForEachBlizzardFrame(fn)
-    for _, name in ipairs(C.BLIZZARD_FRAMES) do
+    for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
             fn(frame, name)
@@ -61,7 +60,7 @@ local function SetGloballyHidden(hidden, reason)
         return
     end
 
-    ECM_log(C.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
+    ECM_log(ECM.Constants.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
 
     _globallyHidden = hidden
     _hideReason = reason
@@ -103,7 +102,7 @@ end
 
 --- Checks all fade and hide conditions and updates global state.
 local function UpdateFadeAndHiddenStates()
-    local globalConfig = ECM.db and ECM.db.profile and ECM.db.profile.global
+    local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
     if not globalConfig then
         return
     end
@@ -135,7 +134,7 @@ local function UpdateFadeAndHiddenStates()
 
         if fadeConfig.exceptInInstance then
             local inInstance, instanceType = IsInInstance()
-            if inInstance and C.GROUP_INSTANCE_TYPES[instanceType] then
+            if inInstance and ECM.Constants.GROUP_INSTANCE_TYPES[instanceType] then
                 shouldSkipFade = true
             end
         end
@@ -154,12 +153,12 @@ local function UpdateFadeAndHiddenStates()
 end
 
 local _chainSet = {}
-for _, name in ipairs(C.CHAIN_ORDER) do _chainSet[name] = true end
+for _, name in ipairs(ECM.Constants.CHAIN_ORDER) do _chainSet[name] = true end
 
 local function UpdateAllLayouts(reason)
     -- Chain frames must update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
-    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+    for _, moduleName in ipairs(ECM.Constants.CHAIN_ORDER) do
         local module = _modules[moduleName]
         if module then
             module:ThrottledUpdateLayout(reason)
@@ -200,7 +199,7 @@ local function RegisterFrame(frame)
     assert(frame and type(frame) == "table" and frame.IsModuleMixin, "RegisterFrame: invalid ModuleMixin")
     assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
     _modules[frame.Name] = frame
-    ECM_log(C.SYS.Layout, nil, "Frame registered: " .. frame.Name)
+    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame registered: " .. frame.Name)
 end
 
 --- Unregisters a ModuleMixin from layout update events.
@@ -216,7 +215,7 @@ local function UnregisterFrame(frame)
     end
 
     _modules[name] = nil
-    ECM_log(C.SYS.Layout, nil, "Frame unregistered: " .. name)
+    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame unregistered: " .. name)
 end
 
 --------------------------------------------------------------------------------

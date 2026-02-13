@@ -3,16 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
-local ECM = ns.Addon
-local SpellColors = ns.SpellColors
-local OH = ECM.OptionHelpers
-
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
-
---------------------------------------------------------------------------------
--- Helpers
---------------------------------------------------------------------------------
 
 local function ResetStyledMarkers()
     local buffBars = ECM.BuffBars
@@ -20,10 +11,6 @@ local function ResetStyledMarkers()
         buffBars:ResetStyledMarkers()
     end
 end
-
---------------------------------------------------------------------------------
--- Spell Options
---------------------------------------------------------------------------------
 
 --- Generates dynamic AceConfig args for per-spell color pickers.
 --- Merges spells from perSpell settings (persisted custom colors) and the bar
@@ -44,7 +31,7 @@ local function GenerateSpellColorArgs()
         return args
     end
 
-    local spellSettings = SpellColors.GetPerSpellColors()
+    local spellSettings = ECM.SpellColors.GetPerSpellColors()
 
     if spellSettings then
 
@@ -86,10 +73,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10,
                 width = "double",
                 get = function()
-                    return SpellColors.GetSpellColor(colorKey, colorKey)
+                    return ECM.SpellColors.GetSpellColor(colorKey, colorKey)
                 end,
                 set = function(_, r, g, b)
-                    SpellColors.SetSpellColor(colorKey, colorKey, r, g, b)
+                    ECM.SpellColors.SetSpellColor(colorKey, colorKey, r, g, b)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -102,10 +89,10 @@ local function GenerateSpellColorArgs()
                 order = i * 10 + 1,
                 width = 0.3,
                 hidden = function()
-                    return not SpellColors.HasCustomSpellColor(colorKey, colorKey)
+                    return not ECM.SpellColors.HasCustomSpellColor(colorKey, colorKey)
                 end,
                 func = function()
-                    SpellColors.ResetSpellColor(colorKey, colorKey)
+                    ECM.SpellColors.ResetSpellColor(colorKey, colorKey)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -139,7 +126,7 @@ local function SpellOptionsTable()
             currentSpec = {
                 type = "description",
                 name = function()
-                    local _, _, className, specName = OH.GetCurrentClassSpec()
+                    local _, _, className, specName = ECM.OptionUtil.GetCurrentClassSpec()
                     return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
                 end,
                 order = 3,
@@ -156,10 +143,10 @@ local function SpellOptionsTable()
                 order = 10,
                 width = "double",
                 get = function()
-                    return SpellColors.GetDefaultColor()
+                    return ECM.SpellColors.GetDefaultColor()
                 end,
                 set = function(_, r, g, b)
-                    SpellColors.SetDefaultColor(r, g, b)
+                    ECM.SpellColors.SetDefaultColor(r, g, b)
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0)
                 end,
@@ -170,8 +157,8 @@ local function SpellOptionsTable()
                 desc = "Reset to default",
                 order = 11,
                 width = 0.3,
-                hidden = function() return not OH.IsValueChanged("buffBars.colors.defaultColor") end,
-                func = OH.MakeResetHandler("buffBars.colors.defaultColor"),
+                hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.colors.defaultColor") end,
+                func = ECM.OptionUtil.MakeResetHandler("buffBars.colors.defaultColor"),
             },
             spellColorsGroup = {
                 type = "group",
@@ -245,7 +232,7 @@ function BuffBarsOptions.GetOptionsTable()
                         set = function(_, val)
                             db.profile.buffBars.enabled = val
                             if val then
-                                OH.SetModuleEnabled("BuffBars", true)
+                                ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
                                 ECM.ScheduleLayoutUpdate(0)
                             else
                                 ECM:ConfirmReloadUI(
@@ -313,8 +300,8 @@ function BuffBarsOptions.GetOptionsTable()
                         name = "X",
                         order = 10,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("buffBars.height") end,
-                        func = OH.MakeResetHandler("buffBars.height"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
+                        func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
                     },
                 },
             },
@@ -332,10 +319,10 @@ function BuffBarsOptions.GetOptionsTable()
                         order = 3,
                         width = "full",
                         dialogControl = "ECM_PositionModeSelector",
-                        values = OH.POSITION_MODE_TEXT,
+                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
                         get = function() return db.profile.buffBars.anchorMode end,
                         set = function(_, val)
-                            OH.ApplyPositionModeToBar(db.profile.buffBars, val)
+                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.buffBars, val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -347,7 +334,7 @@ function BuffBarsOptions.GetOptionsTable()
                 }
 
                 -- Add width setting only (no offsets for BuffBars)
-                local positioningSettings = OH.MakePositioningSettingsArgs("buffBars", {
+                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("buffBars", {
                     includeOffsets = false,
                     widthLabel = "Buff Bar Width",
                     widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",

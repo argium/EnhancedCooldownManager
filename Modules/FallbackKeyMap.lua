@@ -19,10 +19,6 @@
 --   • Lazily on every Get / Set (when both keys are known)
 --   • Eagerly via Reconcile(primaryKey, fallbackKey) or ReconcileAll(pairs)
 
-local _, ns = ...
-
-local C = ns.Constants
-
 ---------------------------------------------------------------------------
 -- Helpers
 ---------------------------------------------------------------------------
@@ -113,7 +109,7 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
     if not pEntry and fEntry then
         byPrimary[primaryKey] = fEntry
         byFallback[fallbackKey] = nil
-        ECM_log(C.SYS.SpellColors, "FallbackKeyMap", "Reconcile - migrated fallback to primary", {
+        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - migrated fallback to primary", {
             primaryKey = primaryKey,
             fallbackKey = fallbackKey,
         })
@@ -131,7 +127,7 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
     end
     byFallback[fallbackKey] = nil
 
-    ECM_log(C.SYS.SpellColors, "FallbackKeyMap", "Reconcile - resolved conflict", {
+    ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - resolved conflict", {
         primaryKey = primaryKey,
         fallbackKey = fallbackKey,
         winner = ts(fEntry) > ts(pEntry) and "fallback" or "primary",
@@ -294,4 +290,4 @@ end
 -- Export
 ---------------------------------------------------------------------------
 
-ns.FallbackKeyMap = FallbackKeyMap
+ECM.FallbackKeyMap = FallbackKeyMap

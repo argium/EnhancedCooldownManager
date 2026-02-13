@@ -5,14 +5,11 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
 - MANDATORY: **ALL constants** are to be stored in Constants.lua.
 - MANDATORY: DO NOT UNDER ANY CIRCUMSTANCE NIL CHECK AND WRAP BUILT IN FUNCTIONS such as issecretvalue, issecrettable.
 - MANDATORY: DO NOT ADD NIL GUARDS UNLESS THE DOCUMENTATION EXPLCITLY STATES THAT RETURNING NIL IS POSSIBLE.
-- Modules that derive from ModuleMixin, must use the live config accessors and never `ECM.db` or `ECM.db.profile` directly. NEVER create an intermediate table for profile/config.
+- Modules that utilize ModuleMixin, must use the live config accessors and never `mod.db` or `mod.db.profile` directly. NEVER create an intermediate table for profile/config.
   - `self:GetGlobalConfig()` for the `global` config block
   - `self:GetModuleConfig()` for the module's specific block
 - Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
 - Layout/refresh/throttle logic lives in `FrameUtil` as stateless utility functions. ModuleMixin provides thin overrideable wrappers. Modules that override `Refresh` should call `FrameUtil.BaseRefresh(self, why, force)` as the guard, not `ModuleMixin.Refresh`.
-- Any and all layout updates MUST be triggered from a call to `UpdateLayout()`. No cheeky workarounds, no funny business. MUST. Any change that modifies the layout outside of this function will be rejected.
-- Any and all value-related updates should be triggered from a call to `Refresh(why)`.
-- Use WoW's built-in `strtrim(...)` for string trimming. Do not use `:trim()` or custom trim helpers.
 
 # Secret Values
 

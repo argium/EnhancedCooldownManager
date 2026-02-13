@@ -2,12 +2,9 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local ADDON_NAME, ns = ...
-
-local ECM = ns.Addon
-local C = ns.Constants
-local Options = ECM:NewModule("Options")
-local OH = ECM.OptionHelpers
+local _, ns = ...
+local mod = ns.Addon
+local Options = mod:NewModule("Options")
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDBOptions = LibStub("AceDBOptions-3.0")
@@ -44,7 +41,7 @@ local function IsDeathKnight()
 end
 
 local function GeneralOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     return {
         type = "group",
         name = "General",
@@ -100,8 +97,8 @@ local function GeneralOptionsTable()
                         name = "X",
                         order = 9,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("global.texture") end,
-                        func = OH.MakeResetHandler("global.texture"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.texture") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.texture"),
                     },
                 },
             },
@@ -135,8 +132,8 @@ local function GeneralOptionsTable()
                         name = "X",
                         order = 3,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("global.offsetY") end,
-                        func = OH.MakeResetHandler("global.offsetY"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.offsetY") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.offsetY"),
                     },
                 },
             },
@@ -188,9 +185,9 @@ local function GeneralOptionsTable()
                         name = "X",
                         order = 5,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("global.outOfCombatFade.opacity") end,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.outOfCombatFade.opacity") end,
                         disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
-                        func = OH.MakeResetHandler("global.outOfCombatFade.opacity"),
+                        func = ECM.OptionUtil.MakeResetHandler("global.outOfCombatFade.opacity"),
                     },
                     spacer2 = {
                         type = "description",
@@ -237,7 +234,7 @@ end
 local TickMarksOptionsTable
 
 local function PowerBarOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     local tickMarks = TickMarksOptionsTable()
     tickMarks.name = "Tick Marks"
     tickMarks.inline = true
@@ -252,7 +249,7 @@ local function PowerBarOptionsTable()
                 name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
                 order = 0,
                 fontSize = "medium",
-                hidden = function() return ECM.PowerBar:ShouldShow() end,
+                hidden = function() return mod.PowerBar:ShouldShow() end,
             },
             basicSettings = {
                 type = "group",
@@ -268,7 +265,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
-                            OH.SetModuleEnabled("PowerBar", val)
+                            ECM.OptionUtil.SetModuleEnabled("PowerBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -296,8 +293,8 @@ local function PowerBarOptionsTable()
                         name = "X",
                         order = 5,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("powerBar.height") end,
-                        func = OH.MakeResetHandler("powerBar.height"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.height") end,
+                        func = ECM.OptionUtil.MakeResetHandler("powerBar.height"),
                     },
                 },
             },
@@ -402,12 +399,12 @@ local function PowerBarOptionsTable()
                         order = 2,
                         width = "full",
                         dialogControl = "ECM_PositionModeSelector",
-                        values = OH.POSITION_MODE_TEXT,
+                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
                         get = function()
                             return db.profile.powerBar.anchorMode
                         end,
                         set = function(_, val)
-                            OH.ApplyPositionModeToBar(db.profile.powerBar, val)
+                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.powerBar, val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -419,7 +416,7 @@ local function PowerBarOptionsTable()
                 }
 
                 -- Add width, offsetX, offsetY settings
-                local positioningSettings = OH.MakePositioningSettingsArgs("powerBar")
+                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("powerBar")
                 for k, v in pairs(positioningSettings) do
                     positioningArgs[k] = v
                 end
@@ -438,7 +435,7 @@ local function PowerBarOptionsTable()
 end
 
 local function ResourceBarOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     return {
         type = "group",
         name = "Resource Bar",
@@ -449,7 +446,7 @@ local function ResourceBarOptionsTable()
                 name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
                 order = 0,
                 fontSize = "medium",
-                hidden = function() return ECM.ResourceBar:ShouldShow() end,
+                hidden = function() return mod.ResourceBar:ShouldShow() end,
             },
             basicSettings = {
                 type = "group",
@@ -465,7 +462,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.enabled end,
                         set = function(_, val)
                             db.profile.resourceBar.enabled = val
-                            OH.SetModuleEnabled("ResourceBar", val)
+                            ECM.OptionUtil.SetModuleEnabled("ResourceBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -493,8 +490,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 6,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.height") end,
-                        func = OH.MakeResetHandler("resourceBar.height"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.height") end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.height"),
                     },
                 },
             },
@@ -512,12 +509,12 @@ local function ResourceBarOptionsTable()
                         order = 2,
                         width = "full",
                         dialogControl = "ECM_PositionModeSelector",
-                        values = OH.POSITION_MODE_TEXT,
+                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
                         get = function()
                             return db.profile.resourceBar.anchorMode
                         end,
                         set = function(_, val)
-                            OH.ApplyPositionModeToBar(db.profile.resourceBar, val)
+                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.resourceBar, val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -529,7 +526,7 @@ local function ResourceBarOptionsTable()
                 }
 
                 -- Add width, offsetX, offsetY settings
-                local positioningSettings = OH.MakePositioningSettingsArgs("resourceBar")
+                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("resourceBar")
                 for k, v in pairs(positioningSettings) do
                     positioningArgs[k] = v
                 end
@@ -620,8 +617,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 11,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors.souls") end,
-                        func = OH.MakeResetHandler("resourceBar.colors.souls"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.souls") end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.souls"),
                     },
                     colorDevourerNormal = {
                         type = "color",
@@ -642,8 +639,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 13,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors.devourerNormal") end,
-                        func = OH.MakeResetHandler("resourceBar.colors.devourerNormal"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.devourerNormal") end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.devourerNormal"),
                     },
                     colorDevourerMeta = {
                         type = "color",
@@ -664,8 +661,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 15,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors.devourerMeta") end,
-                        func = OH.MakeResetHandler("resourceBar.colors.devourerMeta"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.devourerMeta") end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.devourerMeta"),
                     },
                     colorComboPoints = {
                         type = "color",
@@ -686,8 +683,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 17,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors." .. Enum.PowerType.ComboPoints) end,
-                        func = OH.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.ComboPoints),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.ComboPoints) end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.ComboPoints),
                     },
                     colorChi = {
                         type = "color",
@@ -708,8 +705,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 19,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Chi) end,
-                        func = OH.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Chi),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Chi) end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Chi),
                     },
                     colorHolyPower = {
                         type = "color",
@@ -730,8 +727,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 21,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors." .. Enum.PowerType.HolyPower) end,
-                        func = OH.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.HolyPower),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.HolyPower) end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.HolyPower),
                     },
                     colorSoulShards = {
                         type = "color",
@@ -752,8 +749,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 23,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors." .. Enum.PowerType.SoulShards) end,
-                        func = OH.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.SoulShards),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.SoulShards) end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.SoulShards),
                     },
                     colorEssence = {
                         type = "color",
@@ -774,8 +771,8 @@ local function ResourceBarOptionsTable()
                         name = "X",
                         order = 25,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Essence) end,
-                        func = OH.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Essence),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Essence) end,
+                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Essence),
                     },
                 },
             },
@@ -784,7 +781,7 @@ local function ResourceBarOptionsTable()
 end
 
 local function RuneBarOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     return {
         type = "group",
         name = "Rune Bar",
@@ -805,7 +802,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.enabled end,
                         set = function(_, val)
                             db.profile.runeBar.enabled = val
-                            OH.SetModuleEnabled("RuneBar", val)
+                            ECM.OptionUtil.SetModuleEnabled("RuneBar", val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -833,8 +830,8 @@ local function RuneBarOptionsTable()
                         name = "X",
                         order = 5,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("runeBar.height") end,
-                        func = OH.MakeResetHandler("runeBar.height"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("runeBar.height") end,
+                        func = ECM.OptionUtil.MakeResetHandler("runeBar.height"),
                     },
                     spacer1 = {
                         type = "description",
@@ -860,8 +857,8 @@ local function RuneBarOptionsTable()
                         name = "X",
                         order = 22,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("runeBar.color") end,
-                        func = OH.MakeResetHandler("runeBar.color"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("runeBar.color") end,
+                        func = ECM.OptionUtil.MakeResetHandler("runeBar.color"),
                     },
                 },
             },
@@ -879,10 +876,10 @@ local function RuneBarOptionsTable()
                         order = 2,
                         width = "full",
                         dialogControl = "ECM_PositionModeSelector",
-                        values = OH.POSITION_MODE_TEXT,
+                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
                         get = function() return db.profile.runeBar.anchorMode end,
                         set = function(_, val)
-                            OH.ApplyPositionModeToBar(db.profile.runeBar, val)
+                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.runeBar, val)
                             ECM.ScheduleLayoutUpdate(0)
                         end,
                     },
@@ -894,7 +891,7 @@ local function RuneBarOptionsTable()
                 }
 
                 -- Add width, offsetX, offsetY settings
-                local positioningSettings = OH.MakePositioningSettingsArgs("runeBar", {
+                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("runeBar", {
                     widthDesc = "Width when custom positioning is enabled.",
                     offsetXDesc = "\nHorizontal offset when custom positioning is enabled.",
                     offsetYDesc = "\nVertical offset when custom positioning is enabled.",
@@ -916,7 +913,7 @@ local function RuneBarOptionsTable()
 end
 
 local function ItemIconsOptionsTable()
-    local itemIcons = ECM:GetModule(C.ITEMICONS, true)
+    local itemIcons = mod:GetModule(ECM.Constants.ITEMICONS, true)
     if itemIcons and itemIcons.GetOptionsTable then
         return itemIcons:GetOptionsTable()
     end
@@ -930,7 +927,7 @@ local function ItemIconsOptionsTable()
 end
 
 local function ProfileOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     -- Use AceDBOptions to generate a full profile management UI
     local profileOptions = AceDBOptions:GetOptionsTable(db)
     profileOptions.order = 7
@@ -956,13 +953,13 @@ local function ProfileOptionsTable()
                 order = 2,
                 width = "normal",
                 func = function()
-                    local exportString, err = ns.ImportExport.ExportCurrentProfile()
+                    local exportString, err = ECM.ImportExport.ExportCurrentProfile()
                     if not exportString then
-                        ECM:Print("Export failed: " .. (err or "Unknown error"))
+                        mod:Print("Export failed: " .. (err or "Unknown error"))
                         return
                     end
 
-                    ECM:ShowExportDialog(exportString)
+                    mod:ShowExportDialog(exportString)
                 end,
             },
             importButton = {
@@ -973,11 +970,11 @@ local function ProfileOptionsTable()
                 width = "normal",
                 func = function()
                     if InCombatLockdown() then
-                        ECM:Print("Cannot import during combat (reload blocked)")
+                        mod:Print("Cannot import during combat (reload blocked)")
                         return
                     end
 
-                    ECM:ShowImportDialog()
+                    mod:ShowImportDialog()
                 end,
             },
         },
@@ -993,8 +990,8 @@ end
 --- Gets tick marks for the current class/spec.
 ---@return ECM_TickMark[]
 local function GetCurrentTicks()
-    local db = ECM.db
-    local classID, specIndex = OH.GetCurrentClassSpec()
+    local db = mod.db
+    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then
         return {}
     end
@@ -1015,8 +1012,8 @@ end
 --- Sets tick marks for the current class/spec.
 ---@param ticks ECM_TickMark[]
 local function SetCurrentTicks(ticks)
-    local db = ECM.db
-    local classID, specIndex = OH.GetCurrentClassSpec()
+    local db = mod.db
+    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then
         return
     end
@@ -1029,7 +1026,7 @@ local function SetCurrentTicks(ticks)
 
     local ticksCfg = powerBarCfg.ticks
     if not ticksCfg then
-        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
         ticksCfg = powerBarCfg.ticks
     end
     if not ticksCfg.mappings then
@@ -1048,7 +1045,7 @@ end
 ---@param width number|nil
 local function AddTick(value, color, width)
     local ticks = GetCurrentTicks()
-    local db = ECM.db
+    local db = mod.db
     local powerBarCfg = db.profile.powerBar
     if not powerBarCfg then
         db.profile.powerBar = {}
@@ -1057,7 +1054,7 @@ local function AddTick(value, color, width)
 
     local ticksCfg = powerBarCfg.ticks
     if not ticksCfg then
-        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
         ticksCfg = powerBarCfg.ticks
     end
 
@@ -1093,7 +1090,7 @@ local function UpdateTick(index, field, value)
 end
 
 TickMarksOptionsTable = function()
-    local db = ECM.db
+    local db = mod.db
 
     --- Generates per-tick options dynamically.
     local function GenerateTickArgs()
@@ -1204,7 +1201,7 @@ TickMarksOptionsTable = function()
             currentSpec = {
                 type = "description",
                 name = function()
-                    local _, _, className, specName = OH.GetCurrentClassSpec()
+                    local _, _, className, specName = ECM.OptionUtil.GetCurrentClassSpec()
                     return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
                 end,
                 order = 3,
@@ -1223,7 +1220,7 @@ TickMarksOptionsTable = function()
                 hasAlpha = true,
                 get = function()
                     local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
-                    local c = ticksCfg and ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR
+                    local c = ticksCfg and ticksCfg.defaultColor or ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR
                     return c.r or 0, c.g or 0, c.b or 0, c.a or 0.5
                 end,
                 set = function(_, r, g, b, a)
@@ -1234,7 +1231,7 @@ TickMarksOptionsTable = function()
                     end
                     local ticksCfg = powerBarCfg.ticks
                     if not ticksCfg then
-                        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
                         ticksCfg = powerBarCfg.ticks
                     end
                     ticksCfg.defaultColor = { r = r, g = g, b = b, a = a }
@@ -1261,7 +1258,7 @@ TickMarksOptionsTable = function()
                     end
                     local ticksCfg = powerBarCfg.ticks
                     if not ticksCfg then
-                        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
                         ticksCfg = powerBarCfg.ticks
                     end
                     ticksCfg.defaultWidth = val
@@ -1336,7 +1333,7 @@ TickMarksOptionsTable = function()
 end
 
 local function AboutOptionsTable()
-    local db = ECM.db
+    local db = mod.db
     local authorColored = "|cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r"
     local version = C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "unknown"
     return {
@@ -1409,8 +1406,8 @@ local function AboutOptionsTable()
                         name = "X",
                         order = 3,
                         width = 0.3,
-                        hidden = function() return not OH.IsValueChanged("global.updateFrequency") end,
-                        func = OH.MakeResetHandler("global.updateFrequency"),
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.updateFrequency") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.updateFrequency"),
                     },
                 },
             },
@@ -1450,7 +1447,7 @@ end
 local function GetOptionsTable()
     return {
         type = "group",
-        name = Argi.Sparkle(C.ADDON_NAME),
+        name = Argi.Sparkle(ECM.Constants.ADDON_NAME),
         childGroups = "tree",
         args = {
             general = GeneralOptionsTable(),
@@ -1479,7 +1476,7 @@ function Options:OnInitialize()
     )
 
     -- Register callbacks for profile changes to refresh bars
-    local db = ECM.db
+    local db = mod.db
     db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")

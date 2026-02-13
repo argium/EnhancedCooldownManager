@@ -3,9 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
+local mod = ns.Addon
 local ImportExport = {}
-ns.ImportExport = ImportExport
+ECM.ImportExport = ImportExport
 
 local EXPORT_PREFIX = "EnhancedCooldownManager"
 local EXPORT_VERSION = 1
@@ -174,8 +174,7 @@ end
 ---@return string|nil exportString The export string, or nil on failure
 ---@return string|nil errorMessage Error message if export failed
 function ImportExport.ExportCurrentProfile()
-    local ECM = ns.Addon
-    local db = ECM.db
+    local db = mod.db
     if not db or not db.profile then
         return nil, "No active profile found"
     end
@@ -213,8 +212,7 @@ function ImportExport.ApplyImportData(data)
         return false, "Invalid import data"
     end
 
-    local ECM = ns.Addon
-    local db = ECM.db
+    local db = mod.db
     if not db or not db.profile then
         return false, "No active profile to import into"
     end
@@ -242,9 +240,8 @@ function ImportExport.ApplyImportData(data)
     end
 
     -- Run migrations on imported data (it may be from an older schema)
-    local C = ns.Constants
-    if db.profile.schemaVersion and db.profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ns.Migration.Run(db.profile)
+    if db.profile.schemaVersion and db.profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
+        ECM.Migration.Run(db.profile)
     end
 
     return true

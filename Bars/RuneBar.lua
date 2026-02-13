@@ -2,18 +2,13 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local ADDON_NAME, ns = ...
-local ECM = ns.Addon
-local C = ns.Constants
-
-local BarFrame = ns.Mixins.BarFrame
-local ModuleMixin = ns.Mixins.ModuleMixin
-
-local RuneBar = ECM:NewModule("RuneBar", "AceEvent-3.0")
-ECM.RuneBar = RuneBar
+local _, ns = ...
+local mod = ns.Addon
+local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
+mod.RuneBar = RuneBar
 
 --------------------------------------------------------------------------------
--- Fragmented Bars (DK Runes - individual bars per rune with recharge timers)
+-- Fragmented Bars (DK Runes - individual bars with recharge timers)
 --------------------------------------------------------------------------------
 
 --- Creates or returns fragmented sub-bars for runes.
@@ -159,7 +154,7 @@ end
 
 function RuneBar:CreateFrame()
     -- Create base frame using ModuleMixin (not BarFrame, since we manage StatusBar ourselves)
-    local frame = ModuleMixin.CreateFrame(self)
+    local frame = ECM.ModuleMixin.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -179,13 +174,13 @@ function RuneBar:CreateFrame()
         self:ThrottledUpdateLayout("FrameOnUpdate")
     end)
 
-    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
 
 function RuneBar:ShouldShow()
     local _, class = UnitClass("player")
-    return ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
+    return ECM.ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
 end
 
 function RuneBar:Refresh(why, force)
@@ -202,7 +197,7 @@ function RuneBar:Refresh(why, force)
     local globalConfig = self:GetGlobalConfig()
     local frame = self.InnerFrame
 
-    local maxRunes = C.RUNEBAR_MAX_RUNES
+    local maxRunes = ECM.Constants.RUNEBAR_MAX_RUNES
     if not maxRunes or maxRunes <= 0 then
         frame:Hide()
         return
@@ -225,7 +220,7 @@ function RuneBar:Refresh(why, force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
+    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete.")
     return true
 end
 
@@ -240,7 +235,7 @@ function RuneBar:OnEnable()
     end
 
     if not self.IsModuleMixin then
-        BarFrame.AddMixin(self, "RuneBar")
+        ECM.BarFrame.AddMixin(self, "RuneBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end

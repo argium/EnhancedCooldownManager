@@ -16,10 +16,7 @@
 ---   FrameUtil.LazySetHeight(frame, 20)
 ---   FrameUtil.LazyResetState(frame)
 
-local _, ns = ...
-local C = ns.Constants
-
-FrameUtil = {}
+FrameUtil = FrameUtil or {}
 
 --- Returns the region at the given index if it exists and matches the expected type.
 ---@param frame Frame
@@ -50,14 +47,14 @@ end
 ---@param frame ECM_BuffBarFrame
 ---@return Texture|nil
 function FrameUtil.GetIconOverlay(frame)
-    return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
+    return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
 ---@param frame ECM_BuffBarFrame
 ---@return Texture|nil
 function FrameUtil.GetIconTexture(frame)
-    return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+    return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
@@ -332,7 +329,7 @@ function FrameUtil.CalculateLayoutParams(self)
 
     local params = { mode = mode }
 
-    if mode == C.ANCHORMODE_CHAIN then
+    if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local anchor, isFirst = self:GetNextChainAnchor(self.Name)
         params.anchor = anchor
         params.isFirst = isFirst
@@ -342,13 +339,13 @@ function FrameUtil.CalculateLayoutParams(self)
         params.offsetY = (isFirst and -globalConfig.offsetY) or 0
         params.height = moduleConfig.height or globalConfig.barHeight
         params.width = nil -- Width set by dual-point anchoring
-    elseif mode == C.ANCHORMODE_FREE then
+    elseif mode == ECM.Constants.ANCHORMODE_FREE then
         params.anchor = UIParent
         params.isFirst = false
         params.anchorPoint = "CENTER"
         params.anchorRelativePoint = "CENTER"
         params.offsetX = moduleConfig.offsetX or 0
-        params.offsetY = moduleConfig.offsetY or C.DEFAULT_FREE_ANCHOR_OFFSET_Y
+        params.offsetY = moduleConfig.offsetY or ECM.Constants.DEFAULT_FREE_ANCHOR_OFFSET_Y
         params.height = moduleConfig.height or globalConfig.barHeight
         params.width = moduleConfig.width or globalConfig.barWidth
     end
@@ -384,7 +381,7 @@ function FrameUtil.ApplyFramePosition(self, frame)
     local anchorRelativePoint = params.anchorRelativePoint
 
     local anchors
-    if mode == C.ANCHORMODE_CHAIN then
+    if mode == ECM.Constants.ANCHORMODE_CHAIN then
         anchors = {
             { "TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY },
             { "TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY },
@@ -435,10 +432,10 @@ function FrameUtil.ApplyStandardLayout(self, why)
 
     -- Apply background color via lazy setter
     ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
-    local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
+    local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or ECM.Constants.DEFAULT_BG_COLOR
     local bgColorChanged = FrameUtil.LazySetBackgroundColor(frame, bgColor)
 
-    ECM_log(C.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
         anchor = anchor:GetName(),
         isFirst = isFirst,
         widthChanged = widthChanged,
@@ -480,7 +477,7 @@ function FrameUtil.ScheduleDebounced(self, flagName, callback)
     self[flagName] = true
 
     local globalConfig = self:GetGlobalConfig()
-    local freq = globalConfig and globalConfig.updateFrequency or C.DEFAULT_REFRESH_FREQUENCY
+    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
     C_Timer.After(freq, function()
         self[flagName] = nil
         callback()
@@ -493,7 +490,7 @@ end
 ---@return boolean refreshed True if Refresh() was called
 function FrameUtil.ThrottledRefresh(self, why)
     local globalConfig = self:GetGlobalConfig()
-    local freq = (globalConfig and globalConfig.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
+    local freq = (globalConfig and globalConfig.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
     if GetTime() - (self._lastUpdate or 0) < freq then
         return false
     end

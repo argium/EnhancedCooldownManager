@@ -2,14 +2,10 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local ADDON_NAME, ns = ...
-local ECM = ns.Addon
-local C = ns.Constants
-
-local BarFrame = ns.Mixins.BarFrame
-
-local PowerBar = ECM:NewModule("PowerBar", "AceEvent-3.0")
-ECM.PowerBar = PowerBar
+local _, ns = ...
+local mod = ns.Addon
+local PowerBar = mod:NewModule("PowerBar", "AceEvent-3.0")
+mod.PowerBar = PowerBar
 
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil
@@ -47,7 +43,7 @@ function PowerBar:UpdateTicks(frame, resource, max)
 
     local config = self:GetModuleConfig()
     local ticksCfg = config and config.ticks
-    local defaultColor = ticksCfg and ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR
+    local defaultColor = ticksCfg and ticksCfg.defaultColor or ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
     -- Create tick textures on TicksFrame, but position them relative to StatusBar
@@ -73,7 +69,7 @@ function PowerBar:GetStatusBarValues()
 end
 
 function PowerBar:Refresh(why, force)
-    local result = BarFrame.Refresh(self, why, force)
+    local result = ECM.BarFrame.Refresh(self, why, force)
     if not result then
         return false
     end
@@ -84,12 +80,12 @@ function PowerBar:Refresh(why, force)
     local max = UnitPowerMax("player", resource)
     self:UpdateTicks(frame, resource, max)
 
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
 function PowerBar:ShouldShow()
-    local show = BarFrame.ShouldShow(self)
+    local show = ECM.BarFrame.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
         local powerType = UnitPowerType("player")
@@ -100,7 +96,7 @@ function PowerBar:ShouldShow()
             if role == "TANK" then
                 return false
             elseif role == "DAMAGER" then
-                return C.POWERBAR_SHOW_MANABAR[class] or false
+                return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false
             end
         end
 
@@ -128,14 +124,13 @@ end
 
 function PowerBar:OnEnable()
     if not self.IsModuleMixin then
-        BarFrame.AddMixin(self, "PowerBar")
+        ECM.BarFrame.AddMixin(self, "PowerBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
 
-    BarFrame.OnEnable(self)
     self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPowerUpdate")
-    ECM_log(C.SYS.Core, self.Name, "Enabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enabled")
 end
 
 function PowerBar:OnDisable()
@@ -143,6 +138,5 @@ function PowerBar:OnDisable()
     if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
-    BarFrame.OnDisable(self)
-    ECM_log(C.SYS.Core, self.Name, "Disabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Disabled")
 end

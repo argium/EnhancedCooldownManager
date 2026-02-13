@@ -32,7 +32,7 @@ Modules\Utilities.lua
 Modules\FrameUtil.lua
 Modules\BugReports.lua
 Options\Migration.lua
-Options\ImportExport.lua
+OptioECM.ImportExport.lua
 
 EnhancedCooldownManager.lua
 
@@ -48,8 +48,8 @@ Bars\RuneBar.lua
 Bars\BuffBars.lua
 Bars\ItemIcons.lua
 
+Options\OptionUtil.lua
 Options\Widgets\PositionModeSelector.lua
-Options\OptionHelpers.lua
 Options\ItemIconsOptions.lua
 Options\BuffBarsOptions.lua
 Options\Options.lua

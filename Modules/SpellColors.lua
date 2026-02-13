@@ -6,12 +6,8 @@
 -- Backed by a FallbackKeyMap (primary = spell name, fallback = texture file ID).
 
 local _, ns = ...
-
-local C = ns.Constants
-local FallbackKeyMap = ns.FallbackKeyMap
-
 local SpellColors = {}
-ns.SpellColors = SpellColors
+ECM.SpellColors = SpellColors
 
 ---------------------------------------------------------------------------
 -- Key validation
@@ -62,7 +58,7 @@ local function ensure_profile_is_setup(cfg)
             byName = {},
             byTexture = {},
             cache = {},
-            defaultColor = C.BUFFBARS_DEFAULT_COLOR,
+            defaultColor = ECM.Constants.BUFFBARS_DEFAULT_COLOR,
         }
     end
     if type(cfg.colors.byName) ~= "table" then
@@ -75,15 +71,15 @@ local function ensure_profile_is_setup(cfg)
         cfg.colors.cache = {}
     end
     if type(cfg.colors.defaultColor) ~= "table" then
-        cfg.colors.defaultColor = C.BUFFBARS_DEFAULT_COLOR
+        cfg.colors.defaultColor = ECM.Constants.BUFFBARS_DEFAULT_COLOR
     end
 end
 
 --- Returns the buffBars config table, or nil if unavailable.
 ---@return table|nil cfg
 local function config()
-    local addon = ns.Addon
-    local cfg = addon and addon.db and addon.db.profile and addon.db.profile.buffBars or nil
+    local mod = ns.Addon
+    local cfg = mod and mod.db and mod.db.profile and mod.db.profile.buffBars or nil
     if type(cfg) ~= "table" then
         ECM_debug_assert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil
@@ -110,7 +106,7 @@ local function get_map()
         return nil
     end
 
-    _map = FallbackKeyMap.New(
+    _map = ECM.FallbackKeyMap.New(
         function()
             local cfg = config()
             if not cfg then return nil end
@@ -144,7 +140,7 @@ function SpellColors.GetColorForBar(frame)
     ECM_debug_assert(frame, "Expected bar frame")
 
     if not (frame and frame.__ecmHooked) then
-        ECM_log(C.SYS.Styling, "SpellColors", "GetColorForBar - invalid bar frame", {
+        ECM_log(ECM.Constants.SYS.Styling, "SpellColors", "GetColorForBar - invalid bar frame", {
             frame = frame,
             nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
             iconExists = frame and type(frame.Icon) == "table" and type(frame.Icon.GetRegions) == "function",

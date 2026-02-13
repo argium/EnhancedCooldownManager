@@ -1,7 +1,5 @@
 -- Bug report popup and player info helpers
 
-local _, ns = ...
-
 local bugReportFrame = nil
 
 --- Gets player info string for bug reports.
@@ -94,7 +92,7 @@ end
 --- Shows the bug report popup with trace log and player info.
 local function ShowBugReportPopup()
     local frame = GetBugReportFrame()
-    local content = GetPlayerInfoString() .. "\n" .. string.rep("-", 60) .. "\n" .. ns.GetTraceLog()
+    local content = GetPlayerInfoString() .. "\n" .. string.rep("-", 60) .. "\n" .. ECM.GetTraceLog()
     frame.originalText = content
     frame.editBox:SetText(content)
     frame.editBox:SetCursorPosition(0)
@@ -102,4 +100,4 @@ local function ShowBugReportPopup()
     frame.editBox:HighlightText()
 end
 
-ns.ShowBugReportPopup = ShowBugReportPopup
+ECM.ShowBugReportPopup = ShowBugReportPopup

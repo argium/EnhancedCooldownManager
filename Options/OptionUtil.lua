@@ -1,9 +1,9 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Solär
+-- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
-local ECM = ns.Addon
-local C = ns.Constants
-
+local mod = ns.Addon
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
 --------------------------------------------------------------------------------
@@ -32,14 +32,14 @@ local function IsOptionsDisabled(self)
 end
 
 local POSITION_MODE_TEXT = {
-    [C.ANCHORMODE_CHAIN] = "Position Automatically",
-    [C.ANCHORMODE_FREE] = "Free Positioning",
+    [ECM.Constants.ANCHORMODE_CHAIN] = "Position Automatically",
+    [ECM.Constants.ANCHORMODE_FREE] = "Free Positioning",
 }
 
 local function ApplyPositionModeToBar(cfg, mode)
-    if mode == C.ANCHORMODE_FREE then
+    if mode == ECM.Constants.ANCHORMODE_FREE then
         if cfg.width == nil then
-            cfg.width = C.DEFAULT_BAR_WIDTH
+            cfg.width = ECM.Constants.DEFAULT_BAR_WIDTH
         end
     end
 
@@ -47,11 +47,11 @@ local function ApplyPositionModeToBar(cfg, mode)
 end
 
 local function IsAnchorModeFree(cfg)
-    return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
+    return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
 end
 
 local function SetModuleEnabled(moduleName, enabled)
-    local module = ECM[moduleName]
+    local module = mod[moduleName]
     if not module then
         return
     end
@@ -61,15 +61,15 @@ local function SetModuleEnabled(moduleName, enabled)
             if module.Enable then
                 module:Enable()
             else
-                ECM:EnableModule(moduleName)
+                mod:EnableModule(moduleName)
             end
         end
     else
         if module:IsEnabled() then
             if module.Disable then
                 module:Disable()
-            elseif ECM.DisableModule then
-                ECM:DisableModule(moduleName)
+            elseif mod.DisableModule then
+                mod:DisableModule(moduleName)
             end
         end
     end
@@ -135,8 +135,8 @@ end
 --- @param path string The dot-separated config path to check (e.g., "powerBar.width")
 --- @return boolean True if the current value differs from the default value, false otherwise
 local function IsValueChanged(path)
-    local profile = ECM.db and ECM.db.profile
-    local defaults = ECM.db and ECM.db.defaults and ECM.db.defaults.profile
+    local profile = mod.db and mod.db.profile
+    local defaults = mod.db and mod.db.defaults and mod.db.defaults.profile
     if not profile or not defaults then return false end
 
     local currentVal = GetNestedValue(profile, path)
@@ -149,8 +149,8 @@ end
 --- @param path string The dot-separated config path to reset (e.g., "powerBar.width")
 --- @return nil
 local function ResetToDefault(path)
-    local profile = ECM.db and ECM.db.profile
-    local defaults = ns.defaults and ns.defaults.profile
+    local profile = mod.db and mod.db.profile
+    local defaults = ECM.defaults and ECM.defaults.profile
     if not profile or not defaults then return end
 
     local defaultVal = GetNestedValue(defaults, path)
@@ -198,7 +198,7 @@ local function MakePositioningSettingsArgs(configPath, options)
     local offsetXDesc = options.offsetXDesc or "\nHorizontal offset when free positioning is enabled."
     local offsetYDesc = options.offsetYDesc or "\nVertical offset when free positioning is enabled."
 
-    local db = ECM.db
+    local db = mod.db
     local args = {
         widthDesc = {
             type = "description",
@@ -217,7 +217,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
-                return cfg.width or C.DEFAULT_BAR_WIDTH
+                return cfg.width or ECM.Constants.DEFAULT_BAR_WIDTH
             end,
             set = function(_, val)
                 local cfg = GetNestedValue(db.profile, configPath)
@@ -320,7 +320,7 @@ end
 -- Export
 --------------------------------------------------------------------------------
 
-ECM.OptionHelpers = {
+ECM.OptionUtil = {
     IsOptionsDisabled = IsOptionsDisabled,
     GetOptionValue = GetOptionValue,
     GetNestedValue = GetNestedValue,

@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ns.Constants
 
 ---------------------------------------------------------------------------
 -- String helpers
@@ -95,7 +94,7 @@ local function get_lsm_media(mediaType, key)
 end
 
 local function get_font_path(fontKey)
-    return get_lsm_media("font", fontKey) or C.DEFAULT
+    return get_lsm_media("font", fontKey) or ECM.Constants.DEFAULT_FONT
 end
 
 --- Returns a statusbar texture path (LSM-resolved when available).
@@ -114,7 +113,7 @@ function ECM_GetTexture(texture)
         end
     end
 
-    return get_lsm_media("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
+    return get_lsm_media("statusbar", "Blizzard") or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
 end
 
 --- Applies font settings to a FontString.
@@ -124,16 +123,16 @@ function ECM_ApplyFont(fontString)
         return
     end
 
-    local globalConfig = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global
-    local fontPath = get_font_path(globalConfig and globalConfig.font)
-    local fontSize = (globalConfig and globalConfig.fontSize)
-    local fontOutline = (globalConfig and globalConfig.fontOutline)
+    local config = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global
+    local fontPath = get_font_path(config and config.font)
+    local fontSize = (config and config.fontSize)
+    local fontOutline = (config and config.fontOutline)
 
     if fontOutline == "NONE" then
         fontOutline = ""
     end
 
-    local hasShadow = globalConfig and globalConfig.fontShadow
+    local hasShadow = config and config.fontShadow
 
     ECM_debug_assert(fontPath, "Font path cannot be nil")
     ECM_debug_assert(fontSize, "Font size cannot be nil")
@@ -277,7 +276,7 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)
-    local prefix = Argi.Sparkle(C.ADDON_NAME .. ":")
+    local prefix = Argi.Sparkle(ECM.Constants.ADDON_NAME .. ":")
     local message = table.concat({...}, " ")
     print(prefix .. " " .. message)
 end

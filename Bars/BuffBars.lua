@@ -2,14 +2,6 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
-local _, ns = ...
-
-ECM = ns.Addon
-local C = ns.Constants
-
-local ModuleMixin = ns.Mixins.ModuleMixin
-local SpellColors = ns.SpellColors
-
 local BuffBars = {}
 ECM.BuffBars = BuffBars
 
@@ -131,8 +123,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
             end)
         end
 
-        local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK
-        barBG:SetTexture(C.FALLBACK_TEXTURE)
+        local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK
+        barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
         barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
         barBG:ClearAllPoints()
         barBG:SetAllPoints(frame)
@@ -215,23 +207,23 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     -- Name
     --------------------------------------------------------------------------
     FrameUtil.LazySetAnchors(bar.Name, {
-        { "LEFT", bar, "LEFT", C.BUFFBARS_TEXT_PADDING, 0 },
-        { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
+        { "LEFT", bar, "LEFT", ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+        { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
     })
 
     if bar.Duration then
         FrameUtil.LazySetAnchors(bar.Duration, {
-            { "RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0 },
+            { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         })
     end
 
-    ECM_log(C.SYS.Styling, C.BUFFBARS, "Applied style to bar", {
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Applied style to bar", {
         barIndex = barIndex,
         height = height,
         pipHidden = true,
         pipTexture = nil,
-        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or C.COLOR_BLACK)) or nil,
-        barBgTexture = barBG and C.FALLBACK_TEXTURE or nil,
+        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK)) or nil,
+        barBgTexture = barBG and ECM.Constants.FALLBACK_TEXTURE or nil,
         barBgLayer = barBG and "BACKGROUND" or nil,
         barBgSubLayer = barBG and 0 or nil,
         textureName = textureName,
@@ -248,8 +240,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
         applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
         nameShown = showSpellName,
         durationShown = showDuration,
-        nameLeftInset = C.BUFFBARS_TEXT_PADDING,
-        nameRightPadding = C.BUFFBARS_TEXT_PADDING,
+        nameLeftInset = ECM.Constants.BUFFBARS_TEXT_PADDING,
+        nameRightPadding = ECM.Constants.BUFFBARS_TEXT_PADDING,
         barAnchorMode = iconVisible and "icon" or "frame",
     })
 end
@@ -283,7 +275,7 @@ local function layout_bars(self)
         end
     end
 
-    ECM_log(C.SYS.Layout, C.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
+    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
 end
 
 --------------------------------------------------------------------------------
@@ -295,12 +287,12 @@ end
 function BuffBars:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
-    local mode = cfg and cfg.anchorMode or C.ANCHORMODE_CHAIN
+    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
     local params = { mode = mode }
 
-    if mode == C.ANCHORMODE_CHAIN then
-        local anchor, isFirst = self:GetNextChainAnchor(C.BUFFBARS)
+    if mode == ECM.Constants.ANCHORMODE_CHAIN then
+        local anchor, isFirst = self:GetNextChainAnchor(ECM.Constants.BUFFBARS)
         params.anchor = anchor
         params.isFirst = isFirst
         params.anchorPoint = "TOPLEFT"
@@ -328,7 +320,7 @@ end
 
 --- Override IsReady to require viewer existence and valid attach state.
 function BuffBars:IsReady()
-    if not ModuleMixin.IsReady(self) then
+    if not ECM.ModuleMixin.IsReady(self) then
         return false
     end
 
@@ -359,12 +351,12 @@ function BuffBars:UpdateLayout(why)
 
     -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
     local params = self:CalculateLayoutParams()
-    if params.mode == C.ANCHORMODE_CHAIN then
+    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
         FrameUtil.LazySetAnchors(viewer, {
             { "TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY },
             { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
         })
-    elseif params.mode == C.ANCHORMODE_FREE then
+    elseif params.mode == ECM.Constants.ANCHORMODE_FREE then
         local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
@@ -387,7 +379,7 @@ function BuffBars:UpdateLayout(why)
 
     self._layoutRunning = nil
     viewer:Show()
-    ECM_log(C.SYS.Layout, C.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -449,7 +441,7 @@ function BuffBars:HookViewer()
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    ECM_log(C.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -482,7 +474,7 @@ function BuffBars:HookEditMode()
         self:ThrottledUpdateLayout("EditModeEnter")
     end)
 
-    ECM_log(C.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
 end
 
 function BuffBars:OnUnitAura(_, unit)
@@ -504,7 +496,7 @@ function BuffBars:Enable()
     self._enabled = true
 
     if not self.IsModuleMixin then
-        ModuleMixin.AddMixin(self, "BuffBars")
+        ECM.ModuleMixin.AddMixin(self, "BuffBars")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
@@ -522,7 +514,7 @@ function BuffBars:Enable()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
 
-    ECM_log(C.SYS.Core, self.Name, "Enable - module enabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enable - module enabled")
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)
