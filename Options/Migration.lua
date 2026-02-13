@@ -1,5 +1,5 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V7).
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V8).
 
 local Migration = {}
 ECM.Migration = Migration

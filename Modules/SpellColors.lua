@@ -95,6 +95,28 @@ end
 
 local _map -- FallbackKeyMap instance (created on first use)
 
+--- Repopulates byFallback entries from byPrimary for any colour whose
+--- stored value carries a textureId.  This repairs SavedVariables left
+--- empty by an older Reconcile implementation that deleted fallback entries.
+local function repair_fallback_from_primary()
+    local cfg = config()
+    if not cfg then return end
+
+    local scope = get_scope(cfg)
+    local byPrimary = scope.byPrimary
+    local byFallback = scope.byFallback
+    if not byPrimary or not byFallback then return end
+
+    for _, entry in pairs(byPrimary) do
+        if type(entry) == "table" and type(entry.value) == "table" then
+            local tid = entry.value.textureId
+            if tid and not byFallback[tid] then
+                byFallback[tid] = entry
+            end
+        end
+    end
+end
+
 --- Returns the FallbackKeyMap instance, creating it on first call.
 ---@return FallbackKeyMap|nil
 local function get_map()
@@ -106,6 +128,8 @@ local function get_map()
     if not cfg then
         return nil
     end
+
+    repair_fallback_from_primary()
 
     _map = ECM.FallbackKeyMap.New(
         function()
@@ -177,33 +201,30 @@ function SpellColors.SetColor(spellName, textureId, color)
     if not map then
         return
     end
+    if textureId then
+        color.textureId = textureId
+    end
     map:Set(spellName, textureId, color)
 end
 
---- Returns the default bar color as r, g, b (unpacked for AceConfig).
----@return number r
----@return number g
----@return number b
+--- Returns the default bar color.
+---@return ECM_Color
 function SpellColors.GetDefaultColor()
     local cfg = config()
     if not cfg then
-        local c = ECM.Constants.BUFFBARS_DEFAULT_COLOR
-        return c.r, c.g, c.b
+        return ECM.Constants.BUFFBARS_DEFAULT_COLOR
     end
-    local c = cfg.colors.defaultColor
-    return c.r, c.g, c.b
+    return cfg.colors.defaultColor
 end
 
 --- Sets the default bar color.
----@param r number
----@param g number
----@param b number
-function SpellColors.SetDefaultColor(r, g, b)
+---@param color ECM_Color
+function SpellColors.SetDefaultColor(color)
     local cfg = config()
     if not cfg then
         return
     end
-    cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
+    cfg.colors.defaultColor = { r = color.r, g = color.g, b = color.b, a = 1 }
 end
 
 --- Removes the custom color for a spell from both key maps.

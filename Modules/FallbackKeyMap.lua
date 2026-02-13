@@ -78,9 +78,10 @@ function FallbackKeyMap:_tables()
     return scope.byPrimary, scope.byFallback
 end
 
---- Reconciles a single primary/fallback pair.  Most-recently-written wins,
---- and the losing entry is deleted.  If only the fallback entry exists and
---- the primary key is now available, the entry is migrated to primary.
+--- Reconciles a single primary/fallback pair so both key spaces stay in sync.
+--- If only one entry exists, it is copied to the other table.  If both exist
+--- with different timestamps, the most-recently-written value wins and is
+--- unified under both keys.
 ---
 ---@param primaryKey any|nil  Validated primary key (may still be nil).
 ---@param fallbackKey any|nil  Validated fallback key (may still be nil).
@@ -105,27 +106,31 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
         return false
     end
 
-    -- Only fallback exists → migrate to primary.
+    -- Only fallback exists → copy to primary (keep both).
     if not pEntry and fEntry then
         byPrimary[primaryKey] = fEntry
-        byFallback[fallbackKey] = nil
-        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - migrated fallback to primary", {
+        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied fallback to primary", {
             primaryKey = primaryKey,
             fallbackKey = fallbackKey,
         })
         return true
     end
 
-    -- Only primary exists → nothing to do.
+    -- Only primary exists → copy to fallback so fallback-only lookups
+    -- (e.g. restricted areas where spell names are secret) still hit.
     if pEntry and not fEntry then
-        return false
+        byFallback[fallbackKey] = pEntry
+        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied primary to fallback", {
+            primaryKey = primaryKey,
+            fallbackKey = fallbackKey,
+        })
+        return true
     end
 
-    -- Both exist → most-recently-written wins.  Keep under primary, delete fallback.
-    if ts(fEntry) > ts(pEntry) then
-        byPrimary[primaryKey] = fEntry
-    end
-    byFallback[fallbackKey] = nil
+    -- Both exist → most-recently-written wins.  Unify under both keys.
+    local winner = ts(fEntry) > ts(pEntry) and fEntry or pEntry
+    byPrimary[primaryKey] = winner
+    byFallback[fallbackKey] = winner
 
     ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - resolved conflict", {
         primaryKey = primaryKey,
@@ -175,17 +180,35 @@ function FallbackKeyMap:Get(primaryKey, fallbackKey)
     if primaryKey and byPrimary then
         local entry = byPrimary[primaryKey]
         if entry then
-            return unwrap(entry)
+            local result = unwrap(entry)
+            ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - primary hit", {
+                primaryKey = primaryKey,
+                fallbackKey = fallbackKey,
+                entry = result
+            })
+            return result
         end
     end
 
     if fallbackKey and byFallback then
         local entry = byFallback[fallbackKey]
         if entry then
-            return unwrap(entry)
+            local result = unwrap(entry)
+            ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - fallback hit", {
+                primaryKey = primaryKey,
+                fallbackKey = fallbackKey,
+                entry = result
+            })
+            return result
         end
     end
 
+    ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - miss", {
+        primaryKey = primaryKey,
+        fallbackKey = fallbackKey,
+        byFallback = byFallback or "nil",
+        byPrimary = byPrimary or "nil",
+    })
     return nil
 end
 
@@ -211,11 +234,11 @@ function FallbackKeyMap:Set(primaryKey, fallbackKey, value)
 
     if primaryKey and byPrimary then
         byPrimary[primaryKey] = entry
-        -- Clean up fallback when primary is known.
-        if fallbackKey and byFallback then
-            byFallback[fallbackKey] = nil
-        end
-        return
+        -- DO NOT clean up fallback, even if primary is known so the value can be retrieved later by its fallback.
+        -- if fallbackKey and byFallback then
+        --     byFallback[fallbackKey] = nil
+        -- end
+        -- return
     end
 
     if fallbackKey and byFallback then

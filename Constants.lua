@@ -44,7 +44,7 @@ local constants = {
     RESOURCEBAR_COLLAPSING_STAR_SPELLID = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
     RUNEBAR_MAX_RUNES = 6,
-    BUFFBARS_DEFAULT_COLOR = { r = 0.9, g = 0.9, b = 0.9, a = 1 },
+    BUFFBARS_DEFAULT_COLOR = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
     BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,
     BUFFBARS_ICON_OVERLAY_REGION_INDEX = 3,
     BUFFBARS_TEXT_PADDING = 4,

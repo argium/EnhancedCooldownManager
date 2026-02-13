@@ -9,6 +9,7 @@
 ---@field g number Green channel (0-1).
 ---@field b number Blue channel (0-1).
 ---@field a number Alpha channel (0-1).
+---@field textureId number|nil Texture file ID for icon display.
 
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.

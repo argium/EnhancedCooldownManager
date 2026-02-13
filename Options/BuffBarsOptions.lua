@@ -28,6 +28,10 @@ local function GenerateSpellColorArgs()
     local seen = {}
     local ordered = {}
 
+    -- Texture lookup — maps colorKey → textureFileID so the options UI
+    -- can display an inline icon for every entry, not just fallback keys.
+    local textureForKey = {}
+
     -- 1) Currently-visible aura bars — prefer spellName, fall back to
     --    textureFileID (consistent with FallbackKeyMap's primary/fallback).
     local activeBars = ECM.BuffBars:GetActiveSpellData()
@@ -37,11 +41,28 @@ local function GenerateSpellColorArgs()
             seen[key] = true
             ordered[#ordered + 1] = key
         end
+        if key and bar.textureFileID then
+            textureForKey[key] = bar.textureFileID
+            seen[bar.textureFileID] = true
+        end
     end
 
     -- 2) Persisted custom colors — appended so users can manage colours
     --    for spells that aren't currently active.
     local savedColors = ECM.SpellColors.GetAllColors()
+
+    -- Pre-pass: harvest texture associations from name-keyed saved colours
+    -- and mark those texture IDs as seen so fallback-keyed duplicates
+    -- are suppressed below.
+    for colorKey, color in pairs(savedColors) do
+        if type(colorKey) == "string" and type(color) == "table" and color.textureId then
+            if not textureForKey[colorKey] then
+                textureForKey[colorKey] = color.textureId
+            end
+            seen[color.textureId] = true
+        end
+    end
+
     for colorKey in pairs(savedColors) do
         if not seen[colorKey] then
             seen[colorKey] = true
@@ -61,9 +82,11 @@ local function GenerateSpellColorArgs()
     for i, colorKey in ipairs(ordered) do
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
-        local displayName = type(colorKey) == "string" and colorKey or ("|T" .. colorKey .. ":14:14|t Bar (" .. colorKey .. ")")
+        local texture = textureForKey[colorKey] or (type(colorKey) == "number" and colorKey or nil)
+        local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
+        local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
         local spellName = type(colorKey) == "string" and colorKey or nil
-        local textureId = type(colorKey) == "number" and colorKey or nil
+        local textureId = type(colorKey) == "number" and colorKey or texture
 
         args[optKey] = {
             type = "color",
@@ -74,7 +97,8 @@ local function GenerateSpellColorArgs()
             get = function()
                 local c = ECM.SpellColors.GetColor(spellName, textureId)
                 if c then return c.r, c.g, c.b end
-                return ECM.SpellColors.GetDefaultColor()
+                local dc = ECM.SpellColors.GetDefaultColor()
+                return dc.r, dc.g, dc.b
             end,
             set = function(_, r, g, b)
                 ECM.SpellColors.SetColor(spellName, textureId, { r = r, g = g, b = b, a = 1 })
@@ -105,7 +129,6 @@ local function GenerateSpellColorArgs()
 end
 
 local function SpellOptionsTable()
-    local db = ns.Addon.db
     local result = {
         type = "group",
         name = "Spells",
@@ -126,7 +149,7 @@ local function SpellOptionsTable()
                 type = "description",
                 name = function()
                     local _, _, className, specName = ECM.OptionUtil.GetCurrentClassSpec()
-                    return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
+                    return "|cff00ff00" .. (className or "Unknown") .. " " .. specName .. "|r"
                 end,
                 order = 3,
             },
@@ -135,17 +158,25 @@ local function SpellOptionsTable()
                 name = " ",
                 order = 4,
             },
+            combatlockdown = {
+                type = "description",
+                name = "|cffcc0000These settings cannot be changed while in combat lockdown. Leave combat and open the options panel again to make changes.|r\n\n",
+                order = 5,
+                hidden = function() return not InCombatLockdown() end,
+            },
             defaultColor = {
                 type = "color",
                 name = "Default color",
                 desc = "Default color for spells without a custom color.",
                 order = 10,
                 width = "double",
+                disabled = function() return InCombatLockdown() end,
                 get = function()
-                    return ECM.SpellColors.GetDefaultColor()
+                    local c = ECM.SpellColors.GetDefaultColor()
+                    return c.r, c.g, c.b
                 end,
                 set = function(_, r, g, b)
-                    ECM.SpellColors.SetDefaultColor(r, g, b)
+                    ECM.SpellColors.SetDefaultColor({ r = r, g = g, b = b, a = 1 })
                     ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
@@ -157,6 +188,7 @@ local function SpellOptionsTable()
                 order = 11,
                 width = 0.3,
                 hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.colors.defaultColor") end,
+                disabled = function() return InCombatLockdown() end,
                 func = ECM.OptionUtil.MakeResetHandler("buffBars.colors.defaultColor"),
             },
             spellColorsGroup = {
@@ -164,6 +196,7 @@ local function SpellOptionsTable()
                 name = "",
                 order = 20,
                 inline = true,
+                disabled = function() return InCombatLockdown() end,
                 args = GenerateSpellColorArgs(),
             },
             refreshSpellList = {
@@ -172,6 +205,7 @@ local function SpellOptionsTable()
                 desc = "Scan current buffs to refresh discovered spell names.",
                 order = 100,
                 width = "normal",
+                disabled = function() return InCombatLockdown() end,
                 func = function()
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,

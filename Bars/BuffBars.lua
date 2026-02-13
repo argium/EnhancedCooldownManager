@@ -5,6 +5,7 @@
 local FrameUtil = ECM.FrameUtil
 local BuffBars = {}
 ECM.BuffBars = BuffBars
+local warned = false
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
@@ -141,6 +142,25 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
 
     -- DevTool:AddData(frame)
     local barColor = ECM.SpellColors.GetColorForBar(frame)
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "GetColorForBar", {
+        barIndex = barIndex,
+        spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil",
+        textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil",
+        barColor = barColor or "nil",
+    })
+
+    if issecretvalue(spellName) and issecretvalue(textureFileID) and not InCombatLockdown() and not warned then
+        ECM_print("Spell name AND texture both being secret outside of combat is unexpected and I have not tracked down how this happens.")
+        warned = true
+    end
+
+    -- If bar color is nil that can mean one of two things:
+    --   1) We are in combat lockdown and both keys are secret so lookup is impossible. Do not change anything because it will mess up the internal state.
+    --   2) There truly is no color for this bar, in which case we should apply the default color.
+    if not barColor and not InCombatLockdown() then
+        barColor = ECM.SpellColors.GetDefaultColor()
+    end
+
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
@@ -405,7 +425,6 @@ function BuffBars:ResetStyledMarkers()
             FrameUtil.LazyResetState(child.Bar)
         end
     end
-
 end
 
 --- Returns metadata for all currently-visible aura bars.

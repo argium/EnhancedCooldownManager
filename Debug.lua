@@ -63,7 +63,7 @@ function ECM_log(subsystem, module, message, data)
     end
     AddToTraceLog(logLine)
 
-    if DevTool and DevTool.AddData then
+    if DevTool and DevTool.AddData and (subsystem == ECM.Constants.SYS.SpellColors or module == ECM.Constants.BUFFBARS) then
         local payload = {
             subsystem = subsystem,
             module = module or "nil",

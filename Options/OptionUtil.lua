@@ -150,7 +150,7 @@ end
 --- @return nil
 local function ResetToDefault(path)
     local profile = mod.db and mod.db.profile
-    local defaults = ECM.defaults and ECM.defaults.profile
+    local defaults = mod.db and mod.db.defaults and mod.db.defaults.profile
     if not profile or not defaults then return end
 
     local defaultVal = GetNestedValue(defaults, path)
