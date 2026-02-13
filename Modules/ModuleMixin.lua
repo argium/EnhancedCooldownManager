@@ -56,7 +56,7 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local barName = ECM.Constants.CHAIN_ORDER[i]
         local barModule = mod:GetECMModule(barName, false)
         local isEnabled = barModule and barModule:IsEnabled() or false
-        local shouldShow = barModule and barModule.IsModuleMixin and barModule:ShouldShow() or false
+        local shouldShow = barModule and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule:GetModuleConfig()
         local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
         local BarMixin = barModule and barModule.InnerFrame

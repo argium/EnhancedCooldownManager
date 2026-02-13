@@ -170,11 +170,6 @@ function RuneBar:CreateFrame()
     -- FragmentedBars for individual rune display
     frame.FragmentedBars = {}
 
-    -- Attach OnUpdate script for continuous rune updates
-    frame:SetScript("OnUpdate", function()
-        self:ThrottledUpdateLayout("FrameOnUpdate")
-    end)
-
     ECM_log(ECM.Constants.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
@@ -230,15 +225,22 @@ function RuneBar:OnRunePowerUpdate()
 end
 
 function RuneBar:OnEnable()
+    if not self.IsModuleMixin then
+        ECM.BarMixin.AddMixin(self, "RuneBar")
+    elseif ECM.RegisterFrame then
+        ECM.RegisterFrame(self)
+    end
+
     local _, class = UnitClass("player")
     if class ~= "DEATHKNIGHT" then
         return
     end
 
-    if not self.IsModuleMixin then
-        ECM.BarMixin.AddMixin(self, "RuneBar")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
+    -- DK-only: continuous rune cooldown updates and power events
+    if self.InnerFrame then
+        self.InnerFrame:SetScript("OnUpdate", function()
+            self:ThrottledUpdateLayout("FrameOnUpdate")
+        end)
     end
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
 end
