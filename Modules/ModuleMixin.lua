@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
+local mod
 local FrameUtil = ECM.FrameUtil
 local ModuleMixin = {}
 ECM.ModuleMixin = ModuleMixin
@@ -234,6 +234,7 @@ function ModuleMixin:ThrottledUpdateLayout(reason, opts)
 end
 
 function ModuleMixin.AddMixin(target, name)
+    mod = mod or ns.Addon
     assert(target, "target required")
     assert(name, "name required")
 

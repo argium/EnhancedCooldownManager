@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
+local mod
 local ImportExport = {}
 ECM.ImportExport = ImportExport
 
@@ -174,6 +174,7 @@ end
 ---@return string|nil exportString The export string, or nil on failure
 ---@return string|nil errorMessage Error message if export failed
 function ImportExport.ExportCurrentProfile()
+    mod = mod or ns.Addon
     local db = mod.db
     if not db or not db.profile then
         return nil, "No active profile found"
@@ -208,6 +209,7 @@ end
 ---@return boolean success Whether apply succeeded
 ---@return string|nil errorMessage Error message if apply failed
 function ImportExport.ApplyImportData(data)
+    mod = mod or ns.Addon
     if not data or not data.profile then
         return false, "Invalid import data"
     end

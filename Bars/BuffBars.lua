@@ -139,7 +139,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     local texture = ECM_GetTexture(textureName)
     FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
 
-    local barColor = SpellColors.GetColorForBar(frame)
+    local barColor = ECM.SpellColors.GetColorForBar(frame)
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
