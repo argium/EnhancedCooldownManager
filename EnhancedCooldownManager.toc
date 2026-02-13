@@ -29,7 +29,7 @@ Defaults.lua
 Modules\Sparkle.lua
 Modules\TraceLog.lua
 Modules\Utilities.lua
-Modules\FrameHelpers.lua
+Modules\FrameUtil.lua
 Modules\BugReports.lua
 Options\Migration.lua
 Options\ImportExport.lua
@@ -37,7 +37,7 @@ Options\ImportExport.lua
 EnhancedCooldownManager.lua
 
 Modules\Layout.lua
-Modules\ECMFrame.lua
+Modules\ModuleMixin.lua
 Modules\BuffBarColors.lua
 
 Bars\BarFrame.lua

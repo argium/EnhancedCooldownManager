@@ -277,7 +277,7 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)
-    local prefix = ECM_sparkle(C.ADDON_NAME .. ":")
+    local prefix = Argi.Sparkle(C.ADDON_NAME .. ":")
     local message = table.concat({...}, " ")
     print(prefix .. " " .. message)
 end

@@ -2,7 +2,7 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
---- FrameHelpers: a global table of static helper methods for WoW frames.
+--- FrameUtil: a global table of static helper methods for WoW frames.
 ---
 --- Includes:
 ---   - Buff-bar inspection (GetSpellName, GetIconTexture, etc.)
@@ -11,15 +11,15 @@
 ---     WoW API when the value actually differs.
 ---
 --- Usage:
----   FrameHelpers.GetSpellName(frame)
----   FrameHelpers.GetIconTexture(frame)
----   FrameHelpers.LazySetHeight(frame, 20)
----   FrameHelpers.LazyResetState(frame)
+---   FrameUtil.GetSpellName(frame)
+---   FrameUtil.GetIconTexture(frame)
+---   FrameUtil.LazySetHeight(frame, 20)
+---   FrameUtil.LazyResetState(frame)
 
 local _, ns = ...
 local C = ns.Constants
 
-FrameHelpers = {}
+FrameUtil = {}
 
 --- Returns the region at the given index if it exists and matches the expected type.
 ---@param frame Frame
@@ -42,29 +42,29 @@ end
 --- Returns the spell name shown on the bar, or nil.
 ---@param frame ECM_BuffBarFrame
 ---@return string|nil
-function FrameHelpers.GetSpellName(frame)
+function FrameUtil.GetSpellName(frame)
     return frame.Bar.Name and frame.Bar.Name:GetText() or nil
 end
 
 --- Returns the icon overlay texture region, or nil.
 ---@param frame ECM_BuffBarFrame
 ---@return Texture|nil
-function FrameHelpers.GetIconOverlay(frame)
+function FrameUtil.GetIconOverlay(frame)
     return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
 ---@param frame ECM_BuffBarFrame
 ---@return Texture|nil
-function FrameHelpers.GetIconTexture(frame)
+function FrameUtil.GetIconTexture(frame)
     return TryGetRegion(frame.Icon, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
 ---@param frame ECM_BuffBarFrame
 ---@return number|nil
-function FrameHelpers.GetIconTextureFileID(frame)
-    local iconTexture = FrameHelpers.GetIconTexture(frame)
+function FrameUtil.GetIconTextureFileID(frame)
+    local iconTexture = FrameUtil.GetIconTexture(frame)
     return iconTexture and iconTexture.GetTextureFileID and iconTexture:GetTextureFileID() or nil
 end
 
@@ -72,7 +72,7 @@ end
 --- Caches result on statusBar.__ecmBarBG for subsequent calls.
 ---@param statusBar any
 ---@return any barBG The background texture region, or nil
-function FrameHelpers.GetBarBackground(statusBar)
+function FrameUtil.GetBarBackground(statusBar)
     if not statusBar or not statusBar.GetRegions then
         return nil
     end
@@ -134,7 +134,7 @@ end
 ---@param frame Frame
 ---@param h number
 ---@return boolean changed
-function FrameHelpers.LazySetHeight(frame, h)
+function FrameUtil.LazySetHeight(frame, h)
     local s = get_state(frame)
     if s.height == h then return false end
     frame:SetHeight(h)
@@ -146,7 +146,7 @@ end
 ---@param frame Frame
 ---@param w number
 ---@return boolean changed
-function FrameHelpers.LazySetWidth(frame, w)
+function FrameUtil.LazySetWidth(frame, w)
     local s = get_state(frame)
     if s.width == w then return false end
     frame:SetWidth(w)
@@ -158,7 +158,7 @@ end
 ---@param frame Frame
 ---@param alpha number
 ---@return boolean changed
-function FrameHelpers.LazySetAlpha(frame, alpha)
+function FrameUtil.LazySetAlpha(frame, alpha)
     local s = get_state(frame)
     if s.alpha == alpha then return false end
     frame:SetAlpha(alpha)
@@ -171,7 +171,7 @@ end
 ---@param frame Frame
 ---@param anchors table[] Array of anchor specifications
 ---@return boolean changed
-function FrameHelpers.LazySetAnchors(frame, anchors)
+function FrameUtil.LazySetAnchors(frame, anchors)
     local s = get_state(frame)
     local key = serialize_anchors(anchors)
     if s.anchors == key then return false end
@@ -189,7 +189,7 @@ end
 ---@param frame Frame
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
-function FrameHelpers.LazySetBackgroundColor(frame, color)
+function FrameUtil.LazySetBackgroundColor(frame, color)
     local s = get_state(frame)
     if ECM_AreColorsEqual(s.bgColor, color) then return false end
     if frame.Background then
@@ -206,7 +206,7 @@ end
 ---@param cacheKey string Unique key for this texture in the state cache
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
-function FrameHelpers.LazySetVertexColor(frame, texture, cacheKey, color)
+function FrameUtil.LazySetVertexColor(frame, texture, cacheKey, color)
     local s = get_state(frame)
     if ECM_AreColorsEqual(s[cacheKey], color) then return false end
     texture:SetVertexColor(color.r, color.g, color.b, color.a)
@@ -219,7 +219,7 @@ end
 ---@param bar StatusBar The status bar frame
 ---@param texturePath string Texture path or LSM key
 ---@return boolean changed
-function FrameHelpers.LazySetStatusBarTexture(frame, bar, texturePath)
+function FrameUtil.LazySetStatusBarTexture(frame, bar, texturePath)
     local s = get_state(frame)
     if s.statusBarTexture == texturePath then return false end
     bar:SetStatusBarTexture(texturePath)
@@ -235,7 +235,7 @@ end
 ---@param b number Blue component
 ---@param a number|nil Alpha component (default 1)
 ---@return boolean changed
-function FrameHelpers.LazySetStatusBarColor(frame, bar, r, g, b, a)
+function FrameUtil.LazySetStatusBarColor(frame, bar, r, g, b, a)
     local s = get_state(frame)
     a = a or 1
     local cached = s.statusBarColor
@@ -252,7 +252,7 @@ end
 ---@param frame Frame
 ---@param borderConfig table Table with enabled, thickness, color fields
 ---@return boolean changed
-function FrameHelpers.LazySetBorder(frame, borderConfig)
+function FrameUtil.LazySetBorder(frame, borderConfig)
     local s = get_state(frame)
     local border = frame.Border
     if not border then return false end
@@ -296,7 +296,7 @@ end
 ---@param cacheKey string Unique key for this text in the state cache
 ---@param text string|nil The text to set
 ---@return boolean changed
-function FrameHelpers.LazySetText(frame, fontString, cacheKey, text)
+function FrameUtil.LazySetText(frame, fontString, cacheKey, text)
     local s = get_state(frame)
     if s[cacheKey] == text then return false end
     fontString:SetText(text)
@@ -306,8 +306,207 @@ end
 
 --- Wipes the __ecm_state cache so every Lazy method will re-apply on next call.
 ---@param frame table Any frame with __ecm_state
-function FrameHelpers.LazyResetState(frame)
+function FrameUtil.LazyResetState(frame)
     if frame then
         frame.__ecm_state = nil
     end
+end
+
+--------------------------------------------------------------------------------
+-- Layout & Refresh Utilities
+--
+-- Stateless functions that implement layout, refresh, and throttle logic.
+-- ModuleMixin provides thin overrideable wrappers; modules may also call these
+-- directly when they need explicit control (e.g. custom UpdateLayout overrides).
+--------------------------------------------------------------------------------
+
+--- Default layout parameter calculation for chain/free anchor modes.
+--- Modules with custom positioning (e.g. BuffBars) override the ModuleMixin wrapper
+--- rather than calling this directly.
+---@param self ModuleMixin
+---@return table params
+function FrameUtil.CalculateLayoutParams(self)
+    local globalConfig = self:GetGlobalConfig()
+    local moduleConfig = self:GetModuleConfig()
+    local mode = moduleConfig.anchorMode
+
+    local params = { mode = mode }
+
+    if mode == C.ANCHORMODE_CHAIN then
+        local anchor, isFirst = self:GetNextChainAnchor(self.Name)
+        params.anchor = anchor
+        params.isFirst = isFirst
+        params.anchorPoint = "TOPLEFT"
+        params.anchorRelativePoint = "BOTTOMLEFT"
+        params.offsetX = 0
+        params.offsetY = (isFirst and -globalConfig.offsetY) or 0
+        params.height = moduleConfig.height or globalConfig.barHeight
+        params.width = nil -- Width set by dual-point anchoring
+    elseif mode == C.ANCHORMODE_FREE then
+        params.anchor = UIParent
+        params.isFirst = false
+        params.anchorPoint = "CENTER"
+        params.anchorRelativePoint = "CENTER"
+        params.offsetX = moduleConfig.offsetX or 0
+        params.offsetY = moduleConfig.offsetY or C.DEFAULT_FREE_ANCHOR_OFFSET_Y
+        params.height = moduleConfig.height or globalConfig.barHeight
+        params.width = moduleConfig.width or globalConfig.barWidth
+    end
+
+    return params
+end
+
+--- Applies positioning to a frame based on layout parameters.
+--- Handles ShouldShow check, layout calculation, and anchor positioning.
+---@param self ModuleMixin
+---@param frame Frame The frame to position
+---@return table|nil params Layout params if shown, nil if hidden
+function FrameUtil.ApplyFramePosition(self, frame)
+    if not self:ShouldShow() then
+        frame:Hide()
+        return nil
+    end
+
+    -- Ensure the frame is visible. ApplyFramePosition hides the frame when
+    -- ShouldShow() returns false, so we must re-show it here. This cannot
+    -- be deferred to Refresh() because ThrottledRefresh may suppress the
+    -- call, leaving the frame hidden after a quick hide→show transition
+    -- (e.g. rapid mount/dismount).
+    if not frame:IsShown() then
+        frame:Show()
+    end
+
+    local params = self:CalculateLayoutParams()
+    local mode = params.mode
+    local anchor = params.anchor
+    local offsetX, offsetY = params.offsetX, params.offsetY
+    local anchorPoint = params.anchorPoint
+    local anchorRelativePoint = params.anchorRelativePoint
+
+    local anchors
+    if mode == C.ANCHORMODE_CHAIN then
+        anchors = {
+            { "TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY },
+            { "TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY },
+        }
+    else
+        assert(anchor ~= nil, "anchor required for free anchor mode")
+        anchors = {
+            { anchorPoint, anchor, anchorRelativePoint, offsetX, offsetY },
+        }
+    end
+
+    FrameUtil.LazySetAnchors(frame, anchors)
+
+    return params
+end
+
+--- Standard layout pass: positioning, dimensions, border, background color.
+--- Calls self:ThrottledRefresh at the end to update values.
+---@param self ModuleMixin
+---@param why string|nil
+---@return boolean
+function FrameUtil.ApplyStandardLayout(self, why)
+    local globalConfig = self:GetGlobalConfig()
+    local moduleConfig = self:GetModuleConfig()
+    local frame = self.InnerFrame
+    local borderConfig = moduleConfig.border
+
+    -- Apply positioning and get params (returns nil if frame should be hidden)
+    local params = FrameUtil.ApplyFramePosition(self, frame)
+    if not params then
+        return false
+    end
+
+    local anchor = params.anchor
+    local isFirst = params.isFirst
+    local width = params.width
+    local height = params.height
+
+    -- Apply dimensions via lazy setters (no-ops when unchanged)
+    local heightChanged = height and FrameUtil.LazySetHeight(frame, height) or false
+    local widthChanged = width and FrameUtil.LazySetWidth(frame, width) or false
+
+    -- Apply border via lazy setter
+    local borderChanged = false
+    if borderConfig then
+        borderChanged = FrameUtil.LazySetBorder(frame, borderConfig)
+    end
+
+    -- Apply background color via lazy setter
+    ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
+    local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or C.DEFAULT_BG_COLOR
+    local bgColorChanged = FrameUtil.LazySetBackgroundColor(frame, bgColor)
+
+    ECM_log(C.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
+        anchor = anchor:GetName(),
+        isFirst = isFirst,
+        widthChanged = widthChanged,
+        width = width,
+        heightChanged = heightChanged,
+        height = height,
+        borderChanged = borderChanged,
+        borderEnabled = borderConfig and borderConfig.enabled,
+        borderThickness = borderConfig and borderConfig.thickness,
+        borderColor = borderConfig and borderConfig.color,
+        bgColorChanged = bgColorChanged,
+        bgColor = bgColor,
+    })
+
+    self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
+    return true
+end
+
+--- Base refresh guard. Returns true if the module should continue refreshing.
+---@param self ModuleMixin
+---@param why string|nil
+---@param force boolean|nil
+---@return boolean
+function FrameUtil.BaseRefresh(self, why, force)
+    if not force and not self:ShouldShow() then
+        return false
+    end
+    return true
+end
+
+--- Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
+---@param self ModuleMixin
+---@param flagName string Key for the pending flag on self
+---@param callback function Function to call after delay
+function FrameUtil.ScheduleDebounced(self, flagName, callback)
+    if self[flagName] then
+        return
+    end
+    self[flagName] = true
+
+    local globalConfig = self:GetGlobalConfig()
+    local freq = globalConfig and globalConfig.updateFrequency or C.DEFAULT_REFRESH_FREQUENCY
+    C_Timer.After(freq, function()
+        self[flagName] = nil
+        callback()
+    end)
+end
+
+--- Rate-limited refresh. Skips if called within updateFrequency window.
+---@param self ModuleMixin
+---@param why string|nil
+---@return boolean refreshed True if Refresh() was called
+function FrameUtil.ThrottledRefresh(self, why)
+    local globalConfig = self:GetGlobalConfig()
+    local freq = (globalConfig and globalConfig.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
+    if GetTime() - (self._lastUpdate or 0) < freq then
+        return false
+    end
+    self:Refresh(why)
+    self._lastUpdate = GetTime()
+    return true
+end
+
+--- Schedules a throttled layout update via debounced callback.
+---@param self ModuleMixin
+---@param why string|nil
+function FrameUtil.ScheduleLayoutUpdate(self, why)
+    FrameUtil.ScheduleDebounced(self, "_layoutPending", function()
+        self:UpdateLayout(why)
+    end)
 end

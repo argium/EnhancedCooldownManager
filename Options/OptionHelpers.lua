@@ -16,7 +16,7 @@ local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 ---@param defaultValue boolean
 ---@return boolean
 local function GetOptionValue(self, key, defaultValue)
-    local moduleConfig = self.ModuleConfig
+    local moduleConfig = self:GetModuleConfig()
     if moduleConfig and moduleConfig[key] ~= nil then
         return moduleConfig[key]
     end

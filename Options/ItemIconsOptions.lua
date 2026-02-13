@@ -29,7 +29,7 @@ local function BuildModuleToggleOption(self, key, label, order)
             return OptionHelpers.GetOptionValue(self, key, true)
         end,
         set = function(_, val)
-            local moduleConfig = self.ModuleConfig
+            local moduleConfig = self:GetModuleConfig()
             if moduleConfig then
                 moduleConfig[key] = val
             end
@@ -57,7 +57,7 @@ function ItemIcons:GetBasicOptionsArgs()
                 return OptionHelpers.GetOptionValue(self, "enabled", true)
             end,
             set = function(_, val)
-                local moduleConfig = self.ModuleConfig
+                local moduleConfig = self:GetModuleConfig()
                 if moduleConfig then
                     moduleConfig.enabled = val
                 end

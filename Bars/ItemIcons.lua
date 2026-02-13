@@ -7,13 +7,13 @@ local _, ns = ...
 local ECM = ns.Addon
 local C = ns.Constants
 
-local ECMFrame = ns.Mixins.ECMFrame
+local ModuleMixin = ns.Mixins.ModuleMixin
 
 local ItemIcons = ECM:NewModule("ItemIcons", "AceEvent-3.0")
 ECM.ItemIcons = ItemIcons
 ItemIcons:SetEnabledState(false)
 
----@class ECM_ItemIconsModule : ECMFrame
+---@class ECM_ItemIconsModule : ModuleMixin
 
 ---@class ECM_IconData
 ---@field itemId number Item ID.
@@ -398,7 +398,7 @@ local function GetUtilityViewerLayout()
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame Overrides
+-- ModuleMixin Overrides
 --------------------------------------------------------------------------------
 
 --- Override CreateFrame to create the container for item icons.
@@ -421,7 +421,7 @@ end
 --- Override ShouldShow to check module enabled state and item availability.
 ---@return boolean shouldShow Whether the frame should be shown.
 function ItemIcons:ShouldShow()
-    if not ECMFrame.ShouldShow(self) then
+    if not ModuleMixin.ShouldShow(self) then
         return false
     end
 
@@ -443,7 +443,7 @@ function ItemIcons:UpdateLayout(why)
         return false
     end
 
-    local moduleConfig = self.ModuleConfig
+    local moduleConfig = self:GetModuleConfig()
     if not moduleConfig then
         RestoreViewerPosition(self)
         return false
@@ -564,7 +564,7 @@ end
 
 --- Override Refresh to update cooldown states.
 function ItemIcons:Refresh(why)
-    if not ECMFrame.Refresh(self) then
+    if not FrameUtil.BaseRefresh(self, why) then
         return false
     end
 
@@ -672,8 +672,8 @@ end
 --------------------------------------------------------------------------------
 
 function ItemIcons:OnEnable()
-    if not self.IsECMFrame then
-        ECMFrame.AddMixin(self, "ItemIcons")
+    if not self.IsModuleMixin then
+        ModuleMixin.AddMixin(self, "ItemIcons")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
@@ -699,7 +699,7 @@ function ItemIcons:OnDisable()
 
     self:UpdateLayout("OnDisable")
 
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
 

@@ -128,7 +128,7 @@ function BuffBarColors.GetColorForBar(frame)
     -- local iconFrame = frame and frame.Icon
     -- local iconTexture = iconFrame and iconFrame.GetRegions and select(C.BUFFBARS_ICON_TEXTURE_REGION_INDEX, iconFrame:GetRegions()) or nil
     -- local textureFileID = iconTexture and iconTexture.GetIconTextureFileID and iconTexture:GetIconTextureFileID() or nil
-    local textureFileID = FrameHelpers.GetIconTextureFileID(frame) or nil
+    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
     ECM_debug_assert(not textureFileID or not issecretvalue(textureFileID), "Texture file ID is a secret value, cannot use as color key")
     return BuffBarColors.GetColor(spellName, textureFileID)
 end

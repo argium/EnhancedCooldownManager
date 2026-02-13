@@ -28,7 +28,7 @@ local function RegisterAddonCompartmentEntry()
         return
     end
 
-    local text = ECM_sparkle(C.ADDON_NAME)
+    local text = Argi.Sparkle(C.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
         icon = C.ADDON_ICON_TEXTURE,

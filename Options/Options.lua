@@ -1450,7 +1450,7 @@ end
 local function GetOptionsTable()
     return {
         type = "group",
-        name = ECM_sparkle(C.ADDON_NAME),
+        name = Argi.Sparkle(C.ADDON_NAME),
         childGroups = "tree",
         args = {
             general = GeneralOptionsTable(),
@@ -1486,7 +1486,7 @@ function Options:OnInitialize()
 end
 
 function Options:OnProfileChanged()
-    ECM.SetAllConfigs(ECM.db and ECM.db.profile)
+    ECM.ScheduleLayoutUpdate(0)
 end
 
 function Options:OnEnable()

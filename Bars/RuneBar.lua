@@ -7,7 +7,7 @@ local ECM = ns.Addon
 local C = ns.Constants
 
 local BarFrame = ns.Mixins.BarFrame
-local ECMFrame = ns.Mixins.ECMFrame
+local ModuleMixin = ns.Mixins.ModuleMixin
 
 local RuneBar = ECM:NewModule("RuneBar", "AceEvent-3.0")
 ECM.RuneBar = RuneBar
@@ -154,12 +154,12 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame/BarFrame Overrides
+-- ModuleMixin/BarFrame Overrides
 --------------------------------------------------------------------------------
 
 function RuneBar:CreateFrame()
-    -- Create base frame using ECMFrame (not BarFrame, since we manage StatusBar ourselves)
-    local frame = ECMFrame.CreateFrame(self)
+    -- Create base frame using ModuleMixin (not BarFrame, since we manage StatusBar ourselves)
+    local frame = ModuleMixin.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -184,24 +184,22 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    local config = self.ModuleConfig
     local _, class = UnitClass("player")
-    return ECMFrame.ShouldShow(self) and class == "DEATHKNIGHT"
+    return ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
 end
 
-function RuneBar:Refresh(force)
+function RuneBar:Refresh(why, force)
     local _, class = UnitClass("player")
     assert(class == "DEATHKNIGHT", "RuneBar should only be enabled for Death Knights")
 
-    -- Use ECMFrame.Refresh instead of BarFrame.Refresh since we manage
+    -- Use BaseRefresh instead of BarFrame.Refresh since we manage
     -- our own fragmented bars and don't use the standard StatusBar
-    local continue = ECMFrame.Refresh(self, force)
-    if not continue then
+    if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
 
-    local cfg = self.ModuleConfig
-    local globalConfig = self.GlobalConfig
+    local cfg = self:GetModuleConfig()
+    local globalConfig = self:GetGlobalConfig()
     local frame = self.InnerFrame
 
     local maxRunes = C.RUNEBAR_MAX_RUNES
@@ -241,7 +239,7 @@ function RuneBar:OnEnable()
         return
     end
 
-    if not self.IsECMFrame then
+    if not self.IsModuleMixin then
         BarFrame.AddMixin(self, "RuneBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
@@ -251,7 +249,7 @@ end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
 

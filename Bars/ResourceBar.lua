@@ -84,7 +84,7 @@ local function GetValues(moduleConfig)
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame/BarFrame Overrides
+-- ModuleMixin/BarFrame Overrides
 --------------------------------------------------------------------------------
 
 function ResourceBar:ShouldShow()
@@ -106,7 +106,7 @@ function ResourceBar:ShouldShow()
 end
 
 function ResourceBar:GetStatusBarValues()
-    local maxResources, currentValue, kind, isVoidMeta = GetValues(self.ModuleConfig)
+    local maxResources, currentValue, kind, isVoidMeta = GetValues(self:GetModuleConfig())
 
     if not maxResources or maxResources <= 0 then
         return 0, 1, 0, false
@@ -120,20 +120,20 @@ end
 --- Handles DH souls (Vengeance, Devourer normal/meta).
 ---@return ECM_Color
 function ResourceBar:GetStatusBarColor()
-    local cfg = self.ModuleConfig
+    local cfg = self:GetModuleConfig()
     local _, _, kind = GetValues(cfg)
     local color = cfg.colors and cfg.colors[kind]
     return color or C.COLOR_WHITE
 end
 
-function ResourceBar:Refresh(force)
-    local continue = BarFrame.Refresh(self, force)
+function ResourceBar:Refresh(why, force)
+    local continue = BarFrame.Refresh(self, why, force)
     if not continue then
         return false
     end
 
     -- Handle ticks (Devourer has no ticks, others have dividers)
-    local _, _, kind = GetValues(self.ModuleConfig)
+    local _, _, kind = GetValues(self:GetModuleConfig())
     local isDevourer = (kind == "devourerMeta" or kind == "devourerNormal")
 
     if isDevourer then
@@ -159,7 +159,7 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
-    if not self.IsECMFrame then
+    if not self.IsModuleMixin then
         BarFrame.AddMixin(self, "ResourceBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
@@ -171,7 +171,7 @@ end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
 end

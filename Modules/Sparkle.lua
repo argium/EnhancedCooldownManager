@@ -2,6 +2,8 @@
 -- Author: Solär
 -- Licensed under the GNU General Public License v3.0
 
+Argi = Argi or {}
+
 local function clamp(v, minV, maxV)
     return math.max(minV, math.min(maxV, v))
 end
@@ -116,7 +118,7 @@ end
 ---@param midColor string|table|nil
 ---@param endColor string|table|nil
 ---@return string
-function ECM_sparkle(text, startColor, midColor, endColor)
+Argi.Sparkle = function(text, startColor, midColor, endColor)
     assert(type(text) == "string", "text must be a string")
     startColor = startColor or { r = 0.25, g = 0.82, b = 1.00, a = 1 }
     midColor = midColor or { r = 0.62, g = 0.45, b = 1.00, a = 1 }

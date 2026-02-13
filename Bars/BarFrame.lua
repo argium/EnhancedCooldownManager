@@ -8,7 +8,7 @@ local BarFrame = {}
 ns.Mixins = ns.Mixins or {}
 ns.Mixins.BarFrame = BarFrame
 local ECM = ns.Addon
-local ECMFrame = ns.Mixins.ECMFrame
+local ModuleMixin = ns.Mixins.ModuleMixin
 local C = ns.Constants
 
 -- owns:
@@ -188,17 +188,18 @@ end
 ---@return ECM_Color Color table with r, g, b, a fields
 function BarFrame:GetStatusBarColor()
     local resource = UnitPowerType("player")
-    local color = self.ModuleConfig and self.ModuleConfig.colors and self.ModuleConfig.colors[resource]
+    local moduleConfig = self:GetModuleConfig()
+    local color = moduleConfig and moduleConfig.colors and moduleConfig.colors[resource]
     return color or C.COLOR_WHITE
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame Overrides
+-- ModuleMixin Overrides
 --------------------------------------------------------------------------------
 
 function BarFrame:ShouldShow()
-    -- Pass through so derived classes don't have to override ECMFrame
-    return ECMFrame.ShouldShow(self)
+    -- Pass through so derived classes don't have to override ModuleMixin
+    return ModuleMixin.ShouldShow(self)
 end
 
 --- Refreshes the bar frame layout and values.
@@ -206,15 +207,14 @@ end
 --- @param force boolean|nil If true, forces a refresh even if not needed.
 --- @return boolean continue True if refresh completed, false if skipped
 function BarFrame:Refresh(why, force)
-    local continue = ECMFrame.Refresh(self, force)
-    if not continue then
+    if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
     ECM_log(C.SYS.Styling, self.Name, "Starting refresh (" .. (why or "") .. ")")
 
     local frame = self.InnerFrame
-    local globalConfig = self.GlobalConfig
-    local moduleConfig = self.ModuleConfig
+    local globalConfig = self:GetGlobalConfig()
+    local moduleConfig = self:GetModuleConfig()
 
     -- Values: apply min/max before value so startup/transient states do not
     -- render full when current is zero.
@@ -241,11 +241,11 @@ function BarFrame:Refresh(why, force)
 
     -- Texture
     local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or C.DEFAULT_STATUSBAR_TEXTURE
-    FrameHelpers.LazySetStatusBarTexture(frame, frame.StatusBar, tex)
+    FrameUtil.LazySetStatusBarTexture(frame, frame.StatusBar, tex)
 
     -- Status bar color
     local statusBarColor = self:GetStatusBarColor()
-    FrameHelpers.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
+    FrameUtil.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
     -- ECM_log(C.SYS.Styling, self.Name, "BarFrame:Refresh", {
@@ -267,7 +267,7 @@ end
 --------------------------------------------------------------------------------
 
 function BarFrame:CreateFrame()
-    local frame = ECMFrame.CreateFrame(self)
+    local frame = ModuleMixin.CreateFrame(self)
 
     -- StatusBar for value display
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -327,6 +327,6 @@ function BarFrame.AddMixin(module, name)
         end
     end
 
-    ECMFrame.AddMixin(module, name)
+    ModuleMixin.AddMixin(module, name)
     module._lastUpdate = GetTime()
 end

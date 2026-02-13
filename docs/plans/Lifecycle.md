@@ -25,11 +25,11 @@ This design replaces scattered event-driven layout/value calls with one coalesce
 
 - No new user-facing settings.
 - No new standalone `Lifecycle.lua`.
-- No ownership changes across `ECMFrame`, `BarFrame`, `Bars/*`, and `Layout.lua`.
+- No ownership changes across `ModuleMixin`, `BarFrame`, `Bars/*`, and `Layout.lua`.
 
 ## File Ownership
 
-### `Modules/ECMFrame.lua`
+### `Modules/ModuleMixin.lua`
 Owns lifecycle orchestration internals and exposes:
 
 - `RequestUpdate(reason, opts)`
@@ -85,7 +85,7 @@ Base readiness checks:
 
 Module-specific overrides are allowed (notably `BuffBars`).
 
-## Internal State (`ECMFrame` per-instance)
+## Internal State (`ModuleMixin` per-instance)
 
 - `_pendingReasons` (set/map)
 - `_dispatchPending` (boolean)
@@ -155,17 +155,17 @@ Second-pass stabilization should be requested through `RequestUpdate(..., { seco
 
 Replace direct fanout:
 
-- `ecmFrame:UpdateLayout()`
+- `ModuleMixin:UpdateLayout()`
 
 With dispatch:
 
-- `ecmFrame:RequestUpdate(C.LIFECYCLE_REASON_LAYOUT, { forceLayout = true })`
+- `ModuleMixin:RequestUpdate(C.LIFECYCLE_REASON_LAYOUT, { forceLayout = true })`
 
 ## Removed / Folded Behavior
 
 ### Remove
 
-- `ECMFrame:ScheduleLayoutUpdate()`
+- `ModuleMixin:ScheduleLayoutUpdate()`
 - Module-level direct event/hook calls to `ThrottledRefresh()`
 - Module-local deferred update timers used for stabilization (`C_Timer.After(0, ...)`)
 
@@ -216,7 +216,7 @@ With dispatch:
 ## Recommended Rollout Sequence
 
 1. Add lifecycle constants.
-2. Add lifecycle internals in `ECMFrame`.
+2. Add lifecycle internals in `ModuleMixin`.
 3. Migrate `PowerBar`, `ResourceBar`, `RuneBar`.
 4. Migrate `BuffBars` with readiness override.
 5. Update `Layout.lua` dispatch integration.

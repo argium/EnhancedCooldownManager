@@ -14,7 +14,7 @@ ECM.PowerBar = PowerBar
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil
 function PowerBar:GetCurrentTicks()
-    local config = self.ModuleConfig
+    local config = self:GetModuleConfig()
     local ticksCfg = config and config.ticks
     if not ticksCfg or not ticksCfg.mappings then
         return nil
@@ -45,7 +45,7 @@ function PowerBar:UpdateTicks(frame, resource, max)
         return
     end
 
-    local config = self.ModuleConfig
+    local config = self:GetModuleConfig()
     local ticksCfg = config and config.ticks
     local defaultColor = ticksCfg and ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
@@ -56,14 +56,14 @@ function PowerBar:UpdateTicks(frame, resource, max)
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame/BarFrame Overrides
+-- ModuleMixin/BarFrame Overrides
 --------------------------------------------------------------------------------
 
 function PowerBar:GetStatusBarValues()
     local resource = UnitPowerType("player")
     local current = UnitPower("player", resource)
     local max = UnitPowerMax("player", resource)
-    local cfg = self.ModuleConfig
+    local cfg = self:GetModuleConfig()
 
     if cfg and cfg.showManaAsPercent and resource == Enum.PowerType.Mana then
         return current, max, string.format("%.0f%%", UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)), true
@@ -127,7 +127,7 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnEnable()
-    if not self.IsECMFrame then
+    if not self.IsModuleMixin then
         BarFrame.AddMixin(self, "PowerBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
@@ -140,7 +140,7 @@ end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
     BarFrame.OnDisable(self)

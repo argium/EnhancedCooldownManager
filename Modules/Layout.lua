@@ -31,7 +31,7 @@ local LAYOUT_EVENTS = {
 -- State
 --------------------------------------------------------------------------------
 
-local _ecmFrames = {}
+local _modules = {}
 local _globallyHidden = false
 local _hideReason = nil
 local _inCombat = InCombatLockdown()
@@ -53,7 +53,7 @@ local function ForEachBlizzardFrame(fn)
     end
 end
 
---- Sets the globally hidden state for all frames (ECMFrames + Blizzard frames).
+--- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
 local function SetGloballyHidden(hidden, reason)
@@ -77,9 +77,9 @@ local function SetGloballyHidden(hidden, reason)
         end
     end)
 
-    -- Hide/show ECMFrames
-    for _, ecmFrame in pairs(_ecmFrames) do
-        ecmFrame:SetHidden(hidden)
+    -- Hide/show ModuleMixins
+    for _, module in pairs(_modules) do
+        module:SetHidden(hidden)
     end
 end
 
@@ -93,9 +93,9 @@ local function SetAlpha(alpha)
         frame:SetAlpha(alpha)
     end)
 
-    for _, ecmFrame in pairs(_ecmFrames) do
-        --- @type ECMFrame
-        ecmFrame:SetAlpha(alpha)
+    for _, module in pairs(_modules) do
+        --- @type ModuleMixin
+        module:SetAlpha(alpha)
     end
 
     _lastAlpha = alpha
@@ -153,24 +153,24 @@ local function UpdateFadeAndHiddenStates()
     SetAlpha(alpha)
 end
 
---- Calls UpdateLayout on all registered ECMFrames.
+--- Calls UpdateLayout on all registered ModuleMixins.
 local function UpdateAllLayouts()
     local updated = {}
 
     -- Chain frames must update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
-        local ecmFrame = _ecmFrames[moduleName]
-        if ecmFrame then
-            ecmFrame:UpdateLayout("UpdateAllLayouts")
+        local module = _modules[moduleName]
+        if module then
+            module:UpdateLayout("UpdateAllLayouts")
             updated[moduleName] = true
         end
     end
 
     -- Update all remaining frames (non-chain modules).
-    for frameName, ecmFrame in pairs(_ecmFrames) do
+    for frameName, module in pairs(_modules) do
         if not updated[frameName] then
-            ecmFrame:UpdateLayout("UpdateAllLayouts")
+            module:UpdateLayout("UpdateAllLayouts")
         end
     end
 end
@@ -194,46 +194,29 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 
---- Registers an ECMFrame to receive layout update events.
---- @param frame ECMFrame The frame to register
+--- Registers a ModuleMixin to receive layout update events.
+--- @param frame ModuleMixin The frame to register
 local function RegisterFrame(frame)
-    assert(frame and type(frame) == "table" and frame.IsECMFrame, "RegisterFrame: invalid ECMFrame")
-    assert(_ecmFrames[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
-    _ecmFrames[frame.Name] = frame
+    assert(frame and type(frame) == "table" and frame.IsModuleMixin, "RegisterFrame: invalid ModuleMixin")
+    assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
+    _modules[frame.Name] = frame
     ECM_log(C.SYS.Layout, nil, "Frame registered: " .. frame.Name)
 end
 
---- Unregisters an ECMFrame from layout update events.
---- @param frame ECMFrame The frame to unregister
+--- Unregisters a ModuleMixin from layout update events.
+--- @param frame ModuleMixin The frame to unregister
 local function UnregisterFrame(frame)
     if not frame or type(frame) ~= "table" then
         return
     end
 
     local name = frame.Name
-    if not name or _ecmFrames[name] ~= frame then
+    if not name or _modules[name] ~= frame then
         return
     end
 
-    _ecmFrames[name] = nil
+    _modules[name] = nil
     ECM_log(C.SYS.Layout, nil, "Frame unregistered: " .. name)
-end
-
---- Rebinds config references for all registered ECMFrames.
---- @param configRoot table|nil Active profile root
-local function SetAllConfigs(configRoot)
-    local root = configRoot or (ECM.db and ECM.db.profile)
-    if not root then
-        return
-    end
-
-    for _, ecmFrame in pairs(_ecmFrames) do
-        if ecmFrame and ecmFrame.SetConfig then
-            ecmFrame:SetConfig(root)
-        end
-    end
-
-    ECM.ScheduleLayoutUpdate(0)
 end
 
 --------------------------------------------------------------------------------
@@ -291,4 +274,3 @@ end)
 ECM.RegisterFrame = RegisterFrame
 ECM.UnregisterFrame = UnregisterFrame
 ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate
-ECM.SetAllConfigs = SetAllConfigs

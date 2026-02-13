@@ -29,7 +29,8 @@
             "EssentialCooldownViewer",
             "UtilityCooldownViewer",
             "RAID_CLASS_COLORS",
-            "ColorPickerFrame"
+            "ColorPickerFrame",
+            "FrameUtil"
         ],
 	}
 }
