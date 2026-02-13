@@ -1,9 +1,10 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
 local mod = ns.Addon
+local FrameUtil = ECM.FrameUtil
 local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
 mod.RuneBar = RuneBar
 

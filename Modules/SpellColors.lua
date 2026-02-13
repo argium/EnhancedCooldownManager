@@ -1,11 +1,12 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 --
 -- SpellColors: Manages per-spell color customization for buff bars.
 -- Backed by a FallbackKeyMap (primary = spell name, fallback = texture file ID).
 
 local _, ns = ...
+local FrameUtil = ECM.FrameUtil
 local SpellColors = {}
 ECM.SpellColors = SpellColors
 

@@ -1,7 +1,8 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local FrameUtil = ECM.FrameUtil
 local BuffBars = {}
 ECM.BuffBars = BuffBars
 
@@ -246,7 +247,6 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     })
 end
 
-
 --- Positions all bar children in a vertical stack, preserving edit mode order.
 local function layout_bars(self)
     local viewer = _G["BuffBarCooldownViewer"]
@@ -277,10 +277,6 @@ local function layout_bars(self)
 
     ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
 end
-
---------------------------------------------------------------------------------
--- ModuleMixin Overrides
---------------------------------------------------------------------------------
 
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
@@ -313,12 +309,10 @@ function BuffBars:CalculateLayoutParams()
     return params
 end
 
---- Override CreateFrame to return the Blizzard BuffBarCooldownViewer instead of creating a new one.
 function BuffBars:CreateFrame()
     return _G["BuffBarCooldownViewer"]
 end
 
---- Override IsReady to require viewer existence and valid attach state.
 function BuffBars:IsReady()
     if not ECM.ModuleMixin.IsReady(self) then
         return false
@@ -489,17 +483,16 @@ function BuffBars:OnZoneChanged()
     self:ThrottledUpdateLayout("OnZoneChanged")
 end
 
+function BuffBars:IsEnabled()
+    return self._enabled or false
+end
 
 local _eventFrame = CreateFrame("Frame")
 function BuffBars:Enable()
     if self._enabled then return end
     self._enabled = true
 
-    if not self.IsModuleMixin then
-        ECM.ModuleMixin.AddMixin(self, "BuffBars")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
+    ECM.ModuleMixin.AddMixin(self, "BuffBars")
 
     _eventFrame:RegisterEvent("UNIT_AURA")
     _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")

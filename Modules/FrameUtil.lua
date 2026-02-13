@@ -1,8 +1,8 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
---- FrameUtil: a global table of static helper methods for WoW frames.
+--- ECM.FrameUtil: static helper methods for WoW frames.
 ---
 --- Includes:
 ---   - Buff-bar inspection (GetSpellName, GetIconTexture, etc.)
@@ -11,12 +11,13 @@
 ---     WoW API when the value actually differs.
 ---
 --- Usage:
----   FrameUtil.GetSpellName(frame)
----   FrameUtil.GetIconTexture(frame)
----   FrameUtil.LazySetHeight(frame, 20)
----   FrameUtil.LazyResetState(frame)
+---   ECM.FrameUtil.GetSpellName(frame)
+---   ECM.FrameUtil.GetIconTexture(frame)
+---   ECM.FrameUtil.LazySetHeight(frame, 20)
+---   ECM.FrameUtil.LazyResetState(frame)
 
-FrameUtil = FrameUtil or {}
+local FrameUtil = {}
+ECM.FrameUtil = FrameUtil
 
 --- Returns the region at the given index if it exists and matches the expected type.
 ---@param frame Frame

@@ -1,7 +1,7 @@
 ## Interface: 120000, 120001, 110207
 ## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r
 ## Notes: Standalone resource bars anchored to Blizzard Cooldown Manager viewers.
-## Author: Solär
+## Author: Argium
 ## Version: v0.5.2
 ## SavedVariables: EnhancedCooldownManagerDB
 ## OptionalDeps: Ace3, LibSharedMedia-3.0
@@ -25,17 +25,20 @@ Libs\LibSharedMedia-3.0\lib.xml
 
 Constants.lua
 Defaults.lua
+Debug.lua
 
 Modules\Sparkle.lua
-Modules\TraceLog.lua
 Modules\Utilities.lua
 Modules\FrameUtil.lua
 Modules\BugReports.lua
 Options\Migration.lua
-OptioECM.ImportExport.lua
+Options\ImportExport.lua
+
+Bars\BuffBars.lua
 
 EnhancedCooldownManager.lua
 
+# Legacy Ace-modules.
 Modules\Layout.lua
 Modules\ModuleMixin.lua
 Modules\FallbackKeyMap.lua
@@ -45,7 +48,6 @@ Bars\BarMixin.lua
 Bars\PowerBar.lua
 Bars\ResourceBar.lua
 Bars\RuneBar.lua
-Bars\BuffBars.lua
 Bars\ItemIcons.lua
 
 Options\OptionUtil.lua

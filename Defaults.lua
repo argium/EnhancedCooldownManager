@@ -1,5 +1,5 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 -- Defaults for Enhanced Cooldown Manager

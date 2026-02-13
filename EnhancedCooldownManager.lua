@@ -1,5 +1,5 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local ADDON_NAME, ns = ...
@@ -285,6 +285,14 @@ function mod:HandleOpenOptionsAfterCombat()
     end
 end
 
+function mod:GetECMModule(moduleName, silent)
+    local module = self[moduleName] or ECM[moduleName] or nil
+    if not module and not silent then
+        ECM_print("Module not found:", moduleName)
+    end
+    return module
+end
+
 function mod:OnInitialize()
     -- Set up versioned SV store and point the active key at the current version.
     ECM.Migration.PrepareDatabase()
@@ -328,7 +336,7 @@ function mod:OnEnable()
     }
 
     for _, moduleName in ipairs(moduleOrder) do
-        local module = self[moduleName]
+        local module = self:GetECMModule(moduleName)
         assert(module, "Module not found: " .. moduleName)
 
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)

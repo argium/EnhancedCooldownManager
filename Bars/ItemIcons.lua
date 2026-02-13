@@ -1,9 +1,10 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
 local mod = ns.Addon
+local FrameUtil = ECM.FrameUtil
 local ItemIcons = mod:NewModule("ItemIcons", "AceEvent-3.0")
 mod.ItemIcons = ItemIcons
 ItemIcons:SetEnabledState(false)
@@ -546,7 +547,7 @@ function ItemIcons:UpdateLayout(why)
         C_Timer.After(ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()
             self._layoutRetryPending = nil
             if self:IsEnabled() then
-                self:ScheduleLayoutUpdate("UpdateLayout")
+                self:ThrottledUpdateLayout("UpdateLayout")
             end
         end)
     end
@@ -591,18 +592,18 @@ end
 
 function ItemIcons:OnBagUpdateDelayed()
     -- Bag contents changed, which consumables to show may have changed
-    self:ScheduleLayoutUpdate("OnBagUpdateDelayed")
+    self:ThrottledUpdateLayout("OnBagUpdateDelayed")
 end
 
 function ItemIcons:OnPlayerEquipmentChanged(_, slotId)
     -- Only update if a trinket slot changed
     if slotId == ECM.Constants.TRINKET_SLOT_1 or slotId == ECM.Constants.TRINKET_SLOT_2 then
-        self:ScheduleLayoutUpdate("OnPlayerEquipmentChanged")
+        self:ThrottledUpdateLayout("OnPlayerEquipmentChanged")
     end
 end
 
 function ItemIcons:OnPlayerEnteringWorld()
-    self:ScheduleLayoutUpdate("OnPlayerEnteringWorld")
+    self:ThrottledUpdateLayout("OnPlayerEnteringWorld")
 end
 
 --- Hook EditModeManagerFrame to pause ItemIcons layout while edit mode is active.
@@ -621,14 +622,14 @@ function ItemIcons:HookEditMode()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate("EnterEditMode")
+            self:ThrottledUpdateLayout("EnterEditMode")
         end
     end)
 
     editModeManager:HookScript("OnHide", function()
         self._isEditModeActive = false
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate("ExitEditMode")
+            self:ThrottledUpdateLayout("ExitEditMode")
         end
     end)
 end
@@ -643,7 +644,7 @@ function ItemIcons:HookUtilityViewer()
     self._viewerHooked = true
 
     utilityViewer:HookScript("OnShow", function()
-        self:ScheduleLayoutUpdate("OnShow")
+        self:ThrottledUpdateLayout("OnShow")
     end)
 
     utilityViewer:HookScript("OnHide", function()
@@ -651,12 +652,12 @@ function ItemIcons:HookUtilityViewer()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ScheduleLayoutUpdate("OnHide")
+            self:ThrottledUpdateLayout("OnHide")
         end
     end)
 
     utilityViewer:HookScript("OnSizeChanged", function()
-        self:ScheduleLayoutUpdate("OnSizeChanged")
+        self:ThrottledUpdateLayout("OnSizeChanged")
     end)
 
     ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
@@ -683,7 +684,7 @@ function ItemIcons:OnEnable()
     C_Timer.After(0.1, function()
         self:HookEditMode()
         self:HookUtilityViewer()
-        self:ScheduleLayoutUpdate("OnEnable")
+        self:ThrottledUpdateLayout("OnEnable")
     end)
 
     ECM_log(ECM.Constants.SYS.Core, self.Name, "OnEnable - module enabled")

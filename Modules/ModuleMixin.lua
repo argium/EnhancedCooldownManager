@@ -1,9 +1,10 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
 local mod = ns.Addon
+local FrameUtil = ECM.FrameUtil
 local ModuleMixin = {}
 ECM.ModuleMixin = ModuleMixin
 
@@ -53,9 +54,9 @@ function ModuleMixin:GetNextChainAnchor(frameName)
     local debugCandidates = {}
     for i = stopIndex - 1, 1, -1 do
         local barName = ECM.Constants.CHAIN_ORDER[i]
-        local barModule = mod[barName]
+        local barModule = mod:GetECMModule(barName, false)
         local isEnabled = barModule and barModule:IsEnabled() or false
-        local shouldShow = barModule and barModule:ShouldShow() or false
+        local shouldShow = barModule and barModule.IsModuleMixin and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule:GetModuleConfig()
         local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
         local BarMixin = barModule and barModule.InnerFrame
@@ -205,7 +206,7 @@ end
 --- @param reason string Debug trace string identifying the caller.
 --- @param opts table|nil Optional parameters: { secondPass = boolean }
 function ModuleMixin:ThrottledUpdateLayout(reason, opts)
-    ECM_debug_assert(reason, "ScheduleLayoutUpdate: reason is required")
+    ECM_debug_assert(reason, "ThrottledUpdateLayout: reason is required")
 
     -- Bail immediately if the module is disabled (safe for plain-table modules
     -- like BuffBars that lack IsEnabled).
