@@ -273,6 +273,22 @@ function ECM_DeepCopy(tbl, seen, depth)
     return copy
 end
 
+--- Creates a proper deep clone of a value, preserving types.
+--- Unlike ECM_DeepCopy (which is for debug logging and stringifies leaf values),
+--- this preserves numeric and boolean values without conversion.
+---@param value any
+---@return any
+function ECM_CloneValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+    local copy = {}
+    for k, v in pairs(value) do
+        copy[k] = ECM_CloneValue(v)
+    end
+    return copy
+end
+
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)

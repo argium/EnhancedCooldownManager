@@ -151,8 +151,7 @@ function SpellColors.GetColorForBar(frame)
 
     local spellName = frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
     local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
-    ECM_debug_assert(not textureFileID or not issecretvalue(textureFileID),
-        "Texture file ID is a secret value, cannot use as color key")
+    ECM_debug_assert(textureFileID and canaccessvalue(textureFileID),"Texture file ID is a secret value, cannot use as color key")
     return SpellColors.GetColor(spellName, textureFileID)
 end
 
@@ -179,6 +178,32 @@ function SpellColors.SetColor(spellName, textureId, color)
         return
     end
     map:Set(spellName, textureId, color)
+end
+
+--- Returns the default bar color as r, g, b (unpacked for AceConfig).
+---@return number r
+---@return number g
+---@return number b
+function SpellColors.GetDefaultColor()
+    local cfg = config()
+    if not cfg then
+        local c = ECM.Constants.BUFFBARS_DEFAULT_COLOR
+        return c.r, c.g, c.b
+    end
+    local c = cfg.colors.defaultColor
+    return c.r, c.g, c.b
+end
+
+--- Sets the default bar color.
+---@param r number
+---@param g number
+---@param b number
+function SpellColors.SetDefaultColor(r, g, b)
+    local cfg = config()
+    if not cfg then
+        return
+    end
+    cfg.colors.defaultColor = { r = r, g = g, b = b, a = 1 }
 end
 
 --- Removes the custom color for a spell from both key maps.

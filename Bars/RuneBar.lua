@@ -8,10 +8,6 @@ local FrameUtil = ECM.FrameUtil
 local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
 mod.RuneBar = RuneBar
 
---------------------------------------------------------------------------------
--- Fragmented Bars (DK Runes - individual bars with recharge timers)
---------------------------------------------------------------------------------
-
 --- Creates or returns fragmented sub-bars for runes.
 ---@param bar Frame
 ---@param maxResources number

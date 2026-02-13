@@ -139,6 +139,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     local texture = ECM_GetTexture(textureName)
     FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
 
+    -- DevTool:AddData(frame)
     local barColor = ECM.SpellColors.GetColorForBar(frame)
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
@@ -407,6 +408,34 @@ function BuffBars:ResetStyledMarkers()
 
 end
 
+--- Returns metadata for all currently-visible aura bars.
+--- Each entry contains a spellName (string) and/or textureFileID (number),
+--- with secret values filtered out. Entries where both are nil are skipped.
+---@return { spellName: string|nil, textureFileID: number|nil }[]
+function BuffBars:GetActiveSpellData()
+    local viewer = _G["BuffBarCooldownViewer"]
+    if not viewer then
+        return {}
+    end
+
+    local ordered = get_children_ordered(viewer)
+    local result = {}
+    for _, entry in ipairs(ordered) do
+        local frame = entry.frame
+        local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
+        local tex = FrameUtil.GetIconTextureFileID(frame) or nil
+
+        -- Filter out secret values that cannot be used as table keys
+        if name and issecretvalue(name) then name = nil end
+        if tex and issecretvalue(tex) then tex = nil end
+
+        if name or tex then
+            result[#result + 1] = { spellName = name, textureFileID = tex }
+        end
+    end
+    return result
+end
+
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
     local viewer = _G["BuffBarCooldownViewer"]
@@ -452,9 +481,6 @@ function BuffBars:HookEditMode()
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         self:ResetStyledMarkers()
-        if ECM.RefreshBuffBarDiscovery then
-            ECM.RefreshBuffBarDiscovery("edit_mode_exit")
-        end
 
         -- Edit mode exit is infrequent, so perform an immediate restyle pass.
         local viewer = _G["BuffBarCooldownViewer"]

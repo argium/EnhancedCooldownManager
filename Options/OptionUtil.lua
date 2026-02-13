@@ -166,7 +166,7 @@ local function MakeResetHandler(path, refreshFunc)
     return function()
         ResetToDefault(path)
         if refreshFunc then refreshFunc() end
-        ECM.ScheduleLayoutUpdate(0)
+        ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
     end
 end
@@ -222,7 +222,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             set = function(_, val)
                 local cfg = GetNestedValue(db.profile, configPath)
                 cfg.width = val
-                ECM.ScheduleLayoutUpdate(0)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         },
         widthReset = {
@@ -261,7 +261,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             set = function(_, val)
                 local cfg = GetNestedValue(db.profile, configPath)
                 cfg.offsetX = val ~= 0 and val or nil
-                ECM.ScheduleLayoutUpdate(0)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         }
         args.offsetXReset = {
@@ -297,7 +297,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             set = function(_, val)
                 local cfg = GetNestedValue(db.profile, configPath)
                 cfg.offsetY = val ~= 0 and val or nil
-                ECM.ScheduleLayoutUpdate(0)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         }
         args.offsetYReset = {
@@ -316,6 +316,54 @@ local function MakePositioningSettingsArgs(configPath, options)
     return args
 end
 
+--- Generates a full positioning group (mode selector + width/offset settings).
+--- @param configPath string The config path (e.g., "powerBar", "buffBars")
+--- @param order number The order of the group in the options panel
+--- @param options table|nil Options forwarded to MakePositioningSettingsArgs plus optional modeDesc
+--- @return table AceConfig group table
+local function MakePositioningGroup(configPath, order, options)
+    options = options or {}
+    local db = mod.db
+
+    local args = {
+        modeDesc = options.modeDesc and {
+            type = "description",
+            name = options.modeDesc,
+            order = 0.5,
+        } or nil,
+        modeSelector = {
+            type = "select",
+            name = "",
+            order = 1,
+            width = "full",
+            dialogControl = "ECM_PositionModeSelector",
+            values = POSITION_MODE_TEXT,
+            get = function()
+                local cfg = GetNestedValue(db.profile, configPath)
+                return cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
+            end,
+            set = function(_, val)
+                ApplyPositionModeToBar(GetNestedValue(db.profile, configPath), val)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+            end,
+        },
+    }
+
+    local settingsArgs = MakePositioningSettingsArgs(configPath, options)
+    for k, v in pairs(settingsArgs) do
+        args[k] = v
+    end
+
+    return {
+        type = "group",
+        name = "Positioning",
+        inline = true,
+        order = order,
+        args = args,
+    }
+end
+
 --------------------------------------------------------------------------------
 -- Export
 --------------------------------------------------------------------------------
@@ -331,5 +379,6 @@ ECM.OptionUtil = {
     SetModuleEnabled = SetModuleEnabled,
     GetCurrentClassSpec = GetCurrentClassSpec,
     MakePositioningSettingsArgs = MakePositioningSettingsArgs,
+    MakePositioningGroup = MakePositioningGroup,
     POSITION_MODE_TEXT = POSITION_MODE_TEXT,
 }

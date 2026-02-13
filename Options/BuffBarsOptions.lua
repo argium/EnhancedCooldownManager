@@ -13,100 +13,99 @@ local function ResetStyledMarkers()
 end
 
 --- Generates dynamic AceConfig args for per-spell color pickers.
---- Merges spells from perSpell settings (persisted custom colors) and the bar
---- metadata cache (recently discovered bars) so that both customized and
---- newly-seen spells appear in the options panel.
+--- Merges spells from persisted custom colors (SpellColors) and the
+--- currently-visible aura bars (BuffBars) so that both customized and
+--- newly-seen spells appear in the options panel.  Deduplication follows
+--- the FallbackKeyMap convention: spell name is preferred over texture
+--- file ID.
 ---@return table args AceConfig args table with color pickers and reset buttons
 local function GenerateSpellColorArgs()
     local args = {}
 
-    local cachedBars = ECM.GetBuffBarDiscoveryCache and ECM.GetBuffBarDiscoveryCache() or {}
-    local cachedTextures = ECM.GetBuffBarDiscoverySecondaryKeyMap and ECM.GetBuffBarDiscoverySecondaryKeyMap() or {}
-    if not cachedBars or not next(cachedBars) then
+    -- Build an ordered, deduplicated list of spell keys.
+    -- Active bars come first (in viewer top-to-bottom order), then any
+    -- persisted-only colours that aren't currently visible.
+    local seen = {}
+    local ordered = {}
+
+    -- 1) Currently-visible aura bars — prefer spellName, fall back to
+    --    textureFileID (consistent with FallbackKeyMap's primary/fallback).
+    local activeBars = ECM.BuffBars:GetActiveSpellData()
+    for _, bar in ipairs(activeBars) do
+        local key = bar.spellName or bar.textureFileID
+        if key and not seen[key] then
+            seen[key] = true
+            ordered[#ordered + 1] = key
+        end
+    end
+
+    -- 2) Persisted custom colors — appended so users can manage colours
+    --    for spells that aren't currently active.
+    local savedColors = ECM.SpellColors.GetAllColors()
+    for colorKey in pairs(savedColors) do
+        if not seen[colorKey] then
+            seen[colorKey] = true
+            ordered[#ordered + 1] = colorKey
+        end
+    end
+
+    if #ordered == 0 then
         args.noData = {
             type = "description",
-            name = "|cffaaaaaa(No buff bars cached yet. Cast a buff and click 'Refresh Spell List'.)|r",
+            name = "|cffaaaaaa(No aura bars found. Cast a buff and click 'Refresh Spell List'.)|r",
             order = 1,
         }
         return args
     end
 
-    local spellSettings = ECM.SpellColors.GetPerSpellColors()
+    for i, colorKey in ipairs(ordered) do
+        local optKey = "spellColor" .. i
+        local resetKey = "spellColor" .. i .. "Reset"
+        local displayName = type(colorKey) == "string" and colorKey or ("|T" .. colorKey .. ":14:14|t Bar (" .. colorKey .. ")")
+        local spellName = type(colorKey) == "string" and colorKey or nil
+        local textureId = type(colorKey) == "number" and colorKey or nil
 
-    if spellSettings then
+        args[optKey] = {
+            type = "color",
+            name = displayName,
+            desc = "Color for " .. displayName,
+            order = i * 10,
+            width = "double",
+            get = function()
+                local c = ECM.SpellColors.GetColor(spellName, textureId)
+                if c then return c.r, c.g, c.b end
+                return ECM.SpellColors.GetDefaultColor()
+            end,
+            set = function(_, r, g, b)
+                ECM.SpellColors.SetColor(spellName, textureId, { r = r, g = g, b = b, a = 1 })
+                ResetStyledMarkers()
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
 
-        local spells = {}
+        args[resetKey] = {
+            type = "execute",
+            name = "X",
+            desc = "Reset to default",
+            order = i * 10 + 1,
+            width = 0.3,
+            hidden = function()
+                return ECM.SpellColors.GetColor(spellName, textureId) == nil
+            end,
+            func = function()
+                ECM.SpellColors.ResetColor(spellName, textureId)
+                ResetStyledMarkers()
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
 
-        for spellName, v in pairs(spellSettings) do
-            spells[spellName] = {}
-        end
-
-        local cacheIndices = {}
-        for index in pairs(cachedBars) do
-            cacheIndices[#cacheIndices + 1] = index
-        end
-        table.sort(cacheIndices)
-
-        -- Use the spell name if available; fall back to the icon texture file ID
-        -- (from the separate textureMap) as a stable identifier for bars whose names
-        -- are secret. Bars with neither are skipped entirely.
-        for _, index in ipairs(cacheIndices) do
-            local c = cachedBars[index]
-            if c then
-                local key = c.spellName or cachedTextures[index]
-                if key then
-                    spells[key] = {}
-                end
-            end
-        end
-
-        local i = 1
-        for colorKey, v in pairs(spells) do
-            local optKey = "spellColor" .. i
-            local resetKey = "spellColor" .. i .. "Reset"
-            local displayName = type(colorKey) == "string" and colorKey or "Bar"
-
-            args[optKey] = {
-                type = "color",
-                name = displayName,
-                desc = "Color for " .. displayName,
-                order = i * 10,
-                width = "double",
-                get = function()
-                    return ECM.SpellColors.GetSpellColor(colorKey, colorKey)
-                end,
-                set = function(_, r, g, b)
-                    ECM.SpellColors.SetSpellColor(colorKey, colorKey, r, g, b)
-                    ResetStyledMarkers()
-                    ECM.ScheduleLayoutUpdate(0)
-                end,
-            }
-
-            args[resetKey] = {
-                type = "execute",
-                name = "X",
-                desc = "Reset to default",
-                order = i * 10 + 1,
-                width = 0.3,
-                hidden = function()
-                    return not ECM.SpellColors.HasCustomSpellColor(colorKey, colorKey)
-                end,
-                func = function()
-                    ECM.SpellColors.ResetSpellColor(colorKey, colorKey)
-                    ResetStyledMarkers()
-                    ECM.ScheduleLayoutUpdate(0)
-                end,
-            }
-
-            i = i + 1
-        end
     end
 
     return args
 end
 
 local function SpellOptionsTable()
-    local db = ECM.db
+    local db = ns.Addon.db
     local result = {
         type = "group",
         name = "Spells",
@@ -148,7 +147,7 @@ local function SpellOptionsTable()
                 set = function(_, r, g, b)
                     ECM.SpellColors.SetDefaultColor(r, g, b)
                     ResetStyledMarkers()
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
             },
             defaultColorReset = {
@@ -174,19 +173,11 @@ local function SpellOptionsTable()
                 order = 100,
                 width = "normal",
                 func = function()
-                    if ECM.RefreshBuffBarDiscovery then
-                        ECM.RefreshBuffBarDiscovery("options_refresh")
-                    end
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
         },
     }
-
-    -- Inject dynamic bar color args
-    if result.args and result.args.spellColorsGroup then
-        result.args.spellColorsGroup.args = GenerateSpellColorArgs()
-    end
 
     return result
 end
@@ -199,7 +190,7 @@ local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 
 function BuffBarsOptions.GetOptionsTable()
-    local db = ECM.db
+    local db = ns.Addon.db
 
     local spells = SpellOptionsTable()
     spells.name = ""
@@ -233,7 +224,7 @@ function BuffBarsOptions.GetOptionsTable()
                             db.profile.buffBars.enabled = val
                             if val then
                                 ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
-                                ECM.ScheduleLayoutUpdate(0)
+                                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                             else
                                 ECM:ConfirmReloadUI(
                                     "Disabling aura bars requires a UI reload. Reload now?",
@@ -251,7 +242,7 @@ function BuffBarsOptions.GetOptionsTable()
                         get = function() return db.profile.buffBars.showIcon end,
                         set = function(_, val)
                             db.profile.buffBars.showIcon = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     showSpellName = {
@@ -262,7 +253,7 @@ function BuffBarsOptions.GetOptionsTable()
                         get = function() return db.profile.buffBars.showSpellName end,
                         set = function(_, val)
                             db.profile.buffBars.showSpellName = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     showDuration = {
@@ -273,7 +264,7 @@ function BuffBarsOptions.GetOptionsTable()
                         get = function() return db.profile.buffBars.showDuration end,
                         set = function(_, val)
                             db.profile.buffBars.showDuration = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightDesc = {
@@ -292,7 +283,7 @@ function BuffBarsOptions.GetOptionsTable()
                         get = function() return db.profile.buffBars.height or 0 end,
                         set = function(_, val)
                             db.profile.buffBars.height = val > 0 and val or nil
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightReset = {
@@ -305,52 +296,12 @@ function BuffBarsOptions.GetOptionsTable()
                     },
                 },
             },
-            positioningSettings = (function()
-                local positioningArgs = {
-                    modeDesc = {
-                        type = "description",
-                        name = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
-                        order = 1,
-                        fontSize = "medium",
-                    },
-                    modeSelector = {
-                        type = "select",
-                        name = "",
-                        order = 3,
-                        width = "full",
-                        dialogControl = "ECM_PositionModeSelector",
-                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
-                        get = function() return db.profile.buffBars.anchorMode end,
-                        set = function(_, val)
-                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.buffBars, val)
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    spacer1 = {
-                        type = "description",
-                        name = " ",
-                        order = 2.5,
-                    },
-                }
-
-                -- Add width setting only (no offsets for BuffBars)
-                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("buffBars", {
-                    includeOffsets = false,
-                    widthLabel = "Buff Bar Width",
-                    widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
-                })
-                for k, v in pairs(positioningSettings) do
-                    positioningArgs[k] = v
-                end
-
-                return {
-                    type = "group",
-                    name = "Positioning",
-                    inline = true,
-                    order = 2,
-                    args = positioningArgs,
-                }
-            end)(),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
+                modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
+                includeOffsets = false,
+                widthLabel = "Buff Bar Width",
+                widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
+            }),
             spells = spells,
         },
     }

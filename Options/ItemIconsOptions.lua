@@ -30,7 +30,7 @@ local function BuildModuleToggleOption(self, key, label, order)
             if moduleConfig then
                 moduleConfig[key] = val
             end
-            ECM.ScheduleLayoutUpdate(0)
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end,
     }
 end
@@ -69,7 +69,7 @@ function ItemIconsOptions:GetBasicOptionsArgs()
                     end
                 end
 
-                ECM.ScheduleLayoutUpdate(0)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         },
     }

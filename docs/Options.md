@@ -691,7 +691,7 @@ func = MakeResetHandler("powerBar.height"),
 
 ```lua
 local function MyModuleOptionsTable()
-    local db = ECM.db
+    local db = ns.Addon.db
     return {
         type = "group",
         name = "My Module",
@@ -730,7 +730,7 @@ end
 
 ```lua
 local function MyBarOptionsTable()
-    local db = ECM.db
+    local db = ns.Addon.db
     return {
         type = "group",
         name = "My Bar",
@@ -1150,7 +1150,7 @@ end,
 1. **Create the generator function:**
 ```lua
 local function MyNewModuleOptionsTable()
-    local db = ECM.db
+    local db = ns.Addon.db
     return {
         type = "group",
         name = "My New Module",

@@ -66,7 +66,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.hideWhenMounted end,
                         set = function(_, val)
                             db.profile.global.hideWhenMounted = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     hideOutOfCombatInRestAreas = {
@@ -77,7 +77,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.hideOutOfCombatInRestAreas end,
                         set = function(_, val)
                             db.profile.global.hideOutOfCombatInRestAreas = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     texture = {
@@ -89,7 +89,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
                             db.profile.global.texture = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     textureReset = {
@@ -124,7 +124,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.offsetY end,
                         set = function(_, val)
                             db.profile.global.offsetY = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     offsetYReset = {
@@ -157,7 +157,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.outOfCombatFade.enabled end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.enabled = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     combatFadeOpacityDesc = {
@@ -177,7 +177,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.outOfCombatFade.opacity end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.opacity = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     combatFadeOpacityReset = {
@@ -208,7 +208,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.outOfCombatFade.exceptInInstance end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.exceptInInstance = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     exceptIfTargetCanBeAttackedEnabled ={
@@ -220,7 +220,7 @@ local function GeneralOptionsTable()
                         get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                 },
@@ -266,7 +266,7 @@ local function PowerBarOptionsTable()
                         set = function(_, val)
                             db.profile.powerBar.enabled = val
                             ECM.OptionUtil.SetModuleEnabled("PowerBar", val)
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightDesc = {
@@ -285,7 +285,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.height or 0 end,
                         set = function(_, val)
                             db.profile.powerBar.height = val > 0 and val or nil
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightReset = {
@@ -317,7 +317,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showText end,
                         set = function(_, val)
                             db.profile.powerBar.showText = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     showManaAsPercentDesc = {
@@ -333,7 +333,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.showManaAsPercent end,
                         set = function(_, val)
                             db.profile.powerBar.showManaAsPercent = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     borderSpacer = {
@@ -349,7 +349,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.border.enabled end,
                         set = function(_, val)
                             db.profile.powerBar.border.enabled = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     borderThickness = {
@@ -364,7 +364,7 @@ local function PowerBarOptionsTable()
                         get = function() return db.profile.powerBar.border.thickness end,
                         set = function(_, val)
                             db.profile.powerBar.border.thickness = val
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     borderColor = {
@@ -380,58 +380,156 @@ local function PowerBarOptionsTable()
                         end,
                         set = function(_, r, g, b, a)
                             db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
+                    },
+                    borderThicknessReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 8.5,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.thickness") end,
+                        disabled = function() return not db.profile.powerBar.border.enabled end,
+                        func = ECM.OptionUtil.MakeResetHandler("powerBar.border.thickness"),
+                    },
+                    borderColorReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 9.5,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.color") end,
+                        disabled = function() return not db.profile.powerBar.border.enabled end,
+                        func = ECM.OptionUtil.MakeResetHandler("powerBar.border.color"),
                     },
                 },
             },
-            positioningSettings = (function()
-                local positioningArgs = {
-                    modeDesc = {
-                        type = "description",
-                        name = "Choose how the bar is positioned. Automatic keeps the bar attached to the Cooldown Manager. Custom lets you position it anywhere on the screen and configure its size.",
-                        order = 1,
-                        fontSize = "medium",
-                    },
-                    modeSelector = {
-                        type = "select",
-                        name = "",
-                        order = 2,
-                        width = "full",
-                        dialogControl = "ECM_PositionModeSelector",
-                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
-                        get = function()
-                            return db.profile.powerBar.anchorMode
-                        end,
-                        set = function(_, val)
-                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.powerBar, val)
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    spacer1 = {
-                        type = "description",
-                        name = " ",
-                        order = 2.5,
-                    },
-                }
-
-                -- Add width, offsetX, offsetY settings
-                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("powerBar")
-                for k, v in pairs(positioningSettings) do
-                    positioningArgs[k] = v
-                end
-
-                return {
-                    type = "group",
-                    name = "Positioning",
-                    inline = true,
-                    order = 3,
-                    args = positioningArgs,
-                }
-            end)(),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("powerBar", 3),
             tickMarks = tickMarks,
         },
     }
+end
+
+--- Generates the display options args for the resource bar, including
+--- border settings and per-resource-type color pickers with reset buttons.
+---@param db AceDBObject-3.0
+---@return table args AceConfig args table
+local function GenerateResourceColorArgs(db)
+    local args = {
+        borderEnabled = {
+            type = "toggle",
+            name = "Show border",
+            order = 1,
+            width = "full",
+            get = function() return db.profile.resourceBar.border.enabled end,
+            set = function(_, val)
+                db.profile.resourceBar.border.enabled = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderThickness = {
+            type = "range",
+            name = "Border width",
+            order = 2,
+            width = "small",
+            min = 1,
+            max = 10,
+            step = 1,
+            disabled = function() return not db.profile.resourceBar.border.enabled end,
+            get = function() return db.profile.resourceBar.border.thickness end,
+            set = function(_, val)
+                db.profile.resourceBar.border.thickness = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderThicknessReset = {
+            type = "execute",
+            name = "X",
+            order = 2.5,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.border.thickness") end,
+            disabled = function() return not db.profile.resourceBar.border.enabled end,
+            func = ECM.OptionUtil.MakeResetHandler("resourceBar.border.thickness"),
+        },
+        borderColor = {
+            type = "color",
+            name = "Border color",
+            order = 3,
+            width = "small",
+            hasAlpha = true,
+            disabled = function() return not db.profile.resourceBar.border.enabled end,
+            get = function()
+                local c = db.profile.resourceBar.border.color
+                return c.r, c.g, c.b, c.a
+            end,
+            set = function(_, r, g, b, a)
+                db.profile.resourceBar.border.color = { r = r, g = g, b = b, a = a }
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderColorReset = {
+            type = "execute",
+            name = "X",
+            order = 3.5,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.border.color") end,
+            disabled = function() return not db.profile.resourceBar.border.enabled end,
+            func = ECM.OptionUtil.MakeResetHandler("resourceBar.border.color"),
+        },
+        colorsSpacer = {
+            type = "description",
+            name = " ",
+            order = 4,
+        },
+        colorsDescription = {
+            type = "description",
+            name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
+            fontSize = "medium",
+            order = 5,
+        },
+    }
+
+    -- Generate color pickers from definitions
+    local colorDefs = {
+        { key = "souls", name = "Soul Fragments (Demon Hunter)" },
+        { key = "devourerNormal", name = "Devourer Souls (Normal)" },
+        { key = "devourerMeta", name = "Devourer Souls (Neon)" },
+        { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
+        { key = Enum.PowerType.Chi, name = "Chi" },
+        { key = Enum.PowerType.HolyPower, name = "Holy Power" },
+        { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
+        { key = Enum.PowerType.Essence, name = "Essence" },
+    }
+
+    for i, def in ipairs(colorDefs) do
+        local key = def.key
+        local configPath = "resourceBar.colors." .. tostring(key)
+        local orderBase = 10 + (i - 1) * 2
+
+        args["color" .. tostring(key)] = {
+            type = "color",
+            name = def.name,
+            order = orderBase,
+            width = "double",
+            get = function()
+                local c = db.profile.resourceBar.colors[key]
+                return c.r, c.g, c.b
+            end,
+            set = function(_, r, g, b)
+                db.profile.resourceBar.colors[key] = { r = r, g = g, b = b, a = 1 }
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
+        args["color" .. tostring(key) .. "Reset"] = {
+            type = "execute",
+            name = "X",
+            order = orderBase + 1,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged(configPath) end,
+            func = ECM.OptionUtil.MakeResetHandler(configPath),
+        }
+    end
+
+    return args
 end
 
 local function ResourceBarOptionsTable()
@@ -463,7 +561,7 @@ local function ResourceBarOptionsTable()
                         set = function(_, val)
                             db.profile.resourceBar.enabled = val
                             ECM.OptionUtil.SetModuleEnabled("ResourceBar", val)
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightDesc = {
@@ -482,7 +580,7 @@ local function ResourceBarOptionsTable()
                         get = function() return db.profile.resourceBar.height or 0 end,
                         set = function(_, val)
                             db.profile.resourceBar.height = val > 0 and val or nil
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightReset = {
@@ -495,286 +593,13 @@ local function ResourceBarOptionsTable()
                     },
                 },
             },
-            positioningSettings = (function()
-                local positioningArgs = {
-                    modeDesc = {
-                        type = "description",
-                        name = "Choose how the bar is positioned. Automatic keeps the bar attached to the Cooldown Manager. Custom lets you position it anywhere on the screen and configure its size.",
-                        order = 1,
-                        fontSize = "medium",
-                    },
-                    modeSelector = {
-                        type = "select",
-                        name = "",
-                        order = 2,
-                        width = "full",
-                        dialogControl = "ECM_PositionModeSelector",
-                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
-                        get = function()
-                            return db.profile.resourceBar.anchorMode
-                        end,
-                        set = function(_, val)
-                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.resourceBar, val)
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    spacer1 = {
-                        type = "description",
-                        name = " ",
-                        order = 2.5,
-                    },
-                }
-
-                -- Add width, offsetX, offsetY settings
-                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("resourceBar")
-                for k, v in pairs(positioningSettings) do
-                    positioningArgs[k] = v
-                end
-
-                return {
-                    type = "group",
-                    name = "Positioning",
-                    inline = true,
-                    order = 2,
-                    args = positioningArgs,
-                }
-            end)(),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("resourceBar", 2),
             resourceColors = {
                 type = "group",
                 name = "Display Options",
                 inline = true,
                 order = 3,
-                args = {
-                    borderEnabled = {
-                        type = "toggle",
-                        name = "Show border",
-                        order = 1,
-                        width = "full",
-                        get = function() return db.profile.resourceBar.border.enabled end,
-                        set = function(_, val)
-                            db.profile.resourceBar.border.enabled = val
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    borderThickness = {
-                        type = "range",
-                        name = "Border width",
-                        order = 2,
-                        width = "small",
-                        min = 1,
-                        max = 10,
-                        step = 1,
-                        disabled = function() return not db.profile.resourceBar.border.enabled end,
-                        get = function() return db.profile.resourceBar.border.thickness end,
-                        set = function(_, val)
-                            db.profile.resourceBar.border.thickness = val
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    borderColor = {
-                        type = "color",
-                        name = "Border color",
-                        order = 3,
-                        width = "small",
-                        hasAlpha = true,
-                        disabled = function() return not db.profile.resourceBar.border.enabled end,
-                        get = function()
-                            local c = db.profile.resourceBar.border.color
-                            return c.r, c.g, c.b, c.a
-                        end,
-                        set = function(_, r, g, b, a)
-                            db.profile.resourceBar.border.color = { r = r, g = g, b = b, a = a }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorsSpacer = {
-                        type = "description",
-                        name = " ",
-                        order = 4,
-                    },
-                    colorsDescription = {
-                        type = "description",
-                        name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
-                        fontSize = "medium",
-                        order = 5,
-                    },
-                    colorDemonHunterSouls = {
-                        type = "color",
-                        name = "Soul Fragments (Demon Hunter)",
-                        order = 10,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors.souls
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors.souls = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorDemonHunterSoulsReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 11,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.souls") end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.souls"),
-                    },
-                    colorDevourerNormal = {
-                        type = "color",
-                        name = "Devourer Souls (Normal)",
-                        order = 12,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors.devourerNormal
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors.devourerNormal = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorDevourerNormalReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 13,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.devourerNormal") end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.devourerNormal"),
-                    },
-                    colorDevourerMeta = {
-                        type = "color",
-                        name = "Devourer Souls (Neon)",
-                        order = 14,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors.devourerMeta
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors.devourerMeta = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorDevourerMetaReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 15,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors.devourerMeta") end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors.devourerMeta"),
-                    },
-                    colorComboPoints = {
-                        type = "color",
-                        name = "Combo Points",
-                        order = 16,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors[Enum.PowerType.ComboPoints]
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors[Enum.PowerType.ComboPoints] = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorComboPointsReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 17,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.ComboPoints) end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.ComboPoints),
-                    },
-                    colorChi = {
-                        type = "color",
-                        name = "Chi",
-                        order = 18,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors[Enum.PowerType.Chi]
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors[Enum.PowerType.Chi] = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorChiReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 19,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Chi) end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Chi),
-                    },
-                    colorHolyPower = {
-                        type = "color",
-                        name = "Holy Power",
-                        order = 20,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors[Enum.PowerType.HolyPower]
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors[Enum.PowerType.HolyPower] = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorHolyPowerReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 21,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.HolyPower) end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.HolyPower),
-                    },
-                    colorSoulShards = {
-                        type = "color",
-                        name = "Soul Shards",
-                        order = 22,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors[Enum.PowerType.SoulShards]
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors[Enum.PowerType.SoulShards] = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorSoulShardsReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 23,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.SoulShards) end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.SoulShards),
-                    },
-                    colorEssence = {
-                        type = "color",
-                        name = "Essence",
-                        order = 24,
-                        width = "double",
-                        get = function()
-                            local c = db.profile.resourceBar.colors[Enum.PowerType.Essence]
-                            return c.r, c.g, c.b
-                        end,
-                        set = function(_, r, g, b)
-                            db.profile.resourceBar.colors[Enum.PowerType.Essence] = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    colorEssenceReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 25,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.colors." .. Enum.PowerType.Essence) end,
-                        func = ECM.OptionUtil.MakeResetHandler("resourceBar.colors." .. Enum.PowerType.Essence),
-                    },
-                },
+                args = GenerateResourceColorArgs(db),
             },
         },
     }
@@ -803,7 +628,7 @@ local function RuneBarOptionsTable()
                         set = function(_, val)
                             db.profile.runeBar.enabled = val
                             ECM.OptionUtil.SetModuleEnabled("RuneBar", val)
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightDesc = {
@@ -822,7 +647,7 @@ local function RuneBarOptionsTable()
                         get = function() return db.profile.runeBar.height or 0 end,
                         set = function(_, val)
                             db.profile.runeBar.height = val > 0 and val or nil
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     heightReset = {
@@ -849,7 +674,7 @@ local function RuneBarOptionsTable()
                         end,
                         set = function(_, r, g, b)
                             db.profile.runeBar.color = { r = r, g = g, b = b, a = 1 }
-                            ECM.ScheduleLayoutUpdate(0)
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
                     colorReset = {
@@ -862,52 +687,11 @@ local function RuneBarOptionsTable()
                     },
                 },
             },
-            positioningSettings = (function()
-                local positioningArgs = {
-                    modeDesc = {
-                        type = "description",
-                        name = "Choose how the bar is positioned. Automatic keeps the bar attached to the Cooldown Manager. Custom lets you position it anywhere on the screen and configure its size.",
-                        order = 1,
-                        fontSize = "medium",
-                    },
-                    modeSelector = {
-                        type = "select",
-                        name = "",
-                        order = 2,
-                        width = "full",
-                        dialogControl = "ECM_PositionModeSelector",
-                        values = ECM.OptionUtil.POSITION_MODE_TEXT,
-                        get = function() return db.profile.runeBar.anchorMode end,
-                        set = function(_, val)
-                            ECM.OptionUtil.ApplyPositionModeToBar(db.profile.runeBar, val)
-                            ECM.ScheduleLayoutUpdate(0)
-                        end,
-                    },
-                    spacer1 = {
-                        type = "description",
-                        name = " ",
-                        order = 2.5,
-                    },
-                }
-
-                -- Add width, offsetX, offsetY settings
-                local positioningSettings = ECM.OptionUtil.MakePositioningSettingsArgs("runeBar", {
-                    widthDesc = "Width when custom positioning is enabled.",
-                    offsetXDesc = "\nHorizontal offset when custom positioning is enabled.",
-                    offsetYDesc = "\nVertical offset when custom positioning is enabled.",
-                })
-                for k, v in pairs(positioningSettings) do
-                    positioningArgs[k] = v
-                end
-
-                return {
-                    type = "group",
-                    name = "Positioning",
-                    inline = true,
-                    order = 3,
-                    args = positioningArgs,
-                }
-            end)(),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("runeBar", 3, {
+                widthDesc = "Width when custom positioning is enabled.",
+                offsetXDesc = "\nHorizontal offset when custom positioning is enabled.",
+                offsetYDesc = "\nVertical offset when custom positioning is enabled.",
+            }),
         },
     }
 end
@@ -1060,7 +844,7 @@ local function AddTick(value, color, width)
 
     local newTick = {
         value = value,
-        color = color or ECM_DeepCopy(ticksCfg.defaultColor),
+        color = color or ECM_CloneValue(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
     table.insert(ticks, newTick)
@@ -1122,7 +906,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "value", val)
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1142,7 +926,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, val)
                     UpdateTick(i, "width", val)
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1161,7 +945,7 @@ TickMarksOptionsTable = function()
                 end,
                 set = function(_, r, g, b, a)
                     UpdateTick(i, "color", { r = r, g = g, b = b, a = a })
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1176,7 +960,7 @@ TickMarksOptionsTable = function()
                 confirmText = "Remove tick mark at value " .. (tick.value or "?") .. "?",
                 func = function()
                     RemoveTick(i)
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             }
@@ -1289,7 +1073,7 @@ TickMarksOptionsTable = function()
                 width = "normal",
                 func = function()
                     AddTick(50, nil, nil)
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1323,7 +1107,7 @@ TickMarksOptionsTable = function()
                 end,
                 func = function()
                     SetCurrentTicks({})
-                    ECM.ScheduleLayoutUpdate(0)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
@@ -1383,7 +1167,7 @@ local function AboutOptionsTable()
                 type = "group",
                 name = "Performance",
                 inline = true,
-                order = 3,
+                order = 4,
                 args = {
                     updateFrequencyDesc = {
                         type = "description",
@@ -1415,7 +1199,7 @@ local function AboutOptionsTable()
                 type = "group",
                 name = "Reset Settings",
                 inline = true,
-                order = 4,
+                order = 5,
                 args = {
                     resetDesc = {
                         type = "description",
@@ -1483,7 +1267,7 @@ function Options:OnInitialize()
 end
 
 function Options:OnProfileChanged()
-    ECM.ScheduleLayoutUpdate(0)
+    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
 end
 
 function Options:OnEnable()
