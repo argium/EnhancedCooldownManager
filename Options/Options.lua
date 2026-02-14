@@ -244,13 +244,15 @@ local function PowerBarOptionsTable()
         name = "Power Bar",
         order = 2,
         args = {
-            notShownNotice = {
-                type = "description",
-                name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
-                order = 0,
-                fontSize = "medium",
-                hidden = function() return mod.PowerBar:ShouldShow() end,
-            },
+            -- TODO: ShouldShow returns false if the bar is disabled but would be otherwise, meaning the message shown is incorrect.
+            --       Add another function that returns true/false based only on class/spec requirements and use that for the message visibility.
+            -- notShownNotice = {
+            --     type = "description",
+            --     name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
+            --     order = 0,
+            --     fontSize = "medium",
+            --     hidden = function() return mod.PowerBar:ShouldShow() end,
+            -- },
             basicSettings = {
                 type = "group",
                 name = "Basic Settings",
@@ -538,14 +540,17 @@ local function ResourceBarOptionsTable()
         type = "group",
         name = "Resource Bar",
         order = 3,
+        disabled = function() return IsDeathKnight() end,
         args = {
-            notShownNotice = {
-                type = "description",
-                name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
-                order = 0,
-                fontSize = "medium",
-                hidden = function() return mod.ResourceBar:ShouldShow() end,
-            },
+            -- TODO: ShouldShow returns false if the bar is disabled but would be otherwise, meaning the message shown is incorrect.
+            --       Add another function that returns true/false based only on class/spec requirements and use that for the message visibility.
+            -- notShownNotice = {
+            --     type = "description",
+            --     name = "|cfff1e02fNote: This bar is currently not being shown due to your current class or specialization.|r\n\n",
+            --     order = 0,
+            --     fontSize = "medium",
+            --     hidden = function() return mod.PowerBar:ShouldShow() end,
+            -- },
             basicSettings = {
                 type = "group",
                 name = "Basic Settings",
