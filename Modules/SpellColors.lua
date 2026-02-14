@@ -42,10 +42,18 @@ end
 
 --- Ensures the color storage tables exist for the current class/spec.
 ---@param cfg table  buffBars config table
----@return table scope  Keyed by KEY_DEFS field names; each value is the class/spec sub-table.
+---@return table|nil scope  Keyed by KEY_DEFS field names; each value is the class/spec sub-table.
 local function get_scope(cfg)
     local _, _, classID = UnitClass("player")
     local specID = GetSpecialization()
+
+    if not classID or not specID then
+        ECM_debug_assert(false, "SpellColors.get_scope - unable to determine player class/spec", {
+            classID = classID,
+            specID = specID,
+        })
+        return nil
+    end
 
     local scope = {}
     for _, def in ipairs(KEY_DEFS) do
@@ -110,6 +118,7 @@ local function repair_from_primary()
     if not cfg then return end
 
     local scope = get_scope(cfg)
+    if not scope then return end
     local byName = scope.byName
     if not byName then return end
 
