@@ -104,11 +104,13 @@ function PriorityKeyMap:Reconcile(keys)
         return false
     end
 
-    -- Validate all keys up front.
+    -- Validate all keys up front.  Use a numeric loop instead of ipairs
+    -- so that nil holes (e.g. a missing spellName) don't short-circuit
+    -- iteration and prevent later keys from being validated.
     local vkeys = {}
     local validCount = 0
-    for i, k in ipairs(keys) do
-        vkeys[i] = self._validateKey(k)
+    for i = 1, #self._keyDefs do
+        vkeys[i] = self._validateKey(keys[i])
         if vkeys[i] then
             validCount = validCount + 1
         end
@@ -191,11 +193,12 @@ function PriorityKeyMap:Get(keys)
         return nil
     end
 
-    -- Validate keys.
+    -- Validate keys.  Use a numeric loop instead of ipairs so that nil
+    -- holes don't prevent later keys from being checked.
     local vkeys = {}
     local validCount = 0
-    for i, k in ipairs(keys) do
-        vkeys[i] = self._validateKey(k)
+    for i = 1, #self._keyDefs do
+        vkeys[i] = self._validateKey(keys[i])
         if vkeys[i] then
             validCount = validCount + 1
         end
@@ -242,13 +245,11 @@ function PriorityKeyMap:Set(keys, value)
         end
     end
 
-    if ECM_is_debug_enabled() then
-        local parts = {}
-        for i, k in ipairs(keys) do
-            parts[i] = ECM_tostring(k)
-        end
-        ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM_tostring(value))
+    local parts = {}
+    for i = 1, #self._keyDefs do
+        parts[i] = ECM_tostring(keys[i])
     end
+    ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM_tostring(value))
 end
 
 ---------------------------------------------------------------------------
