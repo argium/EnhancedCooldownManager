@@ -143,7 +143,6 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     local texture = ECM_GetTexture(textureName)
     FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
 
-    -- DevTool:AddData(frame)
     local barColor = ECM.SpellColors.GetColorForBar(frame)
     local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
     local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "nil"
@@ -394,6 +393,21 @@ function BuffBars:UpdateLayout(why)
             { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
         })
     elseif params.mode == ECM.Constants.ANCHORMODE_FREE then
+        -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
+        -- override explicit width.  If stale chain anchors remain,
+        -- collapse to the first anchor point so SetWidth can work.
+        -- Blizzard's edit mode manages positioning from here on.
+        if viewer:GetNumPoints() > 1 then
+            local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
+            viewer:ClearAllPoints()
+            if point and relativeTo then
+                viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
+            end
+            -- Invalidate anchor cache so chain mode can re-anchor later
+            local s = viewer.__ecm_state
+            if s then s.anchors = nil end
+        end
+
         local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
