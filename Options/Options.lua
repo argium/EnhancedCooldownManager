@@ -1231,7 +1231,7 @@ end
 local function GetOptionsTable()
     return {
         type = "group",
-        name = Argi.Sparkle(ECM.Constants.ADDON_NAME),
+        name = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME),
         childGroups = "tree",
         args = {
             general = GeneralOptionsTable(),

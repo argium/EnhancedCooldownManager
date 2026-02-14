@@ -68,17 +68,17 @@ end
 ---@param config table Module config
 ---@param globalConfig table Global config
 ---@param barIndex number Index of the bar (for logging)
-local function style_child_frame(frame, config, globalConfig, barIndex)
+---@param retryCount number|nil Number of times this function has been retried
+local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
         ECM_debug_assert(false, "Attempted to style a child frame that has not been hooked", { frame = frame })
         return
     end
 
+    retryCount = retryCount or 0
     local bar = frame.Bar
     local iconFrame = frame.Icon
     local barBG = FrameUtil.GetBarBackground(bar)
-    -- DevTool:AddData(frame)
-    -- DevTool:AddData(iconFrame.Applications)
 
     -- frame
     --  - Bar
@@ -142,16 +142,17 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
 
     -- DevTool:AddData(frame)
     local barColor = ECM.SpellColors.GetColorForBar(frame)
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "GetColorForBar", {
-        barIndex = barIndex,
-        spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil",
-        textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil",
-        barColor = barColor or "nil",
-    })
+    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
+    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil"
 
-    if issecretvalue(spellName) and issecretvalue(textureFileID) and not InCombatLockdown() and not warned then
-        ECM_print("Spell name AND texture both being secret outside of combat is unexpected and I have not tracked down how this happens.")
-        warned = true
+    if issecretvalue(spellName) and issecretvalue(textureFileID) and not InCombatLockdown() then
+        ECM_warning("Spell name AND texture both being secret outside of combat is unexpected and I have not tracked down how this happens.")
+        if retryCount < 3 then
+            C_Timer.After(1, function()
+                style_child_frame(frame, config, globalConfig, barIndex, retryCount + 1)
+            end)
+        -- warned = true
+        end
     end
 
     -- If bar color is nil that can mean one of two things:
@@ -160,6 +161,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex)
     if not barColor and not InCombatLockdown() then
         barColor = ECM.SpellColors.GetDefaultColor()
     end
+
+    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
+    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
+    local logLine = "GetColorForBar[".. barIndex .."] (" .. spellName .. ", " .. textureFileID .. ") = " .. colorLog
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, frame)
 
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)

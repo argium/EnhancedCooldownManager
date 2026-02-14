@@ -292,11 +292,19 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)
-    local prefix = Argi.Sparkle(ECM.Constants.ADDON_NAME .. ":")
+    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME .. ":")
     local message = table.concat({...}, " ")
     print(prefix .. " " .. message)
 end
 
+
+--- Prints a chat message with a colorful ECM prefix.
+---@param ... any
+function ECM_warning(...)
+    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. " Warning:", "FFEA61", "FFD400", "FFFFB7")
+    local message = table.concat({...}, " ")
+    print(prefix .. " " .. message)
+end
 
 
 -- ---@param oldA table|nil

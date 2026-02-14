@@ -2,7 +2,7 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-Argi = Argi or {}
+ColorUtil = ColorUtil or {}
 
 local function clamp(v, minV, maxV)
     return math.max(minV, math.min(maxV, v))
@@ -57,6 +57,24 @@ local function normalize_rgb(color)
     error("ECM.Util: unsupported color type: " .. type(color))
 end
 
+---@param r number 0..1
+---@param g number 0..1
+---@param b number 0..1
+---@return string hex
+local function rgb_to_hex(r, g, b)
+    local ri = clamp(math.floor((r * 255) + 0.5), 0, 255)
+    local gi = clamp(math.floor((g * 255) + 0.5), 0, 255)
+    local bi = clamp(math.floor((b * 255) + 0.5), 0, 255)
+    return string.format("%02x%02x%02x", ri, gi, bi)
+end
+
+
+---@param color ECM_Color
+---@return string hex
+function ColorUtil.color_to_hex(color)
+    return rgb_to_hex(color.r, color.g, color.b)
+end
+
 ---@param t number 0..1
 ---@param r1 number
 ---@param g1 number
@@ -94,17 +112,6 @@ local function three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
     return lerp_rgb((t - 0.5) * 2, mr, mg, mb, er, eg, eb)
 end
 
----@param r number 0..1
----@param g number 0..1
----@param b number 0..1
----@return string hex
-local function rgb_to_hex(r, g, b)
-    local ri = clamp(math.floor((r * 255) + 0.5), 0, 255)
-    local gi = clamp(math.floor((g * 255) + 0.5), 0, 255)
-    local bi = clamp(math.floor((b * 255) + 0.5), 0, 255)
-    return string.format("%02x%02x%02x", ri, gi, bi)
-end
-
 --- Returns `text` with each character wrapped in a 3-stop gradient color.
 ---
 --- The gradient is computed dynamically so that the start, midpoint, and endpoint colors
@@ -118,7 +125,7 @@ end
 ---@param midColor string|table|nil
 ---@param endColor string|table|nil
 ---@return string
-Argi.Sparkle = function(text, startColor, midColor, endColor)
+ColorUtil.Sparkle = function(text, startColor, midColor, endColor)
     assert(type(text) == "string", "text must be a string")
     startColor = startColor or { r = 0.25, g = 0.82, b = 1.00, a = 1 }
     midColor = midColor or { r = 0.62, g = 0.45, b = 1.00, a = 1 }
