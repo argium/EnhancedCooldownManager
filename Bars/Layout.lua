@@ -1,11 +1,9 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local ECM = ns.Addon
-local C = ns.Constants
-local Util = ns.Util
+local mod = ns.Addon
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -32,7 +30,7 @@ local LAYOUT_EVENTS = {
 -- State
 --------------------------------------------------------------------------------
 
-local _ecmFrames = {}
+local _modules = {}
 local _globallyHidden = false
 local _hideReason = nil
 local _inCombat = InCombatLockdown()
@@ -46,7 +44,7 @@ local _lastAlpha = 1
 --- Iterates over all Blizzard cooldown viewer frames.
 --- @param fn fun(frame: Frame, name: string)
 local function ForEachBlizzardFrame(fn)
-    for _, name in ipairs(C.BLIZZARD_FRAMES) do
+    for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
             fn(frame, name)
@@ -54,7 +52,7 @@ local function ForEachBlizzardFrame(fn)
     end
 end
 
---- Sets the globally hidden state for all frames (ECMFrames + Blizzard frames).
+--- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
 local function SetGloballyHidden(hidden, reason)
@@ -62,7 +60,7 @@ local function SetGloballyHidden(hidden, reason)
         return
     end
 
-    Util.Log("Layout", "SetGloballyHidden", { hidden = hidden, reason = reason })
+    ECM_log(ECM.Constants.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
 
     _globallyHidden = hidden
     _hideReason = reason
@@ -78,9 +76,9 @@ local function SetGloballyHidden(hidden, reason)
         end
     end)
 
-    -- Hide/show ECMFrames
-    for _, ecmFrame in pairs(_ecmFrames) do
-        ecmFrame:SetHidden(hidden)
+    -- Hide/show ModuleMixins
+    for _, module in pairs(_modules) do
+        module:SetHidden(hidden)
     end
 end
 
@@ -94,8 +92,9 @@ local function SetAlpha(alpha)
         frame:SetAlpha(alpha)
     end)
 
-    for _, ecmFrame in pairs(_ecmFrames) do
-        ecmFrame.InnerFrame:SetAlpha(alpha)
+    for _, module in pairs(_modules) do
+        --- @type ModuleMixin
+        module:SetAlpha(alpha)
     end
 
     _lastAlpha = alpha
@@ -103,7 +102,7 @@ end
 
 --- Checks all fade and hide conditions and updates global state.
 local function UpdateFadeAndHiddenStates()
-    local globalConfig = ECM.db and ECM.db.profile and ECM.db.profile.global
+    local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
     if not globalConfig then
         return
     end
@@ -135,7 +134,7 @@ local function UpdateFadeAndHiddenStates()
 
         if fadeConfig.exceptInInstance then
             local inInstance, instanceType = IsInInstance()
-            if inInstance and C.GROUP_INSTANCE_TYPES[instanceType] then
+            if inInstance and ECM.Constants.GROUP_INSTANCE_TYPES[instanceType] then
                 shouldSkipFade = true
             end
         end
@@ -153,31 +152,31 @@ local function UpdateFadeAndHiddenStates()
     SetAlpha(alpha)
 end
 
---- Calls UpdateLayout on all registered ECMFrames.
-local function UpdateAllLayouts()
-    local updated = {}
+local _chainSet = {}
+for _, name in ipairs(ECM.Constants.CHAIN_ORDER) do _chainSet[name] = true end
 
+local function UpdateAllLayouts(reason)
     -- Chain frames must update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
-    for _, moduleName in ipairs(C.CHAIN_ORDER) do
-        local ecmFrame = _ecmFrames[moduleName]
-        if ecmFrame then
-            ecmFrame:UpdateLayout()
-            updated[moduleName] = true
+    for _, moduleName in ipairs(ECM.Constants.CHAIN_ORDER) do
+        local module = _modules[moduleName]
+        if module then
+            module:ThrottledUpdateLayout(reason)
         end
     end
 
     -- Update all remaining frames (non-chain modules).
-    for frameName, ecmFrame in pairs(_ecmFrames) do
-        if not updated[frameName] then
-            ecmFrame:UpdateLayout()
+    for frameName, module in pairs(_modules) do
+        if not _chainSet[frameName] then
+            module:ThrottledUpdateLayout(reason)
         end
     end
 end
 
 --- Schedules a layout update after a delay (debounced).
 --- @param delay number Delay in seconds
-local function ScheduleLayoutUpdate(delay)
+--- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
+local function ScheduleLayoutUpdate(delay, reason)
     if _layoutPending then
         return
     end
@@ -186,7 +185,7 @@ local function ScheduleLayoutUpdate(delay)
     C_Timer.After(delay or 0, function()
         _layoutPending = false
         UpdateFadeAndHiddenStates()
-        UpdateAllLayouts()
+        UpdateAllLayouts(reason)
     end)
 end
 
@@ -194,46 +193,29 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 
---- Registers an ECMFrame to receive layout update events.
---- @param frame ECMFrame The frame to register
+--- Registers a ModuleMixin to receive layout update events.
+--- @param frame ModuleMixin The frame to register
 local function RegisterFrame(frame)
-    assert(frame and type(frame) == "table" and frame.IsECMFrame, "RegisterFrame: invalid ECMFrame")
-    assert(_ecmFrames[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
-    _ecmFrames[frame.Name] = frame
-    ECM.Log("Layout", "Frame registered", frame.Name)
+    assert(frame and type(frame) == "table" and frame.IsModuleMixin, "RegisterFrame: invalid ModuleMixin")
+    assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
+    _modules[frame.Name] = frame
+    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame registered: " .. frame.Name)
 end
 
---- Unregisters an ECMFrame from layout update events.
---- @param frame ECMFrame The frame to unregister
+--- Unregisters a ModuleMixin from layout update events.
+--- @param frame ModuleMixin The frame to unregister
 local function UnregisterFrame(frame)
     if not frame or type(frame) ~= "table" then
         return
     end
 
     local name = frame.Name
-    if not name or _ecmFrames[name] ~= frame then
+    if not name or _modules[name] ~= frame then
         return
     end
 
-    _ecmFrames[name] = nil
-    ECM.Log("Layout", "Frame unregistered", name)
-end
-
---- Rebinds config references for all registered ECMFrames.
---- @param configRoot table|nil Active profile root
-local function SetAllConfigs(configRoot)
-    local root = configRoot or (ECM.db and ECM.db.profile)
-    if not root then
-        return
-    end
-
-    for _, ecmFrame in pairs(_ecmFrames) do
-        if ecmFrame and ecmFrame.SetConfig then
-            ecmFrame:SetConfig(root)
-        end
-    end
-
-    ECM.ScheduleLayoutUpdate(0)
+    _modules[name] = nil
+    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame unregistered: " .. name)
 end
 
 --------------------------------------------------------------------------------
@@ -256,7 +238,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
     -- Handle CVAR_UPDATE specially
     if event == "CVAR_UPDATE" then
         if arg1 == "cooldownViewerEnabled" then
-            ScheduleLayoutUpdate(0)
+            ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
         end
         return
     end
@@ -271,16 +253,16 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
         _inCombat = (event == "PLAYER_REGEN_DISABLED")
     end
 
-    -- Schedule update with delay
     if config.delay and config.delay > 0 then
         C_Timer.After(config.delay, function()
             UpdateFadeAndHiddenStates()
-            UpdateAllLayouts()
+            UpdateAllLayouts(event)
         end)
     else
         UpdateFadeAndHiddenStates()
-        UpdateAllLayouts()
+        UpdateAllLayouts(event)
     end
+
 end)
 
 --------------------------------------------------------------------------------
@@ -290,4 +272,3 @@ end)
 ECM.RegisterFrame = RegisterFrame
 ECM.UnregisterFrame = UnregisterFrame
 ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate
-ECM.SetAllConfigs = SetAllConfigs

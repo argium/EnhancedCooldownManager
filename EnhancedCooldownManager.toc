@@ -1,10 +1,10 @@
 ## Interface: 120000, 120001, 110207
-## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7S|r|cff7a84f7o|r|cff6b9bf7l|r|cff4cc9f0ä|r|cff22c55er|r
+## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7A|r|cff7a84f7r|r|cff4cc9f0g|r|cff22c55ei|r
 ## Notes: Standalone resource bars anchored to Blizzard Cooldown Manager viewers.
-## Author: Solär
-## Version: v0.5.1
+## Author: Argium
+## Version: v0.5.5
 ## SavedVariables: EnhancedCooldownManagerDB
-## OptionalDeps: Ace3, LibSharedMedia-3.0
+## OptionalDeps: Ace3, LibSharedMedia-3.0, WoWUnit
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
 
@@ -25,26 +25,32 @@ Libs\LibSharedMedia-3.0\lib.xml
 
 Constants.lua
 Defaults.lua
+Debug.lua
 
-Modules\SparkleUtil.lua
-Modules\TraceLog.lua
+Modules\ColorUtil.lua
 Modules\Utilities.lua
-Modules\Migration.lua
-Modules\ImportExport.lua
-Modules\BugReports.lua
+Modules\FrameUtil.lua
+Modules\ModuleMixin.lua
+Modules\PriorityKeyMap.lua
+Modules\SpellColors.lua
+Options\Migration.lua
+Options\ImportExport.lua
+
+Bars\BuffBars.lua
 
 EnhancedCooldownManager.lua
 
-Modules\Layout.lua
-Modules\ECMFrame.lua
-Modules\BarFrame.lua
+Bars\BarMixin.lua
 Bars\PowerBar.lua
 Bars\ResourceBar.lua
 Bars\RuneBar.lua
-Bars\BuffBars.lua
-Modules\ItemIcons.lua
+Bars\ItemIcons.lua
+Bars\Layout.lua
 
+Options\OptionUtil.lua
 Options\Widgets\PositionModeSelector.lua
-Options\OptionHelpers.lua
 Options\ItemIconsOptions.lua
+Options\BuffBarsOptions.lua
 Options\Options.lua
+
+#Tests\SpellColorsTests.lua

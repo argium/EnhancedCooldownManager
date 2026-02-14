@@ -1,11 +1,11 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
+local mod
 local ImportExport = {}
-ns.ImportExport = ImportExport
+ECM.ImportExport = ImportExport
 
 local EXPORT_PREFIX = "EnhancedCooldownManager"
 local EXPORT_VERSION = 1
@@ -174,8 +174,8 @@ end
 ---@return string|nil exportString The export string, or nil on failure
 ---@return string|nil errorMessage Error message if export failed
 function ImportExport.ExportCurrentProfile()
-    local ECM = ns.Addon
-    local db = ECM.db
+    mod = mod or ns.Addon
+    local db = mod.db
     if not db or not db.profile then
         return nil, "No active profile found"
     end
@@ -209,12 +209,12 @@ end
 ---@return boolean success Whether apply succeeded
 ---@return string|nil errorMessage Error message if apply failed
 function ImportExport.ApplyImportData(data)
+    mod = mod or ns.Addon
     if not data or not data.profile then
         return false, "Invalid import data"
     end
 
-    local ECM = ns.Addon
-    local db = ECM.db
+    local db = mod.db
     if not db or not db.profile then
         return false, "No active profile to import into"
     end
@@ -242,9 +242,8 @@ function ImportExport.ApplyImportData(data)
     end
 
     -- Run migrations on imported data (it may be from an older schema)
-    local C = ns.Constants
-    if db.profile.schemaVersion and db.profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ns.Migration.Run(db.profile)
+    if db.profile.schemaVersion and db.profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
+        ECM.Migration.Run(db.profile)
     end
 
     return true

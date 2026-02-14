@@ -1,16 +1,11 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local ADDON_NAME, ns = ...
-local ECM = ns.Addon
-local Util = ns.Util
-
-local C = ns.Constants
-local BarFrame = ns.Mixins.BarFrame
-
-local ResourceBar = ECM:NewModule("ResourceBar", "AceEvent-3.0")
-ECM.ResourceBar = ResourceBar
+local _, ns = ...
+local mod = ns.Addon
+local ResourceBar = mod:NewModule("ResourceBar", "AceEvent-3.0")
+mod.ResourceBar = ResourceBar
 
 --- Power types that have discrete values and should be displayed using the resource bar.
 local discreteResourceTypes = {
@@ -52,10 +47,10 @@ local function GetValues(moduleConfig)
 
     -- Demon hunter souls can still be tracked by their aura stacks (thank the lord)
     if class == "DEMONHUNTER" then
-        if GetSpecialization() == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
+        if GetSpecialization() == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             -- Devourer is tracked by two spells - one for void meta, and one not.
-            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.RESOURCEBAR_VOID_FRAGMENTS_SPELLID)
-            local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.RESOURCEBAR_COLLAPSING_STAR_SPELLID)
+            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_VOID_FRAGMENTS_SPELLID)
+            local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_SPELLID)
             if collapsingStar then
                 -- return 6, (collapsingStar.applications or 0) / 5, "souls", true
                 return 30, collapsingStar.applications or 0, "devourerMeta", true
@@ -63,11 +58,11 @@ local function GetValues(moduleConfig)
 
             return 35, voidFragments and voidFragments.applications or 0, "devourerNormal", false
             -- return 7, (voidFragments.applications or 0) / 5, "souls", false
-        elseif GetSpecialization() == C.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
+        elseif GetSpecialization() == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
             -- Vengeance use the same type of soul fragments. The value can be tracked by checking
             -- the number of times spirit bomb can be cast, of all things.
-            local count = C_Spell.GetSpellCastCount(C.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
-            return C.RESOURCEBAR_VENGEANCE_SOULS_MAX, count, "souls", nil
+            local count = C_Spell.GetSpellCastCount(ECM.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
+            return ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, count, "souls", nil
         end
 
         -- Not displaying anything for havoc currently.
@@ -85,11 +80,11 @@ local function GetValues(moduleConfig)
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame/BarFrame Overrides
+-- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 
 function ResourceBar:ShouldShow()
-    local shouldShow = BarFrame.ShouldShow(self)
+    local shouldShow = ECM.BarMixin.ShouldShow(self)
 
     if not shouldShow then
         return false
@@ -98,8 +93,13 @@ function ResourceBar:ShouldShow()
     local _, class = UnitClass("player")
     local specId =  GetSpecialization()
 
-    if (class == "DEMONHUNTER") and (specId == C.DEMONHUNTER_DEVOURER_SPEC_INDEX or specId == C.DEMONHUNTER_VENGEANCE_SPEC_INDEX) then
+    if (class == "DEMONHUNTER") and (specId == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX or specId == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX) then
          return true
+    end
+
+    -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
+    if (class == "MONK") and (specId == 1) then
+        return false
     end
 
     local discreteResource = GetActiveDiscreteResourceType()
@@ -107,7 +107,7 @@ function ResourceBar:ShouldShow()
 end
 
 function ResourceBar:GetStatusBarValues()
-    local maxResources, currentValue, kind, isVoidMeta = GetValues(self.ModuleConfig)
+    local maxResources, currentValue, kind, isVoidMeta = GetValues(self:GetModuleConfig())
 
     if not maxResources or maxResources <= 0 then
         return 0, 1, 0, false
@@ -121,20 +121,20 @@ end
 --- Handles DH souls (Vengeance, Devourer normal/meta).
 ---@return ECM_Color
 function ResourceBar:GetStatusBarColor()
-    local cfg = self.ModuleConfig
+    local cfg = self:GetModuleConfig()
     local _, _, kind = GetValues(cfg)
     local color = cfg.colors and cfg.colors[kind]
-    return color or C.COLOR_WHITE
+    return color or ECM.Constants.COLOR_WHITE
 end
 
-function ResourceBar:Refresh(force)
-    local continue = BarFrame.Refresh(self, force)
+function ResourceBar:Refresh(why, force)
+    local continue = ECM.BarMixin.Refresh(self, why, force)
     if not continue then
         return false
     end
 
     -- Handle ticks (Devourer has no ticks, others have dividers)
-    local _, _, kind = GetValues(self.ModuleConfig)
+    local _, _, kind = GetValues(self:GetModuleConfig())
     local isDevourer = (kind == "devourerMeta" or kind == "devourerNormal")
 
     if isDevourer then
@@ -145,13 +145,22 @@ function ResourceBar:Refresh(force)
         if maxResources > 1 then
             local tickCount = maxResources - 1
             self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
-            self:LayoutResourceTicks(maxResources, C.COLOR_BLACK, 1, "tickPool")
+            self:LayoutResourceTicks(maxResources, ECM.Constants.COLOR_BLACK, 1, "tickPool")
         else
             self:HideAllTicks("tickPool")
         end
     end
 
+    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete.")
     return true
+end
+
+--------------------------------------------------------------------------------
+-- Event Handling
+--------------------------------------------------------------------------------
+
+function ResourceBar:OnEventUpdate(event, ...)
+    self:ThrottledUpdateLayout(event or "OnEventUpdate")
 end
 
 --------------------------------------------------------------------------------
@@ -159,19 +168,19 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
-    if not self.IsECMFrame then
-        BarFrame.AddMixin(self, "ResourceBar")
+    if not self.IsModuleMixin then
+        ECM.BarMixin.AddMixin(self, "ResourceBar")
     elseif ECM.RegisterFrame then
         ECM.RegisterFrame(self)
     end
 
-    self:RegisterEvent("UNIT_AURA", "ThrottledRefresh")
-    self:RegisterEvent("UNIT_POWER_FREQUENT", "ThrottledRefresh")
+    self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
+    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnEventUpdate")
 end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
 end

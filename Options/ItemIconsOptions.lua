@@ -1,21 +1,11 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-
-local ECM = ns.Addon
-local C = ns.Constants
-local AceGUI = LibStub("AceGUI-3.0", true)
-
-local ItemIcons = ECM.ItemIcons
-local OptionHelpers = ECM.OptionHelpers
-
-local PREVIEW_CONTROL_TYPE = "ECM_ItemIconPreview"
-local PREVIEW_CONTROL_VERSION = 1
-local _previewControlRegistered = false
-
-
+local mod = ns.Addon
+local ItemIconsOptions = {}
+mod.ItemIconsOptions = ItemIconsOptions
 
 --- Builds a standard Item Icons module toggle option.
 ---@param self ECM_ItemIconsModule
@@ -30,24 +20,24 @@ local function BuildModuleToggleOption(self, key, label, order)
         order = order,
         width = "full",
         disabled = function()
-            return OptionHelpers.IsOptionsDisabled(self)
+            return ECM.OptionUtil.IsOptionsDisabled(self)
         end,
         get = function()
-            return OptionHelpers.GetOptionValue(self, key, true)
+            return ECM.OptionUtil.GetOptionValue(self, key, true)
         end,
         set = function(_, val)
-            local moduleConfig = self.ModuleConfig
+            local moduleConfig = mod.ItemIcons:GetModuleConfig()
             if moduleConfig then
                 moduleConfig[key] = val
             end
-            ECM.ScheduleLayoutUpdate(0)
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end,
     }
 end
 
 --- Builds Item Icons basic settings options.
 ---@return table
-function ItemIcons:GetBasicOptionsArgs()
+function ItemIconsOptions.GetBasicOptionsArgs()
     return {
         description = {
             type = "description",
@@ -61,25 +51,25 @@ function ItemIcons:GetBasicOptionsArgs()
             order = 1,
             width = "full",
             get = function()
-                return OptionHelpers.GetOptionValue(self, "enabled", true)
+                return ECM.OptionUtil.GetOptionValue(mod.ItemIcons, "enabled", true)
             end,
             set = function(_, val)
-                local moduleConfig = self.ModuleConfig
+                local moduleConfig = mod.ItemIcons:GetModuleConfig()
                 if moduleConfig then
                     moduleConfig.enabled = val
                 end
 
                 if val then
-                    if not self:IsEnabled() then
-                        ECM:EnableModule(C.ITEMICONS)
+                    if not mod.ItemIcons:IsEnabled() then
+                        mod:EnableModule(ECM.Constants.ITEMICONS)
                     end
                 else
-                    if self:IsEnabled() then
-                        ECM:DisableModule(C.ITEMICONS)
+                    if mod.ItemIcons:IsEnabled() then
+                        mod:DisableModule(ECM.Constants.ITEMICONS)
                     end
                 end
 
-                ECM.ScheduleLayoutUpdate(0)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         },
     }
@@ -87,7 +77,7 @@ end
 
 --- Builds Item Icons item toggles options.
 ---@return table
-function ItemIcons:GetEquipmentOptionsArgs()
+function ItemIconsOptions.GetEquipmentOptionsArgs()
     return {
         description = {
             type = "description",
@@ -95,14 +85,14 @@ function ItemIcons:GetEquipmentOptionsArgs()
             order = 0,
             fontSize = "medium",
         },
-        showTrinket1 = BuildModuleToggleOption(self, "showTrinket1", "Show first trinket", 1),
-        showTrinket2 = BuildModuleToggleOption(self, "showTrinket2", "Show second trinket", 2),
+        showTrinket1 = BuildModuleToggleOption(mod.ItemIcons, "showTrinket1", "Show first trinket", 1),
+        showTrinket2 = BuildModuleToggleOption(mod.ItemIcons, "showTrinket2", "Show second trinket", 2),
     }
 end
 
 --- Builds Item Icons consumable toggles options.
 ---@return table
-function ItemIcons:GetConsumableOptionsArgs()
+function ItemIconsOptions.GetConsumableOptionsArgs()
     return {
         description = {
             type = "description",
@@ -110,15 +100,15 @@ function ItemIcons:GetConsumableOptionsArgs()
             order = 0,
             fontSize = "medium",
         },
-        showHealthPotion = BuildModuleToggleOption(self, "showHealthPotion", "Show health potions", 1),
-        showCombatPotion = BuildModuleToggleOption(self, "showCombatPotion", "Show combat potions", 2),
-        showHealthstone = BuildModuleToggleOption(self, "showHealthstone", "Show healthstone", 3),
+        showHealthPotion = BuildModuleToggleOption(mod.ItemIcons, "showHealthPotion", "Show health potions", 1),
+        showCombatPotion = BuildModuleToggleOption(mod.ItemIcons, "showCombatPotion", "Show combat potions", 2),
+        showHealthstone = BuildModuleToggleOption(mod.ItemIcons, "showHealthstone", "Show healthstone", 3),
     }
 end
 
 --- Builds the Item Icons options group.
 ---@return table itemIconsOptions AceConfig group for Item Icons section.
-function ItemIcons:GetOptionsTable()
+function ItemIconsOptions.GetOptionsTable()
     return {
         type = "group",
         name = "Item Icons",
@@ -129,21 +119,21 @@ function ItemIcons:GetOptionsTable()
                 name = "Basic Settings",
                 inline = true,
                 order = 1,
-                args = self:GetBasicOptionsArgs(),
+                args = ItemIconsOptions.GetBasicOptionsArgs(),
             },
             equipmentSettings = {
                 type = "group",
                 name = "Equipment",
                 inline = true,
                 order = 2,
-                args = self:GetEquipmentOptionsArgs(),
+                args = ItemIconsOptions.GetEquipmentOptionsArgs(),
             },
             consumableSettings = {
                 type = "group",
                 name = "Consumables",
                 inline = true,
                 order = 3,
-                args = self:GetConsumableOptionsArgs(),
+                args = ItemIconsOptions.GetConsumableOptionsArgs(),
             },
         },
     }

@@ -1,30 +1,23 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
 local ADDON_NAME, ns = ...
 
-local ECM = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
-ns.Addon = ECM
-local Util = ns.Util
-local C = ns.Constants
+local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
+ns.Addon = mod
 local LSM = LibStub("LibSharedMedia-3.0", true)
-ECM.Log = Util.Log
-ECM.Print = Util.Print
-ECM.DebugAssert = Util.DebugAssert
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
-assert(ns.defaults, "Defaults.lua must be loaded before ECM.lua")
-assert(ns.AddToTraceLog and ns.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
-assert(ns.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
-assert(ns.Constants, "Constants.lua must be loaded before ECM.lua")
-assert(ns.Migration, "Migration.lua must be loaded before ECM.lua")
+assert(ECM.defaults, "Defaults.lua must be loaded before ECM.lua")
+assert(ECM.Constants, "Constants.lua must be loaded before ECM.lua")
+assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 
 local function RegisterAddonCompartmentEntry()
-    if ECM._addonCompartmentRegistered then
+    if mod._addonCompartmentRegistered then
         return
     end
 
@@ -32,23 +25,18 @@ local function RegisterAddonCompartmentEntry()
         return
     end
 
-    local text = C.ADDON_NAME
-    local sparkle = ns.SparkleUtil
-    if sparkle and sparkle.GetText then
-        text = sparkle.GetText(text)
-    end
-
+    local text = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
-        icon = C.ADDON_ICON_TEXTURE,
+        icon = ECM.Constants.ADDON_ICON_TEXTURE,
         notCheckable = true,
         func = function()
-            ECM:ChatCommand("options")
+            mod:ChatCommand("options")
         end,
     })
 
     if ok then
-        ECM._addonCompartmentRegistered = true
+        mod._addonCompartmentRegistered = true
     end
 end
 
@@ -57,14 +45,14 @@ end
 ---@param text string
 ---@param onAccept fun()|nil
 ---@param onCancel fun()|nil
-function ECM:ConfirmReloadUI(text, onAccept, onCancel)
+function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        Util.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        ECM_print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
     end
 
     if not StaticPopupDialogs or not StaticPopup_Show then
-        Util.Print("Unable to show confirmation dialog (StaticPopup API unavailable).")
+        ECM_print("Unable to show confirmation dialog (StaticPopup API unavailable).")
         return
     end
 
@@ -133,9 +121,9 @@ end
 
 --- Shows a dialog with the export string for copying.
 ---@param exportString string
-function ECM:ShowExportDialog(exportString)
+function mod:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        Util.Print("Invalid export string provided")
+        ECM_print("Invalid export string provided")
         return
     end
 
@@ -156,7 +144,7 @@ function ECM:ShowExportDialog(exportString)
 end
 
 --- Shows a dialog to paste an import string and handles the import process.
-function ECM:ShowImportDialog()
+function mod:ShowImportDialog()
     EnsureEditBoxDialog(POPUP_IMPORT_PROFILE, {
         text = "Paste your import string:",
         button1 = OKAY or "Import",
@@ -181,14 +169,14 @@ function ECM:ShowImportDialog()
         local input = editBox:GetText() or ""
 
         if strtrim(input) == "" then
-            ECM:Print("Import cancelled: no string provided")
+            mod:Print("Import cancelled: no string provided")
             return
         end
 
         -- Validate first WITHOUT applying
-        local data, errorMsg = ns.ImportExport.ValidateImportString(input)
+        local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
         if not data then
-            ECM:Print("Import failed: " .. (errorMsg or "unknown error"))
+            mod:Print("Import failed: " .. (errorMsg or "unknown error"))
             return
         end
 
@@ -199,10 +187,10 @@ function ECM:ShowImportDialog()
         )
 
         -- Only apply the import AFTER user confirms reload
-        ECM:ConfirmReloadUI(confirmText, function()
-            local success, applyErr = ns.ImportExport.ApplyImportData(data)
+        mod:ConfirmReloadUI(confirmText, function()
+            local success, applyErr = ECM.ImportExport.ApplyImportData(data)
             if not success then
-                ECM:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
             end
         end, nil)
     end
@@ -227,27 +215,23 @@ end
 
 --- Handles slash command input.
 ---@param input string|nil
-function ECM:ChatCommand(input)
+function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        Util.Print("Commands: /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
+        ECM_print("Commands: /ecm debug [on|off|toggle] | /ecm options")
         return
     end
 
-    if cmd == "bug" then
-        local profile = self.db and self.db.profile
-        if not profile or not profile.debug then
-            Util.Print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
-            return
-        end
-        ns.ShowBugReportPopup()
+    if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
+        ECM.ScheduleLayoutUpdate(0, "ChatCommand")
+        ECM_print("Refreshing all modules.")
         return
     end
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
-            Util.Print("Options cannot be opened during combat. They will open when combat ends.")
+            ECM_print("Options cannot be opened during combat. They will open when combat ends.")
             if not self._openOptionsAfterCombat then
                 self._openOptionsAfterCombat = true
                 self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
@@ -270,18 +254,18 @@ function ECM:ChatCommand(input)
     if cmd == "debug" then
         local newVal, err = ParseToggleArg(arg, profile.debug)
         if err then
-            Util.Print(err)
+            ECM_print(err)
             return
         end
         profile.debug = newVal
-        Util.Print("Debug:", profile.debug and "ON" or "OFF")
+        ECM_print("Debug:", profile.debug and "ON" or "OFF")
         return
     end
 
-    Util.Print("Unknown command. Use /ecm help")
+    ECM_print("Unknown command. Use /ecm help")
 end
 
-function ECM:HandleOpenOptionsAfterCombat()
+function mod:HandleOpenOptionsAfterCombat()
     if not self._openOptionsAfterCombat then
         return
     end
@@ -295,22 +279,31 @@ function ECM:HandleOpenOptionsAfterCombat()
     end
 end
 
-function ECM:OnInitialize()
-    -- Set up versioned SV store and point the active key at the current version.
-    ns.Migration.PrepareDatabase()
+function mod:GetECMModule(moduleName, silent)
+    local module = self[moduleName] or ECM[moduleName] or nil
+    if not module and not silent then
+        ECM_print("Module not found:", moduleName)
+    end
+    return module
+end
 
-    self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ns.defaults, true)
+function mod:OnInitialize()
+    -- Set up versioned SV store and point the active key at the current version.
+    ECM.Migration.PrepareDatabase()
+
+    self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    Util.Log("ECM", "OnInitialize", {
+    ECM_log(ECM.Constants.SYS.Core, nil, "Initialize", {
         schemaVersion = profile and profile.schemaVersion or "nil",
-        currentSchemaVersion = C.CURRENT_SCHEMA_VERSION,
+        currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
     })
-    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ns.Migration.Run(profile)
+
+    if profile and profile.schemaVersion and profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
+        ECM.Migration.Run(profile)
     end
 
-    ns.Migration.FlushLog()
+    ECM.Migration.FlushLog()
 
     -- Register bundled font with LibSharedMedia if present.
     if LSM and LSM.Register then
@@ -323,36 +316,26 @@ function ECM:OnInitialize()
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
-function ECM:OnEnable()
+function mod:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
     RegisterAddonCompartmentEntry()
     local profile = self.db and self.db.profile
 
     local moduleOrder = {
-        "PowerBar",
-        "ResourceBar",
-        "RuneBar",
-        "BuffBars",
-        "ItemIcons",
+        ECM.Constants.POWERBAR,
+        ECM.Constants.RESOURCEBAR,
+        ECM.Constants.RUNEBAR,
+        ECM.Constants.BUFFBARS,
+        ECM.Constants.ITEMICONS,
     }
 
     for _, moduleName in ipairs(moduleOrder) do
-        local module = self:GetModule(moduleName, true)
+        local module = self:GetECMModule(moduleName)
         assert(module, "Module not found: " .. moduleName)
 
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
-        if moduleName == C.ITEMICONS then
-            shouldEnable = moduleConfig and moduleConfig.enabled == true
-        end
-
-        if shouldEnable then
-            if not module:IsEnabled() then
-                self:EnableModule(moduleName)
-            end
-        elseif module:IsEnabled() then
-            self:DisableModule(moduleName)
-        end
+        ECM.OptionUtil.SetModuleEnabled(moduleName, shouldEnable)
     end
 end

@@ -1,21 +1,12 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local ADDON_NAME, ns = ...
-local ECM = ns.Addon
-local Util = ns.Util
-local C = ns.Constants
-
-local BarFrame = ns.Mixins.BarFrame
-local ECMFrame = ns.Mixins.ECMFrame
-
-local RuneBar = ECM:NewModule("RuneBar", "AceEvent-3.0")
-ECM.RuneBar = RuneBar
-
---------------------------------------------------------------------------------
--- Fragmented Bars (DK Runes - individual bars per rune with recharge timers)
---------------------------------------------------------------------------------
+local _, ns = ...
+local mod = ns.Addon
+local FrameUtil = ECM.FrameUtil
+local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
+mod.RuneBar = RuneBar
 
 --- Creates or returns fragmented sub-bars for runes.
 ---@param bar Frame
@@ -25,7 +16,7 @@ ECM.RuneBar = RuneBar
 local function EnsureFragmentedBars(bar, maxResources, moduleConfig, globalConfig)
     -- Get texture
     local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
-    local tex = Util.GetTexture(texKey)
+    local tex = ECM_GetTexture(texKey)
 
     for i = 1, maxResources do
         if not bar.FragmentedBars[i] then
@@ -119,17 +110,17 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         end
 
         local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
-        local tex = Util.GetTexture(texKey)
+        local tex = ECM_GetTexture(texKey)
 
-        -- Use same positioning logic as BarFrame tick layout to avoid sub-pixel gaps
+        -- Use same positioning logic as BarMixin tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
         for pos, runeIndex in ipairs(bar._displayOrder) do
             local frag = bar.FragmentedBars[runeIndex]
             if frag then
                 frag:SetStatusBarTexture(tex)
                 frag:ClearAllPoints()
-                local leftX = Util.PixelSnap((pos - 1) * step)
-                local rightX = Util.PixelSnap(pos * step)
+                local leftX = ECM_PixelSnap((pos - 1) * step)
+                local rightX = ECM_PixelSnap(pos * step)
                 local w = rightX - leftX
                 frag:SetSize(w, barHeight)
                 frag:SetPoint("LEFT", bar, "LEFT", leftX, 0)
@@ -147,20 +138,91 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
                 frag:SetStatusBarColor(r, g, b)
             else
                 local cd = cdLookup[i]
+                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
                 frag:SetValue(cd and cd.frac or 0)
-                frag:SetStatusBarColor(r * 0.5, g * 0.5, b * 0.5)
+                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
+            end
+        end
+    end
+end
+
+--- Lightweight per-frame rune value updater.
+--- Only updates fill values and colors on existing fragment bars.
+--- Triggers a full layout refresh when rune ready/CD states change.
+---@param self RuneBar
+---@param frame Frame
+local function UpdateRuneValues(self, frame)
+    if not GetRuneCooldown then
+        return
+    end
+
+    local frags = frame.FragmentedBars
+    if not frags then
+        return
+    end
+
+    local maxRunes = frame._maxResources
+    if not maxRunes or maxRunes <= 0 then
+        return
+    end
+
+    -- Throttle to updateFrequency to match existing refresh cadence
+    local now = GetTime()
+    local globalConfig = self:GetGlobalConfig()
+    local freq = (globalConfig and globalConfig.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+    if frame._lastValueUpdate and (now - frame._lastValueUpdate) < freq then
+        return
+    end
+    frame._lastValueUpdate = now
+
+    local cfg = self:GetModuleConfig()
+    local r, g, b = cfg.color.r, cfg.color.g, cfg.color.b
+
+    -- Detect state transitions to trigger full reorder/reposition
+    local stateChanged = false
+    for i = 1, maxRunes do
+        local start, duration, runeReady = GetRuneCooldown(i)
+        local isReady = runeReady or not start or start == 0 or not duration or duration == 0
+        local wasReady = frame._lastReadySet and frame._lastReadySet[i]
+
+        if (isReady and true or false) ~= (wasReady and true or false) then
+            stateChanged = true
+            break
+        end
+    end
+
+    if stateChanged then
+        -- A rune just finished or started CD — trigger full refresh for reorder/reposition
+        self:ThrottledUpdateLayout("RuneStateChange")
+        return
+    end
+
+    -- Fast path: only update fill values and colors, no repositioning
+    for i = 1, maxRunes do
+        local frag = frags[i]
+        if frag then
+            local start, duration, runeReady = GetRuneCooldown(i)
+            if runeReady or not start or start == 0 or not duration or duration == 0 then
+                frag:SetValue(1)
+                frag:SetStatusBarColor(r, g, b)
+            else
+                local elapsed = now - start
+                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
+                local frac = math.max(0, math.min(1, elapsed / duration))
+                frag:SetValue(frac)
+                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
             end
         end
     end
 end
 
 --------------------------------------------------------------------------------
--- ECMFrame/BarFrame Overrides
+-- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 
 function RuneBar:CreateFrame()
-    -- Create base frame using ECMFrame (not BarFrame, since we manage StatusBar ourselves)
-    local frame = ECMFrame.CreateFrame(self)
+    -- Create base frame using ModuleMixin (not BarMixin, since we manage StatusBar ourselves)
+    local frame = ECM.ModuleMixin.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -175,38 +237,30 @@ function RuneBar:CreateFrame()
     -- FragmentedBars for individual rune display
     frame.FragmentedBars = {}
 
-    -- Attach OnUpdate script for continuous rune updates
-    frame:SetScript("OnUpdate", function()
-        self:ThrottledRefresh()
-    end)
-
-    ECM.Log(self.Name, "RuneBar:CreateFrame", "Success")
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
 
 function RuneBar:ShouldShow()
-    local config = self.ModuleConfig
     local _, class = UnitClass("player")
-    return ECMFrame.ShouldShow(self) and class == "DEATHKNIGHT"
+    return ECM.ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
 end
 
-function RuneBar:Refresh(force)
+function RuneBar:Refresh(why, force)
     local _, class = UnitClass("player")
     assert(class == "DEATHKNIGHT", "RuneBar should only be enabled for Death Knights")
 
-    -- Use ECMFrame.Refresh instead of BarFrame.Refresh since we manage
+    -- Use BaseRefresh instead of BarMixin.Refresh since we manage
     -- our own fragmented bars and don't use the standard StatusBar
-    local continue = ECMFrame.Refresh(self, force)
-    if not continue then
-        Util.Log(self.Name, "RuneBar:Refresh", "Skipping refresh")
+    if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
 
-    local cfg = self.ModuleConfig
-    local globalConfig = self.GlobalConfig
+    local cfg = self:GetModuleConfig()
+    local globalConfig = self:GetGlobalConfig()
     local frame = self.InnerFrame
 
-    local maxRunes = C.RUNEBAR_MAX_RUNES
+    local maxRunes = ECM.Constants.RUNEBAR_MAX_RUNES
     if not maxRunes or maxRunes <= 0 then
         frame:Hide()
         return
@@ -229,32 +283,42 @@ function RuneBar:Refresh(force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    Util.Log(self.Name, "RuneBar:Refresh", {
-        maxRunes = maxRunes,
-    })
+    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete.")
+    return true
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
+function RuneBar:OnEvent(event)
+    self:ThrottledUpdateLayout(event, { secondPass = true })
+end
 
 function RuneBar:OnEnable()
+    if not self.IsModuleMixin then
+        ECM.BarMixin.AddMixin(self, "RuneBar")
+    elseif ECM.RegisterFrame then
+        ECM.RegisterFrame(self)
+    end
+
     local _, class = UnitClass("player")
     if class ~= "DEATHKNIGHT" then
         return
     end
 
-    if not self.IsECMFrame then
-        BarFrame.AddMixin(self, "RuneBar")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
+    -- DK-only: lightweight per-frame rune value updates and power events
+    if self.InnerFrame then
+        self.InnerFrame:SetScript("OnUpdate", function()
+            UpdateRuneValues(self, self.InnerFrame)
+        end)
     end
-    self:RegisterEvent("RUNE_POWER_UPDATE", "ThrottledRefresh")
+    self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
+end
+
+function RuneBar:OnRunePowerUpdate()
+    self:ThrottledUpdateLayout("RUNE_POWER_UPDATE")
 end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
+    if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
 

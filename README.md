@@ -1,4 +1,4 @@
-# Enhanced Cooldown Manager by Solär
+# Enhanced Cooldown Manager by Argium
 
 Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.**
 

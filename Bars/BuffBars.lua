@@ -1,388 +1,25 @@
 -- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Solär
+-- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local _, ns = ...
-
-local ECM = ns.Addon
-local Util = ns.Util
-local C = ns.Constants
-
-local ECMFrame = ns.Mixins.ECMFrame
-
-local BuffBars = ECM:NewModule("BuffBars", "AceEvent-3.0")
+local FrameUtil = ECM.FrameUtil
+local BuffBars = {}
 ECM.BuffBars = BuffBars
+local _warned = false
+local _editLocked = false
 
----@class ECM_BuffBarsModule : ECMFrame
+---@class ECM_BuffBarMixin : Frame
+---@field __ecmHooked boolean
+---@field Bar StatusBar
+---@field DebuffBorder any
+---@field Icon Frame
+---@field cooldownID number|nil
+---@field cooldownInfo { spellID: number|nil }|nil
 
----@class ECM_BuffBarChild : Frame
----@field __ecmAnchorHooked boolean
----@field __ecmStyled boolean
-
-local GetSortedChildren
-local GetChildTextureFileID
-
--- Helper functions for accessing texture/color utilities
-local BarHelpers = {
-    GetTexture = function(texKey)
-        return Util.GetTexture(texKey)
-    end,
-    GetBgColor = function(moduleConfig, globalConfig)
-        local bgColor = (moduleConfig and moduleConfig.bgColor) or (globalConfig and globalConfig.barBgColor)
-        return bgColor or C.COLOR_BLACK
-    end,
-    ApplyFont = function(fontString, globalConfig)
-        if not fontString then
-            return
-        end
-        Util.ApplyFont(fontString, globalConfig)
-    end,
-    GetBarHeight = function(moduleConfig, globalConfig, fallback)
-        local height = (moduleConfig and moduleConfig.height) or (globalConfig and globalConfig.barHeight) or (fallback or 13)
-        return Util.PixelSnap(height)
-    end,
-    GetBarWidth = function(moduleConfig, globalConfig, fallback)
-        local width = (moduleConfig and moduleConfig.width) or (globalConfig and globalConfig.barWidth) or (fallback or 300)
-        return Util.PixelSnap(width)
-    end,
-}
-
---- Returns current class ID and spec ID.
----@return number|nil classID, number|nil specID
-local function GetCurrentClassSpec()
-    local _, _, classID = UnitClass("player")
-    local specID = GetSpecialization()
-    return classID, specID
-end
-
---- Ensures nested tables exist for buff bar color storage.
----@param cfg table|nil
-local function EnsureColorStorage(cfg)
-    if not cfg then
-        return
-    end
-
-    if not cfg.colors then
-        cfg.colors = {
-            perSpell = {},
-            cache = {},
-            defaultColor = C.BUFFBARS_DEFAULT_COLOR,
-        }
-    end
-
-    local colors = cfg.colors
-    if not colors.perSpell then
-        colors.perSpell = {}
-    end
-    if not colors.cache then
-        colors.cache = {}
-    end
-    if not colors.defaultColor then
-        colors.defaultColor = C.BUFFBARS_DEFAULT_COLOR
-    end
-    if not colors.textureMap then
-        colors.textureMap = {}
-    end
-end
-
---- Gets color context for current class/spec.
----@param module ECM_BuffBarsModule
----@return table|nil cfg, number|nil classID, number|nil specID
-local function GetColorContext(module)
-    local cfg = module.ModuleConfig
-    if not cfg then
-        return nil, nil, nil
-    end
-    local classID, specID = GetCurrentClassSpec()
-    return cfg, classID, specID
-end
-
---- Returns normalized spell name for a buff bar child, or nil if unavailable.
----@param child ECM_BuffBarChild|nil
----@return string|nil
-local function GetChildSpellName(child)
-    local bar = child and child.Bar
-    if not (bar and bar.Name and bar.Name.GetText) then
-        return nil
-    end
-
-    local text = bar.Name:GetText()
-    if type(canaccessvalue) == "function" and not canaccessvalue(text) then
-        Util.Log("BuffBars", "GetChildSpellName", {
-            message = "Spell name is secret",
-            childName = child:GetName() or "nil",
-        })
-        return nil
-    end
-
-    if type(text) ~= "string" then
-        return nil
-    end
-
-    if text == "" then
-        return nil
-    end
-
-    return text
-end
-
---- Returns the color lookup key for a bar: spell name if known, or textureFileID fallback.
---- When Blizzard marks spell names as secret (via `canaccessvalue`), the icon texture file ID
---- serves as a stable identifier for color customization. textureFileID is a number, creating
---- natural key-type separation from string spell names in perSpell storage.
----@param spellName string|nil
----@param textureFileID number|nil
----@return string|number|nil
-local function GetColorKey(spellName, textureFileID)
-    return spellName or textureFileID
-end
-
---- Returns color for spell with name spellName for current class/spec, or nil if not set.
----@param spellName string|nil
----@param cfg table|nil
----@return ECM_Color|nil
-local function GetSpellColor(spellName, cfg)
-    if not cfg or not cfg.colors.perSpell then
-        Util.DebugAssert(false, "GetSpellColor called with nil cfg or missing perSpell colors")
-        return C.BUFFBARS_DEFAULT_COLOR
-    end
-
-    local classID, specID = GetCurrentClassSpec()
-    local colors = cfg.colors.perSpell
-    if classID and specID and colors[classID] and colors[classID][specID] then
-        local c = colors[classID][specID][spellName]
-        if c then
-            return c
-        end
-    end
-
-    return nil
-end
-
---- Builds a cache snapshot for current class/spec from current viewer children.
----@param viewer Frame
----@param cfg table|nil
----@return table|nil
-local function BuildBarCacheSnapshot(viewer, cfg)
-    if not cfg then
-        return nil
-    end
-
-    local classID, specID = GetCurrentClassSpec()
-    if not classID or not specID then
-        return nil
-    end
-
-    local children = GetSortedChildren(viewer, false)
-    local nextCache = {}
-    local validCount = 0
-
-    -- Store all entries, including those with nil spellName (secret/unavailable names).
-    -- textureFileIDs are stored in a separate table (not in cache entries) to prevent
-    -- taint propagation from secret spell names to texture IDs.
-    local nextTextures = {}
-    for index, entry in ipairs(children) do
-        local spellName = GetChildSpellName(entry.frame)
-        nextCache[index] = {
-            spellName = spellName,  -- nil is allowed
-            lastSeen = GetTime(),
-        }
-        nextTextures[index] = GetChildTextureFileID(entry.frame)
-        if spellName then
-            validCount = validCount + 1
-        end
-    end
-
-    Util.Log("BuffBars", "BuildBarCacheSnapshot", {
-        totalChildren = #children,
-        validCount = validCount,
-    })
-
-    return {
-        classID = classID,
-        specID = specID,
-        cache = nextCache,
-        textures = nextTextures,
-        validCount = validCount,
-    }
-end
-
---- Rebuilds the bar cache for the current class/spec from current viewer children.
---- Scans both shown and hidden bars. If no valid bars are found, keeps existing cache.
----@param viewer Frame
----@param moduleConfig table
----@return boolean updated
-local function RefreshBarCache(viewer, moduleConfig)
-    local snapshot = BuildBarCacheSnapshot(viewer, moduleConfig)
-    if not snapshot then
-        return false
-    end
-
-    if not next(snapshot.cache) then
-        Util.Log("BuffBars", "RefreshBarCache", {
-            message = "No children at all; preserving existing cache",
-            classID = snapshot.classID,
-            specID = snapshot.specID,
-        })
-        return false
-    end
-
-    local cache = moduleConfig.colors.cache
-    cache[snapshot.classID] = cache[snapshot.classID] or {}
-
-    local textureMap = moduleConfig.colors.textureMap
-    textureMap[snapshot.classID] = textureMap[snapshot.classID] or {}
-
-    -- Texture file ID resolution and color migration:
-    -- textureFileIDs are stored in a separate table (textureMap) from cache entries
-    -- to prevent taint propagation from secret spell names to texture IDs.
-    -- 1. Build textureFileID → spellName mapping from old textureMap + old cache
-    -- 2. Resolve nil spellNames in new cache via textureFileID lookup
-    -- 3. Migrate perSpell colors from textureFileID (number) key to resolved spell name
-    local oldCache = cache[snapshot.classID][snapshot.specID]
-    local oldTextures = textureMap[snapshot.classID] and textureMap[snapshot.classID][snapshot.specID]
-    if oldCache and oldTextures then
-        local texIdToName = {}
-        for index, entry in pairs(oldCache) do
-            local texId = oldTextures[index]
-            if entry.spellName and texId then
-                texIdToName[texId] = entry.spellName
-            end
-        end
-        Util.Log("BuffBars", "RefreshBarCache", {
-            message = "Built textureFileID to spellName mapping from old cache",
-            mappingCount = #texIdToName,
-            map = texIdToName,
-        })
-
-        local perSpell = moduleConfig.colors.perSpell
-        local classSpells = perSpell and perSpell[snapshot.classID]
-        local specSpells = classSpells and classSpells[snapshot.specID]
-
-        for index, newEntry in pairs(snapshot.cache) do
-            local newTexId = snapshot.textures[index]
-            if not newEntry.spellName and newTexId then
-                local resolvedName = texIdToName[newTexId]
-                if resolvedName then
-                    Util.Log("BuffBars", "RefreshBarCache", {
-                        message = "Resolved spell name from texture ID",
-                        resolvedName = resolvedName,
-                        textureFileID = newTexId,
-                    })
-                    newEntry.spellName = resolvedName
-                end
-            end
-
-            -- Migrate colors from textureFileID key to real spell name
-            if specSpells and newEntry.spellName and newTexId then
-                if specSpells[newTexId] and specSpells[newEntry.spellName] == nil then
-                    Util.Log("BuffBars", "RefreshBarCache", {
-                        message = "Migrating color from texture ID to resolved spell name",
-                        spellName = newEntry.spellName,
-                        textureFileID = newTexId,
-                    })
-                    specSpells[newEntry.spellName] = specSpells[newTexId]
-                end
-                specSpells[newTexId] = nil
-            end
-        end
-    end
-
-    Util.Log("BuffBars", "RefreshBarCache", {
-        message = "Updating bar cache with new snapshot",
-        current = cache[snapshot.classID] and cache[snapshot.classID][snapshot.specID] or "nil",
-        new = snapshot.cache,
-    })
-
-    cache[snapshot.classID][snapshot.specID] = snapshot.cache
-    textureMap[snapshot.classID][snapshot.specID] = snapshot.textures
-    return true
-end
-
-local function GetBuffBarBackground(statusBar)
-    if not statusBar or not statusBar.GetRegions then
-        return nil
-    end
-
-    local cached = statusBar.__ecmBarBG
-    if cached and cached.IsObjectType and cached:IsObjectType("Texture") then
-        return cached
-    end
-
-    for _, region in ipairs({ statusBar:GetRegions() }) do
-        if region and region.IsObjectType and region:IsObjectType("Texture") then
-            local atlas = region.GetAtlas and region:GetAtlas()
-            if atlas == "UI-HUD-CoolDownManager-Bar-BG" or atlas == "UI-HUD-CooldownManager-Bar-BG" then
-                statusBar.__ecmBarBG = region
-                return region
-            end
-        end
-    end
-
-    return nil
-end
-
---- Gets a deterministic icon region by index.
----@param iconFrame Frame|nil
----@param index number
----@return Texture|nil
-local function GetIconRegion(iconFrame, index)
-    if not iconFrame or not iconFrame.GetRegions then
-        return nil
-    end
-
-    local region = select(index, iconFrame:GetRegions())
-    if region and region.IsObjectType and region:IsObjectType("Texture") then
-        return region
-    end
-
-    return nil
-end
-
----@param iconFrame Frame|nil
----@return Texture|nil
-local function GetBuffBarIconTexture(iconFrame)
-    return GetIconRegion(iconFrame, C.BUFFBARS_ICON_TEXTURE_REGION_INDEX)
-end
-
----@param iconFrame Frame|nil
----@return Texture|nil
-local function GetBuffBarIconOverlay(iconFrame)
-    return GetIconRegion(iconFrame, C.BUFFBARS_ICON_OVERLAY_REGION_INDEX)
-end
-
----@param child ECM_BuffBarChild
----@return Frame|nil
-local function GetBuffBarIconFrame(child)
-    return child and child.Icon or nil
-end
-
---- Returns the icon texture file ID for a buff bar child, or nil if unavailable.
---- Used as a stable secondary identifier when the spell name is secret.
----@param child ECM_BuffBarChild|nil
----@return number|nil
-GetChildTextureFileID = function(child)
-    local iconFrame = GetBuffBarIconFrame(child)
-    if not iconFrame then
-        return nil
-    end
-    local iconTexture = GetBuffBarIconTexture(iconFrame)
-    if not (iconTexture and iconTexture.GetTextureFileID) then
-        return nil
-    end
-    return iconTexture:GetTextureFileID()
-end
-
---- Returns visible bar children sorted by Y position (top to bottom) to preserve edit mode order.
---- GetChildren() returns in creation order, not visual order, so we must sort by position.
----@param viewer Frame The BuffBarCooldownViewer frame
----@param onlyVisible boolean|nil If true, only include visible children
----@return table[] Array of {frame, top, order} sorted top-to-bottom
-GetSortedChildren = function(viewer, onlyVisible)
+local function get_children_ordered(viewer)
     local result = {}
-
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
-        if child and child.Bar and (not onlyVisible or child:IsShown()) then
+        if child and child.Bar then
             local top = child.GetTop and child:GetTop()
             result[#result + 1] = { frame = child, top = top, order = insertOrder }
         end
@@ -402,238 +39,298 @@ GetSortedChildren = function(viewer, onlyVisible)
     return result
 end
 
---- Hooks a child frame to re-layout when Blizzard changes its anchors.
----@param child ECM_BuffBarChild
----@param module ECM_BuffBarsModule
-local function HookChildAnchoring(child, module)
-    if child.__ecmAnchorHooked then
+local function hook_child_frame(child, module)
+    if child.__ecmHooked then
         return
     end
-    child.__ecmAnchorHooked = true
 
-    -- Hook SetPoint to detect when Blizzard re-anchors this child
+    -- Hook SetPoint to detect when Blizzard re-anchors this child.
+    -- When triggered outside our own layout pass, invalidate the lazy
+    -- anchor cache so the next layout re-applies the correct anchors.
     hooksecurefunc(child, "SetPoint", function()
-        -- Only re-layout if we're not already running a layout
-        local viewer = _G[C.VIEWER_BUFFBAR]
-        if viewer and not module._layoutRunning then
-            module:ScheduleLayoutUpdate()
-        end
+        if module._layoutRunning then return end
+        FrameUtil.LazyResetState(child)
+        module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
 
     -- Hook OnShow to ensure newly shown bars get positioned
     child:HookScript("OnShow", function()
-        module:ScheduleLayoutUpdate()
+        module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
 
     child:HookScript("OnHide", function()
-        module:ScheduleLayoutUpdate()
+        module:ThrottledUpdateLayout("OnHide:child", { secondPass = true })
     end)
+
+    child.__ecmHooked = true
 end
 
---- Enforces visibility settings for icon, spell name, and duration.
---- This must be called frequently because Blizzard resets these when cooldowns update.
----@param child ECM_BuffBarChild
----@param moduleConfig table
-local function HidePandemicGlows(child)
-    if not child then
+--- Applies all sizing, styling, visibility, and anchoring to a single buff bar
+--- child frame. Lazy setters ensure no-ops when values haven't changed.
+---@param frame ECM_BuffBarMixin
+---@param config table Module config
+---@param globalConfig table Global config
+---@param barIndex number Index of the bar (for logging)
+---@param retryCount number|nil Number of times this function has been retried
+local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
+    if not (frame and frame.__ecmHooked) then
+        ECM_debug_assert(false, "Attempted to style a child frame that wasn't hooked.")
         return
     end
 
-    -- Hide() doesn't work because Blizzard keeps showing it again
-    if child.DebuffBorder then
-        child.DebuffBorder:SetAlpha(0)
-    end
-end
+    retryCount = retryCount or 0
+    local bar = frame.Bar
+    local iconFrame = frame.Icon
+    local barBG = FrameUtil.GetBarBackground(bar)
 
----@param child ECM_BuffBarChild
----@param moduleConfig table
-local ApplyStatusBarAnchors
-local ApplyBarNameInset
+    -- frame
+    --  - Bar
+    --     - Name
+    --     - Duration
+    --     - Pip
+    --     - BarBG
+    --  - Icon
+    --    - Applications
+    --  - DebuffBorder
 
----@param child ECM_BuffBarChild
----@param moduleConfig table
-local function ApplyVisibilitySettings(child, moduleConfig)
-    if not (child and child.Bar) then
-        return
-    end
-
-    -- Apply visibility settings from buffBars config (default to shown)
-    local showIcon = moduleConfig and moduleConfig.showIcon ~= false
-    local iconFrame = GetBuffBarIconFrame(child)
-    if iconFrame then
-        iconFrame:SetShown(showIcon)
-        local iconTexture = GetBuffBarIconTexture(iconFrame)
-
-        if iconTexture and iconTexture.SetShown then
-            iconTexture:SetShown(showIcon)
+    --------------------------------------------------------------------------
+    -- Heights
+    --------------------------------------------------------------------------
+    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
+    if height > 0 then
+        FrameUtil.LazySetHeight(frame, height)
+        FrameUtil.LazySetHeight(bar, height)
+        if iconFrame then
+            FrameUtil.LazySetHeight(iconFrame, height)
+            FrameUtil.LazySetWidth(iconFrame, height)
         end
-
-        local iconOverlay = GetBuffBarIconOverlay(iconFrame)
-        if iconOverlay and iconOverlay.SetShown then
-            iconOverlay:SetShown(showIcon)
-        end
     end
 
-    if not showIcon then
-        HidePandemicGlows(child)
-    end
+    --------------------------------------------------------------------------
+    -- Pip — always hidden
+    --------------------------------------------------------------------------
+    bar.Pip:Hide()
+    bar.Pip:SetTexture(nil)
 
-    local bar = child.Bar
-    if bar.Name then
-        bar.Name:SetShown(moduleConfig and moduleConfig.showSpellName ~= false)
-    end
-    if bar.Duration then
-        bar.Duration:SetShown(moduleConfig and moduleConfig.showDuration ~= false)
-    end
-
-    ApplyStatusBarAnchors(child, iconFrame, nil)
-    ApplyBarNameInset(child, iconFrame, nil)
-end
-
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-ApplyStatusBarAnchors = function(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and child) then
-        return
-    end
-
-    bar:ClearAllPoints()
-    if iconFrame and iconFrame:IsShown() then
-        bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 0, 0)
-    else
-        bar:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
-    end
-    bar:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
-end
-
----@param child ECM_BuffBarChild
----@param iconFrame Frame|nil
----@param iconHeight number|nil
-ApplyBarNameInset = function(child, iconFrame, iconHeight)
-    local bar = child and child.Bar
-    if not (bar and bar.Name) then
-        return
-    end
-
-    local leftInset = C.BUFFBARS_TEXT_PADDING
-    if iconFrame and iconFrame:IsShown() then
-        local resolvedIconHeight = iconHeight
-        if not resolvedIconHeight or resolvedIconHeight <= 0 then
-            resolvedIconHeight = iconFrame:GetHeight() or 0
-        end
-        leftInset = resolvedIconHeight + C.BUFFBARS_TEXT_PADDING
-    end
-
-    bar.Name:ClearAllPoints()
-    bar.Name:SetPoint("LEFT", bar, "LEFT", leftInset, 0)
-    if bar.Duration and bar.Duration:IsShown() then
-        bar.Name:SetPoint("RIGHT", bar.Duration, "LEFT", -C.BUFFBARS_TEXT_PADDING, 0)
-    else
-        bar.Name:SetPoint("RIGHT", bar, "RIGHT", -C.BUFFBARS_TEXT_PADDING, 0)
-    end
-end
-
---- Applies styling to a single cooldown bar child.
----@param child ECM_BuffBarChild
----@param moduleConfig table
----@param globalConfig table
----@param barIndex number|nil 1-based index in current layout order (metadata/logging only)
-local function ApplyCooldownBarStyle(child, moduleConfig, globalConfig, barIndex)
-    if not (child and child.Bar) then
-        return
-    end
-
-    local bar = child.Bar
-    if not (bar and bar.SetStatusBarTexture) then
-        return
-    end
-
-    local texKey = globalConfig and globalConfig.texture
-    local tex = BarHelpers.GetTexture(texKey)
-    bar:SetStatusBarTexture(tex)
-
-    -- Resolve the color lookup key: spell name if available, otherwise the icon
-    -- texture file ID as a stable fallback for bars with secret/unavailable names.
-    if bar.SetStatusBarColor then
-        local spellName = GetChildSpellName(child)
-        local colorKey = GetColorKey(spellName, GetChildTextureFileID(child))
-        local color = GetSpellColor(colorKey, moduleConfig) or moduleConfig.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
-        bar:SetStatusBarColor(color.r, color.g, color.b, 1.0)
-    end
-
-    local bgColor = BarHelpers.GetBgColor(moduleConfig, globalConfig)
-    local barBG = GetBuffBarBackground(bar)
+    --------------------------------------------------------------------------
+    -- Bar background (BarBG texture)
+    --------------------------------------------------------------------------
     if barBG then
-        barBG:SetTexture(C.FALLBACK_TEXTURE)
+        -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
+        -- so Blizzard cannot override our anchors. SetAllPoints does not fire
+        -- SetPoint hooks, so no re-entrancy guard is needed.
+        if not barBG.__ecmBGHooked then
+            barBG.__ecmBGHooked = true
+            barBG:SetParent(frame)
+            hooksecurefunc(barBG, "SetPoint", function()
+                barBG:ClearAllPoints()
+                barBG:SetAllPoints(frame)
+            end)
+        end
+
+        local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK
+        barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
         barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
         barBG:ClearAllPoints()
-        barBG:SetPoint("TOPLEFT", child, "TOPLEFT")
-        barBG:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT")
+        barBG:SetAllPoints(frame)
         barBG:SetDrawLayer("BACKGROUND", 0)
     end
 
-    if bar.Pip then
-        bar.Pip:Hide()
-        bar.Pip:SetTexture(nil)
+    --------------------------------------------------------------------------
+    -- StatusBar texture & color
+    --------------------------------------------------------------------------
+    local textureName = globalConfig and globalConfig.texture
+    local texture = ECM_GetTexture(textureName)
+    FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
+
+    local barColor = ECM.SpellColors.GetColorForBar(frame)
+    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
+    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "nil"
+    local cooldownID = frame.cooldownID or "nil"
+    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil"
+
+    -- When in a raid instance, and after exiting combat, all identifying
+    -- values may remain secret.  Lock editing only when every key is
+    -- unusable.  With four tiers (name, spellID, cooldownID, texture)
+    -- the colour lookup is much more resilient to partial secrecy.
+    local allSecret = issecretvalue(spellName) and issecretvalue(spellID)
+        and issecretvalue(cooldownID) and issecretvalue(textureFileID)
+    _editLocked = _editLocked or allSecret
+
+    -- Purely diagnostics to help track down issues with secrets
+    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
+    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
+    local logPrefix = "GetColorForBar[".. barIndex .."] "
+    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+
+    if allSecret and not InCombatLockdown() then
+        if retryCount < 3 then
+            C_Timer.After(1, function()
+                style_child_frame(frame, config, globalConfig, barIndex, retryCount + 1)
+            end)
+            -- Don't apply any colour while retries are pending — preserve
+            -- the bar's existing colour rather than clobbering it with the
+            -- default while we wait for secrets to clear.
+            barColor = nil
+        elseif not _warned then
+            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
+            _warned = true
+        end
+    elseif retryCount > 0 then
+        ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
-    local height = BarHelpers.GetBarHeight(moduleConfig, globalConfig, 13)
-    if height and height > 0 then
-        bar:SetHeight(height)
-        child:SetHeight(height)
+    if barColor == nil and not allSecret then
+        barColor = ECM.SpellColors.GetDefaultColor()
+    end
+    if barColor then
+        FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
 
-    local iconFrame = GetBuffBarIconFrame(child)
+    --------------------------------------------------------------------------
+    -- Fonts (before visibility/positioning — font changes affect layout)
+    --------------------------------------------------------------------------
+    ECM_ApplyFont(bar.Name)
+    ECM_ApplyFont(bar.Duration)
 
-    -- Apply visibility settings (extracted to separate function for frequent reapplication)
-    ApplyVisibilitySettings(child, moduleConfig)
-
-    if iconFrame and height and height > 0 then
-        iconFrame:SetSize(height, height)
-    end
-
-    BarHelpers.ApplyFont(bar.Name, globalConfig)
-    BarHelpers.ApplyFont(bar.Duration, globalConfig)
-
+    --------------------------------------------------------------------------
+    -- Icon anchor
+    --------------------------------------------------------------------------
     if iconFrame then
-        iconFrame:ClearAllPoints()
-        iconFrame:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
+        FrameUtil.LazySetAnchors(iconFrame, {
+            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
+        })
     end
 
-    ApplyStatusBarAnchors(child, iconFrame, height)
+    --------------------------------------------------------------------------
+    -- Visibility — icon, name, duration, debuff border, applications
+    --------------------------------------------------------------------------
+    local showIcon = config and config.showIcon ~= false
+    if iconFrame then
+        local iconTexture = FrameUtil.GetIconTexture(frame)
+        local iconOverlay = FrameUtil.GetIconOverlay(frame)
+        iconFrame:SetShown(showIcon)
+        iconTexture:SetShown(showIcon)
+        iconOverlay:SetShown(showIcon)
+    end
 
-    -- Keep the bar/background full-width (under icon), but inset spell text when icon is shown.
-    ApplyBarNameInset(child, iconFrame, height)
+    local iconAlpha = showIcon and 1 or 0
+    if frame.DebuffBorder then
+        FrameUtil.LazySetAlpha(frame.DebuffBorder, iconAlpha)
+    end
+    if iconFrame.Applications then
+        FrameUtil.LazySetAlpha(iconFrame.Applications, iconAlpha)
+    end
 
-    -- Mark as styled
-    child.__ecmStyled = true
+    local showSpellName = config and config.showSpellName ~= false
+    local showDuration = config and config.showDuration ~= false
+    if bar.Name then
+        bar.Name:SetShown(showSpellName)
+    end
+    if bar.Duration then
+        bar.Duration:SetShown(showDuration)
+    end
 
-    Util.Log("BuffBars", "Applied style to bar", {
+    --------------------------------------------------------------------------
+    -- Bar anchors (relative to icon visibility)
+    --------------------------------------------------------------------------
+    local iconVisible = iconFrame and iconFrame:IsShown()
+    if iconVisible then
+        FrameUtil.LazySetAnchors(bar, {
+            { "TOPLEFT", iconFrame, "TOPRIGHT", 0, 0 },
+            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+        })
+    else
+        FrameUtil.LazySetAnchors(bar, {
+            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
+            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+        })
+    end
+
+    --------------------------------------------------------------------------
+    -- Name
+    --------------------------------------------------------------------------
+    FrameUtil.LazySetAnchors(bar.Name, {
+        { "LEFT", bar, "LEFT", ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+        { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+    })
+
+    if bar.Duration then
+        FrameUtil.LazySetAnchors(bar.Duration, {
+            { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+        })
+    end
+
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
         barIndex = barIndex,
-        showIcon = moduleConfig and moduleConfig.showIcon ~= false,
-        showSpellName = moduleConfig and moduleConfig.showSpellName ~= false,
-        showDuration = moduleConfig and moduleConfig.showDuration ~= false,
         height = height,
+        pipHidden = true,
+        pipTexture = nil,
+        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK)) or nil,
+        barBgTexture = barBG and ECM.Constants.FALLBACK_TEXTURE or nil,
+        barBgLayer = barBG and "BACKGROUND" or nil,
+        barBgSubLayer = barBG and 0 or nil,
+        textureName = textureName,
+        statusBarTexture = texture,
+        statusBarColor = barColor,
+        showIcon = showIcon,
+        showSpellName = showSpellName,
+        showDuration = showDuration,
+        iconAlpha = iconAlpha,
+        iconVisible = iconVisible,
+        iconShown = iconFrame and iconFrame:IsShown() or false,
+        iconSize = iconVisible and (iconFrame:GetHeight() or frame:GetHeight() or 0) or 0,
+        debuffBorderAlpha = frame.DebuffBorder and iconAlpha or nil,
+        applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
+        nameShown = showSpellName,
+        durationShown = showDuration,
+        nameLeftInset = ECM.Constants.BUFFBARS_TEXT_PADDING,
+        nameRightPadding = ECM.Constants.BUFFBARS_TEXT_PADDING,
+        barAnchorMode = iconVisible and "icon" or "frame",
     })
 end
 
---------------------------------------------------------------------------------
--- ECMFrame Overrides
---------------------------------------------------------------------------------
+--- Positions all bar children in a vertical stack, preserving edit mode order.
+local function layout_bars(self)
+    local viewer = _G["BuffBarCooldownViewer"]
+    if not viewer then
+        return
+    end
+
+    local children = get_children_ordered(viewer)
+    local prev
+
+    for _, entry in ipairs(children) do
+        local child = entry.frame
+        if child:IsShown() then
+            if not prev then
+                FrameUtil.LazySetAnchors(child, {
+                    { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
+                    { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
+                })
+            else
+                FrameUtil.LazySetAnchors(child, {
+                    { "TOPLEFT", prev, "BOTTOMLEFT", 0, 0 },
+                    { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0 },
+                })
+            end
+            prev = child
+        end
+    end
+end
 
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
 function BuffBars:CalculateLayoutParams()
-    local globalConfig = self.GlobalConfig
-    local cfg = self.ModuleConfig
-    local mode = cfg and cfg.anchorMode or C.ANCHORMODE_CHAIN
+    local globalConfig = self:GetGlobalConfig()
+    local cfg = self:GetModuleConfig()
+    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
     local params = { mode = mode }
 
-    if mode == C.ANCHORMODE_CHAIN then
-        local anchor, isFirst = self:GetNextChainAnchor(C.BUFFBARS)
+    if mode == ECM.Constants.ANCHORMODE_CHAIN then
+        local anchor, isFirst = self:GetNextChainAnchor(ECM.Constants.BUFFBARS)
         params.anchor = anchor
         params.isFirst = isFirst
         params.anchorPoint = "TOPLEFT"
@@ -654,70 +351,91 @@ function BuffBars:CalculateLayoutParams()
     return params
 end
 
---- Override CreateFrame to return the Blizzard BuffBarCooldownViewer instead of creating a new one.
 function BuffBars:CreateFrame()
-    local viewer = _G[C.VIEWER_BUFFBAR]
-    if not viewer then
-        Util.Log("BuffBars", "CreateFrame", "BuffBarCooldownViewer not found, creating placeholder")
-        -- Fallback: create a placeholder frame if Blizzard viewer doesn't exist
-        viewer = CreateFrame("Frame", "ECMBuffBarPlaceholder", UIParent)
-        viewer:SetSize(200, 20)
-    end
-    return viewer
+    return _G["BuffBarCooldownViewer"]
 end
 
---- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
-function BuffBars:UpdateLayout()
-    local viewer = self.InnerFrame
+function BuffBars:IsReady()
+    if not ECM.ModuleMixin.IsReady(self) then
+        return false
+    end
+
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return false
     end
 
-    local globalConfig = self.GlobalConfig
-    local cfg = self.ModuleConfig
+    -- Check if the viewer is in a state where we can enumerate children
+    local canGetChildren = pcall(function() viewer:GetChildren() end)
+    if not canGetChildren then
+        return false
+    end
 
-    -- Refresh cache independently from visibility so options can discover bars in hidden states.
-    RefreshBarCache(viewer, cfg)
+    return true
+end
 
-    -- Check visibility first
+--- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
+function BuffBars:UpdateLayout(why)
+    local viewer = self.InnerFrame
+    local globalConfig = self:GetGlobalConfig()
+    local cfg = self:GetModuleConfig()
+
     if not self:ShouldShow() then
-        -- Util.Log(self.Name, "BuffBars:UpdateLayout", "ShouldShow returned false, hiding viewer")
         viewer:Hide()
         return false
     end
 
-    local params = self:CalculateLayoutParams()
-
     -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
-    if params.mode == C.ANCHORMODE_CHAIN then
-        viewer:ClearAllPoints()
-        viewer:SetPoint("TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY)
-        viewer:SetPoint("TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY)
-    elseif params.mode == C.ANCHORMODE_FREE then
-        local width = BarHelpers.GetBarWidth(cfg, globalConfig, 300)
+    local params = self:CalculateLayoutParams()
+    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+        FrameUtil.LazySetAnchors(viewer, {
+            { "TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY },
+            { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
+        })
+    elseif params.mode == ECM.Constants.ANCHORMODE_FREE then
+        -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
+        -- override explicit width.  If stale chain anchors remain,
+        -- collapse to the first anchor point so SetWidth can work.
+        -- Blizzard's edit mode manages positioning from here on.
+        if viewer:GetNumPoints() > 1 then
+            local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
+            viewer:ClearAllPoints()
+            if point and relativeTo then
+                viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
+            end
+            -- Invalidate anchor cache so chain mode can re-anchor later
+            local s = viewer.__ecm_state
+            if s then s.anchors = nil end
+        end
+
+        local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
 
         if width and width > 0 then
-            viewer:SetWidth(width)
+            FrameUtil.LazySetWidth(viewer, width)
         end
     end
 
-    -- Style all visible children (skip already-styled unless markers were reset)
-    local visibleChildren = GetSortedChildren(viewer, true)
+    -- Guard against child SetPoint hooks scheduling redundant layout updates
+    -- while we are actively styling and positioning bars.
+    self._layoutRunning = true
+
+    -- Style all visible children (lazy setters make redundant calls no-ops)
+    _warned = false
+    _editLocked = false
+    local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
-        if not entry.frame.__ecmStyled then
-            ApplyCooldownBarStyle(entry.frame, cfg, globalConfig, barIndex)
-        else
-            -- Always reapply visibility settings because Blizzard resets them on cooldown updates
-            ApplyVisibilitySettings(entry.frame, cfg)
+        -- Some children of the viewer do not have a Bar so might be some other part of the UI.
+        if entry.frame.Bar then
+            hook_child_frame(entry.frame, self)
+            style_child_frame(entry.frame, cfg, globalConfig, barIndex)
         end
-        HookChildAnchoring(entry.frame, self)
     end
 
-    -- Layout bars vertically
-    self:LayoutBars()
+    layout_bars(self)
 
+    self._layoutRunning = nil
     viewer:Show()
-    Util.Log(self.Name, "BuffBars:UpdateLayout", {
+    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -727,87 +445,68 @@ function BuffBars:UpdateLayout()
         offsetX = params.offsetX,
         offsetY = params.offsetY,
     })
-
     return true
-end
-
---------------------------------------------------------------------------------
--- Helper Methods
---------------------------------------------------------------------------------
-
---- Positions all bar children in a vertical stack, preserving edit mode order.
-function BuffBars:LayoutBars()
-    local viewer = _G[C.VIEWER_BUFFBAR]
-    if not viewer then
-        return
-    end
-
-    self._layoutRunning = true
-
-    local visibleChildren = GetSortedChildren(viewer, true)
-    local prev
-
-    for _, entry in ipairs(visibleChildren) do
-        local child = entry.frame
-        child:ClearAllPoints()
-        if not prev then
-            child:SetPoint("TOPLEFT", viewer, "TOPLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", viewer, "TOPRIGHT", 0, 0)
-        else
-            child:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, 0)
-            child:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0)
-        end
-        prev = child
-    end
-
-    Util.Log("BuffBars", "LayoutBars complete", { visibleCount = #visibleChildren })
-
-    self._layoutRunning = nil
 end
 
 --- Resets all styled markers so bars get fully re-styled on next update.
 function BuffBars:ResetStyledMarkers()
-    local viewer = _G[C.VIEWER_BUFFBAR]
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
     end
 
-    -- Clear anchor cache to force re-anchor
-    viewer._layoutCache = nil
+    -- Clear lazy state on the viewer itself so chain anchoring is re-applied
+    FrameUtil.LazyResetState(viewer)
 
-    -- Clear styled markers on all children
+    -- Clear lazy state on all children to force full re-style
     local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
-        if child and child.__ecmStyled then
-            Util.Log("BuffBars", "ResetStyledMarkers", {
-                message = "Clearing styled marker for child",
-                childName = child:GetName() or "nil",
-            })
-            child.__ecmStyled = nil
+        FrameUtil.LazyResetState(child)
+        if child.Bar then
+            FrameUtil.LazyResetState(child.Bar)
         end
     end
-
 end
 
---- Public helper for options and hooks to rebuild bar metadata cache.
-function BuffBars:RefreshBarCache()
-    local viewer = self.InnerFrame
-    local cfg = self.ModuleConfig
-    if not (viewer and cfg and cfg.colors and cfg.colors.cache) then
-        return false
+--- Returns metadata for all currently-visible aura bars.
+--- Each entry contains a spellName (string), spellID (number),
+--- cooldownID (number), and/or textureFileID (number), with secret
+--- values filtered out. Entries where all keys are nil are skipped.
+---@return { spellName: string|nil, spellID: number|nil, cooldownID: number|nil, textureFileID: number|nil }[]
+function BuffBars:GetActiveSpellData()
+    local viewer = _G["BuffBarCooldownViewer"]
+    if not viewer then
+        return {}
     end
 
-    return RefreshBarCache(viewer, cfg)
+    local ordered = get_children_ordered(viewer)
+    local result = {}
+    for _, entry in ipairs(ordered) do
+        local frame = entry.frame
+        local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
+        local sid = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+        local cid = frame.cooldownID or nil
+        local tex = FrameUtil.GetIconTextureFileID(frame) or nil
+
+        -- Filter out secret values that cannot be used as table keys
+        if name and issecretvalue(name) then name = nil end
+        if sid and issecretvalue(sid) then sid = nil end
+        if cid and issecretvalue(cid) then cid = nil end
+        if tex and issecretvalue(tex) then tex = nil end
+
+        if name or sid or cid or tex then
+            result[#result + 1] = { spellName = name, spellID = sid, cooldownID = cid, textureFileID = tex }
+        end
+    end
+    return result
 end
 
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
-    local viewer = _G[C.VIEWER_BUFFBAR]
+    local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
     end
-
-    self._viewerLayoutCache = self._viewerLayoutCache or {}
 
     if self._viewerHooked then
         return
@@ -816,7 +515,7 @@ function BuffBars:HookViewer()
 
     -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function(f)
-        self:UpdateLayout()
+        self:ThrottledUpdateLayout("viewer:OnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
@@ -824,13 +523,13 @@ function BuffBars:HookViewer()
         if self._layoutRunning then
             return
         end
-        self:ScheduleLayoutUpdate()
+        self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
     end)
 
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    Util.Log("BuffBars", "Hooked BuffBarCooldownViewer")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -847,179 +546,73 @@ function BuffBars:HookEditMode()
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
         self:ResetStyledMarkers()
-        -- Use immediate update (not scheduled) so the cache is rebuilt before
-        -- the user opens Options. Edit mode exit is infrequent, so no throttling needed.
-        local viewer = _G[C.VIEWER_BUFFBAR]
+
+        -- Edit mode exit is infrequent, so perform an immediate restyle pass.
+        local viewer = _G["BuffBarCooldownViewer"]
         if viewer and viewer:IsShown() then
-            self:UpdateLayout()
+            self:ThrottledUpdateLayout("EditModeExit")
         end
     end)
 
     hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
         -- Re-apply style during edit mode so bars look correct while editing
-        self:ScheduleLayoutUpdate()
+        self:ThrottledUpdateLayout("EditModeEnter")
     end)
 
-    Util.Log("BuffBars", "Hooked EditModeManagerFrame")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
 end
-
---------------------------------------------------------------------------------
--- Options UI / Color Management
---------------------------------------------------------------------------------
-
---- Returns cached bars for current class/spec for Options UI.
----@return table<number, ECM_BarCacheEntry> bars Indexed by bar position
-function BuffBars:GetCachedBars()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local cache = cfg.colors.cache
-    if cache[classID] and cache[classID][specID] then
-        return cache[classID][specID]
-    end
-
-    return {}
-end
-
---- Returns cached texture file IDs for current class/spec for Options UI.
---- Stored separately from cache entries to avoid taint propagation.
----@return table<number, number> textures Indexed by bar position, values are texture file IDs
-function BuffBars:GetCachedTextures()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local textureMap = cfg.colors.textureMap
-    if textureMap and textureMap[classID] and textureMap[classID][specID] then
-        return textureMap[classID][specID]
-    end
-
-    return {}
-end
-
---- Returns configured spell colors for current class/spec for Options UI.
----@return table<string, ECM_Color> per-spell colors Indexed by spell name
-function BuffBars:GetSpellSettings()
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return {}
-    end
-
-    local cache = cfg.colors.perSpell
-    if cache[classID] and cache[classID][specID] then
-        return cache[classID][specID]
-    end
-
-    return {}
-end
-
---- Sets color for named spell for current class/spec.
----@param spellName string
----@param r number
----@param g number
----@param b number
-function BuffBars:SetSpellColor(spellName, r, g, b)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return
-    end
-
-    local colors = cfg.colors.perSpell
-    colors[classID] = colors[classID] or {}
-    colors[classID][specID] = colors[classID][specID] or {}
-    colors[classID][specID][spellName] = { r = r, g = g, b = b, a = 1 }
-
-    Util.Log("BuffBars", "SetSpellColor", { spellName = spellName, r = r, g = g, b = b })
-
-    self:ResetStyledMarkers()
-    self:ScheduleLayoutUpdate()
-end
-
---- Resets color for named spell to default.
----@param spellName string
-function BuffBars:ResetSpellColor(spellName)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return
-    end
-
-    local colors = cfg.colors.perSpell
-    if colors[classID] and colors[classID][specID] then
-        colors[classID][specID][spellName] = nil
-    end
-
-    Util.Log("BuffBars", "ResetSpellColor", { spellName = spellName })
-
-    -- Refresh bars to apply default color
-    self:ResetStyledMarkers()
-    self:ScheduleLayoutUpdate()
-end
-
---- Returns color for named spell (wrapper for Options UI).
----@param spellName string
----@return number r, number g, number b
-function BuffBars:GetSpellColor(spellName)
-    local cfg = self.ModuleConfig
-    local color = GetSpellColor(spellName, cfg) or cfg.colors.defaultColor or C.BUFFBARS_DEFAULT_COLOR
-
-    return color.r, color.g, color.b
-end
-
---- Checks if a named spell has a custom color set.
----@param spellName string
----@return boolean
-function BuffBars:HasCustomSpellColor(spellName)
-    local cfg, classID, specID = GetColorContext(self)
-    if not cfg or not classID or not specID then
-        return false
-    end
-
-    local spells = cfg.colors.perSpell
-    return spells[classID] and spells[classID][specID] and spells[classID][specID][spellName] ~= nil
-end
-
---------------------------------------------------------------------------------
--- Event Handlers
---------------------------------------------------------------------------------
 
 function BuffBars:OnUnitAura(_, unit)
     if unit == "player" then
-        self:ScheduleLayoutUpdate()
+        self:ThrottledUpdateLayout("OnUnitAura")
     end
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
+function BuffBars:OnZoneChanged()
+    --- Invalidates lazy state so the next layout pass re-applies chain anchoring.
+    self:ResetStyledMarkers()
+    self:ThrottledUpdateLayout("OnZoneChanged")
+end
 
-function BuffBars:OnEnable()
-    if not self.IsECMFrame then
-        ECMFrame.AddMixin(self, "BuffBars")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
+function BuffBars:IsEnabled()
+    return self._enabled or false
+end
 
-    -- Register events with dedicated handlers
-    self:RegisterEvent("UNIT_AURA", "OnUnitAura")
+--- Gets a boolean indicating if editing is allowed.
+--- @return boolean isEditLocked Whether editing is locked due to combat or secrets
+--- @return string reason Reason editing is locked ("combat", "secrets", or nil)
+function BuffBars:IsEditLocked()
+    local reason = InCombatLockdown() and "combat" or (_editLocked and "secrets") or nil
+    return reason ~= nil, reason
+end
+
+local _eventFrame = CreateFrame("Frame")
+function BuffBars:Enable()
+    if self._enabled then return end
+    self._enabled = true
+
+    ECM.ModuleMixin.AddMixin(self, "BuffBars")
+
+    _eventFrame:RegisterEvent("UNIT_AURA")
+    _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    _eventFrame:RegisterEvent("ZONE_CHANGED")
+    _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
+    _eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
-        EnsureColorStorage(self.ModuleConfig)
         self:HookViewer()
         self:HookEditMode()
-        self:ScheduleLayoutUpdate()
+        self:ThrottledUpdateLayout("ModuleInit")
     end)
 
-    Util.Log("BuffBars", "OnEnable - module enabled")
+    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enable - module enabled")
 end
 
-function BuffBars:OnDisable()
-    self:UnregisterAllEvents()
-    if self.IsECMFrame and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
+_eventFrame:SetScript("OnEvent", function(_, event, ...)
+    if event == "UNIT_AURA" then
+        BuffBars:OnUnitAura(event, ...)
+    else
+        BuffBars:OnZoneChanged()
     end
-    Util.Log("BuffBars", "Disabled")
-end
+end)
