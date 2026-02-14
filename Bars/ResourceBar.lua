@@ -97,6 +97,11 @@ function ResourceBar:ShouldShow()
          return true
     end
 
+    -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
+    if (class == "MONK") and (specId == 1) then
+        return false
+    end
+
     local discreteResource = GetActiveDiscreteResourceType()
     return discreteResource ~= nil
 end
