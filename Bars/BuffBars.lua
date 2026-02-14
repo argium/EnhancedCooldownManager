@@ -5,7 +5,7 @@
 local FrameUtil = ECM.FrameUtil
 local BuffBars = {}
 ECM.BuffBars = BuffBars
-local warned = false
+local _warned = false
 local _editLocked = false
 
 ---@class ECM_BuffBarMixin : Frame
@@ -155,7 +155,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     -- the colour lookup is much more resilient to partial secrecy.
     local allSecret = issecretvalue(spellName) and issecretvalue(spellID)
         and issecretvalue(cooldownID) and issecretvalue(textureFileID)
-    _editLocked = allSecret
+    _editLocked = _editLocked or allSecret
 
     -- Purely diagnostics to help track down issues with secrets
     local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
@@ -173,9 +173,9 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
             barColor = nil
-        elseif not warned then
+        elseif not _warned then
             ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
-            warned = true
+            _warned = true
         end
     elseif retryCount > 0 then
         ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
@@ -420,7 +420,8 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
-    warned = false
+    _warned = false
+    _editLocked = false
     local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
         -- Some children of the viewer do not have a Bar so might be some other part of the UI.
