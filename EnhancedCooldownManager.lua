@@ -336,15 +336,6 @@ function mod:OnEnable()
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
-        if shouldEnable then
-            -- Call the correct methods for Ace modules.
-            if module.Enable then
-                module:Enable()
-            else
-                self:EnableModule(moduleName)
-            end
-        else
-            self:DisableModule(moduleName)
-        end
+        ECM.OptionUtil.SetModuleEnabled(moduleName, shouldEnable)
     end
 end

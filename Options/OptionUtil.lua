@@ -51,7 +51,7 @@ local function IsAnchorModeFree(cfg)
 end
 
 local function SetModuleEnabled(moduleName, enabled)
-    local module = mod[moduleName]
+    local module = mod[moduleName] or ECM[moduleName]
     if not module then
         return
     end

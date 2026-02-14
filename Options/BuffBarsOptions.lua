@@ -3,6 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
+local mod = ns.Addon
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
 local function ResetStyledMarkers()
@@ -303,7 +304,7 @@ function BuffBarsOptions.GetOptionsTable()
                                 ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
                                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                             else
-                                ECM:ConfirmReloadUI(
+                                mod:ConfirmReloadUI(
                                     "Disabling aura bars requires a UI reload. Reload now?",
                                     nil,
                                     function() db.profile.buffBars.enabled = true end
