@@ -138,8 +138,79 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
                 frag:SetStatusBarColor(r, g, b)
             else
                 local cd = cdLookup[i]
+                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
                 frag:SetValue(cd and cd.frac or 0)
-                frag:SetStatusBarColor(r * 0.5, g * 0.5, b * 0.5)
+                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
+            end
+        end
+    end
+end
+
+--- Lightweight per-frame rune value updater.
+--- Only updates fill values and colors on existing fragment bars.
+--- Triggers a full layout refresh when rune ready/CD states change.
+---@param self RuneBar
+---@param frame Frame
+local function UpdateRuneValues(self, frame)
+    if not GetRuneCooldown then
+        return
+    end
+
+    local frags = frame.FragmentedBars
+    if not frags then
+        return
+    end
+
+    local maxRunes = frame._maxResources
+    if not maxRunes or maxRunes <= 0 then
+        return
+    end
+
+    -- Throttle to updateFrequency to match existing refresh cadence
+    local now = GetTime()
+    local globalConfig = self:GetGlobalConfig()
+    local freq = (globalConfig and globalConfig.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+    if frame._lastValueUpdate and (now - frame._lastValueUpdate) < freq then
+        return
+    end
+    frame._lastValueUpdate = now
+
+    local cfg = self:GetModuleConfig()
+    local r, g, b = cfg.color.r, cfg.color.g, cfg.color.b
+
+    -- Detect state transitions to trigger full reorder/reposition
+    local stateChanged = false
+    for i = 1, maxRunes do
+        local start, duration, runeReady = GetRuneCooldown(i)
+        local isReady = runeReady or not start or start == 0 or not duration or duration == 0
+        local wasReady = frame._lastReadySet and frame._lastReadySet[i]
+
+        if (isReady and true or false) ~= (wasReady and true or false) then
+            stateChanged = true
+            break
+        end
+    end
+
+    if stateChanged then
+        -- A rune just finished or started CD — trigger full refresh for reorder/reposition
+        self:ThrottledUpdateLayout("RuneStateChange")
+        return
+    end
+
+    -- Fast path: only update fill values and colors, no repositioning
+    for i = 1, maxRunes do
+        local frag = frags[i]
+        if frag then
+            local start, duration, runeReady = GetRuneCooldown(i)
+            if runeReady or not start or start == 0 or not duration or duration == 0 then
+                frag:SetValue(1)
+                frag:SetStatusBarColor(r, g, b)
+            else
+                local elapsed = now - start
+                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
+                local frac = math.max(0, math.min(1, elapsed / duration))
+                frag:SetValue(frac)
+                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
             end
         end
     end
@@ -232,13 +303,17 @@ function RuneBar:OnEnable()
         return
     end
 
-    -- DK-only: continuous rune cooldown updates and power events
+    -- DK-only: lightweight per-frame rune value updates and power events
     if self.InnerFrame then
         self.InnerFrame:SetScript("OnUpdate", function()
-            self:ThrottledUpdateLayout("FrameOnUpdate")
+            UpdateRuneValues(self, self.InnerFrame)
         end)
     end
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
+end
+
+function RuneBar:OnRunePowerUpdate()
+    self:ThrottledUpdateLayout("RUNE_POWER_UPDATE")
 end
 
 function RuneBar:OnDisable()

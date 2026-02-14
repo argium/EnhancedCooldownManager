@@ -10,6 +10,7 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
   - `self:GetModuleConfig()` for the module's specific block
 - Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
 - Layout/refresh/throttle logic lives in `FrameUtil` as stateless utility functions. ModuleMixin provides thin overrideable wrappers. Modules that override `Refresh` should call `FrameUtil.BaseRefresh(self, why, force)` as the guard, not `ModuleMixin.Refresh`.
+- NEVER listen to the expensive "OnUpdate" event.
 
 # Secret Values
 
