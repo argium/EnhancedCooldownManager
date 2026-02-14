@@ -241,6 +241,18 @@ function PriorityKeyMap:Set(keys, value)
             tables[i][k] = entry
         end
     end
+
+    local keysString = table.concat(
+        (function()
+            local t = {}
+            for i, k in ipairs(keys) do
+                t[i] = ECM_tostring(k)
+            end
+            return t
+        end)(),
+        ","
+    )
+    ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap", "Set (" .. keysString .. ") = " .. ECM_tostring(value))
 end
 
 ---------------------------------------------------------------------------
