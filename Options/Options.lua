@@ -1150,7 +1150,7 @@ local function AboutOptionsTable()
                 args = {
                     debugDesc = {
                         type = "description",
-                        name = "Enable trace logging for bug reports. This will generate more detailed logs in the chat window.",
+                        name = "Enable debug mode. This will generate more detailed logs in the chat window.",
                         order = 1,
                     },
                     debug = {

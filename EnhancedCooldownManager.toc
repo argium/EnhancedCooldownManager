@@ -30,7 +30,6 @@ Debug.lua
 Modules\ColorUtil.lua
 Modules\Utilities.lua
 Modules\FrameUtil.lua
-Modules\BugReports.lua
 Modules\ModuleMixin.lua
 Modules\FallbackKeyMap.lua
 Modules\SpellColors.lua

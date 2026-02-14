@@ -5,7 +5,6 @@ local constants = {
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_ABRV = "ECM",
 
-    TRACE_LOG_MAX = 200,
     DEBUG_COLOR = "F17934",
 
     -- Internal module names
