@@ -216,8 +216,8 @@ function RuneBar:Refresh(why, force)
     return true
 end
 
-function RuneBar:OnRunePowerUpdate()
-    self:ThrottledUpdateLayout("OnRunePowerUpdate")
+function RuneBar:OnEvent(event)
+    self:ThrottledUpdateLayout(event, { secondPass = true })
 end
 
 function RuneBar:OnEnable()

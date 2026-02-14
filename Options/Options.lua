@@ -696,20 +696,6 @@ local function RuneBarOptionsTable()
     }
 end
 
-local function ItemIconsOptionsTable()
-    local itemIcons = mod:GetModule(ECM.Constants.ITEMICONS, true)
-    if itemIcons and itemIcons.GetOptionsTable then
-        return itemIcons:GetOptionsTable()
-    end
-
-    return {
-        type = "group",
-        name = "Item Icons",
-        order = 6,
-        args = {},
-    }
-end
-
 local function ProfileOptionsTable()
     local db = mod.db
     -- Use AceDBOptions to generate a full profile management UI
@@ -1239,7 +1225,7 @@ local function GetOptionsTable()
             resourceBar = ResourceBarOptionsTable(),
             runeBar = RuneBarOptionsTable(),
             auraBars = ns.BuffBarsOptions.GetOptionsTable(),
-            itemIcons = ItemIconsOptionsTable(),
+            itemIcons = mod.ItemIconsOptions.GetOptionsTable(),
             profile = ProfileOptionsTable(),
             about = AboutOptionsTable(),
         },

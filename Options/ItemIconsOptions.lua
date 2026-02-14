@@ -37,7 +37,7 @@ end
 
 --- Builds Item Icons basic settings options.
 ---@return table
-function ItemIconsOptions:GetBasicOptionsArgs()
+function ItemIconsOptions.GetBasicOptionsArgs()
     return {
         description = {
             type = "description",
@@ -51,7 +51,7 @@ function ItemIconsOptions:GetBasicOptionsArgs()
             order = 1,
             width = "full",
             get = function()
-                return ECM.OptionUtil.GetOptionValue(self, "enabled", true)
+                return ECM.OptionUtil.GetOptionValue(mod.ItemIcons, "enabled", true)
             end,
             set = function(_, val)
                 local moduleConfig = mod.ItemIcons:GetModuleConfig()
@@ -77,7 +77,7 @@ end
 
 --- Builds Item Icons item toggles options.
 ---@return table
-function ItemIconsOptions:GetEquipmentOptionsArgs()
+function ItemIconsOptions.GetEquipmentOptionsArgs()
     return {
         description = {
             type = "description",
@@ -92,7 +92,7 @@ end
 
 --- Builds Item Icons consumable toggles options.
 ---@return table
-function ItemIconsOptions:GetConsumableOptionsArgs()
+function ItemIconsOptions.GetConsumableOptionsArgs()
     return {
         description = {
             type = "description",
@@ -108,7 +108,7 @@ end
 
 --- Builds the Item Icons options group.
 ---@return table itemIconsOptions AceConfig group for Item Icons section.
-function ItemIconsOptions:GetOptionsTable()
+function ItemIconsOptions.GetOptionsTable()
     return {
         type = "group",
         name = "Item Icons",
@@ -119,21 +119,21 @@ function ItemIconsOptions:GetOptionsTable()
                 name = "Basic Settings",
                 inline = true,
                 order = 1,
-                args = self:GetBasicOptionsArgs(),
+                args = ItemIconsOptions.GetBasicOptionsArgs(),
             },
             equipmentSettings = {
                 type = "group",
                 name = "Equipment",
                 inline = true,
                 order = 2,
-                args = self:GetEquipmentOptionsArgs(),
+                args = ItemIconsOptions.GetEquipmentOptionsArgs(),
             },
             consumableSettings = {
                 type = "group",
                 name = "Consumables",
                 inline = true,
                 order = 3,
-                args = self:GetConsumableOptionsArgs(),
+                args = ItemIconsOptions.GetConsumableOptionsArgs(),
             },
         },
     }
