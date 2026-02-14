@@ -198,11 +198,10 @@ function SpellColors.GetColorForBar(frame)
         return nil
     end
 
-    local spellName = frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
-    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
-    local cooldownID = frame.cooldownID or nil
-    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
-    ECM_debug_assert(textureFileID and canaccessvalue(textureFileID),"Texture file ID is a secret value, cannot use as color key")
+    local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
+    local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
+    local cooldownID = validateKey(frame.cooldownID)
+    local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
     return SpellColors.GetColor(spellName, spellID, cooldownID, textureFileID)
 end
 
@@ -293,10 +292,10 @@ function SpellColors.ReconcileBar(frame)
     if not map then
         return
     end
-    local spellName = frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
-    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
-    local cooldownID = frame.cooldownID or nil
-    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
+    local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
+    local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
+    local cooldownID = validateKey(frame.cooldownID)
+    local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
     map:Reconcile({ spellName, spellID, cooldownID, textureFileID })
 end
 
@@ -311,10 +310,10 @@ function SpellColors.ReconcileAllBars(frames)
     local keys_list = {}
     for _, frame in ipairs(frames) do
         if frame and frame.__ecmHooked then
-            local spellName = frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
-            local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
-            local cooldownID = frame.cooldownID or nil
-            local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
+            local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
+            local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
+            local cooldownID = validateKey(frame.cooldownID)
+            local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
             keys_list[#keys_list + 1] = { spellName, spellID, cooldownID, textureFileID }
         end
     end
