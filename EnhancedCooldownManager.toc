@@ -4,7 +4,7 @@
 ## Author: Argium
 ## Version: v0.5.5
 ## SavedVariables: EnhancedCooldownManagerDB
-## OptionalDeps: Ace3, LibSharedMedia-3.0
+## OptionalDeps: Ace3, LibSharedMedia-3.0, WoWUnit
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
 
@@ -31,7 +31,7 @@ Modules\ColorUtil.lua
 Modules\Utilities.lua
 Modules\FrameUtil.lua
 Modules\ModuleMixin.lua
-Modules\FallbackKeyMap.lua
+Modules\PriorityKeyMap.lua
 Modules\SpellColors.lua
 Options\Migration.lua
 Options\ImportExport.lua
@@ -52,3 +52,5 @@ Options\Widgets\PositionModeSelector.lua
 Options\ItemIconsOptions.lua
 Options\BuffBarsOptions.lua
 Options\Options.lua
+
+#Tests\SpellColorsTests.lua

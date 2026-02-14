@@ -26,8 +26,8 @@ end
 --- Merges spells from persisted custom colors (SpellColors) and the
 --- currently-visible aura bars (BuffBars) so that both customized and
 --- newly-seen spells appear in the options panel.  Deduplication follows
---- the FallbackKeyMap convention: spell name is preferred over texture
---- file ID.
+--- the PriorityKeyMap convention: spell name is preferred, then spellID,
+--- cooldownID, and finally texture file ID.
 ---@return table args AceConfig args table with color pickers and reset buttons
 local function GenerateSpellColorArgs()
     local args = {}
@@ -38,45 +38,67 @@ local function GenerateSpellColorArgs()
     local seen = {}
     local ordered = {}
 
+    -- Per-entry auxiliary data keyed by display key so we can pass all
+    -- four identifying keys to SpellColors.Get/Set/Reset later.
+    ---@type table<any, { spellName: string|nil, spellID: number|nil, cooldownID: number|nil, textureFileID: number|nil }>
+    local auxForKey = {}
+
     -- Texture lookup — maps colorKey → textureFileID so the options UI
     -- can display an inline icon for every entry, not just fallback keys.
     local textureForKey = {}
 
-    -- 1) Currently-visible aura bars — prefer spellName, fall back to
-    --    textureFileID (consistent with FallbackKeyMap's primary/fallback).
+    -- 1) Currently-visible aura bars — prefer spellName as display key,
+    --    falling through spellID, cooldownID, then textureFileID.
     local activeBars = ECM.BuffBars:GetActiveSpellData()
     for _, bar in ipairs(activeBars) do
-        local key = bar.spellName or bar.textureFileID
+        local key = bar.spellName or bar.spellID or bar.cooldownID or bar.textureFileID
         if key and not seen[key] then
             seen[key] = true
             ordered[#ordered + 1] = key
+            auxForKey[key] = { spellName = bar.spellName, spellID = bar.spellID, cooldownID = bar.cooldownID, textureFileID = bar.textureFileID }
         end
-        if key and bar.textureFileID then
-            textureForKey[key] = bar.textureFileID
+        -- Mark all sub-keys as seen to suppress duplicates.
+        if bar.textureFileID then
+            if key then textureForKey[key] = bar.textureFileID end
             seen[bar.textureFileID] = true
         end
+        if bar.spellID then seen[bar.spellID] = true end
+        if bar.cooldownID then seen[bar.cooldownID] = true end
     end
 
     -- 2) Persisted custom colors — appended so users can manage colours
     --    for spells that aren't currently active.
     local savedColors = ECM.SpellColors.GetAllColors()
 
-    -- Pre-pass: harvest texture associations from name-keyed saved colours
-    -- and mark those texture IDs as seen so fallback-keyed duplicates
-    -- are suppressed below.
+    -- Pre-pass: harvest texture/spellID/cooldownID associations from
+    -- name-keyed saved colours and mark those IDs as seen so fallback-
+    -- keyed duplicates are suppressed below.
     for colorKey, color in pairs(savedColors) do
-        if type(colorKey) == "string" and type(color) == "table" and color.textureId then
-            if not textureForKey[colorKey] then
-                textureForKey[colorKey] = color.textureId
+        if type(colorKey) == "string" and type(color) == "table" then
+            if color.textureId then
+                if not textureForKey[colorKey] then
+                    textureForKey[colorKey] = color.textureId
+                end
+                seen[color.textureId] = true
             end
-            seen[color.textureId] = true
+            if color.spellID then seen[color.spellID] = true end
+            if color.cooldownID then seen[color.cooldownID] = true end
         end
     end
 
-    for colorKey in pairs(savedColors) do
+    for colorKey, color in pairs(savedColors) do
         if not seen[colorKey] then
             seen[colorKey] = true
             ordered[#ordered + 1] = colorKey
+            -- Build aux from embedded IDs in the saved color value.
+            if type(color) == "table" then
+                auxForKey[colorKey] = {
+                    spellName = type(colorKey) == "string" and colorKey or nil,
+                    spellID = color.spellID,
+                    cooldownID = color.cooldownID,
+                    textureFileID = color.textureId or (type(colorKey) == "number" and colorKey or nil),
+                }
+            end
         end
     end
 
@@ -95,8 +117,13 @@ local function GenerateSpellColorArgs()
         local texture = textureForKey[colorKey] or (type(colorKey) == "number" and colorKey or nil)
         local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
         local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
-        local spellName = type(colorKey) == "string" and colorKey or nil
-        local textureId = type(colorKey) == "number" and colorKey or texture
+
+        -- Resolve all 4 identifying keys for this entry.
+        local aux = auxForKey[colorKey] or {}
+        local spellName = aux.spellName or (type(colorKey) == "string" and colorKey or nil)
+        local spellID = aux.spellID
+        local cooldownID = aux.cooldownID
+        local textureId = aux.textureFileID or (type(colorKey) == "number" and colorKey or nil) or texture
 
         args[optKey] = {
             type = "color",
@@ -105,13 +132,13 @@ local function GenerateSpellColorArgs()
             order = i * 10,
             width = "double",
             get = function()
-                local c = ECM.SpellColors.GetColor(spellName, textureId)
+                local c = ECM.SpellColors.GetColor(spellName, spellID, cooldownID, textureId)
                 if c then return c.r, c.g, c.b end
                 local dc = ECM.SpellColors.GetDefaultColor()
                 return dc.r, dc.g, dc.b
             end,
             set = function(_, r, g, b)
-                ECM.SpellColors.SetColor(spellName, textureId, { r = r, g = g, b = b, a = 1 })
+                ECM.SpellColors.SetColor(spellName, spellID, cooldownID, textureId, { r = r, g = g, b = b, a = 1 })
                 ResetStyledMarkers()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
@@ -124,10 +151,10 @@ local function GenerateSpellColorArgs()
             order = i * 10 + 1,
             width = 0.3,
             hidden = function()
-                return ECM.SpellColors.GetColor(spellName, textureId) == nil
+                return ECM.SpellColors.GetColor(spellName, spellID, cooldownID, textureId) == nil
             end,
             func = function()
-                ECM.SpellColors.ResetColor(spellName, textureId)
+                ECM.SpellColors.ResetColor(spellName, spellID, cooldownID, textureId)
                 ResetStyledMarkers()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,

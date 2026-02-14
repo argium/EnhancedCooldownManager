@@ -13,8 +13,6 @@ local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
 assert(ECM.defaults, "Defaults.lua must be loaded before ECM.lua")
-assert(ECM.AddToTraceLog and ECM.GetTraceLog, "TraceLog.lua must be loaded before ECM.lua")
-assert(ECM.ShowBugReportPopup, "BugReports.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 
@@ -221,17 +219,7 @@ function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        ECM_print("Commands: /ecm debug [on|off|toggle] | /ecm bug | /ecm options")
-        return
-    end
-
-    if cmd == "bug" then
-        local profile = self.db and self.db.profile
-        if not profile or not profile.debug then
-            ECM_print("Debug mode must be enabled to use /ecm bug. Use /ecm debug on first.")
-            return
-        end
-        ECM.ShowBugReportPopup()
+        ECM_print("Commands: /ecm debug [on|off|toggle] | /ecm options")
         return
     end
 

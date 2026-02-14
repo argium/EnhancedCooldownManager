@@ -101,9 +101,50 @@ local BLIZZARD_FRAMES = {
     "BuffBarCooldownViewer",
 }
 
+--- Class info keyed by class ID. Each entry has name and hex color (without alpha prefix).
+local CLASS_BY_ID = {
+    [1]  = { name = "WARRIOR",      color = "C79C6E" },
+    [2]  = { name = "PALADIN",      color = "F58CBA" },
+    [3]  = { name = "HUNTER",       color = "ABD473" },
+    [4]  = { name = "ROGUE",        color = "FFF569" },
+    [5]  = { name = "PRIEST",       color = "FFFFFF" },
+    [6]  = { name = "DEATHKNIGHT",  color = "C41F3B" },
+    [7]  = { name = "SHAMAN",       color = "0070DE" },
+    [8]  = { name = "MAGE",         color = "69CCF0" },
+    [9]  = { name = "WARLOCK",      color = "9482C9" },
+    [10] = { name = "MONK",         color = "00FF96" },
+    [11] = { name = "DRUID",        color = "FF7D0A" },
+    [12] = { name = "DEMONHUNTER",  color = "A330C9" },
+    [13] = { name = "EVOKER",       color = "33937F" },
+}
+
+--- Chat channel colors keyed by channel name.
+local CHAT_CHANNELS = {
+    SAY          = { color = "FFFFFF" },
+    YELL         = { color = "FF3F40" },
+    WHISPER      = { color = "FF7EFF" },
+    PARTY        = { color = "AAABFE" },
+    PARTY_LEADER = { color = "77C8FF" },
+    RAID         = { color = "FF7F00" },
+    RAID_WARNING = { color = "FF4809" },
+    INSTANCE     = { color = "FF7D01" },
+    GUILD        = { color = "3CE13F" },
+    OFFICER      = { color = "40BC40" },
+    EMOTE        = { color = "FF7E40" },
+    SYSTEM       = { color = "FFFF00" },
+    QUEST        = { color = "CC9933" },
+    LFG          = { color = "FEC1C0" },
+    BATTLENET    = { color = "00FAF6" },
+    GENERAL      = { color = "FFC080" },
+    TRADE        = { color = "FFC080" },
+    LOOT         = { color = "00A956" },
+}
+
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
+constants.CLASS_BY_ID = CLASS_BY_ID
+constants.CHAT_CHANNELS = CHAT_CHANNELS
 constants.SYS = SYS
 
 ECM.Constants = constants

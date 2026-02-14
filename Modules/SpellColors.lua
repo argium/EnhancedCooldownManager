@@ -3,12 +3,20 @@
 -- Licensed under the GNU General Public License v3.0
 --
 -- SpellColors: Manages per-spell color customization for buff bars.
--- Backed by a FallbackKeyMap (primary = spell name, fallback = texture file ID).
+-- Backed by a PriorityKeyMap with four ordered tiers:
+--   1. spell name   (highest priority — human-readable, preferred key)
+--   2. spell ID      (numeric, survives secrets better than name)
+--   3. cooldown ID   (numeric, frame-level identifier)
+--   4. texture file ID (lowest priority — last-resort fallback)
 
 local _, ns = ...
 local FrameUtil = ECM.FrameUtil
 local SpellColors = {}
 ECM.SpellColors = SpellColors
+
+--- Key tier definitions, ordered highest-priority first.
+--- Must match the field names returned by get_scope().
+local KEY_DEFS = { "byName", "bySpellID", "byCooldownID", "byTexture" }
 
 ---------------------------------------------------------------------------
 -- Key validation
@@ -34,21 +42,18 @@ end
 
 --- Ensures the color storage tables exist for the current class/spec.
 ---@param cfg table  buffBars config table
----@return table scope  { byPrimary = byName[classID][specID], byFallback = byTexture[classID][specID] }
+---@return table scope  Keyed by KEY_DEFS field names; each value is the class/spec sub-table.
 local function get_scope(cfg)
     local _, _, classID = UnitClass("player")
     local specID = GetSpecialization()
 
-    cfg.colors.byName[classID] = cfg.colors.byName[classID] or {}
-    cfg.colors.byName[classID][specID] = cfg.colors.byName[classID][specID] or {}
-
-    cfg.colors.byTexture[classID] = cfg.colors.byTexture[classID] or {}
-    cfg.colors.byTexture[classID][specID] = cfg.colors.byTexture[classID][specID] or {}
-
-    return {
-        byPrimary = cfg.colors.byName[classID][specID],
-        byFallback = cfg.colors.byTexture[classID][specID],
-    }
+    local scope = {}
+    for _, def in ipairs(KEY_DEFS) do
+        cfg.colors[def][classID] = cfg.colors[def][classID] or {}
+        cfg.colors[def][classID][specID] = cfg.colors[def][classID][specID] or {}
+        scope[def] = cfg.colors[def][classID][specID]
+    end
+    return scope
 end
 
 --- Ensures nested tables exist for color storage.
@@ -57,16 +62,17 @@ local function ensure_profile_is_setup(cfg)
     if not cfg.colors then
         cfg.colors = {
             byName = {},
+            bySpellID = {},
+            byCooldownID = {},
             byTexture = {},
             cache = {},
             defaultColor = ECM.Constants.BUFFBARS_DEFAULT_COLOR,
         }
     end
-    if type(cfg.colors.byName) ~= "table" then
-        cfg.colors.byName = {}
-    end
-    if type(cfg.colors.byTexture) ~= "table" then
-        cfg.colors.byTexture = {}
+    for _, def in ipairs(KEY_DEFS) do
+        if type(cfg.colors[def]) ~= "table" then
+            cfg.colors[def] = {}
+        end
     end
     if type(cfg.colors.cache) ~= "table" then
         cfg.colors.cache = {}
@@ -93,32 +99,38 @@ end
 -- Lazy singleton
 ---------------------------------------------------------------------------
 
-local _map -- FallbackKeyMap instance (created on first use)
+local _map -- PriorityKeyMap instance (created on first use)
 
---- Repopulates byFallback entries from byPrimary for any colour whose
---- stored value carries a textureId.  This repairs SavedVariables left
---- empty by an older Reconcile implementation that deleted fallback entries.
-local function repair_fallback_from_primary()
+--- Repopulates lower-priority tier entries from byName for any colour
+--- whose stored value carries embedded IDs (textureId, spellID,
+--- cooldownID).  This repairs SavedVariables left incomplete by an
+--- older Reconcile implementation that deleted fallback entries.
+local function repair_from_primary()
     local cfg = config()
     if not cfg then return end
 
     local scope = get_scope(cfg)
-    local byPrimary = scope.byPrimary
-    local byFallback = scope.byFallback
-    if not byPrimary or not byFallback then return end
+    local byName = scope.byName
+    if not byName then return end
 
-    for _, entry in pairs(byPrimary) do
+    for _, entry in pairs(byName) do
         if type(entry) == "table" and type(entry.value) == "table" then
-            local tid = entry.value.textureId
-            if tid and not byFallback[tid] then
-                byFallback[tid] = entry
+            local v = entry.value
+            if v.textureId and scope.byTexture and not scope.byTexture[v.textureId] then
+                scope.byTexture[v.textureId] = entry
+            end
+            if v.spellID and scope.bySpellID and not scope.bySpellID[v.spellID] then
+                scope.bySpellID[v.spellID] = entry
+            end
+            if v.cooldownID and scope.byCooldownID and not scope.byCooldownID[v.cooldownID] then
+                scope.byCooldownID[v.cooldownID] = entry
             end
         end
     end
 end
 
---- Returns the FallbackKeyMap instance, creating it on first call.
----@return FallbackKeyMap|nil
+--- Returns the PriorityKeyMap instance, creating it on first call.
+---@return PriorityKeyMap|nil
 local function get_map()
     if _map then
         return _map
@@ -129,9 +141,10 @@ local function get_map()
         return nil
     end
 
-    repair_fallback_from_primary()
+    repair_from_primary()
 
-    _map = ECM.FallbackKeyMap.New(
+    _map = ECM.PriorityKeyMap.New(
+        KEY_DEFS,
         function()
             local cfg = config()
             if not cfg then return nil end
@@ -146,16 +159,19 @@ end
 -- Public interface
 ---------------------------------------------------------------------------
 
---- Gets the custom color for a spell by name and/or texture ID.
+--- Gets the custom color for a spell by its identifying keys.
+--- Keys are tried in priority order: spellName → spellID → cooldownID → textureFileID.
 ---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
 ---@param textureFileID number|nil
 ---@return ECM_Color|nil
-function SpellColors.GetColor(spellName, textureFileID)
+function SpellColors.GetColor(spellName, spellID, cooldownID, textureFileID)
     local map = get_map()
     if not map then
         return nil
     end
-    return map:Get(spellName, textureFileID)
+    return map:Get({ spellName, spellID, cooldownID, textureFileID })
 end
 
 --- Gets the custom color for a bar frame.
@@ -174,9 +190,11 @@ function SpellColors.GetColorForBar(frame)
     end
 
     local spellName = frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
+    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+    local cooldownID = frame.cooldownID or nil
     local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
     ECM_debug_assert(textureFileID and canaccessvalue(textureFileID),"Texture file ID is a secret value, cannot use as color key")
-    return SpellColors.GetColor(spellName, textureFileID)
+    return SpellColors.GetColor(spellName, spellID, cooldownID, textureFileID)
 end
 
 --- Returns a merged table of all custom colors for the current class/spec.
@@ -191,20 +209,32 @@ end
 
 --- Sets a custom color for a spell.
 ---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
 ---@param textureId number|nil
 ---@param color ECM_Color
-function SpellColors.SetColor(spellName, textureId, color)
+function SpellColors.SetColor(spellName, spellID, cooldownID, textureId, color)
     ECM_debug_assert(not spellName or type(spellName) == "string", "Expected spellName to be a string or nil")
+    ECM_debug_assert(not spellID or type(spellID) == "number", "Expected spellID to be a number or nil")
+    ECM_debug_assert(not cooldownID or type(cooldownID) == "number", "Expected cooldownID to be a number or nil")
     ECM_debug_assert(not textureId or type(textureId) == "number", "Expected textureId to be a number or nil")
 
     local map = get_map()
     if not map then
         return
     end
+    -- Embed secondary IDs in the color value so repair_from_primary can
+    -- repopulate lower-priority tiers from byName entries.
     if textureId then
         color.textureId = textureId
     end
-    map:Set(spellName, textureId, color)
+    if spellID then
+        color.spellID = spellID
+    end
+    if cooldownID then
+        color.cooldownID = cooldownID
+    end
+    map:Set({ spellName, spellID, cooldownID, textureId }, color)
 end
 
 --- Returns the default bar color.
@@ -227,17 +257,21 @@ function SpellColors.SetDefaultColor(color)
     cfg.colors.defaultColor = { r = color.r, g = color.g, b = color.b, a = 1 }
 end
 
---- Removes the custom color for a spell from both key maps.
+--- Removes the custom color for a spell from all key tiers.
 ---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
 ---@param textureId number|nil
 ---@return boolean nameCleared
+---@return boolean spellIDCleared
+---@return boolean cooldownIDCleared
 ---@return boolean textureCleared
-function SpellColors.ResetColor(spellName, textureId)
+function SpellColors.ResetColor(spellName, spellID, cooldownID, textureId)
     local map = get_map()
     if not map then
-        return false, false
+        return false, false, false, false
     end
-    return map:Remove(spellName, textureId)
+    return map:Remove({ spellName, spellID, cooldownID, textureId })
 end
 
 --- Reconciles the color entry for a single bar frame.
@@ -251,8 +285,10 @@ function SpellColors.ReconcileBar(frame)
         return
     end
     local spellName = frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
+    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+    local cooldownID = frame.cooldownID or nil
     local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
-    map:Reconcile(spellName, textureFileID)
+    map:Reconcile({ spellName, spellID, cooldownID, textureFileID })
 end
 
 --- Reconciles color entries for a list of bar frames.
@@ -263,13 +299,15 @@ function SpellColors.ReconcileAllBars(frames)
     if not map then
         return 0
     end
-    local pairs_list = {}
+    local keys_list = {}
     for _, frame in ipairs(frames) do
         if frame and frame.__ecmHooked then
             local spellName = frame.Name and frame.Name.GetText and frame.Name:GetText() or nil
+            local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+            local cooldownID = frame.cooldownID or nil
             local textureFileID = FrameUtil.GetIconTextureFileID(frame) or nil
-            pairs_list[#pairs_list + 1] = { spellName, textureFileID }
+            keys_list[#keys_list + 1] = { spellName, spellID, cooldownID, textureFileID }
         end
     end
-    return map:ReconcileAll(pairs_list)
+    return map:ReconcileAll(keys_list)
 end

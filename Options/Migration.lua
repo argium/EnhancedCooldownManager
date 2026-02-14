@@ -385,7 +385,7 @@ function Migration.Run(profile)
         -- Migration: split flat perSpell map into separate byName / byTexture tables.
         -- String keys go to byName, number keys go to byTexture.
         -- Each entry is wrapped as { value = color, t = 0 } so that any fresh
-        -- write will win during FallbackKeyMap reconciliation.
+        -- write will win during PriorityKeyMap reconciliation.
         local buffBars = profile.buffBars
         if buffBars and type(buffBars.colors) == "table" then
             local colors = buffBars.colors
@@ -422,6 +422,15 @@ function Migration.Run(profile)
                 end
 
                 colors.perSpell = nil
+            end
+
+            -- Ensure new key-tier tables exist (lazily populated at runtime
+            -- by PriorityKeyMap reconciliation; no data migration needed).
+            if type(colors.bySpellID) ~= "table" then
+                colors.bySpellID = {}
+            end
+            if type(colors.byCooldownID) ~= "table" then
+                colors.byCooldownID = {}
             end
         end
 
