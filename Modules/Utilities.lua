@@ -254,7 +254,9 @@ end
 ---@param ... any
 function ECM_print(...)
     local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME .. ":")
-    local message = table.concat({...}, " ")
+    local args = {...}
+    for i = 1, #args do args[i] = tostring(args[i]) end
+    local message = table.concat(args, " ")
     print(prefix .. " " .. message)
 end
 
@@ -263,7 +265,9 @@ end
 ---@param ... any
 function ECM_warning(...)
     local prefix = "|T878250:14:14|t " .. ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. " WARN", "FFD400", "FFEA61", "FFFFB7")
-    local message = table.concat({...}, " ")
+    local args = {...}
+    for i = 1, #args do args[i] = tostring(args[i]) end
+    local message = table.concat(args, " ")
     print(prefix .. " " .. message)
 end
 
