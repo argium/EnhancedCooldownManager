@@ -154,8 +154,7 @@ local function ResetToDefault(path)
     if not profile or not defaults then return end
 
     local defaultVal = GetNestedValue(defaults, path)
-    -- Deep copy for tables (recursive to handle nested tables)
-    SetNestedValue(profile, path, ECM_DeepCopy(defaultVal))
+    SetNestedValue(profile, path, ECM_CloneValue(defaultVal))
 end
 
 --- Generates a reset handler function for a specific config path, which resets that path to its default value and optionally calls a refresh function.

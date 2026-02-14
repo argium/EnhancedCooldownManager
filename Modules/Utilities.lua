@@ -236,46 +236,7 @@ function ECM_DeepEquals(a, b)
     return true
 end
 
---- Creates a deep copy of a table with cycle detection and depth limit.
----@param tbl any
----@param seen table|nil
----@param depth number|nil
----@return any
-function ECM_DeepCopy(tbl, seen, depth)
-    if type(tbl) ~= "table" then
-        return tbl
-    end
-
-    depth = (depth or 0) + 1
-    if depth > 10 then
-        return "<max depth>"
-    end
-
-    seen = seen or {}
-    if seen[tbl] then
-        return "<cycle>"
-    end
-    seen[tbl] = true
-
-    local copy = {}
-    for k, v in pairs(tbl) do
-        -- Handle secret keys
-        if issecretvalue(k) then
-            copy["[secret]"] = "[secret]"
-        elseif type(v) == "table" then
-            copy[k] = ECM_DeepCopy(v, seen, depth)
-        else
-            copy[k] = safe_str_tostring(v)
-        end
-    end
-
-    seen[tbl] = nil
-    return copy
-end
-
 --- Creates a proper deep clone of a value, preserving types.
---- Unlike ECM_DeepCopy (which is for debug logging and stringifies leaf values),
---- this preserves numeric and boolean values without conversion.
 ---@param value any
 ---@return any
 function ECM_CloneValue(value)
