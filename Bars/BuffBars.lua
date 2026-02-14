@@ -6,6 +6,7 @@ local FrameUtil = ECM.FrameUtil
 local BuffBars = {}
 ECM.BuffBars = BuffBars
 local warned = false
+local _editLocked = false
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
@@ -145,28 +146,40 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
     local textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil"
 
+    -- When in a raid instance, and after exiting combat, both spellname and texture id remain secret. If this occurs, we cannot reliably determine colours
+    if issecretvalue(spellName) and issecretvalue(textureFileID) then
+        _editLocked = true
+    else
+        _editLocked = false
+    end
+
+    -- Purely diagnostics to help track down issues with secrets
+    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
+    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
+    local logPrefix = "GetColorForBar[".. barIndex .."] "
+    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = frame.cooldownID or "", spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "" })
+
     if issecretvalue(spellName) and issecretvalue(textureFileID) and not InCombatLockdown() then
-        ECM_warning("Spell name AND texture both being secret outside of combat is unexpected and I have not tracked down how this happens.")
         if retryCount < 3 then
             C_Timer.After(1, function()
                 style_child_frame(frame, config, globalConfig, barIndex, retryCount + 1)
             end)
-        -- warned = true
+            -- Don't apply any colour while retries are pending — preserve
+            -- the bar's existing colour rather than clobbering it with the
+            -- default while we wait for secrets to clear.
+            barColor = nil
+        elseif not warned then
+            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Spell name AND texture both being secret outside of combat.")
+            warned = true
         end
+    elseif retryCount > 0 then
+        ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
-    -- If bar color is nil that can mean one of two things:
-    --   1) We are in combat lockdown and both keys are secret so lookup is impossible. Do not change anything because it will mess up the internal state.
-    --   2) There truly is no color for this bar, in which case we should apply the default color.
-    if not barColor and not InCombatLockdown() then
+    if barColor == nil and not (issecretvalue(spellName) and issecretvalue(textureFileID)) then
         barColor = ECM.SpellColors.GetDefaultColor()
     end
-
-    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
-    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
-    local logLine = "GetColorForBar[".. barIndex .."] (" .. spellName .. ", " .. textureFileID .. ") = " .. colorLog
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, frame)
-
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
@@ -245,7 +258,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         })
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Applied style to bar", {
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
         barIndex = barIndex,
         height = height,
         pipHidden = true,
@@ -390,6 +403,7 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
+    warned = false
     local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
         hook_child_frame(entry.frame, self)
@@ -536,6 +550,14 @@ end
 
 function BuffBars:IsEnabled()
     return self._enabled or false
+end
+
+--- Gets a boolean indicating if editing is allowed.
+--- @return boolean isEditLocked Whether editing is locked due to combat or secrets
+--- @return string reason Reason editing is locked ("combat", "secrets", or nil)
+function BuffBars:IsEditLocked()
+    local reason = InCombatLockdown() and "combat" or (_editLocked and "secrets") or nil
+    return reason ~= nil, reason
 end
 
 local _eventFrame = CreateFrame("Frame")

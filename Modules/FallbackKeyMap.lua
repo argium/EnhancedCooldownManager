@@ -109,10 +109,7 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
     -- Only fallback exists → copy to primary (keep both).
     if not pEntry and fEntry then
         byPrimary[primaryKey] = fEntry
-        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied fallback to primary", {
-            primaryKey = primaryKey,
-            fallbackKey = fallbackKey,
-        })
+        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied fallback " .. fallbackKey .." to primary " .. primaryKey, { value = unwrap(fEntry) })
         return true
     end
 
@@ -120,10 +117,7 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
     -- (e.g. restricted areas where spell names are secret) still hit.
     if pEntry and not fEntry then
         byFallback[fallbackKey] = pEntry
-        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied primary to fallback", {
-            primaryKey = primaryKey,
-            fallbackKey = fallbackKey,
-        })
+        ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - copied primary " .. primaryKey .." to fallback " .. fallbackKey, { value = unwrap(pEntry) })
         return true
     end
 
@@ -132,11 +126,7 @@ function FallbackKeyMap:Reconcile(primaryKey, fallbackKey)
     byPrimary[primaryKey] = winner
     byFallback[fallbackKey] = winner
 
-    ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - resolved conflict", {
-        primaryKey = primaryKey,
-        fallbackKey = fallbackKey,
-        winner = ts(fEntry) > ts(pEntry) and "fallback" or "primary",
-    })
+    ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Reconcile - unified primary " .. primaryKey .." and fallback " .. fallbackKey .. " to the most recent value", { value = unwrap(winner) })
     return true
 end
 
@@ -181,11 +171,11 @@ function FallbackKeyMap:Get(primaryKey, fallbackKey)
         local entry = byPrimary[primaryKey]
         if entry then
             local result = unwrap(entry)
-            ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - primary hit", {
-                primaryKey = primaryKey,
-                fallbackKey = fallbackKey,
-                entry = result
-            })
+            -- ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - primary hit", {
+            --     primaryKey = primaryKey,
+            --     fallbackKey = fallbackKey,
+            --     entry = result
+            -- })
             return result
         end
     end
@@ -194,21 +184,21 @@ function FallbackKeyMap:Get(primaryKey, fallbackKey)
         local entry = byFallback[fallbackKey]
         if entry then
             local result = unwrap(entry)
-            ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - fallback hit", {
-                primaryKey = primaryKey,
-                fallbackKey = fallbackKey,
-                entry = result
-            })
+            -- ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - fallback hit", {
+            --     primaryKey = primaryKey,
+            --     fallbackKey = fallbackKey,
+            --     entry = result
+            -- })
             return result
         end
     end
 
-    ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - miss", {
-        primaryKey = primaryKey,
-        fallbackKey = fallbackKey,
-        byFallback = byFallback or "nil",
-        byPrimary = byPrimary or "nil",
-    })
+    -- ECM_log(ECM.Constants.SYS.SpellColors, "FallbackKeyMap", "Get - miss", {
+    --     primaryKey = primaryKey,
+    --     fallbackKey = fallbackKey,
+    --     byFallback = byFallback or "nil",
+    --     byPrimary = byPrimary or "nil",
+    -- })
     return nil
 end
 

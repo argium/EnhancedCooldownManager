@@ -12,6 +12,16 @@ local function ResetStyledMarkers()
     end
 end
 
+local function IsEditLocked()
+    local locked, _ = ECM.BuffBars:IsEditLocked()
+    return locked
+end
+
+local function EditLockedReason()
+    local _, reason = ECM.BuffBars:IsEditLocked()
+    return reason
+end
+
 --- Generates dynamic AceConfig args for per-spell color pickers.
 --- Merges spells from persisted custom colors (SpellColors) and the
 --- currently-visible aura bars (BuffBars) so that both customized and
@@ -160,9 +170,15 @@ local function SpellOptionsTable()
             },
             combatlockdown = {
                 type = "description",
-                name = "|cffcc0000These settings cannot be changed while in combat lockdown. Leave combat and open the options panel again to make changes.|r\n\n",
+                name = "|cffFF0038These settings cannot be changed while in combat lockdown. Leave combat and open the options panel again to make changes.|r\n\n",
                 order = 5,
-                hidden = function() return not InCombatLockdown() end,
+                hidden = function() return not IsEditLocked() or EditLockedReason() ~= "combat" end,
+            },
+            secretsWarning = {
+                type = "description",
+                name = "|cffFFDD3CThese settings cannot be changed while spell names or textures are secret. This may persist until you leave an instance or reload your UI out of combat.|r\n\n",
+                order = 6,
+                hidden = function() return not IsEditLocked() or EditLockedReason() ~= "secrets" end,
             },
             defaultColor = {
                 type = "color",
@@ -170,7 +186,7 @@ local function SpellOptionsTable()
                 desc = "Default color for spells without a custom color.",
                 order = 10,
                 width = "double",
-                disabled = function() return InCombatLockdown() end,
+                disabled =  IsEditLocked,
                 get = function()
                     local c = ECM.SpellColors.GetDefaultColor()
                     return c.r, c.g, c.b
@@ -188,7 +204,7 @@ local function SpellOptionsTable()
                 order = 11,
                 width = 0.3,
                 hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.colors.defaultColor") end,
-                disabled = function() return InCombatLockdown() end,
+                disabled =  IsEditLocked,
                 func = ECM.OptionUtil.MakeResetHandler("buffBars.colors.defaultColor"),
             },
             spellColorsGroup = {
@@ -196,7 +212,7 @@ local function SpellOptionsTable()
                 name = "",
                 order = 20,
                 inline = true,
-                disabled = function() return InCombatLockdown() end,
+                disabled =  IsEditLocked,
                 args = GenerateSpellColorArgs(),
             },
             refreshSpellList = {
@@ -205,7 +221,7 @@ local function SpellOptionsTable()
                 desc = "Scan current buffs to refresh discovered spell names.",
                 order = 100,
                 width = "normal",
-                disabled = function() return InCombatLockdown() end,
+                disabled =  IsEditLocked,
                 func = function()
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,

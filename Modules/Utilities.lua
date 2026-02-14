@@ -301,7 +301,7 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_warning(...)
-    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. " Warning:", "FFEA61", "FFD400", "FFFFB7")
+    local prefix = "|T878250:14:14|t " .. ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. " WARN", "FFD400", "FFEA61", "FFFFB7")
     local message = table.concat({...}, " ")
     print(prefix .. " " .. message)
 end
