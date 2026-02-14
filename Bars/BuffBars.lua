@@ -13,6 +13,8 @@ local _editLocked = false
 ---@field Bar StatusBar
 ---@field DebuffBorder any
 ---@field Icon Frame
+---@field cooldownID number|nil
+---@field cooldownInfo { spellID: number|nil }|nil
 
 local function get_children_ordered(viewer)
     local result = {}
@@ -72,7 +74,7 @@ end
 ---@param retryCount number|nil Number of times this function has been retried
 local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
-        ECM_debug_assert(false, "Attempted to style a child frame that has not been hooked", { frame = frame })
+        ECM_debug_assert(false, "Attempted to style a child frame that wasn't hooked.")
         return
     end
 
@@ -144,23 +146,26 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     -- DevTool:AddData(frame)
     local barColor = ECM.SpellColors.GetColorForBar(frame)
     local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
+    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "nil"
+    local cooldownID = frame.cooldownID or "nil"
     local textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil"
 
-    -- When in a raid instance, and after exiting combat, both spellname and texture id remain secret. If this occurs, we cannot reliably determine colours
-    if issecretvalue(spellName) and issecretvalue(textureFileID) then
-        _editLocked = true
-    else
-        _editLocked = false
-    end
+    -- When in a raid instance, and after exiting combat, all identifying
+    -- values may remain secret.  Lock editing only when every key is
+    -- unusable.  With four tiers (name, spellID, cooldownID, texture)
+    -- the colour lookup is much more resilient to partial secrecy.
+    local allSecret = issecretvalue(spellName) and issecretvalue(spellID)
+        and issecretvalue(cooldownID) and issecretvalue(textureFileID)
+    _editLocked = allSecret
 
     -- Purely diagnostics to help track down issues with secrets
     local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
     local logPrefix = "GetColorForBar[".. barIndex .."] "
-    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = frame.cooldownID or "", spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "" })
+    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
+    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
 
-    if issecretvalue(spellName) and issecretvalue(textureFileID) and not InCombatLockdown() then
+    if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
                 style_child_frame(frame, config, globalConfig, barIndex, retryCount + 1)
@@ -170,14 +175,14 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
             -- default while we wait for secrets to clear.
             barColor = nil
         elseif not warned then
-            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Spell name AND texture both being secret outside of combat.")
+            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             warned = true
         end
     elseif retryCount > 0 then
         ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
-    if barColor == nil and not (issecretvalue(spellName) and issecretvalue(textureFileID)) then
+    if barColor == nil and not allSecret then
         barColor = ECM.SpellColors.GetDefaultColor()
     end
     if barColor then
@@ -314,8 +319,6 @@ local function layout_bars(self)
             prev = child
         end
     end
-
-    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "LayoutBars complete. Found: " .. #children .. " visible bars.")
 end
 
 --- Override to support custom anchor points in free mode.
@@ -406,8 +409,11 @@ function BuffBars:UpdateLayout(why)
     warned = false
     local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
-        hook_child_frame(entry.frame, self)
-        style_child_frame(entry.frame, cfg, globalConfig, barIndex)
+        -- Some children of the viewer do not have a Bar so might be some other part of the UI.
+        if entry.frame.Bar then
+            hook_child_frame(entry.frame, self)
+            style_child_frame(entry.frame, cfg, globalConfig, barIndex)
+        end
     end
 
     layout_bars(self)
@@ -448,9 +454,10 @@ function BuffBars:ResetStyledMarkers()
 end
 
 --- Returns metadata for all currently-visible aura bars.
---- Each entry contains a spellName (string) and/or textureFileID (number),
---- with secret values filtered out. Entries where both are nil are skipped.
----@return { spellName: string|nil, textureFileID: number|nil }[]
+--- Each entry contains a spellName (string), spellID (number),
+--- cooldownID (number), and/or textureFileID (number), with secret
+--- values filtered out. Entries where all keys are nil are skipped.
+---@return { spellName: string|nil, spellID: number|nil, cooldownID: number|nil, textureFileID: number|nil }[]
 function BuffBars:GetActiveSpellData()
     local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
@@ -462,14 +469,18 @@ function BuffBars:GetActiveSpellData()
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
         local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
+        local sid = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+        local cid = frame.cooldownID or nil
         local tex = FrameUtil.GetIconTextureFileID(frame) or nil
 
         -- Filter out secret values that cannot be used as table keys
         if name and issecretvalue(name) then name = nil end
+        if sid and issecretvalue(sid) then sid = nil end
+        if cid and issecretvalue(cid) then cid = nil end
         if tex and issecretvalue(tex) then tex = nil end
 
-        if name or tex then
-            result[#result + 1] = { spellName = name, textureFileID = tex }
+        if name or sid or cid or tex then
+            result[#result + 1] = { spellName = name, spellID = sid, cooldownID = cid, textureFileID = tex }
         end
     end
     return result
