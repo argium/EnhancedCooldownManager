@@ -235,6 +235,12 @@ function mod:ChatCommand(input)
         return
     end
 
+    if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
+        ECM.ScheduleLayoutUpdate(0, "ChatCommand")
+        ECM_print("Refreshing all modules.")
+        return
+    end
+
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
             ECM_print("Options cannot be opened during combat. They will open when combat ends.")
