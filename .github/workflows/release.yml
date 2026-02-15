@@ -8,6 +8,7 @@ on:
 env:
   ADDON_NAME: EnhancedCooldownManager
   CF_PROJECT_ID: 1427906
+  WOWI_ADDON_ID: 27051
 
 jobs:
   package:
@@ -183,6 +184,36 @@ jobs:
           fi
 
           echo "Successfully uploaded to CurseForge (HTTP $HTTP_CODE)"
+
+      - name: Upload to WoWInterface
+        env:
+          WOWI_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract Interface versions from .toc file
+          COMPATIBLE=$(grep -oP '## Interface: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
+          echo "WoWInterface compatible versions: $COMPATIBLE"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "x-api-token: ${WOWI_TOKEN}" \
+            -F "id=${{ env.WOWI_ADDON_ID }}" \
+            -F "version=${VERSION}" \
+            -F "compatible=${COMPATIBLE}" \
+            -F "updatefile=@${ADDON_NAME}-${VERSION}.zip" \
+            "https://api.wowinterface.com/addons/update")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "WoWInterface response: $BODY"
+
+          if [ "$HTTP_CODE" -ne 202 ]; then
+            echo "::error::WoWInterface upload failed with HTTP $HTTP_CODE: $BODY"
+            exit 1
+          fi
+
+          echo "Successfully uploaded to WoWInterface (HTTP $HTTP_CODE)"
 
       - name: Create GitHub Release
         run: |
