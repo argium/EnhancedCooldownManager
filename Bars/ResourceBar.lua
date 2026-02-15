@@ -16,6 +16,13 @@ local discreteResourceTypes = {
     [Enum.PowerType.Essence] = true,
 }
 
+local function GetMaelstromWeaponMax()
+    if IsPlayerSpell(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then
+        return ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED
+    end
+    return ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
+end
+
 -- Gets the resource type for the player given their class, spec and current shapeshift form (if applicable).
 ---@return Enum.PowerType|nil powerType The current resource type, or nil if none.
 local function GetActiveDiscreteResourceType()
@@ -66,6 +73,12 @@ local function GetValues(moduleConfig)
         end
 
         -- Not displaying anything for havoc currently.
+    elseif class == "SHAMAN" then
+        if GetSpecialization() == ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX then
+            local aura = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_SPELLID)
+            local stacks = aura and aura.applications or 0
+            return GetMaelstromWeaponMax(), stacks, "maelstrom", nil
+        end
     else
         -- Everything else
         local powerType = GetActiveDiscreteResourceType()
@@ -95,6 +108,10 @@ function ResourceBar:ShouldShow()
 
     if (class == "DEMONHUNTER") and (specId == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX or specId == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX) then
          return true
+    end
+
+    if (class == "SHAMAN") and (specId == ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX) then
+        return true
     end
 
     -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.

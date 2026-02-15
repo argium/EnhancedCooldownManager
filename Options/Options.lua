@@ -495,6 +495,7 @@ local function GenerateResourceColorArgs(db)
         { key = "souls", name = "Soul Fragments (Demon Hunter)" },
         { key = "devourerNormal", name = "Devourer Souls (Normal)" },
         { key = "devourerMeta", name = "Devourer Souls (Neon)" },
+        { key = "maelstrom", name = "Maelstrom Weapon (Enhancement Shaman)" },
         { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
         { key = Enum.PowerType.Chi, name = "Chi" },
         { key = Enum.PowerType.HolyPower, name = "Holy Power" },
