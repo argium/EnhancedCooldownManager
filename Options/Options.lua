@@ -493,9 +493,9 @@ local function GenerateResourceColorArgs(db)
     -- Generate color pickers from definitions
     local colorDefs = {
         { key = "souls", name = "Soul Fragments (Demon Hunter)" },
-        { key = "devourerNormal", name = "Devourer Souls (Normal)" },
-        { key = "devourerMeta", name = "Devourer Souls (Neon)" },
-        { key = "maelstrom", name = "Maelstrom Weapon (Enhancement Shaman)" },
+        { key = "devourerNormal", name = "Souls Fragments (Devourer)" },
+        { key = "devourerMeta", name = "Void Fragments (Devourer)" },
+        { key = "maelstrom", name = "Maelstrom Weapon" },
         { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
         { key = Enum.PowerType.Chi, name = "Chi" },
         { key = Enum.PowerType.HolyPower, name = "Holy Power" },
@@ -570,15 +570,31 @@ local function ResourceBarOptionsTable()
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
+                    showTextDesc = {
+                        type = "description",
+                        name = "Display the current value on the bar.",
+                        order = 2,
+                    },
+                    showText = {
+                        type = "toggle",
+                        name = "Show text",
+                        order = 3,
+                        width = "full",
+                        get = function() return db.profile.resourceBar.showText end,
+                        set = function(_, val)
+                            db.profile.resourceBar.showText = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
                     heightDesc = {
                         type = "description",
                         name = "\nOverride the default bar height. Set to 0 to use the global default.",
-                        order = 3,
+                        order = 4,
                     },
                     height = {
                         type = "range",
                         name = "Height Override",
-                        order = 5,
+                        order = 6,
                         width = "double",
                         min = 0,
                         max = 40,
@@ -592,7 +608,7 @@ local function ResourceBarOptionsTable()
                     heightReset = {
                         type = "execute",
                         name = "X",
-                        order = 6,
+                        order = 7,
                         width = 0.3,
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("resourceBar.height") end,
                         func = ECM.OptionUtil.MakeResetHandler("resourceBar.height"),

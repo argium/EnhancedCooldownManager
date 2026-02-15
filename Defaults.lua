@@ -178,7 +178,7 @@ local defaults = {
         },
         resourceBar = {
             enabled             = true,
-            showText            = true,
+            showText            = false,
             anchorMode          = ECM.Constants.ANCHORMODE_CHAIN,
             width               = 300,
             -- height              = nil,
