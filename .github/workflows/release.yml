@@ -74,6 +74,7 @@ jobs:
             --exclude '.*' \
             --exclude 'TODO.md' \
             --exclude 'CLAUDE.md' \
+            --exclude 'docs' \
             --exclude '*.code-workspace' \
             --exclude '.vscode' \
             --exclude '.idea' \
