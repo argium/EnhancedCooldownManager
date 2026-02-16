@@ -49,6 +49,10 @@ local function GetResourceType()
         if (specId == ECM.Constants.MAGE_ARCANE_SPEC_INDEX) then
             return Enum.PowerType.ArcaneCharges
         end
+
+        -- Fire/Frost mages don't use a discrete resource tracked by this bar.
+        -- Return nil explicitly to make this control flow clear.
+        return nil
     else
         for powerType in pairs(discreteResourceTypes) do
             local max = UnitPowerMax("player", powerType)
