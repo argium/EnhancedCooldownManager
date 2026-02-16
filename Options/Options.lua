@@ -495,12 +495,13 @@ local function GenerateResourceColorArgs(db)
         { key = "souls", name = "Soul Fragments (Demon Hunter)" },
         { key = "devourerNormal", name = "Souls Fragments (Devourer)" },
         { key = "devourerMeta", name = "Void Fragments (Devourer)" },
-        { key = "maelstrom", name = "Maelstrom Weapon" },
-        { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
+        { key = Enum.PowerType.ArcaneCharges, name = "Arcane Charges" },
         { key = Enum.PowerType.Chi, name = "Chi" },
-        { key = Enum.PowerType.HolyPower, name = "Holy Power" },
-        { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
+        { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
         { key = Enum.PowerType.Essence, name = "Essence" },
+        { key = Enum.PowerType.HolyPower, name = "Holy Power" },
+        { key = Enum.PowerType.Maelstrom, name = "Maelstrom" },
+        { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
     }
 
     for i, def in ipairs(colorDefs) do

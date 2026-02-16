@@ -9,87 +9,101 @@ mod.ResourceBar = ResourceBar
 
 --- Power types that have discrete values and should be displayed using the resource bar.
 local discreteResourceTypes = {
-    [Enum.PowerType.ComboPoints] = true,
+    [Enum.PowerType.ArcaneCharges] = true,
     [Enum.PowerType.Chi] = true,
+    [Enum.PowerType.ComboPoints] = true,
     [Enum.PowerType.HolyPower] = true,
+    [Enum.PowerType.Maelstrom] = true,
     [Enum.PowerType.SoulShards] = true,
     [Enum.PowerType.Essence] = true,
 }
 
 local function GetMaelstromWeaponMax()
-    if IsPlayerSpell(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then
+    if C_SpellBook.IsSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then
         return ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED
     end
     return ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
--- Gets the resource type for the player given their class, spec and current shapeshift form (if applicable).
----@return Enum.PowerType|nil powerType The current resource type, or nil if none.
-local function GetActiveDiscreteResourceType()
+--- Gets the resource type for the player given their class, spec and current shapeshift form (if applicable).
+--- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
+local function GetResourceType()
     local _, class = UnitClass("player")
+    local specId = GetSpecialization()
 
-    for powerType in pairs(discreteResourceTypes) do
-        local max = UnitPowerMax("player", powerType)
-        if max and max > 0 then
-            if class == "DRUID" then
-                local formIndex = GetShapeshiftForm()
-                if formIndex == 2 then
+    if class == "DEMONHUNTER" then
+        if specId == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX then
+            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_VOID_FRAGMENTS_SPELLID)
+            if voidFragments then
+                return "devourerMeta"
+            else
+                return "devourerNormal"
+            end
+        elseif specId == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
+            return "souls"
+        end
+    -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
+    elseif (class == "MONK") and (specId == ECM.Constants.MONK_BREWMASTER_SPEC_INDEX) then
+        return nil
+    else
+        for powerType in pairs(discreteResourceTypes) do
+            local max = UnitPowerMax("player", powerType)
+            if max and max > 0 then
+                if class == "DRUID" then
+                    local formIndex = GetShapeshiftForm()
+                    if formIndex == ECM.Constants.DRUID_CAT_FORM_INDEX then
+                        return powerType
+                    end
+                else
                     return powerType
                 end
-            else
-                return powerType
             end
         end
     end
+
     return nil
 end
 
 --- Returns resource bar values based on class/power type.
 ---@return number|nil maxResources
 ---@return number|nil currentValue
----@return Enum.PowerType|string|nil kind
----@return boolean|nil isVoidMeta
-local function GetValues(moduleConfig)
-    local _, class = UnitClass("player")
+local function GetValues()
+    local resourceType = GetResourceType()
 
     -- Demon hunter souls can still be tracked by their aura stacks (thank the lord)
-    if class == "DEMONHUNTER" then
-        if GetSpecialization() == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX then
-            -- Devourer is tracked by two spells - one for void meta, and one not.
-            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_VOID_FRAGMENTS_SPELLID)
-            local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_SPELLID)
-            if collapsingStar then
-                -- return 6, (collapsingStar.applications or 0) / 5, "souls", true
-                return 30, collapsingStar.applications or 0, "devourerMeta", true
-            end
-
-            return 35, voidFragments and voidFragments.applications or 0, "devourerNormal", false
-            -- return 7, (voidFragments.applications or 0) / 5, "souls", false
-        elseif GetSpecialization() == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
-            -- Vengeance use the same type of soul fragments. The value can be tracked by checking
-            -- the number of times spirit bomb can be cast, of all things.
-            local count = C_Spell.GetSpellCastCount(ECM.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
-            return ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, count, "souls", nil
-        end
-
-        -- Not displaying anything for havoc currently.
-    elseif class == "SHAMAN" then
-        if GetSpecialization() == ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX then
-            local aura = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_SPELLID)
-            local stacks = aura and aura.applications or 0
-            return GetMaelstromWeaponMax(), stacks, "maelstrom", nil
-        end
-    else
-        -- Everything else
-        local powerType = GetActiveDiscreteResourceType()
-        if powerType then
-            local max = UnitPowerMax("player", powerType) or 0
-            local current = UnitPower("player", powerType) or 0
-            return max, current, powerType, nil
-        end
+    if resourceType == "souls" then
+        -- Vengeance use the same type of soul fragments. The value can be tracked by checking
+        -- the number of times spirit bomb can be cast, of all things.
+        local count = C_Spell.GetSpellCastCount(ECM.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
+        return ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, count
     end
 
-    return nil, nil, nil, nil
+    if resourceType == "devourerNormal" or resourceType == "devourerMeta" then
+        -- Devourer is tracked by two spells - one for void meta, and one not.
+        local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_VOID_FRAGMENTS_SPELLID)
+        local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_SPELLID)
+        if collapsingStar then
+            return ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0
+        end
+
+        return ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, voidFragments and voidFragments.applications or 0
+    end
+
+    if resourceType == Enum.PowerType.Maelstrom then
+        -- The max can be 5 or 10 depending on talent choices
+        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_SPELLID)
+        local stacks = aura and aura.applications or 0
+        return GetMaelstromWeaponMax(), stacks
+    end
+
+    ECM_debug_assert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
+    if resourceType then
+        local max = UnitPowerMax("player", resourceType) or 0
+        local current = UnitPower("player", resourceType) or 0
+        return max, current
+    end
+
+    return nil, nil
 end
 
 --------------------------------------------------------------------------------
@@ -103,28 +117,11 @@ function ResourceBar:ShouldShow()
         return false
     end
 
-    local _, class = UnitClass("player")
-    local specId =  GetSpecialization()
-
-    if (class == "DEMONHUNTER") and (specId == ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX or specId == ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX) then
-         return true
-    end
-
-    if (class == "SHAMAN") and (specId == ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX) then
-        return true
-    end
-
-    -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
-    if (class == "MONK") and (specId == 1) then
-        return false
-    end
-
-    local discreteResource = GetActiveDiscreteResourceType()
-    return discreteResource ~= nil
+    return GetResourceType() ~= nil
 end
 
 function ResourceBar:GetStatusBarValues()
-    local maxResources, currentValue, kind, isVoidMeta = GetValues(self:GetModuleConfig())
+    local maxResources, currentValue = GetValues()
 
     if not maxResources or maxResources <= 0 then
         return 0, 1, 0, false
@@ -139,8 +136,9 @@ end
 ---@return ECM_Color
 function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
-    local _, _, kind = GetValues(cfg)
-    local color = cfg.colors and cfg.colors[kind]
+    local resourceType = GetResourceType()
+    local color = cfg.colors and cfg.colors[resourceType]
+    ECM_debug_assert(color, "Expected color to be defined for resourceType " .. tostring(resourceType))
     return color or ECM.Constants.COLOR_WHITE
 end
 
@@ -151,8 +149,8 @@ function ResourceBar:Refresh(why, force)
     end
 
     -- Handle ticks (Devourer has no ticks, others have dividers)
-    local _, _, kind = GetValues(self:GetModuleConfig())
-    local isDevourer = (kind == "devourerMeta" or kind == "devourerNormal")
+    local resourceType = GetResourceType()
+    local isDevourer = (resourceType == "devourerMeta" or resourceType == "devourerNormal")
 
     if isDevourer then
         self:HideAllTicks("tickPool")
