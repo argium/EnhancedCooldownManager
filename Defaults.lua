@@ -193,7 +193,7 @@ local defaults = {
                 souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
                 devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
                 devourerMeta = { r = 0.275, g = 0.169, b = 1.0, a = 1 },
-                [Enum.PowerType.ArcaneCharges] = { r = 203 / 255, g = 240 / 255, b = 250 / 255, a = 1 },
+                [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
                 [Enum.PowerType.Chi] = { r = 0.00, g = 1.00, b = 0.59, a = 1 },
                 [Enum.PowerType.ComboPoints] = { r = 1.00, g = 0.96, b = 0.41, a = 1 },
                 [Enum.PowerType.Essence] = { r = 0.20, g = 0.58, b = 0.50, a = 1 },

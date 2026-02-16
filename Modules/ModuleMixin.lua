@@ -51,7 +51,6 @@ function ModuleMixin:GetNextChainAnchor(frameName)
     -- Valid frames are those that are enabled, should be shown, in chain mode,
     -- and have an inner frame available. Visibility is intentionally not required
     -- because layout updates can occur while frames are transitioning hide/show.
-    local debugCandidates = {}
     for i = stopIndex - 1, 1, -1 do
         local barName = ECM.Constants.CHAIN_ORDER[i]
         local barModule = mod:GetECMModule(barName, false)
@@ -63,34 +62,14 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local hasFrame = BarMixin ~= nil
         local isVisible = BarMixin and BarMixin:IsVisible() or false
 
-        debugCandidates[#debugCandidates + 1] = {
-            barName = barName,
-            isEnabled = isEnabled,
-            shouldShow = shouldShow,
-            isChainMode = isChainMode,
-            hasFrame = hasFrame,
-            isVisible = isVisible,
-        }
-
         if isEnabled and shouldShow and isChainMode and hasFrame then
-            ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor selected", {
-                frameName = frameName,
-                stopIndex = stopIndex,
-                selected = barName,
-                selectedVisible = isVisible,
-                candidates = debugCandidates,
-            })
+            ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
             return BarMixin, false
         end
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor fallthrough; treating as first anchor", {
-        frameName = frameName,
-        stopIndex = stopIndex,
-        selected = "EssentialCooldownViewer",
-        candidates = debugCandidates,
-    })
+    ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
     return _G["EssentialCooldownViewer"] or UIParent, true
 end
 

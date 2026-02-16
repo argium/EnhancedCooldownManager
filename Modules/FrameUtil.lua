@@ -436,20 +436,20 @@ function FrameUtil.ApplyStandardLayout(self, why)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or ECM.Constants.DEFAULT_BG_COLOR
     local bgColorChanged = FrameUtil.LazySetBackgroundColor(frame, bgColor)
 
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
-        anchor = anchor:GetName(),
-        isFirst = isFirst,
-        widthChanged = widthChanged,
-        width = width,
-        heightChanged = heightChanged,
-        height = height,
-        borderChanged = borderChanged,
-        borderEnabled = borderConfig and borderConfig.enabled,
-        borderThickness = borderConfig and borderConfig.thickness,
-        borderColor = borderConfig and borderConfig.color,
-        bgColorChanged = bgColorChanged,
-        bgColor = bgColor,
-    })
+    -- ECM_log(ECM.Constants.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
+    --     anchor = anchor:GetName(),
+    --     isFirst = isFirst,
+    --     widthChanged = widthChanged,
+    --     width = width,
+    --     heightChanged = heightChanged,
+    --     height = height,
+    --     borderChanged = borderChanged,
+    --     borderEnabled = borderConfig and borderConfig.enabled,
+    --     borderThickness = borderConfig and borderConfig.thickness,
+    --     borderColor = borderConfig and borderConfig.color,
+    --     bgColorChanged = bgColorChanged,
+    --     bgColor = bgColor,
+    -- })
 
     self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
     return true
