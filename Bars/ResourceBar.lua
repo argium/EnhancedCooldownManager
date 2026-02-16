@@ -45,6 +45,10 @@ local function GetResourceType()
     -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
     elseif (class == "MONK") and (specId == ECM.Constants.MONK_BREWMASTER_SPEC_INDEX) then
         return nil
+    elseif (class == "MAGE") then
+        if (specId == ECM.Constants.MAGE_ARCANE_SPEC_INDEX) then
+            return Enum.PowerType.ArcaneCharges
+        end
     else
         for powerType in pairs(discreteResourceTypes) do
             local max = UnitPowerMax("player", powerType)

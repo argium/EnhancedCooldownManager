@@ -205,7 +205,7 @@ function BarMixin:Refresh(why, force)
     if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Starting refresh (" .. (why or "") .. ")")
+    -- ECM_log(ECM.Constants.SYS.Styling, self.Name, "Starting refresh (" .. (why or "") .. ")")
 
     local frame = self.InnerFrame
     local globalConfig = self:GetGlobalConfig()
