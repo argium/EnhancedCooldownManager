@@ -5,6 +5,7 @@
 local FrameUtil = ECM.FrameUtil
 local BuffBars = {}
 ECM.BuffBars = BuffBars
+ECM.ModuleMixin.ApplyConfigMixin(BuffBars, "BuffBars")
 local _warned = false
 local _editLocked = false
 

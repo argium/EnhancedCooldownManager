@@ -212,7 +212,10 @@ function ModuleMixin:ThrottledUpdateLayout(reason, opts)
     end
 end
 
-function ModuleMixin.AddMixin(target, name)
+--- Applies only the config-access portion of the mixin (methods, Name, _configKey).
+--- Safe to call at module creation time before OnEnable; does NOT create frames or
+--- register with layout. Idempotent.
+function ModuleMixin.ApplyConfigMixin(target, name)
     mod = mod or ns.Addon
     assert(target, "target required")
     assert(name, "name required")
@@ -227,6 +230,14 @@ function ModuleMixin.AddMixin(target, name)
     target.Name = name
     target._configKey = name:sub(1,1):lower() .. name:sub(2) -- camelCase-ish
     target.IsHidden = false
+end
+
+function ModuleMixin.AddMixin(target, name)
+    mod = mod or ns.Addon
+
+    -- Ensure config methods are available (idempotent).
+    ModuleMixin.ApplyConfigMixin(target, name)
+
     target.InnerFrame = target:CreateFrame()
     target.IsModuleMixin = true
 
