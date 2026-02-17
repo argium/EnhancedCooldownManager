@@ -133,11 +133,8 @@ local function UpdateFadeAndHiddenStates()
     if not _inCombat and fadeConfig and fadeConfig.enabled then
         local shouldSkipFade = false
 
-        if fadeConfig.exceptInInstance then
-            local inInstance, instanceType = IsInInstance()
-            if inInstance and ECM.Constants.GROUP_INSTANCE_TYPES[instanceType] then
-                shouldSkipFade = true
-            end
+        if fadeConfig.exceptInInstance and IsInInstance() then
+            shouldSkipFade = true
         end
 
         if not shouldSkipFade and fadeConfig.exceptIfTargetCanBeAttacked and UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
