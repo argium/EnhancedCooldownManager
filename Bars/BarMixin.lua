@@ -311,7 +311,9 @@ end
 function BarMixin:OnDisable()
 end
 
-function BarMixin.AddMixin(module, name)
+--- Applies only the config-access portion of both BarMixin and ModuleMixin.
+--- Safe to call at module creation time before OnEnable.
+function BarMixin.ApplyConfigMixin(module, name)
     assert(module, "module required")
     assert(name, "name required")
 
@@ -321,6 +323,13 @@ function BarMixin.AddMixin(module, name)
             module[k] = v
         end
     end
+
+    ECM.ModuleMixin.ApplyConfigMixin(module, name)
+end
+
+function BarMixin.AddMixin(module, name)
+    -- Ensure config methods are available (idempotent).
+    BarMixin.ApplyConfigMixin(module, name)
 
     ECM.ModuleMixin.AddMixin(module, name)
     module._lastUpdate = GetTime()

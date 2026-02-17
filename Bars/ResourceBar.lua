@@ -6,6 +6,7 @@ local _, ns = ...
 local mod = ns.Addon
 local ResourceBar = mod:NewModule("ResourceBar", "AceEvent-3.0")
 mod.ResourceBar = ResourceBar
+ECM.BarMixin.ApplyConfigMixin(ResourceBar, "ResourceBar")
 
 --- Power types that have discrete values and should be displayed using the resource bar.
 local discreteResourceTypes = {

@@ -8,6 +8,7 @@ local FrameUtil = ECM.FrameUtil
 local ItemIcons = mod:NewModule("ItemIcons", "AceEvent-3.0")
 mod.ItemIcons = ItemIcons
 ItemIcons:SetEnabledState(false)
+ECM.ModuleMixin.ApplyConfigMixin(ItemIcons, "ItemIcons")
 
 ---@class ECM_ItemIconsModule : ModuleMixin
 
