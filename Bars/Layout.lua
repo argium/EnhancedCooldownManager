@@ -24,7 +24,7 @@ local LAYOUT_EVENTS = {
     ZONE_CHANGED = { delay = 0.1 },
     ZONE_CHANGED_INDOORS = { delay = 0.1 },
     UPDATE_SHAPESHIFT_FORM = { delay = 0 },
-    SPELL_ACTIVATION_OVERLAY_HIDE = { delay = 0 }, -- this is a failsafe. the default frames were unhiding themselves and this event fires often but not super often.
+    -- SPELL_ACTIVATION_OVERLAY_HIDE = { delay = 0 }, -- this is a failsafe. the default frames were unhiding themselves and this event fires often but not super often.
 }
 
 --------------------------------------------------------------------------------
