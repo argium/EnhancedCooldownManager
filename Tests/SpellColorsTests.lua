@@ -95,6 +95,66 @@ local function assertColorMatch(expected, actual)
     AreEqual(expected.b, actual.b)
 end
 
+---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
+---@param textureFileID number|nil
+---@return ECM_SpellColorKey|nil
+local function MakeKey(spellName, spellID, cooldownID, textureFileID)
+    return SC.MakeKey(spellName, spellID, cooldownID, textureFileID)
+end
+
+---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
+---@param textureFileID number|nil
+---@return ECM_Color|nil
+local function GetColor(spellName, spellID, cooldownID, textureFileID)
+    local key = MakeKey(spellName, spellID, cooldownID, textureFileID)
+    if not key then
+        return nil
+    end
+    return SC.GetColorByKey(key)
+end
+
+---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
+---@param textureFileID number|nil
+---@param c ECM_Color
+local function SetColor(spellName, spellID, cooldownID, textureFileID, c)
+    local key = MakeKey(spellName, spellID, cooldownID, textureFileID)
+    if not key then
+        return
+    end
+    SC.SetColorByKey(key, c)
+end
+
+---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
+---@param textureFileID number|nil
+---@return boolean nameCleared
+---@return boolean spellIDCleared
+---@return boolean cooldownIDCleared
+---@return boolean textureCleared
+local function ResetColor(spellName, spellID, cooldownID, textureFileID)
+    local key = MakeKey(spellName, spellID, cooldownID, textureFileID)
+    if not key then
+        return false, false, false, false
+    end
+    return SC.ResetColorByKey(key)
+end
+
+---@return table<string|number, ECM_Color>
+local function GetAllColors()
+    local result = {}
+    for _, entry in ipairs(SC.GetAllColorEntries()) do
+        result[entry.key.primaryKey] = entry.color
+    end
+    return result
+end
+
 ---------------------------------------------------------------------------
 --  CORE — PLAYER_LOGIN
 --  Full API surface validation.  Runs once at login.
@@ -103,58 +163,58 @@ end
 local Core = WoWUnit("ECM SpellColors Core")
 
 function Core:GetColor_Unknown_ReturnsNil()
-    local result = SC.GetColor("ecm_test_unknown_xyz_987", nil, nil, 99999)
+    local result = GetColor("ecm_test_unknown_xyz_987", nil, nil, 99999)
     IsFalse(result)
 end
 
 function Core:SetAndGetColor_ByName()
     local name = "ECMTest_Core_ByName"
     local c = color(1, 0, 0)
-    SC.SetColor(name, nil, nil, nil, c)
+    SetColor(name, nil, nil, nil, c)
 
-    local got = SC.GetColor(name, nil, nil, nil)
+    local got = GetColor(name, nil, nil, nil)
     assertColorMatch(c, got)
 
-    SC.ResetColor(name, nil, nil, nil)
+    ResetColor(name, nil, nil, nil)
 end
 
 function Core:SetAndGetColor_ByTexture()
     local tid = 700001
     local c = color(0, 1, 0)
-    SC.SetColor(nil, nil, nil, tid, c)
+    SetColor(nil, nil, nil, tid, c)
 
-    local got = SC.GetColor(nil, nil, nil, tid)
+    local got = GetColor(nil, nil, nil, tid)
     assertColorMatch(c, got)
 
-    SC.ResetColor(nil, nil, nil, tid)
+    ResetColor(nil, nil, nil, tid)
 end
 
 function Core:SetAndGetColor_BothKeys()
     local name = "ECMTest_Core_Both"
     local tid = 700004
     local c = color(0, 0, 1)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
-    local byName = SC.GetColor(name, nil, nil, nil)
+    local byName = GetColor(name, nil, nil, nil)
     assertColorMatch(c, byName)
 
-    local byTex = SC.GetColor(nil, nil, nil, tid)
+    local byTex = GetColor(nil, nil, nil, tid)
     assertColorMatch(c, byTex)
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Core:ResetColor_Clears()
     local name = "ECMTest_Core_Reset"
     local tid = 700005
-    SC.SetColor(name, nil, nil, tid, color(0.5, 0.5, 0.5))
+    SetColor(name, nil, nil, tid, color(0.5, 0.5, 0.5))
 
-    SC.ResetColor(name, nil, nil, tid)
-    IsFalse(SC.GetColor(name, nil, nil, tid))
+    ResetColor(name, nil, nil, tid)
+    IsFalse(GetColor(name, nil, nil, tid))
 end
 
 function Core:ResetColor_Nonexistent_ReturnsFalse()
-    local a, b, c, d = SC.ResetColor("ecm_test_never_set_xyz", nil, nil, 888888)
+    local a, b, c, d = ResetColor("ecm_test_never_set_xyz", nil, nil, 888888)
     IsFalse(a)
     IsFalse(d)
 end
@@ -180,17 +240,17 @@ function Core:GetAllColors_ContainsSetColors()
     local cA = color(0.1, 0.2, 0.3)
     local cB = color(0.4, 0.5, 0.6)
 
-    SC.SetColor(nameA, nil, nil, nil, cA)
-    SC.SetColor(nameB, nil, nil, nil, cB)
+    SetColor(nameA, nil, nil, nil, cA)
+    SetColor(nameB, nil, nil, nil, cB)
 
-    local all = SC.GetAllColors()
+    local all = GetAllColors()
     IsTrue(all[nameA])
     IsTrue(all[nameB])
     assertColorMatch(cA, all[nameA])
     assertColorMatch(cB, all[nameB])
 
-    SC.ResetColor(nameA, nil, nil, nil)
-    SC.ResetColor(nameB, nil, nil, nil)
+    ResetColor(nameA, nil, nil, nil)
+    ResetColor(nameB, nil, nil, nil)
 end
 
 function Core:GetColorForBar_InvalidFrame_ReturnsNil()
@@ -202,12 +262,12 @@ function Core:GetColorForBar_ValidMock_ReturnsColor()
     local name = "ECMTest_Core_Bar"
     local tid = 700011
     local c = color(0.8, 0.1, 0.9)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     local frame = makeMockBar(name, tid)
     assertColorMatch(c, SC.GetColorForBar(frame))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Core:ReconcileBar_InvalidFrame_NoError()
@@ -219,34 +279,34 @@ end
 function Core:ReconcileAllBars_ReturnsNumber()
     local name = "ECMTest_Core_Rec"
     local tid = 700013
-    SC.SetColor(name, nil, nil, tid, color(0.3, 0.3, 0.3))
+    SetColor(name, nil, nil, tid, color(0.3, 0.3, 0.3))
 
     local count = SC.ReconcileAllBars({ makeMockBar(name, tid) })
     IsTrue(type(count) == "number")
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Core:NilKeys_GetColor_ReturnsNil()
-    SC.SetColor("ECMTest_Core_Nil", nil, nil, 700014, color(0.9, 0.1, 0.1))
-    IsFalse(SC.GetColor(nil, nil, nil, nil))
-    SC.ResetColor("ECMTest_Core_Nil", nil, nil, 700014)
+    SetColor("ECMTest_Core_Nil", nil, nil, 700014, color(0.9, 0.1, 0.1))
+    IsFalse(GetColor(nil, nil, nil, nil))
+    ResetColor("ECMTest_Core_Nil", nil, nil, 700014)
 end
 
 function Core:NilKeys_SetColor_IsNoop()
     local name = "ECMTest_Core_NilSet"
     local tid = 700015
     local original = color(0.2, 0.7, 0.4)
-    SC.SetColor(name, nil, nil, tid, original)
+    SetColor(name, nil, nil, tid, original)
 
-    SC.SetColor(nil, nil, nil, nil, color(1, 1, 1))
+    SetColor(nil, nil, nil, nil, color(1, 1, 1))
 
-    assertColorMatch(original, SC.GetColor(name, nil, nil, tid))
-    SC.ResetColor(name, nil, nil, tid)
+    assertColorMatch(original, GetColor(name, nil, nil, tid))
+    ResetColor(name, nil, nil, tid)
 end
 
 function Core:NilKeys_ResetColor_ReturnsFalse()
-    local a, b, c, d = SC.ResetColor(nil, nil, nil, nil)
+    local a, b, c, d = ResetColor(nil, nil, nil, nil)
     IsFalse(a)
     IsFalse(d)
 end
@@ -255,23 +315,23 @@ end
 function Core:SetAndGetColor_BySpellID()
     local sid = 800001
     local c = color(0.3, 0.7, 0.1)
-    SC.SetColor(nil, sid, nil, nil, c)
+    SetColor(nil, sid, nil, nil, c)
 
-    local got = SC.GetColor(nil, sid, nil, nil)
+    local got = GetColor(nil, sid, nil, nil)
     assertColorMatch(c, got)
 
-    SC.ResetColor(nil, sid, nil, nil)
+    ResetColor(nil, sid, nil, nil)
 end
 
 function Core:SetAndGetColor_ByCooldownID()
     local cid = 900001
     local c = color(0.2, 0.4, 0.8)
-    SC.SetColor(nil, nil, cid, nil, c)
+    SetColor(nil, nil, cid, nil, c)
 
-    local got = SC.GetColor(nil, nil, cid, nil)
+    local got = GetColor(nil, nil, cid, nil)
     assertColorMatch(c, got)
 
-    SC.ResetColor(nil, nil, cid, nil)
+    ResetColor(nil, nil, cid, nil)
 end
 
 function Core:SetByName_GetBySpellID_AfterReconcile()
@@ -279,26 +339,26 @@ function Core:SetByName_GetBySpellID_AfterReconcile()
     local sid = 800002
     local tid = 700016
     local c = color(0.6, 0.1, 0.4)
-    SC.SetColor(name, sid, nil, tid, c)
+    SetColor(name, sid, nil, tid, c)
 
     -- After Set with all keys, spellID tier should have the value.
-    local got = SC.GetColor(nil, sid, nil, nil)
+    local got = GetColor(nil, sid, nil, nil)
     assertColorMatch(c, got)
 
-    SC.ResetColor(name, sid, nil, tid)
+    ResetColor(name, sid, nil, tid)
 end
 
 function Core:SetByTexture_GetByCooldownID_AfterReconcile()
     local cid = 900002
     local tid = 700017
     local c = color(0.9, 0.3, 0.2)
-    SC.SetColor(nil, nil, cid, tid, c)
+    SetColor(nil, nil, cid, tid, c)
 
     -- After Set with cooldownID and texture, cooldownID tier should have the value.
-    local got = SC.GetColor(nil, nil, cid, nil)
+    local got = GetColor(nil, nil, cid, nil)
     assertColorMatch(c, got)
 
-    SC.ResetColor(nil, nil, cid, tid)
+    ResetColor(nil, nil, cid, tid)
 end
 
 function Core:AllFourKeys_SetAndGet()
@@ -307,15 +367,15 @@ function Core:AllFourKeys_SetAndGet()
     local cid = 900003
     local tid = 700018
     local c = color(0.15, 0.85, 0.55)
-    SC.SetColor(name, sid, cid, tid, c)
+    SetColor(name, sid, cid, tid, c)
 
     -- All 4 individual lookups should succeed.
-    assertColorMatch(c, SC.GetColor(name, nil, nil, nil))
-    assertColorMatch(c, SC.GetColor(nil, sid, nil, nil))
-    assertColorMatch(c, SC.GetColor(nil, nil, cid, nil))
-    assertColorMatch(c, SC.GetColor(nil, nil, nil, tid))
+    assertColorMatch(c, GetColor(name, nil, nil, nil))
+    assertColorMatch(c, GetColor(nil, sid, nil, nil))
+    assertColorMatch(c, GetColor(nil, nil, cid, nil))
+    assertColorMatch(c, GetColor(nil, nil, nil, tid))
 
-    SC.ResetColor(name, sid, cid, tid)
+    ResetColor(name, sid, cid, tid)
 end
 
 function Core:GetColorForBar_WithSpellIDAndCooldownID()
@@ -324,12 +384,12 @@ function Core:GetColorForBar_WithSpellIDAndCooldownID()
     local cid = 900004
     local tid = 700019
     local c = color(0.42, 0.58, 0.31)
-    SC.SetColor(name, sid, cid, tid, c)
+    SetColor(name, sid, cid, tid, c)
 
     local frame = makeMockBar(name, tid, sid, cid)
     assertColorMatch(c, SC.GetColorForBar(frame))
 
-    SC.ResetColor(name, sid, cid, tid)
+    ResetColor(name, sid, cid, tid)
 end
 
 function Core:GetColorForBar_OnlySpellID_Fallback()
@@ -338,13 +398,13 @@ function Core:GetColorForBar_OnlySpellID_Fallback()
     local name = "ECMTest_Core_SIDFallback"
     local sid = 800005
     local c = color(0.77, 0.22, 0.55)
-    SC.SetColor(name, sid, nil, nil, c)
+    SetColor(name, sid, nil, nil, c)
 
     -- Simulate a frame where name and texture are secret (nil), only spellID is available.
     local frame = makeMockBar(nil, nil, sid, nil)
     assertColorMatch(c, SC.GetColorForBar(frame))
 
-    SC.ResetColor(name, sid, nil, nil)
+    ResetColor(name, sid, nil, nil)
 end
 
 ---------------------------------------------------------------------------
@@ -367,11 +427,11 @@ function Combat:GetColor_ReturnsStoredColor()
     local name = "ECMTest_Combat_Get"
     local tid = 700201
     local c = color(0.1, 0.8, 0.3)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
-    assertColorMatch(c, SC.GetColor(name, nil, nil, tid))
+    assertColorMatch(c, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Combat:SetColor_Succeeds()
@@ -379,21 +439,21 @@ function Combat:SetColor_Succeeds()
     local tid = 700202
     local c = color(0.9, 0.2, 0.5)
 
-    SC.SetColor(name, nil, nil, tid, c)
-    assertColorMatch(c, SC.GetColor(name, nil, nil, tid))
+    SetColor(name, nil, nil, tid, c)
+    assertColorMatch(c, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Combat:GetColorForBar_ReturnsStoredColor()
     local name = "ECMTest_Combat_Bar"
     local tid = 700203
     local c = color(0.4, 0.4, 0.8)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     assertColorMatch(c, SC.GetColorForBar(makeMockBar(name, tid)))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Combat:GetDefaultColor_Succeeds()
@@ -403,40 +463,40 @@ end
 
 function Combat:GetAllColors_ReturnsTable()
     local name = "ECMTest_Combat_All"
-    SC.SetColor(name, nil, nil, nil, color(0.5, 0.5, 0.5))
+    SetColor(name, nil, nil, nil, color(0.5, 0.5, 0.5))
 
-    local all = SC.GetAllColors()
+    local all = GetAllColors()
     IsTrue(type(all) == "table")
     IsTrue(all[name])
 
-    SC.ResetColor(name, nil, nil, nil)
+    ResetColor(name, nil, nil, nil)
 end
 
 function Combat:NilKeys_GetColor_ReturnsNil()
     -- During combat inside an instance, all keys are secret (nil).
     -- Verify the lookup fails gracefully even on UNIT_AURA.
-    SC.SetColor("ECMTest_Combat_Nil", nil, nil, 700204, color(0.7, 0.2, 0.1))
-    IsFalse(SC.GetColor(nil, nil, nil, nil))
-    SC.ResetColor("ECMTest_Combat_Nil", nil, nil, 700204)
+    SetColor("ECMTest_Combat_Nil", nil, nil, 700204, color(0.7, 0.2, 0.1))
+    IsFalse(GetColor(nil, nil, nil, nil))
+    ResetColor("ECMTest_Combat_Nil", nil, nil, 700204)
 end
 
 function Combat:NilKeys_GetColorForBar_ReturnsNil()
     -- Frame returns nil for all keys (instance secret)
     -- during an aura update in combat.
-    SC.SetColor("ECMTest_Combat_NilBar", nil, nil, 700205, color(0.3, 0.6, 0.1))
+    SetColor("ECMTest_Combat_NilBar", nil, nil, 700205, color(0.3, 0.6, 0.1))
     IsFalse(SC.GetColorForBar(makeMockBar(nil, nil)))
-    SC.ResetColor("ECMTest_Combat_NilBar", nil, nil, 700205)
+    ResetColor("ECMTest_Combat_NilBar", nil, nil, 700205)
 end
 
 function Combat:ReconcileAllBars_Succeeds()
     local name = "ECMTest_Combat_Rec"
     local tid = 700206
-    SC.SetColor(name, nil, nil, tid, color(0.2, 0.2, 0.2))
+    SetColor(name, nil, nil, tid, color(0.2, 0.2, 0.2))
 
     local count = SC.ReconcileAllBars({ makeMockBar(name, tid) })
     IsTrue(type(count) == "number")
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Combat:LeaveCombat_BothKeysStillSecret()
@@ -458,7 +518,7 @@ function Combat:LeaveCombat_BothKeysStillSecret()
     local name = "ECMTest_Combat_LeaveSecret"
     local tid = 700207
     local c = color(0.65, 0.25, 0.85)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     -- Try to find a real bar with secret values from the live viewer.
     local viewer = _G["BuffBarCooldownViewer"]
@@ -484,20 +544,20 @@ function Combat:LeaveCombat_BothKeysStillSecret()
     if not foundSecretBar then
         -- Not in an instance or no secret bars — fall back to the nil-key
         -- path which is the closest we can get without real secrets.
-        IsFalse(SC.GetColor(nil, nil, nil, nil))
+        IsFalse(GetColor(nil, nil, nil, nil))
         IsFalse(SC.GetColorForBar(makeMockBar(nil, nil)))
     end
 
     -- SetColor with nil keys must not overwrite the stored entry.
-    SC.SetColor(nil, nil, nil, nil, color(1, 1, 1))
+    SetColor(nil, nil, nil, nil, color(1, 1, 1))
 
     -- ReconcileBar with nil keys must not throw or corrupt state.
     SC.ReconcileBar(makeMockBar(nil, nil))
 
     -- Once secrets clear, the original colour is still intact.
-    assertColorMatch(c, SC.GetColor(name, nil, nil, tid))
+    assertColorMatch(c, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 ---------------------------------------------------------------------------
@@ -520,22 +580,22 @@ function Zone:GetColor_ReturnsStoredColor()
     local name = "ECMTest_Zone_Get"
     local tid = 700301
     local c = color(0.55, 0.33, 0.77)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
-    assertColorMatch(c, SC.GetColor(name, nil, nil, tid))
+    assertColorMatch(c, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Zone:GetColorForBar_ReturnsStoredColor()
     local name = "ECMTest_Zone_Bar"
     local tid = 700302
     local c = color(0.22, 0.66, 0.44)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     assertColorMatch(c, SC.GetColorForBar(makeMockBar(name, tid)))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Zone:GetDefaultColor_Unchanged()
@@ -544,38 +604,38 @@ end
 
 function Zone:GetAllColors_ReturnsTable()
     local name = "ECMTest_Zone_All"
-    SC.SetColor(name, nil, nil, nil, color(0.6, 0.3, 0.9))
+    SetColor(name, nil, nil, nil, color(0.6, 0.3, 0.9))
 
-    local all = SC.GetAllColors()
+    local all = GetAllColors()
     IsTrue(type(all) == "table")
     IsTrue(all[name])
 
-    SC.ResetColor(name, nil, nil, nil)
+    ResetColor(name, nil, nil, nil)
 end
 
 function Zone:ReconcileAllBars_Succeeds()
     local name = "ECMTest_Zone_Rec"
     local tid = 700303
-    SC.SetColor(name, nil, nil, tid, color(0.1, 0.1, 0.1))
+    SetColor(name, nil, nil, tid, color(0.1, 0.1, 0.1))
 
     local count = SC.ReconcileAllBars({ makeMockBar(name, tid) })
     IsTrue(type(count) == "number")
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Zone:NilKeys_GetColor_ReturnsNil()
     -- Entering an instance: aura data becomes secret, validateKey strips
     -- keys to nil.  The stored color is unreachable.
-    SC.SetColor("ECMTest_Zone_Nil", nil, nil, 700304, color(0.9, 0.1, 0.1))
-    IsFalse(SC.GetColor(nil, nil, nil, nil))
-    SC.ResetColor("ECMTest_Zone_Nil", nil, nil, 700304)
+    SetColor("ECMTest_Zone_Nil", nil, nil, 700304, color(0.9, 0.1, 0.1))
+    IsFalse(GetColor(nil, nil, nil, nil))
+    ResetColor("ECMTest_Zone_Nil", nil, nil, 700304)
 end
 
 function Zone:NilKeys_GetColorForBar_ReturnsNil()
-    SC.SetColor("ECMTest_Zone_NilBar", nil, nil, 700305, color(0.5, 0.5, 0.5))
+    SetColor("ECMTest_Zone_NilBar", nil, nil, 700305, color(0.5, 0.5, 0.5))
     IsFalse(SC.GetColorForBar(makeMockBar(nil, nil)))
-    SC.ResetColor("ECMTest_Zone_NilBar", nil, nil, 700305)
+    ResetColor("ECMTest_Zone_NilBar", nil, nil, 700305)
 end
 
 function Zone:NilKeys_ReconcileBar_NoError()
@@ -588,17 +648,17 @@ function Zone:NilKeys_SetColor_IsNoop()
     local name = "ECMTest_Zone_NilSet"
     local tid = 700306
     local original = color(0.2, 0.7, 0.4)
-    SC.SetColor(name, nil, nil, tid, original)
+    SetColor(name, nil, nil, tid, original)
 
     -- Inside instance, SetColor with nil keys can't overwrite anything.
-    SC.SetColor(nil, nil, nil, nil, color(1, 1, 1))
-    assertColorMatch(original, SC.GetColor(name, nil, nil, tid))
+    SetColor(nil, nil, nil, nil, color(1, 1, 1))
+    assertColorMatch(original, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function Zone:NilKeys_ResetColor_ReturnsFalse()
-    local a, b, c, d = SC.ResetColor(nil, nil, nil, nil)
+    local a, b, c, d = ResetColor(nil, nil, nil, nil)
     IsFalse(a)
     IsFalse(d)
 end
@@ -619,42 +679,42 @@ function EditMode:ColorsPreserved()
     local name = "ECMTest_Edit_Pres"
     local tid = 700401
     local c = color(0.55, 0.33, 0.77)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     -- After edit mode, every visible bar is re-styled.  The stored colour
     -- must still be retrievable from the DB.
-    assertColorMatch(c, SC.GetColor(name, nil, nil, tid))
+    assertColorMatch(c, GetColor(name, nil, nil, tid))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function EditMode:ReconcileAllBars_Works()
     local name = "ECMTest_Edit_Rec"
     local tid = 700402
-    SC.SetColor(name, nil, nil, tid, color(0.1, 0.1, 0.1))
+    SetColor(name, nil, nil, tid, color(0.1, 0.1, 0.1))
 
     -- Edit-mode exit calls ReconcileAllBars on all visible frames.
     local count = SC.ReconcileAllBars({ makeMockBar(name, tid) })
     IsTrue(type(count) == "number")
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function EditMode:GetColorForBar_Works()
     local name = "ECMTest_Edit_Bar"
     local tid = 700403
     local c = color(0.22, 0.66, 0.44)
-    SC.SetColor(name, nil, nil, tid, c)
+    SetColor(name, nil, nil, tid, c)
 
     assertColorMatch(c, SC.GetColorForBar(makeMockBar(name, tid)))
 
-    SC.ResetColor(name, nil, nil, tid)
+    ResetColor(name, nil, nil, tid)
 end
 
 function EditMode:NilKeys_GetColor_ReturnsNil()
     -- Edit-mode exit inside an instance — live frame values are secret,
     -- so lookup returns nil even though the colour is in the DB.
-    SC.SetColor("ECMTest_Edit_Nil", nil, nil, 700404, color(0.3, 0.3, 0.3))
-    IsFalse(SC.GetColor(nil, nil, nil, nil))
-    SC.ResetColor("ECMTest_Edit_Nil", nil, nil, 700404)
+    SetColor("ECMTest_Edit_Nil", nil, nil, 700404, color(0.3, 0.3, 0.3))
+    IsFalse(GetColor(nil, nil, nil, nil))
+    ResetColor("ECMTest_Edit_Nil", nil, nil, 700404)
 end
