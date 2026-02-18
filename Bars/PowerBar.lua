@@ -6,6 +6,7 @@ local _, ns = ...
 local mod = ns.Addon
 local PowerBar = mod:NewModule("PowerBar", "AceEvent-3.0")
 mod.PowerBar = PowerBar
+ECM.BarMixin.ApplyConfigMixin(PowerBar, "PowerBar")
 
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil

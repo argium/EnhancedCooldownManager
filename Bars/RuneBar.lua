@@ -7,6 +7,7 @@ local mod = ns.Addon
 local FrameUtil = ECM.FrameUtil
 local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
 mod.RuneBar = RuneBar
+ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
 
 --- Creates or returns fragmented sub-bars for runes.
 ---@param bar Frame
