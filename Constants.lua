@@ -55,7 +55,6 @@ local constants = {
     BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,
     BUFFBARS_ICON_OVERLAY_REGION_INDEX = 3,
     BUFFBARS_TEXT_PADDING = 4,
-    GROUP_INSTANCE_TYPES = { party = true, raid = true, arena = true, pvp = true, delve = true }, -- keyed by IsInInstance()[2]
 
     DEMONHUNTER_CLASS_ID = 12,
     DEMONHUNTER_VENGEANCE_SPEC_INDEX = 2,

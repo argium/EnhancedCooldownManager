@@ -676,7 +676,7 @@ function ItemIcons:OnEnable()
     end
 
     -- Register events
-    -- self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy
+    self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items
     self:RegisterEvent("BAG_UPDATE_DELAYED", "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnPlayerEquipmentChanged")
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")

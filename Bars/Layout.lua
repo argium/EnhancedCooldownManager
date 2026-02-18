@@ -56,16 +56,16 @@ end
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
 local function SetGloballyHidden(hidden, reason)
-    if _globallyHidden == hidden and _hideReason == reason then
-        return
-    end
+    local stateChanged = _globallyHidden ~= hidden or _hideReason ~= reason
 
-    ECM_log(ECM.Constants.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
+    if stateChanged then
+        ECM_log(ECM.Constants.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
+    end
 
     _globallyHidden = hidden
     _hideReason = reason
 
-    -- Hide/show Blizzard frames
+    -- Always enforce Blizzard frame state; the game may re-show them externally
     ForEachBlizzardFrame(function(frame, name)
         if hidden then
             if frame:IsShown() then
@@ -132,11 +132,8 @@ local function UpdateFadeAndHiddenStates()
     if not _inCombat and fadeConfig and fadeConfig.enabled then
         local shouldSkipFade = false
 
-        if fadeConfig.exceptInInstance then
-            local inInstance, instanceType = IsInInstance()
-            if inInstance and ECM.Constants.GROUP_INSTANCE_TYPES[instanceType] then
-                shouldSkipFade = true
-            end
+        if fadeConfig.exceptInInstance and IsInInstance() then
+            shouldSkipFade = true
         end
 
         if not shouldSkipFade and fadeConfig.exceptIfTargetCanBeAttacked and UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
@@ -200,6 +197,14 @@ local function RegisterFrame(frame)
     assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
     _modules[frame.Name] = frame
     ECM_log(ECM.Constants.SYS.Layout, nil, "Frame registered: " .. frame.Name)
+
+    -- Sync current global hidden/alpha state to late-registered frames
+    if _globallyHidden then
+        frame:SetHidden(true)
+    end
+    if _lastAlpha ~= 1 then
+        frame:SetAlpha(_lastAlpha)
+    end
 end
 
 --- Unregisters a ModuleMixin from layout update events.
