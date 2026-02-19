@@ -27,6 +27,7 @@ Constants.lua
 Defaults.lua
 Debug.lua
 
+Modules\ClassUtil.lua
 Modules\ColorUtil.lua
 Modules\Utilities.lua
 Modules\FrameUtil.lua
