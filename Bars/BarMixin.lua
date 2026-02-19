@@ -28,7 +28,7 @@ end
 
 --- Ensures the tick pool has the required number of ticks.
 --- Creates new ticks as needed, shows required ticks, hides extras.
----@param self ECMBarMixin
+---@param self BarMixin
 ---@param count number Number of ticks needed
 ---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
 ---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
@@ -54,7 +54,7 @@ function BarMixin:EnsureTicks(count, parentFrame, poolKey)
 end
 
 --- Hides all ticks in the pool.
----@param self ECMBarMixin
+---@param self BarMixin
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
 function BarMixin:HideAllTicks(poolKey)
     local pool = self[poolKey or "tickPool"]
@@ -69,7 +69,7 @@ end
 
 --- Positions ticks evenly as resource dividers.
 --- Used by ResourceBar to show divisions between resources.
----@param self ECMBarMixin
+---@param self BarMixin
 ---@param maxResources number Number of resources (ticks = maxResources - 1)
 ---@param color ECM_Color|table|nil RGBA color (default black)
 ---@param tickWidth number|nil Width of each tick (default 1)
@@ -113,7 +113,7 @@ end
 
 --- Positions ticks at specific resource values.
 --- Used by PowerBar for breakpoint markers (e.g., energy thresholds).
----@param self ECMBarMixin
+---@param self BarMixin
 ---@param statusBar StatusBar StatusBar to position ticks on
 ---@param ticks table Array of tick definitions { { value = number, color = ECM_Color, width = number }, ... }
 ---@param maxValue number Maximum resource value
