@@ -57,6 +57,7 @@ end
 ---@field _validateKey fun(k: any): any|nil
 local PriorityKeyMap = {}
 PriorityKeyMap.__index = PriorityKeyMap
+local unpack = unpack or table.unpack
 
 --- Creates a new PriorityKeyMap.
 ---@param keyDefs string[]  Ordered array of scope field names, highest-priority first.

@@ -6,6 +6,7 @@ local _, ns = ...
 local mod = ns.Addon
 local FrameUtil = ECM.FrameUtil
 local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
+local C = ECM.Constants
 mod.RuneBar = RuneBar
 ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
 
@@ -139,7 +140,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
                 frag:SetStatusBarColor(r, g, b)
             else
                 local cd = cdLookup[i]
-                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
+                local dim = C.RUNEBAR_CD_DIM_FACTOR
                 frag:SetValue(cd and cd.frac or 0)
                 frag:SetStatusBarColor(r * dim, g * dim, b * dim)
             end
@@ -170,7 +171,7 @@ local function UpdateRuneValues(self, frame)
     -- Throttle to updateFrequency to match existing refresh cadence
     local now = GetTime()
     local globalConfig = self:GetGlobalConfig()
-    local freq = (globalConfig and globalConfig.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+    local freq = (globalConfig and globalConfig.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
     if frame._lastValueUpdate and (now - frame._lastValueUpdate) < freq then
         return
     end
@@ -208,7 +209,7 @@ local function UpdateRuneValues(self, frame)
                 frag:SetStatusBarColor(r, g, b)
             else
                 local elapsed = now - start
-                local dim = ECM.Constants.RUNEBAR_CD_DIM_FACTOR
+                local dim = C.RUNEBAR_CD_DIM_FACTOR
                 local frac = math.max(0, math.min(1, elapsed / duration))
                 frag:SetValue(frac)
                 frag:SetStatusBarColor(r * dim, g * dim, b * dim)
@@ -238,18 +239,18 @@ function RuneBar:CreateFrame()
     -- FragmentedBars for individual rune display
     frame.FragmentedBars = {}
 
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "Frame created.")
+    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
     return frame
 end
 
 function RuneBar:ShouldShow()
     local _, class = UnitClass("player")
-    return ECM.ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
+    return ECM.ModuleMixin.ShouldShow(self) and class == C.CLASS.DEATHKNIGHT
 end
 
 function RuneBar:Refresh(why, force)
     local _, class = UnitClass("player")
-    assert(class == "DEATHKNIGHT", "RuneBar should only be enabled for Death Knights")
+    assert(class == C.CLASS.DEATHKNIGHT, "RuneBar should only be enabled for Death Knights")
 
     -- Use BaseRefresh instead of BarMixin.Refresh since we manage
     -- our own fragmented bars and don't use the standard StatusBar
@@ -261,7 +262,7 @@ function RuneBar:Refresh(why, force)
     local globalConfig = self:GetGlobalConfig()
     local frame = self.InnerFrame
 
-    local maxRunes = ECM.Constants.RUNEBAR_MAX_RUNES
+    local maxRunes = C.RUNEBAR_MAX_RUNES
     if not maxRunes or maxRunes <= 0 then
         frame:Hide()
         return
@@ -284,7 +285,7 @@ function RuneBar:Refresh(why, force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete.")
+    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
     return true
 end
 
@@ -300,7 +301,7 @@ function RuneBar:OnEnable()
     end
 
     local _, class = UnitClass("player")
-    if class ~= "DEATHKNIGHT" then
+    if class ~= C.CLASS.DEATHKNIGHT then
         return
     end
 

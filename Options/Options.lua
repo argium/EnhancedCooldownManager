@@ -9,6 +9,7 @@ local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local AceDBOptions = LibStub("AceDBOptions-3.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
+local C = ECM.Constants
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -37,7 +38,7 @@ end
 
 local function IsDeathKnight()
     local _, className = UnitClass("player")
-    return className == "DEATHKNIGHT"
+    return className == C.CLASS.DEATHKNIGHT
 end
 
 local function GeneralOptionsTable()
@@ -819,7 +820,7 @@ local function SetCurrentTicks(ticks)
 
     local ticksCfg = powerBarCfg.ticks
     if not ticksCfg then
-        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
         ticksCfg = powerBarCfg.ticks
     end
     if not ticksCfg.mappings then
@@ -847,7 +848,7 @@ local function AddTick(value, color, width)
 
     local ticksCfg = powerBarCfg.ticks
     if not ticksCfg then
-        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
         ticksCfg = powerBarCfg.ticks
     end
 
@@ -1013,7 +1014,7 @@ TickMarksOptionsTable = function()
                 hasAlpha = true,
                 get = function()
                     local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
-                    local c = ticksCfg and ticksCfg.defaultColor or ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR
+                    local c = ticksCfg and ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR
                     return c.r or 0, c.g or 0, c.b or 0, c.a or 0.5
                 end,
                 set = function(_, r, g, b, a)
@@ -1024,7 +1025,7 @@ TickMarksOptionsTable = function()
                     end
                     local ticksCfg = powerBarCfg.ticks
                     if not ticksCfg then
-                        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
                         ticksCfg = powerBarCfg.ticks
                     end
                     ticksCfg.defaultColor = { r = r, g = g, b = b, a = a }
@@ -1051,7 +1052,7 @@ TickMarksOptionsTable = function()
                     end
                     local ticksCfg = powerBarCfg.ticks
                     if not ticksCfg then
-                        powerBarCfg.ticks = { mappings = {}, defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
+                        powerBarCfg.ticks = { mappings = {}, defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR, defaultWidth = 1 }
                         ticksCfg = powerBarCfg.ticks
                     end
                     ticksCfg.defaultWidth = val
@@ -1240,7 +1241,7 @@ end
 local function GetOptionsTable()
     return {
         type = "group",
-        name = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME),
+        name = ColorUtil.Sparkle(C.ADDON_NAME),
         childGroups = "tree",
         args = {
             general = GeneralOptionsTable(),

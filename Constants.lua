@@ -39,12 +39,12 @@ local constants = {
     -- Module-specific constants and configuration
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
     RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
-    RESOURCEBAR_VOID_FRAGMENTS_SPELLID = 1225789,  -- tracks progress towards void meta form (35 fragments)
-    RESOURCEBAR_COLLAPSING_STAR_SPELLID = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
+    SPELLID_VOID_FRAGMENTS = 1225789,  -- tracks progress towards void meta form (35 fragments)
+    SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
     RESOURCEBAR_DEVOURER_NORMAL_MAX = 30,
     RESOURCEBAR_DEVOURER_META_MAX = 35,
-    RESOURCEBAR_MAELSTROM_WEAPON_SPELLID = 344179,
+    SPELLID_MAELSTROM_WEAPON = 344179,
     RESOURCEBAR_RAGING_MAELSTROM_SPELLID = 384143,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE = 5,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED = 10,
@@ -112,25 +112,40 @@ local BLIZZARD_FRAMES = {
     "BuffBarCooldownViewer",
 }
 
---- Class info keyed by class ID. Each entry has name and hex color (without alpha prefix).
-local CLASS_BY_ID = {
-    [1]  = { name = "WARRIOR",      color = "C79C6E" },
-    [2]  = { name = "PALADIN",      color = "F58CBA" },
-    [3]  = { name = "HUNTER",       color = "ABD473" },
-    [4]  = { name = "ROGUE",        color = "FFF569" },
-    [5]  = { name = "PRIEST",       color = "FFFFFF" },
-    [6]  = { name = "DEATHKNIGHT",  color = "C41F3B" },
-    [7]  = { name = "SHAMAN",       color = "0070DE" },
-    [8]  = { name = "MAGE",         color = "69CCF0" },
-    [9]  = { name = "WARLOCK",      color = "9482C9" },
-    [10] = { name = "MONK",         color = "00FF96" },
-    [11] = { name = "DRUID",        color = "FF7D0A" },
-    [12] = { name = "DEMONHUNTER",  color = "A330C9" },
-    [13] = { name = "EVOKER",       color = "33937F" },
+local CLASS = {
+    DEATHKNIGHT = "DEATHKNIGHT",
+    DEMONHUNTER = "DEMONHUNTER",
+    DRUID = "DRUID",
+    EVOKER = "EVOKER",
+    HUNTER = "HUNTER",
+    MAGE = "MAGE",
+    MONK = "MONK",
+    PALADIN = "PALADIN",
+    PRIEST = "PRIEST",
+    ROGUE = "ROGUE",
+    SHAMAN = "SHAMAN",
+    WARLOCK = "WARLOCK",
+    WARRIOR = "WARRIOR",
+}
+
+local ClassColors = {
+    [CLASS.DEATHKNIGHT] = { color = "C41F3B" },
+    [CLASS.DEMONHUNTER] = { color = "A330C9" },
+    [CLASS.DRUID]       = { color = "FF7D0A" },
+    [CLASS.EVOKER]      = { color = "33937F" },
+    [CLASS.HUNTER]      = { color = "ABD473" },
+    [CLASS.MAGE]        = { color = "69CCF0" },
+    [CLASS.MONK]        = { color = "00FF96" },
+    [CLASS.PALADIN]     = { color = "F58CBA" },
+    [CLASS.PRIEST]      = { color = "FFFFFF" },
+    [CLASS.ROGUE]       = { color = "FFF569" },
+    [CLASS.SHAMAN]      = { color = "0070DE" },
+    [CLASS.WARLOCK]     = { color = "9482C9" },
+    [CLASS.WARRIOR]     = { color = "C79C6E" },
 }
 
 --- Chat channel colors keyed by channel name.
-local CHAT_CHANNELS = {
+local ChatChannelColors = {
     SAY          = { color = "FFFFFF" },
     YELL         = { color = "FF3F40" },
     WHISPER      = { color = "FF7EFF" },
@@ -154,8 +169,7 @@ local CHAT_CHANNELS = {
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
-constants.CLASS_BY_ID = CLASS_BY_ID
-constants.CHAT_CHANNELS = CHAT_CHANNELS
 constants.SYS = SYS
+constants.CLASS = CLASS
 
 ECM.Constants = constants

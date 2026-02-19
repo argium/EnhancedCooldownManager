@@ -54,3 +54,12 @@ UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 **A few additional APIs exist to handle table secrecy.**
 
 - canaccesstable(table) returns true if the calling function would not error if attempting to access the table.
+
+
+## Unit tests
+
+Tests can be run by executing
+
+```sh
+busted Tests
+```
