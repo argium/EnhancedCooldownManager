@@ -136,7 +136,13 @@ local function UpdateFadeAndHiddenStates()
             shouldSkipFade = true
         end
 
-        if not shouldSkipFade and fadeConfig.exceptIfTargetCanBeAttacked and UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
+        local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
+
+        if not shouldSkipFade and hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target") then
+            shouldSkipFade = true
+        end
+
+        if not shouldSkipFade and hasLiveTarget and fadeConfig.exceptIfTargetCanBeHelped and UnitCanAssist("player", "target") then
             shouldSkipFade = true
         end
 

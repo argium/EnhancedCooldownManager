@@ -239,15 +239,32 @@ local function GeneralOptionsTable()
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
-                    exceptIfTargetCanBeAttackedEnabled ={
-                        type = "toggle",
-                        name = "Except if current target can be attacked",
+                    combatFadeExceptIfDesc = {
+                        type = "description",
+                        name = "\nExcept if ...",
                         order = 9,
+                    },
+                    exceptIfTargetCanBeAttackedEnabled = {
+                        type = "toggle",
+                        name = "... current target can be attacked, and/or",
+                        order = 10,
                         width = "full",
                         disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
                         get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    exceptIfTargetCanBeHelpedEnabled = {
+                        type = "toggle",
+                        name = "... current target can be helped",
+                        order = 11,
+                        width = "full",
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeHelped end,
+                        set = function(_, val)
+                            db.profile.global.outOfCombatFade.exceptIfTargetCanBeHelped = val
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },

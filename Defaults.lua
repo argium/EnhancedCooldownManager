@@ -97,6 +97,7 @@
 ---@field enabled boolean Whether combat fade is enabled.
 ---@field opacity number Target opacity percent.
 ---@field exceptIfTargetCanBeAttacked boolean Skip fade if target is attackable.
+---@field exceptIfTargetCanBeHelped boolean Skip fade if target is assistable.
 ---@field exceptInInstance boolean Skip fade in instances.
 
 ---@class ECM_Profile Profile settings.
@@ -140,6 +141,7 @@ local defaults = {
                 enabled = false,
                 opacity = 60,
                 exceptIfTargetCanBeAttacked = true,
+                exceptIfTargetCanBeHelped = false,
                 exceptInInstance = true,
             },
         },
