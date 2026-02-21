@@ -129,7 +129,7 @@ describe("ClassUtil", function()
         end
 
         local function assertResourceType(classToken, specIndex, expectedResourceType, shapeshiftForm)
-            local resourceType = ClassUtil.GetResourceType(classToken, specIndex, shapeshiftForm or 0)
+            local resourceType = ECM.ClassUtil.GetResourceType(classToken, specIndex, shapeshiftForm or 0)
             if expectedResourceType == nil then
                 assert.is_nil(resourceType)
             else
@@ -245,7 +245,7 @@ describe("ClassUtil", function()
 
     describe("GetCurrentMaxResourceValues", function()
         local function assertValues(resourceType, expectedMax, expectedCurrent)
-            local maxValue, currentValue = ClassUtil.GetCurrentMaxResourceValues(resourceType)
+            local maxValue, currentValue = ECM.ClassUtil.GetCurrentMaxResourceValues(resourceType)
             assert.are.equal(expectedMax, maxValue)
             assert.are.equal(expectedCurrent, currentValue)
         end
@@ -307,7 +307,7 @@ describe("ClassUtil", function()
         end)
 
         it("returns nil values when no resource type is provided", function()
-            local maxValue, currentValue = ClassUtil.GetCurrentMaxResourceValues(nil)
+            local maxValue, currentValue = ECM.ClassUtil.GetCurrentMaxResourceValues(nil)
             assert.is_nil(maxValue)
             assert.is_nil(currentValue)
         end)

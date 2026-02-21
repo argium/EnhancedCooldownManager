@@ -5,6 +5,7 @@
 local _, ns = ...
 local mod = ns.Addon
 local ResourceBar = mod:NewModule("ResourceBar", "AceEvent-3.0")
+local ClassUtil = ECM.ClassUtil
 mod.ResourceBar = ResourceBar
 ECM.BarMixin.ApplyConfigMixin(ResourceBar, "ResourceBar")
 

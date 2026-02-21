@@ -2,8 +2,9 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-ClassUtil = {}
 local C = ECM.Constants
+local ClassUtil = {}
+ECM.ClassUtil = ClassUtil
 
 --- Gets the resource type for the class, spec and current shapeshift form (if applicable).
 --- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
