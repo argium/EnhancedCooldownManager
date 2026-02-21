@@ -7,7 +7,7 @@ local ClassUtil = {}
 ECM.ClassUtil = ClassUtil
 
 --- Gets the resource type for the class, spec and current shapeshift form (if applicable).
---- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
+--- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta, maelstrom weapon), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
 function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     --- Power types that have discrete values and should be displayed using the resource bar.
     local discreteResourceTypes = {
@@ -15,7 +15,6 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         [Enum.PowerType.Chi] = true,
         [Enum.PowerType.ComboPoints] = true,
         [Enum.PowerType.HolyPower] = true,
-        [Enum.PowerType.Maelstrom] = true,
         [Enum.PowerType.SoulShards] = true,
         [Enum.PowerType.Essence] = true,
     }
@@ -44,6 +43,13 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         -- Fire/Frost mages don't use a discrete resource tracked by this bar.
         -- Return nil explicitly to make this control flow clear.
         return nil
+    elseif class == CLASS.SHAMAN then
+        -- Enhancement tracks Maelstrom Weapon stacks (aura-based), not Elemental's Maelstrom power type.
+        if specIndex == C.SHAMAN_ENHANCEMENT_SPEC_INDEX then
+            return C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
+        end
+
+        return nil
     else
         for powerType in pairs(discreteResourceTypes) do
             local max = UnitPowerMax("player", powerType)
@@ -63,7 +69,7 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
 end
 
 --- Gets the resource type for the player given their class, spec and current shapeshift form (if applicable).
---- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
+--- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta, maelstrom weapon), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
 function ClassUtil.GetPlayerResourceType()
     local _, class = UnitClass("player")
     return ClassUtil.GetResourceType(class, GetSpecialization(), GetShapeshiftForm())
@@ -97,7 +103,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return C.RESOURCEBAR_DEVOURER_NORMAL_MAX, voidFragments and voidFragments.applications or 0
     end
 
-    if resourceType == Enum.PowerType.Maelstrom then
+    if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then
         -- The max can be 5 or 10 depending on talent choices
         local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_MAELSTROM_WEAPON)
         local stacks = aura and aura.applications or 0

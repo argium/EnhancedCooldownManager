@@ -194,7 +194,7 @@ local defaults = {
                 [Enum.PowerType.ComboPoints] = { r = 1.00, g = 0.96, b = 0.41, a = 1 },
                 [Enum.PowerType.Essence] = { r = 0.20, g = 0.58, b = 0.50, a = 1 },
                 [Enum.PowerType.HolyPower] = { r = 0.8863, g = 0.8235, b = 0.2392, a = 1 },
-                [Enum.PowerType.Maelstrom] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
+                [C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
                 [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
             },
         },

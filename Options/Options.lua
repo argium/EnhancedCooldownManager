@@ -603,7 +603,7 @@ local function GenerateResourceColorArgs(db)
         { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
         { key = Enum.PowerType.Essence, name = "Essence" },
         { key = Enum.PowerType.HolyPower, name = "Holy Power" },
-        { key = Enum.PowerType.Maelstrom, name = "Maelstrom" },
+        { key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON, name = "Maelstrom Weapon (Enhancement)" },
         { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
     }
 
