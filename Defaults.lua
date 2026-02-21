@@ -127,7 +127,7 @@ local defaults = {
         global = {
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
-            updateFrequency = 0.08,
+            updateFrequency = 0.04,
             barHeight = 22,
             barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
             offsetY = 4,
