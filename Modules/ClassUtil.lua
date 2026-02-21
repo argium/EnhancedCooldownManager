@@ -65,7 +65,7 @@ end
 --- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
 function ClassUtil.GetPlayerResourceType()
     local _, class = UnitClass("player")
-    return ClassUtil.GetResourceType(class, GetSpecialization(),  GetShapeshiftForm())
+    return ClassUtil.GetResourceType(class, GetSpecialization(), GetShapeshiftForm())
 end
 
 --- Gets the max Maelstrom value that can diff based on talents
