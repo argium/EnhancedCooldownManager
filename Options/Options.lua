@@ -101,6 +101,33 @@ local function GeneralOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.texture") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.texture"),
                     },
+                    fontSizeDesc = {
+                        type = "description",
+                        name = "\nControls font size for all bars.",
+                        order = 10,
+                    },
+                    fontSize = {
+                        type = "range",
+                        name = "Font Size",
+                        order = 11,
+                        width = "double",
+                        min = 6,
+                        max = 32,
+                        step = 1,
+                        get = function() return db.profile.global.fontSize or 11 end,
+                        set = function(_, val)
+                            db.profile.global.fontSize = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    fontSizeReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 12,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.fontSize") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.fontSize"),
+                    },
                 },
             },
             layoutSettings = {
