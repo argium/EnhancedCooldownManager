@@ -57,6 +57,7 @@ end
 ---@field _validateKey fun(k: any): any|nil
 local PriorityKeyMap = {}
 PriorityKeyMap.__index = PriorityKeyMap
+-- Compatibility shim: Lua 5.1 exposes unpack as a global, while Lua 5.2+ uses table.unpack.
 local unpack = unpack or table.unpack
 
 --- Creates a new PriorityKeyMap.
