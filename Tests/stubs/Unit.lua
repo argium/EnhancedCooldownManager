@@ -6,6 +6,25 @@ local state = {
     powerByType = {},
 }
 
+local function ResolvePowerType(powerType)
+    if powerType ~= nil then
+        return powerType
+    end
+
+    if type(_G.UnitPowerType) == "function" then
+        local primaryPowerType = _G.UnitPowerType("player")
+        if primaryPowerType ~= nil then
+            return primaryPowerType
+        end
+    end
+
+    if _G.Enum and _G.Enum.PowerType and _G.Enum.PowerType.Mana ~= nil then
+        return _G.Enum.PowerType.Mana
+    end
+
+    return 0
+end
+
 function Unit.Reset()
     state.classByUnit = {}
     state.powerMaxByType = {}
@@ -17,11 +36,11 @@ function Unit.SetClass(unit, classToken)
 end
 
 function Unit.SetPowerMax(powerType, value)
-    state.powerMaxByType[powerType] = value
+    state.powerMaxByType[ResolvePowerType(powerType)] = value
 end
 
 function Unit.SetPower(powerType, value)
-    state.powerByType[powerType] = value
+    state.powerByType[ResolvePowerType(powerType)] = value
 end
 
 function Unit.Install()
@@ -30,7 +49,7 @@ function Unit.Install()
     end
 
     _G.UnitPowerMax = function(_, powerType)
-        local value = state.powerMaxByType[powerType]
+        local value = state.powerMaxByType[ResolvePowerType(powerType)]
         if value == nil then
             return 0
         end
@@ -38,7 +57,11 @@ function Unit.Install()
     end
 
     _G.UnitPower = function(_, powerType)
-        return state.powerByType[powerType]
+        local value = state.powerByType[ResolvePowerType(powerType)]
+        if value == nil then
+            return 0
+        end
+        return value
     end
 end
 
