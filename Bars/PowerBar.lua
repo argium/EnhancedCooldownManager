@@ -8,6 +8,24 @@ local PowerBar = mod:NewModule("PowerBar", "AceEvent-3.0")
 mod.PowerBar = PowerBar
 ECM.BarMixin.ApplyConfigMixin(PowerBar, "PowerBar")
 
+--- Resolves the effective resource used by PowerBar.
+--- Elemental Shamans use Maelstrom while other Shaman specs use Mana.
+---@return Enum.PowerType
+function PowerBar:GetCurrentPowerType()
+    local _, class = UnitClass("player")
+    local specIndex = GetSpecialization()
+
+    if class == "SHAMAN" and specIndex then
+        if specIndex == ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX then
+            return Enum.PowerType.Maelstrom
+        end
+
+        return Enum.PowerType.Mana
+    end
+
+    return UnitPowerType("player")
+end
+
 --- Returns the tick marks configured for the current class and spec.
 ---@return ECM_TickMark[]|nil
 function PowerBar:GetCurrentTicks()
@@ -57,7 +75,7 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:GetStatusBarValues()
-    local resource = UnitPowerType("player")
+    local resource = self:GetCurrentPowerType()
     local current = UnitPower("player", resource)
     local max = UnitPowerMax("player", resource)
     local cfg = self:GetModuleConfig()
@@ -69,6 +87,13 @@ function PowerBar:GetStatusBarValues()
     return current, max, current, false
 end
 
+function PowerBar:GetStatusBarColor()
+    local cfg = self:GetModuleConfig()
+    local resource = self:GetCurrentPowerType()
+    local color = cfg and cfg.colors and cfg.colors[resource]
+    return color or ECM.Constants.COLOR_WHITE
+end
+
 function PowerBar:Refresh(why, force)
     local result = ECM.BarMixin.Refresh(self, why, force)
     if not result then
@@ -77,7 +102,7 @@ function PowerBar:Refresh(why, force)
 
     -- Update ticks specific to PowerBar
     local frame = self.InnerFrame
-    local resource = UnitPowerType("player")
+    local resource = self:GetCurrentPowerType()
     local max = UnitPowerMax("player", resource)
     self:UpdateTicks(frame, resource, max)
 
@@ -89,7 +114,7 @@ function PowerBar:ShouldShow()
     local show = ECM.BarMixin.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
-        local powerType = UnitPowerType("player")
+        local powerType = self:GetCurrentPowerType()
 
         -- Hide mana bar for DPS specs (except mage/warlock/druid) and all tank specs
         local role = GetSpecializationRole(GetSpecialization())

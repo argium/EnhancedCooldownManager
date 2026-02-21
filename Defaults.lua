@@ -97,6 +97,7 @@
 ---@field enabled boolean Whether combat fade is enabled.
 ---@field opacity number Target opacity percent.
 ---@field exceptIfTargetCanBeAttacked boolean Skip fade if target is attackable.
+---@field exceptIfTargetCanBeHelped boolean Skip fade if target is assistable.
 ---@field exceptInInstance boolean Skip fade in instances.
 
 ---@class ECM_Profile Profile settings.
@@ -140,6 +141,7 @@ local defaults = {
                 enabled = false,
                 opacity = 60,
                 exceptIfTargetCanBeAttacked = true,
+                exceptIfTargetCanBeHelped = false,
                 exceptInInstance = true,
             },
         },
@@ -167,6 +169,8 @@ local defaults = {
                 [Enum.PowerType.Energy] = { r = 0.85, g = 0.65, b = 0.13, a = 1 },
                 [Enum.PowerType.RunicPower] = { r = 0.00, g = 0.82, b = 1.00, a = 1 },
                 [Enum.PowerType.LunarPower] = { r = 0.30, g = 0.52, b = 0.90, a = 1 },
+                [Enum.PowerType.Maelstrom] = { r = 0.00, g = 0.439, b = 0.871, a = 1 },
+                [Enum.PowerType.Insanity] = { r = 0.40, g = 0.00, b = 0.80, a = 1 },
                 [Enum.PowerType.Fury] = { r = 0.788, g = 0.259, b = 0.992, a = 1 },
             },
         },
@@ -190,7 +194,7 @@ local defaults = {
                 [Enum.PowerType.ComboPoints] = { r = 1.00, g = 0.96, b = 0.41, a = 1 },
                 [Enum.PowerType.Essence] = { r = 0.20, g = 0.58, b = 0.50, a = 1 },
                 [Enum.PowerType.HolyPower] = { r = 0.8863, g = 0.8235, b = 0.2392, a = 1 },
-                [Enum.PowerType.Maelstrom] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
+                [C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
                 [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
             },
         },

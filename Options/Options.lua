@@ -272,15 +272,32 @@ local function GeneralOptionsTable()
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
-                    exceptIfTargetCanBeAttackedEnabled ={
-                        type = "toggle",
-                        name = "Except if current target can be attacked",
+                    combatFadeExceptIfDesc = {
+                        type = "description",
+                        name = "\nExcept if ...",
                         order = 9,
+                    },
+                    exceptIfTargetCanBeAttackedEnabled = {
+                        type = "toggle",
+                        name = "... current target can be attacked, and/or",
+                        order = 10,
                         width = "full",
                         disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
                         get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked end,
                         set = function(_, val)
                             db.profile.global.outOfCombatFade.exceptIfTargetCanBeAttacked = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    exceptIfTargetCanBeHelpedEnabled = {
+                        type = "toggle",
+                        name = "... current target can be helped",
+                        order = 11,
+                        width = "full",
+                        disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
+                        get = function() return db.profile.global.outOfCombatFade.exceptIfTargetCanBeHelped end,
+                        set = function(_, val)
+                            db.profile.global.outOfCombatFade.exceptIfTargetCanBeHelped = val
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
@@ -293,6 +310,162 @@ end
 
 -- Forward declarations (these are defined later, but referenced by option-table builders)
 local TickMarksOptionsTable
+
+local function GeneratePowerBarDisplayArgs(db)
+    local args = {
+        showTextDesc = {
+            type = "description",
+            name = "Display the current value on the bar.",
+            order = 1,
+        },
+        showText = {
+            type = "toggle",
+            name = "Show text",
+            order = 2,
+            width = "full",
+            get = function() return db.profile.powerBar.showText end,
+            set = function(_, val)
+                db.profile.powerBar.showText = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        showManaAsPercentDesc = {
+            type = "description",
+            name = "\nDisplay mana as percentage instead of raw value.",
+            order = 3,
+        },
+        showManaAsPercent = {
+            type = "toggle",
+            name = "Show mana as percent",
+            order = 4,
+            width = "full",
+            get = function() return db.profile.powerBar.showManaAsPercent end,
+            set = function(_, val)
+                db.profile.powerBar.showManaAsPercent = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderSpacer = {
+            type = "description",
+            name = " ",
+            order = 5,
+        },
+        borderEnabled = {
+            type = "toggle",
+            name = "Show border",
+            order = 7,
+            width = "full",
+            get = function() return db.profile.powerBar.border.enabled end,
+            set = function(_, val)
+                db.profile.powerBar.border.enabled = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderThickness = {
+            type = "range",
+            name = "Border width",
+            order = 8,
+            width = "small",
+            min = 1,
+            max = 10,
+            step = 1,
+            disabled = function() return not db.profile.powerBar.border.enabled end,
+            get = function() return db.profile.powerBar.border.thickness end,
+            set = function(_, val)
+                db.profile.powerBar.border.thickness = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderColor = {
+            type = "color",
+            name = "Border color",
+            order = 9,
+            width = "small",
+            hasAlpha = true,
+            disabled = function() return not db.profile.powerBar.border.enabled end,
+            get = function()
+                local c = db.profile.powerBar.border.color
+                return c.r, c.g, c.b, c.a
+            end,
+            set = function(_, r, g, b, a)
+                db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        borderThicknessReset = {
+            type = "execute",
+            name = "X",
+            order = 8.5,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.thickness") end,
+            disabled = function() return not db.profile.powerBar.border.enabled end,
+            func = ECM.OptionUtil.MakeResetHandler("powerBar.border.thickness"),
+        },
+        borderColorReset = {
+            type = "execute",
+            name = "X",
+            order = 9.5,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.color") end,
+            disabled = function() return not db.profile.powerBar.border.enabled end,
+            func = ECM.OptionUtil.MakeResetHandler("powerBar.border.color"),
+        },
+        colorsSpacer = {
+            type = "description",
+            name = " ",
+            order = 10,
+        },
+        colorsDescription = {
+            type = "description",
+            name = "Customize the color of each primary resource type.",
+            fontSize = "medium",
+            order = 11,
+        },
+    }
+
+    local colorDefs = {
+        { key = Enum.PowerType.Mana, name = "Mana" },
+        { key = Enum.PowerType.Rage, name = "Rage" },
+        { key = Enum.PowerType.Focus, name = "Focus" },
+        { key = Enum.PowerType.Energy, name = "Energy" },
+        { key = Enum.PowerType.RunicPower, name = "Runic Power" },
+        { key = Enum.PowerType.LunarPower, name = "Lunar Power" },
+        { key = Enum.PowerType.Maelstrom, name = "Maelstrom" },
+        { key = Enum.PowerType.Insanity, name = "Insanity" },
+        { key = Enum.PowerType.Fury, name = "Fury" },
+    }
+
+    for i, def in ipairs(colorDefs) do
+        local key = def.key
+        local configPath = "powerBar.colors." .. tostring(key)
+        local orderBase = 12 + (i - 1) * 2
+
+        args["color" .. tostring(key)] = {
+            type = "color",
+            name = def.name,
+            order = orderBase,
+            width = "double",
+            get = function()
+                local c = db.profile.powerBar.colors[key]
+                return c.r, c.g, c.b
+            end,
+            set = function(_, r, g, b)
+                db.profile.powerBar.colors[key] = { r = r, g = g, b = b, a = 1 }
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
+        args["color" .. tostring(key) .. "Reset"] = {
+            type = "execute",
+            name = "X",
+            order = orderBase + 1,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged(configPath) end,
+            func = ECM.OptionUtil.MakeResetHandler(configPath),
+        }
+    end
+
+    return args
+end
 
 local function PowerBarOptionsTable()
     local db = mod.db
@@ -366,105 +539,7 @@ local function PowerBarOptionsTable()
                 name = "Display Options",
                 inline = true,
                 order = 2,
-                args = {
-                    showTextDesc = {
-                        type = "description",
-                        name = "Display the current value on the bar.",
-                        order = 1,
-                    },
-                    showText = {
-                        type = "toggle",
-                        name = "Show text",
-                        order = 2,
-                        width = "full",
-                        get = function() return db.profile.powerBar.showText end,
-                        set = function(_, val)
-                            db.profile.powerBar.showText = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    showManaAsPercentDesc = {
-                        type = "description",
-                        name = "\nDisplay mana as percentage instead of raw value.",
-                        order = 3,
-                    },
-                    showManaAsPercent = {
-                        type = "toggle",
-                        name = "Show mana as percent",
-                        order = 4,
-                        width = "full",
-                        get = function() return db.profile.powerBar.showManaAsPercent end,
-                        set = function(_, val)
-                            db.profile.powerBar.showManaAsPercent = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    borderSpacer = {
-                        type = "description",
-                        name = " ",
-                        order = 5,
-                    },
-                    borderEnabled = {
-                        type = "toggle",
-                        name = "Show border",
-                        order = 7,
-                        width = "full",
-                        get = function() return db.profile.powerBar.border.enabled end,
-                        set = function(_, val)
-                            db.profile.powerBar.border.enabled = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    borderThickness = {
-                        type = "range",
-                        name = "Border width",
-                        order = 8,
-                        width = "small",
-                        min = 1,
-                        max = 10,
-                        step = 1,
-                        disabled = function() return not db.profile.powerBar.border.enabled end,
-                        get = function() return db.profile.powerBar.border.thickness end,
-                        set = function(_, val)
-                            db.profile.powerBar.border.thickness = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    borderColor = {
-                        type = "color",
-                        name = "Border color",
-                        order = 9,
-                        width = "small",
-                        hasAlpha = true,
-                        disabled = function() return not db.profile.powerBar.border.enabled end,
-                        get = function()
-                            local c = db.profile.powerBar.border.color
-                            return c.r, c.g, c.b, c.a
-                        end,
-                        set = function(_, r, g, b, a)
-                            db.profile.powerBar.border.color = { r = r, g = g, b = b, a = a }
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    borderThicknessReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 8.5,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.thickness") end,
-                        disabled = function() return not db.profile.powerBar.border.enabled end,
-                        func = ECM.OptionUtil.MakeResetHandler("powerBar.border.thickness"),
-                    },
-                    borderColorReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 9.5,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("powerBar.border.color") end,
-                        disabled = function() return not db.profile.powerBar.border.enabled end,
-                        func = ECM.OptionUtil.MakeResetHandler("powerBar.border.color"),
-                    },
-                },
+                args = GeneratePowerBarDisplayArgs(db),
             },
             positioningSettings = ECM.OptionUtil.MakePositioningGroup("powerBar", 3),
             tickMarks = tickMarks,
@@ -561,7 +636,7 @@ local function GenerateResourceColorArgs(db)
         { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
         { key = Enum.PowerType.Essence, name = "Essence" },
         { key = Enum.PowerType.HolyPower, name = "Holy Power" },
-        { key = Enum.PowerType.Maelstrom, name = "Maelstrom" },
+        { key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON, name = "Maelstrom Weapon (Enhancement)" },
         { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
     }
 
