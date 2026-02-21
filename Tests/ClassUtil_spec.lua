@@ -224,13 +224,15 @@ describe("ClassUtil", function()
             assertResourceForSpecs(ECM.Constants.CLASS.ROGUE, { 1, 2, 3 }, Enum.PowerType.ComboPoints)
         end)
 
-        it("returns maelstrom for enhancement shamans and nil for elemental/restoration", function()
+        it("returns maelstrom weapon for enhancement shamans and nil for elemental/restoration", function()
             setAvailablePowerType(Enum.PowerType.Maelstrom)
-            assertResourceType(ECM.Constants.CLASS.SHAMAN, ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX, Enum.PowerType.Maelstrom)
-
-            setAvailablePowerType(nil)
-            assertResourceType(ECM.Constants.CLASS.SHAMAN, 1, nil)
-            assertResourceType(ECM.Constants.CLASS.SHAMAN, 3, nil)
+            assertResourceType(
+                ECM.Constants.CLASS.SHAMAN,
+                ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX,
+                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
+            )
+            assertResourceType(ECM.Constants.CLASS.SHAMAN, ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX, nil)
+            assertResourceType(ECM.Constants.CLASS.SHAMAN, ECM.Constants.SHAMAN_RESTORATION_SPEC_INDEX, nil)
         end)
 
         it("returns soul shards for all warlock specs", function()
@@ -278,7 +280,7 @@ describe("ClassUtil", function()
             CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 3 })
             assertValues(
-                Enum.PowerType.Maelstrom,
+                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
                 ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE,
                 3
             )
@@ -288,7 +290,7 @@ describe("ClassUtil", function()
             CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 6 })
             assertValues(
-                Enum.PowerType.Maelstrom,
+                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
                 ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED,
                 6
             )

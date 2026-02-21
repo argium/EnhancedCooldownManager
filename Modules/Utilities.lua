@@ -125,7 +125,7 @@ function ECM_ApplyFont(fontString)
 
     local config = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global
     local fontPath = get_font_path(config and config.font)
-    local fontSize = (config and config.fontSize)
+    local fontSize = (config and config.fontSize) or 11
     local fontOutline = (config and config.fontOutline)
 
     if fontOutline == "NONE" then

@@ -65,6 +65,7 @@
             "MenuConstants",
             "class",
             "DRUID_CAT_FORM",
+            "UIParent",
             "CHAT_CHANNELS",
             "NORMAL_FONT_COLOR",
             "GameFontNormal",
