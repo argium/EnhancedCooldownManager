@@ -30,7 +30,7 @@ function ECM_log(subsystem, module, message, data)
         pcall(DevTool.AddData, DevTool, payload, "|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
     end
 
-    -- print("|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
+    print("|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
 end
 
 function ECM_is_debug_enabled()
