@@ -33,7 +33,23 @@ local function GetLSMValues(mediaType, fallback)
 end
 
 local function GetLSMStatusbarValues()
+    if type(AceGUIWidgetLSMlists) == "table"
+        and type(AceGUIWidgetLSMlists.statusbar) == "table"
+        and next(AceGUIWidgetLSMlists.statusbar) then
+        return AceGUIWidgetLSMlists.statusbar
+    end
+
     return GetLSMValues("statusbar", "Blizzard")
+end
+
+local function GetLSMFontValues()
+    if type(AceGUIWidgetLSMlists) == "table"
+        and type(AceGUIWidgetLSMlists.font) == "table"
+        and next(AceGUIWidgetLSMlists.font) then
+        return AceGUIWidgetLSMlists.font
+    end
+
+    return GetLSMValues("font", "Expressway")
 end
 
 local function IsDeathKnight()
@@ -86,6 +102,7 @@ local function GeneralOptionsTable()
                         name = "Bar Texture",
                         order = 8,
                         width = "double",
+                        dialogControl = "LSM30_Statusbar",
                         values = GetLSMStatusbarValues,
                         get = function() return db.profile.global.texture end,
                         set = function(_, val)
@@ -101,15 +118,41 @@ local function GeneralOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.texture") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.texture"),
                     },
+                    fontDesc = {
+                        type = "description",
+                        name = "\nControls font face for all bars.",
+                        order = 10,
+                    },
+                    font = {
+                        type = "select",
+                        name = "Font",
+                        order = 11,
+                        width = "double",
+                        dialogControl = "LSM30_Font",
+                        values = GetLSMFontValues,
+                        get = function() return db.profile.global.font end,
+                        set = function(_, val)
+                            db.profile.global.font = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    fontReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 12,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.font") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.font"),
+                    },
                     fontSizeDesc = {
                         type = "description",
                         name = "\nControls font size for all bars.",
-                        order = 10,
+                        order = 13,
                     },
                     fontSize = {
                         type = "range",
                         name = "Font Size",
-                        order = 11,
+                        order = 14,
                         width = "double",
                         min = 6,
                         max = 32,
@@ -123,7 +166,7 @@ local function GeneralOptionsTable()
                     fontSizeReset = {
                         type = "execute",
                         name = "X",
-                        order = 12,
+                        order = 15,
                         width = 0.3,
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.fontSize") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.fontSize"),
