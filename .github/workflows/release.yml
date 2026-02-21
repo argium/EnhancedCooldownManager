@@ -75,10 +75,13 @@ jobs:
             --exclude '.*' \
             --exclude 'TODO.md' \
             --exclude 'CLAUDE.md' \
+            --exclude 'AGENTS.md' \
+            --exclude 'CONTRIBUTING.md' \
             --exclude 'docs' \
             --exclude '*.code-workspace' \
             --exclude '.vscode' \
-            --exclude '.idea' \
+            --exclude 'Tests' \
+            --exclude '*.rockspec' \
             --exclude 'package'
 
       - name: Upload artifact

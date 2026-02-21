@@ -19,6 +19,7 @@
             "utf8": "disable"
         },
         "Lua.workspace.library": [
+            "~\\scoop\\apps\\luarocks\\current\\rocks\\share\\lua\\5.4\\busted",
             "~\\.vscode\\extensions\\ketho.wow-api-0.22.2\\Annotations\\Core"
         ],
         "Lua.diagnostics.globals": [
@@ -63,7 +64,19 @@
             "DefaultTooltipMixin",
             "MenuConstants",
             "class",
-            "DRUID_CAT_FORM"
+            "DRUID_CAT_FORM",
+            "CHAT_CHANNELS",
+            "NORMAL_FONT_COLOR",
+            "GameFontNormal",
+            "GameFontHighlight",
+            "GameFontHighlightLarge",
+            "GameFontHighlightSmall",
+            "GameFontDisableSmall",
+            "GameTooltip",
+            "GameFontNormalSmall",
+            "ChatFontNormal",
+            "GRAY_FONT_COLOR",
+            "coroutine"
         ],
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"

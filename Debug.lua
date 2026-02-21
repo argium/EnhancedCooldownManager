@@ -10,6 +10,9 @@ local _, ns = ...
 --- @param message string Debug message
 --- @param data any|nil Optional additional data to log (will be stringified)
 function ECM_log(subsystem, module, message, data)
+    if not ECM_is_debug_enabled() then
+        return
+    end
     ECM_debug_assert(subsystem and type(subsystem) == "string", "ECM_log: subsystem must be a string")
     ECM_debug_assert(message and type(message) == "string", "ECM_log: message must be a string")
     ECM_debug_assert(module == nil or type(module) == "string", "ECM_log: module must be a string or nil")
@@ -27,9 +30,7 @@ function ECM_log(subsystem, module, message, data)
         pcall(DevTool.AddData, DevTool, payload, "|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
     end
 
-    if ECM_is_debug_enabled() then
-        print("|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
-    end
+    print("|cff".. ECM.Constants.DEBUG_COLOR ..  prefix .. "|r " .. message)
 end
 
 function ECM_is_debug_enabled()

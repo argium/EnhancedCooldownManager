@@ -469,11 +469,10 @@ function BuffBars:ResetStyledMarkers()
     end
 end
 
---- Returns metadata for all currently-visible aura bars.
---- Each entry contains a spellName (string), spellID (number),
---- cooldownID (number), and/or textureFileID (number), with secret
---- values filtered out. Entries where all keys are nil are skipped.
----@return { spellName: string|nil, spellID: number|nil, cooldownID: number|nil, textureFileID: number|nil }[]
+--- Returns normalized spell-color keys for all currently-visible aura bars.
+--- Secret values are filtered out via MakeKey's validation.
+--- Bars where all identifying keys are secret/nil are skipped.
+---@return ECM_SpellColorKey[]
 function BuffBars:GetActiveSpellData()
     local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
@@ -484,19 +483,15 @@ function BuffBars:GetActiveSpellData()
     local result = {}
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
-        local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
-        local sid = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
-        local cid = frame.cooldownID or nil
-        local tex = FrameUtil.GetIconTextureFileID(frame) or nil
-
-        -- Filter out secret values that cannot be used as table keys
-        if name and issecretvalue(name) then name = nil end
-        if sid and issecretvalue(sid) then sid = nil end
-        if cid and issecretvalue(cid) then cid = nil end
-        if tex and issecretvalue(tex) then tex = nil end
-
-        if name or sid or cid or tex then
-            result[#result + 1] = { spellName = name, spellID = sid, cooldownID = cid, textureFileID = tex }
+        if frame and frame:IsShown() and frame.Bar then
+            local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
+            local sid = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
+            local cid = frame.cooldownID or nil
+            local tex = FrameUtil.GetIconTextureFileID(frame) or nil
+            local key = ECM.SpellColors.MakeKey(name, sid, cid, tex)
+            if key then
+                result[#result + 1] = key
+            end
         end
     end
     return result

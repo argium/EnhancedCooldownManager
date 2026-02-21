@@ -2,8 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
--- Defaults for Enhanced Cooldown Manager
-
 ---@class ECM_Color RGBA color definition.
 ---@field r number Red channel (0-1).
 ---@field g number Green channel (0-1).
@@ -111,6 +109,8 @@
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
 ---@field itemIcons ECM_ItemIconsConfig Item icons configuration.
 
+local C = ECM.Constants
+
 -- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
 powerBarTickMappings[ECM.Constants.DEMONHUNTER_CLASS_ID] = {
@@ -123,7 +123,7 @@ powerBarTickMappings[ECM.Constants.DEMONHUNTER_CLASS_ID] = {
 local defaults = {
     profile = {
         debug = false,
-        schemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION,
+        schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
@@ -147,22 +147,18 @@ local defaults = {
             enabled           = true,
             anchorMode        = ECM.Constants.ANCHORMODE_CHAIN,
             width             = 300,
-            -- height            = nil,
-            -- offsetX           = nil,
             offsetY           = -275,
-            -- texture           = nil,
-            -- bgColor           = nil,
             showText          = true,
             ticks             = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
-                defaultColor = ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
                 defaultWidth = 1,
             },
             showManaAsPercent = true,
             border            = {
                 enabled = false,
-                thickness = ECM.Constants.DEFAULT_BORDER_THICKNESS,
-                color = ECM.Constants.DEFAULT_BORDER_COLOR,
+                thickness = C.DEFAULT_BORDER_THICKNESS,
+                color = C.DEFAULT_BORDER_COLOR,
             },
             colors            = {
                 [Enum.PowerType.Mana] = { r = 0.00, g = 0.00, b = 1.00, a = 1 },
@@ -175,47 +171,39 @@ local defaults = {
             },
         },
         resourceBar = {
-            enabled             = true,
-            showText            = false,
-            anchorMode          = ECM.Constants.ANCHORMODE_CHAIN,
-            width               = 300,
-            -- height              = nil,
-            -- offsetX             = nil,
-            offsetY             = -300,
-            -- texture             = nil,
-            -- bgColor             = nil,
-            border              = {
+            enabled    = true,
+            showText   = false,
+            anchorMode = C.ANCHORMODE_CHAIN,
+            width      = 300,
+            offsetY    = -300,
+            border     = {
                 enabled = false,
-                thickness = ECM.Constants.DEFAULT_BORDER_THICKNESS,
-                color = ECM.Constants.DEFAULT_BORDER_COLOR,
+                thickness = C.DEFAULT_BORDER_THICKNESS,
+                color = C.DEFAULT_BORDER_COLOR,
             },
-            colors              = {
+            colors     = {
                 souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
                 devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                devourerMeta = { r = 0.275, g = 0.169, b = 1.0, a = 1 },
+                devourerMeta = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
                 [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
                 [Enum.PowerType.Chi] = { r = 0.00, g = 1.00, b = 0.59, a = 1 },
                 [Enum.PowerType.ComboPoints] = { r = 1.00, g = 0.96, b = 0.41, a = 1 },
                 [Enum.PowerType.Essence] = { r = 0.20, g = 0.58, b = 0.50, a = 1 },
-                [Enum.PowerType.HolyPower] = { r = 0.95, g = 0.90, b = 0.60, a = 1 },
-                [Enum.PowerType.Maelstrom] = { r = 0.0, g = 0.439, b = 0.871, a = 1 },
-                [Enum.PowerType.SoulShards] = { r = 0.50, g = 0.32, b = 0.55, a = 1 },
+                [Enum.PowerType.HolyPower] = { r = 0.8863, g = 0.8235, b = 0.2392, a = 1 },
+                [Enum.PowerType.Maelstrom] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
+                [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
             },
         },
         runeBar = {
             enabled    = true,
-            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
-            -- height     = nil,
-            -- offsetX    = nil,
             offsetY    = -325,
-            -- texture    = nil,
-            -- bgColor    = nil,
             color      = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, -- DK class colour red
         },
         buffBars = {
             enabled = true,
-            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
             offsetY = -350,
             showIcon = false,
