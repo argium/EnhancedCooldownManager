@@ -118,15 +118,10 @@ local function GeneralOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.texture") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.texture"),
                     },
-                    fontDesc = {
-                        type = "description",
-                        name = "\nControls font face for all bars.",
-                        order = 10,
-                    },
                     font = {
                         type = "select",
                         name = "Font",
-                        order = 11,
+                        order = 10,
                         width = "double",
                         dialogControl = "LSM30_Font",
                         values = GetLSMFontValues,
@@ -143,11 +138,6 @@ local function GeneralOptionsTable()
                         width = 0.3,
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.font") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.font"),
-                    },
-                    fontSizeDesc = {
-                        type = "description",
-                        name = "\nControls font size for all bars.",
-                        order = 13,
                     },
                     fontSize = {
                         type = "range",
