@@ -482,41 +482,6 @@ describe("SpellColors", function()
         assert.are.same(persistedValue, entries[1].color)
     end)
 
-    it("repairs fallback tiers from byName persisted entries with embedded IDs", function()
-        SpellColors.GetDefaultColor()
-
-        local classTables = {
-            byName = buffBarsConfig.colors.byName,
-            bySpellID = buffBarsConfig.colors.bySpellID,
-            byCooldownID = buffBarsConfig.colors.byCooldownID,
-            byTexture = buffBarsConfig.colors.byTexture,
-        }
-
-        for _, tbl in pairs(classTables) do
-            tbl[currentClassID] = tbl[currentClassID] or {}
-            tbl[currentClassID][currentSpecID] = tbl[currentClassID][currentSpecID] or {}
-        end
-
-        local persistedColor = color(0.9, 0.1, 0.7)
-        persistedColor.spellID = 1357
-        persistedColor.cooldownID = 2468
-        persistedColor.textureId = 3699
-
-        local stamped = { value = persistedColor }
-        buffBarsConfig.colors.byName[currentClassID][currentSpecID]["Persisted Spell"] = stamped
-
-        assert.is_nil(buffBarsConfig.colors.bySpellID[currentClassID][currentSpecID][1357])
-        assert.is_nil(buffBarsConfig.colors.byCooldownID[currentClassID][currentSpecID][2468])
-        assert.is_nil(buffBarsConfig.colors.byTexture[currentClassID][currentSpecID][3699])
-
-        local got = SpellColors.GetColorByKey({ spellID = 1357 })
-        assert.are.same(persistedColor, got)
-
-        assert.are.same(stamped, buffBarsConfig.colors.bySpellID[currentClassID][currentSpecID][1357])
-        assert.are.same(stamped, buffBarsConfig.colors.byCooldownID[currentClassID][currentSpecID][2468])
-        assert.are.same(stamped, buffBarsConfig.colors.byTexture[currentClassID][currentSpecID][3699])
-    end)
-
     it("isolates stored colors by class and specialization", function()
         setClassSpec(12, 1)
         local c = color(0.3, 0.8, 0.1)

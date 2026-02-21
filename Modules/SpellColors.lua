@@ -217,78 +217,6 @@ local function key_to_tuple(key)
     return normalized.spellName, normalized.spellID, normalized.cooldownID, normalized.textureFileID, normalized
 end
 
----@param value table
----@param keyType "spellName"|"spellID"|"cooldownID"|"textureFileID"|nil
----@param key any
-local function ensure_entry_metadata(value, keyType, key)
-    if type(value) ~= "table" then
-        return
-    end
-
-    if not value.keyType and keyType then
-        value.keyType = keyType
-    end
-
-    if keyType == "spellID" and type(key) == "number" and not value.spellID then
-        value.spellID = key
-    elseif keyType == "cooldownID" and type(key) == "number" and not value.cooldownID then
-        value.cooldownID = key
-    elseif keyType == "textureFileID" and type(key) == "number" and not value.textureId then
-        -- Intentionally stored as `textureId` (not `textureFileID`) for backward
-        -- compatibility with SavedVariables written by older versions of the addon.
-        value.textureId = key
-    end
-end
-
----@param classSpecStores table
-local function repair_entry_metadata(classSpecStores)
-    -- Iterate in key priority order so primary key type is deterministic.
-    for _, scopeKey in ipairs(KEY_DEFS) do
-        local keyType = KEY_TYPE_TO_STORE[scopeKey]
-        local storeTable = classSpecStores[scopeKey]
-        if storeTable then
-            for key, entry in pairs(storeTable) do
-                if type(entry) == "table" and type(entry.value) == "table" then
-                    ensure_entry_metadata(entry.value, keyType, key)
-                end
-            end
-        end
-    end
-end
-
---- Repopulates lower-priority tier entries from byName for any colour
---- whose stored value carries embedded IDs (textureId, spellID,
---- cooldownID).  This repairs SavedVariables left incomplete by an
---- older Reconcile implementation that deleted fallback entries.
-local function repair_from_primary()
-    local cfg = config()
-    if not cfg then return end
-
-    local classSpecStores = get_current_class_spec_stores(cfg)
-    if not classSpecStores then return end
-    local byName = classSpecStores.byName
-    if not byName then return end
-
-    -- Ensure persisted entries carry explicit metadata (key type + key IDs).
-    -- This removes the need for downstream key-type inference in options.
-    repair_entry_metadata(classSpecStores)
-
-    for _, entry in pairs(byName) do
-        if type(entry) == "table" and type(entry.value) == "table" then
-            local v = entry.value
-            if v.textureId and classSpecStores.byTexture and not classSpecStores.byTexture[v.textureId] then
-                classSpecStores.byTexture[v.textureId] = entry
-            end
-            if v.spellID and classSpecStores.bySpellID and not classSpecStores.bySpellID[v.spellID] then
-                classSpecStores.bySpellID[v.spellID] = entry
-            end
-            if v.cooldownID and classSpecStores.byCooldownID and not classSpecStores.byCooldownID[v.cooldownID] then
-                classSpecStores.byCooldownID[v.cooldownID] = entry
-            end
-        end
-    end
-end
-
 --- Returns the PriorityKeyMap instance, creating it on first call.
 ---@return PriorityKeyMap|nil
 local function get_map()
@@ -300,8 +228,6 @@ local function get_map()
     if not cfg then
         return nil
     end
-
-    repair_from_primary()
 
     _map = ECM.PriorityKeyMap.New(
         KEY_DEFS,

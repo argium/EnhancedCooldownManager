@@ -1,5 +1,5 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V8).
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V9).
 
 local Migration = {}
 ECM.Migration = Migration
@@ -216,6 +216,100 @@ local function MigrateToPerSpellColors(profile)
     end
 
     cfg.colors.perBar = nil
+end
+
+--- Repairs spell-color metadata and fallback tier links for all class/spec stores.
+--- This migration runs once and replaces the previous runtime-only repair path.
+---@param profile table The profile to repair
+local function RepairSpellColorStores(profile)
+    local buffBars = profile.buffBars
+    if not (buffBars and type(buffBars.colors) == "table") then
+        return
+    end
+
+    local colors = buffBars.colors
+    if type(colors.byName) ~= "table" then
+        colors.byName = {}
+    end
+    if type(colors.bySpellID) ~= "table" then
+        colors.bySpellID = {}
+    end
+    if type(colors.byCooldownID) ~= "table" then
+        colors.byCooldownID = {}
+    end
+    if type(colors.byTexture) ~= "table" then
+        colors.byTexture = {}
+    end
+
+    local tierDefs = {
+        { storeKey = "byName", keyType = "spellName" },
+        { storeKey = "bySpellID", keyType = "spellID", idField = "spellID" },
+        { storeKey = "byCooldownID", keyType = "cooldownID", idField = "cooldownID" },
+        { storeKey = "byTexture", keyType = "textureFileID", idField = "textureId" },
+    }
+
+    -- Normalize metadata per stored tier so options/runtime no longer need to infer.
+    for _, tier in ipairs(tierDefs) do
+        local store = colors[tier.storeKey]
+        for _, classMap in pairs(store) do
+            if type(classMap) == "table" then
+                for _, specMap in pairs(classMap) do
+                    if type(specMap) == "table" then
+                        for key, entry in pairs(specMap) do
+                            if type(entry) == "table" and type(entry.value) == "table" then
+                                local value = entry.value
+                                if not value.keyType then
+                                    value.keyType = tier.keyType
+                                end
+                                if tier.idField and type(key) == "number" and value[tier.idField] == nil then
+                                    value[tier.idField] = key
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local function EnsureClassSpecStore(store, classID, specID)
+        if type(store[classID]) ~= "table" then
+            store[classID] = {}
+        end
+        if type(store[classID][specID]) ~= "table" then
+            store[classID][specID] = {}
+        end
+        return store[classID][specID]
+    end
+
+    -- Backfill fallback tiers from byName entries carrying embedded IDs.
+    for classID, classMap in pairs(colors.byName) do
+        if type(classMap) == "table" then
+            for specID, specMap in pairs(classMap) do
+                if type(specMap) == "table" then
+                    local bySpellIDSpec = EnsureClassSpecStore(colors.bySpellID, classID, specID)
+                    local byCooldownIDSpec = EnsureClassSpecStore(colors.byCooldownID, classID, specID)
+                    local byTextureSpec = EnsureClassSpecStore(colors.byTexture, classID, specID)
+
+                    for _, entry in pairs(specMap) do
+                        if type(entry) == "table" and type(entry.value) == "table" then
+                            local value = entry.value
+
+                            if type(value.spellID) == "number" and bySpellIDSpec[value.spellID] == nil then
+                                bySpellIDSpec[value.spellID] = entry
+                            end
+                            if type(value.cooldownID) == "number" and byCooldownIDSpec[value.cooldownID] == nil then
+                                byCooldownIDSpec[value.cooldownID] = entry
+                            end
+                            if type(value.textureId) == "number" and byTextureSpec[value.textureId] == nil then
+                                byTextureSpec[value.textureId] = entry
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -438,6 +532,14 @@ function Migration.Run(profile)
         profile.schemaVersion = 8
     end
 
+    if profile.schemaVersion < 9 then
+        -- Migration: repair spell color metadata and fallback tier links.
+        RepairSpellColorStores(profile)
+
+        Log("Migrated to V9")
+        profile.schemaVersion = 9
+    end
+
     Log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
 end
 
@@ -469,6 +571,7 @@ end
 ---     _versions   = {
 ---       [7] = {profiles=…, profileKeys=…},
 ---       [8] = {…},
+---       [9] = {…},
 ---     },
 ---   }
 ---
