@@ -169,6 +169,8 @@ local defaults = {
                 [Enum.PowerType.Energy] = { r = 0.85, g = 0.65, b = 0.13, a = 1 },
                 [Enum.PowerType.RunicPower] = { r = 0.00, g = 0.82, b = 1.00, a = 1 },
                 [Enum.PowerType.LunarPower] = { r = 0.30, g = 0.52, b = 0.90, a = 1 },
+                [Enum.PowerType.Maelstrom] = { r = 0.00, g = 0.439, b = 0.871, a = 1 },
+                [Enum.PowerType.Insanity] = { r = 0.40, g = 0.00, b = 0.80, a = 1 },
                 [Enum.PowerType.Fury] = { r = 0.788, g = 0.259, b = 0.992, a = 1 },
             },
         },
