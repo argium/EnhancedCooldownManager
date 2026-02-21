@@ -65,7 +65,18 @@
             "MenuConstants",
             "class",
             "DRUID_CAT_FORM",
-            "CHAT_CHANNELS"
+            "CHAT_CHANNELS",
+            "NORMAL_FONT_COLOR",
+            "GameFontNormal",
+            "GameFontHighlight",
+            "GameFontHighlightLarge",
+            "GameFontHighlightSmall",
+            "GameFontDisableSmall",
+            "GameTooltip",
+            "GameFontNormalSmall",
+            "ChatFontNormal",
+            "GRAY_FONT_COLOR",
+            "coroutine"
         ],
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"
