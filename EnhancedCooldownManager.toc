@@ -22,6 +22,7 @@ Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml
 Libs\LibEQOL\LibEQOL.xml
 Libs\LibSharedMedia-3.0\lib.xml
+Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml
 
 Constants.lua
 Defaults.lua

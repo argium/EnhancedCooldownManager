@@ -141,6 +141,30 @@ mySelect = {
 }
 ```
 
+**Font dropdown using SharedMedia widgets:**
+```lua
+myFontSelect = {
+    type = "select",
+    name = "Font",
+    order = 4,
+    width = "double",
+    dialogControl = "LSM30_Font",  -- Requires AceGUI-3.0-SharedMediaWidgets
+    values = function()
+        if AceGUIWidgetLSMlists and AceGUIWidgetLSMlists.font then
+            return AceGUIWidgetLSMlists.font
+        end
+        return GetLSMValues("font", "Expressway")
+    end,
+    get = function() return db.profile.global.font end,
+    set = function(_, val)
+        db.profile.global.font = val
+        ECM.ScheduleLayoutUpdate(0)
+    end,
+}
+```
+
+`LSM30_Font` renders each option name in its own font, which is ideal for global font-face selection.
+
 **Values as table:**
 ```lua
 values = {
