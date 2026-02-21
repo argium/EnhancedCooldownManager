@@ -253,6 +253,69 @@ describe("SpellColors", function()
         end
     end)
 
+    it("NormalizeKey returns opaque key objects with methods", function()
+        local key = SpellColors.NormalizeKey({ keyType = "spellID", primaryKey = 777, textureId = 9090 })
+
+        assert.is_table(key)
+        assert.are.equal("spellID", key.keyType)
+        assert.are.equal(777, key.primaryKey)
+        assert.are.equal(777, key.spellID)
+        assert.are.equal(9090, key.textureFileID)
+        assert.is_true(type(key.Matches) == "function")
+        assert.is_true(type(key.Merge) == "function")
+    end)
+
+    it("KeysMatch compares key identity by non-fallback identifiers", function()
+        local byName = SpellColors.MakeKey("Blade Dance", 188499, nil, 1234)
+
+        assert.is_true(SpellColors.KeysMatch(byName, { spellName = "Blade Dance" }))
+        assert.is_true(byName:Matches({ spellID = 188499 }))
+        assert.is_false(SpellColors.KeysMatch(byName, { textureFileID = 1234 }))
+        assert.is_false(SpellColors.KeysMatch(byName, { spellName = "Other", spellID = 999999 }))
+
+        local textureOnlyA = SpellColors.MakeKey(nil, nil, nil, 4321)
+        local textureOnlyB = SpellColors.MakeKey(nil, nil, nil, 4321)
+        assert.is_true(textureOnlyA:Matches(textureOnlyB))
+    end)
+
+    it("MergeKeys and key:Merge combine discovered identifiers", function()
+        local base = SpellColors.MakeKey("Immolation Aura", nil, nil, nil)
+        local merged = SpellColors.MergeKeys(base, { spellName = "Immolation Aura", spellID = 258920, cooldownID = 77, textureFileID = 9001 })
+
+        assert.is_not_nil(merged)
+        assert.are.equal("spellName", merged.keyType)
+        assert.are.equal("Immolation Aura", merged.primaryKey)
+        assert.are.equal(258920, merged.spellID)
+        assert.are.equal(77, merged.cooldownID)
+        assert.are.equal(9001, merged.textureFileID)
+
+        local mergedViaMethod = base:Merge({ spellName = "Immolation Aura", spellID = 258920 })
+        assert.is_not_nil(mergedViaMethod)
+        assert.are.equal(258920, mergedViaMethod.spellID)
+    end)
+
+    it("MergeKeys returns nil for non-matching keys", function()
+        local left = SpellColors.MakeKey("Sigil of Flame", 204596, nil, nil)
+        local right = SpellColors.MakeKey("Throw Glaive", 185123, nil, nil)
+        assert.is_nil(SpellColors.MergeKeys(left, right))
+        assert.is_nil(left:Merge(right))
+    end)
+
+    it("MergeKeys promotes primary key to strongest discovered identifier", function()
+        local byCooldown = SpellColors.MakeKey(nil, nil, 77, nil)
+        local withName = { spellName = "Immolation Aura", cooldownID = 77 }
+
+        local merged = SpellColors.MergeKeys(byCooldown, withName)
+        assert.is_not_nil(merged)
+        assert.are.equal("spellName", merged.keyType)
+        assert.are.equal("Immolation Aura", merged.primaryKey)
+
+        local mergedViaMethod = byCooldown:Merge(withName)
+        assert.is_not_nil(mergedViaMethod)
+        assert.are.equal("spellName", mergedViaMethod.keyType)
+        assert.are.equal("Immolation Aura", mergedViaMethod.primaryKey)
+    end)
+
     it("SetColorByKey stores metadata and supports lookup from each key tier", function()
         local c = color(0.1, 0.2, 0.3)
         local key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001)
@@ -480,6 +543,75 @@ describe("SpellColors", function()
         assert.are.equal("spellID", entries[1].key.keyType)
         assert.are.equal(2468, entries[1].key.primaryKey)
         assert.are.same(persistedValue, entries[1].color)
+    end)
+
+    it("GetAllColorEntries preserves each store tier raw key when value.keyType mismatches", function()
+        SpellColors.GetDefaultColor()
+
+        local tierCases = {
+            {
+                storeKey = "byName",
+                rawKey = "Raw Persisted Name",
+                value = { r = 0.1, g = 0.2, b = 0.3, a = 1, keyType = "spellID", spellID = 7101 },
+                rawField = "spellName",
+            },
+            {
+                storeKey = "bySpellID",
+                rawKey = 7102,
+                value = { r = 0.2, g = 0.3, b = 0.4, a = 1, keyType = "spellName", spellName = "Metadata Name" },
+                rawField = "spellID",
+            },
+            {
+                storeKey = "byCooldownID",
+                rawKey = 7103,
+                value = { r = 0.3, g = 0.4, b = 0.5, a = 1, keyType = "spellName", spellName = "Metadata Name" },
+                rawField = "cooldownID",
+            },
+            {
+                storeKey = "byTexture",
+                rawKey = 7104,
+                value = { r = 0.4, g = 0.5, b = 0.6, a = 1, keyType = "spellName", spellName = "Metadata Name" },
+                rawField = "textureFileID",
+            },
+        }
+
+        for _, tierCase in ipairs(tierCases) do
+            for _, storeKey in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
+                buffBarsConfig.colors[storeKey][currentClassID] = buffBarsConfig.colors[storeKey][currentClassID] or {}
+                buffBarsConfig.colors[storeKey][currentClassID][currentSpecID] = {}
+            end
+
+            buffBarsConfig.colors[tierCase.storeKey][currentClassID][currentSpecID][tierCase.rawKey] = {
+                value = tierCase.value,
+            }
+
+            local entries = SpellColors.GetAllColorEntries()
+            assert.are.equal(1, #entries)
+            assert.are.equal(tierCase.rawKey, entries[1].key[tierCase.rawField])
+        end
+    end)
+
+    it("GetAllColorEntries keeps reconciled byName raw keys so reset clears byName mappings", function()
+        local persisted = color(0.6, 0.1, 0.9)
+        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 1357, nil, nil), persisted)
+
+        SpellColors.ReconcileBar(makeFrame({
+            spellName = "Persisted Name",
+            spellID = 1357,
+        }))
+
+        assert.are.same(persisted, SpellColors.GetColorByKey({ spellName = "Persisted Name" }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Persisted Name", entries[1].key.spellName)
+        assert.are.equal(1357, entries[1].key.spellID)
+
+        local nameCleared, spellIDCleared = SpellColors.ResetColorByKey(entries[1].key)
+        assert.is_true(nameCleared)
+        assert.is_true(spellIDCleared)
+        assert.is_nil(SpellColors.GetColorByKey({ spellName = "Persisted Name" }))
+        assert.is_nil(SpellColors.GetColorByKey({ spellID = 1357 }))
     end)
 
     it("isolates stored colors by class and specialization", function()

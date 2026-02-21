@@ -29,60 +29,55 @@ end
 --- newly-seen spells appear in the options panel.  Deduplication follows
 --- the PriorityKeyMap convention: spell name is preferred, then spellID,
 --- cooldownID, and finally texture file ID.
----@return table args AceConfig args table with color pickers and reset buttons
-local function GenerateSpellColorArgs()
-    local args = {}
-
-    -- Build an ordered, deduplicated list of spell keys.
-    -- Active bars come first (in viewer top-to-bottom order), then any
-    -- persisted-only colours that aren't currently visible.
-    local seen = {}
-    local ordered = {}
-    ---@type table<any, ECM_SpellColorKey>
-    local keyForPrimary = {}
-
-    -- Texture lookup — maps colorKey → textureFileID so the options UI
-    -- can display an inline icon for every entry, not just fallback keys.
-    local textureForKey = {}
+---@param activeBars ECM_SpellColorKey[]|nil
+---@param savedEntries { key: ECM_SpellColorKey }[]|nil
+---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
+local function BuildSpellColorRows(activeBars, savedEntries)
+    ---@type { key: ECM_SpellColorKey, textureFileID: number|nil }[]
+    local rows = {}
 
     ---@param key ECM_SpellColorKey|nil
     local function AddDiscoveredKey(key)
-        if not (key and key.primaryKey) then
+        local normalized = ECM.SpellColors.NormalizeKey(key)
+        if not normalized then
             return
         end
 
-        local primary = key.primaryKey
-        if not seen[primary] then
-            seen[primary] = true
-            ordered[#ordered + 1] = primary
-            keyForPrimary[primary] = key
-        end
-
-        if key.textureFileID then
-            if not textureForKey[primary] then
-                textureForKey[primary] = key.textureFileID
+        for _, row in ipairs(rows) do
+            if row.key:Matches(normalized) then
+                row.key = row.key:Merge(normalized) or row.key
+                row.textureFileID = row.key.textureFileID or row.textureFileID
+                return
             end
-            seen[key.textureFileID] = true
         end
-        if key.spellID then seen[key.spellID] = true end
-        if key.cooldownID then seen[key.cooldownID] = true end
+
+        rows[#rows + 1] = {
+            key = normalized,
+            textureFileID = normalized.textureFileID,
+        }
     end
 
-    -- 1) Currently-visible aura bars — prefer spellName as display key,
-    --    falling through spellID, cooldownID, then textureFileID.
-    local activeBars = ECM.BuffBars:GetActiveSpellData()
-    for _, key in ipairs(activeBars) do
-        AddDiscoveredKey(key)
+    if type(activeBars) == "table" then
+        for _, key in ipairs(activeBars) do
+            AddDiscoveredKey(key)
+        end
     end
 
-    -- 2) Persisted custom colors — appended so users can manage colours
-    --    for spells that aren't currently active.
-    local savedEntries = ECM.SpellColors.GetAllColorEntries()
-    for _, entry in ipairs(savedEntries) do
-        AddDiscoveredKey(entry.key)
+    if type(savedEntries) == "table" then
+        for _, entry in ipairs(savedEntries) do
+            AddDiscoveredKey(type(entry) == "table" and entry.key or nil)
+        end
     end
 
-    if #ordered == 0 then
+    return rows
+end
+
+---@param rows { key: ECM_SpellColorKey, textureFileID: number|nil }[]
+---@return table args AceConfig args table with color pickers and reset buttons
+local function BuildSpellColorArgsFromRows(rows)
+    local args = {}
+
+    if #rows == 0 then
         args.noData = {
             type = "description",
             name = "|cffaaaaaa(No aura bars found. Cast a buff and click 'Refresh Spell List'.)|r",
@@ -91,14 +86,13 @@ local function GenerateSpellColorArgs()
         return args
     end
 
-    for i, colorKey in ipairs(ordered) do
+    for i, row in ipairs(rows) do
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
-        local key = keyForPrimary[colorKey]
-        if key then
-            local rowKey = key
-            -- Prefer known texture IDs from observed bars, then persisted metadata.
-            local texture = textureForKey[colorKey] or rowKey.textureFileID
+        local rowKey = row.key
+        if rowKey then
+            local colorKey = rowKey.primaryKey
+            local texture = row.textureFileID or rowKey.textureFileID
             local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
             local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
 
@@ -140,6 +134,16 @@ local function GenerateSpellColorArgs()
     end
 
     return args
+end
+
+---@return table args AceConfig args table with color pickers and reset buttons
+local function GenerateSpellColorArgs()
+    -- Active rows come first in viewer order, then persisted-only rows.
+    local rows = BuildSpellColorRows(
+        ECM.BuffBars:GetActiveSpellData(),
+        ECM.SpellColors.GetAllColorEntries()
+    )
+    return BuildSpellColorArgsFromRows(rows)
 end
 
 local function SpellOptionsTable()
@@ -242,6 +246,8 @@ end
 
 local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
+BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
+BuffBarsOptions._BuildSpellColorArgsFromRows = BuildSpellColorArgsFromRows
 
 function BuffBarsOptions.GetOptionsTable()
     local db = ns.Addon.db

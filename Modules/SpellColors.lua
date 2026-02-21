@@ -23,6 +23,12 @@ local KEY_TYPE_TO_STORE = {
     byCooldownID = "cooldownID",
     byTexture = "textureFileID",
 }
+local KEY_TYPES = {
+    spellName = true,
+    spellID = true,
+    cooldownID = true,
+    textureFileID = true,
+}
 
 ---------------------------------------------------------------------------
 -- Key validation
@@ -115,6 +121,10 @@ end
 
 local _map -- PriorityKeyMap instance (created on first use)
 
+---@class ECM_SpellColorKeyType
+local SpellColorKeyType = {}
+SpellColorKeyType.__index = SpellColorKeyType
+
 ---@class ECM_SpellColorKey
 ---@field keyType "spellName"|"spellID"|"cooldownID"|"textureFileID"
 ---@field primaryKey string|number
@@ -166,14 +176,14 @@ local function build_key(spellName, spellID, cooldownID, textureFileID, preferre
         return nil
     end
 
-    return {
+    return setmetatable({
         keyType = keyType,
         primaryKey = primaryKey,
         spellName = spellName,
         spellID = spellID,
         cooldownID = cooldownID,
         textureFileID = textureFileID,
-    }
+    }, SpellColorKeyType)
 end
 
 ---@param key ECM_SpellColorKey|table|nil
@@ -187,7 +197,7 @@ local function normalize_key(key)
     local spellID = validateKey(key.spellID)
     local cooldownID = validateKey(key.cooldownID)
     local textureFileID = validateKey(key.textureFileID or key.textureId)
-    local keyType = key.keyType
+    local keyType = KEY_TYPES[key.keyType] and key.keyType or nil
     local primaryKey = validateKey(key.primaryKey)
 
     if keyType == "spellName" and type(primaryKey) == "string" and not spellName then
@@ -203,6 +213,56 @@ local function normalize_key(key)
     return build_key(spellName, spellID, cooldownID, textureFileID, keyType)
 end
 
+---@param a ECM_SpellColorKey|nil
+---@param b ECM_SpellColorKey|nil
+---@return boolean
+local function keys_match(a, b)
+    if not (a and b) then
+        return false
+    end
+
+    if a.spellName and b.spellName and a.spellName == b.spellName then
+        return true
+    end
+    if a.spellID and b.spellID and a.spellID == b.spellID then
+        return true
+    end
+    if a.cooldownID and b.cooldownID and a.cooldownID == b.cooldownID then
+        return true
+    end
+
+    local aTextureOnly = (a.spellName == nil and a.spellID == nil and a.cooldownID == nil)
+    local bTextureOnly = (b.spellName == nil and b.spellID == nil and b.cooldownID == nil)
+    if aTextureOnly and bTextureOnly and a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
+        return true
+    end
+
+    return false
+end
+
+---@param base ECM_SpellColorKey|nil
+---@param other ECM_SpellColorKey|nil
+---@return ECM_SpellColorKey|nil
+local function merge_keys(base, other)
+    if base == nil then
+        return other
+    end
+    if other == nil then
+        return base
+    end
+    if not keys_match(base, other) then
+        return nil
+    end
+
+    return build_key(
+        base.spellName or other.spellName,
+        base.spellID or other.spellID,
+        base.cooldownID or other.cooldownID,
+        base.textureFileID or other.textureFileID,
+        nil
+    )
+end
+
 ---@param key ECM_SpellColorKey|table|nil
 ---@return string|nil spellName
 ---@return number|nil spellID
@@ -215,6 +275,18 @@ local function key_to_tuple(key)
         return nil, nil, nil, nil, nil
     end
     return normalized.spellName, normalized.spellID, normalized.cooldownID, normalized.textureFileID, normalized
+end
+
+---@param other ECM_SpellColorKey|table|nil
+---@return boolean
+function SpellColorKeyType:Matches(other)
+    return keys_match(self, normalize_key(other))
+end
+
+---@param other ECM_SpellColorKey|table|nil
+---@return ECM_SpellColorKey|nil
+function SpellColorKeyType:Merge(other)
+    return merge_keys(self, normalize_key(other))
 end
 
 --- Returns the PriorityKeyMap instance, creating it on first call.
@@ -258,6 +330,30 @@ function SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
     local validCooldownID = validateKey(cooldownID)
     local validTextureID = validateKey(textureFileID)
     return build_key(validSpellName, validSpellID, validCooldownID, validTextureID, nil)
+end
+
+--- Normalizes a key payload into an opaque spell-color key object.
+---@param key ECM_SpellColorKey|table|nil
+---@return ECM_SpellColorKey|nil
+function SpellColors.NormalizeKey(key)
+    return normalize_key(key)
+end
+
+--- Returns true when two keys identify the same logical spell-color entry.
+---@param left ECM_SpellColorKey|table|nil
+---@param right ECM_SpellColorKey|table|nil
+---@return boolean
+function SpellColors.KeysMatch(left, right)
+    return keys_match(normalize_key(left), normalize_key(right))
+end
+
+--- Merges identifiers from matching keys into a single normalized key.
+--- Returns nil when both keys are valid but identify different entries.
+---@param base ECM_SpellColorKey|table|nil
+---@param other ECM_SpellColorKey|table|nil
+---@return ECM_SpellColorKey|nil
+function SpellColors.MergeKeys(base, other)
+    return merge_keys(normalize_key(base), normalize_key(other))
 end
 
 --- Gets the custom color for a spell by a normalized key object.
@@ -332,13 +428,16 @@ function SpellColors.GetAllColorEntries()
                     local preferredType = value.keyType or keyType
                     local validRawKey = validateKey(rawKey)
 
-                    if preferredType == "spellName" and type(validRawKey) == "string" and not spellName then
+                    -- Always hydrate the identifier represented by the current
+                    -- storage tier from the raw persisted key. This keeps reset
+                    -- semantics correct when value.keyType points to a lower tier.
+                    if keyType == "spellName" and type(validRawKey) == "string" then
                         spellName = validRawKey
-                    elseif preferredType == "spellID" and type(validRawKey) == "number" and not spellID then
+                    elseif keyType == "spellID" and type(validRawKey) == "number" then
                         spellID = validRawKey
-                    elseif preferredType == "cooldownID" and type(validRawKey) == "number" and not cooldownID then
+                    elseif keyType == "cooldownID" and type(validRawKey) == "number" then
                         cooldownID = validRawKey
-                    elseif preferredType == "textureFileID" and type(validRawKey) == "number" and not textureFileID then
+                    elseif keyType == "textureFileID" and type(validRawKey) == "number" then
                         textureFileID = validRawKey
                     end
 
