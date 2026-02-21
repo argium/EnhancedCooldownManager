@@ -2,6 +2,6 @@
 
 ```sh
 scoop install mingw luarocks
-luarock
+luarocks install busted
 busted Tests
 ```
