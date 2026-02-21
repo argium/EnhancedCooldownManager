@@ -7,7 +7,7 @@
 ## X-Category: Library
 
 #@no-lib-strip@
-Libs\Libstub\Libstub.lua
+Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceGUI-3.0\AceGUI-3.0.xml
 Libs\LibSharedMedia-3.0\lib.xml
