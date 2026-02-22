@@ -20,6 +20,60 @@ function Invoke-Git {
     }
 }
 
+function Get-GitHubWorkflowsUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RemoteName
+    )
+
+    $remoteUrlOutput = & git remote get-url $RemoteName 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Could not resolve remote '$RemoteName' URL; skipping browser open." -ForegroundColor Yellow
+        return $null
+    }
+
+    $remoteUrl = ($remoteUrlOutput | Select-Object -First 1).ToString().Trim()
+    if ([string]::IsNullOrWhiteSpace($remoteUrl)) {
+        Write-Host "Remote '$RemoteName' returned an empty URL; skipping browser open." -ForegroundColor Yellow
+        return $null
+    }
+
+    $repoPath = $null
+    if ($remoteUrl -match '^https?://github\.com/(?<repo>[^/]+/[^/]+?)(?:\.git)?/?$') {
+        $repoPath = $Matches['repo']
+    } elseif ($remoteUrl -match '^git@github\.com:(?<repo>[^/]+/[^/]+?)(?:\.git)?$') {
+        $repoPath = $Matches['repo']
+    } elseif ($remoteUrl -match '^ssh://git@github\.com/(?<repo>[^/]+/[^/]+?)(?:\.git)?/?$') {
+        $repoPath = $Matches['repo']
+    }
+
+    if (-not $repoPath) {
+        Write-Host "Remote '$RemoteName' is not a supported GitHub URL ('$remoteUrl'); skipping browser open." -ForegroundColor Yellow
+        return $null
+    }
+
+    return "https://github.com/$repoPath/actions/workflows"
+}
+
+function Open-GitHubWorkflowsPage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RemoteName
+    )
+
+    $workflowsUrl = Get-GitHubWorkflowsUrl -RemoteName $RemoteName
+    if (-not $workflowsUrl) {
+        return
+    }
+
+    Write-Host "Opening workflows page: $workflowsUrl"
+    try {
+        Start-Process $workflowsUrl | Out-Null
+    } catch {
+        Write-Host "Failed to open browser for workflows page: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 if (-not (Test-Path -LiteralPath $TocPath)) {
     throw "TOC file not found: $TocPath"
 }
@@ -67,6 +121,7 @@ if (-not $localTagExists -and -not $remoteTagExists) {
 
 if ($remoteTagExists) {
     Write-Host "Refusing to push because '$version' already exists on '$Remote'." -ForegroundColor Red
+    Open-GitHubWorkflowsPage -RemoteName $Remote
     exit 0
 }
 
@@ -77,3 +132,4 @@ if (-not $localTagExists) {
 Write-Host "Pushing tag '$version' to '$Remote'"
 Invoke-Git -Arguments @("push", $Remote, "refs/tags/$version")
 Write-Host "Done." -ForegroundColor Green
+Open-GitHubWorkflowsPage -RemoteName $Remote
