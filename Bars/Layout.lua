@@ -36,6 +36,7 @@ local _hideReason = nil
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
 local _lastAlpha = 1
+local _cooldownViewerSettingsHooked = false
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -83,8 +84,11 @@ local function SetGloballyHidden(hidden, reason)
 end
 
 
-local function SetAlpha(alpha)
-    if _lastAlpha == alpha then
+--- Applies alpha to all managed frames.
+--- @param alpha number
+--- @param force boolean|nil Reapply even if the cached alpha matches
+local function SetAlpha(alpha, force)
+    if not force and _lastAlpha == alpha then
         return
     end
 
@@ -101,7 +105,8 @@ local function SetAlpha(alpha)
 end
 
 --- Checks all fade and hide conditions and updates global state.
-local function UpdateFadeAndHiddenStates()
+--- @param forceAlpha boolean|nil Reapply alpha even if unchanged
+local function UpdateFadeAndHiddenStates(forceAlpha)
     local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
     if not globalConfig then
         return
@@ -152,13 +157,35 @@ local function UpdateFadeAndHiddenStates()
         end
     end
 
-    SetAlpha(alpha)
+    SetAlpha(alpha, forceAlpha)
+end
+
+local UpdateAllLayouts
+
+--- Hooks CooldownViewerSettings hide to force alpha/layout reapplication.
+local function HookCooldownViewerSettings()
+    if _cooldownViewerSettingsHooked then
+        return
+    end
+
+    local settingsFrame = _G.CooldownViewerSettings
+    if not settingsFrame then
+        return
+    end
+
+    settingsFrame:HookScript("OnHide", function()
+        UpdateFadeAndHiddenStates(true)
+        UpdateAllLayouts("OnHide:CooldownViewerSettings")
+    end)
+
+    _cooldownViewerSettingsHooked = true
+    ECM_log(ECM.Constants.SYS.Layout, nil, "Hooked CooldownViewerSettings OnHide")
 end
 
 local _chainSet = {}
 for _, name in ipairs(ECM.Constants.CHAIN_ORDER) do _chainSet[name] = true end
 
-local function UpdateAllLayouts(reason)
+UpdateAllLayouts = function(reason)
     -- Chain frames must update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(ECM.Constants.CHAIN_ORDER) do
@@ -187,6 +214,7 @@ local function ScheduleLayoutUpdate(delay, reason)
     _layoutPending = true
     C_Timer.After(delay or 0, function()
         _layoutPending = false
+        HookCooldownViewerSettings()
         UpdateFadeAndHiddenStates()
         UpdateAllLayouts(reason)
     end)
@@ -242,6 +270,8 @@ end
 eventFrame:RegisterEvent("CVAR_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
+    HookCooldownViewerSettings()
+
     if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
         return
     end
