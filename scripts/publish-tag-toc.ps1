@@ -1,6 +1,8 @@
 param(
     [string]$TocPath = "EnhancedCooldownManager.toc",
-    [string]$Remote = "origin"
+    [string]$Remote = "origin",
+    [Alias("TagMessage", "ReleaseMessage")]
+    [string]$Message
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,7 +52,12 @@ $remoteTagExists = -not [string]::IsNullOrWhiteSpace(($remoteQuery -join "`n"))
 
 if (-not $localTagExists -and -not $remoteTagExists) {
     Write-Host "Creating local tag '$version'"
-    Invoke-Git -Arguments @("tag", $version)
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        Invoke-Git -Arguments @("tag", $version)
+    } else {
+        Write-Host "Using tag/release message: $Message"
+        Invoke-Git -Arguments @("tag", "-a", $version, "-m", $Message)
+    }
     $localTagExists = $true
 } elseif ($localTagExists) {
     Write-Host "Local tag '$version' already exists." -ForegroundColor Yellow
