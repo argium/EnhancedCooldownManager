@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   ADDON_NAME: EnhancedCooldownManager
   CF_PROJECT_ID: 1427906
@@ -23,40 +27,61 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify TOC version matches tag
+      - name: Prepare release metadata
+        id: meta
         run: |
-          TAG_VERSION="${{ github.ref_name }}"
-          TOC_VERSION=$(grep -oP '## Version: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
+          set -euo pipefail
 
-          echo "Tag version: $TAG_VERSION"
+          VERSION="${{ github.ref_name }}"
+          TOC_VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
+          TOC_INTERFACES=$(grep -oP '## Interface: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
+
+          echo "Tag version: $VERSION"
           echo "TOC version: $TOC_VERSION"
+          echo "TOC Interface versions: $TOC_INTERFACES"
 
-          if [ "$TAG_VERSION" != "$TOC_VERSION" ]; then
-            echo "::error::Version mismatch! Tag is '$TAG_VERSION' but TOC file has '$TOC_VERSION'. Please update the TOC file version before releasing."
+          if [ "$VERSION" != "$TOC_VERSION" ]; then
+            echo "::error::Version mismatch! Tag is '$VERSION' but TOC file has '$TOC_VERSION'. Please update the TOC file version before releasing."
             exit 1
           fi
 
-          echo "✓ Version check passed"
-
-      - name: Get version and changelog
-        id: version
-        run: |
-          VERSION="${{ github.ref_name }}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Packaging version: $VERSION"
-
-          # Generate changelog from commits since previous tag
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            echo "Generating changelog from $PREVIOUS_TAG to $VERSION"
-            CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${VERSION}" 2>/dev/null || echo "")
+          if [[ "$VERSION" == *"-alpha"* ]]; then
+            RELEASE_TYPE="alpha"
+            PRERELEASE="true"
+          elif [[ "$VERSION" == *"-beta"* ]]; then
+            RELEASE_TYPE="beta"
+            PRERELEASE="true"
           else
-            echo "No previous tag found, using all commits up to $VERSION"
-            CHANGELOG=$(git log --pretty=format:"- %s" "${VERSION}" 2>/dev/null || echo "")
+            RELEASE_TYPE="release"
+            PRERELEASE="false"
           fi
 
-          # Handle empty changelog
+          echo "Packaging version: $VERSION"
+          echo "Release type: $RELEASE_TYPE"
+
+          # Prefer the annotated tag message for release notes/changelog.
+          TAG_OBJECT_TYPE=$(git cat-file -t "$VERSION" 2>/dev/null || echo "")
+          if [ "$TAG_OBJECT_TYPE" = "tag" ]; then
+            CHANGELOG=$(git for-each-ref "refs/tags/$VERSION" --format='%(contents)')
+          else
+            CHANGELOG=""
+          fi
+
+          # Fallback: generate changelog from commits since previous tag.
+          if [ -z "$CHANGELOG" ]; then
+            PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
+
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "No annotated tag message found. Generating changelog from $PREVIOUS_TAG to $VERSION"
+              CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${VERSION}" 2>/dev/null || echo "")
+            else
+              echo "No annotated tag message or previous tag found. Using all commits up to $VERSION"
+              CHANGELOG=$(git log --pretty=format:"- %s" "${VERSION}" 2>/dev/null || echo "")
+            fi
+          else
+            echo "Using annotated tag message for changelog"
+          fi
+
           if [ -z "$CHANGELOG" ]; then
             CHANGELOG="- Release ${VERSION}"
           fi
@@ -65,13 +90,18 @@ jobs:
           echo "Changelog:"
           cat changelog.txt
 
-      - name: Create package directory
-        run: |
-          mkdir -p package/${ADDON_NAME}
+          {
+            echo "version=$VERSION"
+            echo "toc_interfaces=$TOC_INTERFACES"
+            echo "release_type=$RELEASE_TYPE"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Copy addon files
+      - name: Package addon
         run: |
-          rsync -av --progress . package/${ADDON_NAME}/ \
+          set -euo pipefail
+          mkdir -p "package/${ADDON_NAME}"
+          rsync -av . "package/${ADDON_NAME}/" \
             --exclude '.*' \
             --exclude 'TODO.md' \
             --exclude 'CLAUDE.md' \
@@ -83,35 +113,25 @@ jobs:
             --exclude 'Tests' \
             --exclude '*.rockspec' \
             --exclude 'package'
+          (
+            cd package
+            zip -r "../${ADDON_NAME}-${{ steps.meta.outputs.version }}.zip" "${ADDON_NAME}"
+          )
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ADDON_NAME }}-${{ steps.version.outputs.version }}
-          path: package
-
-      - name: Create zip for CurseForge
-        run: |
-          cd package
-          zip -r ../${ADDON_NAME}-${{ steps.version.outputs.version }}.zip ${ADDON_NAME}
+          name: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}
+          path: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}.zip
 
       - name: Upload to CurseForge
         env:
           CF_TOKEN: ${{ secrets.CF_TOKEN }}
         run: |
-          # Determine release type from version string
-          VERSION="${{ steps.version.outputs.version }}"
-          if [[ "$VERSION" == *"-alpha"* ]]; then
-            RELEASE_TYPE="alpha"
-          elif [[ "$VERSION" == *"-beta"* ]]; then
-            RELEASE_TYPE="beta"
-          else
-            RELEASE_TYPE="release"
-          fi
-
-          # Extract Interface versions from .toc file (e.g., "120000, 120001, 110207")
-          TOC_INTERFACES=$(grep -oP '## Interface: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
-          echo "TOC Interface versions: $TOC_INTERFACES"
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          RELEASE_TYPE="${{ steps.meta.outputs.release_type }}"
+          TOC_INTERFACES="${{ steps.meta.outputs.toc_interfaces }}"
 
           # Fetch game versions from CurseForge API (requires auth)
           CF_VERSIONS=$(curl -s -H "X-Api-Token: ${CF_TOKEN}" "https://wow.curseforge.com/api/game/versions")
@@ -157,7 +177,7 @@ jobs:
           CHANGELOG_JSON=$(echo "$CHANGELOG" | jq -Rs .)
           METADATA=$(jq -n \
             --argjson changelog "$CHANGELOG_JSON" \
-            --arg displayName "${ADDON_NAME} ${{ steps.version.outputs.version }}" \
+            --arg displayName "${ADDON_NAME} ${VERSION}" \
             --argjson gameVersions "$GAME_VERSIONS" \
             --arg releaseType "$RELEASE_TYPE" \
             '{
@@ -173,7 +193,7 @@ jobs:
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             -H "X-Api-Token: ${CF_TOKEN}" \
             -F "metadata=${METADATA}" \
-            -F "file=@${ADDON_NAME}-${{ steps.version.outputs.version }}.zip" \
+            -F "file=@${ADDON_NAME}-${VERSION}.zip" \
             "https://wow.curseforge.com/api/projects/${{ env.CF_PROJECT_ID }}/upload-file")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
@@ -192,10 +212,9 @@ jobs:
         env:
           WOWI_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
-          # Extract Interface versions from .toc file
-          COMPATIBLE=$(grep -oP '## Interface: \K.*' ${ADDON_NAME}.toc | tr -d '[:space:]')
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          COMPATIBLE="${{ steps.meta.outputs.toc_interfaces }}"
           echo "WoWInterface compatible versions: $COMPATIBLE"
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
@@ -220,15 +239,16 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          PRERELEASE_FLAG=""
-          if [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-beta"* ]]; then
-            PRERELEASE_FLAG="--prerelease"
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          PRERELEASE_FLAG=()
+          if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE_FLAG+=(--prerelease)
           fi
 
           gh release create "$VERSION" \
             "${ADDON_NAME}-${VERSION}.zip" \
-            --generate-notes \
-            $PRERELEASE_FLAG
+            --notes-file changelog.txt \
+            "${PRERELEASE_FLAG[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
