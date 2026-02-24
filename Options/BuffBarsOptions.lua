@@ -92,7 +92,10 @@ local function BuildSpellColorArgsFromRows(rows)
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
         local rowKey = row.key
-        unlabeledBarsPresent = unlabeledBarsPresent or (type(rowKey.primaryKey) == "string" and not rowKey.primaryKey)
+
+        -- If there are any entries without valid names, display a warning message to the user.
+        unlabeledBarsPresent = unlabeledBarsPresent
+            or (type(rowKey.primaryKey) ~= "string" or not rowKey.primaryKey or issecretvalue(rowKey.primaryKey) or rowKey.primaryKey == "")
 
         if rowKey then
             local colorKey = rowKey.primaryKey
@@ -195,7 +198,7 @@ local function SpellOptionsTable()
             },
             unlabeledBarsWarning = {
                 type = "description",
-                name = "|cffFFDD3CTSome spell names or icons are secret, and are displayed as a generic \"Bar\". This may persist until you reload your UI.|r\n\n",
+                name = "|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\". This may persist until you reload your UI, or they can be safely deleted.|r\n\n",
                 order = 7,
                 hidden = function() return not unlabeledBarsPresent end
             },
