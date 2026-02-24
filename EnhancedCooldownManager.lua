@@ -213,19 +213,37 @@ local function ParseToggleArg(arg, current)
     return nil, "Usage: expected on|off|toggle"
 end
 
+local function printhelp()
+    ECM_print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
+    ECM_print("/ecm help - show this message")
+    ECM_print("/ecm options|config|settings|o - open the options menu")
+    ECM_print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
+    ECM_print("/ecm migrationlog - show the settings migration log")
+
+end
+
 --- Handles slash command input.
 ---@param input string|nil
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        ECM_print("Commands: /ecm debug [on|off|toggle] | /ecm options")
+        printhelp()
         return
     end
 
     if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
         ECM.ScheduleLayoutUpdate(0, "ChatCommand")
         ECM_print("Refreshing all modules.")
+        return
+    end
+
+    if cmd == "migration" then
+        if arg == "" or arg == "log" then
+            ECM.Migration.PrintLog()
+        else
+            printhelp()
+        end
         return
     end
 
@@ -261,8 +279,6 @@ function mod:ChatCommand(input)
         ECM_print("Debug:", profile.debug and "ON" or "OFF")
         return
     end
-
-    ECM_print("Unknown command. Use /ecm help")
 end
 
 function mod:HandleOpenOptionsAfterCombat()

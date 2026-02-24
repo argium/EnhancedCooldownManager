@@ -646,3 +646,22 @@ function Migration.FlushLog()
 
     wipe(migrationLog)
 end
+
+function Migration.PrintLog()
+    local sv = _G[ECM.Constants.SV_NAME]
+    local versions = sv and sv._versions
+    local slot = versions and versions[ECM.Constants.CURRENT_SCHEMA_VERSION]
+    if not slot then
+        return
+    end
+
+    if #slot._migrationLog == 0 then
+        print("No migration log entries.")
+        return
+    end
+
+    print("Schema Migration Log:")
+    for _, entry in ipairs(slot._migrationLog) do
+        print("- " .. entry)
+    end
+end

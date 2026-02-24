@@ -253,7 +253,7 @@ end
 --- Prints a chat message with a colorful ECM prefix.
 ---@param ... any
 function ECM_print(...)
-    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME .. ":")
+    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. ":")
     local args = {...}
     for i = 1, #args do args[i] = tostring(args[i]) end
     local message = table.concat(args, " ")
