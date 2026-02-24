@@ -89,7 +89,7 @@ local function BuildSpellColorArgsFromRows(rows)
 
         -- If there are any entries without valid names, display a warning message to the user.
         unlabeledBarsPresent = unlabeledBarsPresent
-            or (type(rowKey.primaryKey) ~= "string" or not rowKey.primaryKey or issecretvalue(rowKey.primaryKey) or rowKey.primaryKey == "")
+            or (type(rowKey.primaryKey) == "string" and (issecretvalue(rowKey.primaryKey) or rowKey.primaryKey == ""))
 
         if rowKey then
             local colorKey = rowKey.primaryKey
@@ -236,6 +236,8 @@ local function SpellOptionsTable()
                 width = "normal",
                 disabled =  IsEditLocked,
                 func = function()
+                    local activeKeys = ECM.BuffBars:GetActiveSpellData()
+                    ECM.SpellColors.ReconcileAllKeys(activeKeys)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },

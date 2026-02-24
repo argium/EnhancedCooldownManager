@@ -320,16 +320,13 @@ describe("SpellColors", function()
         assert.are.equal("Immolation Aura", mergedViaMethod.primaryKey)
     end)
 
-    it("SetColorByKey stores metadata and supports lookup from each key tier", function()
+    it("SetColorByKey does not mutate color payload and supports lookup from each key tier", function()
         local c = color(0.1, 0.2, 0.3)
         local key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001)
 
         SpellColors.SetColorByKey(key, c)
 
-        assert.are.equal("spellName", c.keyType)
-        assert.are.equal(258920, c.spellID)
-        assert.are.equal(77, c.cooldownID)
-        assert.are.equal(9001, c.textureId)
+        assert.are.same({ r = 0.1, g = 0.2, b = 0.3, a = 1 }, c)
 
         assert.are.same(c, SpellColors.GetColorByKey({ spellName = "Immolation Aura" }))
         assert.are.same(c, SpellColors.GetColorByKey({ spellID = 258920 }))
@@ -343,8 +340,7 @@ describe("SpellColors", function()
         SpellColors.SetColorByKey({ keyType = "spellID", primaryKey = 321 }, c)
 
         assert.are.same(c, SpellColors.GetColorByKey({ spellID = 321 }))
-        assert.are.equal("spellID", c.keyType)
-        assert.are.equal(321, c.spellID)
+        assert.are.same({ r = 0.4, g = 0.5, b = 0.6, a = 1 }, c)
     end)
 
     it("GetColorByKey accepts legacy textureId field", function()
@@ -592,7 +588,37 @@ describe("SpellColors", function()
             local entries = SpellColors.GetAllColorEntries()
             assert.are.equal(1, #entries)
             assert.are.equal(tierCase.rawKey, entries[1].key[tierCase.rawField])
+            assert.is_nil(entries[1].color.keyType)
         end
+    end)
+
+    it("GetAllColorEntries logically deduplicates fragmented wrappers and prefers newest color", function()
+        SpellColors.GetDefaultColor()
+
+        for _, storeKey in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
+            buffBarsConfig.colors[storeKey][currentClassID] = buffBarsConfig.colors[storeKey][currentClassID] or {}
+            buffBarsConfig.colors[storeKey][currentClassID][currentSpecID] = {}
+        end
+
+        local older = {
+            value = { r = 0.2, g = 0.3, b = 0.4, a = 1 }, t = 10,
+            meta = { keyType = "spellName", primaryKey = "Demon Spikes", spellName = "Demon Spikes", spellID = 203720 },
+        }
+        local newer = {
+            value = { r = 0.8, g = 0.7, b = 0.6, a = 1 }, t = 20,
+            meta = { keyType = "spellID", primaryKey = 203720, spellID = 203720, cooldownID = 11431 },
+        }
+
+        buffBarsConfig.colors.byName[currentClassID][currentSpecID]["Demon Spikes"] = older
+        buffBarsConfig.colors.bySpellID[currentClassID][currentSpecID][203720] = newer
+        buffBarsConfig.colors.byCooldownID[currentClassID][currentSpecID][11431] = newer
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Demon Spikes", entries[1].key.spellName)
+        assert.are.equal(203720, entries[1].key.spellID)
+        assert.are.equal(11431, entries[1].key.cooldownID)
+        assert.are.same(newer.value, entries[1].color)
     end)
 
     it("GetAllColorEntries keeps reconciled byName raw keys so reset clears byName mappings", function()

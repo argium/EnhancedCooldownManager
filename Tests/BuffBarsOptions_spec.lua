@@ -16,6 +16,7 @@ describe("BuffBarsOptions", function()
     local BuffBarsOptions
     local SpellColors
     local layoutUpdateCalls
+    local notifyChangeCalls
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
@@ -40,6 +41,7 @@ describe("BuffBarsOptions", function()
 
     before_each(function()
         layoutUpdateCalls = 0
+        notifyChangeCalls = 0
 
         _G.ECM = {
             FrameUtil = {
@@ -111,7 +113,9 @@ describe("BuffBarsOptions", function()
 
         _G.LibStub = function()
             return {
-                NotifyChange = function() end,
+                NotifyChange = function()
+                    notifyChangeCalls = notifyChangeCalls + 1
+                end,
             }
         end
 
@@ -373,5 +377,33 @@ describe("BuffBarsOptions", function()
         assert.are.equal(1, layoutUpdateCalls)
         assert.is_nil(SpellColors.GetColorByKey({ spellName = "Persisted Name" }))
         assert.is_nil(SpellColors.GetColorByKey({ spellID = 8080 }))
+    end)
+
+    it("Refresh Spell List reconciles active keys before notifying options", function()
+        local activeKeys = {
+            SpellColors.MakeKey("Demon Spikes", 203720, 11431, 1344645),
+        }
+        local gotKeys
+        local reconcileCalls = 0
+
+        ECM.BuffBars.GetActiveSpellData = function()
+            return activeKeys
+        end
+
+        local originalReconcileAllKeys = ECM.SpellColors.ReconcileAllKeys
+        ECM.SpellColors.ReconcileAllKeys = function(keys)
+            reconcileCalls = reconcileCalls + 1
+            gotKeys = keys
+            return 1
+        end
+
+        local options = BuffBarsOptions.GetOptionsTable()
+        options.args.spells.args.refreshSpellList.func()
+
+        assert.are.equal(1, reconcileCalls)
+        assert.are.same(activeKeys, gotKeys)
+        assert.are.equal(1, notifyChangeCalls)
+
+        ECM.SpellColors.ReconcileAllKeys = originalReconcileAllKeys
     end)
 end)

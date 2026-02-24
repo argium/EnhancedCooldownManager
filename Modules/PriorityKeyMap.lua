@@ -29,9 +29,10 @@
 
 --- Wraps a value with a write-timestamp.
 ---@param value any
----@return table { value = any, t = number }
-local function stamp(value)
-    return { value = value, t = time() }
+---@param meta table|nil
+---@return table { value = any, t = number, meta = table|nil }
+local function stamp(value, meta)
+    return { value = value, t = time(), meta = meta }
 end
 
 --- Returns the underlying value from a stamped entry, or nil.
@@ -229,19 +230,44 @@ end
 ---------------------------------------------------------------------------
 
 --- Stores a value under all valid keys so that any single non-secret key
---- can retrieve the color later.
+--- can retrieve the value later. When one of the keys already exists, the
+--- existing stamped wrapper is reused to avoid forking duplicate entries.
 ---@param keys table  Array of key values, one per keyDefs tier (may contain nils).
 ---@param value any  The value to store.
-function PriorityKeyMap:Set(keys, value)
+---@param meta table|nil Optional metadata stored on the stamped wrapper (not part of value).
+function PriorityKeyMap:Set(keys, value, meta)
     local tables = self:_tables()
     if not tables then
         return
     end
 
-    local entry = stamp(value)
-
+    local vkeys = {}
+    local winner
+    local winnerTs = -1
     for i = 1, #self._keyDefs do
         local k = self._validateKey(keys[i])
+        vkeys[i] = k
+        if k and tables[i] then
+            local existing = tables[i][k]
+            if type(existing) == "table" and existing.value ~= nil then
+                local t = ts(existing)
+                if t > winnerTs then
+                    winner = existing
+                    winnerTs = t
+                end
+            end
+        end
+    end
+
+    local entry = winner or stamp(value, meta)
+    if winner then
+        entry.value = value
+        entry.t = time()
+        entry.meta = meta
+    end
+
+    for i = 1, #self._keyDefs do
+        local k = vkeys[i]
         if k and tables[i] then
             tables[i][k] = entry
         end

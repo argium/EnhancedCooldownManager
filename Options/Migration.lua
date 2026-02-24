@@ -1,5 +1,5 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V9).
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V10).
 
 local Migration = {}
 ECM.Migration = Migration
@@ -312,6 +312,399 @@ local function RepairSpellColorStores(profile)
     end
 end
 
+--- Normalizes spell-color wrapper metadata and collapses duplicate entries.
+--- Stored color payloads become color-only (r/g/b/a); identifiers move to entry.meta.
+---@param profile table The profile to repair
+local function NormalizeSpellColorStoresV10(profile)
+    local stats = {
+        skipped = false,
+        skipReason = nil,
+        tierStoresCreated = {},
+        tierStoresCreatedCount = 0,
+        classesProcessed = 0,
+        specsProcessed = 0,
+        entriesScanned = 0,
+        validEntries = 0,
+        invalidEntries = 0,
+        canonicalEntries = 0,
+        aliasLinksMerged = 0,
+        invalidRetained = 0,
+        invalidKeyCollisions = 0,
+        entriesMetaNormalized = 0,
+        finalEntries = 0,
+        perTier = {
+            byName = { scanned = 0, invalid = 0, final = 0 },
+            bySpellID = { scanned = 0, invalid = 0, final = 0 },
+            byCooldownID = { scanned = 0, invalid = 0, final = 0 },
+            byTexture = { scanned = 0, invalid = 0, final = 0 },
+        },
+        anomalySpecs = {},
+        anomalySpecsOverflow = 0,
+    }
+
+    local buffBars = profile.buffBars
+    if not (buffBars and type(buffBars.colors) == "table") then
+        stats.skipped = true
+        stats.skipReason = "buffBars.colors missing"
+        return stats
+    end
+
+    local colors = buffBars.colors
+    local tierDefs = {
+        { storeKey = "byName", keyType = "spellName" },
+        { storeKey = "bySpellID", keyType = "spellID" },
+        { storeKey = "byCooldownID", keyType = "cooldownID" },
+        { storeKey = "byTexture", keyType = "textureFileID" },
+    }
+    local validKeyTypes = {
+        spellName = true,
+        spellID = true,
+        cooldownID = true,
+        textureFileID = true,
+    }
+
+    local function ensureTierStore(storeKey)
+        if type(colors[storeKey]) ~= "table" then
+            colors[storeKey] = {}
+            if not stats.tierStoresCreated[storeKey] then
+                stats.tierStoresCreated[storeKey] = true
+                stats.tierStoresCreatedCount = stats.tierStoresCreatedCount + 1
+            end
+        end
+        return colors[storeKey]
+    end
+
+    local function ensureClassSpec(store, classID, specID)
+        if type(store[classID]) ~= "table" then
+            store[classID] = {}
+        end
+        if type(store[classID][specID]) ~= "table" then
+            store[classID][specID] = {}
+        end
+        return store[classID][specID]
+    end
+
+    local function validKey(k)
+        if type(k) == "string" or type(k) == "number" then
+            return k
+        end
+        return nil
+    end
+
+    local function validNumericKey(k)
+        return type(k) == "number" and k or nil
+    end
+
+    local function CountEntries(map)
+        if type(map) ~= "table" then
+            return 0
+        end
+        local n = 0
+        for _ in pairs(map) do
+            n = n + 1
+        end
+        return n
+    end
+
+    local function selectPrimary(spellName, spellID, cooldownID, textureFileID)
+        if spellName ~= nil then return spellName, "spellName" end
+        if spellID ~= nil then return spellID, "spellID" end
+        if cooldownID ~= nil then return cooldownID, "cooldownID" end
+        if textureFileID ~= nil then return textureFileID, "textureFileID" end
+        return nil, nil
+    end
+
+    local function buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
+        local keyType = validKeyTypes[preferredType] and preferredType or nil
+        local primaryKey
+        if keyType == "spellName" then primaryKey = spellName
+        elseif keyType == "spellID" then primaryKey = spellID
+        elseif keyType == "cooldownID" then primaryKey = cooldownID
+        elseif keyType == "textureFileID" then primaryKey = textureFileID
+        end
+        if primaryKey == nil then
+            primaryKey, keyType = selectPrimary(spellName, spellID, cooldownID, textureFileID)
+        end
+        if keyType == nil or primaryKey == nil then
+            return nil
+        end
+        return {
+            keyType = keyType,
+            primaryKey = primaryKey,
+            spellName = spellName,
+            spellID = spellID,
+            cooldownID = cooldownID,
+            textureFileID = textureFileID,
+        }
+    end
+
+    local function keysMatch(a, b)
+        if not (a and b) then
+            return false
+        end
+        if a.spellName and b.spellName and a.spellName == b.spellName then return true end
+        if a.spellID and b.spellID and a.spellID == b.spellID then return true end
+        if a.cooldownID and b.cooldownID and a.cooldownID == b.cooldownID then return true end
+        if a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then return true end
+        return false
+    end
+
+    local function mergeKeys(a, b)
+        if a == nil then return b end
+        if b == nil then return a end
+        if not keysMatch(a, b) then return nil end
+        return buildKey(
+            a.spellName or b.spellName,
+            a.spellID or b.spellID,
+            a.cooldownID or b.cooldownID,
+            a.textureFileID or b.textureFileID,
+            nil
+        )
+    end
+
+    local function entryTs(entry)
+        return (type(entry) == "table" and type(entry.t) == "number") and entry.t or 0
+    end
+
+    local function scrubValue(value)
+        if type(value) ~= "table" then
+            return
+        end
+        value.keyType = nil
+        value.primaryKey = nil
+        value.spellName = nil
+        value.spellID = nil
+        value.cooldownID = nil
+        value.textureId = nil
+        value.textureFileID = nil
+        if value.a == nil then
+            value.a = 1
+        end
+    end
+
+    local function buildKeyFromEntry(entry, tierKeyType, rawKey)
+        if type(entry) ~= "table" or type(entry.value) ~= "table" then
+            return nil
+        end
+
+        local value = entry.value
+        local meta = type(entry.meta) == "table" and entry.meta or nil
+        local spellName = validKey((meta and meta.spellName) or value.spellName)
+        local spellID = validNumericKey((meta and meta.spellID) or value.spellID)
+        local cooldownID = validNumericKey((meta and meta.cooldownID) or value.cooldownID)
+        local textureFileID = validNumericKey(
+            (meta and (meta.textureFileID or meta.textureId)) or value.textureFileID or value.textureId
+        )
+        local preferredType = (meta and meta.keyType) or value.keyType or tierKeyType
+        if not validKeyTypes[preferredType] then
+            preferredType = tierKeyType
+        end
+
+        local vRaw = validKey(rawKey)
+        if tierKeyType == "spellName" and type(vRaw) == "string" then
+            spellName = vRaw
+        elseif tierKeyType == "spellID" and type(vRaw) == "number" then
+            spellID = vRaw
+        elseif tierKeyType == "cooldownID" and type(vRaw) == "number" then
+            cooldownID = vRaw
+        elseif tierKeyType == "textureFileID" and type(vRaw) == "number" then
+            textureFileID = vRaw
+        end
+
+        return buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
+    end
+
+    local function setEntryMeta(entry, key)
+        if type(entry) ~= "table" or type(entry.value) ~= "table" or not key then
+            return
+        end
+        scrubValue(entry.value)
+        stats.entriesMetaNormalized = stats.entriesMetaNormalized + 1
+        entry.meta = {
+            keyType = key.keyType,
+            primaryKey = key.primaryKey,
+            spellName = key.spellName,
+            spellID = key.spellID,
+            cooldownID = key.cooldownID,
+            textureFileID = key.textureFileID,
+        }
+    end
+
+    for _, tier in ipairs(tierDefs) do
+        ensureTierStore(tier.storeKey)
+    end
+
+    local classIDs = {}
+    for _, tier in ipairs(tierDefs) do
+        local store = colors[tier.storeKey]
+        for classID, classMap in pairs(store) do
+            if type(classMap) == "table" then
+                classIDs[classID] = true
+            end
+        end
+    end
+
+    for classID in pairs(classIDs) do
+        stats.classesProcessed = stats.classesProcessed + 1
+        local specIDs = {}
+        for _, tier in ipairs(tierDefs) do
+            local classMap = colors[tier.storeKey][classID]
+            if type(classMap) == "table" then
+                for specID, specMap in pairs(classMap) do
+                    if type(specMap) == "table" then
+                        specIDs[specID] = true
+                    end
+                end
+            end
+        end
+
+        for specID in pairs(specIDs) do
+            stats.specsProcessed = stats.specsProcessed + 1
+            local groups = {}
+            local groupByEntry = {}
+            local invalidPerTier = {}
+            local newPerTier = {}
+            local specScanned = 0
+            local specInvalid = 0
+            local specInvalidByTier = {}
+
+            for tierIndex, tier in ipairs(tierDefs) do
+                invalidPerTier[tierIndex] = {}
+                newPerTier[tierIndex] = {}
+                specInvalidByTier[tier.storeKey] = 0
+
+                local specStore = ensureClassSpec(colors[tier.storeKey], classID, specID)
+                for rawKey, entry in pairs(specStore) do
+                    stats.entriesScanned = stats.entriesScanned + 1
+                    stats.perTier[tier.storeKey].scanned = stats.perTier[tier.storeKey].scanned + 1
+                    specScanned = specScanned + 1
+                    local key = buildKeyFromEntry(entry, tier.keyType, rawKey)
+                    if not key then
+                        invalidPerTier[tierIndex][rawKey] = entry
+                        stats.invalidEntries = stats.invalidEntries + 1
+                        stats.perTier[tier.storeKey].invalid = stats.perTier[tier.storeKey].invalid + 1
+                        specInvalid = specInvalid + 1
+                        specInvalidByTier[tier.storeKey] = specInvalidByTier[tier.storeKey] + 1
+                    else
+                        stats.validEntries = stats.validEntries + 1
+                        local groupIndex = groupByEntry[entry]
+                        if not groupIndex then
+                            for i, group in ipairs(groups) do
+                                if keysMatch(group.key, key) then
+                                    groupIndex = i
+                                    break
+                                end
+                            end
+                        end
+
+                        if not groupIndex then
+                            groupIndex = #groups + 1
+                            groups[groupIndex] = {
+                                key = key,
+                                entry = entry,
+                                ts = entryTs(entry),
+                                tierIndex = tierIndex,
+                            }
+                        else
+                            local group = groups[groupIndex]
+                            group.key = mergeKeys(group.key, key) or group.key
+                            local t = entryTs(entry)
+                            if t > group.ts or (t == group.ts and tierIndex < group.tierIndex) then
+                                group.entry = entry
+                                group.ts = t
+                                group.tierIndex = tierIndex
+                            end
+                        end
+
+                        if type(entry) == "table" then
+                            groupByEntry[entry] = groupIndex
+                        end
+                    end
+                end
+            end
+
+            stats.canonicalEntries = stats.canonicalEntries + #groups
+            if specScanned > specInvalid and #groups < (specScanned - specInvalid) then
+                stats.aliasLinksMerged = stats.aliasLinksMerged + ((specScanned - specInvalid) - #groups)
+            end
+
+            for _, group in ipairs(groups) do
+                if group.entry and group.key then
+                    setEntryMeta(group.entry, group.key)
+                    if group.key.spellName ~= nil then
+                        newPerTier[1][group.key.spellName] = group.entry
+                    end
+                    if group.key.spellID ~= nil then
+                        newPerTier[2][group.key.spellID] = group.entry
+                    end
+                    if group.key.cooldownID ~= nil then
+                        newPerTier[3][group.key.cooldownID] = group.entry
+                    end
+                    if group.key.textureFileID ~= nil then
+                        newPerTier[4][group.key.textureFileID] = group.entry
+                    end
+                end
+            end
+
+            for tierIndex, tier in ipairs(tierDefs) do
+                ensureClassSpec(colors[tier.storeKey], classID, specID)
+                colors[tier.storeKey][classID][specID] = newPerTier[tierIndex]
+                for rawKey, entry in pairs(invalidPerTier[tierIndex]) do
+                    if newPerTier[tierIndex][rawKey] == nil then
+                        newPerTier[tierIndex][rawKey] = entry
+                        stats.invalidRetained = stats.invalidRetained + 1
+                    else
+                        stats.invalidKeyCollisions = stats.invalidKeyCollisions + 1
+                    end
+                end
+                for _, entry in pairs(newPerTier[tierIndex]) do
+                    if type(entry) == "table" and type(entry.value) == "table" then
+                        scrubValue(entry.value)
+                    end
+                end
+                local finalCount = CountEntries(newPerTier[tierIndex])
+                stats.finalEntries = stats.finalEntries + finalCount
+                stats.perTier[tier.storeKey].final = stats.perTier[tier.storeKey].final + finalCount
+            end
+
+            if specInvalid > 0 or (specScanned > specInvalid and #groups < (specScanned - specInvalid)) then
+                local invalidTierParts = {}
+                for _, tier in ipairs(tierDefs) do
+                    local invalidCount = specInvalidByTier[tier.storeKey]
+                    if invalidCount and invalidCount > 0 then
+                        invalidTierParts[#invalidTierParts + 1] = tier.storeKey .. "=" .. invalidCount
+                    end
+                end
+                local aliasLinks = 0
+                if specScanned > specInvalid and #groups < (specScanned - specInvalid) then
+                    aliasLinks = (specScanned - specInvalid) - #groups
+                end
+                local msg = string.format(
+                    "class=%s spec=%s scanned=%d valid=%d canonical=%d aliases=%d invalid=%d",
+                    tostring(classID),
+                    tostring(specID),
+                    specScanned,
+                    specScanned - specInvalid,
+                    #groups,
+                    aliasLinks,
+                    specInvalid
+                )
+                if #invalidTierParts > 0 then
+                    msg = msg .. " invalidByTier[" .. table.concat(invalidTierParts, ",") .. "]"
+                end
+
+                if #stats.anomalySpecs < 20 then
+                    stats.anomalySpecs[#stats.anomalySpecs + 1] = msg
+                else
+                    stats.anomalySpecsOverflow = stats.anomalySpecsOverflow + 1
+                end
+            end
+        end
+    end
+
+    return stats
+end
+
 --------------------------------------------------------------------------------
 -- Schema Migrations
 --------------------------------------------------------------------------------
@@ -538,6 +931,55 @@ function Migration.Run(profile)
 
         Log("Migrated to V9")
         profile.schemaVersion = 9
+    end
+
+    if profile.schemaVersion < 10 then
+        -- Migration: normalize spell color wrapper metadata and collapse fragmented entries.
+        local v10Stats = NormalizeSpellColorStoresV10(profile)
+        if v10Stats and v10Stats.skipped then
+            Log("V10 spell color normalization skipped: " .. (v10Stats.skipReason or "unknown reason"))
+        elseif v10Stats then
+            local createdTiers = {}
+            for _, tier in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
+                if v10Stats.tierStoresCreated[tier] then
+                    createdTiers[#createdTiers + 1] = tier
+                end
+            end
+
+            Log(string.format(
+                "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
+                v10Stats.classesProcessed,
+                v10Stats.specsProcessed,
+                v10Stats.entriesScanned,
+                v10Stats.validEntries,
+                v10Stats.canonicalEntries,
+                v10Stats.aliasLinksMerged,
+                v10Stats.invalidEntries,
+                v10Stats.invalidRetained,
+                v10Stats.invalidKeyCollisions,
+                v10Stats.entriesMetaNormalized,
+                v10Stats.finalEntries
+            ))
+            Log(string.format(
+                "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
+                v10Stats.perTier.byName.scanned, v10Stats.perTier.byName.invalid, v10Stats.perTier.byName.final,
+                v10Stats.perTier.bySpellID.scanned, v10Stats.perTier.bySpellID.invalid, v10Stats.perTier.bySpellID.final,
+                v10Stats.perTier.byCooldownID.scanned, v10Stats.perTier.byCooldownID.invalid, v10Stats.perTier.byCooldownID.final,
+                v10Stats.perTier.byTexture.scanned, v10Stats.perTier.byTexture.invalid, v10Stats.perTier.byTexture.final
+            ))
+            if #createdTiers > 0 then
+                Log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
+            end
+            for _, msg in ipairs(v10Stats.anomalySpecs) do
+                Log("V10 anomaly: " .. msg)
+            end
+            if v10Stats.anomalySpecsOverflow > 0 then
+                Log("V10 anomaly: additional specs omitted=" .. v10Stats.anomalySpecsOverflow)
+            end
+        end
+
+        Log("Migrated to V10")
+        profile.schemaVersion = 10
     end
 
     Log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
