@@ -372,6 +372,7 @@ ECM.OptionUtil = {
     IsOptionsDisabled = IsOptionsDisabled,
     GetOptionValue = GetOptionValue,
     GetNestedValue = GetNestedValue,
+    SetNestedValue = SetNestedValue,
     IsValueChanged = IsValueChanged,
     MakeResetHandler = MakeResetHandler,
     ApplyPositionModeToBar = ApplyPositionModeToBar,
