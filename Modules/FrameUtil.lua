@@ -87,7 +87,7 @@ end
 --- Returns false when the frame does not expose anchor getters.
 --- Returns nil when a live anchor component is secret and cannot be compared.
 ---@param frame Frame
----@param anchors table[] Array of anchor   s
+---@param anchors table[] Array of anchors
 ---@return boolean|nil
 local function live_anchors_equal(frame, anchors)
     if not frame or not frame.GetNumPoints or not frame.GetPoint then
