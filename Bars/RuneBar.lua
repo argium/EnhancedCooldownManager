@@ -10,6 +10,54 @@ local C = ECM.Constants
 mod.RuneBar = RuneBar
 ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
 
+local function GetRuneCooldownState(index, now)
+    local start, duration, runeReady = GetRuneCooldown(index)
+    if runeReady or not start or start == 0 or not duration or duration == 0 then
+        return true, nil, nil
+    end
+
+    local elapsed = now - start
+    local remaining = math.max(0, duration - elapsed)
+    local frac = math.max(0, math.min(1, elapsed / duration))
+    return false, remaining, frac
+end
+
+local function BuildRuneStateTables(maxRunes, now)
+    local readySet = {}
+    local cdLookup = {}
+
+    for i = 1, maxRunes do
+        local isReady, remaining, frac = GetRuneCooldownState(i, now)
+        if isReady then
+            readySet[i] = true
+        else
+            cdLookup[i] = { remaining = remaining, frac = frac }
+        end
+    end
+
+    return readySet, cdLookup
+end
+
+local function RuneReadyStatesDiffer(lastReadySet, readySet, maxRunes)
+    for i = 1, maxRunes do
+        if (readySet[i] or false) ~= ((lastReadySet and lastReadySet[i]) or false) then
+            return true
+        end
+    end
+    return false
+end
+
+local function ApplyRuneFragmentVisual(frag, isReady, cd, color)
+    if isReady then
+        frag:SetValue(1)
+        frag:SetStatusBarColor(color.r, color.g, color.b)
+        return
+    end
+
+    frag:SetValue(cd and cd.frac or 0)
+    frag:SetStatusBarColor(color.r * C.RUNEBAR_CD_DIM_FACTOR, color.g * C.RUNEBAR_CD_DIM_FACTOR, color.b * C.RUNEBAR_CD_DIM_FACTOR)
+end
+
 --- Creates or returns fragmented sub-bars for runes.
 ---@param bar Frame
 ---@param maxResources number
@@ -39,6 +87,24 @@ local function EnsureFragmentedBars(bar, maxResources, moduleConfig, globalConfi
     end
 end
 
+local function GetColor(cfg)
+    local specId = GetSpecialization()
+
+    local specColor
+    if cfg.useSpecColor then
+        if specId == C.DEATHKNIGHT_FROST_SPEC_INDEX then
+            specColor = cfg.colorFrost
+        elseif specId == C.DEATHKNIGHT_UNHOLY_SPEC_INDEX then
+            specColor = cfg.colorUnholy
+        else
+            specColor = cfg.colorBlood
+        end
+    end
+
+    -- Blood is the default to match DK class color
+    return specColor or cfg.color or ECM.Constants.COLOR_WHITE
+end
+
 --- Updates fragmented rune display (individual bars per rune).
 --- Only repositions bars when rune ready states change to avoid flickering.
 ---@param bar Frame
@@ -62,32 +128,10 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         return
     end
 
-    local r, g, b = cfg.color.r, cfg.color.g, cfg.color.b
-    local readySet = {}
-    local cdLookup = {}
     local now = GetTime()
-
-    for i = 1, maxRunes do
-        local start, duration, runeReady = GetRuneCooldown(i)
-        if runeReady or not start or start == 0 or not duration or duration == 0 then
-            readySet[i] = true
-        else
-            local elapsed = now - start
-            local remaining = math.max(0, duration - elapsed)
-            local frac = math.max(0, math.min(1, elapsed / duration))
-            cdLookup[i] = { remaining = remaining, frac = frac }
-        end
-    end
-
-    local statesChanged = not bar._lastReadySet
-    if not statesChanged then
-        for i = 1, maxRunes do
-            if (readySet[i] or false) ~= (bar._lastReadySet[i] or false) then
-                statesChanged = true
-                break
-            end
-        end
-    end
+    local color = GetColor(cfg)
+    local readySet, cdLookup = BuildRuneStateTables(maxRunes, now)
+    local statesChanged = (bar._lastReadySet == nil) or RuneReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
 
     if statesChanged then
         bar._lastReadySet = readySet
@@ -135,15 +179,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     for i = 1, maxRunes do
         local frag = bar.FragmentedBars[i]
         if frag then
-            if readySet[i] then
-                frag:SetValue(1)
-                frag:SetStatusBarColor(r, g, b)
-            else
-                local cd = cdLookup[i]
-                local dim = C.RUNEBAR_CD_DIM_FACTOR
-                frag:SetValue(cd and cd.frac or 0)
-                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
-            end
+            ApplyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
 end
@@ -178,22 +214,11 @@ local function UpdateRuneValues(self, frame)
     frame._lastValueUpdate = now
 
     local cfg = self:GetModuleConfig()
-    local r, g, b = cfg.color.r, cfg.color.g, cfg.color.b
+    local color = GetColor(cfg)
+    local readySet, cdLookup = BuildRuneStateTables(maxRunes, now)
 
     -- Detect state transitions to trigger full reorder/reposition
-    local stateChanged = false
-    for i = 1, maxRunes do
-        local start, duration, runeReady = GetRuneCooldown(i)
-        local isReady = runeReady or not start or start == 0 or not duration or duration == 0
-        local wasReady = frame._lastReadySet and frame._lastReadySet[i]
-
-        if (isReady and true or false) ~= (wasReady and true or false) then
-            stateChanged = true
-            break
-        end
-    end
-
-    if stateChanged then
+    if RuneReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
         -- A rune just finished or started CD — trigger full refresh for reorder/reposition
         self:ThrottledUpdateLayout("RuneStateChange")
         return
@@ -203,17 +228,7 @@ local function UpdateRuneValues(self, frame)
     for i = 1, maxRunes do
         local frag = frags[i]
         if frag then
-            local start, duration, runeReady = GetRuneCooldown(i)
-            if runeReady or not start or start == 0 or not duration or duration == 0 then
-                frag:SetValue(1)
-                frag:SetStatusBarColor(r, g, b)
-            else
-                local elapsed = now - start
-                local dim = C.RUNEBAR_CD_DIM_FACTOR
-                local frac = math.max(0, math.min(1, elapsed / duration))
-                frag:SetValue(frac)
-                frag:SetStatusBarColor(r * dim, g * dim, b * dim)
-            end
+            ApplyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
 end

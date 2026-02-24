@@ -822,10 +822,26 @@ local function RuneBarOptionsTable()
                         name = " ",
                         order = 20,
                     },
+                    useSpecColorDesc = {
+                        type = "description",
+                        name = "\nUse your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
+                        order = 30,
+                    },
+                    useSpecColor = {
+                        type = "toggle",
+                        name = "Use specialization color",
+                        order = 31,
+                        width = "full",
+                        get = function() return db.profile.runeBar.useSpecColor end,
+                        set = function(_, val)
+                            db.profile.runeBar.useSpecColor = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
                     color = {
                         type = "color",
                         name = "Rune color",
-                        order = 21,
+                        order = 32,
                         width = "double",
                         get = function()
                             local c = db.profile.runeBar.color
@@ -835,14 +851,16 @@ local function RuneBarOptionsTable()
                             db.profile.runeBar.color = { r = r, g = g, b = b, a = 1 }
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
+                        disabled = function() return db.profile.runeBar.useSpecColor end,
                     },
                     colorReset = {
                         type = "execute",
                         name = "X",
-                        order = 22,
+                        order = 33,
                         width = 0.3,
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("runeBar.color") end,
                         func = ECM.OptionUtil.MakeResetHandler("runeBar.color"),
+                        disabled = function() return db.profile.runeBar.useSpecColor end,
                     },
                 },
             },

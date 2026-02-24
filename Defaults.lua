@@ -203,7 +203,11 @@ local defaults = {
             anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
             offsetY    = -325,
-            color      = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, -- DK class colour red
+            useSpecColor = true,
+            color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
+            colorUnholy = { r = 0.00, g = 0.61, b = 0.00, a = 1 },
         },
         buffBars = {
             enabled = true,
