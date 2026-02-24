@@ -20,7 +20,9 @@ local _editLocked = false
 local function get_children_ordered(viewer)
     local result = {}
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
-        if child and child.Bar then
+        -- There are other children that are present but don't appear to be valid. I'm not sure what they are
+        -- so this check is a bit of a guess (that only valid bars have a cooldownID).
+        if child and child.Bar and child.cooldownID then
             local top = child.GetTop and child:GetTop()
             result[#result + 1] = { frame = child, top = top, order = insertOrder }
         end
@@ -589,7 +591,7 @@ function BuffBars:Enable()
 
     ECM.ModuleMixin.AddMixin(self, "BuffBars")
 
-    _eventFrame:RegisterEvent("UNIT_AURA")
+    -- _eventFrame:RegisterEvent("UNIT_AURA")
     _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     _eventFrame:RegisterEvent("ZONE_CHANGED")
     _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
