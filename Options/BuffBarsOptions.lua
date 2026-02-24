@@ -358,6 +358,33 @@ function BuffBarsOptions.GetOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
                         func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
                     },
+                    verticalSpacingDesc = {
+                        type = "description",
+                        name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
+                        order = 11,
+                    },
+                    verticalSpacing = {
+                        type = "range",
+                        name = "Vertical Spacing",
+                        order = 12,
+                        width = "double",
+                        min = 0,
+                        max = 20,
+                        step = 1,
+                        get = function() return db.profile.buffBars.verticalSpacing or 0 end,
+                        set = function(_, val)
+                            db.profile.buffBars.verticalSpacing = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    verticalSpacingReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 13,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
+                        func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
+                    },
                 },
             },
             positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {

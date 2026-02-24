@@ -738,7 +738,7 @@ describe("FrameUtil", function()
             local selfObj = {
                 Name = "ResourceBar",
                 GetGlobalConfig = function()
-                    return { offsetY = 12, barHeight = 18, barWidth = 200 }
+                    return { offsetY = 12, moduleSpacing = 6, barHeight = 18, barWidth = 200 }
                 end,
                 GetModuleConfig = function()
                     return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN, height = 22 }
@@ -759,6 +759,52 @@ describe("FrameUtil", function()
             assert.are.equal(-12, params.offsetY)
             assert.are.equal(22, params.height)
             assert.is_nil(params.width)
+        end)
+
+        it("CalculateLayoutParams uses moduleSpacing for non-first chain modules", function()
+            local anchor = makeFrame({ name = "ChainAnchor" })
+            local selfObj = {
+                Name = "RuneBar",
+                GetGlobalConfig = function()
+                    return { offsetY = 12, moduleSpacing = 6, barHeight = 18, barWidth = 200 }
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN, height = 22 }
+                end,
+                GetNextChainAnchor = function(_, name)
+                    assert.are.equal("RuneBar", name)
+                    return anchor, false
+                end,
+            }
+
+            local params = FrameUtil.CalculateLayoutParams(selfObj)
+            assert.are.equal(ECM.Constants.ANCHORMODE_CHAIN, params.mode)
+            assert.are.equal(anchor, params.anchor)
+            assert.is_false(params.isFirst)
+            assert.are.equal(0, params.offsetX)
+            assert.are.equal(-6, params.offsetY)
+            assert.are.equal(22, params.height)
+            assert.is_nil(params.width)
+        end)
+
+        it("CalculateLayoutParams defaults non-first chain module spacing to zero", function()
+            local anchor = makeFrame({ name = "ChainAnchor" })
+            local selfObj = {
+                Name = "RuneBar",
+                GetGlobalConfig = function()
+                    return { offsetY = 12, barHeight = 18, barWidth = 200 }
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN, height = 22 }
+                end,
+                GetNextChainAnchor = function(_, name)
+                    assert.are.equal("RuneBar", name)
+                    return anchor, false
+                end,
+            }
+
+            local params = FrameUtil.CalculateLayoutParams(selfObj)
+            assert.are.equal(0, params.offsetY)
         end)
 
         it("CalculateLayoutParams returns free mode parameters with defaults", function()

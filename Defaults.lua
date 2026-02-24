@@ -44,6 +44,7 @@
 ---@field barHeight number Default bar height.
 ---@field barBgColor ECM_Color Default bar background color.
 ---@field offsetY number Global vertical offset.
+---@field moduleSpacing number Vertical gap between chained modules.
 ---@field texture string|nil Default bar texture.
 ---@field font string Font face.
 ---@field fontSize number Font size.
@@ -70,6 +71,7 @@
 ---@field anchor ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field width number|nil Buff bar width when free anchor.
 ---@field offsetY number|nil Vertical offset when free anchor.
+---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
@@ -132,6 +134,7 @@ local defaults = {
             barHeight = 22,
             barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
             offsetY = 4,
+            moduleSpacing = 0,
             texture = "Solid",
             font = "Expressway",
             fontSize = 11,
@@ -214,6 +217,7 @@ local defaults = {
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
             offsetY = -350,
+            verticalSpacing = 0,
             showIcon = false,
             showSpellName = true,
             showDuration = true,

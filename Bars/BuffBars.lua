@@ -296,6 +296,12 @@ local function layout_bars(self)
         return
     end
 
+    local cfg = self:GetModuleConfig()
+    local verticalSpacing = 0
+    if cfg and type(cfg.verticalSpacing) == "number" then
+        verticalSpacing = math.max(0, cfg.verticalSpacing)
+    end
+
     local children = get_children_ordered(viewer)
     local prev
 
@@ -309,8 +315,8 @@ local function layout_bars(self)
                 })
             else
                 FrameUtil.LazySetAnchors(child, {
-                    { "TOPLEFT", prev, "BOTTOMLEFT", 0, 0 },
-                    { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0 },
+                    { "TOPLEFT", prev, "BOTTOMLEFT", 0, -verticalSpacing },
+                    { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, -verticalSpacing },
                 })
             end
             prev = child
@@ -329,12 +335,13 @@ function BuffBars:CalculateLayoutParams()
 
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local anchor, isFirst = self:GetNextChainAnchor(ECM.Constants.BUFFBARS)
+        local moduleSpacing = (globalConfig and globalConfig.moduleSpacing) or 0
         params.anchor = anchor
         params.isFirst = isFirst
         params.anchorPoint = "TOPLEFT"
         params.anchorRelativePoint = "BOTTOMLEFT"
         params.offsetX = 0
-        params.offsetY = (isFirst and -(globalConfig and globalConfig.offsetY or 0)) or 0
+        params.offsetY = (isFirst and -(globalConfig and globalConfig.offsetY or 0)) or -moduleSpacing
     else
         -- Free mode: BuffBars supports custom anchor points from config
         params.anchor = UIParent

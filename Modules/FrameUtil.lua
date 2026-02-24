@@ -444,12 +444,13 @@ function FrameUtil.CalculateLayoutParams(self)
 
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local anchor, isFirst = self:GetNextChainAnchor(self.Name)
+        local moduleSpacing = globalConfig.moduleSpacing or 0
         params.anchor = anchor
         params.isFirst = isFirst
         params.anchorPoint = "TOPLEFT"
         params.anchorRelativePoint = "BOTTOMLEFT"
         params.offsetX = 0
-        params.offsetY = (isFirst and -globalConfig.offsetY) or 0
+        params.offsetY = (isFirst and -globalConfig.offsetY) or -moduleSpacing
         params.height = moduleConfig.height or globalConfig.barHeight
         params.width = nil -- Width set by dual-point anchoring
     elseif mode == ECM.Constants.ANCHORMODE_FREE then

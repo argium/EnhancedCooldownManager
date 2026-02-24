@@ -196,6 +196,33 @@ local function GeneralOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.offsetY") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.offsetY"),
                     },
+                    moduleSpacingDesc = {
+                        type = "description",
+                        name = "\nAdds vertical spacing between modules. Spacing between individual buff bars is configured separately in the their options.",
+                        order = 4,
+                    },
+                    moduleSpacing = {
+                        type = "range",
+                        name = "Vertical Spacing",
+                        order = 5,
+                        width = "double",
+                        min = 0,
+                        max = 20,
+                        step = 1,
+                        get = function() return db.profile.global.moduleSpacing or 0 end,
+                        set = function(_, val)
+                            db.profile.global.moduleSpacing = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    moduleSpacingReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 6,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.moduleSpacing") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.moduleSpacing"),
+                    },
                 },
             },
             combatFadeSettings = {
