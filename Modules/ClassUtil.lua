@@ -32,9 +32,6 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         elseif specIndex == C.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
             return "souls"
         end
-    -- Brewmaster Monks don't use discrete resources (Chi), so hide the bar.
-    elseif (class == CLASS.MONK) and (specIndex == C.MONK_BREWMASTER_SPEC_INDEX) then
-        return nil
     elseif (class == CLASS.MAGE) then
         if (specIndex == C.MAGE_ARCANE_SPEC_INDEX) then
             return Enum.PowerType.ArcaneCharges

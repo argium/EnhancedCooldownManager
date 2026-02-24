@@ -47,14 +47,11 @@ local function hook_child_frame(child, module)
         return
     end
 
-    -- Hook SetPoint to detect when Blizzard re-anchors this child.
-    -- When triggered outside our own layout pass, invalidate the lazy
-    -- anchor cache so the next layout re-applies the correct anchors.
+    -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
     hooksecurefunc(child, "SetPoint", function()
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
 
-    -- Hook OnShow to ensure newly shown bars get positioned
     child:HookScript("OnShow", function()
         module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
@@ -582,9 +579,9 @@ function BuffBars:Enable()
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)
-    if event == "UNIT_AURA" then
-        BuffBars:OnUnitAura(event, ...)
-    else
-        BuffBars:OnZoneChanged()
-    end
+    -- if event == "UNIT_AURA" then
+    --     BuffBars:OnUnitAura(event, ...)
+    -- else
+    BuffBars:OnZoneChanged()
+    -- end
 end)
