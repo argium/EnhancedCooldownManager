@@ -155,7 +155,7 @@ function PowerBar:OnEnable()
         ECM.RegisterFrame(self)
     end
 
-    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnUnitPowerUpdate")
+    self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
     ECM_log(ECM.Constants.SYS.Core, self.Name, "Enabled")
 end
 
