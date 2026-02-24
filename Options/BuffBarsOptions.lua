@@ -88,6 +88,7 @@ local function BuildSpellColorArgsFromRows(rows)
         return args
     end
 
+    unlabeledBarsPresent = false
     for i, row in ipairs(rows) do
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
