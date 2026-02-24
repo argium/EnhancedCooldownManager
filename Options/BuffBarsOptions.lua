@@ -8,13 +8,6 @@ local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local C = ECM.Constants
 local unlabeledBarsPresent = false
 
-local function ResetStyledMarkers()
-    local buffBars = ECM.BuffBars
-    if buffBars then
-        buffBars:ResetStyledMarkers()
-    end
-end
-
 local function IsEditLocked()
     local locked, _ = ECM.BuffBars:IsEditLocked()
     return locked
@@ -118,7 +111,6 @@ local function BuildSpellColorArgsFromRows(rows)
                 end,
                 set = function(_, r, g, b)
                     ECM.SpellColors.SetColorByKey(rowKey, { r = r, g = g, b = b, a = 1 })
-                    ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
             }
@@ -134,7 +126,6 @@ local function BuildSpellColorArgsFromRows(rows)
                 end,
                 func = function()
                     ECM.SpellColors.ResetColorByKey(rowKey)
-                    ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
             }
@@ -216,7 +207,6 @@ local function SpellOptionsTable()
                 end,
                 set = function(_, r, g, b)
                     ECM.SpellColors.SetDefaultColor({ r = r, g = g, b = b, a = 1 })
-                    ResetStyledMarkers()
                     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
             },

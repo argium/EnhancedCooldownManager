@@ -47,16 +47,11 @@ local function hook_child_frame(child, module)
         return
     end
 
-    -- Hook SetPoint to detect when Blizzard re-anchors this child.
-    -- When triggered outside our own layout pass, invalidate the lazy
-    -- anchor cache so the next layout re-applies the correct anchors.
+    -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
     hooksecurefunc(child, "SetPoint", function()
-        if module._layoutRunning then return end
-        FrameUtil.LazyResetState(child)
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
 
-    -- Hook OnShow to ensure newly shown bars get positioned
     child:HookScript("OnShow", function()
         module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
@@ -406,9 +401,6 @@ function BuffBars:UpdateLayout(why)
             if point and relativeTo then
                 viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
             end
-            -- Invalidate anchor cache so chain mode can re-anchor later
-            local s = viewer.__ecm_state
-            if s then s.anchors = nil end
         end
 
         local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
@@ -449,26 +441,6 @@ function BuffBars:UpdateLayout(why)
         offsetY = params.offsetY,
     })
     return true
-end
-
---- Resets all styled markers so bars get fully re-styled on next update.
-function BuffBars:ResetStyledMarkers()
-    local viewer = _G["BuffBarCooldownViewer"]
-    if not viewer then
-        return
-    end
-
-    -- Clear lazy state on the viewer itself so chain anchoring is re-applied
-    FrameUtil.LazyResetState(viewer)
-
-    -- Clear lazy state on all children to force full re-style
-    local children = { viewer:GetChildren() }
-    for _, child in ipairs(children) do
-        FrameUtil.LazyResetState(child)
-        if child.Bar then
-            FrameUtil.LazyResetState(child.Bar)
-        end
-    end
 end
 
 --- Returns normalized spell-color keys for all currently-visible aura bars.
@@ -543,8 +515,6 @@ function BuffBars:HookEditMode()
     self._editModeHooked = true
 
     hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
-        self:ResetStyledMarkers()
-
         -- Edit mode exit is infrequent, so perform an immediate restyle pass.
         local viewer = _G["BuffBarCooldownViewer"]
         if viewer and viewer:IsShown() then
@@ -567,8 +537,6 @@ function BuffBars:OnUnitAura(_, unit)
 end
 
 function BuffBars:OnZoneChanged()
-    --- Invalidates lazy state so the next layout pass re-applies chain anchoring.
-    self:ResetStyledMarkers()
     self:ThrottledUpdateLayout("OnZoneChanged")
 end
 
@@ -611,9 +579,9 @@ function BuffBars:Enable()
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)
-    if event == "UNIT_AURA" then
-        BuffBars:OnUnitAura(event, ...)
-    else
-        BuffBars:OnZoneChanged()
-    end
+    -- if event == "UNIT_AURA" then
+    --     BuffBars:OnUnitAura(event, ...)
+    -- else
+    BuffBars:OnZoneChanged()
+    -- end
 end)
