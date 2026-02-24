@@ -20,7 +20,6 @@ end
 --------------------------------------------------------------------------------
 -- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
-
 function ResourceBar:ShouldShow()
     local shouldShow = ECM.BarMixin.ShouldShow(self)
 
@@ -86,6 +85,13 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEventUpdate(event, ...)
+    if event == "UNIT_AURA" then
+        local unit = ...
+        if unit ~= "player" then
+            return
+        end
+    end
+
     self:ThrottledUpdateLayout(event or "OnEventUpdate")
 end
 
@@ -101,7 +107,7 @@ function ResourceBar:OnEnable()
     end
 
     self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
-    self:RegisterEvent("UNIT_POWER_FREQUENT", "OnEventUpdate")
+    self:RegisterEvent("UNIT_POWER_UPDATE", "OnEventUpdate")
 end
 
 function ResourceBar:OnDisable()

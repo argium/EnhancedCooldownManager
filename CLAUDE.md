@@ -5,6 +5,14 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
 - MANDATORY: **ALL constants** are to be stored in Constants.lua.
 - MANDATORY: DO NOT UNDER ANY CIRCUMSTANCE NIL CHECK AND WRAP BUILT IN FUNCTIONS such as issecretvalue, issecrettable.
 - MANDATORY: DO NOT ADD NIL GUARDS UNLESS THE DOCUMENTATION EXPLCITLY STATES THAT RETURNING NIL IS POSSIBLE.
+- MANDATORY: All lua files must include the standard copyright header
+
+```
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+```
+
 - Modules that utilize ModuleMixin, must use the live config accessors and never `mod.db` or `mod.db.profile` directly. NEVER create an intermediate table for profile/config.
   - `self:GetGlobalConfig()` for the `global` config block
   - `self:GetModuleConfig()` for the module's specific block

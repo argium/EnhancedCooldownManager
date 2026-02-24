@@ -50,6 +50,13 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         end
 
         return nil
+    elseif class == CLASS.MONK then
+        if specIndex == C.MONK_WINDWALKER_SPEC_INDEX then
+            return Enum.PowerType.Chi
+        else
+            -- Mistweaver and Brewmaster don't use chi.
+            return nil
+        end
     else
         for powerType in pairs(discreteResourceTypes) do
             local max = UnitPowerMax("player", powerType)
