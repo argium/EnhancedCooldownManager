@@ -15,36 +15,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Lua
-        uses: leafo/gh-actions-lua@v11
-        with:
-          luaVersion: "5.1"
-
-      - name: Setup LuaRocks
-        uses: leafo/gh-actions-luarocks@v4
+      - name: Install Lua 5.1 and LuaRocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
 
       - name: Install test dependencies
-        run: luarocks make enhancedcooldownmanager.rockspec
+        run: |
+          luarocks --lua-version=5.1 install --local moonscript
+          luarocks --lua-version=5.1 install --local busted
 
       - name: Run Busted tests (JUnit output)
         run: |
+          eval "$(luarocks --lua-version=5.1 path --local)"
           mkdir -p test-results
           busted Tests --output=junit > test-results/busted-junit.xml
 
-      - name: Publish test results
+      - name: Add test report summary
         if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Busted Unit Tests
-          path: test-results/busted-junit.xml
-          reporter: java-junit
-          fail-on-error: false
+        run: |
+          if [ -f test-results/busted-junit.xml ]; then
+            echo "Busted JUnit report generated: \`test-results/busted-junit.xml\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Busted JUnit report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload test report artifact
         if: always()

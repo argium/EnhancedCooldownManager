@@ -93,7 +93,7 @@ local constants = {
     ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS = 2,
 
     -- Schema migration
-    CURRENT_SCHEMA_VERSION = 9,
+    CURRENT_SCHEMA_VERSION = 10,
     SV_NAME = "EnhancedCooldownManagerDB",
     ACTIVE_SV_KEY = "_ECM_DB",
 

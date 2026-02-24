@@ -18,6 +18,7 @@ describe("FrameUtil", function()
     local FrameUtil
     local scheduledTimers
     local fakeTime
+    local secretValues
 
     local function incCalls(obj, name)
         obj.__calls = obj.__calls or {}
@@ -288,6 +289,7 @@ describe("FrameUtil", function()
             "C_Timer",
             "GetTime",
             "UIParent",
+            "issecretvalue",
         })
     end)
 
@@ -298,6 +300,7 @@ describe("FrameUtil", function()
     before_each(function()
         scheduledTimers = {}
         fakeTime = 0
+        secretValues = {}
 
         _G.ECM = {}
         _G.ECM_AreColorsEqual = function(a, b)
@@ -326,6 +329,9 @@ describe("FrameUtil", function()
             return fakeTime
         end
         _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.issecretvalue = function(value)
+            return secretValues[value] == true
+        end
 
         local constantsChunk = TestHelpers.loadChunk(
             { "Constants.lua", "../Constants.lua" },
@@ -530,6 +536,38 @@ describe("FrameUtil", function()
             assert.is_true(FrameUtil.LazySetAnchors(frame, anchors))
             assert.are.equal(2, getCalls(frame, "ClearAllPoints"))
             assert.are.equal(2, getCalls(frame, "SetPoint"))
+        end)
+
+        it("LazySetAnchors reuses cached anchors when live point strings are secret", function()
+            local anchor = makeFrame({ name = "AnchorA" })
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchor, "BOTTOMLEFT", 4, -5 },
+                },
+            })
+            local desired = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 4, -5 },
+            }
+            local secretPoint = {}
+            local secretRelativePoint = {}
+            secretValues[secretPoint] = true
+            secretValues[secretRelativePoint] = true
+
+            frame.GetPoint = function(self, index)
+                local a = self.__anchors[index]
+                if not a then
+                    return nil
+                end
+                return secretPoint, a[2], secretRelativePoint, a[4], a[5]
+            end
+
+            assert.is_true(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(1, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(1, getCalls(frame, "SetPoint"))
+
+            assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(1, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(1, getCalls(frame, "SetPoint"))
         end)
 
         it("LazySetBackgroundColor reads live texture color before writing", function()

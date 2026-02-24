@@ -83,11 +83,12 @@ end
 -- Lazy Setters — change-detection-aware frame property setters
 --------------------------------------------------------------------------------
 
---- Compares a frame's live anchor points against the desired anchor specs.
+--- Compares a frame's live anchor points against the desired anchors.
 --- Returns false when the frame does not expose anchor getters.
+--- Returns nil when a live anchor component is secret and cannot be compared.
 ---@param frame Frame
----@param anchors table[] Array of anchor specifications
----@return boolean
+---@param anchors table[] Array of anchors
+---@return boolean|nil
 local function live_anchors_equal(frame, anchors)
     if not frame or not frame.GetNumPoints or not frame.GetPoint then
         return false
@@ -100,11 +101,62 @@ local function live_anchors_equal(frame, anchors)
     for i = 1, #anchors do
         local want = anchors[i]
         local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
+        if issecretvalue(point)
+            or issecretvalue(relativeTo)
+            or issecretvalue(relativePoint)
+            or issecretvalue(x)
+            or issecretvalue(y)
+        then
+            return nil
+        end
         if point ~= want[1]
             or relativeTo ~= want[2]
             or relativePoint ~= want[3]
             or (x or 0) ~= (want[4] or 0)
             or (y or 0) ~= (want[5] or 0)
+        then
+            return false
+        end
+    end
+
+    return true
+end
+
+---@param anchors table[]|nil
+---@return table[]|nil
+local function clone_anchors(anchors)
+    if not anchors then
+        return nil
+    end
+
+    local out = {}
+    for i = 1, #anchors do
+        local a = anchors[i]
+        out[i] = { a[1], a[2], a[3], a[4] or 0, a[5] or 0 }
+    end
+    return out
+end
+
+---@param lhs table[]|nil
+---@param rhs table[]|nil
+---@return boolean
+local function anchors_equal(lhs, rhs)
+    if not lhs or not rhs then
+        return false
+    end
+
+    if #lhs ~= #rhs then
+        return false
+    end
+
+    for i = 1, #lhs do
+        local a = lhs[i]
+        local b = rhs[i]
+        if a[1] ~= b[1]
+            or a[2] ~= b[2]
+            or a[3] ~= b[3]
+            or (a[4] or 0) ~= (b[4] or 0)
+            or (a[5] or 0) ~= (b[5] or 0)
         then
             return false
         end
@@ -200,13 +252,23 @@ function FrameUtil.LazySetAlpha(frame, alpha)
     return true
 end
 
---- Clears and re-applies anchor points only if the anchor spec has changed.
+--- Clears and re-applies anchor points only if the anchors has changed.
 --- `anchors` is an array of { point, relativeTo, relativePoint, offsetX, offsetY }.
 ---@param frame Frame
----@param anchors table[] Array of anchor specifications
+---@param anchors table[] Array of anchors
 ---@return boolean changed
 function FrameUtil.LazySetAnchors(frame, anchors)
-    if live_anchors_equal(frame, anchors) then
+    local liveEqual = live_anchors_equal(frame, anchors)
+    if liveEqual == true then
+        if not anchors_equal(frame.__ecmAnchorCache, anchors) then
+            frame.__ecmAnchorCache = clone_anchors(anchors)
+        end
+        return false
+    end
+
+    -- Some Blizzard frames return secret point strings from GetPoint(). We cannot
+    -- safely compare those in tainted code, so fall back to our last applied anchors.
+    if liveEqual == nil and anchors_equal(frame.__ecmAnchorCache, anchors) then
         return false
     end
     frame:ClearAllPoints()
@@ -214,6 +276,7 @@ function FrameUtil.LazySetAnchors(frame, anchors)
         local a = anchors[i]
         frame:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
     end
+    frame.__ecmAnchorCache = clone_anchors(anchors)
     return true
 end
 

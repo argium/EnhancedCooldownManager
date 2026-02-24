@@ -86,50 +86,47 @@ local function BuildSpellColorArgsFromRows(rows)
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
         local rowKey = row.key
+        local colorKey = rowKey.primaryKey
+        local texture = row.textureFileID
+        local label = type(colorKey) == "string" and colorKey or ("Bar |cff555555(" .. colorKey .. ")|r")
+        local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
 
         -- If there are any entries without valid names, display a warning message to the user.
         unlabeledBarsPresent = unlabeledBarsPresent
-            or (type(rowKey.primaryKey) ~= "string" or not rowKey.primaryKey or issecretvalue(rowKey.primaryKey) or rowKey.primaryKey == "")
+            or (type(colorKey) == "string" and (issecretvalue(colorKey) or colorKey == ""))
 
-        if rowKey then
-            local colorKey = rowKey.primaryKey
-            local texture = row.textureFileID or rowKey.textureFileID
-            local label = type(colorKey) == "string" and colorKey or ("Bar |cff555555(" .. colorKey .. ")|r")
-            local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
+        args[optKey] = {
+            type = "color",
+            name = displayName,
+            desc = "Color for " .. displayName,
+            order = i * 10,
+            width = "double",
+            get = function()
+                local c = ECM.SpellColors.GetColorByKey(rowKey)
+                if c then return c.r, c.g, c.b end
+                local dc = ECM.SpellColors.GetDefaultColor()
+                return dc.r, dc.g, dc.b
+            end,
+            set = function(_, r, g, b)
+                ECM.SpellColors.SetColorByKey(rowKey, { r = r, g = g, b = b, a = 1 })
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
 
-            args[optKey] = {
-                type = "color",
-                name = displayName,
-                desc = "Color for " .. displayName,
-                order = i * 10,
-                width = "double",
-                get = function()
-                    local c = ECM.SpellColors.GetColorByKey(rowKey)
-                    if c then return c.r, c.g, c.b end
-                    local dc = ECM.SpellColors.GetDefaultColor()
-                    return dc.r, dc.g, dc.b
-                end,
-                set = function(_, r, g, b)
-                    ECM.SpellColors.SetColorByKey(rowKey, { r = r, g = g, b = b, a = 1 })
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-            }
-
-            args[resetKey] = {
-                type = "execute",
-                name = "X",
-                desc = "Reset to default",
-                order = i * 10 + 1,
-                width = 0.3,
-                hidden = function()
-                    return ECM.SpellColors.GetColorByKey(rowKey) == nil
-                end,
-                func = function()
-                    ECM.SpellColors.ResetColorByKey(rowKey)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-            }
-        end
+        args[resetKey] = {
+            type = "execute",
+            name = "X",
+            desc = "Reset to default",
+            order = i * 10 + 1,
+            width = 0.3,
+            hidden = function()
+                return ECM.SpellColors.GetColorByKey(rowKey) == nil
+            end,
+            func = function()
+                ECM.SpellColors.ResetColorByKey(rowKey)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        }
     end
 
     return args
@@ -236,6 +233,8 @@ local function SpellOptionsTable()
                 width = "normal",
                 disabled =  IsEditLocked,
                 func = function()
+                    local activeKeys = ECM.BuffBars:GetActiveSpellData()
+                    ECM.SpellColors.ReconcileAllKeys(activeKeys)
                     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
                 end,
             },
