@@ -18,6 +18,8 @@ local constants = {
     CONFIG_SECTION_GLOBAL = "global",
     ANCHORMODE_CHAIN = "chain",
     ANCHORMODE_FREE = "free",
+    GROW_DIRECTION_DOWN = "down",
+    GROW_DIRECTION_UP = "up",
 
     -- Default or fallback values for configuration
     DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",

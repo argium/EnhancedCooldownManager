@@ -223,6 +223,36 @@ local function GeneralOptionsTable()
                         hidden = function() return not ECM.OptionUtil.IsValueChanged("global.moduleSpacing") end,
                         func = ECM.OptionUtil.MakeResetHandler("global.moduleSpacing"),
                     },
+                    moduleGrowDirectionDesc = {
+                        type = "description",
+                        name = "\nChoose whether chained modules stack below or above the cooldown viewer.",
+                        order = 7,
+                    },
+                    moduleGrowDirection = {
+                        type = "select",
+                        name = "Module Grow Direction",
+                        order = 8,
+                        width = "double",
+                        values = {
+                            [C.GROW_DIRECTION_DOWN] = "Down",
+                            [C.GROW_DIRECTION_UP] = "Up",
+                        },
+                        get = function()
+                            return db.profile.global.moduleGrowDirection or C.GROW_DIRECTION_DOWN
+                        end,
+                        set = function(_, val)
+                            db.profile.global.moduleGrowDirection = val
+                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        end,
+                    },
+                    moduleGrowDirectionReset = {
+                        type = "execute",
+                        name = "X",
+                        order = 9,
+                        width = 0.3,
+                        hidden = function() return not ECM.OptionUtil.IsValueChanged("global.moduleGrowDirection") end,
+                        func = ECM.OptionUtil.MakeResetHandler("global.moduleGrowDirection"),
+                    },
                 },
             },
             combatFadeSettings = {

@@ -17,6 +17,7 @@ describe("BuffBarsOptions", function()
     local SpellColors
     local layoutUpdateCalls
     local notifyChangeCalls
+    local addonDB
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
@@ -146,6 +147,7 @@ describe("BuffBarsOptions", function()
                 },
             },
         }
+        addonDB = addonNS.Addon.db
 
         local spellColorsChunk = TestHelpers.loadChunk(
             {
@@ -405,5 +407,30 @@ describe("BuffBarsOptions", function()
         assert.are.equal(1, notifyChangeCalls)
 
         ECM.SpellColors.ReconcileAllKeys = originalReconcileAllKeys
+    end)
+
+    it("adds a free grow direction selector to positioning settings", function()
+        local options = BuffBarsOptions.GetOptionsTable()
+        local positioningArgs = options.args.positioningSettings.args
+        local selector = positioningArgs.freeGrowDirection
+        local reset = positioningArgs.freeGrowDirectionReset
+
+        assert.is_table(selector)
+        assert.are.equal("select", selector.type)
+        assert.are.equal("Free Grow Direction", selector.name)
+        assert.is_true(selector.hidden())
+        assert.is_true(reset.hidden())
+
+        addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_FREE
+        assert.is_false(selector.hidden())
+
+        selector.set(nil, ECM.Constants.GROW_DIRECTION_UP)
+        assert.are.equal(ECM.Constants.GROW_DIRECTION_UP, addonDB.profile.buffBars.freeGrowDirection)
+        assert.are.equal(1, layoutUpdateCalls)
+
+        ECM.OptionUtil.IsValueChanged = function()
+            return true
+        end
+        assert.is_false(reset.hidden())
     end)
 end)

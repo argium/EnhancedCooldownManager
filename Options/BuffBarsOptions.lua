@@ -261,6 +261,53 @@ function BuffBarsOptions.GetOptionsTable()
     spells.inline = true
     spells.order = 5
 
+    local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
+        modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
+        includeOffsets = false,
+        widthLabel = "Buff Bar Width",
+        widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
+    })
+
+    positioningSettings.args.freeGrowDirectionDesc = {
+        type = "description",
+        name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
+        order = 6,
+        hidden = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+        end,
+    }
+    positioningSettings.args.freeGrowDirection = {
+        type = "select",
+        name = "Free Grow Direction",
+        order = 7,
+        width = "double",
+        values = {
+            [C.GROW_DIRECTION_DOWN] = "Down",
+            [C.GROW_DIRECTION_UP] = "Up",
+        },
+        hidden = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+        end,
+        get = function()
+            return db.profile.buffBars.freeGrowDirection or C.GROW_DIRECTION_DOWN
+        end,
+        set = function(_, val)
+            db.profile.buffBars.freeGrowDirection = val
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end,
+    }
+    positioningSettings.args.freeGrowDirectionReset = {
+        type = "execute",
+        name = "X",
+        order = 8,
+        width = 0.3,
+        hidden = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+                or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
+        end,
+        func = ECM.OptionUtil.MakeResetHandler("buffBars.freeGrowDirection"),
+    }
+
     return {
         type = "group",
         name = "Aura Bars",
@@ -387,12 +434,7 @@ function BuffBarsOptions.GetOptionsTable()
                     },
                 },
             },
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
-                modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
-                includeOffsets = false,
-                widthLabel = "Buff Bar Width",
-                widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
-            }),
+            positioningSettings = positioningSettings,
             spells = spells,
         },
     }

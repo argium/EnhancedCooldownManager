@@ -807,6 +807,40 @@ describe("FrameUtil", function()
             assert.are.equal(0, params.offsetY)
         end)
 
+        it("CalculateLayoutParams supports upward chain grow direction", function()
+            local anchor = makeFrame({ name = "ChainAnchor" })
+            local selfObj = {
+                Name = "RuneBar",
+                GetGlobalConfig = function()
+                    return {
+                        offsetY = 12,
+                        moduleSpacing = 6,
+                        moduleGrowDirection = ECM.Constants.GROW_DIRECTION_UP,
+                        barHeight = 18,
+                        barWidth = 200,
+                    }
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN, height = 22 }
+                end,
+                GetNextChainAnchor = function(_, name)
+                    assert.are.equal("RuneBar", name)
+                    return anchor, false
+                end,
+            }
+
+            local params = FrameUtil.CalculateLayoutParams(selfObj)
+            assert.are.equal(ECM.Constants.ANCHORMODE_CHAIN, params.mode)
+            assert.are.equal(anchor, params.anchor)
+            assert.is_false(params.isFirst)
+            assert.are.equal("BOTTOMLEFT", params.anchorPoint)
+            assert.are.equal("TOPLEFT", params.anchorRelativePoint)
+            assert.are.equal(0, params.offsetX)
+            assert.are.equal(6, params.offsetY)
+            assert.are.equal(22, params.height)
+            assert.is_nil(params.width)
+        end)
+
         it("CalculateLayoutParams returns free mode parameters with defaults", function()
             local selfObj = {
                 GetGlobalConfig = function()
@@ -893,6 +927,31 @@ describe("FrameUtil", function()
             FrameUtil.ApplyFramePosition(selfObj, frame)
             assert.are.equal(1, frame:GetNumPoints())
             assertAnchor(frame, 1, "CENTER", anchor, "TOPLEFT", 9, 10)
+        end)
+
+        it("ApplyFramePosition honors upward chain anchor points", function()
+            local anchor = makeFrame({ name = "AnchorUp" })
+            local frame = makeFrame({ shown = true })
+            local selfObj = {
+                ShouldShow = function()
+                    return true
+                end,
+                CalculateLayoutParams = function()
+                    return {
+                        mode = ECM.Constants.ANCHORMODE_CHAIN,
+                        anchor = anchor,
+                        anchorPoint = "BOTTOMLEFT",
+                        anchorRelativePoint = "TOPLEFT",
+                        offsetX = 2,
+                        offsetY = 5,
+                    }
+                end,
+            }
+
+            FrameUtil.ApplyFramePosition(selfObj, frame)
+            assert.are.equal(2, frame:GetNumPoints())
+            assertAnchor(frame, 1, "BOTTOMLEFT", anchor, "TOPLEFT", 2, 5)
+            assertAnchor(frame, 2, "BOTTOMRIGHT", anchor, "TOPRIGHT", 2, 5)
         end)
 
         it("ApplyStandardLayout returns false when the frame should be hidden", function()

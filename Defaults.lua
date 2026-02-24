@@ -45,6 +45,7 @@
 ---@field barBgColor ECM_Color Default bar background color.
 ---@field offsetY number Global vertical offset.
 ---@field moduleSpacing number Vertical gap between chained modules.
+---@field moduleGrowDirection "down"|"up"|nil Vertical grow direction for chained modules.
 ---@field texture string|nil Default bar texture.
 ---@field font string Font face.
 ---@field fontSize number Font size.
@@ -72,6 +73,7 @@
 ---@field width number|nil Buff bar width when free anchor.
 ---@field offsetY number|nil Vertical offset when free anchor.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
+---@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
@@ -135,6 +137,7 @@ local defaults = {
             barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
             offsetY = 4,
             moduleSpacing = 0,
+            moduleGrowDirection = C.GROW_DIRECTION_DOWN,
             texture = "Solid",
             font = "Expressway",
             fontSize = 11,
@@ -218,6 +221,7 @@ local defaults = {
             width = 300,
             offsetY = -350,
             verticalSpacing = 0,
+            freeGrowDirection = C.GROW_DIRECTION_DOWN,
             showIcon = false,
             showSpellName = true,
             showDuration = true,
