@@ -2,20 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
---- ECM.FrameUtil: static helper methods for WoW frames.
----
---- Includes:
----   - Buff-bar inspection (GetSpellName, GetIconTexture, etc.)
----   - Change-detection-aware "Lazy" setters that compare desired values
----     against a per-frame `__ecm_state` cache and only call the underlying
----     WoW API when the value actually differs.
----
---- Usage:
----   ECM.FrameUtil.GetSpellName(frame)
----   ECM.FrameUtil.GetIconTexture(frame)
----   ECM.FrameUtil.LazySetHeight(frame, 20)
----   ECM.FrameUtil.LazyResetState(frame)
-
 local FrameUtil = {}
 ECM.FrameUtil = FrameUtil
 
@@ -97,70 +83,120 @@ end
 -- Lazy Setters — change-detection-aware frame property setters
 --------------------------------------------------------------------------------
 
---- Serializes a list of anchor specs into a comparable string key.
---- Each spec is { point, relativeTo, relativePoint, x, y }.
----@param anchors table[] Array of anchor spec tables
----@return string
-local function serialize_anchors(anchors)
-    local parts = {}
+--- Compares a frame's live anchor points against the desired anchor specs.
+--- Returns false when the frame does not expose anchor getters.
+---@param frame Frame
+---@param anchors table[] Array of anchor specifications
+---@return boolean
+local function live_anchors_equal(frame, anchors)
+    if not frame or not frame.GetNumPoints or not frame.GetPoint then
+        return false
+    end
+
+    if frame:GetNumPoints() ~= #anchors then
+        return false
+    end
+
     for i = 1, #anchors do
-        local a = anchors[i]
-        -- relativeTo: use the frame's name (or its tostring address) for comparison
-        local relName = a[2] and (a[2].GetName and a[2]:GetName() or tostring(a[2])) or "nil"
-        parts[#parts + 1] = (a[1] or "nil")
-            .. ";" .. relName
-            .. ";" .. (a[3] or "nil")
-            .. ";" .. (a[4] or 0)
-            .. ";" .. (a[5] or 0)
+        local want = anchors[i]
+        local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
+        if point ~= want[1]
+            or relativeTo ~= want[2]
+            or relativePoint ~= want[3]
+            or (x or 0) ~= (want[4] or 0)
+            or (y or 0) ~= (want[5] or 0)
+        then
+            return false
+        end
     end
-    return table.concat(parts, "|")
+
+    return true
 end
 
---- Returns (or initializes) the __ecm_state table on a frame.
----@param frame table
----@return table
-local function get_state(frame)
-    local s = frame.__ecm_state
-    if not s then
-        s = {}
-        frame.__ecm_state = s
+---@param color ECM_Color|nil
+---@param r number|nil
+---@param g number|nil
+---@param b number|nil
+---@param a number|nil
+---@return boolean
+local function color_equals_rgba(color, r, g, b, a)
+    if not color then
+        return false
     end
-    return s
+    return color.r == r and color.g == g and color.b == b and color.a == (a or 1)
 end
 
---- Sets height only if it differs from the cached value.
+--- Reads a texture color via available getters. Returns nil if unavailable.
+---@param texture Texture|nil
+---@return number|nil, number|nil, number|nil, number|nil
+local function get_texture_color(texture)
+    if not texture then
+        return nil, nil, nil, nil
+    end
+
+    if texture.GetColorTexture then
+        local r, g, b, a = texture:GetColorTexture()
+        if r ~= nil then
+            return r, g, b, a
+        end
+    end
+
+    if texture.GetVertexColor then
+        return texture:GetVertexColor()
+    end
+
+    return nil, nil, nil, nil
+end
+
+--- Reads status bar texture value (path/file id) from the underlying texture.
+---@param bar StatusBar|nil
+---@return any|nil
+local function get_statusbar_texture_value(bar)
+    if not bar or not bar.GetStatusBarTexture then
+        return nil
+    end
+
+    local tex = bar:GetStatusBarTexture()
+    if tex and tex.GetTexture then
+        return tex:GetTexture()
+    end
+
+    return nil
+end
+
+--- Sets height only if it differs from the current value.
 ---@param frame Frame
 ---@param h number
 ---@return boolean changed
 function FrameUtil.LazySetHeight(frame, h)
-    local s = get_state(frame)
-    if s.height == h then return false end
+    if frame.GetHeight and frame:GetHeight() == h then
+        return false
+    end
     frame:SetHeight(h)
-    s.height = h
     return true
 end
 
---- Sets width only if it differs from the cached value.
+--- Sets width only if it differs from the current value.
 ---@param frame Frame
 ---@param w number
 ---@return boolean changed
 function FrameUtil.LazySetWidth(frame, w)
-    local s = get_state(frame)
-    if s.width == w then return false end
+    if frame.GetWidth and frame:GetWidth() == w then
+        return false
+    end
     frame:SetWidth(w)
-    s.width = w
     return true
 end
 
---- Sets alpha only if it differs from the cached value.
+--- Sets alpha only if it differs from the current value.
 ---@param frame Frame
 ---@param alpha number
 ---@return boolean changed
 function FrameUtil.LazySetAlpha(frame, alpha)
-    local s = get_state(frame)
-    if s.alpha == alpha then return false end
+    if frame.GetAlpha and frame:GetAlpha() == alpha then
+        return false
+    end
     frame:SetAlpha(alpha)
-    s.alpha = alpha
     return true
 end
 
@@ -170,15 +206,14 @@ end
 ---@param anchors table[] Array of anchor specifications
 ---@return boolean changed
 function FrameUtil.LazySetAnchors(frame, anchors)
-    local s = get_state(frame)
-    local key = serialize_anchors(anchors)
-    if s.anchors == key then return false end
+    if live_anchors_equal(frame, anchors) then
+        return false
+    end
     frame:ClearAllPoints()
     for i = 1, #anchors do
         local a = anchors[i]
         frame:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
     end
-    s.anchors = key
     return true
 end
 
@@ -188,45 +223,51 @@ end
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
 function FrameUtil.LazySetBackgroundColor(frame, color)
-    local s = get_state(frame)
-    if ECM_AreColorsEqual(s.bgColor, color) then return false end
-    if frame.Background then
-        frame.Background:SetColorTexture(color.r, color.g, color.b, color.a)
+    local background = frame.Background
+    if not background then
+        return false
     end
-    s.bgColor = { r = color.r, g = color.g, b = color.b, a = color.a }
+
+    local r, g, b, a = get_texture_color(background)
+    if color_equals_rgba(color, r, g, b, a) then
+        return false
+    end
+
+    background:SetColorTexture(color.r, color.g, color.b, color.a)
     return true
 end
 
 --- Sets vertex color on a texture only if the color has changed.
---- Uses a namespaced cache key so multiple textures can be tracked independently.
----@param frame Frame The frame that owns the state cache
+---@param frame Frame Unused; retained for API compatibility
 ---@param texture Texture The texture object
----@param cacheKey string Unique key for this texture in the state cache
+---@param cacheKey string Unused; retained for API compatibility
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
 function FrameUtil.LazySetVertexColor(frame, texture, cacheKey, color)
-    local s = get_state(frame)
-    if ECM_AreColorsEqual(s[cacheKey], color) then return false end
+    local r, g, b, a = get_texture_color(texture)
+    if color_equals_rgba(color, r, g, b, a) then
+        return false
+    end
     texture:SetVertexColor(color.r, color.g, color.b, color.a)
-    s[cacheKey] = { r = color.r, g = color.g, b = color.b, a = color.a }
     return true
 end
 
---- Sets the status bar texture only if it differs from the cached value.
----@param frame Frame The frame that owns the state cache
+--- Sets the status bar texture only if it differs from the current value.
+---@param frame Frame Unused; retained for API compatibility
 ---@param bar StatusBar The status bar frame
 ---@param texturePath string Texture path or LSM key
 ---@return boolean changed
 function FrameUtil.LazySetStatusBarTexture(frame, bar, texturePath)
-    local s = get_state(frame)
-    if s.statusBarTexture == texturePath then return false end
+    local currentTexture = get_statusbar_texture_value(bar)
+    if currentTexture ~= nil and currentTexture == texturePath then
+        return false
+    end
     bar:SetStatusBarTexture(texturePath)
-    s.statusBarTexture = texturePath
     return true
 end
 
 --- Sets the status bar color only if RGBA has changed.
----@param frame Frame The frame that owns the state cache
+---@param frame Frame Unused; retained for API compatibility
 ---@param bar StatusBar The status bar frame
 ---@param r number Red component
 ---@param g number Green component
@@ -234,14 +275,14 @@ end
 ---@param a number|nil Alpha component (default 1)
 ---@return boolean changed
 function FrameUtil.LazySetStatusBarColor(frame, bar, r, g, b, a)
-    local s = get_state(frame)
     a = a or 1
-    local cached = s.statusBarColor
-    if cached and cached[1] == r and cached[2] == g and cached[3] == b and cached[4] == a then
-        return false
+    if bar.GetStatusBarColor then
+        local cr, cg, cb, ca = bar:GetStatusBarColor()
+        if cr == r and cg == g and cb == b and (ca or 1) == a then
+            return false
+        end
     end
     bar:SetStatusBarColor(r, g, b, a)
-    s.statusBarColor = { r, g, b, a }
     return true
 end
 
@@ -251,21 +292,40 @@ end
 ---@param borderConfig table Table with enabled, thickness, color fields
 ---@return boolean changed
 function FrameUtil.LazySetBorder(frame, borderConfig)
-    local s = get_state(frame)
     local border = frame.Border
     if not border then return false end
 
-    local changed = borderConfig.enabled ~= s.borderEnabled
-        or borderConfig.thickness ~= s.borderThickness
-        or not ECM_AreColorsEqual(borderConfig.color, s.borderColor)
-
-    if not changed then return false end
-
     local thickness = borderConfig.thickness or 1
+    local liveEnabled = border.IsShown and border:IsShown() or nil
+    local liveThickness = nil
+    if border.GetBackdrop then
+        local backdrop = border:GetBackdrop()
+        if backdrop and backdrop.edgeSize ~= nil then
+            liveThickness = backdrop.edgeSize
+        end
+    end
+    local liveColor = nil
+    if border.GetBackdropBorderColor then
+        local r, g, b, a = border:GetBackdropBorderColor()
+        if r ~= nil then
+            liveColor = { r = r, g = g, b = b, a = a or 1 }
+        end
+    end
+
+    if borderConfig.enabled then
+        if liveEnabled == true and liveThickness == thickness and ECM_AreColorsEqual(borderConfig.color, liveColor) then
+            return false
+        end
+    else
+        if liveEnabled == false then
+            return false
+        end
+    end
+
     if borderConfig.enabled then
         border:Show()
         ECM_debug_assert(borderConfig.thickness, "border thickness required when enabled")
-        if s.borderThickness ~= thickness then
+        if liveThickness ~= thickness then
             border:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
                 edgeSize = thickness,
@@ -282,32 +342,21 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
         border:Hide()
     end
 
-    s.borderEnabled = borderConfig.enabled
-    s.borderThickness = thickness
-    s.borderColor = borderConfig.color
     return true
 end
 
---- Sets text on a FontString only if it differs from the cached value.
----@param frame Frame The frame that owns the state cache
+--- Sets text on a FontString only if it differs from the current value.
+---@param frame Frame Unused; retained for API compatibility
 ---@param fontString FontString The font string to update
----@param cacheKey string Unique key for this text in the state cache
+---@param cacheKey string Unused; retained for API compatibility
 ---@param text string|nil The text to set
 ---@return boolean changed
 function FrameUtil.LazySetText(frame, fontString, cacheKey, text)
-    local s = get_state(frame)
-    if s[cacheKey] == text then return false end
-    fontString:SetText(text)
-    s[cacheKey] = text
-    return true
-end
-
---- Wipes the __ecm_state cache so every Lazy method will re-apply on next call.
----@param frame table Any frame with __ecm_state
-function FrameUtil.LazyResetState(frame)
-    if frame then
-        frame.__ecm_state = nil
+    if fontString.GetText and fontString:GetText() == text then
+        return false
     end
+    fontString:SetText(text)
+    return true
 end
 
 --------------------------------------------------------------------------------
@@ -416,40 +465,26 @@ function FrameUtil.ApplyStandardLayout(self, why)
         return false
     end
 
-    local anchor = params.anchor
-    local isFirst = params.isFirst
     local width = params.width
     local height = params.height
 
     -- Apply dimensions via lazy setters (no-ops when unchanged)
-    local heightChanged = height and FrameUtil.LazySetHeight(frame, height) or false
-    local widthChanged = width and FrameUtil.LazySetWidth(frame, width) or false
+    if height then
+        FrameUtil.LazySetHeight(frame, height)
+    end
+    if width then
+        FrameUtil.LazySetWidth(frame, width)
+    end
 
     -- Apply border via lazy setter
-    local borderChanged = false
     if borderConfig then
-        borderChanged = FrameUtil.LazySetBorder(frame, borderConfig)
+        FrameUtil.LazySetBorder(frame, borderConfig)
     end
 
     -- Apply background color via lazy setter
     ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or ECM.Constants.DEFAULT_BG_COLOR
-    local bgColorChanged = FrameUtil.LazySetBackgroundColor(frame, bgColor)
-
-    -- ECM_log(ECM.Constants.SYS.Layout, self.Name, "ApplyStandardLayout complete (" .. (why or "") .. ")", {
-    --     anchor = anchor:GetName(),
-    --     isFirst = isFirst,
-    --     widthChanged = widthChanged,
-    --     width = width,
-    --     heightChanged = heightChanged,
-    --     height = height,
-    --     borderChanged = borderChanged,
-    --     borderEnabled = borderConfig and borderConfig.enabled,
-    --     borderThickness = borderConfig and borderConfig.thickness,
-    --     borderColor = borderConfig and borderConfig.color,
-    --     bgColorChanged = bgColorChanged,
-    --     bgColor = bgColor,
-    -- })
+    FrameUtil.LazySetBackgroundColor(frame, bgColor)
 
     self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
     return true

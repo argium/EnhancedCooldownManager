@@ -16,7 +16,6 @@ describe("BuffBarsOptions", function()
     local BuffBarsOptions
     local SpellColors
     local layoutUpdateCalls
-    local styledResetCalls
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
@@ -41,7 +40,6 @@ describe("BuffBarsOptions", function()
 
     before_each(function()
         layoutUpdateCalls = 0
-        styledResetCalls = 0
 
         _G.ECM = {
             FrameUtil = {
@@ -55,9 +53,6 @@ describe("BuffBarsOptions", function()
             BuffBars = {
                 IsEditLocked = function()
                     return false, nil
-                end,
-                ResetStyledMarkers = function()
-                    styledResetCalls = styledResetCalls + 1
                 end,
                 GetActiveSpellData = function()
                     return {}
@@ -304,7 +299,6 @@ describe("BuffBarsOptions", function()
 
         assert.are.same(rowKey, capturedKey)
         assert.are.same({ r = 0.9, g = 0.8, b = 0.7, a = 1 }, capturedColor)
-        assert.are.equal(1, styledResetCalls)
         assert.are.equal(1, layoutUpdateCalls)
 
         ECM.SpellColors.SetColorByKey = originalSetColorByKey
@@ -338,7 +332,6 @@ describe("BuffBarsOptions", function()
 
         args.spellColor1Reset.func()
         assert.are.same(rowKey, capturedResetKey)
-        assert.are.equal(1, styledResetCalls)
         assert.are.equal(1, layoutUpdateCalls)
 
         ECM.SpellColors.GetColorByKey = originalGetColorByKey
@@ -377,7 +370,6 @@ describe("BuffBarsOptions", function()
         assert.is_false(reset.hidden())
         reset.func()
 
-        assert.are.equal(1, styledResetCalls)
         assert.are.equal(1, layoutUpdateCalls)
         assert.is_nil(SpellColors.GetColorByKey({ spellName = "Persisted Name" }))
         assert.is_nil(SpellColors.GetColorByKey({ spellID = 8080 }))
