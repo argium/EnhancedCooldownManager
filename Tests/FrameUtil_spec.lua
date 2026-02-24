@@ -1059,31 +1059,6 @@ describe("FrameUtil", function()
             assert.is_true(FrameUtil.BaseRefresh(selfObj, "why", false))
         end)
 
-        it("ScheduleDebounced coalesces calls and clears the pending flag after callback", function()
-            local callbackCalls = 0
-            local selfObj = {
-                GetGlobalConfig = function()
-                    return { updateFrequency = 0.25 }
-                end,
-            }
-
-            FrameUtil.ScheduleDebounced(selfObj, "_pending", function()
-                callbackCalls = callbackCalls + 1
-            end)
-            FrameUtil.ScheduleDebounced(selfObj, "_pending", function()
-                callbackCalls = callbackCalls + 100
-            end)
-
-            assert.is_true(selfObj._pending)
-            assert.are.equal(1, #scheduledTimers)
-            assert.are.equal(0.25, scheduledTimers[1].delay)
-
-            flushTimers()
-
-            assert.is_nil(selfObj._pending)
-            assert.are.equal(1, callbackCalls)
-        end)
-
         it("ThrottledRefresh skips calls inside the throttle window and refreshes outside it", function()
             local refreshCalls = {}
             local selfObj = {
@@ -1132,7 +1107,7 @@ describe("FrameUtil", function()
             assert.are.equal(1, refreshCalls)
         end)
 
-        it("ScheduleLayoutUpdate schedules UpdateLayout through the debounced helper", function()
+        it("ScheduleLayoutUpdate coalesces calls and schedules UpdateLayout after updateFrequency", function()
             local layoutCalls = {}
             local selfObj = {
                 GetGlobalConfig = function()
@@ -1146,11 +1121,28 @@ describe("FrameUtil", function()
             FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-1")
             FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-2")
 
+            assert.is_true(selfObj._layoutPending)
             assert.are.equal(1, #scheduledTimers)
             assert.are.equal(0.15, scheduledTimers[1].delay)
 
             flushTimers()
+            assert.is_nil(selfObj._layoutPending)
             assert.are.same({ "layout-1" }, layoutCalls)
+        end)
+
+        it("ScheduleLayoutUpdate uses the default refresh frequency when global config is missing", function()
+            local selfObj = {
+                GetGlobalConfig = function()
+                    return nil
+                end,
+                UpdateLayout = function()
+                end,
+            }
+
+            FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-default")
+
+            assert.are.equal(1, #scheduledTimers)
+            assert.are.equal(ECM.Constants.DEFAULT_REFRESH_FREQUENCY, scheduledTimers[1].delay)
         end)
     end)
 end)

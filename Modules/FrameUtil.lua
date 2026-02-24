@@ -596,24 +596,6 @@ function FrameUtil.BaseRefresh(self, why, force)
     return true
 end
 
---- Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
----@param self ModuleMixin
----@param flagName string Key for the pending flag on self
----@param callback function Function to call after delay
-function FrameUtil.ScheduleDebounced(self, flagName, callback)
-    if self[flagName] then
-        return
-    end
-    self[flagName] = true
-
-    local globalConfig = self:GetGlobalConfig()
-    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
-    C_Timer.After(freq, function()
-        self[flagName] = nil
-        callback()
-    end)
-end
-
 --- Rate-limited refresh. Skips if called within updateFrequency window.
 ---@param self ModuleMixin
 ---@param why string|nil
@@ -629,11 +611,19 @@ function FrameUtil.ThrottledRefresh(self, why)
     return true
 end
 
---- Schedules a throttled layout update via debounced callback.
+--- Schedules a throttled layout update (debounced by updateFrequency).
 ---@param self ModuleMixin
 ---@param why string|nil
 function FrameUtil.ScheduleLayoutUpdate(self, why)
-    FrameUtil.ScheduleDebounced(self, "_layoutPending", function()
+    if self._layoutPending then
+        return
+    end
+    self._layoutPending = true
+
+    local globalConfig = self:GetGlobalConfig()
+    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+    C_Timer.After(freq, function()
+        self._layoutPending = nil
         self:UpdateLayout(why)
     end)
 end
