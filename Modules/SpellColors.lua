@@ -36,13 +36,8 @@ local KEY_TYPES = {
 
 --- Returns k if it is a valid, non-secret string or number; nil otherwise.
 local function validateKey(k)
-    if k == nil then
-        return nil
-    end
-    if type(k) == "string" and not issecretvalue(k) then
-        return k
-    end
-    if type(k) == "number" and not issecretvalue(k) then
+    local t = type(k)
+    if (t == "string" or t == "number") and not issecretvalue(k) then
         return k
     end
     return nil
@@ -289,18 +284,10 @@ local function sanitize_color_value(color)
     if type(color) ~= "table" then
         return nil
     end
-
-    local result = {
-        r = color.r,
-        g = color.g,
-        b = color.b,
-        a = color.a,
-    }
-    if result.a == nil then
-        result.a = 1
-    end
-    return result
+    return { r = color.r, g = color.g, b = color.b, a = color.a or 1 }
 end
+
+local LEGACY_METADATA_FIELDS = { "keyType", "primaryKey", "spellName", "spellID", "cooldownID", "textureId", "textureFileID" }
 
 ---@param value table|nil
 ---@return boolean changed
@@ -310,15 +297,7 @@ local function scrub_legacy_color_metadata(value)
     end
 
     local changed = false
-    for _, field in ipairs({
-        "keyType",
-        "primaryKey",
-        "spellName",
-        "spellID",
-        "cooldownID",
-        "textureId",
-        "textureFileID",
-    }) do
+    for _, field in ipairs(LEGACY_METADATA_FIELDS) do
         if value[field] ~= nil then
             value[field] = nil
             changed = true
@@ -408,16 +387,15 @@ end
 ---@param value table|nil
 ---@return boolean
 local function has_legacy_color_metadata(value)
-    return type(value) == "table"
-        and (
-            value.keyType ~= nil
-            or value.primaryKey ~= nil
-            or value.spellName ~= nil
-            or value.spellID ~= nil
-            or value.cooldownID ~= nil
-            or value.textureId ~= nil
-            or value.textureFileID ~= nil
-        )
+    if type(value) ~= "table" then
+        return false
+    end
+    for _, field in ipairs(LEGACY_METADATA_FIELDS) do
+        if value[field] ~= nil then
+            return true
+        end
+    end
+    return false
 end
 
 ---@param other ECM_SpellColorKey|table|nil
@@ -545,6 +523,18 @@ function SpellColors.GetColorByKey(key)
     return map:Get({ spellName, spellID, cooldownID, textureFileID })
 end
 
+--- Extracts identifying values from a bar frame and returns a normalized key.
+---@param frame ECM_BuffBarMixin
+---@return ECM_SpellColorKey|nil
+local function make_key_from_bar(frame)
+    return SpellColors.MakeKey(
+        validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()),
+        validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID),
+        validateKey(frame.cooldownID),
+        validateKey(FrameUtil.GetIconTextureFileID(frame))
+    )
+end
+
 --- Gets the custom color for a bar frame.
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_Color|nil
@@ -560,12 +550,7 @@ function SpellColors.GetColorForBar(frame)
         return nil
     end
 
-    local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
-    local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
-    local cooldownID = validateKey(frame.cooldownID)
-    local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
-    local key = SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
-    return SpellColors.GetColorByKey(key)
+    return SpellColors.GetColorByKey(make_key_from_bar(frame))
 end
 
 --- Returns deduplicated color entries for the current class/spec.
@@ -721,11 +706,7 @@ function SpellColors.ReconcileBar(frame)
     if not (frame and frame.__ecmHooked) then
         return
     end
-    local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
-    local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
-    local cooldownID = validateKey(frame.cooldownID)
-    local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
-    local key = SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
+    local key = make_key_from_bar(frame)
     if key then
         SpellColors.ReconcileAllKeys({ key })
     end
@@ -764,11 +745,7 @@ function SpellColors.ReconcileAllBars(frames)
     local keys = {}
     for _, frame in ipairs(frames) do
         if frame and frame.__ecmHooked then
-            local spellName = validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText())
-            local spellID = validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID)
-            local cooldownID = validateKey(frame.cooldownID)
-            local textureFileID = validateKey(FrameUtil.GetIconTextureFileID(frame))
-            local key = SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
+            local key = make_key_from_bar(frame)
             if key then
                 keys[#keys + 1] = key
             end
