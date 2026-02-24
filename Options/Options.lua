@@ -282,9 +282,9 @@ local function GeneralOptionsTable()
                         name = " ",
                         order = 6,
                     },
-                    combatFadeExceptInInstanceDesc = {
+                    combatFadeExceptionsDesc = {
                         type = "description",
-                        name = "\nWhen enabled, bars will not fade in instanced content.",
+                        name = "\nExceptions to combat fading. If any of the enabled exceptions apply, bars will not fade even if you're out of combat.",
                         order = 7,
                     },
                     combatFadeExceptInInstance = {
@@ -299,14 +299,9 @@ local function GeneralOptionsTable()
                             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                         end,
                     },
-                    combatFadeExceptIfDesc = {
-                        type = "description",
-                        name = "\nExcept if ...",
-                        order = 9,
-                    },
                     exceptIfTargetCanBeAttackedEnabled = {
                         type = "toggle",
-                        name = "... current target can be attacked, and/or",
+                        name = "Except when your current target can be attacked",
                         order = 10,
                         width = "full",
                         disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
@@ -318,7 +313,7 @@ local function GeneralOptionsTable()
                     },
                     exceptIfTargetCanBeHelpedEnabled = {
                         type = "toggle",
-                        name = "... current target can be helped",
+                        name = "Except when your current target can be helped",
                         order = 11,
                         width = "full",
                         disabled = function() return not db.profile.global.outOfCombatFade.enabled end,
