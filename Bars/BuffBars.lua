@@ -591,7 +591,10 @@ function BuffBars:Enable()
 
     ECM.ModuleMixin.AddMixin(self, "BuffBars")
 
+    -- Listening to unit auras is expensive, and it doesn't appear strictly necessary due to the viewer
+    -- being hooked.
     -- _eventFrame:RegisterEvent("UNIT_AURA")
+
     _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     _eventFrame:RegisterEvent("ZONE_CHANGED")
     _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
