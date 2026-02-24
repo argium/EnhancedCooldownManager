@@ -82,5 +82,11 @@
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"
         ],
+        "chat.tools.terminal.autoApprove": {
+            "/^busted Tests$/": {
+                "approve": true,
+                "matchCommandLine": true
+            }
+        },
 	}
 }
