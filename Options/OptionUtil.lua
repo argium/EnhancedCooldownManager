@@ -213,7 +213,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             width = "double",
             min = 100,
             max = 600,
-            step = 10,
+            step = 1,
             hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
