@@ -1,3 +1,7 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
 if type(describe) ~= "function" or type(it) ~= "function" then
     return
 end
@@ -203,11 +207,11 @@ describe("ClassUtil", function()
             assertResourceType(ECM.Constants.CLASS.MAGE, 3, nil)
         end)
 
-        it("returns chi for mistweaver and windwalker monks, nil for brewmaster", function()
+        it("returns chi for windwalker monks, nil for brewmaster and mistweaver", function()
             setAvailablePowerType(Enum.PowerType.Chi)
-            assertResourceType(ECM.Constants.CLASS.MONK, 2, Enum.PowerType.Chi)
-            assertResourceType(ECM.Constants.CLASS.MONK, 3, Enum.PowerType.Chi)
+            assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_WINDWALKER_SPEC_INDEX, Enum.PowerType.Chi)
             assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_BREWMASTER_SPEC_INDEX, nil)
+            assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_MISTWEAVER_SPEC_INDEX, nil)
         end)
 
         it("returns holy power for all paladin specs", function()
