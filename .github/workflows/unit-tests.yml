@@ -1,0 +1,55 @@
+name: Unit Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: unit-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  busted:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Lua
+        uses: leafo/gh-actions-lua@v11
+        with:
+          luaVersion: "5.1"
+
+      - name: Setup LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Install test dependencies
+        run: luarocks make enhancedcooldownmanager.rockspec
+
+      - name: Run Busted tests (JUnit output)
+        run: |
+          mkdir -p test-results
+          busted Tests --output=junit > test-results/busted-junit.xml
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Busted Unit Tests
+          path: test-results/busted-junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload test report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: busted-junit-report
+          path: test-results/busted-junit.xml
+          if-no-files-found: ignore
