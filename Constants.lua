@@ -35,6 +35,7 @@ local constants = {
     -- Color constants
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
     COLOR_WHITE = { r = 1, g = 1, b = 1, a = 1 },
+    COLOR_WHITE_HEX = "FFFFFF",
 
     -- Module-specific constants and configuration
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
@@ -74,9 +75,9 @@ local constants = {
     TRINKET_SLOT_2 = 14,
 
     -- Consumable item IDs (priority-ordered: best first)
-    COMBAT_POTIONS = { 212265, 212264, 212263 }, -- Tempered Potion R3, R2, R1
-    HEALTH_POTIONS = { 211880, 211879, 211878,   -- Algari Healing Potion R3, R2, R1
-        212244, 212243, 212242 },                -- Cavedweller's Delight R3, R2, R1
+    COMBAT_POTIONS = {  212265, 212264, 212263 },   -- Tempered Potion R3, R2, R1
+    HEALTH_POTIONS = {  211880, 211879, 211878,     -- Algari Healing Potion R3, R2, R1
+                        212244, 212243, 212242 },   -- Cavedweller's Delight R3, R2, R1
     HEALTHSTONE_ITEM_ID = 5512,
     ITEM_ICONS_MAX = 5,
 
@@ -133,42 +134,42 @@ local CLASS = {
     WARRIOR = "WARRIOR",
 }
 
-local ClassColors = {
-    [CLASS.DEATHKNIGHT] = { color = "C41F3B" },
-    [CLASS.DEMONHUNTER] = { color = "A330C9" },
-    [CLASS.DRUID]       = { color = "FF7D0A" },
-    [CLASS.EVOKER]      = { color = "33937F" },
-    [CLASS.HUNTER]      = { color = "ABD473" },
-    [CLASS.MAGE]        = { color = "69CCF0" },
-    [CLASS.MONK]        = { color = "00FF96" },
-    [CLASS.PALADIN]     = { color = "F58CBA" },
-    [CLASS.PRIEST]      = { color = "FFFFFF" },
-    [CLASS.ROGUE]       = { color = "FFF569" },
-    [CLASS.SHAMAN]      = { color = "0070DE" },
-    [CLASS.WARLOCK]     = { color = "9482C9" },
-    [CLASS.WARRIOR]     = { color = "C79C6E" },
+local CLASS_COLORS = {
+    [CLASS.DEATHKNIGHT] = "C41F3B",
+    [CLASS.DEMONHUNTER] = "A330C9",
+    [CLASS.DRUID]       = "FF7D0A",
+    [CLASS.EVOKER]      = "33937F",
+    [CLASS.HUNTER]      = "ABD473",
+    [CLASS.MAGE]        = "69CCF0",
+    [CLASS.MONK]        = "00FF96",
+    [CLASS.PALADIN]     = "F58CBA",
+    [CLASS.PRIEST]      = "FFFFFF",
+    [CLASS.ROGUE]       = "FFF569",
+    [CLASS.SHAMAN]      = "0070DE",
+    [CLASS.WARLOCK]     = "9482C9",
+    [CLASS.WARRIOR]     = "C79C6E",
 }
 
 --- Chat channel colors keyed by channel name.
 local ChatChannelColors = {
-    SAY          = { color = "FFFFFF" },
-    YELL         = { color = "FF3F40" },
-    WHISPER      = { color = "FF7EFF" },
-    PARTY        = { color = "AAABFE" },
-    PARTY_LEADER = { color = "77C8FF" },
-    RAID         = { color = "FF7F00" },
-    RAID_WARNING = { color = "FF4809" },
-    INSTANCE     = { color = "FF7D01" },
-    GUILD        = { color = "3CE13F" },
-    OFFICER      = { color = "40BC40" },
-    EMOTE        = { color = "FF7E40" },
-    SYSTEM       = { color = "FFFF00" },
-    QUEST        = { color = "CC9933" },
-    LFG          = { color = "FEC1C0" },
-    BATTLENET    = { color = "00FAF6" },
-    GENERAL      = { color = "FFC080" },
-    TRADE        = { color = "FFC080" },
-    LOOT         = { color = "00A956" },
+    SAY          = "FFFFFF",
+    YELL         = "FF3F40",
+    WHISPER      = "FF7EFF",
+    PARTY        = "AAABFE",
+    PARTY_LEADER = "77C8FF",
+    RAID         = "FF7F00",
+    RAID_WARNING = "FF4809",
+    INSTANCE     = "FF7D01",
+    GUILD        = "3CE13F",
+    OFFICER      = "40BC40",
+    EMOTE        = "FF7E40",
+    SYSTEM       = "FFFF00",
+    QUEST        = "CC9933",
+    LFG          = "FEC1C0",
+    BATTLENET    = "00FAF6",
+    GENERAL      = "FFC080",
+    TRADE        = "FFC080",
+    LOOT         = "00A956",
 }
 
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
@@ -176,5 +177,6 @@ constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.SYS = SYS
 constants.CLASS = CLASS
+constants.CLASS_COLORS = CLASS_COLORS
 
 ECM.Constants = constants

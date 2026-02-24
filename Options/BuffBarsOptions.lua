@@ -5,6 +5,8 @@
 local _, ns = ...
 local mod = ns.Addon
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
+local C = ECM.Constants
+local unlabeledBarsPresent = false
 
 local function ResetStyledMarkers()
     local buffBars = ECM.BuffBars
@@ -90,10 +92,12 @@ local function BuildSpellColorArgsFromRows(rows)
         local optKey = "spellColor" .. i
         local resetKey = "spellColor" .. i .. "Reset"
         local rowKey = row.key
+        unlabeledBarsPresent = unlabeledBarsPresent or (type(rowKey.primaryKey) == "string" and not rowKey.primaryKey)
+
         if rowKey then
             local colorKey = rowKey.primaryKey
             local texture = row.textureFileID or rowKey.textureFileID
-            local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
+            local label = type(colorKey) == "string" and colorKey or ("Bar |cff555555(" .. colorKey .. ")|r")
             local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
 
             args[optKey] = {
@@ -166,8 +170,9 @@ local function SpellOptionsTable()
             currentSpec = {
                 type = "description",
                 name = function()
-                    local _, _, className, specName = ECM.OptionUtil.GetCurrentClassSpec()
-                    return "|cff00ff00" .. (className or "Unknown") .. " " .. specName .. "|r"
+                    local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
+                    local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
+                    return "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
                 end,
                 order = 3,
             },
@@ -187,6 +192,12 @@ local function SpellOptionsTable()
                 name = "|cffFFDD3CThese settings cannot be changed while spell names or textures are secret. This may persist until you leave an instance or reload your UI out of combat.|r\n\n",
                 order = 6,
                 hidden = function() return not IsEditLocked() or EditLockedReason() ~= "secrets" end,
+            },
+            unlabeledBarsWarning = {
+                type = "description",
+                name = "|cffFFDD3CTSome spell names or icons are secret, and are displayed as a generic \"Bar\". This may persist until you reload your UI.|r\n\n",
+                order = 7,
+                hidden = function() return not unlabeledBarsPresent end
             },
             defaultColor = {
                 type = "color",

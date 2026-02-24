@@ -175,6 +175,7 @@ end
 --- @return number specIndex The player's current specialization index (1-based), or nil if not applicable
 --- @return string localisedClassName The player's localized class name (e.g., "Warrior", "Paladin", etc.)
 --- @return string specName The player's current specialization name (e.g., "Arms", "Fury", etc.), or "None" if not applicable
+--- @return string className The player's non-localized class name (e.g., "WARRIOR", "PALADIN", etc.)
 local function GetCurrentClassSpec()
     local localisedClassName, className, classID = UnitClass("player")
     local specIndex = GetSpecialization()
@@ -182,7 +183,7 @@ local function GetCurrentClassSpec()
     if specIndex then
         _, specName = GetSpecializationInfo(specIndex)
     end
-    return classID, specIndex, localisedClassName or "Unknown", specName or "None"
+    return classID, specIndex, localisedClassName or "Unknown", specName or "None", className
 end
 
 --- Generates positioning settings for a bar (width, offsetX, offsetY with reset buttons).
