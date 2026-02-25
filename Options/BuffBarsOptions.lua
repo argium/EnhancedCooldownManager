@@ -149,11 +149,6 @@ local function SpellOptionsTable()
         name = "Spells",
         order = 3,
         args = {
-            header = {
-                type = "header",
-                name = "Per-spell Colors",
-                order = 1,
-            },
             desc = {
                 type = "description",
                 name = "Customize colors for individual spells. Colors are saved per class and spec. Use 'Refresh Spell List' to rescan active aura bars.\n\n",
@@ -230,7 +225,7 @@ local function SpellOptionsTable()
                 type = "execute",
                 name = "Refresh Spell List",
                 desc = "Scan current buffs to refresh discovered spell names.",
-                order = 100,
+                order = 12,
                 width = "normal",
                 disabled =  IsEditLocked,
                 func = function()
@@ -258,9 +253,9 @@ function BuffBarsOptions.GetOptionsTable()
     local db = ns.Addon.db
 
     local spells = SpellOptionsTable()
-    spells.name = ""
+    spells.name = "Colors"
     spells.inline = true
-    spells.order = 5
+    spells.order = 3
 
     local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
         modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
@@ -273,7 +268,7 @@ function BuffBarsOptions.GetOptionsTable()
         type = "description",
         name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
         order = 6,
-        hidden = function()
+        disabled = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
     }
@@ -286,7 +281,7 @@ function BuffBarsOptions.GetOptionsTable()
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
-        hidden = function()
+        disabled = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
         get = function()
@@ -302,14 +297,14 @@ function BuffBarsOptions.GetOptionsTable()
         name = "X",
         order = 8,
         width = 0.3,
-        hidden = function()
+        disabled = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
                 or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
         end,
         func = ECM.OptionUtil.MakeResetHandler("buffBars.freeGrowDirection"),
     }
 
-    local displayArgs = {
+    local basicArgs = {
         desc = {
             type = "description",
             name = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
@@ -331,16 +326,27 @@ function BuffBarsOptions.GetOptionsTable()
                     mod:ConfirmReloadUI(
                         "Disabling aura bars requires a UI reload. Reload now?",
                         nil,
-                        function() db.profile.buffBars.enabled = true end
+                        function()
+                            db.profile.buffBars.enabled = true
+                            AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+                        end
                     )
                 end
             end,
         },
+    }
+
+    local displayArgs = {
+        displayElementsDesc = {
+            type = "description",
+            name = "Choose which aura bar elements are shown and customize their appearance.",
+            order = 11,
+        },
         showIcon = {
             type = "toggle",
             name = "Show icon",
-            order = 3,
-            width = "full",
+            order = 12,
+            width = "double",
             get = function() return db.profile.buffBars.showIcon end,
             set = function(_, val)
                 db.profile.buffBars.showIcon = val
@@ -350,8 +356,8 @@ function BuffBarsOptions.GetOptionsTable()
         showSpellName = {
             type = "toggle",
             name = "Show spell name",
-            order = 5,
-            width = "full",
+            order = 13,
+            width = "double",
             get = function() return db.profile.buffBars.showSpellName end,
             set = function(_, val)
                 db.profile.buffBars.showSpellName = val
@@ -361,8 +367,8 @@ function BuffBarsOptions.GetOptionsTable()
         showDuration = {
             type = "toggle",
             name = "Show remaining duration",
-            order = 7,
-            width = "full",
+            order = 14,
+            width = "double",
             get = function() return db.profile.buffBars.showDuration end,
             set = function(_, val)
                 db.profile.buffBars.showDuration = val
@@ -372,13 +378,13 @@ function BuffBarsOptions.GetOptionsTable()
         heightDesc = {
             type = "description",
             name = "\nOverride the default bar height. Set to 0 to use the global default.",
-            order = 8,
+            order = 15,
         },
         height = {
             type = "range",
             name = "Height Override",
-            order = 9,
-            width = "double",
+            order = 16,
+            width = "half",
             min = 0,
             max = 40,
             step = 1,
@@ -391,7 +397,7 @@ function BuffBarsOptions.GetOptionsTable()
         heightReset = {
             type = "execute",
             name = "X",
-            order = 10,
+            order = 17,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
@@ -399,13 +405,13 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingDesc = {
             type = "description",
             name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
-            order = 11,
+            order = 18,
         },
         verticalSpacing = {
             type = "range",
             name = "Vertical Spacing",
-            order = 12,
-            width = "double",
+            order = 19,
+            width = "half",
             min = 0,
             max = 20,
             step = 1,
@@ -418,25 +424,26 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingReset = {
             type = "execute",
             name = "X",
-            order = 13,
+            order = 20,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
         },
     }
-    OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 14))
+    OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
+    OB.MergeArgs(basicArgs, displayArgs)
 
     return {
         type = "group",
         name = "Aura Bars",
         order = 5,
         args = {
-            displaySettings = {
+            auraBarsSettings = {
                 type = "group",
-                name = "Basic Settings",
+                name = "Aura Bars",
                 inline = true,
                 order = 1,
-                args = displayArgs,
+                args = basicArgs,
             },
             positioningSettings = positioningSettings,
             spells = spells,

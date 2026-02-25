@@ -204,7 +204,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             type = "description",
             name = widthDesc,
             order = 3,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
         },
         width = {
             type = "range",
@@ -214,7 +214,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             min = 100,
             max = 600,
             step = 1,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.width or ECM.Constants.DEFAULT_BAR_WIDTH
@@ -231,9 +231,9 @@ local function MakePositioningSettingsArgs(configPath, options)
             order = 5,
             width = 0.3,
             hidden = function()
-                return not IsAnchorModeFree(GetNestedValue(db.profile, configPath))
-                    or not IsValueChanged(configPath .. ".width")
+                return not IsValueChanged(configPath .. ".width")
             end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".width"),
         },
     }
@@ -243,17 +243,17 @@ local function MakePositioningSettingsArgs(configPath, options)
             type = "description",
             name = offsetXDesc,
             order = 6,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
         }
         args.offsetX = {
             type = "range",
             name = "Offset X",
             order = 7,
-            width = "double",
+            width = "half",
             min = -800,
             max = 800,
             step = 1,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.offsetX or 0
@@ -270,26 +270,26 @@ local function MakePositioningSettingsArgs(configPath, options)
             order = 8,
             width = 0.3,
             hidden = function()
-                return not IsAnchorModeFree(GetNestedValue(db.profile, configPath))
-                    or not IsValueChanged(configPath .. ".offsetX")
+                return not IsValueChanged(configPath .. ".offsetX")
             end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".offsetX"),
         }
         args.offsetYDesc = {
             type = "description",
             name = offsetYDesc,
             order = 9,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
         }
         args.offsetY = {
             type = "range",
             name = "Offset Y",
             order = 10,
-            width = "double",
+            width = "half",
             min = -800,
             max = 800,
             step = 1,
-            hidden = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.offsetY or 0
@@ -306,9 +306,9 @@ local function MakePositioningSettingsArgs(configPath, options)
             order = 11,
             width = 0.3,
             hidden = function()
-                return not IsAnchorModeFree(GetNestedValue(db.profile, configPath))
-                    or not IsValueChanged(configPath .. ".offsetY")
+                return not IsValueChanged(configPath .. ".offsetY")
             end,
+            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".offsetY"),
         }
     end

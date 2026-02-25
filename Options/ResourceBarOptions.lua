@@ -19,17 +19,29 @@ local RESOURCE_COLOR_DEFS = {
     { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
 }
 
-local function GenerateResourceColorArgs()
+local function GenerateResourceBarDisplayArgs()
     local args = {
-        colorsSpacer = OB.MakeSpacer(4),
+        showTextDesc = OB.MakeDescription({
+            name = "Display the current value on the bar.",
+            order = 1,
+        }),
+        showText = OB.MakePathToggle({
+            path = "resourceBar.showText",
+            name = "Show text",
+            order = 2,
+            width = "full",
+        }),
+        borderSpacer = OB.MakeSpacer(3),
+        colorsSpacer = OB.MakeSpacer(8),
         colorsDescription = OB.MakeDescription({
             name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
             fontSize = "medium",
-            order = 5,
+            order = 9,
         }),
     }
 
-    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 1))
+    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 4))
+    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 40))
     OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 10))
 
     return args
@@ -41,19 +53,8 @@ local DisableForDeathKnight = OB.DisabledIfPlayerClass(C.CLASS.DEATHKNIGHT)
 function ResourceBarOptions.GetOptionsTable()
     local basicArgs = {
         enabled = OB.BuildModuleEnabledToggle("ResourceBar", "resourceBar.enabled", "Enable resource bar", 1),
-        showTextDesc = OB.MakeDescription({
-            name = "Display the current value on the bar.",
-            order = 2,
-        }),
-        showText = OB.MakePathToggle({
-            path = "resourceBar.showText",
-            name = "Show text",
-            order = 3,
-            width = "full",
-        }),
     }
     OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("resourceBar", 4))
-    OB.MergeArgs(basicArgs, OB.BuildFontOverrideArgs("resourceBar", 7))
 
     return OB.MakeGroup({
         name = "Resource Bar",
@@ -62,7 +63,7 @@ function ResourceBarOptions.GetOptionsTable()
         args = {
             basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
             positioningSettings = ECM.OptionUtil.MakePositioningGroup("resourceBar", 2),
-            resourceColors = OB.MakeInlineGroup("Display Options", 3, GenerateResourceColorArgs()),
+            displaySettings = OB.MakeInlineGroup("Display Options", 3, GenerateResourceBarDisplayArgs()),
         },
     })
 end

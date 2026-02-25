@@ -10,44 +10,58 @@ local RuneBarOptions = {}
 local DisableUnlessDeathKnight = OB.DisabledUnlessPlayerClass(C.CLASS.DEATHKNIGHT)
 local DisableRuneColor = OB.DisabledWhenPathTrue("runeBar.useSpecColor")
 
-function RuneBarOptions.GetOptionsTable()
-    local basicArgs = {
-        enabled = OB.BuildModuleEnabledToggle("RuneBar", "runeBar.enabled", "Enable rune bar", 2),
-        spacer1 = OB.MakeSpacer(20),
+local function GenerateRuneBarAppearanceArgs()
+    local args = {}
+    OB.MergeArgs(args, OB.BuildFontOverrideArgs("runeBar", 10))
+    return args
+end
+
+local function GenerateRuneBarColorArgs()
+    local args = {
         useSpecColorDesc = OB.MakeDescription({
-            name = "\nUse your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
-            order = 30,
+            name = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
+            order = 1,
         }),
         useSpecColor = OB.MakePathToggle({
             path = "runeBar.useSpecColor",
             name = "Use specialization color",
-            order = 31,
-            width = "full",
+            order = 2,
+            width = "double",
         }),
     }
-    OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("runeBar", 3))
-    OB.MergeArgs(basicArgs, OB.BuildFontOverrideArgs("runeBar", 6))
-    OB.MergeArgs(basicArgs, OB.BuildPathColorWithReset("color", {
+
+    OB.MergeArgs(args, OB.BuildPathColorWithReset("color", {
         path = "runeBar.color",
         name = "Rune color",
-        order = 32,
+        order = 3,
         width = "double",
         disabled = DisableRuneColor,
-        resetOrder = 33,
+        resetOrder = 4,
         resetDisabled = DisableRuneColor,
     }))
+
+    return args
+end
+
+function RuneBarOptions.GetOptionsTable()
+    local basicArgs = {
+        enabled = OB.BuildModuleEnabledToggle("RuneBar", "runeBar.enabled", "Enable rune bar", 1),
+    }
+    OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("runeBar", 3))
+    OB.MergeArgs(basicArgs, GenerateRuneBarAppearanceArgs())
 
     return OB.MakeGroup({
         name = "Rune Bar",
         order = 4,
         disabled = DisableUnlessDeathKnight,
         args = {
-            basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("runeBar", 3, {
+            runeBarSettings = OB.MakeInlineGroup("Rune Bar", 1, basicArgs),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("runeBar", 2, {
                 widthDesc = "Width when custom positioning is enabled.",
                 offsetXDesc = "\nHorizontal offset when custom positioning is enabled.",
                 offsetYDesc = "\nVertical offset when custom positioning is enabled.",
             }),
+            colorSettings = OB.MakeInlineGroup("Colors", 3, GenerateRuneBarColorArgs()),
         },
     })
 end

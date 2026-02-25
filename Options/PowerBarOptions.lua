@@ -17,41 +17,46 @@ local POWER_COLOR_DEFS = {
     { key = Enum.PowerType.Fury, name = "Fury" },
 }
 
-local function GeneratePowerBarDisplayArgs()
+local function GeneratePowerBarAppearanceArgs()
     local args = {
         showTextDesc = OB.MakeDescription({
             name = "Display the current value on the bar.",
-            order = 1,
+            order = 10,
         }),
         showText = OB.MakePathToggle({
             path = "powerBar.showText",
             name = "Show text",
-            order = 2,
-            width = "full",
+            order = 11,
+            width = "double",
         }),
         showManaAsPercentDesc = OB.MakeDescription({
             name = "\nDisplay mana as percentage instead of raw value.",
-            order = 3,
+            order = 12,
         }),
         showManaAsPercent = OB.MakePathToggle({
             path = "powerBar.showManaAsPercent",
             name = "Show mana as percent",
-            order = 4,
-            width = "full",
-        }),
-        borderSpacer = OB.MakeSpacer(5),
-        colorsSpacer = OB.MakeSpacer(10),
-        colorsDescription = OB.MakeDescription({
-            name = "Customize the color of each primary resource type.",
-            fontSize = "medium",
-            order = 11,
+            order = 13,
+            width = "double",
         }),
     }
 
-    OB.MergeArgs(args, OB.BuildBorderArgs("powerBar.border", 7))
-    OB.MergeArgs(args, OB.BuildColorPickerList("powerBar.colors", POWER_COLOR_DEFS, 12))
+    OB.MergeArgs(args, OB.BuildBorderArgs("powerBar.border", 20))
     OB.MergeArgs(args, OB.BuildFontOverrideArgs("powerBar", 30))
 
+    return args
+end
+
+local function GeneratePowerBarColorArgs()
+    local args = {
+        colorsDescription = OB.MakeDescription({
+            name = "Customize the color of each primary resource type.",
+            fontSize = "medium",
+            order = 1,
+        }),
+    }
+
+    OB.MergeArgs(args, OB.BuildColorPickerList("powerBar.colors", POWER_COLOR_DEFS, 2))
     return args
 end
 
@@ -67,14 +72,15 @@ function PowerBarOptions.GetOptionsTable()
         enabled = OB.BuildModuleEnabledToggle("PowerBar", "powerBar.enabled", "Enable power bar", 1),
     }
     OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("powerBar", 3))
+    OB.MergeArgs(basicArgs, GeneratePowerBarAppearanceArgs())
 
     return OB.MakeGroup({
         name = "Power Bar",
         order = 2,
         args = {
-            basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
-            displaySettings = OB.MakeInlineGroup("Display Options", 2, GeneratePowerBarDisplayArgs()),
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("powerBar", 3),
+            powerBarSettings = OB.MakeInlineGroup("Power Bar", 1, basicArgs),
+            positioningSettings = ECM.OptionUtil.MakePositioningGroup("powerBar", 2),
+            colorSettings = OB.MakeInlineGroup("Colors", 3, GeneratePowerBarColorArgs()),
             tickMarks = tickMarks,
         },
     })
