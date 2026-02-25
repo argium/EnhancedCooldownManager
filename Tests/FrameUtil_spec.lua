@@ -285,7 +285,6 @@ describe("FrameUtil", function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
             "ECM_AreColorsEqual",
-            "ECM_debug_assert",
             "C_Timer",
             "GetTime",
             "UIParent",

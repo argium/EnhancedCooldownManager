@@ -81,7 +81,6 @@ describe("Migration", function()
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
-            "ECM_log",
             "date",
             "strtrim",
             "wipe",

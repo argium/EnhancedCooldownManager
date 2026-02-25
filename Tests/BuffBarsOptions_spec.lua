@@ -29,8 +29,6 @@ describe("BuffBarsOptions", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
-            "ECM_debug_assert",
-            "ECM_log",
             "ECM_tostring",
             "LibStub",
         })
