@@ -85,6 +85,75 @@ local function hook_child_frame(child, module)
     child.__ecmHooked = true
 end
 
+---@param iconFrame Frame|nil
+---@param iconTexture Texture|nil
+---@param iconOverlay Texture|nil
+---@param debuffBorder Texture|nil
+---@return table
+local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debuffBorder)
+    local info = {
+        hasIconTexture = iconTexture ~= nil,
+        hasIconOverlay = iconOverlay ~= nil,
+        hasDebuffBorder = debuffBorder ~= nil,
+        textureMaskCountBefore = 0,
+        textureMaskCountRemoved = 0,
+        frameMaskRegionCountBefore = 0,
+        frameMaskRegionsRemoved = 0,
+        usedSetMaskFallback = false,
+        overlayWasShown = iconOverlay and iconOverlay.IsShown and iconOverlay:IsShown() or false,
+        debuffBorderWasShown = debuffBorder and debuffBorder.IsShown and debuffBorder:IsShown() or false,
+    }
+
+    if iconTexture then
+        iconTexture:SetTexCoord(0, 1, 0, 1)
+
+        if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
+            local maskCount = iconTexture:GetNumMaskTextures() or 0
+            info.textureMaskCountBefore = maskCount
+            for i = maskCount, 1, -1 do
+                local mask = iconTexture:GetMaskTexture(i)
+                if mask then
+                    iconTexture:RemoveMaskTexture(mask)
+                    info.textureMaskCountRemoved = info.textureMaskCountRemoved + 1
+                    if mask.Hide then
+                        mask:Hide()
+                    end
+                end
+            end
+        elseif iconTexture.SetMask then
+            info.usedSetMaskFallback = true
+            pcall(iconTexture.SetMask, iconTexture, nil)
+        end
+
+        if iconFrame and iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
+            for _, region in ipairs({ iconFrame:GetRegions() }) do
+                if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
+                    info.frameMaskRegionCountBefore = info.frameMaskRegionCountBefore + 1
+                    local ok = pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
+                    if ok then
+                        info.frameMaskRegionsRemoved = info.frameMaskRegionsRemoved + 1
+                    end
+                    if region.Hide then
+                        region:Hide()
+                    end
+                end
+            end
+        end
+    end
+
+    if iconOverlay then
+        iconOverlay:Hide()
+        iconOverlay:SetAlpha(0)
+    end
+
+    if debuffBorder then
+        debuffBorder:Hide()
+        debuffBorder:SetAlpha(0)
+    end
+
+    return info
+end
+
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
 --- child frame. Lazy setters ensure no-ops when values haven't changed.
 ---@param frame ECM_BuffBarMixin
@@ -230,14 +299,30 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
+        local iconCleanupInfo = apply_square_icon_style(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
         iconFrame:SetShown(showIcon)
-        iconTexture:SetShown(showIcon)
-        iconOverlay:SetShown(showIcon)
+        if iconTexture then
+            iconTexture:SetShown(showIcon)
+        end
+        if iconOverlay then
+            iconOverlay:SetShown(false)
+        end
+
+        if iconCleanupInfo and (
+            iconCleanupInfo.hasIconOverlay
+            or iconCleanupInfo.hasDebuffBorder
+            or iconCleanupInfo.textureMaskCountBefore > 0
+            or iconCleanupInfo.frameMaskRegionCountBefore > 0
+            or iconCleanupInfo.usedSetMaskFallback
+        ) then
+            ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup [" .. barIndex .. "]", iconCleanupInfo)
+        end
     end
 
     local iconAlpha = showIcon and 1 or 0
     if frame.DebuffBorder then
-        FrameUtil.LazySetAlpha(frame.DebuffBorder, iconAlpha)
+        FrameUtil.LazySetAlpha(frame.DebuffBorder, 0)
+        frame.DebuffBorder:Hide()
     end
     if iconFrame.Applications then
         FrameUtil.LazySetAlpha(iconFrame.Applications, iconAlpha)
