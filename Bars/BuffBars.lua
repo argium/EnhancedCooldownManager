@@ -85,12 +85,18 @@ local function hook_child_frame(child, module)
     child.__ecmHooked = true
 end
 
+--- Strips circular masks and hides overlay/border to produce a square icon.
+--- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
+--- frame via `__ecmSquareStyled` so it only runs once per icon frame.
 ---@param iconFrame Frame|nil
 ---@param iconTexture Texture|nil
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
----@return table
 local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debuffBorder)
+    if not iconFrame then return end
+    if iconFrame.__ecmSquareStyled then return end
+    iconFrame.__ecmSquareStyled = true
+
     local info = {
         hasIconTexture = iconTexture ~= nil,
         hasIconOverlay = iconOverlay ~= nil,
@@ -125,7 +131,7 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
             pcall(iconTexture.SetMask, iconTexture, nil)
         end
 
-        if iconFrame and iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
+        if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
             for _, region in ipairs({ iconFrame:GetRegions() }) do
                 if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
                     info.frameMaskRegionCountBefore = info.frameMaskRegionCountBefore + 1
@@ -151,7 +157,14 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
         debuffBorder:SetAlpha(0)
     end
 
-    return info
+    local didWork = info.textureMaskCountBefore > 0
+        or info.frameMaskRegionCountBefore > 0
+        or info.usedSetMaskFallback
+        or info.hasIconOverlay
+        or info.hasDebuffBorder
+    if didWork then
+        ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup", info)
+    end
 end
 
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
@@ -299,23 +312,13 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
-        local iconCleanupInfo = apply_square_icon_style(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
+        apply_square_icon_style(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
         iconFrame:SetShown(showIcon)
         if iconTexture then
             iconTexture:SetShown(showIcon)
         end
         if iconOverlay then
             iconOverlay:SetShown(false)
-        end
-
-        if iconCleanupInfo and (
-            iconCleanupInfo.hasIconOverlay
-            or iconCleanupInfo.hasDebuffBorder
-            or iconCleanupInfo.textureMaskCountBefore > 0
-            or iconCleanupInfo.frameMaskRegionCountBefore > 0
-            or iconCleanupInfo.usedSetMaskFallback
-        ) then
-            ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup [" .. barIndex .. "]", iconCleanupInfo)
         end
     end
 
