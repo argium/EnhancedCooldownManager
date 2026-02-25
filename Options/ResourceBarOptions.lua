@@ -33,17 +33,24 @@ local function GenerateResourceBarDisplayArgs()
             width = "full",
         }),
         borderSpacer = OB.MakeSpacer(3),
-        colorsSpacer = OB.MakeSpacer(8),
-        colorsDescription = OB.MakeDescription({
-            name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
-            fontSize = "medium",
-            order = 9,
-        }),
     }
 
     OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 4))
     OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 40))
-    OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 10))
+
+    return args
+end
+
+local function GenerateResourceBarColorArgs()
+    local args = {
+        colorsDescription = OB.MakeDescription({
+            name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
+            fontSize = "medium",
+            order = 1,
+        }),
+    }
+
+    OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 2))
 
     return args
 end
@@ -65,6 +72,7 @@ function ResourceBarOptions.GetOptionsTable()
             basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
             positioningSettings = ECM.OptionUtil.MakePositioningGroup("resourceBar", 2),
             displaySettings = OB.MakeInlineGroup("Display Options", 3, GenerateResourceBarDisplayArgs()),
+            colorSettings = OB.MakeInlineGroup("Colors", 4, GenerateResourceBarColorArgs()),
         },
     })
 end
