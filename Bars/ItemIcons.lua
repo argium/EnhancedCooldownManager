@@ -49,11 +49,22 @@ local function GetTrinketData(slotId)
     }
 end
 
+--- Returns the item ID from a consumable priority entry.
+---@param entry number|{ itemID: number, quality: number|nil }
+---@return number
+local function GetConsumableItemID(entry)
+    if type(entry) == "table" then
+        return entry.itemID
+    end
+    return entry
+end
+
 --- Returns the first item from priorityList that exists in the player's bags.
----@param priorityList number[] Array of item IDs, ordered by priority.
+---@param priorityList (number|{ itemID: number, quality: number|nil })[] Array of priority entries, ordered by priority.
 ---@return ECM_IconData|nil iconData Icon data if found, nil otherwise.
 local function GetBestConsumable(priorityList)
-    for _, itemId in ipairs(priorityList) do
+    for _, entry in ipairs(priorityList) do
+        local itemId = GetConsumableItemID(entry)
         if C_Item.GetItemCount(itemId) > 0 then
             local texture = C_Item.GetItemIconByID(itemId)
             return {

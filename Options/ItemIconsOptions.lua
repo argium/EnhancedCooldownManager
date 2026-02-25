@@ -6,6 +6,167 @@ local _, ns = ...
 local mod = ns.Addon
 local ItemIconsOptions = {}
 mod.ItemIconsOptions = ItemIconsOptions
+local _itemLoadRefreshQueued = false
+local _pendingItemLoads = {}
+
+local QUALITY_ICON_ATLASES = {
+    [1] = "Professions-ChatIcon-Quality-Tier1",
+    [2] = "Professions-ChatIcon-Quality-Tier2",
+    [3] = "Professions-ChatIcon-Quality-Tier3",
+}
+
+local QUALITY_ICON_FALLBACKS = {
+    [1] = "|cffcd7f32★|r",
+    [2] = "|cffc0c0c0★|r",
+    [3] = "|cffffd700★|r",
+}
+
+---@param atlas string
+---@return boolean
+local function HasAtlas(atlas)
+    if C_Texture and C_Texture.GetAtlasInfo then
+        return C_Texture.GetAtlasInfo(atlas) ~= nil
+    end
+    if type(GetAtlasInfo) == "function" then
+        return GetAtlasInfo(atlas) ~= nil
+    end
+    return false
+end
+
+---@param quality number|nil
+---@return string
+local function FormatQualityIcon(quality)
+    if not quality then
+        return ""
+    end
+
+    local atlas = QUALITY_ICON_ATLASES[quality]
+    if atlas and HasAtlas(atlas) then
+        return "|A:" .. atlas .. ":14:14|a"
+    end
+
+    return QUALITY_ICON_FALLBACKS[quality] or ""
+end
+
+---@param itemID number
+---@return string
+local function FormatItemIcon(itemID)
+    if not (C_Item and C_Item.GetItemIconByID) then
+        return ""
+    end
+
+    local texture = C_Item.GetItemIconByID(itemID)
+    if not texture then
+        return ""
+    end
+
+    return "|T" .. texture .. ":14:14:0:0|t "
+end
+
+local function NotifyOptionsChanged()
+    local AceConfigRegistry = LibStub and LibStub("AceConfigRegistry-3.0", true)
+    if AceConfigRegistry then
+        AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+    end
+end
+
+local function QueueOptionsRefresh()
+    if _itemLoadRefreshQueued then
+        return
+    end
+
+    _itemLoadRefreshQueued = true
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.1, function()
+            _itemLoadRefreshQueued = false
+            NotifyOptionsChanged()
+        end)
+        return
+    end
+
+    _itemLoadRefreshQueued = false
+    NotifyOptionsChanged()
+end
+
+---@param itemID number
+local function RequestItemDataAndRefresh(itemID)
+    if _pendingItemLoads[itemID] then
+        return
+    end
+    _pendingItemLoads[itemID] = true
+
+    if C_Item and C_Item.RequestLoadItemDataByID then
+        C_Item.RequestLoadItemDataByID(itemID)
+    end
+
+    if Item and Item.CreateFromItemID then
+        local item = Item:CreateFromItemID(itemID)
+        if item and item.ContinueOnItemLoad then
+            item:ContinueOnItemLoad(function()
+                _pendingItemLoads[itemID] = nil
+                QueueOptionsRefresh()
+            end)
+            return
+        end
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0.5, function()
+            _pendingItemLoads[itemID] = nil
+            QueueOptionsRefresh()
+        end)
+    else
+        _pendingItemLoads[itemID] = nil
+        QueueOptionsRefresh()
+    end
+end
+
+---@param itemID number
+---@return string
+local function GetItemNameForOptions(itemID)
+    if C_Item and C_Item.GetItemNameByID then
+        local name = C_Item.GetItemNameByID(itemID)
+        if name then
+            return name
+        end
+    end
+
+    RequestItemDataAndRefresh(itemID)
+
+    return "Item " .. tostring(itemID)
+end
+
+---@param entries { itemID: number, quality: number|nil }[]
+---@return string
+local function BuildPotionPriorityLines(entries)
+    local lines = {}
+    for index, entry in ipairs(entries) do
+        local qualityIcon = FormatQualityIcon(entry.quality)
+        lines[#lines + 1] = string.format(
+            "%d. %s%s%s%s",
+            index,
+            FormatItemIcon(entry.itemID),
+            GetItemNameForOptions(entry.itemID),
+            qualityIcon ~= "" and " " or "",
+            qualityIcon
+        )
+    end
+    return table.concat(lines, "\n")
+end
+
+---@return string
+local function BuildPotionPriorityDescription()
+    local sections = {
+        "Potion priority (highest first):",
+        "",
+        "Combat Potions",
+        BuildPotionPriorityLines(ECM.Constants.COMBAT_POTIONS),
+        "",
+        "Health Potions",
+        BuildPotionPriorityLines(ECM.Constants.HEALTH_POTIONS),
+    }
+    return table.concat(sections, "\n")
+end
 
 --- Builds a standard Item Icons module toggle option.
 ---@param self ECM_ItemIconsModule
@@ -103,6 +264,18 @@ function ItemIconsOptions.GetConsumableOptionsArgs()
         showHealthPotion = BuildModuleToggleOption(mod.ItemIcons, "showHealthPotion", "Show health potions", 1),
         showCombatPotion = BuildModuleToggleOption(mod.ItemIcons, "showCombatPotion", "Show combat potions", 2),
         showHealthstone = BuildModuleToggleOption(mod.ItemIcons, "showHealthstone", "Show healthstone", 3),
+        potionPrioritySpacer = {
+            type = "description",
+            name = " ",
+            order = 90,
+            fontSize = "medium",
+        },
+        potionPriorityList = {
+            type = "description",
+            name = BuildPotionPriorityDescription,
+            order = 91,
+            fontSize = "medium",
+        },
     }
 end
 

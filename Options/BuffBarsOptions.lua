@@ -255,7 +255,7 @@ function BuffBarsOptions.GetOptionsTable()
     local spells = SpellOptionsTable()
     spells.name = "Colors"
     spells.inline = true
-    spells.order = 3
+    spells.order = 4
 
     local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
         modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
@@ -297,6 +297,9 @@ function BuffBarsOptions.GetOptionsTable()
         name = "X",
         order = 8,
         width = 0.3,
+        hidden = function()
+            return not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
+        end,
         disabled = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
                 or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
@@ -431,7 +434,6 @@ function BuffBarsOptions.GetOptionsTable()
         },
     }
     OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
-    OB.MergeArgs(basicArgs, displayArgs)
 
     return {
         type = "group",
@@ -446,6 +448,13 @@ function BuffBarsOptions.GetOptionsTable()
                 args = basicArgs,
             },
             positioningSettings = positioningSettings,
+            displaySettings = {
+                type = "group",
+                name = "Display",
+                inline = true,
+                order = 3,
+                args = displayArgs,
+            },
             spells = spells,
         },
     }

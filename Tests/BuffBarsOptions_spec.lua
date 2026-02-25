@@ -430,17 +430,23 @@ describe("BuffBarsOptions", function()
     it("adds a free grow direction selector to positioning settings", function()
         local options = BuffBarsOptions.GetOptionsTable()
         local positioningArgs = options.args.positioningSettings.args
+        local desc = positioningArgs.freeGrowDirectionDesc
         local selector = positioningArgs.freeGrowDirection
         local reset = positioningArgs.freeGrowDirectionReset
 
+        assert.is_table(desc)
         assert.is_table(selector)
         assert.are.equal("select", selector.type)
         assert.are.equal("Free Grow Direction", selector.name)
-        assert.is_true(selector.hidden())
+        assert.is_nil(selector.hidden)
+        assert.is_true(desc.disabled())
+        assert.is_true(selector.disabled())
         assert.is_true(reset.hidden())
+        assert.is_true(reset.disabled())
 
         addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_FREE
-        assert.is_false(selector.hidden())
+        assert.is_false(desc.disabled())
+        assert.is_false(selector.disabled())
 
         selector.set(nil, ECM.Constants.GROW_DIRECTION_UP)
         assert.are.equal(ECM.Constants.GROW_DIRECTION_UP, addonDB.profile.buffBars.freeGrowDirection)
@@ -449,6 +455,11 @@ describe("BuffBarsOptions", function()
         ECM.OptionUtil.IsValueChanged = function()
             return true
         end
+        assert.is_false(reset.hidden())
+        assert.is_false(reset.disabled())
+
+        addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_CHAIN
+        assert.is_true(reset.disabled())
         assert.is_false(reset.hidden())
     end)
 
