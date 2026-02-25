@@ -375,15 +375,16 @@ function BuffBarsOptions.GetOptionsTable()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         },
+        spacer1 = OB.MakeSpacer(15),
         heightDesc = {
             type = "description",
             name = "\nOverride the default bar height. Set to 0 to use the global default.",
-            order = 15,
+            order = 16,
         },
         height = {
             type = "range",
             name = "Height Override",
-            order = 16,
+            order = 17,
             width = "half",
             min = 0,
             max = 40,
@@ -397,7 +398,7 @@ function BuffBarsOptions.GetOptionsTable()
         heightReset = {
             type = "execute",
             name = "X",
-            order = 17,
+            order = 18,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
@@ -405,12 +406,12 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingDesc = {
             type = "description",
             name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
-            order = 18,
+            order = 19,
         },
         verticalSpacing = {
             type = "range",
             name = "Vertical Spacing",
-            order = 19,
+            order = 20,
             width = "half",
             min = 0,
             max = 20,
@@ -424,12 +425,13 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingReset = {
             type = "execute",
             name = "X",
-            order = 20,
+            order = 21,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
         },
     }
+    displayArgs.spacer2 = OB.MakeSpacer(29)
     OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
 
     return {

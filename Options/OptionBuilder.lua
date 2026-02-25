@@ -288,10 +288,10 @@ local function MakeDescription(spec)
     })
 end
 
-local function MakeSpacer(order, opts)
+local function MakeSpacer(order, height, opts)
     opts = opts or {}
     return MakeDescription({
-        name = opts.name or " ",
+        name = string.rep("\n", height or 1),
         order = order,
         hidden = opts.hidden,
         width = opts.width,
@@ -430,6 +430,7 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
         heightDesc = MakeDescription({
             name = "\nOverride the default bar height. Set to 0 to use the global default.",
             order = orderBase,
+            width = "full"
         }),
     }
 
@@ -437,7 +438,7 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".height",
         name = "Height Override",
         order = orderBase + 1,
-        width = "half",
+        width = "small",
         min = 0,
         max = 40,
         step = 1,

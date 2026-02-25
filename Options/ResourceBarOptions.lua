@@ -32,11 +32,12 @@ local function GenerateResourceBarDisplayArgs()
             order = 2,
             width = "full",
         }),
-        borderSpacer = OB.MakeSpacer(3),
     }
 
-    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 4))
-    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 40))
+    OB.MergeArgs(args, OB.MakeSpacer(9))
+    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 10))
+    OB.MergeArgs(args, OB.MakeSpacer(19))
+    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 20))
 
     return args
 end
