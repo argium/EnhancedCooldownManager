@@ -5,6 +5,7 @@
 local _, ns = ...
 local mod = ns.Addon
 local ItemIconsOptions = {}
+local OB = ECM.OptionBuilder
 mod.ItemIconsOptions = ItemIconsOptions
 
 local QUALITY_ICON_ATLASES = {
@@ -89,7 +90,7 @@ local function BuildPotionPriorityText(entries)
             qualityIcon
         )
     end
-    return table.concat(lines, "\n\n") .. "\n\n"
+    return table.concat(lines, "\n\n")
 end
 
 --- Builds a standard Item Icons module toggle option.
@@ -188,23 +189,6 @@ function ItemIconsOptions.GetConsumableOptionsArgs()
         showHealthPotion = BuildModuleToggleOption(mod.ItemIcons, "showHealthPotion", "Show health potions", 1),
         showCombatPotion = BuildModuleToggleOption(mod.ItemIcons, "showCombatPotion", "Show combat potions", 2),
         showHealthstone = BuildModuleToggleOption(mod.ItemIcons, "showHealthstone", "Show healthstone", 3),
-        potionPriorityHeading = {
-            type = "header",
-            name = "Potion priority (highest first)",
-            order = 90,
-        },
-        combatPotionList = {
-            type = "description",
-            name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
-            order = 92,
-            fontSize = "medium",
-        },
-        healthPotionList = {
-            type = "description",
-            name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
-            order = 94,
-            fontSize = "medium",
-        },
     }
 end
 
@@ -237,6 +221,25 @@ function ItemIconsOptions.GetOptionsTable()
                 order = 3,
                 args = ItemIconsOptions.GetConsumableOptionsArgs(),
             },
+            OB.MakeSpacer(89),
+            potionPriorityHeading = {
+                type = "description",
+                name = "Potion priority (highest first)",
+                order = 90,
+            },
+            combatPotionList = {
+                type = "description",
+                name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
+                order = 91,
+                fontSize = "medium",
+            },
+            OB.MakeSpacer(92),
+            healthPotionList = {
+                type = "description",
+                name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
+                order = 93,
+                fontSize = "medium",
+            }
         },
     }
 end
