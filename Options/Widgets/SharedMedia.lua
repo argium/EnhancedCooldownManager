@@ -21,22 +21,10 @@ local function GetLSMValues(mediaType, fallback)
 end
 
 local function GetStatusbarValues()
-    if type(AceGUIWidgetLSMlists) == "table"
-        and type(AceGUIWidgetLSMlists.statusbar) == "table"
-        and next(AceGUIWidgetLSMlists.statusbar) then
-        return AceGUIWidgetLSMlists.statusbar
-    end
-
     return GetLSMValues("statusbar", "Blizzard")
 end
 
 local function GetFontValues()
-    if type(AceGUIWidgetLSMlists) == "table"
-        and type(AceGUIWidgetLSMlists.font) == "table"
-        and next(AceGUIWidgetLSMlists.font) then
-        return AceGUIWidgetLSMlists.font
-    end
-
     return GetLSMValues("font", "Expressway")
 end
 

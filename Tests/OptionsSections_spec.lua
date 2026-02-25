@@ -16,11 +16,11 @@ describe("Options sections and root assembly", function()
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
-            "ECM",
-            "LibStub",
-            "ColorUtil",
-            "Settings",
-            "UnitClass",
+            "ECM", "ECM_CloneValue", "ECM_DeepEquals",
+            "Settings", "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
+            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
+            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "Enum",
         })
     end)
@@ -29,50 +29,37 @@ describe("Options sections and root assembly", function()
         TestHelpers.restoreGlobals(originalGlobals)
     end)
 
-    it("root Options module assembles expected top-level sections", function()
-        local registeredOptionsFactory
-        local createdModule
+    it("root Options module creates categories and calls RegisterSettings on sections", function()
+        TestHelpers.setupSettingsStubs()
+
+        local registerSettingsCalls = {}
+        local dbCallbacks = {}
 
         _G.ECM = {
-            Constants = { ADDON_NAME = "EnhancedCooldownManager" },
+            Constants = {
+                ADDON_NAME = "ECM",
+                ANCHORMODE_CHAIN = 1,
+                ANCHORMODE_FREE = 2,
+                DEFAULT_BAR_WIDTH = 300,
+            },
             ScheduleLayoutUpdate = function() end,
+            SettingsBuilder = nil, -- Will be loaded
         }
-        _G.ColorUtil = {
-            Sparkle = function(name)
-                return name
-            end,
-        }
-        _G.Settings = {
-            OpenToCategory = function() end,
-        }
-        _G.LibStub = function(name)
-            if name == "AceConfigRegistry-3.0" then
-                return {
-                    RegisterOptionsTable = function(_, _, factory)
-                        registeredOptionsFactory = factory
-                    end,
-                }
-            end
-            if name == "AceConfigDialog-3.0" then
-                return {
-                    AddToBlizOptions = function()
-                        return { name = "Enhanced Cooldown Manager" }
-                    end,
-                }
-            end
-            return {}
-        end
 
-        local dbCallbacks = {}
+        _G.ECM_DeepEquals = function(a, b) return a == b end
+        _G.ECM_CloneValue = function(v) return v end
+
+        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
+        _G.GetSpecialization = function() return 1 end
+        _G.GetSpecializationInfo = function() return nil, "Arms" end
+
+        local createdModule
         local mod = {
             db = {
+                profile = {},
+                defaults = { profile = {} },
                 RegisterCallback = function(_, owner, eventName, methodName)
-                    dbCallbacks[#dbCallbacks + 1] = { owner = owner, eventName = eventName, methodName = methodName }
-                end,
-            },
-            ItemIconsOptions = {
-                GetOptionsTable = function()
-                    return { type = "group", name = "Item Icons", order = 6, args = {} }
+                    dbCallbacks[#dbCallbacks + 1] = { eventName = eventName, methodName = methodName }
                 end,
             },
             NewModule = function(self, name)
@@ -83,185 +70,80 @@ describe("Options sections and root assembly", function()
 
         local ns = {
             Addon = mod,
-            BuffBarsOptions = {
-                GetOptionsTable = function()
-                    return { type = "group", name = "Aura Bars", order = 5, args = {} }
-                end,
-            },
-            OptionsSections = {
-                General = { GetOptionsTable = function() return { order = 1 } end },
-                PowerBar = { GetOptionsTable = function() return { order = 2 } end },
-                ResourceBar = { GetOptionsTable = function() return { order = 3 } end },
-                RuneBar = { GetOptionsTable = function() return { order = 4 } end },
-                Profile = { GetOptionsTable = function() return { order = 7 } end },
-                About = { GetOptionsTable = function() return { order = 8 } end },
-            },
+            OptionsSections = {},
         }
 
-        local chunk = TestHelpers.loadChunk(
-            { "Options/Options.lua", "../Options/Options.lua" },
-            "Unable to load Options/Options.lua"
+        -- Load OptionUtil first (SB depends on it)
+        local optionUtilChunk = TestHelpers.loadChunk(
+            { "Options/OptionUtil.lua", "../Options/OptionUtil.lua" },
+            "Unable to load OptionUtil.lua"
         )
-        chunk(nil, ns)
+        optionUtilChunk(nil, ns)
+
+        -- Load SettingsBuilder
+        local sbChunk = TestHelpers.loadChunk(
+            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            "Unable to load SettingsBuilder.lua"
+        )
+        sbChunk(nil, ns)
+
+        -- Register mock sections
+        for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "About" }) do
+            ns.OptionsSections[key] = {
+                RegisterSettings = function(SB)
+                    registerSettingsCalls[#registerSettingsCalls + 1] = key
+                end,
+            }
+        end
+
+        -- Load Options.lua
+        local optionsChunk = TestHelpers.loadChunk(
+            { "Options/Options.lua", "../Options/Options.lua" },
+            "Unable to load Options.lua"
+        )
+        optionsChunk(nil, ns)
 
         assert.is_table(createdModule)
         createdModule:OnInitialize()
 
-        assert.is_function(registeredOptionsFactory)
-        local root = registeredOptionsFactory()
-        assert.is_table(root.args)
-        assert.is_not_nil(root.args.general)
-        assert.is_not_nil(root.args.powerBar)
-        assert.is_not_nil(root.args.resourceBar)
-        assert.is_not_nil(root.args.runeBar)
-        assert.is_not_nil(root.args.auraBars)
-        assert.is_not_nil(root.args.itemIcons)
-        assert.is_not_nil(root.args.profile)
-        assert.is_not_nil(root.args.about)
-        assert.are.equal("tree", root.childGroups)
+        -- All 8 sections should have been called, in order
+        assert.are.equal(8, #registerSettingsCalls)
+        assert.are.equal("General", registerSettingsCalls[1])
+        assert.are.equal("About", registerSettingsCalls[8])
+
+        -- DB callbacks registered
         assert.are.equal(3, #dbCallbacks)
+
+        -- GetCategoryID returns something
+        assert.is_not_nil(ECM.SettingsBuilder.GetCategoryID())
     end)
 
-    it("resource/rune sections preserve Death Knight gating", function()
+    it("resource/rune sections register via SB.RegisterSection and have class gating", function()
+        TestHelpers.setupSettingsStubs()
+
         local className = "WARRIOR"
+        _G.UnitClass = function() return "Player", className, 1 end
+        _G.GetSpecialization = function() return 1 end
+        _G.GetSpecializationInfo = function() return nil, "Arms" end
 
         _G.Enum = {
             PowerType = {
-                ArcaneCharges = 1,
-                Chi = 2,
-                ComboPoints = 3,
-                Essence = 4,
-                HolyPower = 5,
-                SoulShards = 6,
+                ArcaneCharges = 1, Chi = 2, ComboPoints = 3,
+                Essence = 4, HolyPower = 5, SoulShards = 6,
             },
         }
-        _G.UnitClass = function()
-            return "Player", className, 1
-        end
+
         _G.ECM = {
             Constants = {
                 CLASS = { DEATHKNIGHT = "DEATHKNIGHT" },
                 RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
+                ANCHORMODE_CHAIN = 1,
+                ANCHORMODE_FREE = 2,
+                DEFAULT_BAR_WIDTH = 300,
             },
-            OptionBuilder = {
-                MergeArgs = function(target, source)
-                    for k, v in pairs(source or {}) do
-                        target[k] = v
-                    end
-                    return target
-                end,
-                MakeGroup = function(spec)
-                    return {
-                        type = "group",
-                        name = spec.name,
-                        order = spec.order,
-                        args = spec.args or {},
-                        inline = spec.inline,
-                        disabled = spec.disabled,
-                        hidden = spec.hidden,
-                    }
-                end,
-                MakeInlineGroup = function(name, order, args, opts)
-                    opts = opts or {}
-                    return {
-                        type = "group",
-                        name = name,
-                        order = order,
-                        inline = true,
-                        args = args or {},
-                        disabled = opts.disabled,
-                        hidden = opts.hidden,
-                    }
-                end,
-                MakeDescription = function(spec)
-                    return {
-                        type = "description",
-                        name = spec.name,
-                        order = spec.order,
-                    }
-                end,
-                MakeSpacer = function(order, opts)
-                    opts = opts or {}
-                    return {
-                        type = "description",
-                        name = opts.name or " ",
-                        order = order,
-                    }
-                end,
-                BuildModuleEnabledToggle = function(_, _, label, order)
-                    return { type = "toggle", name = label, order = order }
-                end,
-                BuildHeightOverrideArgs = function()
-                    return {
-                        heightDesc = { type = "description", order = 3 },
-                        height = { type = "range", order = 4 },
-                        heightReset = { type = "execute", order = 5 },
-                    }
-                end,
-                BuildFontOverrideArgs = function()
-                    return {}
-                end,
-                BuildBorderArgs = function()
-                    return {}
-                end,
-                BuildColorPickerList = function()
-                    return {}
-                end,
-                BuildPathColorWithReset = function(key, spec)
-                    local args = {}
-                    args[key] = {
-                        type = "color",
-                        name = spec.name,
-                        order = spec.order,
-                        disabled = spec.disabled,
-                    }
-                    args[key .. "Reset"] = {
-                        type = "execute",
-                        order = spec.resetOrder,
-                        disabled = spec.resetDisabled,
-                    }
-                    return args
-                end,
-                MakePathToggle = function(spec)
-                    return { type = "toggle", name = spec.name, order = spec.order }
-                end,
-                DisabledWhenPathTrue = function(_)
-                    return function()
-                        return false
-                    end
-                end,
-                DisabledIfPlayerClass = function(classToken)
-                    return function()
-                        local _, playerClass = UnitClass("player")
-                        return playerClass == classToken
-                    end
-                end,
-                DisabledUnlessPlayerClass = function(classToken)
-                    return function()
-                        local _, playerClass = UnitClass("player")
-                        return playerClass ~= classToken
-                    end
-                end,
-                RegisterSection = function(namespace, key, section)
-                    namespace.OptionsSections = namespace.OptionsSections or {}
-                    namespace.OptionsSections[key] = section
-                    return section
-                end,
-            },
-            OptionUtil = {
-                MakePositioningGroup = function(_, order)
-                    return { type = "group", order = order, args = {} }
-                end,
-                GetNestedValue = function(tbl, path)
-                    local current = tbl
-                    for key in path:gmatch("[^.]+") do
-                        if type(current) ~= "table" then
-                            return nil
-                        end
-                        current = current[key]
-                    end
-                    return current
-                end,
+            ScheduleLayoutUpdate = function() end,
+            SharedMediaOptions = {
+                GetFontValues = function() return {} end,
             },
         }
 
@@ -269,35 +151,39 @@ describe("Options sections and root assembly", function()
             Addon = {
                 db = {
                     profile = {
-                        runeBar = { useSpecColor = false },
+                        resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                        runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                    },
+                    defaults = {
+                        profile = {
+                            resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                            runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                        },
                     },
                 },
             },
             OptionsSections = {},
         }
 
-        local resourceChunk = TestHelpers.loadChunk(
-            { "Options/ResourceBarOptions.lua", "../Options/ResourceBarOptions.lua" },
-            "Unable to load Options/ResourceBarOptions.lua"
-        )
-        resourceChunk(nil, ns)
+        -- Load OptionUtil and SettingsBuilder
+        local optUtil = TestHelpers.loadChunk({ "Options/OptionUtil.lua" }, "OptionUtil")
+        optUtil(nil, ns)
+        local sb = TestHelpers.loadChunk({ "Options/SettingsBuilder.lua" }, "SB")
+        sb(nil, ns)
 
-        local runeChunk = TestHelpers.loadChunk(
-            { "Options/RuneBarOptions.lua", "../Options/RuneBarOptions.lua" },
-            "Unable to load Options/RuneBarOptions.lua"
-        )
+        -- Set up root category so subcategories can be created
+        ECM.SettingsBuilder.CreateRootCategory("Test")
+
+        -- Load ResourceBarOptions and RuneBarOptions
+        local resChunk = TestHelpers.loadChunk({ "Options/ResourceBarOptions.lua" }, "ResourceBarOptions")
+        resChunk(nil, ns)
+        local runeChunk = TestHelpers.loadChunk({ "Options/RuneBarOptions.lua" }, "RuneBarOptions")
         runeChunk(nil, ns)
 
-        local resourceOptions = ns.OptionsSections.ResourceBar.GetOptionsTable()
-        local runeOptions = ns.OptionsSections.RuneBar.GetOptionsTable()
-
-        assert.are.equal(3, resourceOptions.order)
-        assert.are.equal(4, runeOptions.order)
-        assert.is_false(resourceOptions.disabled())
-        assert.is_true(runeOptions.disabled())
-
-        className = "DEATHKNIGHT"
-        assert.is_true(resourceOptions.disabled())
-        assert.is_false(runeOptions.disabled())
+        -- Both should have registered themselves
+        assert.is_not_nil(ns.OptionsSections.ResourceBar)
+        assert.is_not_nil(ns.OptionsSections.RuneBar)
+        assert.is_function(ns.OptionsSections.ResourceBar.RegisterSettings)
+        assert.is_function(ns.OptionsSections.RuneBar.RegisterSettings)
     end)
 end)

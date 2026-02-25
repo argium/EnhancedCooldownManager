@@ -4,11 +4,10 @@
 
 local _, ns = ...
 local C = ECM.Constants
-local OB = ECM.OptionBuilder
 
 local RESOURCE_COLOR_DEFS = {
     { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = "Soul Fragments (Demon Hunter)" },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Souls Fragments (Devourer)" },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Soul Fragments (Devourer)" },
     { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = "Void Fragments (Devourer)" },
     { key = C.RESOURCEBAR_TYPE_ICICLES, name = "Icicles (Frost Mage)" },
     { key = Enum.PowerType.ArcaneCharges, name = "Arcane Charges" },
@@ -20,62 +19,46 @@ local RESOURCE_COLOR_DEFS = {
     { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
 }
 
-local function GenerateResourceBarDisplayArgs()
-    local args = {
-        showTextDesc = OB.MakeDescription({
-            name = "Display the current value on the bar.",
-            order = 1,
-        }),
-        showText = OB.MakePathToggle({
-            path = "resourceBar.showText",
-            name = "Show text",
-            order = 2,
-            width = "full",
-        }),
-    }
-
-    args.spacer9 = OB.MakeSpacer(9)
-    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 10))
-    args.spacer19 = OB.MakeSpacer(19)
-    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 20))
-
-    return args
-end
-
-local function GenerateResourceBarColorArgs()
-    local args = {
-        colorsDescription = OB.MakeDescription({
-            name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
-            fontSize = "medium",
-            order = 1,
-        }),
-    }
-
-    OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 2))
-
-    return args
-end
-
 local ResourceBarOptions = {}
-local DisableForDeathKnight = OB.DisabledIfPlayerClass(C.CLASS.DEATHKNIGHT)
 
-function ResourceBarOptions.GetOptionsTable()
-    local basicArgs = {
-        enabled = OB.BuildModuleEnabledToggle("ResourceBar", "resourceBar.enabled", "Enable resource bar", 1),
-    }
-    OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("resourceBar", 4))
-
-    return OB.MakeGroup({
-        name = "Resource Bar",
-        order = 3,
-        disabled = DisableForDeathKnight,
-        args = {
-            basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("resourceBar", 2),
-            displaySettings = OB.MakeInlineGroup("Display Options", 3, GenerateResourceBarDisplayArgs()),
-            colorSettings = OB.MakeInlineGroup("Colors", 4, GenerateResourceBarColorArgs()),
-        },
-    })
+local function isDeathKnight()
+    return ECM.SettingsBuilder.IsPlayerClass(C.CLASS.DEATHKNIGHT)
 end
 
-OB.RegisterSection(ns, "ResourceBar", ResourceBarOptions)
+function ResourceBarOptions.RegisterSettings(SB)
+    SB.CreateSubcategory("Resource Bar")
+
+    SB.Header("Resource Bar")
+
+    SB.ModuleEnabledCheckbox("ResourceBar", {
+        path = "resourceBar.enabled",
+        name = "Enable resource bar",
+        hidden = isDeathKnight,
+    })
+
+    SB.HeightOverrideSlider("resourceBar", { hidden = isDeathKnight })
+
+    SB.Header("Display")
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "resourceBar.showText",
+        name = "Show text",
+        tooltip = "Display the current value on the bar.",
+        hidden = isDeathKnight,
+    })
+
+    SB.Header("Border")
+    SB.BorderGroup("resourceBar.border", { hidden = isDeathKnight })
+
+    SB.Header("Font Override")
+    SB.FontOverrideGroup("resourceBar", { hidden = isDeathKnight })
+
+    SB.Header("Positioning")
+    SB.PositioningGroup("resourceBar", { hidden = isDeathKnight })
+
+    SB.Header("Colors")
+    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { hidden = isDeathKnight })
+end
+
+ECM.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)

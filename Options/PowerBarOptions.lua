@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local OB = ECM.OptionBuilder
 
 local POWER_COLOR_DEFS = {
     { key = Enum.PowerType.Mana, name = "Mana" },
@@ -17,75 +16,56 @@ local POWER_COLOR_DEFS = {
     { key = Enum.PowerType.Fury, name = "Fury" },
 }
 
-local function GeneratePowerBarAppearanceArgs()
-    local args = {
-        showTextDesc = OB.MakeDescription({
-            name = "Display the current value on the bar.",
-            order = 10,
-        }),
-        showText = OB.MakePathToggle({
-            path = "powerBar.showText",
-            name = "Show text",
-            order = 11,
-            width = "double",
-        }),
-        showManaAsPercentDesc = OB.MakeDescription({
-            name = "\nDisplay mana as percentage instead of raw value.",
-            order = 12,
-        }),
-        showManaAsPercent = OB.MakePathToggle({
-            path = "powerBar.showManaAsPercent",
-            name = "Show mana as percent",
-            order = 13,
-            width = "double",
-        }),
-    }
-
-    args.spacer19 = OB.MakeSpacer(19)
-    OB.MergeArgs(args, OB.BuildBorderArgs("powerBar.border", 20))
-    args.spacer29 = OB.MakeSpacer(29)
-    OB.MergeArgs(args, OB.BuildFontOverrideArgs("powerBar", 30))
-
-    return args
-end
-
-local function GeneratePowerBarColorArgs()
-    local args = {
-        colorsDescription = OB.MakeDescription({
-            name = "Customize the color of each primary resource type.",
-            fontSize = "medium",
-            order = 1,
-        }),
-    }
-
-    OB.MergeArgs(args, OB.BuildColorPickerList("powerBar.colors", POWER_COLOR_DEFS, 2))
-    return args
-end
-
 local PowerBarOptions = {}
 
-function PowerBarOptions.GetOptionsTable()
-    local tickMarks = ECM.PowerBarTickMarksOptions.GetOptionsGroup()
-    tickMarks.name = "Tick Marks"
-    tickMarks.inline = true
-    tickMarks.order = 4
+function PowerBarOptions.RegisterSettings(SB)
+    SB.CreateSubcategory("Power Bar")
 
-    local basicArgs = {
-        enabled = OB.BuildModuleEnabledToggle("PowerBar", "powerBar.enabled", "Enable power bar", 1),
-    }
-    OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("powerBar", 3))
-    OB.MergeArgs(basicArgs, GeneratePowerBarAppearanceArgs())
+    -- Basic Settings
+    SB.Header("Power Bar")
 
-    return OB.MakeGroup({
-        name = "Power Bar",
-        order = 2,
-        args = {
-            powerBarSettings = OB.MakeInlineGroup("Power Bar", 1, basicArgs),
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("powerBar", 2),
-            colorSettings = OB.MakeInlineGroup("Colors", 3, GeneratePowerBarColorArgs()),
-            tickMarks = tickMarks,
-        },
+    SB.ModuleEnabledCheckbox("PowerBar", {
+        path = "powerBar.enabled",
+        name = "Enable power bar",
     })
+
+    SB.HeightOverrideSlider("powerBar")
+
+    -- Display
+    SB.Header("Display")
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "powerBar.showText",
+        name = "Show text",
+        tooltip = "Display the current value on the bar.",
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "powerBar.showManaAsPercent",
+        name = "Show mana as percent",
+        tooltip = "Display mana as percentage instead of raw value.",
+    })
+
+    -- Border
+    SB.Header("Border")
+    SB.BorderGroup("powerBar.border")
+
+    -- Font Override
+    SB.Header("Font Override")
+    SB.FontOverrideGroup("powerBar")
+
+    -- Positioning
+    SB.Header("Positioning")
+    SB.PositioningGroup("powerBar")
+
+    -- Colors
+    SB.Header("Colors")
+    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS)
+
+    -- Tick Marks (canvas subcategory)
+    ECM.PowerBarTickMarksOptions.RegisterSettings(SB)
 end
 
-OB.RegisterSection(ns, "PowerBar", PowerBarOptions)
+ECM.SettingsBuilder.RegisterSection(ns, "PowerBar", PowerBarOptions)

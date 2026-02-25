@@ -4,9 +4,8 @@
 
 local _, ns = ...
 local mod = ns.Addon
-local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local C = ECM.Constants
-local OB = ECM.OptionBuilder
+
 local unlabeledBarsPresent = false
 
 local function IsEditLocked()
@@ -19,20 +18,13 @@ local function EditLockedReason()
     return reason
 end
 
---- Generates dynamic AceConfig args for per-spell color pickers.
---- Merges spells from persisted custom colors (SpellColors) and the
---- currently-visible aura bars (BuffBars) so that both customized and
---- newly-seen spells appear in the options panel.  Deduplication follows
---- the PriorityKeyMap convention: spell name is preferred, then spellID,
---- cooldownID, and finally texture file ID.
+--- Generates the merged list of spell color rows from active bars and saved entries.
 ---@param activeBars ECM_SpellColorKey[]|nil
 ---@param savedEntries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
 local function BuildSpellColorRows(activeBars, savedEntries)
-    ---@type { key: ECM_SpellColorKey, textureFileID: number|nil }[]
     local rows = {}
 
-    ---@param key ECM_SpellColorKey|nil
     local function AddDiscoveredKey(key)
         local normalized = ECM.SpellColors.NormalizeKey(key)
         if not normalized then
@@ -68,393 +60,345 @@ local function BuildSpellColorRows(activeBars, savedEntries)
     return rows
 end
 
----@param rows { key: ECM_SpellColorKey, textureFileID: number|nil }[]
----@return table args AceConfig args table with color pickers and reset buttons
-local function BuildSpellColorArgsFromRows(rows)
-    local args = {}
+--------------------------------------------------------------------------------
+-- Canvas Frame for Spell Colors
+--------------------------------------------------------------------------------
 
-    if #rows == 0 then
-        args.noData = {
-            type = "description",
-            name = "|cffaaaaaa(No aura bars found. Cast a buff and click 'Refresh Spell List'.)|r",
-            order = 1,
-        }
-        return args
+local function CreateSpellColorCanvas()
+    local frame = CreateFrame("Frame", "ECM_BuffBarsColorsCanvas", UIParent)
+    frame:SetSize(600, 400)
+
+    -- Warning labels
+    local combatWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontRed")
+    combatWarning:SetPoint("TOPLEFT", 10, -10)
+    combatWarning:SetText("These settings cannot be changed while in combat lockdown.")
+    combatWarning:Hide()
+
+    local secretsWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    secretsWarning:SetPoint("TOPLEFT", 10, -10)
+    secretsWarning:SetText("|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r")
+    secretsWarning:Hide()
+
+    local unlabeledWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    unlabeledWarning:SetPoint("TOPLEFT", 10, -30)
+    unlabeledWarning:SetText("|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\".|r")
+    unlabeledWarning:Hide()
+
+    -- Current spec label
+    local specLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    specLabel:SetPoint("TOPLEFT", 10, -55)
+
+    -- Default color swatch
+    local defaultColorLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    defaultColorLabel:SetPoint("TOPLEFT", 10, -80)
+    defaultColorLabel:SetText("Default color:")
+
+    local defaultColorSwatch = CreateFrame("Button", nil, frame)
+    defaultColorSwatch:SetSize(20, 20)
+    defaultColorSwatch:SetPoint("LEFT", defaultColorLabel, "RIGHT", 5, 0)
+    local defaultSwatchTex = defaultColorSwatch:CreateTexture(nil, "BACKGROUND")
+    defaultSwatchTex:SetAllPoints()
+    defaultSwatchTex:SetColorTexture(1, 1, 1)
+
+    local function UpdateDefaultSwatch()
+        local c = ECM.SpellColors.GetDefaultColor()
+        defaultSwatchTex:SetColorTexture(c.r, c.g, c.b)
     end
 
-    unlabeledBarsPresent = false
-    for i, row in ipairs(rows) do
-        local optKey = "spellColor" .. i
-        local resetKey = "spellColor" .. i .. "Reset"
-        local rowKey = row.key
-        local colorKey = rowKey.primaryKey
-        local texture = row.textureFileID
-        local label = type(colorKey) == "string" and colorKey or ("Bar |cff555555(" .. colorKey .. ")|r")
-        local displayName = texture and ("|T" .. texture .. ":14:14|t " .. label) or label
-
-        -- If there are any entries without valid names, display a warning message to the user.
-        unlabeledBarsPresent = unlabeledBarsPresent
-            or (type(colorKey) == "string" and (issecretvalue(colorKey) or colorKey == ""))
-
-        args[optKey] = {
-            type = "color",
-            name = displayName,
-            desc = "Color for " .. displayName,
-            order = i * 10,
-            width = "double",
-            get = function()
-                local c = ECM.SpellColors.GetColorByKey(rowKey)
-                if c then return c.r, c.g, c.b end
-                local dc = ECM.SpellColors.GetDefaultColor()
-                return dc.r, dc.g, dc.b
-            end,
-            set = function(_, r, g, b)
-                ECM.SpellColors.SetColorByKey(rowKey, { r = r, g = g, b = b, a = 1 })
+    defaultColorSwatch:SetScript("OnClick", function()
+        if IsEditLocked() then return end
+        local c = ECM.SpellColors.GetDefaultColor()
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = c.r, g = c.g, b = c.b,
+            hasOpacity = false,
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                ECM.SpellColors.SetDefaultColor({ r = r, g = g, b = b, a = 1 })
+                UpdateDefaultSwatch()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
-        }
-
-        args[resetKey] = {
-            type = "execute",
-            name = "X",
-            desc = "Reset to default",
-            order = i * 10 + 1,
-            width = 0.3,
-            hidden = function()
-                return ECM.SpellColors.GetColorByKey(rowKey) == nil
-            end,
-            func = function()
-                ECM.SpellColors.ResetColorByKey(rowKey)
+            cancelFunc = function(prev)
+                ECM.SpellColors.SetDefaultColor({ r = prev.r, g = prev.g, b = prev.b, a = 1 })
+                UpdateDefaultSwatch()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
-        }
-    end
+        })
+    end)
 
-    return args
-end
+    -- Refresh button
+    local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    refreshBtn:SetSize(150, 22)
+    refreshBtn:SetPoint("TOPLEFT", 10, -105)
+    refreshBtn:SetText("Refresh Spell List")
+    refreshBtn:SetScript("OnClick", function()
+        if IsEditLocked() then return end
+        local activeKeys = ECM.BuffBars:GetActiveSpellData()
+        ECM.SpellColors.ReconcileAllKeys(activeKeys)
+        frame:RefreshSpellList()
+    end)
 
----@return table args AceConfig args table with color pickers and reset buttons
-local function GenerateSpellColorArgs()
-    -- Active rows come first in viewer order, then persisted-only rows.
-    local rows = BuildSpellColorRows(
-        ECM.BuffBars:GetActiveSpellData(),
-        ECM.SpellColors.GetAllColorEntries()
-    )
-    return BuildSpellColorArgsFromRows(rows)
-end
+    -- ScrollBox for spell list
+    local scrollBox = CreateFrame("Frame", nil, frame, "WowScrollBoxList")
+    scrollBox:SetPoint("TOPLEFT", 10, -135)
+    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
 
-local function SpellOptionsTable()
-    local result = {
-        type = "group",
-        name = "Spells",
-        order = 3,
-        args = {
-            desc = {
-                type = "description",
-                name = "Customize colors for individual spells. Colors are saved per class and spec. Use 'Refresh Spell List' to rescan active aura bars.\n\n",
-                order = 2,
-                fontSize = "medium",
-            },
-            currentSpec = {
-                type = "description",
-                name = function()
-                    local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
-                    local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
-                    return "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
-                end,
-                order = 3,
-            },
-            spacer1 = {
-                type = "description",
-                name = " ",
-                order = 4,
-            },
-            combatlockdown = {
-                type = "description",
-                name = "|cffFF0038These settings cannot be changed while in combat lockdown. Leave combat and open the options panel again to make changes.|r\n\n",
-                order = 5,
-                hidden = function() return not IsEditLocked() or EditLockedReason() ~= "combat" end,
-            },
-            secretsWarning = {
-                type = "description",
-                name = "|cffFFDD3CThese settings cannot be changed while spell names or textures are secret. This may persist until you leave an instance or reload your UI out of combat.|r\n\n",
-                order = 6,
-                hidden = function() return not IsEditLocked() or EditLockedReason() ~= "secrets" end,
-            },
-            unlabeledBarsWarning = {
-                type = "description",
-                name = "|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\". This may persist until you reload your UI, or they can be safely deleted.|r\n\n",
-                order = 7,
-                hidden = function() return not unlabeledBarsPresent end
-            },
-            defaultColor = {
-                type = "color",
-                name = "Default color",
-                desc = "Default color for spells without a custom color.",
-                order = 10,
-                width = "double",
-                disabled =  IsEditLocked,
-                get = function()
-                    local c = ECM.SpellColors.GetDefaultColor()
-                    return c.r, c.g, c.b
-                end,
-                set = function(_, r, g, b)
-                    ECM.SpellColors.SetDefaultColor({ r = r, g = g, b = b, a = 1 })
+    local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementInitializer("Frame", function(rowFrame, data)
+        if not rowFrame._initialized then
+            rowFrame:SetSize(scrollBox:GetWidth(), 24)
+
+            local icon = rowFrame:CreateTexture(nil, "ARTWORK")
+            icon:SetSize(20, 20)
+            icon:SetPoint("LEFT", 2, 0)
+            rowFrame._icon = icon
+
+            local nameLabel = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameLabel:SetPoint("LEFT", icon, "RIGHT", 5, 0)
+            nameLabel:SetWidth(300)
+            nameLabel:SetJustifyH("LEFT")
+            rowFrame._nameLabel = nameLabel
+
+            local swatch = CreateFrame("Button", nil, rowFrame)
+            swatch:SetSize(20, 20)
+            swatch:SetPoint("LEFT", nameLabel, "RIGHT", 5, 0)
+            local swatchTex = swatch:CreateTexture(nil, "BACKGROUND")
+            swatchTex:SetAllPoints()
+            swatchTex:SetColorTexture(1, 1, 1)
+            swatch._tex = swatchTex
+            rowFrame._swatch = swatch
+
+            local resetBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
+            resetBtn:SetSize(20, 20)
+            resetBtn:SetPoint("LEFT", swatch, "RIGHT", 5, 0)
+            resetBtn:SetText("X")
+            rowFrame._resetBtn = resetBtn
+
+            rowFrame._initialized = true
+        end
+
+        -- Set icon
+        if data.textureFileID then
+            rowFrame._icon:SetTexture(data.textureFileID)
+            rowFrame._icon:Show()
+        else
+            rowFrame._icon:Hide()
+        end
+
+        -- Set name
+        local colorKey = data.key.primaryKey
+        local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
+        rowFrame._nameLabel:SetText(label)
+
+        -- Track unlabeled bars
+        if type(colorKey) == "string" and (issecretvalue(colorKey) or colorKey == "") then
+            unlabeledBarsPresent = true
+        end
+
+        -- Set color swatch
+        local function UpdateSwatch()
+            local c = ECM.SpellColors.GetColorByKey(data.key)
+            if not c then c = ECM.SpellColors.GetDefaultColor() end
+            rowFrame._swatch._tex:SetColorTexture(c.r, c.g, c.b)
+        end
+        UpdateSwatch()
+
+        rowFrame._swatch:SetScript("OnClick", function()
+            if IsEditLocked() then return end
+            local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
+            ColorPickerFrame:SetupColorPickerAndShow({
+                r = c.r, g = c.g, b = c.b,
+                hasOpacity = false,
+                swatchFunc = function()
+                    local r, g, b = ColorPickerFrame:GetColorRGB()
+                    ECM.SpellColors.SetColorByKey(data.key, { r = r, g = g, b = b, a = 1 })
+                    UpdateSwatch()
                     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
-            },
-            defaultColorReset = {
-                type = "execute",
-                name = "X",
-                desc = "Reset to default",
-                order = 11,
-                width = 0.3,
-                hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.colors.defaultColor") end,
-                disabled =  IsEditLocked,
-                func = ECM.OptionUtil.MakeResetHandler("buffBars.colors.defaultColor"),
-            },
-            spellColorsGroup = {
-                type = "group",
-                name = "",
-                order = 20,
-                inline = true,
-                disabled =  IsEditLocked,
-                args = GenerateSpellColorArgs(),
-            },
-            refreshSpellList = {
-                type = "execute",
-                name = "Refresh Spell List",
-                desc = "Scan current buffs to refresh discovered spell names.",
-                order = 12,
-                width = "normal",
-                disabled =  IsEditLocked,
-                func = function()
-                    local activeKeys = ECM.BuffBars:GetActiveSpellData()
-                    ECM.SpellColors.ReconcileAllKeys(activeKeys)
-                    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+                cancelFunc = function(prev)
+                    ECM.SpellColors.SetColorByKey(data.key, { r = prev.r, g = prev.g, b = prev.b, a = 1 })
+                    UpdateSwatch()
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
                 end,
-            },
-        },
-    }
+            })
+        end)
 
-    return result
+        -- Reset button
+        local hasCustomColor = ECM.SpellColors.GetColorByKey(data.key) ~= nil
+        if hasCustomColor then
+            rowFrame._resetBtn:Show()
+        else
+            rowFrame._resetBtn:Hide()
+        end
+        rowFrame._resetBtn:SetScript("OnClick", function()
+            ECM.SpellColors.ResetColorByKey(data.key)
+            UpdateSwatch()
+            rowFrame._resetBtn:Hide()
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end)
+    end)
+
+    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+
+    local dataProvider = CreateDataProvider()
+    scrollBox:SetDataProvider(dataProvider)
+
+    frame._scrollBox = scrollBox
+    frame._dataProvider = dataProvider
+    frame._specLabel = specLabel
+    frame._combatWarning = combatWarning
+    frame._secretsWarning = secretsWarning
+    frame._unlabeledWarning = unlabeledWarning
+    frame._defaultColorSwatch = defaultColorSwatch
+    frame._updateDefaultSwatch = UpdateDefaultSwatch
+
+    function frame:RefreshSpellList()
+        unlabeledBarsPresent = false
+        local rows = BuildSpellColorRows(
+            ECM.BuffBars:GetActiveSpellData(),
+            ECM.SpellColors.GetAllColorEntries()
+        )
+
+        dataProvider:Flush()
+        for _, row in ipairs(rows) do
+            dataProvider:Insert(row)
+        end
+
+        -- Update warnings
+        local locked = IsEditLocked()
+        local reason = EditLockedReason()
+        combatWarning:SetShown(locked and reason == "combat")
+        secretsWarning:SetShown(locked and reason == "secrets")
+        unlabeledWarning:SetShown(unlabeledBarsPresent)
+
+        -- Update spec label
+        local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
+        local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
+        specLabel:SetText("|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown"))
+
+        UpdateDefaultSwatch()
+    end
+
+    frame:SetScript("OnShow", function(self)
+        self:RefreshSpellList()
+    end)
+
+    return frame
 end
 
 --------------------------------------------------------------------------------
--- Options Table
+-- Options Registration
 --------------------------------------------------------------------------------
 
 local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
-BuffBarsOptions._BuildSpellColorArgsFromRows = BuildSpellColorArgsFromRows
 
-function BuffBarsOptions.GetOptionsTable()
-    local db = ns.Addon.db
+function BuffBarsOptions.RegisterSettings(SB)
+    SB.CreateSubcategory("Aura Bars")
 
-    local spells = SpellOptionsTable()
-    spells.name = "Colors"
-    spells.inline = true
-    spells.order = 4
+    -- Basic Settings
+    SB.Header("Aura Bars")
 
-    local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
-        modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
-        includeOffsets = false,
-        widthLabel = "Buff Bar Width",
-        widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
+    SB.PathControl({
+        type = "checkbox",
+        path = "buffBars.enabled",
+        name = "Enable aura bars",
+        tooltip = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
+        onSet = function(value)
+            if value then
+                ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
+            else
+                mod:ConfirmReloadUI(
+                    "Disabling aura bars requires a UI reload. Reload now?",
+                    nil,
+                    function()
+                        ECM.OptionUtil.SetNestedValue(
+                            mod.db.profile, "buffBars.enabled", true)
+                    end
+                )
+            end
+        end,
     })
 
-    positioningSettings.args.freeGrowDirectionDesc = {
-        type = "description",
-        name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
-        order = 6,
-        hidden = function()
-            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
-        end,
-    }
-    positioningSettings.args.freeGrowDirection = {
-        type = "select",
+    -- Display
+    SB.Header("Display")
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "buffBars.showIcon",
+        name = "Show icon",
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "buffBars.showSpellName",
+        name = "Show spell name",
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "buffBars.showDuration",
+        name = "Show remaining duration",
+    })
+
+    SB.PathControl({
+        type = "slider",
+        path = "buffBars.height",
+        name = "Height Override",
+        tooltip = "Override the default bar height. Set to 0 to use the global default.",
+        min = 0,
+        max = 40,
+        step = 1,
+        getTransform = function(value) return value or 0 end,
+        setTransform = function(value) return value > 0 and value or nil end,
+    })
+
+    SB.PathControl({
+        type = "slider",
+        path = "buffBars.verticalSpacing",
+        name = "Vertical Spacing",
+        tooltip = "Vertical gap between aura bars. Set to 0 for no spacing.",
+        min = 0,
+        max = 20,
+        step = 1,
+        getTransform = function(value) return value or 0 end,
+    })
+
+    -- Font Override
+    SB.Header("Font Override")
+    SB.FontOverrideGroup("buffBars")
+
+    -- Positioning
+    SB.Header("Positioning")
+    local posGroup = SB.PositioningGroup("buffBars", {
+        includeOffsetX = false,
+    })
+
+    -- Free grow direction (shown only when in free mode)
+    SB.PathControl({
+        type = "dropdown",
+        path = "buffBars.freeGrowDirection",
         name = "Free Grow Direction",
-        order = 7,
-        width = "double",
+        tooltip = "Choose whether aura bars stack downward or upward in free positioning mode.",
         values = {
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
-        hidden = function()
-            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+        getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
+        parent = posGroup.modeInit,
+        parentCheck = function()
+            return ECM.OptionUtil.IsAnchorModeFree(
+                ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars"))
         end,
-        get = function()
-            return db.profile.buffBars.freeGrowDirection or C.GROW_DIRECTION_DOWN
-        end,
-        set = function(_, val)
-            db.profile.buffBars.freeGrowDirection = val
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-        end,
-    }
-    positioningSettings.args.freeGrowDirectionReset = {
-        type = "execute",
-        name = "X",
-        order = 8,
-        width = 0.3,
-        hidden = function()
-            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
-                or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
-        end,
-        func = ECM.OptionUtil.MakeResetHandler("buffBars.freeGrowDirection"),
-    }
+    })
 
-    local basicArgs = {
-        desc = {
-            type = "description",
-            name = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
-            order = 1,
-            fontSize = "medium",
-        },
-        enabled = {
-            type = "toggle",
-            name = "Enable aura bars",
-            order = 2,
-            width = "full",
-            get = function() return db.profile.buffBars.enabled end,
-            set = function(_, val)
-                db.profile.buffBars.enabled = val
-                if val then
-                    ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                else
-                    mod:ConfirmReloadUI(
-                        "Disabling aura bars requires a UI reload. Reload now?",
-                        nil,
-                        function()
-                            db.profile.buffBars.enabled = true
-                            AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-                        end
-                    )
-                end
-            end,
-        },
-    }
-
-    local displayArgs = {
-        displayElementsDesc = {
-            type = "description",
-            name = "Choose which aura bar elements are shown and customize their appearance.",
-            order = 11,
-        },
-        showIcon = {
-            type = "toggle",
-            name = "Show icon",
-            order = 12,
-            width = "double",
-            get = function() return db.profile.buffBars.showIcon end,
-            set = function(_, val)
-                db.profile.buffBars.showIcon = val
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        },
-        showSpellName = {
-            type = "toggle",
-            name = "Show spell name",
-            order = 13,
-            width = "double",
-            get = function() return db.profile.buffBars.showSpellName end,
-            set = function(_, val)
-                db.profile.buffBars.showSpellName = val
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        },
-        showDuration = {
-            type = "toggle",
-            name = "Show remaining duration",
-            order = 14,
-            width = "double",
-            get = function() return db.profile.buffBars.showDuration end,
-            set = function(_, val)
-                db.profile.buffBars.showDuration = val
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        },
-        spacer1 = OB.MakeSpacer(15),
-        heightDesc = {
-            type = "description",
-            name = "\nOverride the default bar height. Set to 0 to use the global default.",
-            order = 16,
-        },
-        height = {
-            type = "range",
-            name = "Height Override",
-            order = 17,
-            width = "half",
-            min = 0,
-            max = 40,
-            step = 1,
-            get = function() return db.profile.buffBars.height or 0 end,
-            set = function(_, val)
-                db.profile.buffBars.height = val > 0 and val or nil
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        },
-        heightReset = {
-            type = "execute",
-            name = "X",
-            order = 18,
-            width = 0.3,
-            hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
-            func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
-        },
-        verticalSpacingDesc = {
-            type = "description",
-            name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
-            order = 19,
-        },
-        verticalSpacing = {
-            type = "range",
-            name = "Vertical Spacing",
-            order = 20,
-            width = "half",
-            min = 0,
-            max = 20,
-            step = 1,
-            get = function() return db.profile.buffBars.verticalSpacing or 0 end,
-            set = function(_, val)
-                db.profile.buffBars.verticalSpacing = val
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        },
-        verticalSpacingReset = {
-            type = "execute",
-            name = "X",
-            order = 21,
-            width = 0.3,
-            hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
-            func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
-        },
-    }
-    displayArgs.spacer2 = OB.MakeSpacer(29)
-    OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
-
-    return {
-        type = "group",
-        name = "Aura Bars",
-        order = 5,
-        args = {
-            auraBarsSettings = {
-                type = "group",
-                name = "Aura Bars",
-                inline = true,
-                order = 1,
-                args = basicArgs,
-            },
-            positioningSettings = positioningSettings,
-            displaySettings = {
-                type = "group",
-                name = "Display",
-                inline = true,
-                order = 3,
-                args = displayArgs,
-            },
-            spells = spells,
-        },
-    }
+    -- Spell Colors (canvas subcategory)
+    local colorsFrame = CreateSpellColorCanvas()
+    SB.CreateCanvasSubcategory(colorsFrame, "Aura Bar Colors")
 end
+
+ECM.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)
