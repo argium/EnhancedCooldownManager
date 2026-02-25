@@ -1,0 +1,19 @@
+# Match the Windows-based development environment to avoid CRLF/LF churn.
+* text=auto eol=crlf
+
+# Keep Unix shell scripts executable in Linux/macOS environments.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Common binary assets (never normalize line endings).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.7z binary
