@@ -88,13 +88,13 @@ local function EnsureFragmentedBars(bar, maxResources, moduleConfig, globalConfi
 end
 
 local function GetColor(cfg)
-    local specId = GetSpecialization()
+    local specIndex = GetSpecialization()
 
     local specColor
     if cfg.useSpecColor then
-        if specId == C.DEATHKNIGHT_FROST_SPEC_INDEX then
+        if specIndex == C.DEATHKNIGHT_FROST_SPEC_INDEX then
             specColor = cfg.colorFrost
-        elseif specId == C.DEATHKNIGHT_UNHOLY_SPEC_INDEX then
+        elseif specIndex == C.DEATHKNIGHT_UNHOLY_SPEC_INDEX then
             specColor = cfg.colorUnholy
         else
             specColor = cfg.colorBlood
