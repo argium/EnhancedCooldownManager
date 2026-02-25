@@ -49,7 +49,6 @@ describe("Utilities", function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
             "LibStub",
-            "ECM_debug_assert",
             "issecretvalue",
             "issecrettable",
         })

@@ -31,7 +31,6 @@ describe("ClassUtil", function()
             "C_UnitAuras",
             "C_Spell",
             "C_SpellBook",
-            "ECM_debug_assert",
         })
 
         _G.ECM = {}
