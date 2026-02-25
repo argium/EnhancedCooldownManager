@@ -6,8 +6,6 @@ local _, ns = ...
 local mod = ns.Addon
 local ItemIconsOptions = {}
 mod.ItemIconsOptions = ItemIconsOptions
-local _itemLoadRefreshQueued = false
-local _pendingItemLoads = {}
 
 local QUALITY_ICON_ATLASES = {
     [1] = "Professions-ChatIcon-Quality-Tier1",
@@ -63,64 +61,6 @@ local function FormatItemIcon(itemID)
     return "|T" .. texture .. ":14:14:0:0|t "
 end
 
-local function NotifyOptionsChanged()
-    local AceConfigRegistry = LibStub and LibStub("AceConfigRegistry-3.0", true)
-    if AceConfigRegistry then
-        AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-    end
-end
-
-local function QueueOptionsRefresh()
-    if _itemLoadRefreshQueued then
-        return
-    end
-
-    _itemLoadRefreshQueued = true
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0.1, function()
-            _itemLoadRefreshQueued = false
-            NotifyOptionsChanged()
-        end)
-        return
-    end
-
-    _itemLoadRefreshQueued = false
-    NotifyOptionsChanged()
-end
-
----@param itemID number
-local function RequestItemDataAndRefresh(itemID)
-    if _pendingItemLoads[itemID] then
-        return
-    end
-    _pendingItemLoads[itemID] = true
-
-    if C_Item and C_Item.RequestLoadItemDataByID then
-        C_Item.RequestLoadItemDataByID(itemID)
-    end
-
-    if Item and Item.CreateFromItemID then
-        local item = Item:CreateFromItemID(itemID)
-        if item and item.ContinueOnItemLoad then
-            item:ContinueOnItemLoad(function()
-                _pendingItemLoads[itemID] = nil
-                QueueOptionsRefresh()
-            end)
-            return
-        end
-    end
-
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0.5, function()
-            _pendingItemLoads[itemID] = nil
-            QueueOptionsRefresh()
-        end)
-    else
-        _pendingItemLoads[itemID] = nil
-        QueueOptionsRefresh()
-    end
-end
-
 ---@param itemID number
 ---@return string
 local function GetItemNameForOptions(itemID)
@@ -131,14 +71,12 @@ local function GetItemNameForOptions(itemID)
         end
     end
 
-    RequestItemDataAndRefresh(itemID)
-
     return "Item " .. tostring(itemID)
 end
 
 ---@param entries { itemID: number, quality: number|nil }[]
 ---@return string
-local function BuildPotionPriorityLines(entries)
+local function BuildPotionPriorityText(entries)
     local lines = {}
     for index, entry in ipairs(entries) do
         local qualityIcon = FormatQualityIcon(entry.quality)
@@ -151,21 +89,7 @@ local function BuildPotionPriorityLines(entries)
             qualityIcon
         )
     end
-    return table.concat(lines, "\n")
-end
-
----@return string
-local function BuildPotionPriorityDescription()
-    local sections = {
-        "Potion priority (highest first):",
-        "",
-        "Combat Potions",
-        BuildPotionPriorityLines(ECM.Constants.COMBAT_POTIONS),
-        "",
-        "Health Potions",
-        BuildPotionPriorityLines(ECM.Constants.HEALTH_POTIONS),
-    }
-    return table.concat(sections, "\n")
+    return table.concat(lines, "\n\n") .. "\n\n"
 end
 
 --- Builds a standard Item Icons module toggle option.
@@ -264,16 +188,21 @@ function ItemIconsOptions.GetConsumableOptionsArgs()
         showHealthPotion = BuildModuleToggleOption(mod.ItemIcons, "showHealthPotion", "Show health potions", 1),
         showCombatPotion = BuildModuleToggleOption(mod.ItemIcons, "showCombatPotion", "Show combat potions", 2),
         showHealthstone = BuildModuleToggleOption(mod.ItemIcons, "showHealthstone", "Show healthstone", 3),
-        potionPrioritySpacer = {
-            type = "description",
-            name = " ",
+        potionPriorityHeading = {
+            type = "header",
+            name = "Potion priority (highest first)",
             order = 90,
+        },
+        combatPotionList = {
+            type = "description",
+            name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
+            order = 92,
             fontSize = "medium",
         },
-        potionPriorityList = {
+        healthPotionList = {
             type = "description",
-            name = BuildPotionPriorityDescription,
-            order = 91,
+            name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
+            order = 94,
             fontSize = "medium",
         },
     }

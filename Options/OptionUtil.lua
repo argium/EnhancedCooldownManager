@@ -249,7 +249,6 @@ local function MakePositioningSettingsArgs(configPath, options)
             type = "range",
             name = "Offset X",
             order = 7,
-            width = "half",
             min = -800,
             max = 800,
             step = 1,
@@ -267,7 +266,7 @@ local function MakePositioningSettingsArgs(configPath, options)
         args.offsetXReset = {
             type = "execute",
             name = "X",
-            order = 8,
+            order = 7,
             width = 0.3,
             hidden = function()
                 return not IsValueChanged(configPath .. ".offsetX")
@@ -285,7 +284,6 @@ local function MakePositioningSettingsArgs(configPath, options)
             type = "range",
             name = "Offset Y",
             order = 10,
-            width = "half",
             min = -800,
             max = 800,
             step = 1,
@@ -303,7 +301,7 @@ local function MakePositioningSettingsArgs(configPath, options)
         args.offsetYReset = {
             type = "execute",
             name = "X",
-            order = 11,
+            order = 9,
             width = 0.3,
             hidden = function()
                 return not IsValueChanged(configPath .. ".offsetY")
@@ -368,7 +366,12 @@ end
 -- Export
 --------------------------------------------------------------------------------
 
+local function NotifyOptionsChanged()
+    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+end
+
 ECM.OptionUtil = {
+    NotifyOptionsChanged = NotifyOptionsChanged,
     IsOptionsDisabled = IsOptionsDisabled,
     GetOptionValue = GetOptionValue,
     GetNestedValue = GetNestedValue,

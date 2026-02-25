@@ -108,8 +108,9 @@ local function GetOptionsGroup()
         }),
         currentSpec = OB.MakeDescription({
             name = function()
-                local _, _, className, specName = ECM.OptionUtil.GetCurrentClassSpec()
-                return "|cff00ff00Current: " .. (className or "Unknown") .. " " .. specName .. "|r"
+                local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
+                local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
+                return "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
             end,
             order = 3,
         }),
