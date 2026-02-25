@@ -118,14 +118,17 @@ end
 
 --- Applies font settings to a FontString.
 ---@param fontString FontString
-function ECM_ApplyFont(fontString)
+---@param globalConfig table|nil
+---@param moduleConfig table|nil
+function ECM_ApplyFont(fontString, globalConfig, moduleConfig)
     if not fontString then
         return
     end
 
-    local config = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global
-    local fontPath = get_font_path(config and config.font)
-    local fontSize = (config and config.fontSize) or 11
+    local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
+    local useModuleOverride = moduleConfig and moduleConfig.overrideFont == true
+    local fontPath = get_font_path((useModuleOverride and moduleConfig.font) or (config and config.font))
+    local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or 11
     local fontOutline = (config and config.fontOutline)
 
     if fontOutline == "NONE" then

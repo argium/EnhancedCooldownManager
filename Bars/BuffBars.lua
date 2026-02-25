@@ -211,8 +211,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     --------------------------------------------------------------------------
     -- Fonts (before visibility/positioning — font changes affect layout)
     --------------------------------------------------------------------------
-    ECM_ApplyFont(bar.Name)
-    ECM_ApplyFont(bar.Duration)
+    ECM_ApplyFont(bar.Name, globalConfig, config)
+    ECM_ApplyFont(bar.Duration, globalConfig, config)
 
     --------------------------------------------------------------------------
     -- Icon anchor

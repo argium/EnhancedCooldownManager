@@ -16,6 +16,9 @@
 ---@field width number|nil Bar width override.
 ---@field height number|nil Bar height override.
 ---@field texture string|nil Bar texture override.
+---@field overrideFont boolean|nil Whether this bar overrides global font settings.
+---@field font string|nil Font face override for bar text.
+---@field fontSize number|nil Font size override for bar text.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
 ---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
@@ -77,6 +80,9 @@
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
+---@field overrideFont boolean|nil Whether aura bars override global font settings.
+---@field font string|nil Font face override for aura bar text.
+---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
 ---@class ECM_ItemIconsConfig Item icons configuration.
@@ -157,6 +163,7 @@ local defaults = {
             width             = 300,
             offsetY           = -275,
             showText          = true,
+            overrideFont      = false,
             ticks             = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
                 defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
@@ -183,6 +190,7 @@ local defaults = {
         resourceBar = {
             enabled    = true,
             showText   = false,
+            overrideFont = false,
             anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
             offsetY    = -300,
@@ -209,6 +217,7 @@ local defaults = {
             anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
             offsetY    = -325,
+            overrideFont = false,
             useSpecColor = true,
             color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
             colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
@@ -225,6 +234,7 @@ local defaults = {
             showIcon = false,
             showSpellName = true,
             showDuration = true,
+            overrideFont = false,
             colors = {
                 byName = {},
                 bySpellID = {},

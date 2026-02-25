@@ -198,6 +198,9 @@ describe("Options sections and root assembly", function()
                         heightReset = { type = "execute", order = 5 },
                     }
                 end,
+                BuildFontOverrideArgs = function()
+                    return {}
+                end,
                 BuildBorderArgs = function()
                     return {}
                 end,

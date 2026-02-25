@@ -53,6 +53,7 @@ function ResourceBarOptions.GetOptionsTable()
         }),
     }
     OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("resourceBar", 4))
+    OB.MergeArgs(basicArgs, OB.BuildFontOverrideArgs("resourceBar", 7))
 
     return OB.MakeGroup({
         name = "Resource Bar",

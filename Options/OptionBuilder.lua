@@ -457,6 +457,60 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
     return args
 end
 
+local function BuildFontOverrideArgs(sectionPath, orderBase)
+    local overridePath = sectionPath .. ".overrideFont"
+    local isFontOverrideDisabled = DisabledWhenPathFalse(overridePath)
+
+    local args = {
+        fontOverrideDesc = MakeDescription({
+            name = "\nOverride the global font settings for this module's text.",
+            order = orderBase,
+        }),
+        overrideFont = MakePathToggle({
+            path = overridePath,
+            name = "Override font",
+            order = orderBase + 1,
+            width = "full",
+            getTransform = function(value)
+                return value == true
+            end,
+        }),
+    }
+
+    MergeArgs(args, BuildPathSelectWithReset("font", {
+        path = sectionPath .. ".font",
+        name = "Font",
+        order = orderBase + 2,
+        width = "double",
+        dialogControl = "LSM30_Font",
+        values = ECM.SharedMediaOptions.GetFontValues,
+        getTransform = function(value)
+            return value or GetPathValue("global.font") or "Expressway"
+        end,
+        disabled = isFontOverrideDisabled,
+        resetOrder = orderBase + 3,
+        resetDisabled = isFontOverrideDisabled,
+    }))
+
+    MergeArgs(args, BuildPathRangeWithReset("fontSize", {
+        path = sectionPath .. ".fontSize",
+        name = "Font Size",
+        order = orderBase + 4,
+        width = "double",
+        min = 6,
+        max = 32,
+        step = 1,
+        getTransform = function(value)
+            return value or GetPathValue("global.fontSize") or 11
+        end,
+        disabled = isFontOverrideDisabled,
+        resetOrder = orderBase + 5,
+        resetDisabled = isFontOverrideDisabled,
+    }))
+
+    return args
+end
+
 local function BuildBorderArgs(borderPath, orderBase, opts)
     opts = opts or {}
     local enabledPath = borderPath .. ".enabled"
@@ -549,6 +603,7 @@ ECM.OptionBuilder = {
     RegisterSection = RegisterSection,
     BuildModuleEnabledToggle = BuildModuleEnabledToggle,
     BuildHeightOverrideArgs = BuildHeightOverrideArgs,
+    BuildFontOverrideArgs = BuildFontOverrideArgs,
     BuildBorderArgs = BuildBorderArgs,
     BuildColorPickerList = BuildColorPickerList,
 }

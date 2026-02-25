@@ -76,6 +76,15 @@ describe("OptionBuilder", function()
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
             },
+            SharedMediaOptions = {
+                GetFontValues = function()
+                    return {
+                        Expressway = "Expressway",
+                        ["Global Font"] = "Global Font",
+                        ["Module Font"] = "Module Font",
+                    }
+                end,
+            },
             ScheduleLayoutUpdate = function()
                 layoutUpdateCalls = layoutUpdateCalls + 1
             end,
@@ -111,6 +120,8 @@ describe("OptionBuilder", function()
                             hideWhenMounted = true,
                             value = 5,
                             mode = "solid",
+                            font = "Global Font",
+                            fontSize = 11,
                             color = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
                             nested = {
                                 enabled = true,
@@ -118,6 +129,7 @@ describe("OptionBuilder", function()
                         },
                         powerBar = {
                             height = 10,
+                            overrideFont = false,
                         },
                     },
                     defaults = {
@@ -127,6 +139,8 @@ describe("OptionBuilder", function()
                                 hideWhenMounted = true,
                                 value = 5,
                                 mode = "solid",
+                                font = "Global Font",
+                                fontSize = 11,
                                 color = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
                                 nested = {
                                     enabled = true,
@@ -134,6 +148,7 @@ describe("OptionBuilder", function()
                             },
                             powerBar = {
                                 height = 10,
+                                overrideFont = false,
                             },
                         },
                     },
@@ -381,6 +396,43 @@ describe("OptionBuilder", function()
 
         colorArgs.tint.set(nil, 0.9, 0.8, 0.7, 0.6)
         assert.are.same({ r = 0.9, g = 0.8, b = 0.7, a = 0.6 }, addonNS.Addon.db.profile.global.color)
+    end)
+
+    it("BuildFontOverrideArgs builds module font controls with global fallback getters", function()
+        local args = ECM.OptionBuilder.BuildFontOverrideArgs("powerBar", 20)
+
+        assert.is_table(args.fontOverrideDesc)
+        assert.is_table(args.overrideFont)
+        assert.is_table(args.font)
+        assert.is_table(args.fontReset)
+        assert.is_table(args.fontSize)
+        assert.is_table(args.fontSizeReset)
+
+        assert.is_true(args.font.disabled())
+        assert.is_true(args.fontReset.disabled())
+        assert.is_true(args.fontSize.disabled())
+        assert.is_true(args.fontSizeReset.disabled())
+        assert.are.equal("Global Font", args.font.get())
+        assert.are.equal(11, args.fontSize.get())
+
+        addonNS.Addon.db.profile.powerBar.overrideFont = true
+        addonNS.Addon.db.profile.global.fontSize = 13
+        assert.is_false(args.font.disabled())
+        assert.is_false(args.fontReset.disabled())
+        assert.is_false(args.fontSize.disabled())
+        assert.is_false(args.fontSizeReset.disabled())
+        assert.are.equal("Global Font", args.font.get())
+        assert.are.equal(13, args.fontSize.get())
+
+        args.font.set(nil, "Module Font")
+        args.fontSize.set(nil, 20)
+        assert.are.equal("Module Font", addonNS.Addon.db.profile.powerBar.font)
+        assert.are.equal(20, addonNS.Addon.db.profile.powerBar.fontSize)
+        assert.are.equal("Module Font", args.font.get())
+        assert.are.equal(20, args.fontSize.get())
+
+        addonNS.Addon.db.profile.powerBar.fontSize = nil
+        assert.are.equal(13, args.fontSize.get())
     end)
 
     it("DisabledWhenPathFalse/True evaluate current profile values", function()

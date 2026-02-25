@@ -50,6 +50,7 @@ local function GeneratePowerBarDisplayArgs()
 
     OB.MergeArgs(args, OB.BuildBorderArgs("powerBar.border", 7))
     OB.MergeArgs(args, OB.BuildColorPickerList("powerBar.colors", POWER_COLOR_DEFS, 12))
+    OB.MergeArgs(args, OB.BuildFontOverrideArgs("powerBar", 30))
 
     return args
 end

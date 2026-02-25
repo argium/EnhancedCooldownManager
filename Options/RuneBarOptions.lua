@@ -26,6 +26,7 @@ function RuneBarOptions.GetOptionsTable()
         }),
     }
     OB.MergeArgs(basicArgs, OB.BuildHeightOverrideArgs("runeBar", 3))
+    OB.MergeArgs(basicArgs, OB.BuildFontOverrideArgs("runeBar", 6))
     OB.MergeArgs(basicArgs, OB.BuildPathColorWithReset("color", {
         path = "runeBar.color",
         name = "Rune color",
