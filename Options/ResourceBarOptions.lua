@@ -8,7 +8,7 @@ local OB = ECM.OptionBuilder
 
 local RESOURCE_COLOR_DEFS = {
     { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = "Soul Fragments (Demon Hunter)" },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Souls Fragments (Devourer)" },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Soul Fragments (Devourer)" },
     { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = "Void Fragments (Devourer)" },
     { key = C.RESOURCEBAR_TYPE_ICICLES, name = "Icicles (Frost Mage)" },
     { key = Enum.PowerType.ArcaneCharges, name = "Arcane Charges" },
