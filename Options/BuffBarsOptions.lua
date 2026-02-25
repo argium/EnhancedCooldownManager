@@ -268,7 +268,7 @@ function BuffBarsOptions.GetOptionsTable()
         type = "description",
         name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
         order = 6,
-        disabled = function()
+        hidden = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
     }
@@ -281,7 +281,7 @@ function BuffBarsOptions.GetOptionsTable()
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
-        disabled = function()
+        hidden = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
         get = function()
@@ -298,9 +298,6 @@ function BuffBarsOptions.GetOptionsTable()
         order = 8,
         width = 0.3,
         hidden = function()
-            return not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
-        end,
-        disabled = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
                 or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
         end,

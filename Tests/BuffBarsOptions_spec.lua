@@ -436,15 +436,13 @@ describe("BuffBarsOptions", function()
         assert.is_table(selector)
         assert.are.equal("select", selector.type)
         assert.are.equal("Free Grow Direction", selector.name)
-        assert.is_nil(selector.hidden)
-        assert.is_true(desc.disabled())
-        assert.is_true(selector.disabled())
+        assert.is_true(desc.hidden())
+        assert.is_true(selector.hidden())
         assert.is_true(reset.hidden())
-        assert.is_true(reset.disabled())
 
         addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_FREE
-        assert.is_false(desc.disabled())
-        assert.is_false(selector.disabled())
+        assert.is_false(desc.hidden())
+        assert.is_false(selector.hidden())
 
         selector.set(nil, ECM.Constants.GROW_DIRECTION_UP)
         assert.are.equal(ECM.Constants.GROW_DIRECTION_UP, addonDB.profile.buffBars.freeGrowDirection)
@@ -454,11 +452,9 @@ describe("BuffBarsOptions", function()
             return true
         end
         assert.is_false(reset.hidden())
-        assert.is_false(reset.disabled())
 
         addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_CHAIN
-        assert.is_true(reset.disabled())
-        assert.is_false(reset.hidden())
+        assert.is_true(reset.hidden())
     end)
 
     it("GetOptionsTable includes font override controls in display settings", function()
