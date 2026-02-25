@@ -42,15 +42,21 @@ local constants = {
     -- Module-specific constants and configuration
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
     RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
+    RESOURCEBAR_ICICLES_SPELLID = 205473,
     SPELLID_VOID_FRAGMENTS = 1225789,  -- tracks progress towards void meta form (35 fragments)
     SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
     RESOURCEBAR_DEVOURER_NORMAL_MAX = 30,
     RESOURCEBAR_DEVOURER_META_MAX = 35,
+    RESOURCEBAR_ICICLES_MAX = 5,
     SPELLID_MAELSTROM_WEAPON = 344179,
     RESOURCEBAR_RAGING_MAELSTROM_SPELLID = 384143,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE = 5,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED = 10,
+    RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
+    RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
+    RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
+    RESOURCEBAR_TYPE_ICICLES = "icicles",
     RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
 
     RUNEBAR_MAX_RUNES = 6,
@@ -73,6 +79,7 @@ local constants = {
     MONK_MISTWEAVER_SPEC_INDEX = 2,
     MONK_WINDWALKER_SPEC_INDEX = 3,
     MAGE_ARCANE_SPEC_INDEX = 1,
+    MAGE_FROST_SPEC_INDEX = 3,
     DRUID_CAT_FORM_INDEX = 2,
 
     -- Trinket slots
@@ -80,9 +87,19 @@ local constants = {
     TRINKET_SLOT_2 = 14,
 
     -- Consumable item IDs (priority-ordered: best first)
-    COMBAT_POTIONS = {  212265, 212264, 212263 },   -- Tempered Potion R3, R2, R1
-    HEALTH_POTIONS = {  211880, 211879, 211878,     -- Algari Healing Potion R3, R2, R1
-                        212244, 212243, 212242 },   -- Cavedweller's Delight R3, R2, R1
+    COMBAT_POTIONS = {
+        { itemID = 212265, quality = 3 }, -- Tempered Potion R3
+        { itemID = 212264, quality = 2 }, -- Tempered Potion R2
+        { itemID = 212263, quality = 1 }, -- Tempered Potion R1
+    },
+    HEALTH_POTIONS = {
+        { itemID = 211880, quality = 3 }, -- Algari Healing Potion R3
+        { itemID = 211879, quality = 2 }, -- Algari Healing Potion R2
+        { itemID = 211878, quality = 1 }, -- Algari Healing Potion R1
+        { itemID = 212244, quality = 3 }, -- Cavedweller's Delight R3
+        { itemID = 212243, quality = 2 }, -- Cavedweller's Delight R2
+        { itemID = 212242, quality = 1 }, -- Cavedweller's Delight R1
+    },
     HEALTHSTONE_ITEM_ID = 5512,
     ITEM_ICONS_MAX = 5,
 
@@ -105,15 +122,6 @@ local constants = {
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
 
     ME = "Solar"
-}
-
---- @enum SUBSYSTEM
-local SYS = {
-    Core = "Core",
-    Migration = "Migration",
-    Layout = "Layout",
-    Styling = "Styling",
-    SpellColors = "SpellColors",
 }
 
 local BLIZZARD_FRAMES = {
@@ -180,7 +188,6 @@ local ChatChannelColors = {
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
-constants.SYS = SYS
 constants.CLASS = CLASS
 constants.CLASS_COLORS = CLASS_COLORS
 

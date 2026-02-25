@@ -106,7 +106,7 @@ function PowerBar:Refresh(why, force)
     local max = UnitPowerMax("player", resource)
     self:UpdateTicks(frame, resource, max)
 
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -156,7 +156,7 @@ function PowerBar:OnEnable()
     end
 
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enabled")
+    ECM.Log(self.Name, "Enabled")
 end
 
 function PowerBar:OnDisable()
@@ -164,5 +164,5 @@ function PowerBar:OnDisable()
     if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Disabled")
+    ECM.Log(self.Name, "Disabled")
 end

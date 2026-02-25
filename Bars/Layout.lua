@@ -60,7 +60,7 @@ local function SetGloballyHidden(hidden, reason)
     local stateChanged = _globallyHidden ~= hidden or _hideReason ~= reason
 
     if stateChanged then
-        ECM_log(ECM.Constants.SYS.Layout, nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
+        ECM.Log(nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
     end
 
     _globallyHidden = hidden
@@ -179,7 +179,7 @@ local function HookCooldownViewerSettings()
     end)
 
     _cooldownViewerSettingsHooked = true
-    ECM_log(ECM.Constants.SYS.Layout, nil, "Hooked CooldownViewerSettings OnHide")
+    ECM.Log(nil, "Hooked CooldownViewerSettings OnHide")
 end
 
 local _chainSet = {}
@@ -230,7 +230,7 @@ local function RegisterFrame(frame)
     assert(frame and type(frame) == "table" and frame.IsModuleMixin, "RegisterFrame: invalid ModuleMixin")
     assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
     _modules[frame.Name] = frame
-    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame registered: " .. frame.Name)
+    ECM.Log(nil, "Frame registered: " .. frame.Name)
 
     -- Sync current global hidden/alpha state to late-registered frames
     if _globallyHidden then
@@ -261,7 +261,7 @@ local function UnregisterFrame(frame)
         frame.InnerFrame:Hide()
     end
 
-    ECM_log(ECM.Constants.SYS.Layout, nil, "Frame unregistered: " .. name)
+    ECM.Log(nil, "Frame unregistered: " .. name)
 end
 
 --------------------------------------------------------------------------------

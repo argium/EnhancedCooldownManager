@@ -175,7 +175,7 @@ end
 ---@return number|nil displayValue
 ---@return boolean isFraction valueType
 function BarMixin:GetStatusBarValues()
-    ECM_debug_assert(false, "GetStatusBarValues not implemented in derived class")
+    ECM.DebugAssert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
 end
 
@@ -205,7 +205,7 @@ function BarMixin:Refresh(why, force)
     if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
-    -- ECM_log(ECM.Constants.SYS.Styling, self.Name, "Starting refresh (" .. (why or "") .. ")")
+    -- ECM.Log(self.Name, "Starting refresh (" .. (why or "") .. ")")
 
     local frame = self.InnerFrame
     local globalConfig = self:GetGlobalConfig()
@@ -243,7 +243,7 @@ function BarMixin:Refresh(why, force)
     FrameUtil.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
-    -- ECM_log(ECM.Constants.SYS.Styling, self.Name, "BarMixin:Refresh", {
+    -- ECM.Log(self.Name, "BarMixin:Refresh", {
     --     current = current,
     --     max = max,
     --     displayValue = displayValue,
@@ -253,7 +253,7 @@ function BarMixin:Refresh(why, force)
     --     statusBarColor = statusBarColor,
     -- })
 
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
+    ECM.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
     return true
 end
 
@@ -297,7 +297,7 @@ function BarMixin:CreateFrame()
         end
     end
 
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "Frame created.")
+    ECM.Log(self.Name, "Frame created.")
     return frame
 end
 

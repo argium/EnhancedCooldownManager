@@ -387,7 +387,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
 
     if borderConfig.enabled then
         border:Show()
-        ECM_debug_assert(borderConfig.thickness, "border thickness required when enabled")
+        ECM.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
         if liveThickness ~= thickness then
             border:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -576,7 +576,7 @@ function FrameUtil.ApplyStandardLayout(self, why)
     end
 
     -- Apply background color via lazy setter
-    ECM_debug_assert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
+    ECM.DebugAssert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or ECM.Constants.DEFAULT_BG_COLOR
     FrameUtil.LazySetBackgroundColor(frame, bgColor)
 

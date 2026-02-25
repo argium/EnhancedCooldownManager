@@ -67,9 +67,9 @@ local unpack = unpack or table.unpack
 ---@param validateKey fun(k: any): any|nil  Returns k when valid; nil when the key should be rejected (nil, secret, wrong type).
 ---@return PriorityKeyMap
 function PriorityKeyMap.New(keyDefs, scopeFn, validateKey)
-    ECM_debug_assert(type(keyDefs) == "table" and #keyDefs >= 2, "PriorityKeyMap.New: keyDefs must be an array with at least 2 entries")
-    ECM_debug_assert(type(scopeFn) == "function", "PriorityKeyMap.New: scopeFn must be a function")
-    ECM_debug_assert(type(validateKey) == "function", "PriorityKeyMap.New: validateKey must be a function")
+    ECM.DebugAssert(type(keyDefs) == "table" and #keyDefs >= 2, "PriorityKeyMap.New: keyDefs must be an array with at least 2 entries")
+    ECM.DebugAssert(type(scopeFn) == "function", "PriorityKeyMap.New: scopeFn must be a function")
+    ECM.DebugAssert(type(validateKey) == "function", "PriorityKeyMap.New: validateKey must be a function")
 
     local self = setmetatable({}, PriorityKeyMap)
     self._keyDefs = keyDefs
@@ -153,13 +153,13 @@ function PriorityKeyMap:Reconcile(keys)
             if not existing then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap",
+                ECM.Log("PriorityKeyMap",
                     "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM_tostring(vkeys[i]),
                     { value = unwrap(winner) })
             elseif ts(existing) < winnerTs then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap",
+                ECM.Log("PriorityKeyMap",
                     "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM_tostring(vkeys[i]) .. " to most recent",
                     { value = unwrap(winner) })
             end
@@ -277,7 +277,7 @@ function PriorityKeyMap:Set(keys, value, meta)
     for i = 1, #self._keyDefs do
         parts[i] = ECM_tostring(keys[i])
     end
-    ECM_log(ECM.Constants.SYS.SpellColors, "PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM_tostring(value))
+    ECM.Log("PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM_tostring(value))
 end
 
 ---------------------------------------------------------------------------

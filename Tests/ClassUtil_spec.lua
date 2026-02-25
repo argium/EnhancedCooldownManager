@@ -35,7 +35,7 @@ describe("ClassUtil", function()
         })
 
         _G.ECM = {}
-        _G.ECM_debug_assert = function() end
+        _G.ECM.DebugAssert = function() end
         _G.GetShapeshiftForm = function()
             return 0
         end

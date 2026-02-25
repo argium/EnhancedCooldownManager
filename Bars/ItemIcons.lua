@@ -530,7 +530,7 @@ function ItemIcons:UpdateLayout(why)
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -577,7 +577,7 @@ function ItemIcons:Refresh(why)
         end
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -661,7 +661,7 @@ function ItemIcons:HookUtilityViewer()
         self:ThrottledUpdateLayout("OnSizeChanged")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
+    ECM.Log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
 --------------------------------------------------------------------------------
@@ -688,7 +688,7 @@ function ItemIcons:OnEnable()
         self:ThrottledUpdateLayout("OnEnable")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "OnEnable - module enabled")
+    ECM.Log(self.Name, "OnEnable - module enabled")
 end
 
 function ItemIcons:OnDisable()
@@ -709,5 +709,5 @@ function ItemIcons:OnDisable()
         self.InnerFrame:Hide()
     end
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Disabled")
+    ECM.Log(self.Name, "Disabled")
 end

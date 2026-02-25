@@ -310,7 +310,7 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM_log(ECM.Constants.SYS.Core, nil, "Initialize", {
+    ECM.Log(nil, "Initialize", {
         schemaVersion = profile and profile.schemaVersion or "nil",
         currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
     })

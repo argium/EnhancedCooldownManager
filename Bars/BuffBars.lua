@@ -94,7 +94,7 @@ end
 ---@param retryCount number|nil Number of times this function has been retried
 local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
-        ECM_debug_assert(false, "Attempted to style a child frame that wasn't hooked.")
+        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
         return
     end
 
@@ -182,7 +182,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
     local logPrefix = "GetColorForBar[".. barIndex .."] "
     local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+    ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
@@ -194,11 +194,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
             -- default while we wait for secrets to clear.
             barColor = nil
         elseif not _warned then
-            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
+            ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             _warned = true
         end
     elseif retryCount > 0 then
-        ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
+        ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
     if barColor == nil and not allSecret then
@@ -282,7 +282,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         })
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
+    ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
         barIndex = barIndex,
         height = height,
         pipHidden = true,
@@ -487,7 +487,7 @@ function BuffBars:UpdateLayout(why)
 
     self._layoutRunning = nil
     viewer:Show()
-    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -556,7 +556,7 @@ function BuffBars:HookViewer()
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
+    ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -584,7 +584,7 @@ function BuffBars:HookEditMode()
         self:ThrottledUpdateLayout("EditModeEnter")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
+    ECM.Log(self.Name, "Hooked EditModeManagerFrame")
 end
 
 function BuffBars:OnUnitAura(_, unit)
@@ -632,7 +632,7 @@ function BuffBars:Enable()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enable - module enabled")
+    ECM.Log(self.Name, "Enable - module enabled")
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)

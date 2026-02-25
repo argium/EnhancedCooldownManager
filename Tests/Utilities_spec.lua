@@ -74,7 +74,7 @@ describe("Utilities", function()
             end
             return nil
         end
-        _G.ECM_debug_assert = function() end
+        _G.ECM.DebugAssert = function() end
         _G.issecretvalue = function() return false end
         _G.issecrettable = function() return false end
 

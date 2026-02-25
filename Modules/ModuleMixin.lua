@@ -63,13 +63,13 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local isVisible = BarMixin and BarMixin:IsVisible() or false
 
         if isEnabled and shouldShow and isChainMode and hasFrame then
-            ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
+            ECM.Log(self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
             return BarMixin, false
         end
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
+    ECM.Log(self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
     return _G["EssentialCooldownViewer"] or UIParent, true
 end
 
@@ -159,7 +159,7 @@ end
 --- Internal: checks readiness and runs the coalesced layout update.
 local function update_layout_deferred(self)
     if not self:IsReady() then
-        ECM_log(ECM.Constants.SYS.Core, self.Name, "Layout update skipped (not ready)")
+        ECM.Log(self.Name, "Layout update skipped (not ready)")
         self._updateLayoutPending = false
         self._pendingWhy = nil
         return
@@ -185,7 +185,7 @@ end
 --- @param reason string Debug trace string identifying the caller.
 --- @param opts table|nil Optional parameters: { secondPass = boolean }
 function ModuleMixin:ThrottledUpdateLayout(reason, opts)
-    ECM_debug_assert(reason, "ThrottledUpdateLayout: reason is required")
+    ECM.DebugAssert(reason, "ThrottledUpdateLayout: reason is required")
 
     -- Bail immediately if the module is disabled (safe for plain-table modules
     -- like BuffBars that lack IsEnabled).

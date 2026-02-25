@@ -95,7 +95,7 @@ describe("Migration", function()
     before_each(function()
         logMessages = {}
         _G.ECM = {}
-        _G.ECM_log = function(_, _, message)
+        _G.ECM.Log = function(_, message)
             logMessages[#logMessages + 1] = message
         end
         _G.date = function()

@@ -137,8 +137,8 @@ describe("SpellColors", function()
             return fakeNow
         end
 
-        _G.ECM_debug_assert = function() end
-        _G.ECM_log = function() end
+        _G.ECM.DebugAssert = function() end
+        _G.ECM.Log = function() end
         _G.ECM_tostring = function(value)
             return tostring(value)
         end

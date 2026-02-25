@@ -114,7 +114,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return GetMaelstromWeaponMax(), stacks
     end
 
-    ECM_debug_assert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
+    ECM.DebugAssert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
     if resourceType then
         local max = UnitPowerMax("player", resourceType) or 0
         local current = UnitPower("player", resourceType) or 0

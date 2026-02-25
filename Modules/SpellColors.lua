@@ -55,7 +55,7 @@ local function get_current_class_spec_stores(cfg)
     local specID = GetSpecialization()
 
     if not classID or not specID then
-        ECM_debug_assert(false, "SpellColors.get_current_class_spec_stores - unable to determine player class/spec", {
+        ECM.DebugAssert(false, "SpellColors.get_current_class_spec_stores - unable to determine player class/spec", {
             classID = classID,
             specID = specID,
         })
@@ -103,7 +103,7 @@ local function config()
     local mod = ns.Addon
     local cfg = mod and mod.db and mod.db.profile and mod.db.profile.buffBars or nil
     if type(cfg) ~= "table" then
-        ECM_debug_assert(false, "SpellColors.config - missing or invalid buffBars config")
+        ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil
     end
     ensure_profile_is_setup(cfg)
@@ -539,10 +539,10 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_Color|nil
 function SpellColors.GetColorForBar(frame)
-    ECM_debug_assert(frame, "Expected bar frame")
+    ECM.DebugAssert(frame, "Expected bar frame")
 
     if not (frame and frame.__ecmHooked) then
-        ECM_log(ECM.Constants.SYS.Styling, "SpellColors", "GetColorForBar - invalid bar frame", {
+        ECM.Log("SpellColors", "GetColorForBar - invalid bar frame", {
             frame = frame,
             nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
             iconExists = frame and type(frame.Icon) == "table" and type(frame.Icon.GetRegions) == "function",
@@ -637,7 +637,7 @@ end
 ---@param key ECM_SpellColorKey|table|nil
 ---@param color ECM_Color
 function SpellColors.SetColorByKey(key, color)
-    ECM_debug_assert(type(color) == "table", "Expected color to be a table")
+    ECM.DebugAssert(type(color) == "table", "Expected color to be a table")
 
     local map = get_map()
     if not map then

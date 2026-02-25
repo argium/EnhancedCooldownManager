@@ -48,7 +48,7 @@ function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local resourceType = ClassUtil.GetPlayerResourceType()
     local color = cfg.colors and cfg.colors[resourceType]
-    ECM_debug_assert(color, "Expected color to be defined for resourceType " .. tostring(resourceType))
+    ECM.DebugAssert(color, "Expected color to be defined for resourceType " .. tostring(resourceType))
     return color or ECM.Constants.COLOR_WHITE
 end
 
@@ -76,7 +76,7 @@ function ResourceBar:Refresh(why, force)
         end
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete.")
+    ECM.Log(self.Name, "Refresh complete.")
     return true
 end
 
