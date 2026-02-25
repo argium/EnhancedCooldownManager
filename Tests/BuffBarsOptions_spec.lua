@@ -17,6 +17,7 @@ describe("BuffBarsOptions", function()
     local SpellColors
     local layoutUpdateCalls
     local notifyChangeCalls
+    local addonDB
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
@@ -78,6 +79,24 @@ describe("BuffBarsOptions", function()
                     }
                 end,
                 SetModuleEnabled = function() end,
+            },
+            OptionBuilder = {
+                MergeArgs = function(target, source)
+                    for key, value in pairs(source or {}) do
+                        target[key] = value
+                    end
+                    return target
+                end,
+                BuildFontOverrideArgs = function()
+                    return {
+                        fontOverrideDesc = { type = "description", order = 14 },
+                        overrideFont = { type = "toggle", name = "Override font", order = 15 },
+                        font = { type = "select", name = "Font", order = 16 },
+                        fontReset = { type = "execute", order = 17 },
+                        fontSize = { type = "range", name = "Font Size", order = 18 },
+                        fontSizeReset = { type = "execute", order = 19 },
+                    }
+                end,
             },
         }
 
@@ -146,6 +165,7 @@ describe("BuffBarsOptions", function()
                 },
             },
         }
+        addonDB = addonNS.Addon.db
 
         local spellColorsChunk = TestHelpers.loadChunk(
             {
@@ -405,5 +425,42 @@ describe("BuffBarsOptions", function()
         assert.are.equal(1, notifyChangeCalls)
 
         ECM.SpellColors.ReconcileAllKeys = originalReconcileAllKeys
+    end)
+
+    it("adds a free grow direction selector to positioning settings", function()
+        local options = BuffBarsOptions.GetOptionsTable()
+        local positioningArgs = options.args.positioningSettings.args
+        local selector = positioningArgs.freeGrowDirection
+        local reset = positioningArgs.freeGrowDirectionReset
+
+        assert.is_table(selector)
+        assert.are.equal("select", selector.type)
+        assert.are.equal("Free Grow Direction", selector.name)
+        assert.is_true(selector.hidden())
+        assert.is_true(reset.hidden())
+
+        addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_FREE
+        assert.is_false(selector.hidden())
+
+        selector.set(nil, ECM.Constants.GROW_DIRECTION_UP)
+        assert.are.equal(ECM.Constants.GROW_DIRECTION_UP, addonDB.profile.buffBars.freeGrowDirection)
+        assert.are.equal(1, layoutUpdateCalls)
+
+        ECM.OptionUtil.IsValueChanged = function()
+            return true
+        end
+        assert.is_false(reset.hidden())
+    end)
+
+    it("GetOptionsTable includes font override controls in display settings", function()
+        local options = BuffBarsOptions.GetOptionsTable()
+        local displayArgs = options.args.displaySettings.args
+
+        assert.is_table(displayArgs.fontOverrideDesc)
+        assert.is_table(displayArgs.overrideFont)
+        assert.is_table(displayArgs.font)
+        assert.is_table(displayArgs.fontReset)
+        assert.is_table(displayArgs.fontSize)
+        assert.is_table(displayArgs.fontSizeReset)
     end)
 end)

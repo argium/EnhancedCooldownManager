@@ -114,9 +114,9 @@ function ItemIconsOptions.GetOptionsTable()
         name = "Item Icons",
         order = 6,
         args = {
-            basicSettings = {
+            itemIconsSettings = {
                 type = "group",
-                name = "Basic Settings",
+                name = "Item Icons",
                 inline = true,
                 order = 1,
                 args = ItemIconsOptions.GetBasicOptionsArgs(),

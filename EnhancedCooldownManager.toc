@@ -50,6 +50,16 @@ Bars\ItemIcons.lua
 Bars\Layout.lua
 
 Options\OptionUtil.lua
+Options\SharedMedia.lua
+Options\OptionBuilder.lua
+Options\PowerBarTickMarksStore.lua
+Options\PowerBarTickMarksOptions.lua
+Options\GeneralOptions.lua
+Options\PowerBarOptions.lua
+Options\ResourceBarOptions.lua
+Options\RuneBarOptions.lua
+Options\ProfileOptions.lua
+Options\AboutOptions.lua
 Options\Widgets\PositionModeSelector.lua
 Options\ItemIconsOptions.lua
 Options\BuffBarsOptions.lua

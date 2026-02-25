@@ -430,6 +430,28 @@ end
 -- directly when they need explicit control (e.g. custom UpdateLayout overrides).
 --------------------------------------------------------------------------------
 
+---@param point string|nil
+---@param fallback string
+---@return string
+local function ChainRightPoint(point, fallback)
+    if point == "TOPLEFT" then
+        return "TOPRIGHT"
+    end
+    if point == "BOTTOMLEFT" then
+        return "BOTTOMRIGHT"
+    end
+    return fallback
+end
+
+---@param direction string|nil
+---@return string
+local function NormalizeGrowDirection(direction)
+    if direction == ECM.Constants.GROW_DIRECTION_UP then
+        return ECM.Constants.GROW_DIRECTION_UP
+    end
+    return ECM.Constants.GROW_DIRECTION_DOWN
+end
+
 --- Default layout parameter calculation for chain/free anchor modes.
 --- Modules with custom positioning (e.g. BuffBars) override the ModuleMixin wrapper
 --- rather than calling this directly.
@@ -444,12 +466,17 @@ function FrameUtil.CalculateLayoutParams(self)
 
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local anchor, isFirst = self:GetNextChainAnchor(self.Name)
+        local moduleSpacing = globalConfig.moduleSpacing or 0
+        local growDirection = NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
+        local growsUp = growDirection == ECM.Constants.GROW_DIRECTION_UP
+        local firstGap = (globalConfig and globalConfig.offsetY) or 0
+        local gap = isFirst and firstGap or moduleSpacing
         params.anchor = anchor
         params.isFirst = isFirst
-        params.anchorPoint = "TOPLEFT"
-        params.anchorRelativePoint = "BOTTOMLEFT"
+        params.anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
+        params.anchorRelativePoint = growsUp and "TOPLEFT" or "BOTTOMLEFT"
         params.offsetX = 0
-        params.offsetY = (isFirst and -globalConfig.offsetY) or 0
+        params.offsetY = growsUp and gap or -gap
         params.height = moduleConfig.height or globalConfig.barHeight
         params.width = nil -- Width set by dual-point anchoring
     elseif mode == ECM.Constants.ANCHORMODE_FREE then
@@ -495,9 +522,13 @@ function FrameUtil.ApplyFramePosition(self, frame)
 
     local anchors
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
+        local leftAnchorPoint = anchorPoint or "TOPLEFT"
+        local leftRelativePoint = anchorRelativePoint or "BOTTOMLEFT"
+        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
         anchors = {
-            { "TOPLEFT", anchor, "BOTTOMLEFT", offsetX, offsetY },
-            { "TOPRIGHT", anchor, "BOTTOMRIGHT", offsetX, offsetY },
+            { leftAnchorPoint, anchor, leftRelativePoint, offsetX, offsetY },
+            { rightAnchorPoint, anchor, rightRelativePoint, offsetX, offsetY },
         }
     else
         assert(anchor ~= nil, "anchor required for free anchor mode")
@@ -565,24 +596,6 @@ function FrameUtil.BaseRefresh(self, why, force)
     return true
 end
 
---- Schedules a debounced callback. Multiple calls within updateFrequency coalesce into one.
----@param self ModuleMixin
----@param flagName string Key for the pending flag on self
----@param callback function Function to call after delay
-function FrameUtil.ScheduleDebounced(self, flagName, callback)
-    if self[flagName] then
-        return
-    end
-    self[flagName] = true
-
-    local globalConfig = self:GetGlobalConfig()
-    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
-    C_Timer.After(freq, function()
-        self[flagName] = nil
-        callback()
-    end)
-end
-
 --- Rate-limited refresh. Skips if called within updateFrequency window.
 ---@param self ModuleMixin
 ---@param why string|nil
@@ -598,11 +611,19 @@ function FrameUtil.ThrottledRefresh(self, why)
     return true
 end
 
---- Schedules a throttled layout update via debounced callback.
+--- Schedules a throttled layout update (debounced by updateFrequency).
 ---@param self ModuleMixin
 ---@param why string|nil
 function FrameUtil.ScheduleLayoutUpdate(self, why)
-    FrameUtil.ScheduleDebounced(self, "_layoutPending", function()
+    if self._layoutPending then
+        return
+    end
+    self._layoutPending = true
+
+    local globalConfig = self:GetGlobalConfig()
+    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+    C_Timer.After(freq, function()
+        self._layoutPending = nil
         self:UpdateLayout(why)
     end)
 end

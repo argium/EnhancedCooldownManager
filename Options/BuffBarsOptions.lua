@@ -6,6 +6,7 @@ local _, ns = ...
 local mod = ns.Addon
 local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 local C = ECM.Constants
+local OB = ECM.OptionBuilder
 local unlabeledBarsPresent = false
 
 local function IsEditLocked()
@@ -148,11 +149,6 @@ local function SpellOptionsTable()
         name = "Spells",
         order = 3,
         args = {
-            header = {
-                type = "header",
-                name = "Per-spell Colors",
-                order = 1,
-            },
             desc = {
                 type = "description",
                 name = "Customize colors for individual spells. Colors are saved per class and spec. Use 'Refresh Spell List' to rescan active aura bars.\n\n",
@@ -229,7 +225,7 @@ local function SpellOptionsTable()
                 type = "execute",
                 name = "Refresh Spell List",
                 desc = "Scan current buffs to refresh discovered spell names.",
-                order = 100,
+                order = 12,
                 width = "normal",
                 disabled =  IsEditLocked,
                 func = function()
@@ -257,115 +253,199 @@ function BuffBarsOptions.GetOptionsTable()
     local db = ns.Addon.db
 
     local spells = SpellOptionsTable()
-    spells.name = ""
+    spells.name = "Colors"
     spells.inline = true
-    spells.order = 5
+    spells.order = 3
+
+    local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
+        modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
+        includeOffsets = false,
+        widthLabel = "Buff Bar Width",
+        widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
+    })
+
+    positioningSettings.args.freeGrowDirectionDesc = {
+        type = "description",
+        name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
+        order = 6,
+        disabled = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+        end,
+    }
+    positioningSettings.args.freeGrowDirection = {
+        type = "select",
+        name = "Free Grow Direction",
+        order = 7,
+        width = "double",
+        values = {
+            [C.GROW_DIRECTION_DOWN] = "Down",
+            [C.GROW_DIRECTION_UP] = "Up",
+        },
+        disabled = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+        end,
+        get = function()
+            return db.profile.buffBars.freeGrowDirection or C.GROW_DIRECTION_DOWN
+        end,
+        set = function(_, val)
+            db.profile.buffBars.freeGrowDirection = val
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end,
+    }
+    positioningSettings.args.freeGrowDirectionReset = {
+        type = "execute",
+        name = "X",
+        order = 8,
+        width = 0.3,
+        disabled = function()
+            return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
+                or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
+        end,
+        func = ECM.OptionUtil.MakeResetHandler("buffBars.freeGrowDirection"),
+    }
+
+    local basicArgs = {
+        desc = {
+            type = "description",
+            name = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
+            order = 1,
+            fontSize = "medium",
+        },
+        enabled = {
+            type = "toggle",
+            name = "Enable aura bars",
+            order = 2,
+            width = "full",
+            get = function() return db.profile.buffBars.enabled end,
+            set = function(_, val)
+                db.profile.buffBars.enabled = val
+                if val then
+                    ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
+                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                else
+                    mod:ConfirmReloadUI(
+                        "Disabling aura bars requires a UI reload. Reload now?",
+                        nil,
+                        function()
+                            db.profile.buffBars.enabled = true
+                            AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+                        end
+                    )
+                end
+            end,
+        },
+    }
+
+    local displayArgs = {
+        displayElementsDesc = {
+            type = "description",
+            name = "Choose which aura bar elements are shown and customize their appearance.",
+            order = 11,
+        },
+        showIcon = {
+            type = "toggle",
+            name = "Show icon",
+            order = 12,
+            width = "double",
+            get = function() return db.profile.buffBars.showIcon end,
+            set = function(_, val)
+                db.profile.buffBars.showIcon = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        showSpellName = {
+            type = "toggle",
+            name = "Show spell name",
+            order = 13,
+            width = "double",
+            get = function() return db.profile.buffBars.showSpellName end,
+            set = function(_, val)
+                db.profile.buffBars.showSpellName = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        showDuration = {
+            type = "toggle",
+            name = "Show remaining duration",
+            order = 14,
+            width = "double",
+            get = function() return db.profile.buffBars.showDuration end,
+            set = function(_, val)
+                db.profile.buffBars.showDuration = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        heightDesc = {
+            type = "description",
+            name = "\nOverride the default bar height. Set to 0 to use the global default.",
+            order = 15,
+        },
+        height = {
+            type = "range",
+            name = "Height Override",
+            order = 16,
+            width = "half",
+            min = 0,
+            max = 40,
+            step = 1,
+            get = function() return db.profile.buffBars.height or 0 end,
+            set = function(_, val)
+                db.profile.buffBars.height = val > 0 and val or nil
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        heightReset = {
+            type = "execute",
+            name = "X",
+            order = 17,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
+            func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
+        },
+        verticalSpacingDesc = {
+            type = "description",
+            name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
+            order = 18,
+        },
+        verticalSpacing = {
+            type = "range",
+            name = "Vertical Spacing",
+            order = 19,
+            width = "half",
+            min = 0,
+            max = 20,
+            step = 1,
+            get = function() return db.profile.buffBars.verticalSpacing or 0 end,
+            set = function(_, val)
+                db.profile.buffBars.verticalSpacing = val
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end,
+        },
+        verticalSpacingReset = {
+            type = "execute",
+            name = "X",
+            order = 20,
+            width = 0.3,
+            hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
+            func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
+        },
+    }
+    OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
+    OB.MergeArgs(basicArgs, displayArgs)
 
     return {
         type = "group",
         name = "Aura Bars",
         order = 5,
         args = {
-            displaySettings = {
+            auraBarsSettings = {
                 type = "group",
-                name = "Basic Settings",
+                name = "Aura Bars",
                 inline = true,
                 order = 1,
-                args = {
-                    desc = {
-                        type = "description",
-                        name = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
-                        order = 1,
-                        fontSize = "medium",
-                    },
-                    enabled = {
-                        type = "toggle",
-                        name = "Enable aura bars",
-                        order = 2,
-                        width = "full",
-                        get = function() return db.profile.buffBars.enabled end,
-                        set = function(_, val)
-                            db.profile.buffBars.enabled = val
-                            if val then
-                                ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
-                                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                            else
-                                mod:ConfirmReloadUI(
-                                    "Disabling aura bars requires a UI reload. Reload now?",
-                                    nil,
-                                    function() db.profile.buffBars.enabled = true end
-                                )
-                            end
-                        end,
-                    },
-                    showIcon = {
-                        type = "toggle",
-                        name = "Show icon",
-                        order = 3,
-                        width = "full",
-                        get = function() return db.profile.buffBars.showIcon end,
-                        set = function(_, val)
-                            db.profile.buffBars.showIcon = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    showSpellName = {
-                        type = "toggle",
-                        name = "Show spell name",
-                        order = 5,
-                        width = "full",
-                        get = function() return db.profile.buffBars.showSpellName end,
-                        set = function(_, val)
-                            db.profile.buffBars.showSpellName = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    showDuration = {
-                        type = "toggle",
-                        name = "Show remaining duration",
-                        order = 7,
-                        width = "full",
-                        get = function() return db.profile.buffBars.showDuration end,
-                        set = function(_, val)
-                            db.profile.buffBars.showDuration = val
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    heightDesc = {
-                        type = "description",
-                        name = "\nOverride the default bar height. Set to 0 to use the global default.",
-                        order = 8,
-                    },
-                    height = {
-                        type = "range",
-                        name = "Height Override",
-                        order = 9,
-                        width = "double",
-                        min = 0,
-                        max = 40,
-                        step = 1,
-                        get = function() return db.profile.buffBars.height or 0 end,
-                        set = function(_, val)
-                            db.profile.buffBars.height = val > 0 and val or nil
-                            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        end,
-                    },
-                    heightReset = {
-                        type = "execute",
-                        name = "X",
-                        order = 10,
-                        width = 0.3,
-                        hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
-                        func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
-                    },
-                },
+                args = basicArgs,
             },
-            positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
-                modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
-                includeOffsets = false,
-                widthLabel = "Buff Bar Width",
-                widthDesc = "\nWidth of the buff bars when automatic positioning is disabled.",
-            }),
+            positioningSettings = positioningSettings,
             spells = spells,
         },
     }

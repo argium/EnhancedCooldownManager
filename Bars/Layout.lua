@@ -254,6 +254,13 @@ local function UnregisterFrame(frame)
     end
 
     _modules[name] = nil
+
+    -- Disabled modules are removed from future layout passes, so hide the
+    -- current frame immediately to prevent stale bar visuals from lingering.
+    if frame.InnerFrame then
+        frame.InnerFrame:Hide()
+    end
+
     ECM_log(ECM.Constants.SYS.Layout, nil, "Frame unregistered: " .. name)
 end
 

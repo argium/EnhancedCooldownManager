@@ -18,6 +18,8 @@ local constants = {
     CONFIG_SECTION_GLOBAL = "global",
     ANCHORMODE_CHAIN = "chain",
     ANCHORMODE_FREE = "free",
+    GROW_DIRECTION_DOWN = "down",
+    GROW_DIRECTION_UP = "up",
 
     -- Default or fallback values for configuration
     DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
@@ -61,6 +63,9 @@ local constants = {
     DEMONHUNTER_CLASS_ID = 12,
     DEMONHUNTER_VENGEANCE_SPEC_INDEX = 2,
     DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
+    DEATHKNIGHT_BLOOD_SPEC_INDEX = 1,
+    DEATHKNIGHT_FROST_SPEC_INDEX = 2,
+    DEATHKNIGHT_UNHOLY_SPEC_INDEX = 3,
     SHAMAN_ELEMENTAL_SPEC_INDEX = 1,
     SHAMAN_ENHANCEMENT_SPEC_INDEX = 2,
     SHAMAN_RESTORATION_SPEC_INDEX = 3,

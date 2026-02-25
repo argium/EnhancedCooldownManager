@@ -230,7 +230,7 @@ function BarMixin:Refresh(why, force)
         frame:SetText(displayValue)
 
         -- Apply font settings
-        ECM_ApplyFont(frame.TextValue)
+        ECM_ApplyFont(frame.TextValue, globalConfig, moduleConfig)
     end
     frame:SetTextVisible(showText)
 

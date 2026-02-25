@@ -42,6 +42,28 @@ local function get_children_ordered(viewer)
     return result
 end
 
+---@param point string|nil
+---@param fallback string
+---@return string
+local function chain_right_point(point, fallback)
+    if point == "TOPLEFT" then
+        return "TOPRIGHT"
+    end
+    if point == "BOTTOMLEFT" then
+        return "BOTTOMRIGHT"
+    end
+    return fallback
+end
+
+---@param direction string|nil
+---@return string
+local function normalize_grow_direction(direction)
+    if direction == ECM.Constants.GROW_DIRECTION_UP then
+        return ECM.Constants.GROW_DIRECTION_UP
+    end
+    return ECM.Constants.GROW_DIRECTION_DOWN
+end
+
 local function hook_child_frame(child, module)
     if child.__ecmHooked then
         return
@@ -189,8 +211,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     --------------------------------------------------------------------------
     -- Fonts (before visibility/positioning — font changes affect layout)
     --------------------------------------------------------------------------
-    ECM_ApplyFont(bar.Name)
-    ECM_ApplyFont(bar.Duration)
+    ECM_ApplyFont(bar.Name, globalConfig, config)
+    ECM_ApplyFont(bar.Duration, globalConfig, config)
 
     --------------------------------------------------------------------------
     -- Icon anchor
@@ -296,24 +318,62 @@ local function layout_bars(self)
         return
     end
 
+    local cfg = self:GetModuleConfig()
+    local globalConfig = self:GetGlobalConfig()
+    local mode = (cfg and cfg.anchorMode) or ECM.Constants.ANCHORMODE_CHAIN
+    local growDirection
+    if mode == ECM.Constants.ANCHORMODE_FREE then
+        growDirection = normalize_grow_direction(cfg and cfg.freeGrowDirection)
+    else
+        growDirection = normalize_grow_direction(globalConfig and globalConfig.moduleGrowDirection)
+    end
+    local growsUp = growDirection == ECM.Constants.GROW_DIRECTION_UP
+    local verticalSpacing = 0
+    if cfg and type(cfg.verticalSpacing) == "number" then
+        verticalSpacing = math.max(0, cfg.verticalSpacing)
+    end
+
     local children = get_children_ordered(viewer)
     local prev
 
-    for _, entry in ipairs(children) do
-        local child = entry.frame
+    local function anchor_child(child)
         if child:IsShown() then
             if not prev then
-                FrameUtil.LazySetAnchors(child, {
-                    { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
-                    { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
-                })
+                if growsUp then
+                    FrameUtil.LazySetAnchors(child, {
+                        { "BOTTOMLEFT", viewer, "BOTTOMLEFT", 0, 0 },
+                        { "BOTTOMRIGHT", viewer, "BOTTOMRIGHT", 0, 0 },
+                    })
+                else
+                    FrameUtil.LazySetAnchors(child, {
+                        { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
+                        { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
+                    })
+                end
             else
-                FrameUtil.LazySetAnchors(child, {
-                    { "TOPLEFT", prev, "BOTTOMLEFT", 0, 0 },
-                    { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, 0 },
-                })
+                if growsUp then
+                    FrameUtil.LazySetAnchors(child, {
+                        { "BOTTOMLEFT", prev, "TOPLEFT", 0, verticalSpacing },
+                        { "BOTTOMRIGHT", prev, "TOPRIGHT", 0, verticalSpacing },
+                    })
+                else
+                    FrameUtil.LazySetAnchors(child, {
+                        { "TOPLEFT", prev, "BOTTOMLEFT", 0, -verticalSpacing },
+                        { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, -verticalSpacing },
+                    })
+                end
             end
             prev = child
+        end
+    end
+
+    if growsUp then
+        for i = #children, 1, -1 do
+            anchor_child(children[i].frame)
+        end
+    else
+        for _, entry in ipairs(children) do
+            anchor_child(entry.frame)
         end
     end
 end
@@ -321,20 +381,13 @@ end
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
 function BuffBars:CalculateLayoutParams()
-    local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
     local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
     local params = { mode = mode }
 
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
-        local anchor, isFirst = self:GetNextChainAnchor(ECM.Constants.BUFFBARS)
-        params.anchor = anchor
-        params.isFirst = isFirst
-        params.anchorPoint = "TOPLEFT"
-        params.anchorRelativePoint = "BOTTOMLEFT"
-        params.offsetX = 0
-        params.offsetY = (isFirst and -(globalConfig and globalConfig.offsetY or 0)) or 0
+        return FrameUtil.CalculateLayoutParams(self)
     else
         -- Free mode: BuffBars supports custom anchor points from config
         params.anchor = UIParent
@@ -386,9 +439,13 @@ function BuffBars:UpdateLayout(why)
     -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
     local params = self:CalculateLayoutParams()
     if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+        local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
+        local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
+        local rightAnchorPoint = chain_right_point(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = chain_right_point(leftRelativePoint, "BOTTOMRIGHT")
         FrameUtil.LazySetAnchors(viewer, {
-            { "TOPLEFT", params.anchor, "BOTTOMLEFT", params.offsetX, params.offsetY },
-            { "TOPRIGHT", params.anchor, "BOTTOMRIGHT", params.offsetX, params.offsetY },
+            { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
+            { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
         })
     elseif params.mode == ECM.Constants.ANCHORMODE_FREE then
         -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which

@@ -16,6 +16,9 @@
 ---@field width number|nil Bar width override.
 ---@field height number|nil Bar height override.
 ---@field texture string|nil Bar texture override.
+---@field overrideFont boolean|nil Whether this bar overrides global font settings.
+---@field font string|nil Font face override for bar text.
+---@field fontSize number|nil Font size override for bar text.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
 ---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
@@ -33,7 +36,11 @@
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase Rune bar configuration.
 ---@field max number Maximum rune count.
+---@field useSpecColor boolean Whether to use class/spec colors instead of custom color.
 ---@field color ECM_Color Rune bar color.
+---@field colorBlood ECM_Color Blood rune color.
+---@field colorFrost ECM_Color Frost rune color.
+---@field colorUnholy ECM_Color Unholy rune color.
 
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
@@ -44,6 +51,8 @@
 ---@field barHeight number Default bar height.
 ---@field barBgColor ECM_Color Default bar background color.
 ---@field offsetY number Global vertical offset.
+---@field moduleSpacing number Vertical gap between chained modules.
+---@field moduleGrowDirection "down"|"up"|nil Vertical grow direction for chained modules.
 ---@field texture string|nil Default bar texture.
 ---@field font string Font face.
 ---@field fontSize number Font size.
@@ -62,17 +71,25 @@
 
 ---@class ECM_SpellColorsConfig Spell color configuration.
 ---@field byName table<number, table<number, table<string, table>>> Per-name colors by class/spec/spellName.
+---@field bySpellID table<number, table<number, table<number, table>>> Per-spellID colors by class/spec/spellID.
+---@field byCooldownID table<number, table<number, table<number, table>>> Per-cooldownID colors by class/spec/cooldownID.
 ---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
 ---@field defaultColor ECM_Color Default color for buff bars.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
----@field anchor ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field enabled boolean Whether buff bars are enabled.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field width number|nil Buff bar width when free anchor.
 ---@field offsetY number|nil Vertical offset when free anchor.
+---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
+---@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
+---@field overrideFont boolean|nil Whether aura bars override global font settings.
+---@field font string|nil Font face override for aura bar text.
+---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
 ---@class ECM_ItemIconsConfig Item icons configuration.
@@ -132,6 +149,8 @@ local defaults = {
             barHeight = 22,
             barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
             offsetY = 4,
+            moduleSpacing = 0,
+            moduleGrowDirection = C.GROW_DIRECTION_DOWN,
             texture = "Solid",
             font = "Expressway",
             fontSize = 11,
@@ -151,6 +170,7 @@ local defaults = {
             width             = 300,
             offsetY           = -275,
             showText          = true,
+            overrideFont      = false,
             ticks             = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
                 defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
@@ -177,6 +197,7 @@ local defaults = {
         resourceBar = {
             enabled    = true,
             showText   = false,
+            overrideFont = false,
             anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
             offsetY    = -300,
@@ -203,16 +224,24 @@ local defaults = {
             anchorMode = C.ANCHORMODE_CHAIN,
             width      = 300,
             offsetY    = -325,
-            color      = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, -- DK class colour red
+            overrideFont = false,
+            useSpecColor = true,
+            color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
+            colorUnholy = { r = 0.00, g = 0.61, b = 0.00, a = 1 },
         },
         buffBars = {
             enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
             offsetY = -350,
+            verticalSpacing = 0,
+            freeGrowDirection = C.GROW_DIRECTION_DOWN,
             showIcon = false,
             showSpellName = true,
             showDuration = true,
+            overrideFont = false,
             colors = {
                 byName = {},
                 bySpellID = {},
