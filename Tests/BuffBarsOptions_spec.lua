@@ -85,6 +85,9 @@ describe("BuffBarsOptions", function()
                     end
                     return target
                 end,
+                MakeSpacer = function(order)
+                    return { type = "description", name = "\n", order = order }
+                end,
                 BuildFontOverrideArgs = function()
                     return {
                         fontOverrideDesc = { type = "description", order = 14 },

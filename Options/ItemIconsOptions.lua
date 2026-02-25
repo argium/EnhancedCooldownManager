@@ -195,51 +195,54 @@ end
 --- Builds the Item Icons options group.
 ---@return table itemIconsOptions AceConfig group for Item Icons section.
 function ItemIconsOptions.GetOptionsTable()
+    local args = {
+        itemIconsSettings = {
+            type = "group",
+            name = "Item Icons",
+            inline = true,
+            order = 1,
+            args = ItemIconsOptions.GetBasicOptionsArgs(),
+        },
+        equipmentSettings = {
+            type = "group",
+            name = "Equipment",
+            inline = true,
+            order = 2,
+            args = ItemIconsOptions.GetEquipmentOptionsArgs(),
+        },
+        consumableSettings = {
+            type = "group",
+            name = "Consumables",
+            inline = true,
+            order = 3,
+            args = ItemIconsOptions.GetConsumableOptionsArgs(),
+        },
+        potionPriorityHeading = {
+            type = "description",
+            name = "Potion priority (highest first)",
+            order = 90,
+        },
+        combatPotionList = {
+            type = "description",
+            name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
+            order = 91,
+            fontSize = "medium",
+        },
+        healthPotionList = {
+            type = "description",
+            name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
+            order = 93,
+            fontSize = "medium",
+        },
+    }
+
+    args.spacer89 = OB.MakeSpacer(89)
+    args.spacer92 = OB.MakeSpacer(92)
+
     return {
         type = "group",
         name = "Item Icons",
         order = 6,
-        args = {
-            itemIconsSettings = {
-                type = "group",
-                name = "Item Icons",
-                inline = true,
-                order = 1,
-                args = ItemIconsOptions.GetBasicOptionsArgs(),
-            },
-            equipmentSettings = {
-                type = "group",
-                name = "Equipment",
-                inline = true,
-                order = 2,
-                args = ItemIconsOptions.GetEquipmentOptionsArgs(),
-            },
-            consumableSettings = {
-                type = "group",
-                name = "Consumables",
-                inline = true,
-                order = 3,
-                args = ItemIconsOptions.GetConsumableOptionsArgs(),
-            },
-            OB.MakeSpacer(89),
-            potionPriorityHeading = {
-                type = "description",
-                name = "Potion priority (highest first)",
-                order = 90,
-            },
-            combatPotionList = {
-                type = "description",
-                name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
-                order = 91,
-                fontSize = "medium",
-            },
-            OB.MakeSpacer(92),
-            healthPotionList = {
-                type = "description",
-                name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
-                order = 93,
-                fontSize = "medium",
-            }
-        },
+        args = args,
     }
 end
