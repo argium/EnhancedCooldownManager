@@ -36,7 +36,11 @@
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase Rune bar configuration.
 ---@field max number Maximum rune count.
+---@field useSpecColor boolean Whether to use class/spec colors instead of custom color.
 ---@field color ECM_Color Rune bar color.
+---@field colorBlood ECM_Color Blood rune color.
+---@field colorFrost ECM_Color Frost rune color.
+---@field colorUnholy ECM_Color Unholy rune color.
 
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
@@ -67,12 +71,15 @@
 
 ---@class ECM_SpellColorsConfig Spell color configuration.
 ---@field byName table<number, table<number, table<string, table>>> Per-name colors by class/spec/spellName.
+---@field bySpellID table<number, table<number, table<number, table>>> Per-spellID colors by class/spec/spellID.
+---@field byCooldownID table<number, table<number, table<number, table>>> Per-cooldownID colors by class/spec/cooldownID.
 ---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
 ---@field defaultColor ECM_Color Default color for buff bars.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
----@field anchor ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field enabled boolean Whether buff bars are enabled.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field width number|nil Buff bar width when free anchor.
 ---@field offsetY number|nil Vertical offset when free anchor.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
