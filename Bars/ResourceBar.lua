@@ -60,7 +60,10 @@ function ResourceBar:Refresh(why, force)
 
     -- Handle ticks (Devourer has no ticks, others have dividers)
     local resourceType = ClassUtil.GetPlayerResourceType()
-    local isDevourer = (resourceType == "devourerMeta" or resourceType == "devourerNormal")
+    local isDevourer = (
+        resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
+        or resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
+    )
 
     if isDevourer then
         self:HideAllTicks("tickPool")

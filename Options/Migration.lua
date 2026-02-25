@@ -759,9 +759,9 @@ function Migration.Run(profile)
         -- Migration: demon hunter souls default color update
         local resourceCfg = profile.resourceBar
         local colors = resourceCfg and resourceCfg.colors
-        local soulsColor = colors and colors.souls
+        local soulsColor = colors and colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
         if IsColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
-            colors.souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
+            colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
         end
 
         -- Migration: powerBarTicks -> powerBar.ticks

@@ -25,19 +25,23 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
             if voidFragments then
-                return "devourerMeta"
+                return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
-                return "devourerNormal"
+                return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL
             end
         elseif specIndex == C.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
-            return "souls"
+            return C.RESOURCEBAR_TYPE_VENGEANCE_SOULS
         end
     elseif (class == CLASS.MAGE) then
         if (specIndex == C.MAGE_ARCANE_SPEC_INDEX) then
             return Enum.PowerType.ArcaneCharges
         end
 
-        -- Fire/Frost mages don't use a discrete resource tracked by this bar.
+        if (specIndex == C.MAGE_FROST_SPEC_INDEX) then
+            return C.RESOURCEBAR_TYPE_ICICLES
+        end
+
+        -- Fire mages don't use a discrete resource tracked by this bar.
         -- Return nil explicitly to make this control flow clear.
         return nil
     elseif class == CLASS.SHAMAN then
@@ -89,14 +93,19 @@ end
 
 function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     -- Demon hunter souls can still be tracked by their aura stacks (thank the lord)
-    if resourceType == "souls" then
+    if resourceType == C.RESOURCEBAR_TYPE_VENGEANCE_SOULS then
         -- Vengeance use the same type of soul fragments. The value can be tracked by checking
         -- the number of times spirit bomb can be cast, of all things.
         local count = C_Spell.GetSpellCastCount(C.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
         return C.RESOURCEBAR_VENGEANCE_SOULS_MAX, count
     end
 
-    if resourceType == "devourerNormal" or resourceType == "devourerMeta" then
+    if resourceType == C.RESOURCEBAR_TYPE_ICICLES then
+        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.RESOURCEBAR_ICICLES_SPELLID)
+        return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0
+    end
+
+    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL or resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
         -- Devourer is tracked by two spells - one for void meta, and one not.
         local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
         local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
