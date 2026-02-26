@@ -23,8 +23,6 @@ local SB = LSB:New({
     getDefaults    = function() return MyAddonDefaults.profile end,
     varPrefix      = "MYADDON",
     onChanged      = function(spec, value) MyAddon:ApplySettings() end,
-    getNestedValue = function(tbl, path) return GetNestedValue(tbl, path) end,
-    setNestedValue = function(tbl, path, value) SetNestedValue(tbl, path, value) end,
 })
 
 SB.CreateRootCategory("My Addon")
@@ -64,7 +62,9 @@ SB.RegisterCategories()
 
 ## Factory: `lib:New(config)`
 
-Creates a new builder instance. All fields are **required**.
+Creates a new builder instance.
+
+### Required Fields
 
 | Field | Type | Description |
 |---|---|---|
@@ -72,8 +72,14 @@ Creates a new builder instance. All fields are **required**.
 | `getDefaults` | `function() -> table` | Returns the defaults table (same shape as the profile; used to derive default values for each control). |
 | `varPrefix` | `string` | Short prefix used to generate unique variable names for [`Settings.RegisterProxySetting`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua). A path `"general.enabled"` with prefix `"ECM"` becomes variable `"ECM_general_enabled"`. |
 | `onChanged` | `function(spec, value)` | Called after every setter. Use this to trigger layout refreshes, event broadcasts, etc. |
-| `getNestedValue` | `function(tbl, path) -> any` | Reads a dot-delimited path from a table (e.g. `"general.enabled"` → `tbl.general.enabled`). |
-| `setNestedValue` | `function(tbl, path, value)` | Writes a value at a dot-delimited path. |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `getNestedValue` | `function(tbl, path) -> any` | Built-in dot-path with `tonumber` | Reads a dot-delimited path from a table (e.g. `"general.enabled"` → `tbl.general.enabled`). The built-in default handles numeric path segments (e.g. `"colors.0"` → `tbl.colors[0]`). |
+| `setNestedValue` | `function(tbl, path, value)` | Built-in dot-path with `tonumber` | Writes a value at a dot-delimited path. Creates intermediate tables as needed. |
+| `compositeDefaults` | `table` | `nil` | Table keyed by composite function name (`"ModuleEnabledCheckbox"`, `"FontOverrideGroup"`, `"PositioningGroup"`). Values are default spec tables merged (lowest priority) into the composite's spec. Eliminates monkey-patching for addon-wide defaults. |
 
 Returns the `SB` table containing all API functions documented below.
 
@@ -182,6 +188,7 @@ Creates a dropdown selector. Wraps `Settings.RegisterProxySetting` + [`Settings.
 | Additional Field | Type | Description |
 |---|---|---|
 | `values` | `table` or `function() -> table` | Map of `value -> label` pairs. Functions are evaluated each time the dropdown opens. |
+| `scrollHeight` | `number` | When present, uses a scroll-enabled dropdown template with `SetScrollMode(scrollHeight)`. Ideal for long lists (fonts, sounds, etc.). |
 
 ```lua
 SB.PathDropdown({
@@ -189,11 +196,21 @@ SB.PathDropdown({
     name   = "Position Mode",
     values = { attached = "Attached", free = "Free" },
 })
+
+-- Scroll-enabled dropdown for long lists
+SB.PathDropdown({
+    path         = "powerBar.font",
+    name         = "Font",
+    values       = GetFontValues,
+    scrollHeight = 300,
+})
 ```
 
 ### `SB.PathColor(spec)`
 
 Creates a color swatch. Stores/reads `{r, g, b, a}` tables in the profile and converts to/from hex strings (AARRGGBB) for the proxy setting. Wraps `Settings.CreateColorSwatch`.
+
+> **Note:** Blizzard's `Settings.CreateColorSwatch` does not support a `hasAlpha` parameter. Alpha channel selection is not available through the Settings API.
 
 ```lua
 SB.PathColor({
@@ -209,6 +226,7 @@ Creates a proxy setting backed by a custom XML frame template. The template's `I
 | Additional Field | Type | Description |
 |---|---|---|
 | `template` | `string` | **Required.** Name of the XML template (must inherit `SettingsListElementTemplate`). |
+| `varType` | `Settings.VarType` | Override the setting variable type. Defaults to `Settings.VarType.String`. Use `Settings.VarType.Number` or `Settings.VarType.Boolean` for non-string custom controls. |
 
 ```lua
 SB.PathCustom({
@@ -350,7 +368,7 @@ Returns `{ modeInit, modeSetting, widthInit, offsetXInit, offsetYInit }`.
 
 Inserts a section header into the vertical list. Wraps `CreateSettingsListSectionHeaderInitializer`.
 
-**Automatic deduplication:** the first header on a page is suppressed if its text matches the subcategory name (avoiding a redundant heading). Headers with the text `"Display"` are always suppressed.
+**Automatic deduplication:** the first header on a page is suppressed if its text matches the subcategory name (avoiding a redundant heading).
 
 ```lua
 SB.Header("Colors")
@@ -443,16 +461,25 @@ LibSettingsBuilder hooks `SettingsSliderControlMixin:Init` globally (once per li
 
 ## Full Example
 
+### Imperative API
+
 ```lua
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
 local SB = LSB:New({
-    getProfile     = function() return MyAddonDB.profile end,
-    getDefaults    = function() return MyAddonDefaults.profile end,
-    varPrefix      = "MYADDON",
-    onChanged      = function() MyAddon:Refresh() end,
-    getNestedValue = function(tbl, path) return GetNestedValue(tbl, path) end,
-    setNestedValue = function(tbl, path, value) SetNestedValue(tbl, path, value) end,
+    getProfile  = function() return MyAddonDB.profile end,
+    getDefaults = function() return MyAddonDefaults.profile end,
+    varPrefix   = "MYADDON",
+    onChanged   = function() MyAddon:Refresh() end,
+    compositeDefaults = {
+        ModuleEnabledCheckbox = {
+            setModuleEnabled = function(name, enabled) MyAddon:ToggleModule(name, enabled) end,
+        },
+        PositioningGroup = {
+            positionModes    = { attached = "Attached", free = "Free" },
+            isAnchorModeFree = function(cfg) return cfg and cfg.anchorMode == "free" end,
+        },
+    },
 })
 
 SB.CreateRootCategory("My Addon")
@@ -465,9 +492,8 @@ SB.PathCheckbox({ path = "general.welcomeMessage", name = "Show welcome message"
 SB.CreateSubcategory("Power Bar")
 
 SB.ModuleEnabledCheckbox("PowerBar", {
-    path             = "powerBar.enabled",
-    name             = "Enable power bar",
-    setModuleEnabled = function(name, enabled) MyAddon:ToggleModule(name, enabled) end,
+    path = "powerBar.enabled",
+    name = "Enable power bar",
 })
 
 SB.HeightOverrideSlider("powerBar")
@@ -487,21 +513,144 @@ SB.Header("Font")
 SB.FontOverrideGroup("powerBar")
 
 SB.Header("Positioning")
-SB.PositioningGroup("powerBar", {
-    positionModes    = { attached = "Attached", free = "Free" },
-    isAnchorModeFree = function(cfg) return cfg and cfg.anchorMode == "free" end,
-})
+SB.PositioningGroup("powerBar")
 
--- Profile subcategory
-SB.CreateSubcategory("Profiles")
-SB.Button({
-    name    = "Reset Profile",
-    confirm = "This will reset your profile to defaults. Continue?",
-    onClick = function() MyAddon:ResetProfile() end,
+SB.RegisterCategories()
+```
+
+### Table-Driven API (AceConfig-inspired)
+
+The same Power Bar page can be declared as a table:
+
+```lua
+SB.CreateRootCategory("My Addon")
+
+SB.RegisterFromTable({
+    name = "Power Bar",
+    path = "powerBar",
+    moduleEnabled = { name = "Enable power bar" },
+    args = {
+        height      = { type = "heightOverride", order = 1 },
+        dispHeader  = { type = "header", name = "Display", order = 10 },
+        opacity     = { type = "range", path = "opacity", name = "Opacity",
+                        min = 0, max = 100, step = 1,
+                        formatter = function(v) return v .. "%" end, order = 11 },
+        bdrHeader   = { type = "header", name = "Border", order = 20 },
+        border      = { type = "border", path = "border", order = 21 },
+        fontHeader  = { type = "header", name = "Font", order = 30 },
+        font        = { type = "fontOverride", order = 31 },
+        posHeader   = { type = "header", name = "Positioning", order = 40 },
+        positioning = { type = "positioning", order = 41 },
+    },
 })
 
 SB.RegisterCategories()
 ```
+
+---
+
+## Table-Driven Registration: `SB.RegisterFromTable(tbl)`
+
+Walks an AceConfig-inspired declarative table and calls the imperative API. Ideal for standard settings pages; complex pages (canvas layouts, dynamic content) should use the imperative API directly.
+
+### Table Structure
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | Subcategory name. A new subcategory is created automatically. |
+| `path` | `string` | no | Path prefix. Child paths are resolved relative to this (e.g. `path = "powerBar"` + child `path = "enabled"` → `"powerBar.enabled"`). |
+| `moduleName` | `string` | no | Module name for `ModuleEnabledCheckbox`. Defaults to `name` with spaces removed. |
+| `moduleEnabled` | `table` | no | Spec for `ModuleEnabledCheckbox`. When present, a module-level toggle is created. |
+| `disabled` | `function() -> bool` | no | Inherited by all children. |
+| `hidden` | `function() -> bool` | no | Inherited by all children. |
+| `args` | `table` | no | Table of entries keyed by name. Each entry is processed in `order`. |
+
+### Type Mapping
+
+Standard types (AceConfig aliases are supported):
+
+| Type | Alias | Maps to |
+|---|---|---|
+| `checkbox` | `toggle` | `PathCheckbox` |
+| `slider` | `range` | `PathSlider` |
+| `dropdown` | `select` | `PathDropdown` |
+| `color` | — | `PathColor` |
+| `custom` | — | `PathCustom` |
+| `button` | `execute` | `Button` |
+| `header` | — | `Header` |
+| `label` | `description` | `Label` |
+
+LSB composite types (no AceConfig equivalent):
+
+| Type | Maps to |
+|---|---|
+| `positioning` | `PositioningGroup` |
+| `border` | `BorderGroup` |
+| `fontOverride` | `FontOverrideGroup` |
+| `heightOverride` | `HeightOverrideSlider` |
+| `colorList` | `ColorPickerList` (requires `defs` field) |
+
+### Entry Fields
+
+Each entry in `args` supports:
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `string` | **Required.** Control type (see mapping above). |
+| `order` | `number` | Sort order (default 100). Lower values appear first. |
+| `path` | `string` | Relative to group `path`, or absolute if it contains a `.`. |
+| `name` | `string` | Display name. |
+| `desc` | `string` | Alias for `tooltip` (AceConfig compatibility). |
+| `parent` | `string` | Key name of another entry in the same `args` table. Resolved to its initializer. |
+| `parentCheck` | `string` or `function` | `"checked"` / `"notChecked"` shortcuts, or a custom function. |
+| `disabled` | `function` | Inherited from group if not set. |
+| `hidden` | `function` | Inherited from group if not set. |
+
+Plus all standard spec fields for the control type (`min`, `max`, `step`, `values`, `template`, etc.).
+
+### Property Inheritance
+
+`disabled` and `hidden` on the group table propagate to all entries that don't set them explicitly. This eliminates patterns like repeating `disabled = isDeathKnight` on every control.
+
+---
+
+## Composite Defaults
+
+The `compositeDefaults` config field lets you declare addon-wide defaults for composite builders. Each composite merges these defaults (lowest priority) under its spec before processing.
+
+```lua
+local SB = LSB:New({
+    -- ... required fields ...
+    compositeDefaults = {
+        ModuleEnabledCheckbox = {
+            setModuleEnabled = function(name, enabled) MyAddon:SetModuleEnabled(name, enabled) end,
+        },
+        FontOverrideGroup = {
+            fontValues = GetFontValues,
+            fontFallback = function() return "Friz Quadrata TT" end,
+            fontTemplate = "MyFontPickerTemplate",
+        },
+        PositioningGroup = {
+            positionModes = { [1] = "Automatic", [2] = "Free" },
+            isAnchorModeFree = function(cfg) return cfg and cfg.anchorMode == 2 end,
+        },
+    },
+})
+```
+
+Per-call spec values always override defaults.
+
+---
+
+## Debug Mode
+
+Set `LSB_DEBUG = true` before creating controls to enable spec field validation. When active, each `Path*` function warns on unrecognized spec fields — catching typos like `typee`, `paht`, or `vale` that would otherwise be silently ignored.
+
+```lua
+LSB_DEBUG = true  -- Enable during development
+```
+
+Zero cost in production (the check is behind a global flag).
 
 ## Blizzard API Reference
 
