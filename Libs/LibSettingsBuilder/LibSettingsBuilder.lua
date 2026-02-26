@@ -433,8 +433,9 @@ function lib:New(config)
     end
 
     local function isControlEnabled(spec)
-        if SB._pageEnabledSetting and not spec._isModuleEnabled then
-            if not SB._pageEnabledSetting:GetValue() then return false end
+        local pageEnabled = spec._pageEnabledSetting
+        if pageEnabled and not spec._isModuleEnabled then
+            if not pageEnabled:GetValue() then return false end
         end
         if spec.disabled and spec.disabled() then return false end
         return isParentEnabled(spec)
@@ -456,7 +457,11 @@ function lib:New(config)
     local function applyModifiers(initializer, spec)
         if not initializer then return end
 
-        if (SB._pageEnabledSetting and not spec._isModuleEnabled) or spec.disabled or spec.canvas or spec.parent then
+        -- Capture the page-enabled setting at control creation time so each
+        -- page's controls reference their own module toggle, not the last one registered.
+        spec._pageEnabledSetting = SB._pageEnabledSetting
+
+        if (spec._pageEnabledSetting and not spec._isModuleEnabled) or spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
                 local enabled = isControlEnabled(spec)
                 setInitializerInteractive(initializer, enabled)
@@ -1075,6 +1080,10 @@ function lib:New(config)
             local meSpec = {}
             for k, v in pairs(tbl.moduleEnabled) do meSpec[k] = v end
             meSpec.path = meSpec.path or (groupPath ~= "" and (groupPath .. ".enabled") or "enabled")
+            if meSpec.desc and not meSpec.tooltip then
+                meSpec.tooltip = meSpec.desc
+                meSpec.desc = nil
+            end
             if tbl.disabled then meSpec.disabled = meSpec.disabled or tbl.disabled end
             if tbl.hidden then meSpec.hidden = meSpec.hidden or tbl.hidden end
             local moduleName = tbl.moduleName or tbl.name:gsub("%s", "")
