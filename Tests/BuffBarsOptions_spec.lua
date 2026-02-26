@@ -83,9 +83,7 @@ describe("BuffBarsOptions", function()
                 ApplyPositionModeToBar = function() end,
                 IsValueChanged = function() return false end,
             },
-            SharedMediaOptions = {
-                GetFontValues = function() return {} end,
-            },
+
             DebugAssert = function() end,
             Log = function() end,
         }
@@ -142,6 +140,12 @@ describe("BuffBarsOptions", function()
             "Unable to load OptionUtil.lua"
         )
         optUtilChunk(nil, addonNS)
+
+        local sbChunk = TestHelpers.loadChunk(
+            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            "Unable to load SettingsBuilder.lua"
+        )
+        sbChunk(nil, addonNS)
 
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")

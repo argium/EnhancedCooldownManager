@@ -436,12 +436,13 @@ function lib:New(config)
         local setting = Settings.RegisterProxySetting(cat, variable,
             Settings.VarType.String, spec.name, default or "", getter, setter)
 
-        local layout = SB._layouts[cat]
-        local initializer = CreateFromMixins(SettingsListElementInitializer)
-        initializer:Init(spec.template)
-        initializer.data = { setting = setting, name = spec.name, tooltip = spec.tooltip }
+        local initializer = Settings.CreateElementInitializer(spec.template,
+            { name = spec.name, tooltip = spec.tooltip })
+        if initializer.SetSetting then
+            initializer:SetSetting(setting)
+        end
 
-        layout:AddInitializer(initializer)
+        Settings.RegisterInitializer(cat, initializer)
         applyModifiers(initializer, spec)
 
         return initializer, setting
@@ -778,14 +779,13 @@ function lib:New(config)
     function SB.EmbedCanvas(canvas, height, spec)
         spec = spec or {}
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
-        local layout = SB._layouts[cat]
 
-        local initializer = CreateFromMixins(SettingsListElementInitializer)
-        initializer:Init(lib.EMBED_CANVAS_TEMPLATE)
-        initializer:SetExtent(height or canvas:GetHeight())
-        initializer.data = { canvas = canvas }
+        local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE,
+            { canvas = canvas })
+        local extent = height or canvas:GetHeight()
+        initializer.GetExtent = function() return extent end
 
-        layout:AddInitializer(initializer)
+        Settings.RegisterInitializer(cat, initializer)
         applyModifiers(initializer, spec)
 
         return initializer

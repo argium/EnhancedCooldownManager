@@ -55,6 +55,7 @@ function LibLSMSettingsWidgets_FontPickerMixin:OnLoad()
 
     self.DropDown = self:CreateDropDown()
     self.Preview = self:CreateFontString(nil, "OVERLAY")
+    self.Preview:SetFontObject(GameFontHighlight)
     self.Preview:SetPoint("LEFT", self.DropDown, "RIGHT", 10, 0)
     self.Preview:SetPoint("RIGHT", self, "RIGHT", -20, 0)
     self.Preview:SetJustifyH("LEFT")
@@ -62,9 +63,14 @@ function LibLSMSettingsWidgets_FontPickerMixin:OnLoad()
 end
 
 function LibLSMSettingsWidgets_FontPickerMixin:CreateDropDown()
-    local dropdown = CreateFrame("DropdownButton", nil, self, "WowStyle1DropdownTemplate")
+    local host = CreateFrame("Frame", nil, self, "SettingsDropdownWithButtonsTemplate")
+    if host.DecrementButton then host.DecrementButton:Hide() end
+    if host.IncrementButton then host.IncrementButton:Hide() end
+
+    local dropdown = host.Dropdown or host
     dropdown:SetPoint("LEFT", self.Text, "RIGHT", 10, 0)
     dropdown:SetWidth(200)
+    self.DropDownHost = host
     return dropdown
 end
 
@@ -72,7 +78,7 @@ function LibLSMSettingsWidgets_FontPickerMixin:Init(initializer)
     SettingsListElementMixin.Init(self, initializer)
 
     local data = initializer:GetData()
-    self.setting = data.setting
+    self.setting = initializer:GetSetting() or data.setting
 
     if data.name and self.Text then
         self.Text:SetText(data.name)
@@ -86,6 +92,8 @@ function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
     local setting = self.setting
     local picker = self
 
+    if not setting then return end
+
     self.DropDown:SetupMenu(function(dropdown, rootDescription)
         local values = lib.GetFontValues()
         local sorted = {}
@@ -95,32 +103,26 @@ function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
         table.sort(sorted)
 
         for _, name in ipairs(sorted) do
-            local fontPath = LSM:Fetch("font", name)
             local radio = rootDescription:CreateRadio(name,
                 function() return setting:GetValue() == name end,
                 function()
                     setting:SetValue(name)
                     picker:UpdatePreview()
                 end)
-
-            if fontPath then
-                radio:AddInitializer(function(button)
-                    local regions = { button:GetRegions() }
-                    for _, region in ipairs(regions) do
-                        if region:IsObjectType("FontString") and region:GetText() == name then
-                            region:SetFont(fontPath, 12, "")
-                            break
-                        end
-                    end
-                end)
-            end
         end
     end)
 end
 
 function LibLSMSettingsWidgets_FontPickerMixin:UpdatePreview()
+    if not self.setting then return end
+
     local currentName = self.setting:GetValue()
-    local fontPath = LSM:Fetch("font", currentName)
+    local fontPath = LSM and LSM.Fetch and LSM:Fetch("font", currentName)
+
+    if self.DropDown and self.DropDown.OverrideText then
+        self.DropDown:OverrideText(currentName or "")
+    end
+
     if fontPath and self.Preview then
         self.Preview:SetFont(fontPath, 14, "")
         self.Preview:SetText("AaBbCcDd 1234")
@@ -144,9 +146,14 @@ function LibLSMSettingsWidgets_TexturePickerMixin:OnLoad()
 end
 
 function LibLSMSettingsWidgets_TexturePickerMixin:CreateDropDown()
-    local dropdown = CreateFrame("DropdownButton", nil, self, "WowStyle1DropdownTemplate")
+    local host = CreateFrame("Frame", nil, self, "SettingsDropdownWithButtonsTemplate")
+    if host.DecrementButton then host.DecrementButton:Hide() end
+    if host.IncrementButton then host.IncrementButton:Hide() end
+
+    local dropdown = host.Dropdown or host
     dropdown:SetPoint("LEFT", self.Text, "RIGHT", 10, 0)
     dropdown:SetWidth(200)
+    self.DropDownHost = host
     return dropdown
 end
 
@@ -154,7 +161,7 @@ function LibLSMSettingsWidgets_TexturePickerMixin:Init(initializer)
     SettingsListElementMixin.Init(self, initializer)
 
     local data = initializer:GetData()
-    self.setting = data.setting
+    self.setting = initializer:GetSetting() or data.setting
 
     if data.name and self.Text then
         self.Text:SetText(data.name)
@@ -168,6 +175,8 @@ function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
     local setting = self.setting
     local picker = self
 
+    if not setting then return end
+
     self.DropDown:SetupMenu(function(dropdown, rootDescription)
         local values = lib.GetStatusbarValues()
         local sorted = {}
@@ -177,33 +186,26 @@ function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
         table.sort(sorted)
 
         for _, name in ipairs(sorted) do
-            local texturePath = LSM:Fetch("statusbar", name)
             local radio = rootDescription:CreateRadio(name,
                 function() return setting:GetValue() == name end,
                 function()
                     setting:SetValue(name)
                     picker:UpdatePreview()
                 end)
-
-            if texturePath then
-                radio:AddInitializer(function(button)
-                    if not button._lsmwPreview then
-                        local preview = button:CreateTexture(nil, "ARTWORK")
-                        preview:SetPoint("RIGHT", button, "RIGHT", -5, 0)
-                        preview:SetSize(80, 12)
-                        button._lsmwPreview = preview
-                    end
-                    button._lsmwPreview:SetTexture(texturePath)
-                    button._lsmwPreview:SetVertexColor(0.4, 0.6, 0.9, 1)
-                end)
-            end
         end
     end)
 end
 
 function LibLSMSettingsWidgets_TexturePickerMixin:UpdatePreview()
+    if not self.setting then return end
+
     local currentName = self.setting:GetValue()
-    local texturePath = LSM:Fetch("statusbar", currentName)
+    local texturePath = LSM and LSM.Fetch and LSM:Fetch("statusbar", currentName)
+
+    if self.DropDown and self.DropDown.OverrideText then
+        self.DropDown:OverrideText(currentName or "")
+    end
+
     if texturePath and self.Preview then
         self.Preview:SetTexture(texturePath)
     end

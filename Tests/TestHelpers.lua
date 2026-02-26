@@ -163,6 +163,22 @@ function TestHelpers.setupSettingsStubs()
         RegisterAddOnCategory = function() end,
         OpenToCategory = function() end,
 
+        RegisterInitializer = function(category, initializer)
+            if category and category.GetLayout then
+                local layout = category:GetLayout()
+                if layout and layout.AddInitializer then
+                    layout:AddInitializer(initializer)
+                end
+            end
+        end,
+
+        CreateElementInitializer = function(frameTemplate, data)
+            local init = _G.CreateFromMixins(_G.SettingsListElementInitializer)
+            init:Init(frameTemplate)
+            init.data = data or {}
+            return init
+        end,
+
         RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
             return makeSetting(getter, setter, default)
         end,
@@ -268,6 +284,10 @@ function TestHelpers.setupSettingsStubs()
         SetExtent = function(self, extent) self._extent = extent end,
         GetExtent = function(self) return self._extent end,
         GetData = function(self) return self.data end,
+        SetSetting = function(self, setting)
+            self.data = self.data or {}
+            self.data.setting = setting
+        end,
         SetParentInitializer = function(self, parent, predicate)
             self._parentInit = parent
             self._parentPredicate = predicate

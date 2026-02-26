@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local GeneralOptions = {}
 
@@ -28,7 +29,7 @@ function GeneralOptions.RegisterSettings(SB)
 
     SB.PathControl({
         type = "custom",
-        template = ECM.SharedMediaOptions.TEXTURE_PICKER_TEMPLATE,
+        template = LSMW.TEXTURE_PICKER_TEMPLATE,
         path = "global.texture",
         name = "Bar Texture",
         tooltip = "Select the texture used for bars.",
@@ -36,7 +37,7 @@ function GeneralOptions.RegisterSettings(SB)
 
     SB.PathControl({
         type = "custom",
-        template = ECM.SharedMediaOptions.FONT_PICKER_TEMPLATE,
+        template = LSMW.FONT_PICKER_TEMPLATE,
         path = "global.font",
         name = "Font",
         tooltip = "Select the font used for bar text.",

@@ -97,6 +97,12 @@ describe("Options sections and root assembly", function()
         )
         optionUtilChunk(nil, ns)
 
+        local sbChunk = TestHelpers.loadChunk(
+            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            "Unable to load SettingsBuilder.lua"
+        )
+        sbChunk(nil, ns)
+
         -- Register mock sections
         for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "About" }) do
             ns.OptionsSections[key] = {
@@ -190,6 +196,9 @@ describe("Options sections and root assembly", function()
         -- Load OptionUtil and SettingsBuilder
         local optUtil = TestHelpers.loadChunk({ "Options/OptionUtil.lua" }, "OptionUtil")
         optUtil(nil, ns)
+
+        local sbChunk = TestHelpers.loadChunk({ "Options/SettingsBuilder.lua" }, "SettingsBuilder")
+        sbChunk(nil, ns)
 
         -- Set up root category so subcategories can be created
         ECM.SettingsBuilder.CreateRootCategory("Test")

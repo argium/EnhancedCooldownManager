@@ -153,6 +153,12 @@ describe("SettingsBuilder", function()
         )
         optionUtilChunk(nil, addonNS)
 
+        local sbChunk = TestHelpers.loadChunk(
+            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            "Unable to load SettingsBuilder.lua"
+        )
+        sbChunk(nil, addonNS)
+
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")
         SB.CreateSubcategory("TestSection")
