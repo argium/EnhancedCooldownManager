@@ -26,25 +26,19 @@ end
 
 local function SetModuleEnabled(moduleName, enabled)
     local module = mod[moduleName] or ECM[moduleName]
-    if not module then
-        return
-    end
+    if not module then return end
 
-    if enabled then
-        if not module:IsEnabled() then
-            if module.Enable then
-                module:Enable()
-            else
-                mod:EnableModule(moduleName)
-            end
+    if enabled and not module:IsEnabled() then
+        if module.Enable then
+            module:Enable()
+        else
+            mod:EnableModule(moduleName)
         end
-    else
-        if module:IsEnabled() then
-            if module.Disable then
-                module:Disable()
-            elseif mod.DisableModule then
-                mod:DisableModule(moduleName)
-            end
+    elseif not enabled and module:IsEnabled() then
+        if module.Disable then
+            module:Disable()
+        elseif mod.DisableModule then
+            mod:DisableModule(moduleName)
         end
     end
 end
@@ -53,11 +47,7 @@ end
 ---@param key string The path key to normalize
 ---@return number|string The normalized key
 local function NormalizePathKey(key)
-    local numberKey = tonumber(key)
-    if numberKey then
-        return numberKey
-    end
-    return key
+    return tonumber(key) or key
 end
 
 --- Gets the nested value from table using dot-separated path
@@ -66,22 +56,11 @@ end
 ---@return any The value at the specified path, or nil if any part of the path is invalid
 local function GetNestedValue(tbl, path)
     local current = tbl
-    for resource in path:gmatch("[^.]+") do
+    for segment in path:gmatch("[^.]+") do
         if type(current) ~= "table" then return nil end
-        current = current[NormalizePathKey(resource)]
+        current = current[NormalizePathKey(segment)]
     end
     return current
-end
-
---- Splits a dot-separated path into its individual components.
----@param path string The dot-separated path to split
----@return table An array of path components
-local function SplitPath(path)
-    local resources = {}
-    for resource in path:gmatch("[^.]+") do
-        table.insert(resources, resource)
-    end
-    return resources
 end
 
 --- Sets a nested value in a table using a dot-separated path, creating intermediate tables as needed.
@@ -89,16 +68,19 @@ end
 ---@param path string The dot-separated path to the value
 ---@param value any The value to set at the specified path
 local function SetNestedValue(tbl, path, value)
-    local resources = SplitPath(path)
+    local segments = {}
+    for segment in path:gmatch("[^.]+") do
+        segments[#segments + 1] = segment
+    end
     local current = tbl
-    for i = 1, #resources - 1 do
-        local key = NormalizePathKey(resources[i])
+    for i = 1, #segments - 1 do
+        local key = NormalizePathKey(segments[i])
         if current[key] == nil then
             current[key] = {}
         end
         current = current[key]
     end
-    current[NormalizePathKey(resources[#resources])] = value
+    current[NormalizePathKey(segments[#segments])] = value
 end
 
 --- Gets the current player's class and specialization information.

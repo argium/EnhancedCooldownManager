@@ -2,9 +2,19 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local _, _ = ...
+local _ = ...
 local C = ECM.Constants
 local BASE_DESC_TEXT = "Tick marks allow you to place markers at specific values on the power bar. These settings are saved per class and specialization"
+
+StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = {
+    text = "Are you sure you want to remove all tick marks for this spec?",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
 
 local function GetStore()
     return ECM.PowerBarTickMarksStore
@@ -113,18 +123,11 @@ local function CreateTickMarksCanvas()
     clearBtn:SetPoint("LEFT", addBtn, "RIGHT", 10, 0)
     clearBtn:SetText("Clear All Ticks")
     clearBtn:SetScript("OnClick", function()
-        StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = {
-            text = "Are you sure you want to remove all tick marks for this spec?",
-            button1 = YES,
-            button2 = NO,
-            OnAccept = function()
-                GetStore().SetCurrentTicks({})
-                frame:RefreshTicks()
-            end,
-            timeout = 0,
-            whileDead = true,
-            hideOnEscape = true,
-        }
+        local dialog = StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"]
+        dialog.OnAccept = function()
+            GetStore().SetCurrentTicks({})
+            frame:RefreshTicks()
+        end
         StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS")
     end)
 

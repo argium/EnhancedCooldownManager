@@ -563,9 +563,28 @@ function lib:New(config)
         return subcategory
     end
 
+    --- Configures the root category to auto-redirect to a named subcategory.
+    --- When the user selects the root addon entry, the settings panel will
+    --- immediately navigate to the specified subcategory instead.
+    function SB.SetRootRedirect(subcategoryName)
+        SB._rootRedirect = subcategoryName
+    end
+
     function SB.RegisterCategories()
         if SB._rootCategory then
             Settings.RegisterAddOnCategory(SB._rootCategory)
+        end
+
+        if SB._rootRedirect and SB._rootCategory then
+            local target = SB._subcategories[SB._rootRedirect]
+            if target and SettingsPanel and SettingsPanel.CategoryList then
+                local categoryID = SB._rootCategory:GetID()
+                hooksecurefunc(SettingsPanel.CategoryList, "SetCurrentCategory", function(_, category)
+                    if category and category:GetID() == categoryID then
+                        Settings.OpenToCategory(target:GetID())
+                    end
+                end)
+            end
         end
     end
 

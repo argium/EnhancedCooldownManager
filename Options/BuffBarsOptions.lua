@@ -276,40 +276,9 @@ function BuffBarsOptions.RegisterSettings(SB)
                 end,
             },
 
-            -- Display
-            displayHeader     = { type = "header", name = "Display", disabled = isDisabled, order = 10 },
-            showIcon          = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 11 },
-            showSpellName     = { type = "toggle", path = "showSpellName", name = "Show spell name", disabled = isDisabled, order = 12 },
-            showDuration      = { type = "toggle", path = "showDuration", name = "Show remaining duration", disabled = isDisabled, order = 13 },
-            height            = {
-                type = "range",
-                path = "height",
-                name = "Height Override",
-                desc = "Override the default bar height. Set to 0 to use the global default.",
-                min = 0, max = 40, step = 1,
-                disabled = isDisabled,
-                getTransform = function(value) return value or 0 end,
-                setTransform = function(value) return value > 0 and value or nil end,
-                order = 14,
-            },
-            verticalSpacing   = {
-                type = "range",
-                path = "verticalSpacing",
-                name = "Vertical Spacing",
-                desc = "Vertical gap between aura bars. Set to 0 for no spacing.",
-                min = 0, max = 20, step = 1,
-                disabled = isDisabled,
-                getTransform = function(value) return value or 0 end,
-                order = 15,
-            },
-
-            -- Font
-            fontHeader        = { type = "header", name = "Font", disabled = isDisabled, order = 20 },
-            fontOverride      = { type = "fontOverride", disabled = isDisabled, order = 21 },
-
-            -- Positioning
-            posHeader         = { type = "header", name = "Positioning", disabled = isDisabled, order = 30 },
-            positioning       = { type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 31 },
+            -- Layout
+            layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
+            positioning       = { type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 11 },
             freeGrowDirection = {
                 type = "select",
                 path = "freeGrowDirection",
@@ -326,8 +295,36 @@ function BuffBarsOptions.RegisterSettings(SB)
                     return ECM.OptionUtil.IsAnchorModeFree(
                         ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars"))
                 end,
-                order = 32,
+                order = 12,
             },
+
+            -- Appearance
+            appearanceHeader  = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },
+            showIcon          = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 21 },
+            showSpellName     = { type = "toggle", path = "showSpellName", name = "Show spell name", disabled = isDisabled, order = 22 },
+            showDuration      = { type = "toggle", path = "showDuration", name = "Show remaining duration", disabled = isDisabled, order = 23 },
+            height            = {
+                type = "range",
+                path = "height",
+                name = "Height Override",
+                desc = "Override the default bar height. Set to 0 to use the global default.",
+                min = 0, max = 40, step = 1,
+                disabled = isDisabled,
+                getTransform = function(value) return value or 0 end,
+                setTransform = function(value) return value > 0 and value or nil end,
+                order = 24,
+            },
+            verticalSpacing   = {
+                type = "range",
+                path = "verticalSpacing",
+                name = "Vertical Spacing",
+                desc = "Vertical gap between aura bars. Set to 0 for no spacing.",
+                min = 0, max = 20, step = 1,
+                disabled = isDisabled,
+                getTransform = function(value) return value or 0 end,
+                order = 25,
+            },
+            fontOverride      = { type = "fontOverride", disabled = isDisabled, order = 26 },
         },
     })
 

@@ -70,7 +70,8 @@ function ProfileOptions.RegisterSettings(SB)
         function(value) selectedCopyProfile = value end
     )
 
-    Settings.CreateDropdown(cat, copySetting, function()
+    --- Generates dropdown data listing all profiles except the active one.
+    local function otherProfilesGenerator()
         local container = Settings.CreateControlTextContainer()
         local current = mod.db:GetCurrentProfile()
         for _, name in ipairs(mod.db:GetProfiles()) do
@@ -79,7 +80,10 @@ function ProfileOptions.RegisterSettings(SB)
             end
         end
         return container:GetData()
-    end, "Select a profile to copy settings from.")
+    end
+
+    Settings.CreateDropdown(cat, copySetting, otherProfilesGenerator,
+        "Select a profile to copy settings from.")
 
     SB.Button({
         name = "Apply copy from selected profile",
@@ -101,16 +105,8 @@ function ProfileOptions.RegisterSettings(SB)
         function(value) selectedDeleteProfile = value end
     )
 
-    Settings.CreateDropdown(cat, deleteSetting, function()
-        local container = Settings.CreateControlTextContainer()
-        local current = mod.db:GetCurrentProfile()
-        for _, name in ipairs(mod.db:GetProfiles()) do
-            if name ~= current then
-                container:Add(name, name)
-            end
-        end
-        return container:GetData()
-    end, "Select a profile to delete.")
+    Settings.CreateDropdown(cat, deleteSetting, otherProfilesGenerator,
+        "Select a profile to delete.")
 
     SB.Button({
         name = "Delete the selected profile",

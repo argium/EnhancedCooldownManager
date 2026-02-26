@@ -13,9 +13,8 @@ function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
     SB.CreateRootCategory(C.ADDON_NAME)
 
-    -- Register sections in display order (About is on the root page)
+    -- Register sections in display order
     local sectionOrder = {
-        "About",
         "General",
         "PowerBar",
         "ResourceBar",
@@ -23,6 +22,7 @@ function Options:OnInitialize()
         "BuffBars",
         "ItemIcons",
         "Profile",
+        "About",
     }
 
     for _, key in ipairs(sectionOrder) do
@@ -32,6 +32,7 @@ function Options:OnInitialize()
         end
     end
 
+    SB.SetRootRedirect("General")
     SB.RegisterCategories()
 
     local db = mod.db

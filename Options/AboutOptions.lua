@@ -10,7 +10,6 @@ local AboutOptions = {}
 function AboutOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = "About",
-        rootCategory = true,
         path = "global",
         args = {
             troubleshootHeader = { type = "header", name = "Troubleshooting", order = 10 },

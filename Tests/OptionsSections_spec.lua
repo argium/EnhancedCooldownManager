@@ -124,7 +124,6 @@ describe("Options sections and root assembly", function()
 
         -- All 8 sections should have been called, in order
         assert.are.same({
-            "About",
             "General",
             "PowerBar",
             "ResourceBar",
@@ -132,6 +131,7 @@ describe("Options sections and root assembly", function()
             "BuffBars",
             "ItemIcons",
             "Profile",
+            "About",
         }, registerSettingsCalls)
 
         -- DB callbacks registered

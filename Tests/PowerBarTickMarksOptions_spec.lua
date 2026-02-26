@@ -15,7 +15,7 @@ describe("PowerBarTickMarksOptions", function()
     local originalGlobals
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({ "ECM" })
+        originalGlobals = TestHelpers.captureGlobals({ "ECM", "StaticPopupDialogs", "YES", "NO" })
     end)
 
     teardown(function()
@@ -23,6 +23,9 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     it("module loads and exposes RegisterSettings", function()
+        _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
+        _G.YES = "Yes"
+        _G.NO = "No"
         _G.ECM = {
             Constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
