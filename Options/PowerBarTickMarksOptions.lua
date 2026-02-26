@@ -38,6 +38,7 @@ end
 local function CreateTickMarksCanvas()
     local frame = CreateFrame("Frame", "ECM_TickMarksCanvas", UIParent)
     frame:SetSize(600, 400)
+    frame:Hide()
 
     local desc = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     desc:SetPoint("TOPLEFT", 10, -10)

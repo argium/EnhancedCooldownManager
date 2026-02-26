@@ -67,6 +67,7 @@ end
 local function CreateSpellColorCanvas()
     local frame = CreateFrame("Frame", "ECM_BuffBarsColorsCanvas", UIParent)
     frame:SetSize(600, 400)
+    frame:Hide()
 
     -- Warning labels
     local combatWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontRed")
