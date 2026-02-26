@@ -1100,105 +1100,103 @@ function lib:New(config)
             local entryType = TYPE_ALIASES[entry.type] or entry.type
 
             -- Skip entry if condition function returns false
+            local shouldProcess = true
             if entry.condition ~= nil then
-                local shouldInclude
                 if type(entry.condition) == "function" then
-                    shouldInclude = entry.condition()
+                    shouldProcess = entry.condition()
                 else
-                    shouldInclude = entry.condition
-                end
-                if not shouldInclude then
-                    goto continue
+                    shouldProcess = entry.condition
                 end
             end
 
-            -- Build spec with inherited properties
-            local spec = {}
-            for k, v in pairs(entry) do
-                if k ~= "type" and k ~= "order" and k ~= "_key" and k ~= "defs" and k ~= "label" and k ~= "condition" then
-                    spec[k] = v
-                end
-            end
-
-            -- Alias desc → tooltip
-            if spec.desc and not spec.tooltip then
-                spec.tooltip = spec.desc
-                spec.desc = nil
-            end
-
-            -- Inherit disabled/hidden from group
-            if tbl.disabled and spec.disabled == nil then spec.disabled = tbl.disabled end
-            if tbl.hidden and spec.hidden == nil then spec.hidden = tbl.hidden end
-
-            -- Resolve parent string references
-            if type(spec.parent) == "string" then
-                local ref = created[spec.parent]
-                if ref then
-                    spec.parent = ref.initializer
-
-                    -- Shortcut parentCheck values
-                    if spec.parentCheck == "checked" then
-                        local refSetting = ref.setting
-                        spec.parentCheck = function() return refSetting:GetValue() end
-                    elseif spec.parentCheck == "notChecked" then
-                        local refSetting = ref.setting
-                        spec.parentCheck = function() return not refSetting:GetValue() end
+            if shouldProcess then
+                -- Build spec with inherited properties
+                local spec = {}
+                for k, v in pairs(entry) do
+                    if k ~= "type" and k ~= "order" and k ~= "_key" and k ~= "defs" and k ~= "label" and k ~= "condition" then
+                        spec[k] = v
                     end
                 end
-            end
 
-            local init, setting
-
-            if entryType == "header" then
-                init = SB.Header(spec.name)
-
-            elseif entryType == "label" then
-                init = SB.Label(spec)
-
-            elseif entryType == "button" then
-                init = SB.Button(spec)
-
-            elseif entryType == "positioning" then
-                local result = SB.PositioningGroup(resolvePath(entry.path), spec)
-                init = result.modeInit
-                setting = result.modeSetting
-
-            elseif entryType == "border" then
-                local result = SB.BorderGroup(resolvePath(entry.path), spec)
-                init = result.enabledInit
-                setting = result.enabledSetting
-
-            elseif entryType == "fontOverride" then
-                local result = SB.FontOverrideGroup(resolvePath(entry.path), spec)
-                init = result.enabledInit
-                setting = result.enabledSetting
-
-            elseif entryType == "heightOverride" then
-                init, setting = SB.HeightOverrideSlider(resolvePath(entry.path), spec)
-
-            elseif entryType == "colorList" then
-                local defs = entry.defs or {}
-                if entry.label then
-                    local labelInit = SB.Label({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
-                    spec.parent = spec.parent or labelInit
-                end
-                local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
-                if results[1] then
-                    init = results[1].initializer
-                    setting = results[1].setting
+                -- Alias desc → tooltip
+                if spec.desc and not spec.tooltip then
+                    spec.tooltip = spec.desc
+                    spec.desc = nil
                 end
 
-            elseif entryType == "checkbox" or entryType == "slider"
-                or entryType == "dropdown" or entryType == "color"
-                or entryType == "custom" then
-                spec.path = resolvePath(entry.path or spec.path)
-                spec.type = entryType
-                init, setting = SB.PathControl(spec)
+                -- Inherit disabled/hidden from group
+                if tbl.disabled and spec.disabled == nil then spec.disabled = tbl.disabled end
+                if tbl.hidden and spec.hidden == nil then spec.hidden = tbl.hidden end
 
+                -- Resolve parent string references
+                if type(spec.parent) == "string" then
+                    local ref = created[spec.parent]
+                    if ref then
+                        spec.parent = ref.initializer
+
+                        -- Shortcut parentCheck values
+                        if spec.parentCheck == "checked" then
+                            local refSetting = ref.setting
+                            spec.parentCheck = function() return refSetting:GetValue() end
+                        elseif spec.parentCheck == "notChecked" then
+                            local refSetting = ref.setting
+                            spec.parentCheck = function() return not refSetting:GetValue() end
+                        end
+                    end
+                end
+
+                local init, setting
+
+                if entryType == "header" then
+                    init = SB.Header(spec.name)
+
+                elseif entryType == "label" then
+                    init = SB.Label(spec)
+
+                elseif entryType == "button" then
+                    init = SB.Button(spec)
+
+                elseif entryType == "positioning" then
+                    local result = SB.PositioningGroup(resolvePath(entry.path), spec)
+                    init = result.modeInit
+                    setting = result.modeSetting
+
+                elseif entryType == "border" then
+                    local result = SB.BorderGroup(resolvePath(entry.path), spec)
+                    init = result.enabledInit
+                    setting = result.enabledSetting
+
+                elseif entryType == "fontOverride" then
+                    local result = SB.FontOverrideGroup(resolvePath(entry.path), spec)
+                    init = result.enabledInit
+                    setting = result.enabledSetting
+
+                elseif entryType == "heightOverride" then
+                    init, setting = SB.HeightOverrideSlider(resolvePath(entry.path), spec)
+
+                elseif entryType == "colorList" then
+                    local defs = entry.defs or {}
+                    if entry.label then
+                        local labelInit = SB.Label({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
+                        spec.parent = spec.parent or labelInit
+                    end
+                    local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
+                    if results[1] then
+                        init = results[1].initializer
+                        setting = results[1].setting
+                    end
+
+                elseif entryType == "checkbox" or entryType == "slider"
+                    or entryType == "dropdown" or entryType == "color"
+                    or entryType == "custom" then
+                    spec.path = resolvePath(entry.path or spec.path)
+                    spec.type = entryType
+                    init, setting = SB.PathControl(spec)
+
+                end
+
+                created[entry._key] = { initializer = init, setting = setting }
             end
-
-            created[entry._key] = { initializer = init, setting = setting }
-            ::continue::
         end
     end
 
