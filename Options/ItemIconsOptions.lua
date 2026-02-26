@@ -3,69 +3,60 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
-local C = ECM.Constants
 
 local ItemIconsOptions = {}
 
 function ItemIconsOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("Item Icons")
-
-    local _, enabledSetting = SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.enabled",
-        name = "Enable item icons",
-        tooltip = "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns.",
-        onSet = function(value)
-            if value then
-                if not mod.ItemIcons:IsEnabled() then
-                    mod:EnableModule(C.ITEMICONS)
-                end
-            else
-                if mod.ItemIcons:IsEnabled() then
-                    mod:DisableModule(C.ITEMICONS)
-                end
-            end
-        end,
-    })
-
-    SB.SetPageEnabledSetting(enabledSetting)
-
-    -- Equipment
-    SB.Header("Equipment")
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.showTrinket1",
-        name = "Show first trinket",
-        tooltip = "Display icons for usable equipment. Trinkets without an on-use effect are never shown.",
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.showTrinket2",
-        name = "Show second trinket",
-    })
-
-    -- Consumables
-    SB.Header("Consumables")
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.showHealthPotion",
-        name = "Show health potions",
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.showCombatPotion",
-        name = "Show combat potions",
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "itemIcons.showHealthstone",
-        name = "Show healthstone",
+    SB.RegisterFromTable({
+        name = "Item Icons",
+        path = "itemIcons",
+        moduleEnabled = {
+            name = "Enable item icons",
+            desc = "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns.",
+        },
+        args = {
+            equipmentHeader = {
+                type = "header",
+                name = "Equipment",
+                order = 10,
+            },
+            showTrinket1 = {
+                type = "toggle",
+                path = "showTrinket1",
+                name = "Show first trinket",
+                desc = "Display icons for usable equipment. Trinkets without an on-use effect are never shown.",
+                order = 11,
+            },
+            showTrinket2 = {
+                type = "toggle",
+                path = "showTrinket2",
+                name = "Show second trinket",
+                order = 12,
+            },
+            consumablesHeader = {
+                type = "header",
+                name = "Consumables",
+                order = 20,
+            },
+            showHealthPotion = {
+                type = "toggle",
+                path = "showHealthPotion",
+                name = "Show health potions",
+                order = 21,
+            },
+            showCombatPotion = {
+                type = "toggle",
+                path = "showCombatPotion",
+                name = "Show combat potions",
+                order = 22,
+            },
+            showHealthstone = {
+                type = "toggle",
+                path = "showHealthstone",
+                name = "Show healthstone",
+                order = 23,
+            },
+        },
     })
 end
 

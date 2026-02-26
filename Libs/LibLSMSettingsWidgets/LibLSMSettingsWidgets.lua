@@ -110,6 +110,8 @@ function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
     if not setting then return end
 
     self.DropDown:SetupMenu(function(dropdown, rootDescription)
+        rootDescription:SetScrollMode(200)
+
         local values = lib.GetFontValues()
         local sorted = {}
         for name in pairs(values) do
@@ -200,6 +202,8 @@ function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
     if not setting then return end
 
     self.DropDown:SetupMenu(function(dropdown, rootDescription)
+        rootDescription:SetScrollMode(200)
+
         local values = lib.GetStatusbarValues()
         local sorted = {}
         for name in pairs(values) do

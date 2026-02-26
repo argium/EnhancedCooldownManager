@@ -19,35 +19,22 @@ local POWER_COLOR_DEFS = {
 local PowerBarOptions = {}
 
 function PowerBarOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("Power Bar")
-
-    SB.ModuleEnabledCheckbox("PowerBar", {
-        path = "powerBar.enabled",
-        name = "Enable power bar",
+    SB.RegisterFromTable({
+        name = "Power Bar",
+        path = "powerBar",
+        moduleEnabled = { name = "Enable power bar" },
+        args = {
+            layoutHeader     = { type = "header", name = "Layout", order = 10 },
+            positioning      = { type = "positioning", order = 11 },
+            appearanceHeader = { type = "header", name = "Appearance", order = 20 },
+            showText         = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", order = 21 },
+            showManaAsPercent = { type = "toggle", path = "showManaAsPercent", name = "Show mana as percent", desc = "Display mana as percentage instead of raw value.", order = 22 },
+            height           = { type = "heightOverride", order = 23 },
+            border           = { type = "border", path = "border", order = 24 },
+            font             = { type = "fontOverride", order = 25 },
+            colors           = { type = "colorList", path = "colors", label = "Colors", defs = POWER_COLOR_DEFS, order = 30 },
+        },
     })
-
-    SB.Header("Layout")
-    SB.PositioningGroup("powerBar")
-
-    SB.Header("Appearance")
-    SB.PathControl({
-        type = "checkbox",
-        path = "powerBar.showText",
-        name = "Show text",
-        tooltip = "Display the current value on the bar.",
-    })
-    SB.PathControl({
-        type = "checkbox",
-        path = "powerBar.showManaAsPercent",
-        name = "Show mana as percent",
-        tooltip = "Display mana as percentage instead of raw value.",
-    })
-    SB.HeightOverrideSlider("powerBar")
-    SB.BorderGroup("powerBar.border")
-    SB.FontOverrideGroup("powerBar")
-
-    local colorLabel = SB.Label({ name = "Colors" })
-    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS, { parent = colorLabel })
 
     -- Tick Marks (canvas subcategory)
     ECM.PowerBarTickMarksOptions.RegisterSettings(SB)

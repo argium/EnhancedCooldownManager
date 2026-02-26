@@ -27,31 +27,22 @@ local function isDeathKnight()
 end
 
 function ResourceBarOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("Resource Bar")
-
-    SB.ModuleEnabledCheckbox("ResourceBar", {
-        path = "resourceBar.enabled",
-        name = "Enable resource bar",
+    SB.RegisterFromTable({
+        name = "Resource Bar",
+        path = "resourceBar",
         disabled = isDeathKnight,
+        moduleEnabled = { name = "Enable resource bar" },
+        args = {
+            layoutHeader    = { type = "header", name = "Layout", order = 1 },
+            positioning     = { type = "positioning", order = 2 },
+            appearHeader    = { type = "header", name = "Appearance", order = 3 },
+            showText        = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", order = 4 },
+            heightOverride  = { type = "heightOverride", order = 5 },
+            border          = { type = "border", path = "border", order = 6 },
+            fontOverride    = { type = "fontOverride", order = 7 },
+            colors          = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", order = 8 },
+        },
     })
-
-    SB.Header("Layout")
-    SB.PositioningGroup("resourceBar", { disabled = isDeathKnight })
-
-    SB.Header("Appearance")
-    SB.PathControl({
-        type = "checkbox",
-        path = "resourceBar.showText",
-        name = "Show text",
-        tooltip = "Display the current value on the bar.",
-        disabled = isDeathKnight,
-    })
-    SB.HeightOverrideSlider("resourceBar", { disabled = isDeathKnight })
-    SB.BorderGroup("resourceBar.border", { disabled = isDeathKnight })
-    SB.FontOverrideGroup("resourceBar", { disabled = isDeathKnight })
-
-    local colorLabel = SB.Label({ name = "Colors", disabled = isDeathKnight })
-    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { disabled = isDeathKnight, parent = colorLabel })
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)

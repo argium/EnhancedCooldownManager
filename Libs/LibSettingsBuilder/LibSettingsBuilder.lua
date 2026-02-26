@@ -1099,10 +1099,23 @@ function lib:New(config)
         for _, entry in ipairs(sorted) do
             local entryType = TYPE_ALIASES[entry.type] or entry.type
 
+            -- Skip entry if condition function returns false
+            if entry.condition ~= nil then
+                local shouldInclude
+                if type(entry.condition) == "function" then
+                    shouldInclude = entry.condition()
+                else
+                    shouldInclude = entry.condition
+                end
+                if not shouldInclude then
+                    goto continue
+                end
+            end
+
             -- Build spec with inherited properties
             local spec = {}
             for k, v in pairs(entry) do
-                if k ~= "type" and k ~= "order" and k ~= "_key" and k ~= "defs" and k ~= "label" then
+                if k ~= "type" and k ~= "order" and k ~= "_key" and k ~= "defs" and k ~= "label" and k ~= "condition" then
                     spec[k] = v
                 end
             end
@@ -1185,6 +1198,7 @@ function lib:New(config)
             end
 
             created[entry._key] = { initializer = init, setting = setting }
+            ::continue::
         end
     end
 

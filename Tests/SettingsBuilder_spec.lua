@@ -1165,4 +1165,64 @@ describe("SettingsBuilder", function()
         assert.is_true(addonNS.Addon.db.profile.powerBar.enabled)
     end)
 
+    -- RegisterFromTable condition support
+    it("RegisterFromTable condition=false skips entry", function()
+        local headerCreated = false
+        local origHeader = CreateSettingsListSectionHeaderInitializer
+        _G.CreateSettingsListSectionHeaderInitializer = function(text)
+            if text == "Should Not Appear" then headerCreated = true end
+            return origHeader(text)
+        end
+
+        local LSB2 = LibStub("LibSettingsBuilder-1.0")
+        local SB2 = LSB2:New({
+            getProfile = function() return addonNS.Addon.db.profile end,
+            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            varPrefix = "COND1",
+            onChanged = function() end,
+        })
+        SB2.CreateRootCategory("CondTest")
+
+        SB2.RegisterFromTable({
+            name = "Cond Section",
+            path = "global",
+            args = {
+                skipped = { type = "header", name = "Should Not Appear", condition = function() return false end, order = 1 },
+                shown = { type = "header", name = "Should Appear", order = 2 },
+            },
+        })
+
+        _G.CreateSettingsListSectionHeaderInitializer = origHeader
+        assert.is_false(headerCreated)
+    end)
+
+    it("RegisterFromTable condition=true includes entry", function()
+        local headerCreated = false
+        local origHeader = CreateSettingsListSectionHeaderInitializer
+        _G.CreateSettingsListSectionHeaderInitializer = function(text)
+            if text == "Conditional Header" then headerCreated = true end
+            return origHeader(text)
+        end
+
+        local LSB2 = LibStub("LibSettingsBuilder-1.0")
+        local SB2 = LSB2:New({
+            getProfile = function() return addonNS.Addon.db.profile end,
+            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            varPrefix = "COND2",
+            onChanged = function() end,
+        })
+        SB2.CreateRootCategory("CondTest2")
+
+        SB2.RegisterFromTable({
+            name = "Cond Section 2",
+            path = "global",
+            args = {
+                shown = { type = "header", name = "Conditional Header", condition = function() return true end, order = 1 },
+            },
+        })
+
+        _G.CreateSettingsListSectionHeaderInitializer = origHeader
+        assert.is_true(headerCreated)
+    end)
+
 end)
