@@ -39,7 +39,7 @@ describe("SettingsBuilder", function()
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM", "ECM_CloneValue", "ECM_DeepEquals",
-            "Settings", "CreateSettingsListSectionHeaderInitializer",
+            "Settings", "SettingsPanel", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
             "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
@@ -507,121 +507,131 @@ describe("SettingsBuilder", function()
         assert.is_false(customEnabled)
     end)
 
-    -- ModuleEnabledCheckbox
-    it("ModuleEnabledCheckbox calls SetModuleEnabled", function()
-        local enabledModule, enabledValue
-
-        local _, setting = SB.ModuleEnabledCheckbox("PowerBar", {
-            path = "powerBar.enabled",
-            name = "Enable",
-            setModuleEnabled = function(name, val)
-                enabledModule = name
-                enabledValue = val
-            end,
-        })
-
-        setting:SetValue(false)
-        assert.are.equal("PowerBar", enabledModule)
-        assert.are.equal(false, enabledValue)
-    end)
-
-    it("ModuleEnabledCheckbox disables embedded canvas controls when unchecked", function()
-        local _, moduleSetting = SB.ModuleEnabledCheckbox("PowerBar", {
-            path = "powerBar.enabled",
-            name = "Enable",
-            setModuleEnabled = function() end,
-        })
-
-        local childEnabled, childMouseEnabled
-        local child = {
-            SetEnabled = function(_, enabled)
-                childEnabled = enabled
-            end,
-            EnableMouse = function(_, enabled)
-                childMouseEnabled = enabled
-            end,
-            GetChildren = function()
-                return nil
+    -- Reactive disabled predicate
+    it("disabled predicate re-evaluates when another setting changes", function()
+        -- Set up a SettingsPanel mock that tracks frames for EvaluateState
+        local frames = {}
+        _G.SettingsPanel = {
+            IsShown = function() return true end,
+            GetSettingsList = function()
+                return {
+                    ScrollBox = {
+                        ForEachFrame = function(_, fn)
+                            for _, f in ipairs(frames) do fn(f) end
+                        end,
+                    },
+                }
             end,
         }
 
-        local canvasEnabled, canvasMouseEnabled, canvasAlpha
-        local canvas = {
-            SetEnabled = function(_, enabled)
-                canvasEnabled = enabled
-            end,
-            EnableMouse = function(_, enabled)
-                canvasMouseEnabled = enabled
-            end,
-            SetAlpha = function(_, alpha)
-                canvasAlpha = alpha
-            end,
-            GetChildren = function()
-                return child
-            end,
-            GetHeight = function()
-                return 100
-            end,
-        }
-
-        local initializer = SB.EmbedCanvas(canvas, 100)
-        assert.is_true(canvasEnabled)
-        assert.is_true(canvasMouseEnabled)
-        assert.is_true(childEnabled)
-        assert.is_true(childMouseEnabled)
-        assert.are.equal(1, canvasAlpha)
-
-        moduleSetting:SetValue(false)
-
-        local enabledPredicate = initializer._modifyPredicates[1]
-        assert.is_false(enabledPredicate())
-        assert.is_false(canvasEnabled)
-        assert.is_false(canvasMouseEnabled)
-        assert.is_false(childEnabled)
-        assert.is_false(childMouseEnabled)
-        assert.are.equal(0.5, canvasAlpha)
-
-        moduleSetting:SetValue(true)
-        enabledPredicate = initializer._modifyPredicates[1]
-        assert.is_true(enabledPredicate())
-        assert.is_true(canvasEnabled)
-        assert.is_true(canvasMouseEnabled)
-        assert.is_true(childEnabled)
-        assert.is_true(childMouseEnabled)
-        assert.are.equal(1, canvasAlpha)
-    end)
-
-    it("ModuleEnabledCheckbox disables PathColor controls when unchecked", function()
-        local _, moduleSetting = SB.ModuleEnabledCheckbox("PowerBar", {
+        local _, enabledSetting = SB.PathCheckbox({
             path = "powerBar.enabled",
             name = "Enable",
-            setModuleEnabled = function() end,
         })
 
-        local colorControlEnabled
-        local originalCreateColorSwatch = Settings.CreateColorSwatch
-        Settings.CreateColorSwatch = function(cat, setting, tooltip)
-            local init = originalCreateColorSwatch(cat, setting, tooltip)
-            init.SetEnabled = function(_, enabled)
-                colorControlEnabled = enabled
-            end
+        local childInit
+        local controlEnabled
+        local origCreateCheckbox = Settings.CreateCheckbox
+        Settings.CreateCheckbox = function(cat, setting, tooltip)
+            local init = origCreateCheckbox(cat, setting, tooltip)
+            childInit = init
             return init
         end
 
-        local initializer = SB.PathColor({
-            path = "powerBar.border.color",
-            name = "Border color",
+        SB.PathCheckbox({
+            path = "powerBar.showText",
+            name = "Show text",
+            disabled = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
         })
 
-        Settings.CreateColorSwatch = originalCreateColorSwatch
+        Settings.CreateCheckbox = origCreateCheckbox
 
-        assert.is_true(colorControlEnabled)
+        -- Simulate a rendered frame for the child control
+        frames[1] = {
+            GetElementData = function() return childInit end,
+            IsEnabled = function(self)
+                return self:GetElementData():EvaluateModifyPredicates()
+            end,
+            EvaluateState = function(self)
+                controlEnabled = self:IsEnabled()
+            end,
+            SetShown = function() end,
+        }
+        -- Verify initial state
+        frames[1]:EvaluateState()
+        assert.is_true(controlEnabled)
 
-        moduleSetting:SetValue(false)
+        enabledSetting:SetValue(false)
+        assert.is_false(controlEnabled)
 
-        local enabledPredicate = initializer._modifyPredicates[1]
-        assert.is_false(enabledPredicate())
-        assert.is_false(colorControlEnabled)
+        enabledSetting:SetValue(true)
+        assert.is_true(controlEnabled)
+
+        _G.SettingsPanel = nil
+    end)
+
+    -- Reactive hidden predicate
+    it("hidden predicate re-evaluates when another setting changes", function()
+        local frames = {}
+        _G.SettingsPanel = {
+            IsShown = function() return true end,
+            GetSettingsList = function()
+                return {
+                    ScrollBox = {
+                        ForEachFrame = function(_, fn)
+                            for _, f in ipairs(frames) do fn(f) end
+                        end,
+                    },
+                }
+            end,
+        }
+
+        local _, toggleSetting = SB.PathCheckbox({
+            path = "powerBar.enabled",
+            name = "Enable",
+        })
+
+        local childInit
+        local origCreateCheckbox = Settings.CreateCheckbox
+        Settings.CreateCheckbox = function(cat, setting, tooltip)
+            local init = origCreateCheckbox(cat, setting, tooltip)
+            childInit = init
+            return init
+        end
+
+        SB.PathCheckbox({
+            path = "powerBar.showText",
+            name = "Show text",
+            hidden = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
+        })
+
+        Settings.CreateCheckbox = origCreateCheckbox
+
+        -- Initial state: enabled=true, so hidden()=false → shown
+        local shownPredicate = childInit._shownPredicates[1]
+        assert.is_true(shownPredicate())
+
+        -- Simulate a rendered frame that checks ShouldShow
+        local frameShown = true
+        childInit.ShouldShow = function()
+            return not childInit._shownPredicates[1] or childInit._shownPredicates[1]()
+        end
+        frames[1] = {
+            GetElementData = function() return childInit end,
+            EvaluateState = function(self)
+                frameShown = self:GetElementData():ShouldShow()
+            end,
+        }
+        frames[1]:EvaluateState()
+        assert.is_true(frameShown)
+
+        toggleSetting:SetValue(false)
+        assert.is_false(frameShown)
+
+        toggleSetting:SetValue(true)
+        assert.is_true(frameShown)
+
+        _G.SettingsPanel = nil
     end)
 
     -- HeightOverrideSlider
@@ -767,82 +777,6 @@ describe("SettingsBuilder", function()
         local hex = setting:GetValue()
         assert.are.equal("string", type(hex))
         assert.are.equal(8, #hex)
-    end)
-
-    -- compositeDefaults
-    it("compositeDefaults merges defaults, spec overrides win", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local customSetModule = function() end
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TEST4",
-            onChanged = function() end,
-            compositeDefaults = {
-                ModuleEnabledCheckbox = {
-                    setModuleEnabled = customSetModule,
-                },
-            },
-        })
-        SB2.CreateRootCategory("Test4")
-        SB2.CreateSubcategory("Sub4")
-
-        -- Should not error — setModuleEnabled comes from compositeDefaults
-        assert.has_no.errors(function()
-            SB2.ModuleEnabledCheckbox("TestModule", {
-                path = "powerBar.enabled",
-                name = "Enable",
-            })
-        end)
-    end)
-
-    it("compositeDefaults spec overrides win over defaults", function()
-        local defaultCalled, overrideCalled = false, false
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TEST5",
-            onChanged = function() end,
-            compositeDefaults = {
-                ModuleEnabledCheckbox = {
-                    setModuleEnabled = function() defaultCalled = true end,
-                },
-            },
-        })
-        SB2.CreateRootCategory("Test5")
-        SB2.CreateSubcategory("Sub5")
-
-        local _, setting = SB2.ModuleEnabledCheckbox("TestModule", {
-            path = "powerBar.enabled",
-            name = "Enable",
-            setModuleEnabled = function() overrideCalled = true end,
-        })
-
-        setting:SetValue(false)
-        assert.is_false(defaultCalled)
-        assert.is_true(overrideCalled)
-    end)
-
-    it("compositeDefaults missing name is harmless", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TEST6",
-            onChanged = function() end,
-            compositeDefaults = {},
-        })
-        SB2.CreateRootCategory("Test6")
-        SB2.CreateSubcategory("Sub6")
-
-        -- ModuleEnabledCheckbox without defaults or spec.setModuleEnabled should error
-        assert.has_error(function()
-            SB2.ModuleEnabledCheckbox("TestModule", {
-                path = "powerBar.enabled",
-                name = "Enable",
-            })
-        end)
     end)
 
     -- Header "Display" no longer suppressed
@@ -1113,36 +1047,6 @@ describe("SettingsBuilder", function()
 
         Settings.CreateCheckbox = origCreateCheckbox
         assert.are.equal("Hide when on a mount.", capturedTooltip)
-    end)
-
-    it("RegisterFromTable supports moduleEnabled", function()
-        local enabledModule, enabledValue
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL6",
-            onChanged = function() end,
-            compositeDefaults = {
-                ModuleEnabledCheckbox = {
-                    setModuleEnabled = function(name, val)
-                        enabledModule = name
-                        enabledValue = val
-                    end,
-                },
-            },
-        })
-        SB2.CreateRootCategory("ModEnabledTest")
-
-        SB2.RegisterFromTable({
-            name = "Power Bar",
-            path = "powerBar",
-            moduleEnabled = { name = "Enable power bar" },
-            args = {},
-        })
-
-        -- Module name derived from subcategory name with spaces removed
-        assert.is_not_nil(SB2.GetSubcategoryID("Power Bar"))
     end)
 
     it("RegisterFromTable path prefixing works", function()

@@ -18,11 +18,6 @@ local SB = LSB:New({
         end
     end,
     compositeDefaults = {
-        ModuleEnabledCheckbox = {
-            setModuleEnabled = function(name, enabled)
-                return ECM.OptionUtil.SetModuleEnabled(name, enabled)
-            end,
-        },
         FontOverrideGroup = {
             fontValues = LSMW.GetFontValues,
             fontFallback = function()

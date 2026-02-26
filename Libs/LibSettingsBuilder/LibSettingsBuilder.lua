@@ -276,7 +276,7 @@ function lib:New(config)
     SB._subcategoryNames = {}
     SB._layouts = {}
     SB._firstHeaderAdded = {}
-    SB._pageEnabledSetting = nil
+    SB._reactiveControls = {}
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
     SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
@@ -317,11 +317,14 @@ function lib:New(config)
         return spec.category or SB._currentSubcategory or SB._rootCategory
     end
 
+    local reevaluateReactiveControls
+
     local function postSet(spec, value)
         if spec.onSet then
             spec.onSet(value)
         end
         config.onChanged(spec, value)
+        reevaluateReactiveControls()
     end
 
     --- Consolidates the getter/setter/default/transform/register boilerplate
@@ -379,7 +382,7 @@ function lib:New(config)
         path = true, name = true, tooltip = true, category = true,
         onSet = true, getTransform = true, setTransform = true,
         parent = true, parentCheck = true, disabled = true, hidden = true,
-        layout = true, _isModuleEnabled = true, type = true, desc = true,
+        layout = true, type = true, desc = true,
     }
 
     local EXTRA_FIELDS_BY_TYPE = {
@@ -433,10 +436,6 @@ function lib:New(config)
     end
 
     local function isControlEnabled(spec)
-        local pageEnabled = spec._pageEnabledSetting
-        if pageEnabled and not spec._isModuleEnabled then
-            if not pageEnabled:GetValue() then return false end
-        end
         if spec.disabled and spec.disabled() then return false end
         return isParentEnabled(spec)
     end
@@ -454,14 +453,36 @@ function lib:New(config)
         setCanvasInteractive(canvas, enabled)
     end
 
+    reevaluateReactiveControls = function()
+        -- Force the WoW settings panel to re-evaluate visible control states.
+        -- This triggers EvaluateState() on each rendered frame, which re-runs
+        -- AddModifyPredicate functions (disabled) and ShouldShow (hidden).
+        local panel = SettingsPanel
+        if panel and panel:IsShown() then
+            local settingsList = panel:GetSettingsList()
+            if settingsList and settingsList.ScrollBox then
+                settingsList.ScrollBox:ForEachFrame(function(frame)
+                    if frame.EvaluateState then
+                        frame:EvaluateState()
+                    end
+                end)
+            end
+        end
+
+        -- Canvas controls aren't part of the settings list, handle directly
+        for _, entry in ipairs(SB._reactiveControls) do
+            local init, s = entry[1], entry[2]
+            if s.canvas then
+                local enabled = isControlEnabled(s)
+                applyCanvasState(s.canvas, enabled)
+            end
+        end
+    end
+
     local function applyModifiers(initializer, spec)
         if not initializer then return end
 
-        -- Capture the page-enabled setting at control creation time so each
-        -- page's controls reference their own module toggle, not the last one registered.
-        spec._pageEnabledSetting = SB._pageEnabledSetting
-
-        if (spec._pageEnabledSetting and not spec._isModuleEnabled) or spec.disabled or spec.canvas or spec.parent then
+        if spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
                 local enabled = isControlEnabled(spec)
                 setInitializerInteractive(initializer, enabled)
@@ -490,6 +511,10 @@ function lib:New(config)
                 return not spec.hidden()
             end)
         end
+
+        if spec.canvas then
+            SB._reactiveControls[#SB._reactiveControls + 1] = { initializer, spec }
+        end
     end
 
     local function colorTableToHex(tbl)
@@ -512,7 +537,6 @@ function lib:New(config)
         SB._layouts[category] = layout
         SB._currentSubcategory = nil
         SB._firstHeaderAdded = {}
-        SB._pageEnabledSetting = nil
         return category
     end
 
@@ -526,7 +550,6 @@ function lib:New(config)
         SB._subcategoryNames[subcategory] = name
         SB._layouts[subcategory] = layout
         SB._currentSubcategory = subcategory
-        SB._pageEnabledSetting = nil
         return subcategory
     end
 
@@ -700,28 +723,6 @@ function lib:New(config)
     ----------------------------------------------------------------------------
     -- Composite builders
     ----------------------------------------------------------------------------
-
-    --- Module-level enabled checkbox. Requires spec.setModuleEnabled (can come from compositeDefaults).
-    function SB.ModuleEnabledCheckbox(moduleName, spec)
-        spec = mergeCompositeDefaults("ModuleEnabledCheckbox", spec)
-        assert(spec.setModuleEnabled, "ModuleEnabledCheckbox: spec.setModuleEnabled is required")
-        local setModuleEnabled = spec.setModuleEnabled
-        local originalOnSet = spec.onSet
-        local merged = {}
-        for k, v in pairs(spec) do merged[k] = v end
-        merged._isModuleEnabled = true
-        merged.onSet = function(value)
-            setModuleEnabled(moduleName, value)
-            if originalOnSet then originalOnSet(value) end
-        end
-        local init, setting = SB.PathCheckbox(merged)
-        SB._pageEnabledSetting = setting
-        return init, setting
-    end
-
-    function SB.SetPageEnabledSetting(setting)
-        SB._pageEnabledSetting = setting
-    end
 
     function SB.HeightOverrideSlider(sectionPath, spec)
         spec = spec or {}
@@ -1051,7 +1052,6 @@ function lib:New(config)
     }
 
     local COMPOSITE_TYPES = {
-        moduleEnabled = true,
         positioning = true,
         border = true,
         fontOverride = true,
@@ -1073,21 +1073,6 @@ function lib:New(config)
             if not entryPath then return groupPath end
             if entryPath:find("%.") or groupPath == "" then return entryPath end
             return groupPath .. "." .. entryPath
-        end
-
-        -- Handle moduleEnabled
-        if tbl.moduleEnabled then
-            local meSpec = {}
-            for k, v in pairs(tbl.moduleEnabled) do meSpec[k] = v end
-            meSpec.path = meSpec.path or (groupPath ~= "" and (groupPath .. ".enabled") or "enabled")
-            if meSpec.desc and not meSpec.tooltip then
-                meSpec.tooltip = meSpec.desc
-                meSpec.desc = nil
-            end
-            if tbl.disabled then meSpec.disabled = meSpec.disabled or tbl.disabled end
-            if tbl.hidden then meSpec.hidden = meSpec.hidden or tbl.hidden end
-            local moduleName = tbl.moduleName or tbl.name:gsub("%s", "")
-            SB.ModuleEnabledCheckbox(moduleName, meSpec)
         end
 
         if not tbl.args then return end

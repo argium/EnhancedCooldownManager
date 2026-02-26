@@ -127,7 +127,7 @@ All path-based controls share a common **spec** table. Each call:
 2. Creates getter/setter functions that read/write via `getNestedValue`/`setNestedValue` on the profile.
 3. Reads the default value from the defaults table.
 4. Calls [`Settings.RegisterProxySetting`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua) and the appropriate `Settings.Create*` factory.
-5. Applies modifiers (parent, disabled, hidden, page-enabled).
+5. Applies modifiers (parent, disabled, hidden) — reactive predicates re-evaluate on every setting change.
 
 All controls return `initializer, setting`.
 
@@ -144,8 +144,8 @@ All controls return `initializer, setting`.
 | `setTransform` | `function(display) -> raw` | Transform the UI value before writing to the profile. |
 | `parent` | `initializer` | Makes this control a child of another (uses [`initializer:SetParentInitializer`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua)). The child is shown indented and only when the parent predicate is truthy. |
 | `parentCheck` | `function() -> bool` | Custom predicate for the parent relationship. Defaults to checking the parent's setting value. |
-| `disabled` | `function() -> bool` | When returns `true`, the control is greyed out (via `AddModifyPredicate`). |
-| `hidden` | `function() -> bool` | When returns `true`, the control is hidden (via `AddShownPredicate`). |
+| `disabled` | `function() -> bool` | When returns `true`, the control is greyed out (via `AddModifyPredicate`). **Reactive** — re-evaluated whenever any setting changes. |
+| `hidden` | `function() -> bool` | When returns `true`, the control is hidden (via `AddShownPredicate`). **Reactive** — re-evaluated whenever any setting changes. |
 
 ### `SB.PathCheckbox(spec)`
 
@@ -260,26 +260,6 @@ SB.PathControl({
 ## Composite Builders
 
 Higher-level helpers that create multiple related controls from a single call.
-
-### `SB.ModuleEnabledCheckbox(moduleName, spec)`
-
-Creates a checkbox that acts as the **page-level enable toggle**. After this call, all subsequent controls on the same page automatically get a modify predicate that greys them out when the module is disabled.
-
-| Additional Field | Type | Description |
-|---|---|---|
-| `setModuleEnabled` | `function(name, enabled)` | **Required.** Called when the toggle changes. |
-
-```lua
-SB.ModuleEnabledCheckbox("PowerBar", {
-    path             = "powerBar.enabled",
-    name             = "Enable power bar",
-    setModuleEnabled = function(name, enabled) MyAddon:SetModuleEnabled(name, enabled) end,
-})
-```
-
-### `SB.SetPageEnabledSetting(setting)`
-
-Manually sets the page-level enabled setting (if you need to wire it up without `ModuleEnabledCheckbox`).
 
 ### `SB.HeightOverrideSlider(sectionPath, spec?)`
 
@@ -472,9 +452,6 @@ local SB = LSB:New({
     varPrefix   = "MYADDON",
     onChanged   = function() MyAddon:Refresh() end,
     compositeDefaults = {
-        ModuleEnabledCheckbox = {
-            setModuleEnabled = function(name, enabled) MyAddon:ToggleModule(name, enabled) end,
-        },
         PositioningGroup = {
             positionModes    = { attached = "Attached", free = "Free" },
             isAnchorModeFree = function(cfg) return cfg and cfg.anchorMode == "free" end,
@@ -490,11 +467,6 @@ SB.PathCheckbox({ path = "general.welcomeMessage", name = "Show welcome message"
 
 -- Power Bar subcategory
 SB.CreateSubcategory("Power Bar")
-
-SB.ModuleEnabledCheckbox("PowerBar", {
-    path = "powerBar.enabled",
-    name = "Enable power bar",
-})
 
 SB.HeightOverrideSlider("powerBar")
 
@@ -528,7 +500,6 @@ SB.CreateRootCategory("My Addon")
 SB.RegisterFromTable({
     name = "Power Bar",
     path = "powerBar",
-    moduleEnabled = { name = "Enable power bar" },
     args = {
         height      = { type = "heightOverride", order = 1 },
         dispHeader  = { type = "header", name = "Display", order = 10 },
@@ -559,8 +530,6 @@ Walks an AceConfig-inspired declarative table and calls the imperative API. Idea
 |---|---|---|---|
 | `name` | `string` | yes | Subcategory name. A new subcategory is created automatically. |
 | `path` | `string` | no | Path prefix. Child paths are resolved relative to this (e.g. `path = "powerBar"` + child `path = "enabled"` → `"powerBar.enabled"`). |
-| `moduleName` | `string` | no | Module name for `ModuleEnabledCheckbox`. Defaults to `name` with spaces removed. |
-| `moduleEnabled` | `table` | no | Spec for `ModuleEnabledCheckbox`. When present, a module-level toggle is created. |
 | `disabled` | `function() -> bool` | no | Inherited by all children. |
 | `hidden` | `function() -> bool` | no | Inherited by all children. |
 | `args` | `table` | no | Table of entries keyed by name. Each entry is processed in `order`. |
@@ -622,9 +591,6 @@ The `compositeDefaults` config field lets you declare addon-wide defaults for co
 local SB = LSB:New({
     -- ... required fields ...
     compositeDefaults = {
-        ModuleEnabledCheckbox = {
-            setModuleEnabled = function(name, enabled) MyAddon:SetModuleEnabled(name, enabled) end,
-        },
         FontOverrideGroup = {
             fontValues = GetFontValues,
             fontFallback = function() return "Friz Quadrata TT" end,

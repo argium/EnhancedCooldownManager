@@ -73,6 +73,13 @@ local function makeInitializer(setting)
         return setting
     end
 
+    function init:EvaluateModifyPredicates()
+        for _, fn in ipairs(self._modifyPredicates) do
+            if not fn() then return false end
+        end
+        return true
+    end
+
     return init
 end
 

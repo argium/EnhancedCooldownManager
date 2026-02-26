@@ -26,21 +26,25 @@ local function isDeathKnight()
     return classToken == C.CLASS.DEATHKNIGHT
 end
 
+local function isDisabled()
+    return isDeathKnight() or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
+end
+
 function ResourceBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = "Resource Bar",
         path = "resourceBar",
         disabled = isDeathKnight,
-        moduleEnabled = { name = "Enable resource bar" },
         args = {
-            layoutHeader    = { type = "header", name = "Layout", order = 1 },
-            positioning     = { type = "positioning", order = 2 },
-            appearHeader    = { type = "header", name = "Appearance", order = 3 },
-            showText        = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", order = 4 },
-            heightOverride  = { type = "heightOverride", order = 5 },
-            border          = { type = "border", path = "border", order = 6 },
-            fontOverride    = { type = "fontOverride", order = 7 },
-            colors          = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", order = 8 },
+            enabled         = { type = "toggle", path = "enabled", name = "Enable resource bar", order = 0, onSet = function(value) ECM.OptionUtil.SetModuleEnabled("ResourceBar", value) end },
+            layoutHeader    = { type = "header", name = "Layout", disabled = isDisabled, order = 1 },
+            positioning     = { type = "positioning", disabled = isDisabled, order = 2 },
+            appearHeader    = { type = "header", name = "Appearance", disabled = isDisabled, order = 3 },
+            showText        = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", disabled = isDisabled, order = 4 },
+            heightOverride  = { type = "heightOverride", disabled = isDisabled, order = 5 },
+            border          = { type = "border", path = "border", disabled = isDisabled, order = 6 },
+            fontOverride    = { type = "fontOverride", disabled = isDisabled, order = 7 },
+            colors          = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", disabled = isDisabled, order = 8 },
         },
     })
 end

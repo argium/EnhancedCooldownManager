@@ -246,6 +246,10 @@ local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
 
+local function isDisabled()
+    return not ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars.enabled")
+end
+
 function BuffBarsOptions.RegisterSettings(SB)
     SB.CreateSubcategory("Aura Bars")
 
@@ -273,8 +277,6 @@ function BuffBarsOptions.RegisterSettings(SB)
         end,
     })
 
-    SB.SetPageEnabledSetting(enabledSetting)
-
     -- Display
     SB.Header("Display")
 
@@ -282,18 +284,21 @@ function BuffBarsOptions.RegisterSettings(SB)
         type = "checkbox",
         path = "buffBars.showIcon",
         name = "Show icon",
+        disabled = isDisabled,
     })
 
     SB.PathControl({
         type = "checkbox",
         path = "buffBars.showSpellName",
         name = "Show spell name",
+        disabled = isDisabled,
     })
 
     SB.PathControl({
         type = "checkbox",
         path = "buffBars.showDuration",
         name = "Show remaining duration",
+        disabled = isDisabled,
     })
 
     SB.PathControl({
@@ -304,6 +309,7 @@ function BuffBarsOptions.RegisterSettings(SB)
         min = 0,
         max = 40,
         step = 1,
+        disabled = isDisabled,
         getTransform = function(value) return value or 0 end,
         setTransform = function(value) return value > 0 and value or nil end,
     })
@@ -316,17 +322,19 @@ function BuffBarsOptions.RegisterSettings(SB)
         min = 0,
         max = 20,
         step = 1,
+        disabled = isDisabled,
         getTransform = function(value) return value or 0 end,
     })
 
     -- Font
     SB.Header("Font")
-    SB.FontOverrideGroup("buffBars")
+    SB.FontOverrideGroup("buffBars", { disabled = isDisabled })
 
     -- Positioning
     SB.Header("Positioning")
     local posGroup = SB.PositioningGroup("buffBars", {
         includeOffsetX = false,
+        disabled = isDisabled,
     })
 
     -- Free grow direction (shown only when in free mode)
@@ -339,6 +347,7 @@ function BuffBarsOptions.RegisterSettings(SB)
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
+        disabled = isDisabled,
         getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
         parent = posGroup.modeInit,
         parentCheck = function()
@@ -357,6 +366,7 @@ function BuffBarsOptions.RegisterSettings(SB)
         path = "buffBars.colors.defaultColor",
         name = "Default color",
         tooltip = "The fallback color used for aura bars that do not have a custom color assigned.",
+        disabled = isDisabled,
     })
 
     local colorsFrame = CreateSpellColorCanvas()
