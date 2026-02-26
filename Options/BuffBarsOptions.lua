@@ -260,11 +260,12 @@ function BuffBarsOptions.RegisterSettings(SB)
             if value then
                 ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
             else
+                -- Revert immediately so the checkbox stays checked until confirmed.
+                enabledSetting:SetValue(true)
                 mod:ConfirmReloadUI(
                     "Disabling aura bars requires a UI reload. Reload now?",
-                    nil,
                     function()
-                        enabledSetting:SetValue(true)
+                        ECM.OptionUtil.SetModuleEnabled("BuffBars", false)
                     end
                 )
             end

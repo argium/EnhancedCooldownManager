@@ -187,12 +187,12 @@ describe("Options sections and root assembly", function()
                 db = {
                     profile = {
                         resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
-                        runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                        runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }, color = { r = 0.77, g = 0.12, b = 0.23, a = 1 }, colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 }, colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 } },
                     },
                     defaults = {
                         profile = {
                             resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
-                            runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
+                            runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }, color = { r = 0.77, g = 0.12, b = 0.23, a = 1 }, colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 }, colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 } },
                         },
                     },
                 },

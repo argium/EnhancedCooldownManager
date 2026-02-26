@@ -7,6 +7,21 @@ local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
 lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
+lib.SUB_HEADER_TEMPLATE = "LibSettingsBuilder_SubHeaderTemplate"
+
+--------------------------------------------------------------------------------
+-- SubHeader Mixin (global, shared across all instances)
+-- Own mixin instead of SettingsListSectionHeaderMixin so the font object
+-- cannot be overridden by Blizzard code.
+--------------------------------------------------------------------------------
+
+LibSettingsBuilder_SubHeaderMixin = LibSettingsBuilder_SubHeaderMixin or {}
+
+function LibSettingsBuilder_SubHeaderMixin:Init(initializer)
+    local name = initializer:GetData().name
+    self.Title:SetText(name)
+    self.Title:SetFontObject(GameFontHighlightSmall)
+end
 
 --------------------------------------------------------------------------------
 -- EmbedCanvas Mixin (global, shared across all instances)
@@ -123,64 +138,6 @@ if not lib._sliderHookInstalled then
 end
 
 --------------------------------------------------------------------------------
--- Color swatch layout hook (global, runs once per lib version)
---------------------------------------------------------------------------------
-
-if not lib._colorSwatchHookInstalled then
-    local function setupColorSwatchLayout()
-        if not SettingsColorSwatchControlMixin then return end
-
-        local function findSwatchControl(control)
-            if control.ColorSelector then return control.ColorSelector end
-            if control.ColorSwatch then return control.ColorSwatch end
-            if control.Button then return control.Button end
-            return nil
-        end
-
-        local function findNameLabel(control)
-            if control.Name then return control.Name end
-            if control.Label then return control.Label end
-            if control.label then return control.label end
-            return nil
-        end
-
-        hooksecurefunc(SettingsColorSwatchControlMixin, "Init", function(self, initializer)
-            if not initializer then return end
-
-            local pickerWidth = initializer._lsbColorPickerWidth
-            local alignName = initializer._lsbAlignName
-            if not pickerWidth and not alignName then return end
-
-            local swatchControl = findSwatchControl(self)
-            if swatchControl and pickerWidth and swatchControl.SetWidth then
-                swatchControl:SetWidth(pickerWidth)
-                if swatchControl.ClearAllPoints and swatchControl.SetPoint then
-                    swatchControl:ClearAllPoints()
-                    swatchControl:SetPoint("RIGHT", self, "RIGHT", 0, 0)
-                end
-            end
-
-            local nameLabel = findNameLabel(self)
-            if nameLabel and alignName then
-                if nameLabel.SetJustifyH then
-                    nameLabel:SetJustifyH("LEFT")
-                end
-                if nameLabel.ClearAllPoints and nameLabel.SetPoint then
-                    nameLabel:ClearAllPoints()
-                    nameLabel:SetPoint("LEFT", self, "LEFT", 0, 0)
-                    if swatchControl then
-                        nameLabel:SetPoint("RIGHT", swatchControl, "LEFT", -8, 0)
-                    end
-                end
-            end
-        end)
-    end
-
-    setupColorSwatchLayout()
-    lib._colorSwatchHookInstalled = true
-end
-
---------------------------------------------------------------------------------
 -- Factory
 --------------------------------------------------------------------------------
 
@@ -213,6 +170,7 @@ function lib:New(config)
     SB._pageEnabledSetting = nil
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
+    SB.SUB_HEADER_TEMPLATE = lib.SUB_HEADER_TEMPLATE
 
     ----------------------------------------------------------------------------
     -- Internal helpers
@@ -526,12 +484,6 @@ function lib:New(config)
             Settings.VarType.String, spec.name, defaultHex, getter, setter)
 
         local initializer = Settings.CreateColorSwatch(cat, setting, spec.tooltip)
-        if spec.pickerWidth then
-            initializer._lsbColorPickerWidth = spec.pickerWidth
-        end
-        if spec.alignName ~= nil then
-            initializer._lsbAlignName = spec.alignName
-        end
         applyModifiers(initializer, spec)
 
         return initializer, setting
@@ -763,8 +715,6 @@ function lib:New(config)
     function SB.ColorPickerList(basePath, defs, spec)
         spec = spec or {}
         local results = {}
-        local pickerWidth = spec.pickerWidth or 100
-        local alignName = spec.alignName ~= false
 
         for _, def in ipairs(defs) do
             local path = basePath .. "." .. tostring(def.key)
@@ -774,8 +724,6 @@ function lib:New(config)
                 tooltip = def.tooltip,
                 category = spec.category,
                 hasAlpha = def.hasAlpha,
-                pickerWidth = pickerWidth,
-                alignName = alignName,
                 parent = spec.parent,
                 parentCheck = spec.parentCheck,
                 disabled = spec.disabled,
@@ -906,6 +854,14 @@ function lib:New(config)
         return initializer
     end
 
+    function SB.SubHeader(text, category)
+        local cat = category or SB._currentSubcategory or SB._rootCategory
+        local layout = SB._layouts[cat]
+        local initializer = Settings.CreateElementInitializer(lib.SUB_HEADER_TEMPLATE, { name = text })
+        layout:AddInitializer(initializer)
+        return initializer
+    end
+
     function SB.EmbedCanvas(canvas, height, spec)
         spec = spec or {}
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
@@ -955,11 +911,6 @@ function lib:New(config)
         applyModifiers(initializer, spec)
 
         return initializer
-    end
-
-    function SB.IsPlayerClass(classToken)
-        local _, className = UnitClass("player")
-        return className == classToken
     end
 
     function SB.RegisterSection(nsTable, key, section)

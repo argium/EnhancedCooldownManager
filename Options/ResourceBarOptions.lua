@@ -22,7 +22,8 @@ local RESOURCE_COLOR_DEFS = {
 local ResourceBarOptions = {}
 
 local function isDeathKnight()
-    return ECM.SettingsBuilder.IsPlayerClass(C.CLASS.DEATHKNIGHT)
+    local _, classToken = UnitClass("player")
+    return classToken == C.CLASS.DEATHKNIGHT
 end
 
 function ResourceBarOptions.RegisterSettings(SB)
@@ -34,8 +35,10 @@ function ResourceBarOptions.RegisterSettings(SB)
         disabled = isDeathKnight,
     })
 
-    SB.Header("Appearance")
+    SB.Header("Layout")
+    SB.PositioningGroup("resourceBar", { disabled = isDeathKnight })
 
+    SB.Header("Appearance")
     SB.PathControl({
         type = "checkbox",
         path = "resourceBar.showText",
@@ -47,10 +50,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     SB.BorderGroup("resourceBar.border", { disabled = isDeathKnight })
     SB.FontOverrideGroup("resourceBar", { disabled = isDeathKnight })
 
-    SB.Header("Layout")
-    SB.PositioningGroup("resourceBar", { disabled = isDeathKnight })
-
-    SB.Header("Colors")
+    SB.SubHeader("Colors")
     SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { disabled = isDeathKnight })
 end
 

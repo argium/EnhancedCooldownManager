@@ -8,5 +8,18 @@
         </Scripts>
     </Frame>
 
+    <Frame name="LibSettingsBuilder_SubHeaderTemplate" mixin="LibSettingsBuilder_SubHeaderMixin" virtual="true">
+        <Size x="30" y="35"/>
+        <Layers>
+            <Layer level="OVERLAY">
+                <FontString parentKey="Title" inherits="GameFontHighlightSmall" justifyH="LEFT" justifyV="TOP">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="35" y="-12"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+    </Frame>
+
     <Script file="LibSettingsBuilder.lua"/>
 </Ui>

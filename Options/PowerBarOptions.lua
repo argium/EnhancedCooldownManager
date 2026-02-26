@@ -26,8 +26,10 @@ function PowerBarOptions.RegisterSettings(SB)
         name = "Enable power bar",
     })
 
-    SB.Header("Appearance")
+    SB.Header("Layout")
+    SB.PositioningGroup("powerBar")
 
+    SB.Header("Appearance")
     SB.PathControl({
         type = "checkbox",
         path = "powerBar.showText",
@@ -44,11 +46,8 @@ function PowerBarOptions.RegisterSettings(SB)
     SB.BorderGroup("powerBar.border")
     SB.FontOverrideGroup("powerBar")
 
-    SB.Header("Layout")
-    SB.PositioningGroup("powerBar")
-
-    SB.Header("Colors")
-    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS)
+    local colorHeading = SB.SubHeader("Colors")
+    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS, { parent = colorHeading })
 
     -- Tick Marks (canvas subcategory)
     ECM.PowerBarTickMarksOptions.RegisterSettings(SB)

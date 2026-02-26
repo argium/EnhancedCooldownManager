@@ -44,7 +44,8 @@ describe("SettingsBuilder", function()
             "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin",
+            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubHeaderMixin",
+            "GameFontHighlightSmall",
         })
     end)
 
@@ -60,6 +61,7 @@ describe("SettingsBuilder", function()
 
         _G.ECM_CloneValue = deepClone
         _G.ECM_DeepEquals = deepEquals
+        _G.GameFontHighlightSmall = "GameFontHighlightSmall"
 
         _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
         _G.GetSpecialization = function() return 1 end
@@ -374,6 +376,21 @@ describe("SettingsBuilder", function()
         assert.are.equal("Test Header", init._text)
     end)
 
+    -- SubHeader
+    it("SubHeader adds element initializer with small font template", function()
+        local init = SB.SubHeader("Item Quality")
+        assert.is_not_nil(init)
+        assert.are.equal("LibSettingsBuilder_SubHeaderTemplate", init._template)
+        assert.are.equal("Item Quality", init.data.name)
+    end)
+
+    it("SubHeader respects explicit category via UseRootCategory", function()
+        SB.UseRootCategory()
+        local init = SB.SubHeader("Root Sub")
+        assert.is_not_nil(init)
+        assert.are.equal("Root Sub", init.data.name)
+    end)
+
     -- Button
     it("Button creates button initializer with onClick", function()
         local clicked = false
@@ -623,7 +640,7 @@ describe("SettingsBuilder", function()
     end)
 
     -- ColorPickerList
-    it("ColorPickerList creates color swatches for each definition", function()
+    it("ColorPickerList creates native color swatch per definition", function()
         addonNS.Addon.db.profile.powerBar.colors = {
             [0] = { r = 0, g = 0, b = 1, a = 1 },
         }
@@ -639,10 +656,10 @@ describe("SettingsBuilder", function()
         assert.are.equal(2, #results)
         assert.are.equal(0, results[1].key)
         assert.are.equal(1, results[2].key)
-        assert.are.equal(100, results[1].initializer._lsbColorPickerWidth)
-        assert.is_true(results[1].initializer._lsbAlignName)
-        assert.are.equal(100, results[2].initializer._lsbColorPickerWidth)
-        assert.is_true(results[2].initializer._lsbAlignName)
+        assert.is_not_nil(results[1].initializer)
+        assert.is_not_nil(results[1].setting)
+        assert.is_not_nil(results[2].initializer)
+        assert.is_not_nil(results[2].setting)
     end)
 
     -- PositioningGroup
@@ -672,9 +689,4 @@ describe("SettingsBuilder", function()
         assert.are.same(section, ns.OptionsSections.Foo)
     end)
 
-    -- IsPlayerClass
-    it("IsPlayerClass checks UnitClass token", function()
-        assert.is_true(SB.IsPlayerClass("WARRIOR"))
-        assert.is_false(SB.IsPlayerClass("DEATHKNIGHT"))
-    end)
 end)

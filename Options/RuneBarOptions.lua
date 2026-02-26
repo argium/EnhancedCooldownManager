@@ -8,7 +8,8 @@ local C = ECM.Constants
 local RuneBarOptions = {}
 
 local function isNotDeathKnight()
-    return not ECM.SettingsBuilder.IsPlayerClass(C.CLASS.DEATHKNIGHT)
+    local _, classToken = UnitClass("player")
+    return classToken ~= C.CLASS.DEATHKNIGHT
 end
 
 function RuneBarOptions.RegisterSettings(SB)
@@ -25,16 +26,14 @@ function RuneBarOptions.RegisterSettings(SB)
         disabled = isNotDeathKnight,
     })
 
-    SB.Header("Appearance")
+    SB.Header("Layout")
+    SB.PositioningGroup("runeBar", { disabled = isNotDeathKnight })
 
+    SB.Header("Appearance")
     SB.HeightOverrideSlider("runeBar", { disabled = isNotDeathKnight })
     SB.FontOverrideGroup("runeBar", { disabled = isNotDeathKnight })
 
-    SB.Header("Positioning")
-    SB.PositioningGroup("runeBar", { disabled = isNotDeathKnight })
-
-    SB.Header("Colors")
-
+    SB.SubHeader("Colors")
     local specInit, specSetting = SB.PathControl({
         type = "checkbox",
         path = "runeBar.useSpecColor",
@@ -42,7 +41,6 @@ function RuneBarOptions.RegisterSettings(SB)
         tooltip = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
         disabled = isNotDeathKnight,
     })
-
     SB.PathControl({
         type = "color",
         path = "runeBar.color",
@@ -50,6 +48,30 @@ function RuneBarOptions.RegisterSettings(SB)
         disabled = isNotDeathKnight,
         parent = specInit,
         parentCheck = function() return not specSetting:GetValue() end,
+    })
+    SB.PathControl({
+        type = "color",
+        path = "runeBar.colorBlood",
+        name = "Blood color",
+        disabled = isNotDeathKnight,
+        parent = specInit,
+        parentCheck = function() return specSetting:GetValue() end,
+    })
+    SB.PathControl({
+        type = "color",
+        path = "runeBar.colorFrost",
+        name = "Frost color",
+        disabled = isNotDeathKnight,
+        parent = specInit,
+        parentCheck = function() return specSetting:GetValue() end,
+    })
+    SB.PathControl({
+        type = "color",
+        path = "runeBar.colorUnholy",
+        name = "Unholy color",
+        disabled = isNotDeathKnight,
+        parent = specInit,
+        parentCheck = function() return specSetting:GetValue() end,
     })
 end
 

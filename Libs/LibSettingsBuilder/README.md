@@ -356,6 +356,17 @@ Inserts a section header into the vertical list. Wraps `CreateSettingsListSectio
 SB.Header("Colors")
 ```
 
+### `SB.SubHeader(text [, category])`
+
+Inserts a smaller, lighter sub-section heading into the vertical list. Uses `GameFontHighlightSmall` (white, small) rather than the bold yellow `GameFontNormal` used by `SB.Header`. Matches the style used by Blizzard's Accessibility → Colors page for headings like "Item Quality".
+
+Unlike `SB.Header`, no automatic deduplication is applied.
+
+```lua
+SB.Header("Colors")
+SB.SubHeader("Item Quality")
+```
+
 ### `SB.EmbedCanvas(canvas, height, spec?)`
 
 Embeds an arbitrary frame (canvas) into the vertical list at the specified height. Uses the `LibSettingsBuilder_EmbedCanvasTemplate` XML template.
@@ -387,10 +398,6 @@ SB.Button({
     onClick    = function() MyAddon:ResetProfile() end,
 })
 ```
-
-### `SB.IsPlayerClass(classToken)`
-
-Returns `true` if the player's class matches the given uppercase token (e.g. `"DEATHKNIGHT"`, `"MAGE"`). Convenience wrapper around `UnitClass("player")`.
 
 ### `SB.RegisterSection(nsTable, key, section)`
 
