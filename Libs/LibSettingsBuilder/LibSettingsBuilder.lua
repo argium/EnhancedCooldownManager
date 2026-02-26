@@ -319,9 +319,9 @@ function lib:New(config)
 
     local reevaluateReactiveControls
 
-    local function postSet(spec, value)
+    local function postSet(spec, value, setting)
         if spec.onSet then
-            spec.onSet(value)
+            spec.onSet(value, setting)
         end
         config.onChanged(spec, value)
         reevaluateReactiveControls()
@@ -332,6 +332,7 @@ function lib:New(config)
     local function makeProxySetting(spec, varType, defaultFallback)
         local variable = makeVarName(spec.path)
         local cat = resolveCategory(spec)
+        local settingRef
 
         local function getter()
             local val = getNestedValue(getProfile(), spec.path)
@@ -342,7 +343,7 @@ function lib:New(config)
         local function setter(value)
             if spec.setTransform then value = spec.setTransform(value) end
             setNestedValue(getProfile(), spec.path, value)
-            postSet(spec, value)
+            postSet(spec, value, settingRef)
         end
 
         local default = getNestedValue(getDefaults(), spec.path)
@@ -350,6 +351,7 @@ function lib:New(config)
 
         local setting = Settings.RegisterProxySetting(cat, variable,
             varType, spec.name, default ~= nil and default or defaultFallback, getter, setter)
+        settingRef = setting
 
         return setting, cat
     end
@@ -660,11 +662,13 @@ function lib:New(config)
             return colorTableToHex(tbl)
         end
 
+        local settingRef
+
         local function setter(hexValue)
             local color = CreateColorFromHexString(hexValue)
             local tbl = { r = color.r, g = color.g, b = color.b, a = color.a }
             setNestedValue(getProfile(), spec.path, tbl)
-            postSet(spec, tbl)
+            postSet(spec, tbl, settingRef)
         end
 
         local defaultTbl = getNestedValue(getDefaults(), spec.path) or {}
@@ -672,6 +676,7 @@ function lib:New(config)
 
         local setting = Settings.RegisterProxySetting(cat, variable,
             Settings.VarType.String, spec.name, defaultHex, getter, setter)
+        settingRef = setting
 
         -- Note: Settings.CreateColorSwatch does not support a hasAlpha parameter.
         -- Alpha channel selection is not available through the Blizzard Settings API.
@@ -759,13 +764,20 @@ function lib:New(config)
         propagateModifiers(enabledSpec, spec)
         local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
 
+        -- Children stay visible but disabled when override is off.
+        -- The font picker's SetEnabled hides the preview automatically.
+        local outerDisabled = spec.disabled
+        local function isOverrideDisabled()
+            if outerDisabled and outerDisabled() then return true end
+            return not enabledSetting:GetValue()
+        end
+
         local fontSpec = {
             path = sectionPath .. ".font",
             name = spec.fontName or "Font",
             tooltip = spec.fontTooltip,
             values = spec.fontValues,
-            parent = enabledInit,
-            parentCheck = function() return enabledSetting:GetValue() end,
+            disabled = isOverrideDisabled,
             getTransform = function(value)
                 if value then return value end
                 if spec.fontFallback then return spec.fontFallback() end
@@ -789,8 +801,7 @@ function lib:New(config)
             min = spec.sizeMin or 6,
             max = spec.sizeMax or 32,
             step = spec.sizeStep or 1,
-            parent = enabledInit,
-            parentCheck = function() return enabledSetting:GetValue() end,
+            disabled = isOverrideDisabled,
             getTransform = function(value)
                 if value then return value end
                 if spec.fontSizeFallback then return spec.fontSizeFallback() end
@@ -1057,6 +1068,7 @@ function lib:New(config)
         fontOverride = true,
         heightOverride = true,
         colorList = true,
+        canvas = true,
     }
 
     --- Walks an AceConfig-inspired option table and calls the imperative API.
@@ -1065,7 +1077,11 @@ function lib:New(config)
     function SB.RegisterFromTable(tbl)
         assert(tbl.name, "RegisterFromTable: tbl.name is required")
 
-        SB.CreateSubcategory(tbl.name)
+        if tbl.rootCategory then
+            SB.UseRootCategory()
+        else
+            SB.CreateSubcategory(tbl.name)
+        end
 
         local groupPath = tbl.path or ""
 
@@ -1167,6 +1183,9 @@ function lib:New(config)
 
                 elseif entryType == "heightOverride" then
                     init, setting = SB.HeightOverrideSlider(resolvePath(entry.path), spec)
+
+                elseif entryType == "canvas" then
+                    init = SB.EmbedCanvas(entry.canvas, entry.height, spec)
 
                 elseif entryType == "colorList" then
                     local defs = entry.defs or {}

@@ -667,9 +667,11 @@ describe("SettingsBuilder", function()
         addonNS.Addon.db.profile.powerBar.overrideFont = false
         local result = SB.FontOverrideGroup("powerBar")
 
-        -- Font and size children should have modify predicates
+        -- Font and size children should have modify predicates (disabled, not hidden)
         assert.is_truthy(result.fontInit._modifyPredicates)
         assert.is_truthy(result.sizeInit._modifyPredicates)
+        assert.is_nil(result.fontInit._parentInit)
+        assert.is_nil(result.sizeInit._parentInit)
 
         local fontPredicate = result.fontInit._modifyPredicates[1]
         local sizePredicate = result.sizeInit._modifyPredicates[1]
@@ -1129,6 +1131,81 @@ describe("SettingsBuilder", function()
 
         _G.CreateSettingsListSectionHeaderInitializer = origHeader
         assert.is_true(headerCreated)
+    end)
+
+    it("RegisterFromTable rootCategory=true uses root instead of subcategory", function()
+        local LSB2 = LibStub("LibSettingsBuilder-1.0")
+        local SB2 = LSB2:New({
+            getProfile = function() return addonNS.Addon.db.profile end,
+            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            varPrefix = "ROOT1",
+            onChanged = function() end,
+        })
+        SB2.CreateRootCategory("RootTest")
+
+        SB2.RegisterFromTable({
+            name = "Root Section",
+            rootCategory = true,
+            path = "global",
+            args = {
+                mounted = { type = "toggle", path = "hideWhenMounted", name = "Hide", order = 1 },
+            },
+        })
+
+        -- rootCategory=true should NOT create a subcategory
+        assert.is_nil(SB2.GetSubcategoryID("Root Section"))
+    end)
+
+    it("RegisterFromTable canvas type embeds a canvas frame", function()
+        local LSB2 = LibStub("LibSettingsBuilder-1.0")
+        local SB2 = LSB2:New({
+            getProfile = function() return addonNS.Addon.db.profile end,
+            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            varPrefix = "CANVAS1",
+            onChanged = function() end,
+        })
+        SB2.CreateRootCategory("CanvasTest")
+
+        local canvasFrame = { GetHeight = function() return 200 end }
+
+        local embeddedCanvas, embeddedHeight
+        local origEmbed = SB2.EmbedCanvas
+        SB2.EmbedCanvas = function(canvas, height, spec)
+            embeddedCanvas = canvas
+            embeddedHeight = height
+            return origEmbed(canvas, height, spec)
+        end
+
+        SB2.RegisterFromTable({
+            name = "Canvas Section",
+            path = "global",
+            args = {
+                myCanvas = { type = "canvas", canvas = canvasFrame, height = 400, order = 1 },
+            },
+        })
+
+        assert.are.equal(canvasFrame, embeddedCanvas)
+        assert.are.equal(400, embeddedHeight)
+    end)
+
+    it("onSet receives setting as second parameter", function()
+        local receivedSetting
+        local receivedValue
+
+        local init, setting = SB.PathCheckbox({
+            path = "global.hideWhenMounted",
+            name = "Test onSet",
+            onSet = function(value, s)
+                receivedValue = value
+                receivedSetting = s
+            end,
+        })
+
+        -- Trigger the setter via SetValue which calls the proxy setter → postSet → onSet
+        setting:SetValue(false)
+        assert.are.equal(false, receivedValue)
+        assert.is_not_nil(receivedSetting)
+        assert.are.equal(setting, receivedSetting)
     end)
 
 end)

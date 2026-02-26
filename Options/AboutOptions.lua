@@ -8,40 +8,42 @@ local mod = ns.Addon
 local AboutOptions = {}
 
 function AboutOptions.RegisterSettings(SB)
-    SB.UseRootCategory()
-
-    SB.Header("Troubleshooting")
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "global.debug",
-        name = "Debug Mode",
-        tooltip = "Enable debug logging to the chat frame.",
-    })
-
-    SB.Header("Performance")
-
-    SB.PathControl({
-        type = "slider",
-        path = "global.updateFrequency",
-        name = "Update Frequency",
-        tooltip = "How often (in seconds) to refresh bar displays. Lower values are smoother but use more CPU.",
-        min = 0.04,
-        max = 0.5,
-        step = 0.04,
-    })
-
-    SB.Header("Reset Settings")
-
-    SB.Button({
-        name = "Reset Everything to Default",
-        buttonText = "Reset",
-        tooltip = "Reset the current profile to default values and reload the UI. This cannot be undone.",
-        confirm = "This will reset ALL settings to their defaults and reload the UI. This cannot be undone. Are you sure?",
-        onClick = function()
-            mod.db:ResetProfile()
-            ReloadUI()
-        end,
+    SB.RegisterFromTable({
+        name = "About",
+        rootCategory = true,
+        path = "global",
+        args = {
+            troubleshootHeader = { type = "header", name = "Troubleshooting", order = 10 },
+            debug = {
+                type = "toggle",
+                path = "debug",
+                name = "Debug Mode",
+                desc = "Enable debug logging to the chat frame.",
+                order = 11,
+            },
+            perfHeader = { type = "header", name = "Performance", order = 20 },
+            updateFrequency = {
+                type = "range",
+                path = "updateFrequency",
+                name = "Update Frequency",
+                desc = "How often (in seconds) to refresh bar displays. Lower values are smoother but use more CPU.",
+                min = 0.04, max = 0.5, step = 0.04,
+                order = 21,
+            },
+            resetHeader = { type = "header", name = "Reset Settings", order = 30 },
+            reset = {
+                type = "execute",
+                name = "Reset Everything to Default",
+                buttonText = "Reset",
+                desc = "Reset the current profile to default values and reload the UI. This cannot be undone.",
+                confirm = "This will reset ALL settings to their defaults and reload the UI. This cannot be undone. Are you sure?",
+                onClick = function()
+                    mod.db:ResetProfile()
+                    ReloadUI()
+                end,
+                order = 31,
+            },
+        },
     })
 end
 

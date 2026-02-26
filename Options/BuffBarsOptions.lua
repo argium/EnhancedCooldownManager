@@ -251,139 +251,122 @@ local function isDisabled()
 end
 
 function BuffBarsOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("Aura Bars")
-
-    -- Basic Settings
-
-    local enabledSetting
-    _, enabledSetting = SB.PathControl({
-        type = "checkbox",
-        path = "buffBars.enabled",
-        name = "Enable aura bars",
-        tooltip = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
-        onSet = function(value)
-            if value then
-                ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
-            else
-                -- Revert immediately so the checkbox stays checked until confirmed.
-                enabledSetting:SetValue(true)
-                mod:ConfirmReloadUI(
-                    "Disabling aura bars requires a UI reload. Reload now?",
-                    function()
-                        ECM.OptionUtil.SetModuleEnabled("BuffBars", false)
+    SB.RegisterFromTable({
+        name = "Aura Bars",
+        path = "buffBars",
+        args = {
+            enabled = {
+                type = "toggle",
+                path = "enabled",
+                name = "Enable aura bars",
+                desc = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
+                order = 0,
+                onSet = function(value, setting)
+                    if value then
+                        ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
+                    else
+                        setting:SetValue(true)
+                        mod:ConfirmReloadUI(
+                            "Disabling aura bars requires a UI reload. Reload now?",
+                            function()
+                                ECM.OptionUtil.SetModuleEnabled("BuffBars", false)
+                            end
+                        )
                     end
-                )
-            end
-        end,
-    })
+                end,
+            },
 
-    -- Display
-    SB.Header("Display")
+            -- Display
+            displayHeader     = { type = "header", name = "Display", disabled = isDisabled, order = 10 },
+            showIcon          = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 11 },
+            showSpellName     = { type = "toggle", path = "showSpellName", name = "Show spell name", disabled = isDisabled, order = 12 },
+            showDuration      = { type = "toggle", path = "showDuration", name = "Show remaining duration", disabled = isDisabled, order = 13 },
+            height            = {
+                type = "range",
+                path = "height",
+                name = "Height Override",
+                desc = "Override the default bar height. Set to 0 to use the global default.",
+                min = 0, max = 40, step = 1,
+                disabled = isDisabled,
+                getTransform = function(value) return value or 0 end,
+                setTransform = function(value) return value > 0 and value or nil end,
+                order = 14,
+            },
+            verticalSpacing   = {
+                type = "range",
+                path = "verticalSpacing",
+                name = "Vertical Spacing",
+                desc = "Vertical gap between aura bars. Set to 0 for no spacing.",
+                min = 0, max = 20, step = 1,
+                disabled = isDisabled,
+                getTransform = function(value) return value or 0 end,
+                order = 15,
+            },
 
-    SB.PathControl({
-        type = "checkbox",
-        path = "buffBars.showIcon",
-        name = "Show icon",
-        disabled = isDisabled,
-    })
+            -- Font
+            fontHeader        = { type = "header", name = "Font", disabled = isDisabled, order = 20 },
+            fontOverride      = { type = "fontOverride", disabled = isDisabled, order = 21 },
 
-    SB.PathControl({
-        type = "checkbox",
-        path = "buffBars.showSpellName",
-        name = "Show spell name",
-        disabled = isDisabled,
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "buffBars.showDuration",
-        name = "Show remaining duration",
-        disabled = isDisabled,
-    })
-
-    SB.PathControl({
-        type = "slider",
-        path = "buffBars.height",
-        name = "Height Override",
-        tooltip = "Override the default bar height. Set to 0 to use the global default.",
-        min = 0,
-        max = 40,
-        step = 1,
-        disabled = isDisabled,
-        getTransform = function(value) return value or 0 end,
-        setTransform = function(value) return value > 0 and value or nil end,
-    })
-
-    SB.PathControl({
-        type = "slider",
-        path = "buffBars.verticalSpacing",
-        name = "Vertical Spacing",
-        tooltip = "Vertical gap between aura bars. Set to 0 for no spacing.",
-        min = 0,
-        max = 20,
-        step = 1,
-        disabled = isDisabled,
-        getTransform = function(value) return value or 0 end,
-    })
-
-    -- Font
-    SB.Header("Font")
-    SB.FontOverrideGroup("buffBars", { disabled = isDisabled })
-
-    -- Positioning
-    SB.Header("Positioning")
-    local posGroup = SB.PositioningGroup("buffBars", {
-        includeOffsetX = false,
-        disabled = isDisabled,
-    })
-
-    -- Free grow direction (shown only when in free mode)
-    SB.PathControl({
-        type = "dropdown",
-        path = "buffBars.freeGrowDirection",
-        name = "Free Grow Direction",
-        tooltip = "Choose whether aura bars stack downward or upward in free positioning mode.",
-        values = {
-            [C.GROW_DIRECTION_DOWN] = "Down",
-            [C.GROW_DIRECTION_UP] = "Up",
+            -- Positioning
+            posHeader         = { type = "header", name = "Positioning", disabled = isDisabled, order = 30 },
+            positioning       = { type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 31 },
+            freeGrowDirection = {
+                type = "select",
+                path = "freeGrowDirection",
+                name = "Free Grow Direction",
+                desc = "Choose whether aura bars stack downward or upward in free positioning mode.",
+                values = {
+                    [C.GROW_DIRECTION_DOWN] = "Down",
+                    [C.GROW_DIRECTION_UP] = "Up",
+                },
+                disabled = isDisabled,
+                getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
+                parent = "positioning",
+                parentCheck = function()
+                    return ECM.OptionUtil.IsAnchorModeFree(
+                        ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars"))
+                end,
+                order = 32,
+            },
         },
-        disabled = isDisabled,
-        getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
-        parent = posGroup.modeInit,
-        parentCheck = function()
-            return ECM.OptionUtil.IsAnchorModeFree(
-                ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars"))
-        end,
     })
 
-    -- Spell Colors (separate vertical-layout subcategory)
-    SB.CreateSubcategory("    Spell Colors")
-
-    SB.Header("Spell Colors")
-
-    SB.PathControl({
-        type = "color",
-        path = "buffBars.colors.defaultColor",
-        name = "Default color",
-        tooltip = "The fallback color used for aura bars that do not have a custom color assigned.",
-        disabled = isDisabled,
-    })
-
+    -- Spell Colors (separate subcategory)
     local colorsFrame = CreateSpellColorCanvas()
 
-    SB.Button({
-        name = "Refresh spell list",
-        buttonText = "Refresh",
-        tooltip = "Re-scan active aura bars and reconcile with saved spell color entries.",
-        onClick = function()
-            if IsEditLocked() then return end
-            local activeKeys = ECM.BuffBars:GetActiveSpellData()
-            ECM.SpellColors.ReconcileAllKeys(activeKeys)
-            colorsFrame:RefreshSpellList()
-        end,
+    SB.RegisterFromTable({
+        name = "    Spell Colors",
+        path = "buffBars",
+        args = {
+            defaultColor = {
+                type = "color",
+                path = "colors.defaultColor",
+                name = "Default color",
+                desc = "The fallback color used for aura bars that do not have a custom color assigned.",
+                disabled = isDisabled,
+                order = 10,
+            },
+            refresh = {
+                type = "execute",
+                name = "Refresh spell list",
+                buttonText = "Refresh",
+                desc = "Re-scan active aura bars and reconcile with saved spell color entries.",
+                onClick = function()
+                    if IsEditLocked() then return end
+                    local activeKeys = ECM.BuffBars:GetActiveSpellData()
+                    ECM.SpellColors.ReconcileAllKeys(activeKeys)
+                    colorsFrame:RefreshSpellList()
+                end,
+                order = 20,
+            },
+            colors = {
+                type = "canvas",
+                canvas = colorsFrame,
+                height = 400,
+                order = 30,
+            },
+        },
     })
-
-    SB.EmbedCanvas(colorsFrame, 400)
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)
