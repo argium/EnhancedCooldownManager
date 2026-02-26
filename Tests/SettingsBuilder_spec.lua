@@ -44,7 +44,7 @@ describe("SettingsBuilder", function()
             "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubHeaderMixin",
+            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_LabelMixin",
             "GameFontHighlightSmall",
         })
     end)
@@ -376,19 +376,31 @@ describe("SettingsBuilder", function()
         assert.are.equal("Test Header", init._text)
     end)
 
-    -- SubHeader
-    it("SubHeader adds element initializer with small font template", function()
-        local init = SB.SubHeader("Item Quality")
+    -- Label
+    it("Label adds element initializer with small font template", function()
+        local init = SB.Label({ name = "Item Quality" })
         assert.is_not_nil(init)
-        assert.are.equal("LibSettingsBuilder_SubHeaderTemplate", init._template)
+        assert.are.equal("LibSettingsBuilder_LabelTemplate", init._template)
         assert.are.equal("Item Quality", init.data.name)
     end)
 
-    it("SubHeader respects explicit category via UseRootCategory", function()
+    it("Label respects explicit category via UseRootCategory", function()
         SB.UseRootCategory()
-        local init = SB.SubHeader("Root Sub")
+        local init = SB.Label({ name = "Root Sub" })
         assert.is_not_nil(init)
         assert.are.equal("Root Sub", init.data.name)
+    end)
+
+    it("Label as parent — isParentEnabled returns true", function()
+        local labelInit = SB.Label({ name = "Colors" })
+        local childInit = SB.PathCheckbox({
+            path = "global.hideWhenMounted",
+            name = "Child",
+            parent = labelInit,
+        })
+        -- Labels have no GetSetting, so isParentEnabled should return true
+        local enabledPredicate = childInit._modifyPredicates[1]
+        assert.is_true(enabledPredicate())
     end)
 
     -- Button
@@ -637,6 +649,27 @@ describe("SettingsBuilder", function()
         assert.is_not_nil(result.enabledSetting)
         assert.is_not_nil(result.fontInit)
         assert.is_not_nil(result.sizeInit)
+    end)
+
+    it("FontOverrideGroup children are disabled when override is unchecked", function()
+        addonNS.Addon.db.profile.powerBar.overrideFont = false
+        local result = SB.FontOverrideGroup("powerBar")
+
+        -- Font and size children should have modify predicates
+        assert.is_truthy(result.fontInit._modifyPredicates)
+        assert.is_truthy(result.sizeInit._modifyPredicates)
+
+        local fontPredicate = result.fontInit._modifyPredicates[1]
+        local sizePredicate = result.sizeInit._modifyPredicates[1]
+
+        -- Override is false → children disabled
+        assert.is_false(fontPredicate())
+        assert.is_false(sizePredicate())
+
+        -- Toggle override on → children enabled
+        result.enabledSetting:SetValue(true)
+        assert.is_true(fontPredicate())
+        assert.is_true(sizePredicate())
     end)
 
     -- ColorPickerList

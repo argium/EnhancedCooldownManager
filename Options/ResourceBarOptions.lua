@@ -50,8 +50,8 @@ function ResourceBarOptions.RegisterSettings(SB)
     SB.BorderGroup("resourceBar.border", { disabled = isDeathKnight })
     SB.FontOverrideGroup("resourceBar", { disabled = isDeathKnight })
 
-    SB.SubHeader("Colors")
-    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { disabled = isDeathKnight })
+    local colorLabel = SB.Label({ name = "Colors", disabled = isDeathKnight })
+    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { disabled = isDeathKnight, parent = colorLabel })
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)

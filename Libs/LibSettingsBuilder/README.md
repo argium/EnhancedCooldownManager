@@ -356,15 +356,23 @@ Inserts a section header into the vertical list. Wraps `CreateSettingsListSectio
 SB.Header("Colors")
 ```
 
-### `SB.SubHeader(text [, category])`
+### `SB.Label(spec)`
 
 Inserts a smaller, lighter sub-section heading into the vertical list. Uses `GameFontHighlightSmall` (white, small) rather than the bold yellow `GameFontNormal` used by `SB.Header`. Matches the style used by Blizzard's Accessibility → Colors page for headings like "Item Quality".
 
-Unlike `SB.Header`, no automatic deduplication is applied.
+Unlike `SB.Header`, no automatic deduplication is applied. Supports `parent`, `hidden`, and `disabled` modifiers via `applyModifiers`. Can be used as a parent initializer to nest controls underneath it.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Display text for the label |
+| `category` | category | no | Override the target layout category |
+| `parent` | initializer | no | Parent initializer for nesting |
+| `hidden` | function | no | Predicate controlling visibility |
+| `disabled` | function | no | Predicate controlling enabled state |
 
 ```lua
-SB.Header("Colors")
-SB.SubHeader("Item Quality")
+local colorLabel = SB.Label({ name = "Item Quality" })
+SB.ColorPickerList("items.colors", COLOR_DEFS, { parent = colorLabel })
 ```
 
 ### `SB.EmbedCanvas(canvas, height, spec?)`

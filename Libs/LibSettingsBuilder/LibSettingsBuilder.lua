@@ -7,17 +7,17 @@ local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
 lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
-lib.SUB_HEADER_TEMPLATE = "LibSettingsBuilder_SubHeaderTemplate"
+lib.LABEL_TEMPLATE = "LibSettingsBuilder_LabelTemplate"
 
 --------------------------------------------------------------------------------
--- SubHeader Mixin (global, shared across all instances)
+-- Label Mixin (global, shared across all instances)
 -- Own mixin instead of SettingsListSectionHeaderMixin so the font object
 -- cannot be overridden by Blizzard code.
 --------------------------------------------------------------------------------
 
-LibSettingsBuilder_SubHeaderMixin = LibSettingsBuilder_SubHeaderMixin or {}
+LibSettingsBuilder_LabelMixin = LibSettingsBuilder_LabelMixin or {}
 
-function LibSettingsBuilder_SubHeaderMixin:Init(initializer)
+function LibSettingsBuilder_LabelMixin:Init(initializer)
     local name = initializer:GetData().name
     self.Title:SetText(name)
     self.Title:SetFontObject(GameFontHighlightSmall)
@@ -170,7 +170,7 @@ function lib:New(config)
     SB._pageEnabledSetting = nil
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
-    SB.SUB_HEADER_TEMPLATE = lib.SUB_HEADER_TEMPLATE
+    SB.LABEL_TEMPLATE = lib.LABEL_TEMPLATE
 
     ----------------------------------------------------------------------------
     -- Internal helpers
@@ -229,8 +229,10 @@ function lib:New(config)
             return spec.parentCheck()
         end
 
+        if not spec.parent.GetSetting then return true end
         local setting = spec.parent:GetSetting()
-        return setting and setting:GetValue()
+        if not setting then return true end
+        return setting:GetValue()
     end
 
     local function isControlEnabled(spec)
@@ -854,11 +856,12 @@ function lib:New(config)
         return initializer
     end
 
-    function SB.SubHeader(text, category)
-        local cat = category or SB._currentSubcategory or SB._rootCategory
+    function SB.Label(spec)
+        local cat = resolveCategory(spec)
         local layout = SB._layouts[cat]
-        local initializer = Settings.CreateElementInitializer(lib.SUB_HEADER_TEMPLATE, { name = text })
+        local initializer = Settings.CreateElementInitializer(lib.LABEL_TEMPLATE, { name = spec.name })
         layout:AddInitializer(initializer)
+        applyModifiers(initializer, spec)
         return initializer
     end
 

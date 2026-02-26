@@ -88,5 +88,57 @@ describe("LibLSMSettingsWidgets", function()
             assert.is_true(hostMouse)
             assert.is_true(previewShown)
         end)
+
+        it(case.name .. " Init bridges initializer.SetEnabled to frame", function()
+            local dropdownEnabled, previewShown
+
+            local setting = {
+                GetValue = function() return "TestFont" end,
+                SetValue = function() end,
+            }
+
+            local initializer = {
+                GetData = function() return { name = "Test", setting = setting } end,
+                GetSetting = function() return setting end,
+            }
+
+            local picker = {
+                Text = { SetText = function() end },
+                DropDown = {
+                    SetupMenu = function() end,
+                    OverrideText = function() end,
+                    SetEnabled = function(_, enabled) dropdownEnabled = enabled end,
+                    EnableMouse = function() end,
+                },
+                DropDownHost = {
+                    SetEnabled = function() end,
+                    EnableMouse = function() end,
+                },
+                Preview = {
+                    SetFont = function() end,
+                    SetText = function() end,
+                    Show = function() previewShown = true end,
+                    Hide = function() previewShown = false end,
+                },
+                SetupDropdown = function() end,
+                UpdatePreview = function() end,
+            }
+
+            local mixin = _G[case.global]
+            picker.SetEnabled = mixin.SetEnabled
+            mixin.Init(picker, initializer)
+
+            -- Init should have bridged SetEnabled onto the initializer
+            assert.is_function(initializer.SetEnabled)
+
+            -- Calling initializer:SetEnabled propagates to the frame
+            initializer:SetEnabled(false)
+            assert.is_false(dropdownEnabled)
+            assert.is_false(previewShown)
+
+            initializer:SetEnabled(true)
+            assert.is_true(dropdownEnabled)
+            assert.is_true(previewShown)
+        end)
     end
 end)

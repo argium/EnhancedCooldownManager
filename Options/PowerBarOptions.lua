@@ -46,8 +46,8 @@ function PowerBarOptions.RegisterSettings(SB)
     SB.BorderGroup("powerBar.border")
     SB.FontOverrideGroup("powerBar")
 
-    local colorHeading = SB.SubHeader("Colors")
-    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS, { parent = colorHeading })
+    local colorLabel = SB.Label({ name = "Colors" })
+    SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS, { parent = colorLabel })
 
     -- Tick Marks (canvas subcategory)
     ECM.PowerBarTickMarksOptions.RegisterSettings(SB)

@@ -33,13 +33,14 @@ function RuneBarOptions.RegisterSettings(SB)
     SB.HeightOverrideSlider("runeBar", { disabled = isNotDeathKnight })
     SB.FontOverrideGroup("runeBar", { disabled = isNotDeathKnight })
 
-    SB.SubHeader("Colors")
+    local colorLabel = SB.Label({ name = "Colors", disabled = isNotDeathKnight })
     local specInit, specSetting = SB.PathControl({
         type = "checkbox",
         path = "runeBar.useSpecColor",
         name = "Use specialization color",
         tooltip = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
         disabled = isNotDeathKnight,
+        parent = colorLabel,
     })
     SB.PathControl({
         type = "color",

@@ -94,6 +94,11 @@ function LibLSMSettingsWidgets_FontPickerMixin:Init(initializer)
 
     self:SetupDropdown()
     self:UpdatePreview()
+
+    local frame = self
+    initializer.SetEnabled = function(_, enabled)
+        frame:SetEnabled(enabled)
+    end
 end
 
 LibLSMSettingsWidgets_FontPickerMixin.SetEnabled = setPickerEnabled
@@ -179,6 +184,11 @@ function LibLSMSettingsWidgets_TexturePickerMixin:Init(initializer)
 
     self:SetupDropdown()
     self:UpdatePreview()
+
+    local frame = self
+    initializer.SetEnabled = function(_, enabled)
+        frame:SetEnabled(enabled)
+    end
 end
 
 LibLSMSettingsWidgets_TexturePickerMixin.SetEnabled = setPickerEnabled
