@@ -25,158 +25,152 @@ StaticPopupDialogs["ECM_CONFIRM_RESET_PROFILE"] = {
     hideOnEscape = true,
 }
 
-local function CreateProfileDropdown(parent, label, yOffset, getEntries, onSelect)
-    local frame = CreateFrame("Frame", nil, parent)
-    frame:SetSize(400, 30)
-    frame:SetPoint("TOPLEFT", 10, yOffset)
+local ProfileOptions = {}
 
-    local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    text:SetPoint("LEFT", 0, 0)
-    text:SetWidth(120)
-    text:SetJustifyH("LEFT")
-    text:SetText(label)
+function ProfileOptions.RegisterSettings(SB)
+    local cat = SB.CreateSubcategory("Profiles")
 
-    local dropdown = CreateFrame("DropdownButton", nil, frame, "WowStyle1DropdownTemplate")
-    dropdown:SetPoint("LEFT", text, "RIGHT", 5, 0)
-    dropdown:SetWidth(200)
+    -- Switch Profile
+    SB.Header("Active Profile")
 
-    dropdown:SetupMenu(function(_, rootDescription)
-        local entries = getEntries()
-        for _, entry in ipairs(entries) do
-            rootDescription:CreateButton(entry.label, function()
-                onSelect(entry.value)
-            end)
-        end
-    end)
-
-    frame._dropdown = dropdown
-    return frame
-end
-
-local function CreateProfileCanvas()
-    local frame = CreateFrame("Frame", "ECM_ProfileCanvas", UIParent)
-    frame:SetSize(600, 400)
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 10, -10)
-    title:SetText("Profiles")
-
-    local currentLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    currentLabel:SetPoint("TOPLEFT", 10, -40)
-    currentLabel:SetText("Current Profile:")
-
-    local currentValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    currentValue:SetPoint("LEFT", currentLabel, "RIGHT", 5, 0)
-
-    CreateProfileDropdown(frame, "Switch Profile:", -70,
-        function()
-            local profiles = mod.db:GetProfiles()
-            local entries = {}
-            for _, name in ipairs(profiles) do
-                entries[#entries + 1] = { label = name, value = name }
-            end
-            return entries
-        end,
-        function(name)
-            mod.db:SetProfile(name)
-            frame:RefreshProfile()
-        end
+    local switchSetting = Settings.RegisterProxySetting(cat, "ECM_ProfileSwitch",
+        Settings.VarType.String, "Switch Profile",
+        mod.db:GetCurrentProfile(),
+        function() return mod.db:GetCurrentProfile() end,
+        function(value) mod.db:SetProfile(value) end
     )
 
-    CreateProfileDropdown(frame, "Copy From:", -105,
-        function()
-            local profiles = mod.db:GetProfiles()
-            local current = mod.db:GetCurrentProfile()
-            local entries = {}
-            for _, name in ipairs(profiles) do
-                if name ~= current then
-                    entries[#entries + 1] = { label = name, value = name }
-                end
-            end
-            return entries
-        end,
-        function(name)
-            mod.db:CopyProfile(name)
-            frame:RefreshProfile()
+    Settings.CreateDropdown(cat, switchSetting, function()
+        local container = Settings.CreateControlTextContainer()
+        for _, name in ipairs(mod.db:GetProfiles()) do
+            container:Add(name, name)
         end
+        return container:GetData()
+    end, "Select a profile to switch to.")
+
+    -- New Profile
+    SB.Button({
+        name = "Create a new profile",
+        buttonText = "New Profile",
+        tooltip = "Create a new profile using your current character name.",
+        onClick = function()
+            local newName = UnitName("player") .. " - " .. date("%H%M%S")
+            switchSetting:SetValue(newName)
+        end,
+    })
+
+    -- Copy From
+    SB.Header("Profile Actions")
+
+    local selectedCopyProfile = nil
+
+    local copySetting = Settings.RegisterProxySetting(cat, "ECM_ProfileCopy",
+        Settings.VarType.String, "Copy From", "",
+        function() return selectedCopyProfile or "" end,
+        function(value) selectedCopyProfile = value end
     )
 
-    CreateProfileDropdown(frame, "Delete:", -140,
-        function()
-            local profiles = mod.db:GetProfiles()
-            local current = mod.db:GetCurrentProfile()
-            local entries = {}
-            for _, name in ipairs(profiles) do
-                if name ~= current then
-                    entries[#entries + 1] = { label = name, value = name }
-                end
+    Settings.CreateDropdown(cat, copySetting, function()
+        local container = Settings.CreateControlTextContainer()
+        local current = mod.db:GetCurrentProfile()
+        for _, name in ipairs(mod.db:GetProfiles()) do
+            if name ~= current then
+                container:Add(name, name)
             end
-            return entries
+        end
+        return container:GetData()
+    end, "Select a profile to copy settings from.")
+
+    SB.Button({
+        name = "Apply copy from selected profile",
+        buttonText = "Copy",
+        tooltip = "Copy all settings from the selected profile into the current one.",
+        onClick = function()
+            if not selectedCopyProfile or selectedCopyProfile == "" then return end
+            mod.db:CopyProfile(selectedCopyProfile)
+            selectedCopyProfile = nil
         end,
-        function(name)
+    })
+
+    -- Delete Profile
+    local selectedDeleteProfile = nil
+
+    local deleteSetting = Settings.RegisterProxySetting(cat, "ECM_ProfileDelete",
+        Settings.VarType.String, "Delete Profile", "",
+        function() return selectedDeleteProfile or "" end,
+        function(value) selectedDeleteProfile = value end
+    )
+
+    Settings.CreateDropdown(cat, deleteSetting, function()
+        local container = Settings.CreateControlTextContainer()
+        local current = mod.db:GetCurrentProfile()
+        for _, name in ipairs(mod.db:GetProfiles()) do
+            if name ~= current then
+                container:Add(name, name)
+            end
+        end
+        return container:GetData()
+    end, "Select a profile to delete.")
+
+    SB.Button({
+        name = "Delete the selected profile",
+        buttonText = "Delete",
+        tooltip = "Delete the selected profile. The active profile cannot be deleted.",
+        onClick = function()
+            if not selectedDeleteProfile or selectedDeleteProfile == "" then return end
+            local name = selectedDeleteProfile
             local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
             dialog.text = string.format("Are you sure you want to delete the profile '%s'?", name)
             dialog.OnAccept = function()
                 mod.db:DeleteProfile(name)
-                frame:RefreshProfile()
+                selectedDeleteProfile = nil
             end
             StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE")
-        end
-    )
+        end,
+    })
 
-    local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(140, 22)
-    resetBtn:SetPoint("TOPLEFT", 10, -180)
-    resetBtn:SetText("Reset Profile")
-    resetBtn:SetScript("OnClick", function()
-        StaticPopupDialogs["ECM_CONFIRM_RESET_PROFILE"].OnAccept = function()
+    -- Reset
+    SB.Header("Reset")
+
+    SB.Button({
+        name = "Reset current profile to defaults",
+        buttonText = "Reset Profile",
+        tooltip = "Reset the current profile back to default settings. This cannot be undone.",
+        confirm = "Are you sure you want to reset the current profile to defaults?",
+        onClick = function()
             mod.db:ResetProfile()
-            frame:RefreshProfile()
-        end
-        StaticPopup_Show("ECM_CONFIRM_RESET_PROFILE")
-    end)
+        end,
+    })
 
-    local importBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    importBtn:SetSize(100, 22)
-    importBtn:SetPoint("TOPLEFT", 10, -215)
-    importBtn:SetText("Import")
-    importBtn:SetScript("OnClick", function()
-        if InCombatLockdown() then
-            mod:Print("Cannot import during combat (reload blocked)")
-            return
-        end
-        mod:ShowImportDialog()
-    end)
+    -- Import / Export
+    SB.Header("Import / Export")
 
-    local exportBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    exportBtn:SetSize(100, 22)
-    exportBtn:SetPoint("LEFT", importBtn, "RIGHT", 10, 0)
-    exportBtn:SetText("Export")
-    exportBtn:SetScript("OnClick", function()
-        local exportString, err = ECM.ImportExport.ExportCurrentProfile()
-        if not exportString then
-            mod:Print("Export failed: " .. (err or "Unknown error"))
-            return
-        end
-        mod:ShowExportDialog(exportString)
-    end)
+    SB.Button({
+        name = "Import a profile from a string",
+        buttonText = "Import",
+        tooltip = "Paste a previously exported profile string to import settings.",
+        onClick = function()
+            if InCombatLockdown() then
+                mod:Print("Cannot import during combat (reload blocked)")
+                return
+            end
+            mod:ShowImportDialog()
+        end,
+    })
 
-    function frame:RefreshProfile()
-        currentValue:SetText(mod.db:GetCurrentProfile())
-    end
-
-    frame:SetScript("OnShow", function(self)
-        self:RefreshProfile()
-    end)
-
-    return frame
-end
-
-local ProfileOptions = {}
-
-function ProfileOptions.RegisterSettings(SB)
-    local canvas = CreateProfileCanvas()
-    SB.CreateCanvasSubcategory(canvas, "Profiles")
+    SB.Button({
+        name = "Export the current profile as a string",
+        buttonText = "Export",
+        tooltip = "Generate a shareable string that can be imported on another character.",
+        onClick = function()
+            local exportString, err = ECM.ImportExport.ExportCurrentProfile()
+            if not exportString then
+                mod:Print("Export failed: " .. (err or "Unknown error"))
+                return
+            end
+            mod:ShowExportDialog(exportString)
+        end,
+    })
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)

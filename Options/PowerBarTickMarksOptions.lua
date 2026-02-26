@@ -107,6 +107,7 @@ local function CreateTickMarksCanvas()
     scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
 
     local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(30)
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then
             rowFrame:SetSize(scrollBox:GetWidth(), 30)
@@ -235,7 +236,8 @@ end
 
 ECM.PowerBarTickMarksOptions = {
     RegisterSettings = function(SB)
+        SB.Header("Tick Marks")
         local canvas = CreateTickMarksCanvas()
-        SB.CreateCanvasSubcategory(canvas, "Tick Marks")
+        SB.EmbedCanvas(canvas, 400)
     end,
 }

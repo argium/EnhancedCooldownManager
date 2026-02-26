@@ -13,7 +13,7 @@ function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
     SB.CreateRootCategory(C.ADDON_NAME)
 
-    -- Register subcategories in display order
+    -- Register sections in display order (General is on the root page)
     local sectionOrder = {
         "General",
         "PowerBar",

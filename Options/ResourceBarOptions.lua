@@ -51,7 +51,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     SB.Header("Border")
     SB.BorderGroup("resourceBar.border", { hidden = isDeathKnight })
 
-    SB.Header("Font Override")
+    SB.Header("Font")
     SB.FontOverrideGroup("resourceBar", { hidden = isDeathKnight })
 
     SB.Header("Positioning")

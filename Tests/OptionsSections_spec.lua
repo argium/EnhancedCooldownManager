@@ -22,6 +22,8 @@ describe("Options sections and root assembly", function()
             "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "Enum",
+            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
 
@@ -30,7 +32,22 @@ describe("Options sections and root assembly", function()
     end)
 
     it("root Options module creates categories and calls RegisterSettings on sections", function()
+        TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
+
+        local libChunk = TestHelpers.loadChunk(
+            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
+            "Unable to load LibSettingsBuilder.lua"
+        )
+        libChunk()
+
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        if lsmw then
+            lsmw.GetFontValues = function() return {} end
+            lsmw.GetStatusbarValues = function() return {} end
+            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        end
 
         local registerSettingsCalls = {}
         local dbCallbacks = {}
@@ -80,13 +97,6 @@ describe("Options sections and root assembly", function()
         )
         optionUtilChunk(nil, ns)
 
-        -- Load SettingsBuilder
-        local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, ns)
-
         -- Register mock sections
         for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "About" }) do
             ns.OptionsSections[key] = {
@@ -119,7 +129,22 @@ describe("Options sections and root assembly", function()
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
+        TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
+
+        local libChunk = TestHelpers.loadChunk(
+            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
+            "Unable to load LibSettingsBuilder.lua"
+        )
+        libChunk()
+
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        if lsmw then
+            lsmw.GetFontValues = function() return {} end
+            lsmw.GetStatusbarValues = function() return {} end
+            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        end
 
         local className = "WARRIOR"
         _G.UnitClass = function() return "Player", className, 1 end
@@ -142,9 +167,6 @@ describe("Options sections and root assembly", function()
                 DEFAULT_BAR_WIDTH = 300,
             },
             ScheduleLayoutUpdate = function() end,
-            SharedMediaOptions = {
-                GetFontValues = function() return {} end,
-            },
         }
 
         local ns = {
@@ -168,8 +190,6 @@ describe("Options sections and root assembly", function()
         -- Load OptionUtil and SettingsBuilder
         local optUtil = TestHelpers.loadChunk({ "Options/OptionUtil.lua" }, "OptionUtil")
         optUtil(nil, ns)
-        local sb = TestHelpers.loadChunk({ "Options/SettingsBuilder.lua" }, "SB")
-        sb(nil, ns)
 
         -- Set up root category so subcategories can be created
         ECM.SettingsBuilder.CreateRootCategory("Test")

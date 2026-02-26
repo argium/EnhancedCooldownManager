@@ -25,6 +25,8 @@ describe("BuffBarsOptions", function()
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "issecretvalue", "issecrettable", "canaccessvalue", "canaccesstable",
             "time", "ECM_tostring",
+            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
 
@@ -33,6 +35,7 @@ describe("BuffBarsOptions", function()
     end)
 
     before_each(function()
+        TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
 
         _G.UnitClass = function() return "Demon Hunter", "DEMONHUNTER", 12 end
@@ -87,6 +90,21 @@ describe("BuffBarsOptions", function()
             Log = function() end,
         }
 
+        -- Load library
+        local libChunk = TestHelpers.loadChunk(
+            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
+            "Unable to load LibSettingsBuilder.lua"
+        )
+        libChunk()
+
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        if lsmw then
+            lsmw.GetFontValues = function() return {} end
+            lsmw.GetStatusbarValues = function() return {} end
+            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        end
+
         -- Load Constants
         local constantsChunk = TestHelpers.loadChunk(
             { "Constants.lua", "../Constants.lua" },
@@ -118,18 +136,12 @@ describe("BuffBarsOptions", function()
         spellColorsChunk(nil, addonNS)
         SpellColors = ECM.SpellColors
 
-        -- Load OptionUtil + SettingsBuilder so BuffBarsOptions can register
+        -- Load OptionUtil (includes SettingsBuilder adapter)
         local optUtilChunk = TestHelpers.loadChunk(
             { "Options/OptionUtil.lua", "../Options/OptionUtil.lua" },
             "Unable to load OptionUtil.lua"
         )
         optUtilChunk(nil, addonNS)
-
-        local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, addonNS)
 
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")

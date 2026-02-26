@@ -11,9 +11,7 @@ local ItemIconsOptions = {}
 function ItemIconsOptions.RegisterSettings(SB)
     SB.CreateSubcategory("Item Icons")
 
-    SB.Header("Item Icons")
-
-    SB.PathControl({
+    local _, enabledSetting = SB.PathControl({
         type = "checkbox",
         path = "itemIcons.enabled",
         name = "Enable item icons",
@@ -30,6 +28,8 @@ function ItemIconsOptions.RegisterSettings(SB)
             end
         end,
     })
+
+    SB.SetPageEnabledSetting(enabledSetting)
 
     -- Equipment
     SB.Header("Equipment")

@@ -8,7 +8,7 @@ local C = ECM.Constants
 local GeneralOptions = {}
 
 function GeneralOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("General")
+    SB.UseRootCategory()
 
     -- General Settings
     SB.Header("General Settings")
@@ -27,19 +27,19 @@ function GeneralOptions.RegisterSettings(SB)
     })
 
     SB.PathControl({
-        type = "dropdown",
+        type = "custom",
+        template = ECM.SharedMediaOptions.TEXTURE_PICKER_TEMPLATE,
         path = "global.texture",
         name = "Bar Texture",
         tooltip = "Select the texture used for bars.",
-        values = ECM.SharedMediaOptions.GetStatusbarValues,
     })
 
     SB.PathControl({
-        type = "dropdown",
+        type = "custom",
+        template = ECM.SharedMediaOptions.FONT_PICKER_TEMPLATE,
         path = "global.font",
         name = "Font",
         tooltip = "Select the font used for bar text.",
-        values = ECM.SharedMediaOptions.GetFontValues,
     })
 
     SB.PathControl({

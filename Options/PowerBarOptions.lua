@@ -52,8 +52,8 @@ function PowerBarOptions.RegisterSettings(SB)
     SB.Header("Border")
     SB.BorderGroup("powerBar.border")
 
-    -- Font Override
-    SB.Header("Font Override")
+    -- Font
+    SB.Header("Font")
     SB.FontOverrideGroup("powerBar")
 
     -- Positioning

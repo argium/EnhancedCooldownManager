@@ -88,58 +88,9 @@ local function CreateSpellColorCanvas()
     local specLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     specLabel:SetPoint("TOPLEFT", 10, -55)
 
-    -- Default color swatch
-    local defaultColorLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    defaultColorLabel:SetPoint("TOPLEFT", 10, -80)
-    defaultColorLabel:SetText("Default color:")
-
-    local defaultColorSwatch = CreateFrame("Button", nil, frame)
-    defaultColorSwatch:SetSize(20, 20)
-    defaultColorSwatch:SetPoint("LEFT", defaultColorLabel, "RIGHT", 5, 0)
-    local defaultSwatchTex = defaultColorSwatch:CreateTexture(nil, "BACKGROUND")
-    defaultSwatchTex:SetAllPoints()
-    defaultSwatchTex:SetColorTexture(1, 1, 1)
-
-    local function UpdateDefaultSwatch()
-        local c = ECM.SpellColors.GetDefaultColor()
-        defaultSwatchTex:SetColorTexture(c.r, c.g, c.b)
-    end
-
-    defaultColorSwatch:SetScript("OnClick", function()
-        if IsEditLocked() then return end
-        local c = ECM.SpellColors.GetDefaultColor()
-        ColorPickerFrame:SetupColorPickerAndShow({
-            r = c.r, g = c.g, b = c.b,
-            hasOpacity = false,
-            swatchFunc = function()
-                local r, g, b = ColorPickerFrame:GetColorRGB()
-                ECM.SpellColors.SetDefaultColor({ r = r, g = g, b = b, a = 1 })
-                UpdateDefaultSwatch()
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-            cancelFunc = function(prev)
-                ECM.SpellColors.SetDefaultColor({ r = prev.r, g = prev.g, b = prev.b, a = 1 })
-                UpdateDefaultSwatch()
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end,
-        })
-    end)
-
-    -- Refresh button
-    local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    refreshBtn:SetSize(150, 22)
-    refreshBtn:SetPoint("TOPLEFT", 10, -105)
-    refreshBtn:SetText("Refresh Spell List")
-    refreshBtn:SetScript("OnClick", function()
-        if IsEditLocked() then return end
-        local activeKeys = ECM.BuffBars:GetActiveSpellData()
-        ECM.SpellColors.ReconcileAllKeys(activeKeys)
-        frame:RefreshSpellList()
-    end)
-
     -- ScrollBox for spell list
     local scrollBox = CreateFrame("Frame", nil, frame, "WowScrollBoxList")
-    scrollBox:SetPoint("TOPLEFT", 10, -135)
+    scrollBox:SetPoint("TOPLEFT", 10, -80)
     scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
 
     local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
@@ -147,6 +98,7 @@ local function CreateSpellColorCanvas()
     scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
 
     local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(24)
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then
             rowFrame:SetSize(scrollBox:GetWidth(), 24)
@@ -252,8 +204,6 @@ local function CreateSpellColorCanvas()
     frame._combatWarning = combatWarning
     frame._secretsWarning = secretsWarning
     frame._unlabeledWarning = unlabeledWarning
-    frame._defaultColorSwatch = defaultColorSwatch
-    frame._updateDefaultSwatch = UpdateDefaultSwatch
 
     function frame:RefreshSpellList()
         unlabeledBarsPresent = false
@@ -278,8 +228,6 @@ local function CreateSpellColorCanvas()
         local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
         local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
         specLabel:SetText("|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown"))
-
-        UpdateDefaultSwatch()
     end
 
     frame:SetScript("OnShow", function(self)
@@ -301,9 +249,8 @@ function BuffBarsOptions.RegisterSettings(SB)
     SB.CreateSubcategory("Aura Bars")
 
     -- Basic Settings
-    SB.Header("Aura Bars")
 
-    SB.PathControl({
+    local _, enabledSetting = SB.PathControl({
         type = "checkbox",
         path = "buffBars.enabled",
         name = "Enable aura bars",
@@ -316,13 +263,14 @@ function BuffBarsOptions.RegisterSettings(SB)
                     "Disabling aura bars requires a UI reload. Reload now?",
                     nil,
                     function()
-                        ECM.OptionUtil.SetNestedValue(
-                            mod.db.profile, "buffBars.enabled", true)
+                        enabledSetting:SetValue(true)
                     end
                 )
             end
         end,
     })
+
+    SB.SetPageEnabledSetting(enabledSetting)
 
     -- Display
     SB.Header("Display")
@@ -368,8 +316,8 @@ function BuffBarsOptions.RegisterSettings(SB)
         getTransform = function(value) return value or 0 end,
     })
 
-    -- Font Override
-    SB.Header("Font Override")
+    -- Font
+    SB.Header("Font")
     SB.FontOverrideGroup("buffBars")
 
     -- Positioning
@@ -396,9 +344,33 @@ function BuffBarsOptions.RegisterSettings(SB)
         end,
     })
 
-    -- Spell Colors (canvas subcategory)
+    -- Spell Colors (separate vertical-layout subcategory)
+    SB.CreateSubcategory("    Spell Colors")
+
+    SB.Header("Spell Colors")
+
+    SB.PathControl({
+        type = "color",
+        path = "buffBars.colors.defaultColor",
+        name = "Default color",
+        tooltip = "The fallback color used for aura bars that do not have a custom color assigned.",
+    })
+
     local colorsFrame = CreateSpellColorCanvas()
-    SB.CreateCanvasSubcategory(colorsFrame, "Aura Bar Colors")
+
+    SB.Button({
+        name = "Refresh spell list",
+        buttonText = "Refresh",
+        tooltip = "Re-scan active aura bars and reconcile with saved spell color entries.",
+        onClick = function()
+            if IsEditLocked() then return end
+            local activeKeys = ECM.BuffBars:GetActiveSpellData()
+            ECM.SpellColors.ReconcileAllKeys(activeKeys)
+            colorsFrame:RefreshSpellList()
+        end,
+    })
+
+    SB.EmbedCanvas(colorsFrame, 400)
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)

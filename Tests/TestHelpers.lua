@@ -89,14 +89,39 @@ local function makeSetting(getter, setter, default)
     return setting
 end
 
+--- Setup a minimal LibStub stub for tests.
+function TestHelpers.setupLibStub()
+    local libs = {}
+    local LibStub = {
+        NewLibrary = function(self, major, minor)
+            if not libs[major] or libs[major].minor < minor then
+                libs[major] = { minor = minor, lib = {} }
+                return libs[major].lib
+            end
+            return nil
+        end,
+    }
+    setmetatable(LibStub, {
+        __call = function(self, major, silent)
+            local entry = libs[major]
+            if entry then return entry.lib end
+            if not silent then error("Library not found: " .. major) end
+            return nil
+        end,
+    })
+    _G.LibStub = LibStub
+    return LibStub
+end
+
 --- Install all Settings API stubs into _G. Returns the list of global names
 --- that were set, so they can be captured/restored.
 function TestHelpers.setupSettingsStubs()
     local globals = {
         "Settings", "CreateSettingsListSectionHeaderInitializer",
         "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-        "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
+        "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
         "ECM_CloneValue", "ECM_DeepEquals",
+        "CreateFromMixins", "SettingsListElementInitializer",
     }
 
     _G.Settings = {
@@ -112,7 +137,7 @@ function TestHelpers.setupSettingsStubs()
                 _id = name,
                 GetID = function(self) return self._id end,
                 GetLayout = function() return layout end,
-            }
+            }, layout
         end,
 
         RegisterVerticalLayoutSubcategory = function(parent, name)
@@ -124,7 +149,7 @@ function TestHelpers.setupSettingsStubs()
                 _name = name,
                 _parent = parent,
                 GetLayout = function() return layout end,
-            }
+            }, layout
         end,
 
         RegisterCanvasLayoutSubcategory = function(parent, frame, name)
@@ -161,8 +186,11 @@ function TestHelpers.setupSettingsStubs()
         end,
 
         CreateSliderOptions = function(min, max, step)
-            local opts = { min = min, max = max, step = step }
-            function opts:SetLabelFormatter() end
+            local opts = { min = min, max = max, step = step, _labelFormatter = nil, _labelFormatterLocation = nil }
+            function opts:SetLabelFormatter(location, formatter)
+                self._labelFormatterLocation = location
+                self._labelFormatter = formatter
+            end
             return opts
         end,
 
@@ -201,6 +229,14 @@ function TestHelpers.setupSettingsStubs()
         return { r = r, g = g, b = b, a = a or 1 }
     end
 
+    _G.CreateColorFromHexString = function(hex)
+        local a = tonumber(hex:sub(1, 2), 16) / 255
+        local r = tonumber(hex:sub(3, 4), 16) / 255
+        local g = tonumber(hex:sub(5, 6), 16) / 255
+        local b = tonumber(hex:sub(7, 8), 16) / 255
+        return { r = r, g = g, b = b, a = a }
+    end
+
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name)
         local dialog = _G.StaticPopupDialogs[name]
@@ -213,6 +249,41 @@ function TestHelpers.setupSettingsStubs()
 
     _G.ECM_CloneValue = deepClone
     _G.ECM_DeepEquals = deepEquals
+
+    _G.CreateFromMixins = function(...)
+        local result = {}
+        for i = 1, select("#", ...) do
+            local mixin = select(i, ...)
+            if mixin then
+                for k, v in pairs(mixin) do
+                    result[k] = v
+                end
+            end
+        end
+        return result
+    end
+
+    _G.SettingsListElementInitializer = {
+        Init = function(self, templateName) self._template = templateName end,
+        SetExtent = function(self, extent) self._extent = extent end,
+        GetExtent = function(self) return self._extent end,
+        GetData = function(self) return self.data end,
+        SetParentInitializer = function(self, parent, predicate)
+            self._parentInit = parent
+            self._parentPredicate = predicate
+        end,
+        AddModifyPredicate = function(self, fn)
+            self._modifyPredicates = self._modifyPredicates or {}
+            self._modifyPredicates[#self._modifyPredicates + 1] = fn
+        end,
+        AddShownPredicate = function(self, fn)
+            self._shownPredicates = self._shownPredicates or {}
+            self._shownPredicates[#self._shownPredicates + 1] = fn
+        end,
+        GetSetting = function(self)
+            return self.data and self.data.setting
+        end,
+    }
 
     return globals
 end

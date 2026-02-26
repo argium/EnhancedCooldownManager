@@ -19,6 +19,8 @@ Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml
 Libs\LibEQOL\LibEQOL.xml
 Libs\LibSharedMedia-3.0\lib.xml
+Libs\LibSettingsBuilder\LibSettingsBuilder.xml
+Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
 Constants.lua
 Defaults.lua
@@ -46,8 +48,6 @@ Bars\ItemIcons.lua
 Bars\Layout.lua
 
 Options\OptionUtil.lua
-Options\Widgets\Widgets.xml
-Options\SettingsBuilder.lua
 Options\PowerBarTickMarksStore.lua
 Options\PowerBarTickMarksOptions.lua
 Options\GeneralOptions.lua

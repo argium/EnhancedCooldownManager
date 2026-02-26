@@ -41,8 +41,10 @@ describe("SettingsBuilder", function()
             "ECM", "ECM_CloneValue", "ECM_DeepEquals",
             "Settings", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
+            "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
+            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
 
@@ -53,6 +55,7 @@ describe("SettingsBuilder", function()
     before_each(function()
         layoutUpdateCalls = 0
 
+        TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
 
         _G.ECM_CloneValue = deepClone
@@ -62,16 +65,27 @@ describe("SettingsBuilder", function()
         _G.GetSpecialization = function() return 1 end
         _G.GetSpecializationInfo = function() return nil, "Arms" end
 
+        -- Load the library
+        local libChunk = TestHelpers.loadChunk(
+            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
+            "Unable to load LibSettingsBuilder.lua"
+        )
+        libChunk()
+
+        -- Register LSMW stub
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        if lsmw then
+            lsmw.GetFontValues = function() return { Expressway = "Expressway" } end
+            lsmw.GetStatusbarValues = function() return { Blizzard = "Blizzard" } end
+            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        end
+
         _G.ECM = {
             Constants = {
                 ANCHORMODE_CHAIN = 1,
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
-            },
-            SharedMediaOptions = {
-                GetFontValues = function()
-                    return { Expressway = "Expressway" }
-                end,
             },
             ScheduleLayoutUpdate = function()
                 layoutUpdateCalls = layoutUpdateCalls + 1
@@ -139,12 +153,6 @@ describe("SettingsBuilder", function()
         )
         optionUtilChunk(nil, addonNS)
 
-        local settingsBuilderChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
-            "Unable to load Options/SettingsBuilder.lua"
-        )
-        settingsBuilderChunk(nil, addonNS)
-
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")
         SB.CreateSubcategory("TestSection")
@@ -158,6 +166,14 @@ describe("SettingsBuilder", function()
 
     it("RegisterCategories does not error", function()
         assert.has_no.errors(function() SB.RegisterCategories() end)
+    end)
+
+    it("UseRootCategory sets current subcategory to root", function()
+        SB.UseRootCategory()
+        local init = SB.Header("Root Header")
+        assert.is_not_nil(init)
+        assert.are.equal("header", init._type)
+        assert.are.equal("Root Header", init._text)
     end)
 
     -- PathCheckbox
@@ -204,6 +220,56 @@ describe("SettingsBuilder", function()
         assert.is_nil(addonNS.Addon.db.profile.powerBar.height)
     end)
 
+    it("PathSlider applies default formatter when none specified", function()
+        local capturedOpts
+        local origCreate = Settings.CreateSlider
+        Settings.CreateSlider = function(cat, setting, options, tooltip)
+            capturedOpts = options
+            return origCreate(cat, setting, options, tooltip)
+        end
+
+        SB.PathSlider({
+            path = "global.value",
+            name = "Value",
+            min = 0,
+            max = 10,
+            step = 1,
+        })
+
+        Settings.CreateSlider = origCreate
+
+        assert.is_not_nil(capturedOpts._labelFormatter)
+        assert.are.equal(MinimalSliderWithSteppersMixin.Label.Right, capturedOpts._labelFormatterLocation)
+        -- Default formatter renders integers without decimals
+        assert.are.equal("5", capturedOpts._labelFormatter(5))
+        assert.are.equal("0", capturedOpts._labelFormatter(0))
+        -- Default formatter renders fractional values with one decimal
+        assert.are.equal("2.5", capturedOpts._labelFormatter(2.5))
+    end)
+
+    it("PathSlider uses custom formatter when specified", function()
+        local capturedOpts
+        local origCreate = Settings.CreateSlider
+        Settings.CreateSlider = function(cat, setting, options, tooltip)
+            capturedOpts = options
+            return origCreate(cat, setting, options, tooltip)
+        end
+
+        local customFormatter = function(value) return value .. "%%" end
+        SB.PathSlider({
+            path = "global.value",
+            name = "Value",
+            min = 0,
+            max = 100,
+            step = 5,
+            formatter = customFormatter,
+        })
+
+        Settings.CreateSlider = origCreate
+
+        assert.are.equal(customFormatter, capturedOpts._labelFormatter)
+    end)
+
     -- PathDropdown
     it("PathDropdown creates dropdown with values", function()
         local init, setting = SB.PathDropdown({
@@ -219,19 +285,19 @@ describe("SettingsBuilder", function()
     end)
 
     -- PathColor
-    it("PathColor reads/writes color via CreateColor", function()
+    it("PathColor reads/writes color as AARRGGBB hex", function()
         local init, setting = SB.PathColor({
             path = "global.color",
             name = "Color",
         })
 
-        local c = setting:GetValue()
-        assert.are.equal(0.1, c.r)
-        assert.are.equal(0.2, c.g)
-        assert.are.equal(0.3, c.b)
+        local hex = setting:GetValue()
+        assert.are.equal("FF1A334D", hex)
 
-        setting:SetValue(CreateColor(0.4, 0.5, 0.6, 1))
-        assert.are.same({ r = 0.4, g = 0.5, b = 0.6, a = 1 }, addonNS.Addon.db.profile.global.color)
+        -- Verify round-trip: hex -> table stored in profile
+        setting:SetValue("FF66809A")
+        local stored = addonNS.Addon.db.profile.global.color
+        assert.are.equal(0.4, math.floor(stored.r * 255 + 0.5) / 255)
     end)
 
     -- PathControl dispatcher
@@ -270,8 +336,9 @@ describe("SettingsBuilder", function()
             path = "global.color",
             name = "Color",
         })
-        local c = setting:GetValue()
-        assert.are.equal(0.1, c.r)
+        local hex = setting:GetValue()
+        assert.are.equal("string", type(hex))
+        assert.are.equal(8, #hex)
     end)
 
     it("PathControl errors on unknown type", function()
@@ -348,14 +415,14 @@ describe("SettingsBuilder", function()
     -- ModuleEnabledCheckbox
     it("ModuleEnabledCheckbox calls SetModuleEnabled", function()
         local enabledModule, enabledValue
-        ECM.OptionUtil.SetModuleEnabled = function(name, val)
-            enabledModule = name
-            enabledValue = val
-        end
 
         local _, setting = SB.ModuleEnabledCheckbox("PowerBar", {
             path = "powerBar.enabled",
             name = "Enable",
+            setModuleEnabled = function(name, val)
+                enabledModule = name
+                enabledValue = val
+            end,
         })
 
         setting:SetValue(false)
