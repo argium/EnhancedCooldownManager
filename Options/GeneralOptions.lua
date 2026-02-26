@@ -9,23 +9,64 @@ local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 local GeneralOptions = {}
 
 function GeneralOptions.RegisterSettings(SB)
-    SB.UseRootCategory()
+    SB.CreateSubcategory("General")
 
-    -- General Settings
-    SB.Header("General Settings")
+    SB.Header("Visibility")
 
     SB.PathControl({
         type = "checkbox",
         path = "global.hideWhenMounted",
-        name = "Hide when mounted or in vehicle",
-        tooltip = "Automatically hide icons and bars when mounted or in a vehicle, and show them when dismounted.",
+        name = "Hide when Mounted",
+        tooltip = "Automatically hide icon and bars while mounted.",
     })
 
     SB.PathControl({
         type = "checkbox",
         path = "global.hideOutOfCombatInRestAreas",
-        name = "Always hide when out of combat in rest areas",
+        name = "Hide in Rest Areas",
+        tooltip = "Automatically hide icon and bars when in rest areas. Bars will reappear if you enter combat.",
     })
+
+    local fadeInit = SB.PathControl({
+        type = "checkbox",
+        path = "global.outOfCombatFade.enabled",
+        name = "Fade when Out of Combat",
+        tooltip = "Automatically fade bars when out of combat to reduce screen clutter.",
+    })
+
+    SB.PathControl({
+        type = "slider",
+        path = "global.outOfCombatFade.opacity",
+        name = "Out of Combat Opacity",
+        tooltip = "How visible the bars are when faded (0%% = invisible, 100%% = fully visible).",
+        min = 0,
+        max = 100,
+        step = 5,
+        parent = fadeInit,
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "global.outOfCombatFade.exceptInInstance",
+        name = "Except Inside Instances",
+        parent = fadeInit,
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "global.outOfCombatFade.exceptIfTargetCanBeAttacked",
+        name = "Except if Target is Hostile",
+        parent = fadeInit,
+    })
+
+    SB.PathControl({
+        type = "checkbox",
+        path = "global.outOfCombatFade.exceptIfTargetCanBeHelped",
+        name = "Except if Target is Friendly",
+        parent = fadeInit,
+    })
+
+    SB.Header("Appearance")
 
     SB.PathControl({
         type = "custom",
@@ -98,8 +139,8 @@ function GeneralOptions.RegisterSettings(SB)
     SB.PathControl({
         type = "slider",
         path = "global.moduleSpacing",
-        name = "Module Spacing",
-        tooltip = "Vertical spacing between modules. Spacing between individual buff bars is configured separately.",
+        name = "Vertical Spacing",
+        tooltip = "Vertical spacing between modules. Spacing between buff bars is controlled separately.",
         min = 0,
         max = 20,
         step = 1,
@@ -109,55 +150,13 @@ function GeneralOptions.RegisterSettings(SB)
     SB.PathControl({
         type = "dropdown",
         path = "global.moduleGrowDirection",
-        name = "Module Grow Direction",
-        tooltip = "Choose whether chained modules stack below or above the cooldown viewer.",
+        name = "Grow Direction",
+        tooltip = "Display bars above or below the cooldown viewer.",
         values = {
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
         getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
-    })
-
-    -- Combat Fade
-    SB.Header("Combat Fade")
-
-    local fadeInit = SB.PathControl({
-        type = "checkbox",
-        path = "global.outOfCombatFade.enabled",
-        name = "Fade when out of combat",
-        tooltip = "Automatically fade bars when out of combat to reduce screen clutter.",
-    })
-
-    SB.PathControl({
-        type = "slider",
-        path = "global.outOfCombatFade.opacity",
-        name = "Out of combat opacity",
-        tooltip = "How visible the bars are when faded (0%% = invisible, 100%% = fully visible).",
-        min = 0,
-        max = 100,
-        step = 5,
-        parent = fadeInit,
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "global.outOfCombatFade.exceptInInstance",
-        name = "Except inside instances",
-        parent = fadeInit,
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "global.outOfCombatFade.exceptIfTargetCanBeAttacked",
-        name = "Except when your current target can be attacked",
-        parent = fadeInit,
-    })
-
-    SB.PathControl({
-        type = "checkbox",
-        path = "global.outOfCombatFade.exceptIfTargetCanBeHelped",
-        name = "Except when your current target can be helped",
-        parent = fadeInit,
     })
 end
 

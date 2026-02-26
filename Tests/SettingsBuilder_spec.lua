@@ -165,9 +165,11 @@ describe("SettingsBuilder", function()
     end)
 
     -- Category lifecycle
-    it("CreateRootCategory, CreateSubcategory, GetCategoryID", function()
-        assert.is_not_nil(SB.GetCategoryID())
-        assert.are.equal("TestAddon", SB.GetCategoryID())
+    it("CreateRootCategory, CreateSubcategory, GetRootCategoryID, GetSubcategoryID", function()
+        assert.is_not_nil(SB.GetRootCategoryID())
+        assert.are.equal("TestAddon", SB.GetRootCategoryID())
+        assert.is_not_nil(SB.GetSubcategoryID("TestSection"))
+        assert.is_nil(SB.GetSubcategoryID("MissingSection"))
     end)
 
     it("RegisterCategories does not error", function()
@@ -418,6 +420,62 @@ describe("SettingsBuilder", function()
         assert.are.equal(1, #childInit._shownPredicates)
     end)
 
+    it("Parent-controlled dropdown is disabled when parent is unchecked", function()
+        local parentInit, parentSetting = SB.PathCheckbox({
+            path = "global.nested.enabled",
+            name = "Parent",
+        })
+
+        local childInit = SB.PathDropdown({
+            path = "global.mode",
+            name = "Child",
+            values = { solid = "Solid", flat = "Flat" },
+            parent = parentInit,
+            parentCheck = function() return parentSetting:GetValue() end,
+        })
+
+        local enabledPredicate = childInit._modifyPredicates[1]
+        assert.is_true(enabledPredicate())
+
+        parentSetting:SetValue(false)
+        assert.is_false(enabledPredicate())
+    end)
+
+    it("Parent-controlled custom picker is disabled when parent is unchecked", function()
+        local parentInit, parentSetting = SB.PathCheckbox({
+            path = "global.nested.enabled",
+            name = "Parent",
+        })
+
+        local customEnabled
+        local originalCreateElementInitializer = Settings.CreateElementInitializer
+        Settings.CreateElementInitializer = function(frameTemplate, data)
+            local init = originalCreateElementInitializer(frameTemplate, data)
+            init.SetEnabled = function(_, enabled)
+                customEnabled = enabled
+            end
+            return init
+        end
+
+        local childInit = SB.PathCustom({
+            path = "global.font",
+            name = "Custom picker",
+            template = "TestTexturePickerTemplate",
+            parent = parentInit,
+            parentCheck = function() return parentSetting:GetValue() end,
+        })
+
+        Settings.CreateElementInitializer = originalCreateElementInitializer
+
+        local enabledPredicate = childInit._modifyPredicates[1]
+        assert.is_true(customEnabled)
+        assert.is_true(enabledPredicate())
+
+        parentSetting:SetValue(false)
+        assert.is_false(enabledPredicate())
+        assert.is_false(customEnabled)
+    end)
+
     -- ModuleEnabledCheckbox
     it("ModuleEnabledCheckbox calls SetModuleEnabled", function()
         local enabledModule, enabledValue
@@ -434,6 +492,105 @@ describe("SettingsBuilder", function()
         setting:SetValue(false)
         assert.are.equal("PowerBar", enabledModule)
         assert.are.equal(false, enabledValue)
+    end)
+
+    it("ModuleEnabledCheckbox disables embedded canvas controls when unchecked", function()
+        local _, moduleSetting = SB.ModuleEnabledCheckbox("PowerBar", {
+            path = "powerBar.enabled",
+            name = "Enable",
+            setModuleEnabled = function() end,
+        })
+
+        local childEnabled, childMouseEnabled
+        local child = {
+            SetEnabled = function(_, enabled)
+                childEnabled = enabled
+            end,
+            EnableMouse = function(_, enabled)
+                childMouseEnabled = enabled
+            end,
+            GetChildren = function()
+                return nil
+            end,
+        }
+
+        local canvasEnabled, canvasMouseEnabled, canvasAlpha
+        local canvas = {
+            SetEnabled = function(_, enabled)
+                canvasEnabled = enabled
+            end,
+            EnableMouse = function(_, enabled)
+                canvasMouseEnabled = enabled
+            end,
+            SetAlpha = function(_, alpha)
+                canvasAlpha = alpha
+            end,
+            GetChildren = function()
+                return child
+            end,
+            GetHeight = function()
+                return 100
+            end,
+        }
+
+        local initializer = SB.EmbedCanvas(canvas, 100)
+        assert.is_true(canvasEnabled)
+        assert.is_true(canvasMouseEnabled)
+        assert.is_true(childEnabled)
+        assert.is_true(childMouseEnabled)
+        assert.are.equal(1, canvasAlpha)
+
+        moduleSetting:SetValue(false)
+
+        local enabledPredicate = initializer._modifyPredicates[1]
+        assert.is_false(enabledPredicate())
+        assert.is_false(canvasEnabled)
+        assert.is_false(canvasMouseEnabled)
+        assert.is_false(childEnabled)
+        assert.is_false(childMouseEnabled)
+        assert.are.equal(0.5, canvasAlpha)
+
+        moduleSetting:SetValue(true)
+        enabledPredicate = initializer._modifyPredicates[1]
+        assert.is_true(enabledPredicate())
+        assert.is_true(canvasEnabled)
+        assert.is_true(canvasMouseEnabled)
+        assert.is_true(childEnabled)
+        assert.is_true(childMouseEnabled)
+        assert.are.equal(1, canvasAlpha)
+    end)
+
+    it("ModuleEnabledCheckbox disables PathColor controls when unchecked", function()
+        local _, moduleSetting = SB.ModuleEnabledCheckbox("PowerBar", {
+            path = "powerBar.enabled",
+            name = "Enable",
+            setModuleEnabled = function() end,
+        })
+
+        local colorControlEnabled
+        local originalCreateColorSwatch = Settings.CreateColorSwatch
+        Settings.CreateColorSwatch = function(cat, setting, tooltip)
+            local init = originalCreateColorSwatch(cat, setting, tooltip)
+            init.SetEnabled = function(_, enabled)
+                colorControlEnabled = enabled
+            end
+            return init
+        end
+
+        local initializer = SB.PathColor({
+            path = "powerBar.border.color",
+            name = "Border color",
+        })
+
+        Settings.CreateColorSwatch = originalCreateColorSwatch
+
+        assert.is_true(colorControlEnabled)
+
+        moduleSetting:SetValue(false)
+
+        local enabledPredicate = initializer._modifyPredicates[1]
+        assert.is_false(enabledPredicate())
+        assert.is_false(colorControlEnabled)
     end)
 
     -- HeightOverrideSlider
@@ -482,6 +639,10 @@ describe("SettingsBuilder", function()
         assert.are.equal(2, #results)
         assert.are.equal(0, results[1].key)
         assert.are.equal(1, results[2].key)
+        assert.are.equal(100, results[1].initializer._lsbColorPickerWidth)
+        assert.is_true(results[1].initializer._lsbAlignName)
+        assert.are.equal(100, results[2].initializer._lsbColorPickerWidth)
+        assert.is_true(results[2].initializer._lsbAlignName)
     end)
 
     -- PositioningGroup

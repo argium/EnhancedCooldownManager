@@ -123,6 +123,64 @@ if not lib._sliderHookInstalled then
 end
 
 --------------------------------------------------------------------------------
+-- Color swatch layout hook (global, runs once per lib version)
+--------------------------------------------------------------------------------
+
+if not lib._colorSwatchHookInstalled then
+    local function setupColorSwatchLayout()
+        if not SettingsColorSwatchControlMixin then return end
+
+        local function findSwatchControl(control)
+            if control.ColorSelector then return control.ColorSelector end
+            if control.ColorSwatch then return control.ColorSwatch end
+            if control.Button then return control.Button end
+            return nil
+        end
+
+        local function findNameLabel(control)
+            if control.Name then return control.Name end
+            if control.Label then return control.Label end
+            if control.label then return control.label end
+            return nil
+        end
+
+        hooksecurefunc(SettingsColorSwatchControlMixin, "Init", function(self, initializer)
+            if not initializer then return end
+
+            local pickerWidth = initializer._lsbColorPickerWidth
+            local alignName = initializer._lsbAlignName
+            if not pickerWidth and not alignName then return end
+
+            local swatchControl = findSwatchControl(self)
+            if swatchControl and pickerWidth and swatchControl.SetWidth then
+                swatchControl:SetWidth(pickerWidth)
+                if swatchControl.ClearAllPoints and swatchControl.SetPoint then
+                    swatchControl:ClearAllPoints()
+                    swatchControl:SetPoint("RIGHT", self, "RIGHT", 0, 0)
+                end
+            end
+
+            local nameLabel = findNameLabel(self)
+            if nameLabel and alignName then
+                if nameLabel.SetJustifyH then
+                    nameLabel:SetJustifyH("LEFT")
+                end
+                if nameLabel.ClearAllPoints and nameLabel.SetPoint then
+                    nameLabel:ClearAllPoints()
+                    nameLabel:SetPoint("LEFT", self, "LEFT", 0, 0)
+                    if swatchControl then
+                        nameLabel:SetPoint("RIGHT", swatchControl, "LEFT", -8, 0)
+                    end
+                end
+            end
+        end)
+    end
+
+    setupColorSwatchLayout()
+    lib._colorSwatchHookInstalled = true
+end
+
+--------------------------------------------------------------------------------
 -- Factory
 --------------------------------------------------------------------------------
 
@@ -190,28 +248,79 @@ function lib:New(config)
         config.onChanged(spec, value)
     end
 
+    local function setCanvasInteractive(frame, enabled)
+        if frame.SetEnabled then
+            frame:SetEnabled(enabled)
+        end
+        if frame.EnableMouse then
+            frame:EnableMouse(enabled)
+        end
+        if frame.GetChildren then
+            for _, child in ipairs({ frame:GetChildren() }) do
+                setCanvasInteractive(child, enabled)
+            end
+        end
+    end
+
+    local function isParentEnabled(spec)
+        if not spec.parent then
+            return true
+        end
+
+        if spec.parentCheck then
+            return spec.parentCheck()
+        end
+
+        local setting = spec.parent:GetSetting()
+        return setting and setting:GetValue()
+    end
+
+    local function isControlEnabled(spec)
+        if SB._pageEnabledSetting and not spec._isModuleEnabled then
+            if not SB._pageEnabledSetting:GetValue() then return false end
+        end
+        if spec.disabled and spec.disabled() then return false end
+        return isParentEnabled(spec)
+    end
+
+    local function setInitializerInteractive(initializer, enabled)
+        if initializer and initializer.SetEnabled then
+            initializer:SetEnabled(enabled)
+        end
+    end
+
+    local function applyCanvasState(canvas, enabled)
+        if canvas.SetAlpha then
+            canvas:SetAlpha(enabled and 1 or 0.5)
+        end
+        setCanvasInteractive(canvas, enabled)
+    end
+
     local function applyModifiers(initializer, spec)
         if not initializer then return end
 
-        if SB._pageEnabledSetting and not spec._isModuleEnabled then
-            local enabledSetting = SB._pageEnabledSetting
+        if (SB._pageEnabledSetting and not spec._isModuleEnabled) or spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
-                return enabledSetting:GetValue()
+                local enabled = isControlEnabled(spec)
+                setInitializerInteractive(initializer, enabled)
+                if spec.canvas then
+                    applyCanvasState(spec.canvas, enabled)
+                end
+                return enabled
             end)
+
+            local enabled = isControlEnabled(spec)
+            setInitializerInteractive(initializer, enabled)
+            if spec.canvas then
+                applyCanvasState(spec.canvas, enabled)
+            end
         end
 
         if spec.parent then
-            local predicate = spec.parentCheck or function()
-                local setting = spec.parent:GetSetting()
-                return setting and setting:GetValue()
+            local predicate = function()
+                return isParentEnabled(spec)
             end
             initializer:SetParentInitializer(spec.parent, predicate)
-        end
-
-        if spec.disabled then
-            initializer:AddModifyPredicate(function()
-                return not spec.disabled()
-            end)
         end
 
         if spec.hidden then
@@ -273,8 +382,19 @@ function lib:New(config)
         end
     end
 
-    function SB.GetCategoryID()
+    function SB.GetRootCategoryID()
         return SB._rootCategory and SB._rootCategory:GetID()
+    end
+
+    function SB.GetSubcategoryID(name)
+        local category = SB._subcategories[name]
+        if not category then
+            return nil
+        end
+        if type(category) == "table" and type(category.GetID) == "function" then
+            return category:GetID()
+        end
+        return category
     end
 
     ----------------------------------------------------------------------------
@@ -406,6 +526,12 @@ function lib:New(config)
             Settings.VarType.String, spec.name, defaultHex, getter, setter)
 
         local initializer = Settings.CreateColorSwatch(cat, setting, spec.tooltip)
+        if spec.pickerWidth then
+            initializer._lsbColorPickerWidth = spec.pickerWidth
+        end
+        if spec.alignName ~= nil then
+            initializer._lsbAlignName = spec.alignName
+        end
         applyModifiers(initializer, spec)
 
         return initializer, setting
@@ -637,6 +763,8 @@ function lib:New(config)
     function SB.ColorPickerList(basePath, defs, spec)
         spec = spec or {}
         local results = {}
+        local pickerWidth = spec.pickerWidth or 100
+        local alignName = spec.alignName ~= false
 
         for _, def in ipairs(defs) do
             local path = basePath .. "." .. tostring(def.key)
@@ -646,6 +774,8 @@ function lib:New(config)
                 tooltip = def.tooltip,
                 category = spec.category,
                 hasAlpha = def.hasAlpha,
+                pickerWidth = pickerWidth,
+                alignName = alignName,
                 parent = spec.parent,
                 parentCheck = spec.parentCheck,
                 disabled = spec.disabled,
@@ -780,13 +910,19 @@ function lib:New(config)
         spec = spec or {}
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
 
+        local modifiers = {}
+        for k, v in pairs(spec) do
+            modifiers[k] = v
+        end
+        modifiers.canvas = canvas
+
         local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE,
             { canvas = canvas })
         local extent = height or canvas:GetHeight()
         initializer.GetExtent = function() return extent end
 
         Settings.RegisterInitializer(cat, initializer)
-        applyModifiers(initializer, spec)
+        applyModifiers(initializer, modifiers)
 
         return initializer
     end

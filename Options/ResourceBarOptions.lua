@@ -28,37 +28,30 @@ end
 function ResourceBarOptions.RegisterSettings(SB)
     SB.CreateSubcategory("Resource Bar")
 
-    SB.Header("Resource Bar")
-
     SB.ModuleEnabledCheckbox("ResourceBar", {
         path = "resourceBar.enabled",
         name = "Enable resource bar",
-        hidden = isDeathKnight,
+        disabled = isDeathKnight,
     })
 
-    SB.HeightOverrideSlider("resourceBar", { hidden = isDeathKnight })
-
-    SB.Header("Display")
+    SB.Header("Appearance")
 
     SB.PathControl({
         type = "checkbox",
         path = "resourceBar.showText",
         name = "Show text",
         tooltip = "Display the current value on the bar.",
-        hidden = isDeathKnight,
+        disabled = isDeathKnight,
     })
+    SB.HeightOverrideSlider("resourceBar", { disabled = isDeathKnight })
+    SB.BorderGroup("resourceBar.border", { disabled = isDeathKnight })
+    SB.FontOverrideGroup("resourceBar", { disabled = isDeathKnight })
 
-    SB.Header("Border")
-    SB.BorderGroup("resourceBar.border", { hidden = isDeathKnight })
-
-    SB.Header("Font")
-    SB.FontOverrideGroup("resourceBar", { hidden = isDeathKnight })
-
-    SB.Header("Positioning")
-    SB.PositioningGroup("resourceBar", { hidden = isDeathKnight })
+    SB.Header("Layout")
+    SB.PositioningGroup("resourceBar", { disabled = isDeathKnight })
 
     SB.Header("Colors")
-    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { hidden = isDeathKnight })
+    SB.ColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, { disabled = isDeathKnight })
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)

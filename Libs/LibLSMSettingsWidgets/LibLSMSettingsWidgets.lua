@@ -48,6 +48,14 @@ end
 -- Font Picker Mixin
 --------------------------------------------------------------------------------
 
+local function setPickerEnabled(self, enabled)
+    if self.DropDown.SetEnabled then self.DropDown:SetEnabled(enabled) end
+    if self.DropDown.EnableMouse then self.DropDown:EnableMouse(enabled) end
+    if self.DropDownHost.SetEnabled then self.DropDownHost:SetEnabled(enabled) end
+    if self.DropDownHost.EnableMouse then self.DropDownHost:EnableMouse(enabled) end
+    self.Preview[enabled and "Show" or "Hide"](self.Preview)
+end
+
 LibLSMSettingsWidgets_FontPickerMixin = {}
 
 function LibLSMSettingsWidgets_FontPickerMixin:OnLoad()
@@ -87,6 +95,8 @@ function LibLSMSettingsWidgets_FontPickerMixin:Init(initializer)
     self:SetupDropdown()
     self:UpdatePreview()
 end
+
+LibLSMSettingsWidgets_FontPickerMixin.SetEnabled = setPickerEnabled
 
 function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
     local setting = self.setting
@@ -170,6 +180,8 @@ function LibLSMSettingsWidgets_TexturePickerMixin:Init(initializer)
     self:SetupDropdown()
     self:UpdatePreview()
 end
+
+LibLSMSettingsWidgets_TexturePickerMixin.SetEnabled = setPickerEnabled
 
 function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
     local setting = self.setting

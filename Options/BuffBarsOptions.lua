@@ -250,7 +250,8 @@ function BuffBarsOptions.RegisterSettings(SB)
 
     -- Basic Settings
 
-    local _, enabledSetting = SB.PathControl({
+    local enabledSetting
+    _, enabledSetting = SB.PathControl({
         type = "checkbox",
         path = "buffBars.enabled",
         name = "Enable aura bars",

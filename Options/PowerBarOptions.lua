@@ -21,18 +21,12 @@ local PowerBarOptions = {}
 function PowerBarOptions.RegisterSettings(SB)
     SB.CreateSubcategory("Power Bar")
 
-    -- Basic Settings
-    SB.Header("Power Bar")
-
     SB.ModuleEnabledCheckbox("PowerBar", {
         path = "powerBar.enabled",
         name = "Enable power bar",
     })
 
-    SB.HeightOverrideSlider("powerBar")
-
-    -- Display
-    SB.Header("Display")
+    SB.Header("Appearance")
 
     SB.PathControl({
         type = "checkbox",
@@ -40,27 +34,19 @@ function PowerBarOptions.RegisterSettings(SB)
         name = "Show text",
         tooltip = "Display the current value on the bar.",
     })
-
     SB.PathControl({
         type = "checkbox",
         path = "powerBar.showManaAsPercent",
         name = "Show mana as percent",
         tooltip = "Display mana as percentage instead of raw value.",
     })
-
-    -- Border
-    SB.Header("Border")
+    SB.HeightOverrideSlider("powerBar")
     SB.BorderGroup("powerBar.border")
-
-    -- Font
-    SB.Header("Font")
     SB.FontOverrideGroup("powerBar")
 
-    -- Positioning
-    SB.Header("Positioning")
+    SB.Header("Layout")
     SB.PositioningGroup("powerBar")
 
-    -- Colors
     SB.Header("Colors")
     SB.ColorPickerList("powerBar.colors", POWER_COLOR_DEFS)
 

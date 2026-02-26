@@ -8,7 +8,7 @@ local mod = ns.Addon
 local AboutOptions = {}
 
 function AboutOptions.RegisterSettings(SB)
-    SB.CreateSubcategory("About")
+    SB.UseRootCategory()
 
     SB.Header("Troubleshooting")
 

@@ -13,8 +13,9 @@ function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
     SB.CreateRootCategory(C.ADDON_NAME)
 
-    -- Register sections in display order (General is on the root page)
+    -- Register sections in display order (About is on the root page)
     local sectionOrder = {
+        "About",
         "General",
         "PowerBar",
         "ResourceBar",
@@ -22,7 +23,6 @@ function Options:OnInitialize()
         "BuffBars",
         "ItemIcons",
         "Profile",
-        "About",
     }
 
     for _, key in ipairs(sectionOrder) do
@@ -45,7 +45,8 @@ function Options:OnProfileChanged()
 end
 
 function Options:OpenOptions()
-    local categoryID = ECM.SettingsBuilder.GetCategoryID()
+    local categoryID = ECM.SettingsBuilder.GetSubcategoryID("General")
+        or ECM.SettingsBuilder.GetRootCategoryID()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end

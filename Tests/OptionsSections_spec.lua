@@ -123,15 +123,22 @@ describe("Options sections and root assembly", function()
         createdModule:OnInitialize()
 
         -- All 8 sections should have been called, in order
-        assert.are.equal(8, #registerSettingsCalls)
-        assert.are.equal("General", registerSettingsCalls[1])
-        assert.are.equal("About", registerSettingsCalls[8])
+        assert.are.same({
+            "About",
+            "General",
+            "PowerBar",
+            "ResourceBar",
+            "RuneBar",
+            "BuffBars",
+            "ItemIcons",
+            "Profile",
+        }, registerSettingsCalls)
 
         -- DB callbacks registered
         assert.are.equal(3, #dbCallbacks)
 
-        -- GetCategoryID returns something
-        assert.is_not_nil(ECM.SettingsBuilder.GetCategoryID())
+        -- GetRootCategoryID returns something
+        assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()

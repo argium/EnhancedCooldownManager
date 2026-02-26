@@ -25,15 +25,14 @@ function RuneBarOptions.RegisterSettings(SB)
         disabled = isNotDeathKnight,
     })
 
-    SB.HeightOverrideSlider("runeBar", { disabled = isNotDeathKnight })
+    SB.Header("Appearance")
 
-    SB.Header("Font")
+    SB.HeightOverrideSlider("runeBar", { disabled = isNotDeathKnight })
     SB.FontOverrideGroup("runeBar", { disabled = isNotDeathKnight })
 
     SB.Header("Positioning")
     SB.PositioningGroup("runeBar", { disabled = isNotDeathKnight })
 
-    -- Colors
     SB.Header("Colors")
 
     local specInit, specSetting = SB.PathControl({
