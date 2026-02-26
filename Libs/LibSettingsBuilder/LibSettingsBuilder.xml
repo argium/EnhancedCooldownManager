@@ -8,7 +8,7 @@
         </Scripts>
     </Frame>
 
-    <Frame name="LibSettingsBuilder_LabelTemplate" mixin="LibSettingsBuilder_LabelMixin" virtual="true">
+    <Frame name="LibSettingsBuilder_SubheaderTemplate" mixin="LibSettingsBuilder_SubheaderMixin" virtual="true">
         <Size x="30" y="35"/>
         <Layers>
             <Layer level="OVERLAY">

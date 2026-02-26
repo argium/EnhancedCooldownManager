@@ -374,22 +374,22 @@ Inserts a section header into the vertical list. Wraps `CreateSettingsListSectio
 SB.Header("Colors")
 ```
 
-### `SB.Label(spec)`
+### `SB.Subheader(spec)`
 
-Inserts a smaller, lighter sub-section heading into the vertical list. Uses `GameFontHighlightSmall` (white, small) rather than the bold yellow `GameFontNormal` used by `SB.Header`. Matches the style used by Blizzard's Accessibility → Colors page for headings like "Item Quality".
+Inserts a sub-section heading into the vertical list using `GameFontNormal` — the same font style as a normal control's label text. Has no control widget; used exclusively as a parent initializer to nest controls underneath it.
 
-Unlike `SB.Header`, no automatic deduplication is applied. Supports `parent`, `hidden`, and `disabled` modifiers via `applyModifiers`. Can be used as a parent initializer to nest controls underneath it.
+Unlike `SB.Header`, no automatic deduplication is applied. Supports `parent`, `hidden`, and `disabled` modifiers via `applyModifiers`.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | yes | Display text for the label |
+| `name` | string | yes | Display text for the subheader |
 | `category` | category | no | Override the target layout category |
 | `parent` | initializer | no | Parent initializer for nesting |
 | `hidden` | function | no | Predicate controlling visibility |
 | `disabled` | function | no | Predicate controlling enabled state |
 
 ```lua
-local colorLabel = SB.Label({ name = "Item Quality" })
+local colorLabel = SB.Subheader({ name = "Colors" })
 SB.ColorPickerList("items.colors", COLOR_DEFS, { parent = colorLabel })
 ```
 
@@ -578,7 +578,7 @@ Standard types (AceConfig aliases are supported):
 | `custom` | — | `PathCustom` |
 | `button` | `execute` | `Button` |
 | `header` | — | `Header` |
-| `label` | `description` | `Label` |
+| `label` | `description` | `Subheader` |
 
 LSB composite types (no AceConfig equivalent):
 

@@ -44,8 +44,9 @@ describe("SettingsBuilder", function()
             "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_LabelMixin",
-            "GameFontHighlightSmall",
+            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
+            "LibSettingsBuilder_ScrollDropdownMixin",
+            "GameFontHighlightSmall", "GameFontNormal",
         })
     end)
 
@@ -62,6 +63,7 @@ describe("SettingsBuilder", function()
         _G.ECM_CloneValue = deepClone
         _G.ECM_DeepEquals = deepEquals
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
+        _G.GameFontNormal = "GameFontNormal"
 
         _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
         _G.GetSpecialization = function() return 1 end
@@ -376,23 +378,23 @@ describe("SettingsBuilder", function()
         assert.are.equal("Test Header", init._text)
     end)
 
-    -- Label
-    it("Label adds element initializer with small font template", function()
-        local init = SB.Label({ name = "Item Quality" })
+    -- Subheader
+    it("Subheader adds element initializer with normal font template", function()
+        local init = SB.Subheader({ name = "Item Quality" })
         assert.is_not_nil(init)
-        assert.are.equal("LibSettingsBuilder_LabelTemplate", init._template)
+        assert.are.equal("LibSettingsBuilder_SubheaderTemplate", init._template)
         assert.are.equal("Item Quality", init.data.name)
     end)
 
-    it("Label respects explicit category via UseRootCategory", function()
+    it("Subheader respects explicit category via UseRootCategory", function()
         SB.UseRootCategory()
-        local init = SB.Label({ name = "Root Sub" })
+        local init = SB.Subheader({ name = "Root Sub" })
         assert.is_not_nil(init)
         assert.are.equal("Root Sub", init.data.name)
     end)
 
-    it("Label as parent — isParentEnabled returns true", function()
-        local labelInit = SB.Label({ name = "Colors" })
+    it("Subheader as parent — isParentEnabled returns true", function()
+        local labelInit = SB.Subheader({ name = "Colors" })
         local childInit = SB.PathCheckbox({
             path = "global.hideWhenMounted",
             name = "Child",

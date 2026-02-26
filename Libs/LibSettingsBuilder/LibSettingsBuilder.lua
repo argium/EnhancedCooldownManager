@@ -7,21 +7,21 @@ local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
 lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
-lib.LABEL_TEMPLATE = "LibSettingsBuilder_LabelTemplate"
+lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
 
 --------------------------------------------------------------------------------
--- Label Mixin (global, shared across all instances)
--- Own mixin instead of SettingsListSectionHeaderMixin so the font object
--- cannot be overridden by Blizzard code.
+-- Subheader Mixin (global, shared across all instances)
+-- Renders as a normal control label (GameFontNormal) with no control widget.
+-- Used exclusively as a parent for sub-settings.
 --------------------------------------------------------------------------------
 
-LibSettingsBuilder_LabelMixin = LibSettingsBuilder_LabelMixin or {}
+LibSettingsBuilder_SubheaderMixin = LibSettingsBuilder_SubheaderMixin or {}
 
-function LibSettingsBuilder_LabelMixin:Init(initializer)
+function LibSettingsBuilder_SubheaderMixin:Init(initializer)
     local name = initializer:GetData().name
     self.Title:SetText(name)
-    self.Title:SetFontObject(GameFontHighlightSmall)
+    self.Title:SetFontObject(GameFontNormal)
 end
 
 --------------------------------------------------------------------------------
@@ -279,7 +279,7 @@ function lib:New(config)
     SB._pageEnabledSetting = nil
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
-    SB.LABEL_TEMPLATE = lib.LABEL_TEMPLATE
+    SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
     SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
 
     ----------------------------------------------------------------------------
@@ -973,10 +973,10 @@ function lib:New(config)
         return initializer
     end
 
-    function SB.Label(spec)
+    function SB.Subheader(spec)
         local cat = resolveCategory(spec)
         local layout = SB._layouts[cat]
-        local initializer = Settings.CreateElementInitializer(lib.LABEL_TEMPLATE, { name = spec.name })
+        local initializer = Settings.CreateElementInitializer(lib.SUBHEADER_TEMPLATE, { name = spec.name })
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer
@@ -1042,7 +1042,7 @@ function lib:New(config)
         range = "slider",
         select = "dropdown",
         execute = "button",
-        description = "label",
+        description = "subheader",
     }
 
     local COMPOSITE_TYPES = {
@@ -1150,8 +1150,8 @@ function lib:New(config)
                 if entryType == "header" then
                     init = SB.Header(spec.name)
 
-                elseif entryType == "label" then
-                    init = SB.Label(spec)
+                elseif entryType == "subheader" then
+                    init = SB.Subheader(spec)
 
                 elseif entryType == "button" then
                     init = SB.Button(spec)
@@ -1177,7 +1177,7 @@ function lib:New(config)
                 elseif entryType == "colorList" then
                     local defs = entry.defs or {}
                     if entry.label then
-                        local labelInit = SB.Label({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
+                        local labelInit = SB.Subheader({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
                         spec.parent = spec.parent or labelInit
                     end
                     local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)

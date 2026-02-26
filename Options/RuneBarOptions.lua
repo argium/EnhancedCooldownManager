@@ -25,7 +25,7 @@ function RuneBarOptions.RegisterSettings(SB)
             appearanceHeader = { type = "header", name = "Appearance", order = 20 },
             heightOverride = { type = "heightOverride", order = 21 },
             fontOverride = { type = "fontOverride", order = 22 },
-            colorLabel = { type = "label", name = "Colors", order = 30 },
+            colorLabel = { type = "subheader", name = "Colors", order = 30 },
             useSpecColor = { type = "checkbox", path = "useSpecColor", name = "Use specialization color", desc = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below.", parent = "colorLabel", order = 31 },
             runeColor = { type = "color", path = "color", name = "Rune color", parent = "useSpecColor", parentCheck = "notChecked", order = 32 },
             bloodColor = { type = "color", path = "colorBlood", name = "Blood color", parent = "useSpecColor", parentCheck = "checked", order = 33 },
