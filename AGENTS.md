@@ -1,4 +1,4 @@
-## Design
+# Coding
 
 The profile is split into GLOBAL and a SECTION specific to the module (typically matching the file name, in camel case).  See [Defaults.lua](Defaults.lua)
 
@@ -19,6 +19,22 @@ The profile is split into GLOBAL and a SECTION specific to the module (typically
 - Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
 - Layout/refresh/throttle logic lives in `FrameUtil` as stateless utility functions. ModuleMixin provides thin overrideable wrappers. Modules that override `Refresh` should call `FrameUtil.BaseRefresh(self, why, force)` as the guard, not `ModuleMixin.Refresh`.
 - NEVER listen to the expensive "OnUpdate" event.
+- Do not create local functions that are exported later. All exported functions must be created using the `VAR:FunctionName(...)` pattern.
+
+# Code Review
+
+Your code will be reviewed by a distinguished engineer. Highly analytical who prioritises code excellence, impeccable design, elegance and simplicity, and is sceptical of poor-quality changes.
+They are on special lookout for:
+- Unused variables.
+- Unnecessary assignments, guards, functions, boilerplate.
+- No human-friendly and understandable comments for complex sections.
+- Inefficiencies.
+- Tight coupling and poor or no boundaries between components.
+- Code duplication.
+-
+- Low reusability; poor future extensibility.
+- Unnecessary complexity.
+- Test coverage; edge cases; gaps.
 
 # Secret Values
 
