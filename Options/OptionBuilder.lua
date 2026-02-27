@@ -441,7 +441,6 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".height",
         name = "Height Override",
         order = orderBase + 1,
-        width = "half",
         min = 0,
         max = 40,
         step = 1,
@@ -481,7 +480,6 @@ local function BuildFontOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".font",
         name = "Font",
         order = orderBase + 2,
-        width = "half",
         dialogControl = "LSM30_Font",
         values = ECM.SharedMediaOptions.GetFontValues,
         getTransform = function(value)
@@ -496,7 +494,6 @@ local function BuildFontOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".fontSize",
         name = "Font Size",
         order = orderBase + 4,
-        width = "half",
         min = 6,
         max = 32,
         step = 1,
