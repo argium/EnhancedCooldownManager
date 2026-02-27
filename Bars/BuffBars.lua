@@ -95,7 +95,7 @@ end
 local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debuffBorder)
     if not iconFrame then return end
     if iconFrame.__ecmSquareStyled then return end
-    iconFrame.__ecmSquareStyled = true
+    if not iconTexture then return end
 
     local info = {
         hasIconTexture = iconTexture ~= nil,
@@ -165,6 +165,8 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
     if didWork then
         ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup", info)
     end
+
+    iconFrame.__ecmSquareStyled = true
 end
 
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar

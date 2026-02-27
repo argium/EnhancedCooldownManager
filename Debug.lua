@@ -9,10 +9,6 @@ local function is_debug_enabled()
     return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
 end
 
-local function is_debug_enabled()
-    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
-end
-
 --- Logs a debug message to DevTool and, when debug mode is enabled, to the chat window.
 --- @param module string|nil Module name
 --- @param message string Debug message
