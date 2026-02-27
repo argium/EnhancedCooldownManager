@@ -31,11 +31,10 @@ describe("ClassUtil", function()
             "C_UnitAuras",
             "C_Spell",
             "C_SpellBook",
-            "ECM_debug_assert",
         })
 
         _G.ECM = {}
-        _G.ECM_debug_assert = function() end
+        _G.ECM.DebugAssert = function() end
         _G.GetShapeshiftForm = function()
             return 0
         end
@@ -163,7 +162,7 @@ describe("ClassUtil", function()
             assertResourceType(
                 ECM.Constants.CLASS.DEMONHUNTER,
                 ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX,
-                "souls"
+                ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS
             )
         end)
 
@@ -173,7 +172,7 @@ describe("ClassUtil", function()
             assertResourceType(
                 ECM.Constants.CLASS.DEMONHUNTER,
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
-                "devourerNormal"
+                ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
             )
         end)
 
@@ -183,7 +182,7 @@ describe("ClassUtil", function()
             assertResourceType(
                 ECM.Constants.CLASS.DEMONHUNTER,
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
-                "devourerMeta"
+                ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
             )
         end)
 
@@ -201,10 +200,10 @@ describe("ClassUtil", function()
             assertResourceForSpecs(ECM.Constants.CLASS.HUNTER, { 1, 2, 3 }, nil)
         end)
 
-        it("returns arcane charges for arcane mages and nil for fire/frost", function()
+        it("returns arcane charges for arcane mages, nil for fire, and icicles for frost", function()
             assertResourceType(ECM.Constants.CLASS.MAGE, 1, Enum.PowerType.ArcaneCharges)
             assertResourceType(ECM.Constants.CLASS.MAGE, 2, nil)
-            assertResourceType(ECM.Constants.CLASS.MAGE, 3, nil)
+            assertResourceType(ECM.Constants.CLASS.MAGE, 3, ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
         end)
 
         it("returns chi for windwalker monks, nil for brewmaster and mistweaver", function()
@@ -258,26 +257,35 @@ describe("ClassUtil", function()
 
         it("returns souls values from spell cast count", function()
             CSpellStub.SetSpellCastCount(ECM.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID, 4)
-            assertValues("souls", ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 4)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 4)
         end)
 
         it("returns souls current value as zero when spell cast count is unavailable", function()
-            assertValues("souls", ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 0)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 0)
+        end)
+
+        it("returns icicles values from aura stacks for frost mage", function()
+            CUnitAurasStub.SetAura(ECM.Constants.RESOURCEBAR_ICICLES_SPELLID, { applications = 3 })
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 3)
+        end)
+
+        it("returns icicles zero stacks when no aura is present", function()
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 0)
         end)
 
         it("returns devourer meta values when collapsing star aura is active", function()
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 11 })
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_COLLAPSING_STAR, { applications = 7 })
-            assertValues("devourerMeta", ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, 7)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META, ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, 7)
         end)
 
         it("returns devourer normal values from void fragments when meta aura is inactive", function()
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 12 })
-            assertValues("devourerNormal", ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 12)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 12)
         end)
 
         it("returns devourer normal zero stacks when no aura is present", function()
-            assertValues("devourerNormal", ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 0)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 0)
         end)
 
         it("returns base maelstrom max when raging maelstrom talent is unknown", function()

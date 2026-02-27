@@ -219,6 +219,8 @@ local function printhelp()
     ECM_print("/ecm options|config|settings|o - open the options menu")
     ECM_print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
     ECM_print("/ecm migrationlog - show the settings migration log")
+    ECM_print("/ecm rollback [N] - delete current version settings and reload to re-migrate (optionally back to version N)")
+    ECM_print("/ecm clearcolors - wipe all spell bar colors for the current spec and refresh layout")
 
 end
 
@@ -261,6 +263,35 @@ function mod:ChatCommand(input)
         if optionsModule then
             optionsModule:OpenOptions()
         end
+        return
+    end
+
+    if cmd == "rollback" then
+        if InCombatLockdown() then
+            ECM_print("Cannot rollback during combat (UI reload is blocked).")
+            return
+        end
+        local targetVersion = arg ~= "" and tonumber(arg) or nil
+        if arg ~= "" and not targetVersion then
+            ECM_print("Usage: /ecm rollback [version_number]")
+            return
+        end
+        local ok, msg = ECM.Migration.ValidateRollback(targetVersion)
+        if not ok then
+            ECM_print(msg)
+            return
+        end
+        ECM_print(msg)
+        self:ConfirmReloadUI(msg, function()
+            ECM.Migration.Rollback(targetVersion)
+        end)
+        return
+    end
+
+    if cmd == "clearcolors" then
+        local cleared = ECM.SpellColors.ClearCurrentSpecColors()
+        ECM_print("Cleared " .. cleared .. " spell color entries for the current spec.")
+        ECM.ScheduleLayoutUpdate(0, "ClearColors")
         return
     end
 
@@ -310,10 +341,7 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM_log(ECM.Constants.SYS.Core, nil, "Initialize", {
-        schemaVersion = profile and profile.schemaVersion or "nil",
-        currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
-    })
+    ECM.Log("Initialize", "Schema version:", profile and profile.schemaVersion or "none" .. " Current version: " .. ECM.Constants.CURRENT_SCHEMA_VERSION)
 
     if profile and profile.schemaVersion and profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)

@@ -25,6 +25,10 @@ local function get_children_ordered(viewer)
         if child and child.Bar and child.cooldownID then
             local top = child.GetTop and child:GetTop()
             result[#result + 1] = { frame = child, top = top, order = insertOrder }
+        elseif not child.Bar then
+            ECM.Log(ECM.Constants.BUFFBARS, "Skipping child frame without Bar", { child = child })
+        elseif not child.cooldownID then
+            ECM.Log(ECM.Constants.BUFFBARS, "Skipping child frame without cooldownID", { child = child })
         end
     end
 
@@ -85,6 +89,78 @@ local function hook_child_frame(child, module)
     child.__ecmHooked = true
 end
 
+--- Strips circular masks and hides overlay/border to produce a square icon.
+--- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
+--- frame via `__ecmSquareStyled` so it only runs once per icon frame.
+---@param iconFrame Frame|nil
+---@param iconTexture Texture|nil
+---@param iconOverlay Texture|nil
+---@param debuffBorder Texture|nil
+local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debuffBorder)
+    if not iconFrame then return end
+    if iconFrame.__ecmSquareStyled then return end
+    iconFrame.__ecmSquareStyled = true
+
+    local textureMasksRemoved = 0
+    local frameMasksRemoved = 0
+    local usedSetMaskFallback = false
+
+    if iconTexture then
+        iconTexture:SetTexCoord(0, 1, 0, 1)
+
+        if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
+            for i = (iconTexture:GetNumMaskTextures() or 0), 1, -1 do
+                local mask = iconTexture:GetMaskTexture(i)
+                if mask then
+                    iconTexture:RemoveMaskTexture(mask)
+                    textureMasksRemoved = textureMasksRemoved + 1
+                    if mask.Hide then
+                        mask:Hide()
+                    end
+                end
+            end
+        elseif iconTexture.SetMask then
+            usedSetMaskFallback = true
+            pcall(iconTexture.SetMask, iconTexture, nil)
+        end
+
+        if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
+            for _, region in ipairs({ iconFrame:GetRegions() }) do
+                if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
+                    local ok = pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
+                    if ok then
+                        frameMasksRemoved = frameMasksRemoved + 1
+                    end
+                    if region.Hide then
+                        region:Hide()
+                    end
+                end
+            end
+        end
+    end
+
+    if iconOverlay then
+        iconOverlay:Hide()
+        iconOverlay:SetAlpha(0)
+    end
+
+    if debuffBorder then
+        debuffBorder:Hide()
+        debuffBorder:SetAlpha(0)
+    end
+
+    if textureMasksRemoved > 0 or frameMasksRemoved > 0 or usedSetMaskFallback
+        or iconOverlay or debuffBorder then
+        ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup", {
+            textureMasksRemoved = textureMasksRemoved,
+            frameMasksRemoved = frameMasksRemoved,
+            usedSetMaskFallback = usedSetMaskFallback,
+            hasOverlay = iconOverlay ~= nil,
+            hasDebuffBorder = debuffBorder ~= nil,
+        })
+    end
+end
+
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
 --- child frame. Lazy setters ensure no-ops when values haven't changed.
 ---@param frame ECM_BuffBarMixin
@@ -94,7 +170,7 @@ end
 ---@param retryCount number|nil Number of times this function has been retried
 local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
-        ECM_debug_assert(false, "Attempted to style a child frame that wasn't hooked.")
+        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
         return
     end
 
@@ -178,11 +254,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     _editLocked = _editLocked or allSecret
 
     -- Purely diagnostics to help track down issues with secrets
-    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
-    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
-    local logPrefix = "GetColorForBar[".. barIndex .."] "
-    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+    -- local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
+    -- local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
+    -- local logPrefix = "GetColorForBar[".. barIndex .."] "
+    -- local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
+    -- ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
@@ -194,11 +270,11 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
             -- default while we wait for secrets to clear.
             barColor = nil
         elseif not _warned then
-            ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
+            -- ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             _warned = true
         end
     elseif retryCount > 0 then
-        ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
+        -- ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
     if barColor == nil and not allSecret then
@@ -230,15 +306,17 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
+        apply_square_icon_style(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
         iconFrame:SetShown(showIcon)
-        iconTexture:SetShown(showIcon)
-        iconOverlay:SetShown(showIcon)
+        if iconTexture then
+            iconTexture:SetShown(showIcon)
+        end
+        if iconOverlay then
+            iconOverlay:SetShown(false)
+        end
     end
 
     local iconAlpha = showIcon and 1 or 0
-    if frame.DebuffBorder then
-        FrameUtil.LazySetAlpha(frame.DebuffBorder, iconAlpha)
-    end
     if iconFrame.Applications then
         FrameUtil.LazySetAlpha(iconFrame.Applications, iconAlpha)
     end
@@ -282,33 +360,33 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         })
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
-        barIndex = barIndex,
-        height = height,
-        pipHidden = true,
-        pipTexture = nil,
-        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK)) or nil,
-        barBgTexture = barBG and ECM.Constants.FALLBACK_TEXTURE or nil,
-        barBgLayer = barBG and "BACKGROUND" or nil,
-        barBgSubLayer = barBG and 0 or nil,
-        textureName = textureName,
-        statusBarTexture = texture,
-        statusBarColor = barColor,
-        showIcon = showIcon,
-        showSpellName = showSpellName,
-        showDuration = showDuration,
-        iconAlpha = iconAlpha,
-        iconVisible = iconVisible,
-        iconShown = iconFrame and iconFrame:IsShown() or false,
-        iconSize = iconVisible and (iconFrame:GetHeight() or frame:GetHeight() or 0) or 0,
-        debuffBorderAlpha = frame.DebuffBorder and iconAlpha or nil,
-        applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
-        nameShown = showSpellName,
-        durationShown = showDuration,
-        nameLeftInset = ECM.Constants.BUFFBARS_TEXT_PADDING,
-        nameRightPadding = ECM.Constants.BUFFBARS_TEXT_PADDING,
-        barAnchorMode = iconVisible and "icon" or "frame",
-    })
+    -- ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
+    --     barIndex = barIndex,
+    --     height = height,
+    --     pipHidden = true,
+    --     pipTexture = nil,
+    --     barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK)) or nil,
+    --     barBgTexture = barBG and ECM.Constants.FALLBACK_TEXTURE or nil,
+    --     barBgLayer = barBG and "BACKGROUND" or nil,
+    --     barBgSubLayer = barBG and 0 or nil,
+    --     textureName = textureName,
+    --     statusBarTexture = texture,
+    --     statusBarColor = barColor,
+    --     showIcon = showIcon,
+    --     showSpellName = showSpellName,
+    --     showDuration = showDuration,
+    --     iconAlpha = iconAlpha,
+    --     iconVisible = iconVisible,
+    --     iconShown = iconFrame and iconFrame:IsShown() or false,
+    --     iconSize = iconVisible and (iconFrame:GetHeight() or frame:GetHeight() or 0) or 0,
+    --     debuffBorderHidden = frame.DebuffBorder ~= nil,
+    --     applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
+    --     nameShown = showSpellName,
+    --     durationShown = showDuration,
+    --     nameLeftInset = ECM.Constants.BUFFBARS_TEXT_PADDING,
+    --     nameRightPadding = ECM.Constants.BUFFBARS_TEXT_PADDING,
+    --     barAnchorMode = iconVisible and "icon" or "frame",
+    -- })
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
@@ -487,7 +565,7 @@ function BuffBars:UpdateLayout(why)
 
     self._layoutRunning = nil
     viewer:Show()
-    ECM_log(ECM.Constants.SYS.Layout, ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
         viewerWidth = params.width or -1,
@@ -511,6 +589,7 @@ function BuffBars:GetActiveSpellData()
     end
 
     local ordered = get_children_ordered(viewer)
+    ECM.Log(ECM.Constants.BUFFBARS, "GetActiveSpellData: found " .. #ordered .. " child frames")
     local result = {}
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
@@ -556,7 +635,7 @@ function BuffBars:HookViewer()
     -- Hook edit mode transitions
     self:HookEditMode()
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked BuffBarCooldownViewer")
+    ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 --- Hooks EditModeManagerFrame to re-apply layout on exit.
@@ -584,7 +663,7 @@ function BuffBars:HookEditMode()
         self:ThrottledUpdateLayout("EditModeEnter")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked EditModeManagerFrame")
+    ECM.Log(self.Name, "Hooked EditModeManagerFrame")
 end
 
 function BuffBars:OnUnitAura(_, unit)
@@ -632,7 +711,7 @@ function BuffBars:Enable()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Enable - module enabled")
+    ECM.Log(self.Name, "Enable - module enabled")
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)

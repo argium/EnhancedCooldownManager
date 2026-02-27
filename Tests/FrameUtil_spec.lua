@@ -285,7 +285,6 @@ describe("FrameUtil", function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
             "ECM_AreColorsEqual",
-            "ECM_debug_assert",
             "C_Timer",
             "GetTime",
             "UIParent",
@@ -312,9 +311,9 @@ describe("FrameUtil", function()
             end
             return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
         end
-        _G.ECM_debug_assert = function(condition, message)
+        _G.ECM.DebugAssert = function(condition, message)
             if not condition then
-                error(message or "ECM_debug_assert failed")
+                error(message or "ECM.DebugAssert failed")
             end
         end
         _G.C_Timer = {

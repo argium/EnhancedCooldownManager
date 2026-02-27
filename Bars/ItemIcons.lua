@@ -49,11 +49,22 @@ local function GetTrinketData(slotId)
     }
 end
 
+--- Returns the item ID from a consumable priority entry.
+---@param entry number|{ itemID: number, quality: number|nil }
+---@return number
+local function GetConsumableItemID(entry)
+    if type(entry) == "table" then
+        return entry.itemID
+    end
+    return entry
+end
+
 --- Returns the first item from priorityList that exists in the player's bags.
----@param priorityList number[] Array of item IDs, ordered by priority.
+---@param priorityList (number|{ itemID: number, quality: number|nil })[] Array of priority entries, ordered by priority.
 ---@return ECM_IconData|nil iconData Icon data if found, nil otherwise.
 local function GetBestConsumable(priorityList)
-    for _, itemId in ipairs(priorityList) do
+    for _, entry in ipairs(priorityList) do
+        local itemId = GetConsumableItemID(entry)
         if C_Item.GetItemCount(itemId) > 0 then
             local texture = C_Item.GetItemIconByID(itemId)
             return {
@@ -281,26 +292,23 @@ end
 
 --- Gets the icon size, spacing, and scale from UtilityCooldownViewer.
 --- Falls back to defaults if viewer is unavailable.
---- Measures actual icon frames to respect Edit Mode settings.
+--- Reads Edit Mode settings directly from the viewer frame.
 --- Returns base (unscaled) sizes - caller should apply scale separately.
 ---@return number iconSize The base icon size in pixels (unscaled).
----@return number spacing The base spacing between icons in pixels (unscaled).
----@return number scale The icon scale factor from Edit Mode (applied to individual icons).
----@return boolean isStable True when spacing was measured from valid live geometry.
----@return table debugInfo Measurement debug payload for logs.
+---@return number spacing The spacing between icons in pixels from Edit Mode IconPadding.
+---@return number scale The icon scale factor from Edit Mode IconSize.
+---@return boolean isStable True when settings were read from the live viewer.
+---@return table debugInfo Debug payload for logs.
 local function GetUtilityViewerLayout()
     local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
         return ECM.Constants.DEFAULT_ITEM_ICON_SIZE, ECM.Constants.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
             reason = "viewer_hidden_or_missing",
             measuredSpacing = nil,
-            gap = nil,
-            left = nil,
-            right = nil,
+            childScale = nil,
         }
     end
 
-    local children = { viewer:GetChildren() }
     local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
     local iconScale = 1.0
     local spacing = ECM.Constants.DEFAULT_ITEM_ICON_SPACING
@@ -308,87 +316,32 @@ local function GetUtilityViewerLayout()
     local debugInfo = {
         reason = "no_pair",
         measuredSpacing = nil,
-        gap = nil,
-        left = nil,
-        right = nil,
         childScale = nil,
-        maxSpacing = nil,
     }
 
-    -- Find first cooldown icon to get size and scale
-    -- Edit Mode "Icon Size" applies scale to individual icons, not the viewer
+    -- Read Edit Mode settings directly from the viewer frame.
+    -- Blizzard's EditModeCooldownViewerSystemMixin stores these on the frame
+    -- when processing settings (iconPadding, iconScale).
+    if viewer.iconPadding then
+        spacing = viewer.iconPadding
+        isStable = true
+        debugInfo.reason = "viewer_iconPadding"
+        debugInfo.measuredSpacing = spacing
+    end
+
+    if viewer.iconScale then
+        iconScale = viewer.iconScale
+        debugInfo.childScale = iconScale
+    end
+
+    -- Get base icon size from a visible cooldown icon child.
+    -- Edit Mode "Icon Size" applies scale to individual icons, not the viewer.
+    local children = { viewer:GetChildren() }
     for _, child in ipairs(children) do
         if child and child:IsShown() and child.GetSpellID then
-            iconSize = child:GetWidth() or iconSize -- base size (unaffected by child scale)
-            iconScale = child:GetScale() or 1.0
+            iconSize = child:GetWidth() or iconSize
             break
         end
-    end
-
-    -- Calculate spacing from adjacent icons sorted by screen position.
-    -- GetChildren() order is not guaranteed to be visual order.
-    local measuredIcons = {}
-    for _, child in ipairs(children) do
-        if child and child:IsShown() and child.GetSpellID then
-            local left = child:GetLeft()
-            local right = child:GetRight()
-            if left and right then
-                measuredIcons[#measuredIcons + 1] = {
-                    left = left,
-                    right = right,
-                    scale = child:GetScale() or 1.0,
-                }
-            end
-        end
-    end
-
-    if #measuredIcons < 2 then
-        debugInfo.reason = "no_pair"
-        return iconSize or ECM.Constants.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
-    end
-
-    table.sort(measuredIcons, function(a, b)
-        return a.left < b.left
-    end)
-
-    local maxSpacing = iconSize * ECM.Constants.ITEM_ICON_MAX_SPACING_FACTOR
-    debugInfo.maxSpacing = maxSpacing
-
-    local bestSpacing = nil
-    local bestGap = nil
-    local bestLeft = nil
-    local bestRight = nil
-    local bestScale = nil
-
-    for i = 2, #measuredIcons do
-        local prev = measuredIcons[i - 1]
-        local curr = measuredIcons[i]
-        local gap = curr.left - prev.right
-        if gap >= 0 and curr.scale > 0 then
-            local measuredSpacing = gap / curr.scale
-            if measuredSpacing >= 0 and measuredSpacing <= maxSpacing then
-                if not bestSpacing or measuredSpacing < bestSpacing then
-                    bestSpacing = measuredSpacing
-                    bestGap = gap
-                    bestLeft = curr.left
-                    bestRight = prev.right
-                    bestScale = curr.scale
-                end
-            end
-        end
-    end
-
-    if bestSpacing then
-        spacing = bestSpacing
-        isStable = true
-        debugInfo.reason = "measured_ok_adjacent"
-        debugInfo.measuredSpacing = bestSpacing
-        debugInfo.gap = bestGap
-        debugInfo.left = bestLeft
-        debugInfo.right = bestRight
-        debugInfo.childScale = bestScale
-    else
-        debugInfo.reason = "no_valid_adjacent_gap"
     end
 
     return iconSize or ECM.Constants.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
@@ -530,7 +483,7 @@ function ItemIcons:UpdateLayout(why)
     frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM_log(ECM.Constants.SYS.Layout, self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+    ECM.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
         numItems = numItems,
         iconSize = iconSize,
         spacing = spacing,
@@ -577,7 +530,7 @@ function ItemIcons:Refresh(why)
         end
     end
 
-    ECM_log(ECM.Constants.SYS.Styling, self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -661,7 +614,7 @@ function ItemIcons:HookUtilityViewer()
         self:ThrottledUpdateLayout("OnSizeChanged")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Hooked UtilityCooldownViewer")
+    ECM.Log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
 --------------------------------------------------------------------------------
@@ -688,7 +641,7 @@ function ItemIcons:OnEnable()
         self:ThrottledUpdateLayout("OnEnable")
     end)
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "OnEnable - module enabled")
+    ECM.Log(self.Name, "OnEnable - module enabled")
 end
 
 function ItemIcons:OnDisable()
@@ -709,5 +662,5 @@ function ItemIcons:OnDisable()
         self.InnerFrame:Hide()
     end
 
-    ECM_log(ECM.Constants.SYS.Core, self.Name, "Disabled")
+    ECM.Log(self.Name, "Disabled")
 end
