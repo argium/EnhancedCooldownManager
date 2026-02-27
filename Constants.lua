@@ -107,10 +107,6 @@ local constants = {
     DEFAULT_ITEM_ICON_SIZE = 32,
     DEFAULT_ITEM_ICON_SPACING = 2,
     ITEM_ICON_BORDER_SCALE = 1.35,
-
-    -- Guardrail for measured utility icon spacing (as a factor of icon width)
-    -- TODO: this has to go. it's gross.
-    ITEM_ICON_MAX_SPACING_FACTOR = 0.6,
     ITEM_ICON_LAYOUT_REMEASURE_DELAY = 0.1,
     ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS = 2,
 

@@ -410,6 +410,23 @@ function SpellColorKeyType:Merge(other)
     return merge_keys(self, normalize_key(other))
 end
 
+function SpellColorKeyType:tostring()
+    -- return key type, and then all 4 values
+    local keyType = self.keyType
+    if keyType == nil then
+        keyType = "nil"
+    end
+
+    return string.format(
+        "SpellColorKey{type=%s, spellName=%s, spellID=%s, cooldownID=%s, textureFileID=%s}",
+        keyType,
+        tostring(self.spellName),
+        tostring(self.spellID),
+        tostring(self.cooldownID),
+        tostring(self.textureFileID)
+    )
+end
+
 --- Returns the PriorityKeyMap instance, creating it on first call.
 ---@return PriorityKeyMap|nil
 local function get_map()
@@ -752,4 +769,36 @@ function SpellColors.ReconcileAllBars(frames)
         end
     end
     return SpellColors.ReconcileAllKeys(keys)
+end
+
+--- Wipes all persisted spell color entries for the current class/spec and
+--- invalidates the in-memory PriorityKeyMap singleton.
+---@return number cleared  Total entries removed across all tiers.
+function SpellColors.ClearCurrentSpecColors()
+    local cfg = config()
+    if not cfg then
+        return 0
+    end
+
+    local _, _, classID = UnitClass("player")
+    local specID = GetSpecialization()
+    if not classID or not specID then
+        return 0
+    end
+
+    local cleared = 0
+    for _, def in ipairs(KEY_DEFS) do
+        local classTbl = cfg.colors[def] and cfg.colors[def][classID]
+        if classTbl and classTbl[specID] then
+            for _ in pairs(classTbl[specID]) do
+                cleared = cleared + 1
+            end
+            classTbl[specID] = {}
+        end
+    end
+
+    -- Invalidate the singleton so it rebuilds from the (now empty) profile data
+    _map = nil
+
+    return cleared
 end

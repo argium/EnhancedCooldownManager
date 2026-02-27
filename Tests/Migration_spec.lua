@@ -653,4 +653,40 @@ describe("Migration", function()
         assert.is_nil(winner.value.cooldownID)
         assert.is_nil(winner.value.textureId)
     end)
+
+    it("ValidateRollback rejects non-integer target versions", function()
+        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        _G[ECM.Constants.SV_NAME] = {
+            _versions = {
+                [current - 1] = {},
+                [current] = {},
+            },
+        }
+
+        local ok, message = Migration.ValidateRollback(2.5)
+        assert.is_false(ok)
+        assert.are.equal("Target version must be a whole number.", message)
+    end)
+
+    it("ValidateRollback accepts integer targets and reports deleted versions", function()
+        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local floor = current - 2
+        _G[ECM.Constants.SV_NAME] = {
+            _versions = {
+                [floor - 1] = {},
+                [floor] = {},
+                [floor + 1] = {},
+                [current] = {},
+            },
+        }
+
+        local ok, message = Migration.ValidateRollback(floor)
+        assert.is_true(ok)
+
+        local deleted = {}
+        for v = floor + 1, current do
+            deleted[#deleted + 1] = "V" .. v
+        end
+        assert.are.equal("Will delete " .. table.concat(deleted, ", ") .. " and re-migrate from V" .. floor .. ".", message)
+    end)
 end)

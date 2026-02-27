@@ -35,7 +35,6 @@ local _globallyHidden = false
 local _hideReason = nil
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
-local _lastAlpha = 1
 local _cooldownViewerSettingsHooked = false
 
 --------------------------------------------------------------------------------
@@ -86,27 +85,21 @@ end
 
 --- Applies alpha to all managed frames.
 --- @param alpha number
---- @param force boolean|nil Reapply even if the cached alpha matches
-local function SetAlpha(alpha, force)
-    if not force and _lastAlpha == alpha then
-        return
-    end
-
+local function SetAlpha(alpha)
     ForEachBlizzardFrame(function(frame)
-        frame:SetAlpha(alpha)
+        ECM.FrameUtil.LazySetAlpha(frame, alpha)
     end)
 
     for _, module in pairs(_modules) do
         --- @type ModuleMixin
-        module:SetAlpha(alpha)
+        if module.InnerFrame then
+            ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+        end
     end
-
-    _lastAlpha = alpha
 end
 
 --- Checks all fade and hide conditions and updates global state.
---- @param forceAlpha boolean|nil Reapply alpha even if unchanged
-local function UpdateFadeAndHiddenStates(forceAlpha)
+local function UpdateFadeAndHiddenStates()
     local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
     if not globalConfig then
         return
@@ -157,7 +150,7 @@ local function UpdateFadeAndHiddenStates(forceAlpha)
         end
     end
 
-    SetAlpha(alpha, forceAlpha)
+    SetAlpha(alpha)
 end
 
 local UpdateAllLayouts
@@ -174,7 +167,7 @@ local function HookCooldownViewerSettings()
     end
 
     settingsFrame:HookScript("OnHide", function()
-        UpdateFadeAndHiddenStates(true)
+        UpdateFadeAndHiddenStates()
         UpdateAllLayouts("OnHide:CooldownViewerSettings")
     end)
 
@@ -232,12 +225,9 @@ local function RegisterFrame(frame)
     _modules[frame.Name] = frame
     ECM.Log(nil, "Frame registered: " .. frame.Name)
 
-    -- Sync current global hidden/alpha state to late-registered frames
+    -- Sync current global hidden state to late-registered frames
     if _globallyHidden then
         frame:SetHidden(true)
-    end
-    if _lastAlpha ~= 1 then
-        frame:SetAlpha(_lastAlpha)
     end
 end
 
