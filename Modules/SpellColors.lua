@@ -55,7 +55,7 @@ local function get_current_class_spec_stores(cfg)
     local specID = GetSpecialization()
 
     if not classID or not specID then
-        ECM_debug_assert(false, "SpellColors.get_current_class_spec_stores - unable to determine player class/spec", {
+        ECM.DebugAssert(false, "SpellColors.get_current_class_spec_stores - unable to determine player class/spec", {
             classID = classID,
             specID = specID,
         })
@@ -103,7 +103,7 @@ local function config()
     local mod = ns.Addon
     local cfg = mod and mod.db and mod.db.profile and mod.db.profile.buffBars or nil
     if type(cfg) ~= "table" then
-        ECM_debug_assert(false, "SpellColors.config - missing or invalid buffBars config")
+        ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil
     end
     ensure_profile_is_setup(cfg)
@@ -410,6 +410,23 @@ function SpellColorKeyType:Merge(other)
     return merge_keys(self, normalize_key(other))
 end
 
+function SpellColorKeyType:tostring()
+    -- return key type, and then all 4 values
+    local keyType = self.keyType
+    if keyType == nil then
+        keyType = "nil"
+    end
+
+    return string.format(
+        "SpellColorKey{type=%s, spellName=%s, spellID=%s, cooldownID=%s, textureFileID=%s}",
+        keyType,
+        tostring(self.spellName),
+        tostring(self.spellID),
+        tostring(self.cooldownID),
+        tostring(self.textureFileID)
+    )
+end
+
 --- Returns the PriorityKeyMap instance, creating it on first call.
 ---@return PriorityKeyMap|nil
 local function get_map()
@@ -539,10 +556,10 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_Color|nil
 function SpellColors.GetColorForBar(frame)
-    ECM_debug_assert(frame, "Expected bar frame")
+    ECM.DebugAssert(frame, "Expected bar frame")
 
     if not (frame and frame.__ecmHooked) then
-        ECM_log(ECM.Constants.SYS.Styling, "SpellColors", "GetColorForBar - invalid bar frame", {
+        ECM.Log("SpellColors", "GetColorForBar - invalid bar frame", {
             frame = frame,
             nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
             iconExists = frame and type(frame.Icon) == "table" and type(frame.Icon.GetRegions) == "function",
@@ -637,7 +654,7 @@ end
 ---@param key ECM_SpellColorKey|table|nil
 ---@param color ECM_Color
 function SpellColors.SetColorByKey(key, color)
-    ECM_debug_assert(type(color) == "table", "Expected color to be a table")
+    ECM.DebugAssert(type(color) == "table", "Expected color to be a table")
 
     local map = get_map()
     if not map then
@@ -752,4 +769,36 @@ function SpellColors.ReconcileAllBars(frames)
         end
     end
     return SpellColors.ReconcileAllKeys(keys)
+end
+
+--- Wipes all persisted spell color entries for the current class/spec and
+--- invalidates the in-memory PriorityKeyMap singleton.
+---@return number cleared  Total entries removed across all tiers.
+function SpellColors.ClearCurrentSpecColors()
+    local cfg = config()
+    if not cfg then
+        return 0
+    end
+
+    local _, _, classID = UnitClass("player")
+    local specID = GetSpecialization()
+    if not classID or not specID then
+        return 0
+    end
+
+    local cleared = 0
+    for _, def in ipairs(KEY_DEFS) do
+        local classTbl = cfg.colors[def] and cfg.colors[def][classID]
+        if classTbl and classTbl[specID] then
+            for _ in pairs(classTbl[specID]) do
+                cleared = cleared + 1
+            end
+            classTbl[specID] = {}
+        end
+    end
+
+    -- Invalidate the singleton so it rebuilds from the (now empty) profile data
+    _map = nil
+
+    return cleared
 end

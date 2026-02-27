@@ -199,12 +199,13 @@ local function MakePositioningSettingsArgs(configPath, options)
     local offsetYDesc = options.offsetYDesc or "\nVertical offset when free positioning is enabled."
 
     local db = mod.db
+    local function isChainMode() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end
     local args = {
         widthDesc = {
             type = "description",
             name = widthDesc,
             order = 3,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
         },
         width = {
             type = "range",
@@ -214,7 +215,7 @@ local function MakePositioningSettingsArgs(configPath, options)
             min = 100,
             max = 600,
             step = 1,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.width or ECM.Constants.DEFAULT_BAR_WIDTH
@@ -231,9 +232,8 @@ local function MakePositioningSettingsArgs(configPath, options)
             order = 5,
             width = 0.3,
             hidden = function()
-                return not IsValueChanged(configPath .. ".width")
+                return isChainMode() or not IsValueChanged(configPath .. ".width")
             end,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".width"),
         },
     }
@@ -243,17 +243,16 @@ local function MakePositioningSettingsArgs(configPath, options)
             type = "description",
             name = offsetXDesc,
             order = 6,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
         }
         args.offsetX = {
             type = "range",
             name = "Offset X",
             order = 7,
-            width = "half",
             min = -800,
             max = 800,
             step = 1,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.offsetX or 0
@@ -267,29 +266,27 @@ local function MakePositioningSettingsArgs(configPath, options)
         args.offsetXReset = {
             type = "execute",
             name = "X",
-            order = 8,
+            order = 7,
             width = 0.3,
             hidden = function()
-                return not IsValueChanged(configPath .. ".offsetX")
+                return isChainMode() or not IsValueChanged(configPath .. ".offsetX")
             end,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".offsetX"),
         }
         args.offsetYDesc = {
             type = "description",
             name = offsetYDesc,
             order = 9,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
         }
         args.offsetY = {
             type = "range",
             name = "Offset Y",
             order = 10,
-            width = "half",
             min = -800,
             max = 800,
             step = 1,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
+            hidden = isChainMode,
             get = function()
                 local cfg = GetNestedValue(db.profile, configPath)
                 return cfg.offsetY or 0
@@ -303,12 +300,11 @@ local function MakePositioningSettingsArgs(configPath, options)
         args.offsetYReset = {
             type = "execute",
             name = "X",
-            order = 11,
+            order = 9,
             width = 0.3,
             hidden = function()
-                return not IsValueChanged(configPath .. ".offsetY")
+                return isChainMode() or not IsValueChanged(configPath .. ".offsetY")
             end,
-            disabled = function() return not IsAnchorModeFree(GetNestedValue(db.profile, configPath)) end,
             func = MakeResetHandler(configPath .. ".offsetY"),
         }
     end
@@ -368,7 +364,12 @@ end
 -- Export
 --------------------------------------------------------------------------------
 
+local function NotifyOptionsChanged()
+    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+end
+
 ECM.OptionUtil = {
+    NotifyOptionsChanged = NotifyOptionsChanged,
     IsOptionsDisabled = IsOptionsDisabled,
     GetOptionValue = GetOptionValue,
     GetNestedValue = GetNestedValue,

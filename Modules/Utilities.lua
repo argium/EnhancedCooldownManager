@@ -137,9 +137,9 @@ function ECM_ApplyFont(fontString, globalConfig, moduleConfig)
 
     local hasShadow = config and config.fontShadow
 
-    ECM_debug_assert(fontPath, "Font path cannot be nil")
-    ECM_debug_assert(fontSize, "Font size cannot be nil")
-    ECM_debug_assert(fontOutline, "Font outline cannot be nil")
+    ECM.DebugAssert(fontPath, "Font path cannot be nil")
+    ECM.DebugAssert(fontSize, "Font size cannot be nil")
+    ECM.DebugAssert(fontOutline, "Font outline cannot be nil")
 
     fontString:SetFont(fontPath, fontSize, fontOutline)
 

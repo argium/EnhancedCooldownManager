@@ -254,7 +254,7 @@ function RuneBar:CreateFrame()
     -- FragmentedBars for individual rune display
     frame.FragmentedBars = {}
 
-    ECM_log(C.SYS.Layout, self.Name, "Frame created.")
+    ECM.Log(self.Name, "Frame created.")
     return frame
 end
 
@@ -300,7 +300,7 @@ function RuneBar:Refresh(why, force)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
-    ECM_log(C.SYS.Styling, self.Name, "Refresh complete.")
+    ECM.Log(self.Name, "Refresh complete.")
     return true
 end
 

@@ -5,7 +5,93 @@
 local _, ns = ...
 local mod = ns.Addon
 local ItemIconsOptions = {}
+local OB = ECM.OptionBuilder
 mod.ItemIconsOptions = ItemIconsOptions
+
+local QUALITY_ICON_ATLASES = {
+    [1] = "Professions-ChatIcon-Quality-Tier1",
+    [2] = "Professions-ChatIcon-Quality-Tier2",
+    [3] = "Professions-ChatIcon-Quality-Tier3",
+}
+
+local QUALITY_ICON_FALLBACKS = {
+    [1] = "|cffcd7f32★|r",
+    [2] = "|cffc0c0c0★|r",
+    [3] = "|cffffd700★|r",
+}
+
+---@param atlas string
+---@return boolean
+local function HasAtlas(atlas)
+    if C_Texture and C_Texture.GetAtlasInfo then
+        return C_Texture.GetAtlasInfo(atlas) ~= nil
+    end
+    if type(GetAtlasInfo) == "function" then
+        return GetAtlasInfo(atlas) ~= nil
+    end
+    return false
+end
+
+---@param quality number|nil
+---@return string
+local function FormatQualityIcon(quality)
+    if not quality then
+        return ""
+    end
+
+    local atlas = QUALITY_ICON_ATLASES[quality]
+    if atlas and HasAtlas(atlas) then
+        return "|A:" .. atlas .. ":14:14|a"
+    end
+
+    return QUALITY_ICON_FALLBACKS[quality] or ""
+end
+
+---@param itemID number
+---@return string
+local function FormatItemIcon(itemID)
+    if not (C_Item and C_Item.GetItemIconByID) then
+        return ""
+    end
+
+    local texture = C_Item.GetItemIconByID(itemID)
+    if not texture then
+        return ""
+    end
+
+    return "|T" .. texture .. ":14:14:0:0|t "
+end
+
+---@param itemID number
+---@return string
+local function GetItemNameForOptions(itemID)
+    if C_Item and C_Item.GetItemNameByID then
+        local name = C_Item.GetItemNameByID(itemID)
+        if name then
+            return name
+        end
+    end
+
+    return "Item " .. tostring(itemID)
+end
+
+---@param entries { itemID: number, quality: number|nil }[]
+---@return string
+local function BuildPotionPriorityText(entries)
+    local lines = {}
+    for index, entry in ipairs(entries) do
+        local qualityIcon = FormatQualityIcon(entry.quality)
+        lines[#lines + 1] = string.format(
+            "%d. %s%s%s%s",
+            index,
+            FormatItemIcon(entry.itemID),
+            GetItemNameForOptions(entry.itemID),
+            qualityIcon ~= "" and " " or "",
+            qualityIcon
+        )
+    end
+    return table.concat(lines, "\n\n")
+end
 
 --- Builds a standard Item Icons module toggle option.
 ---@param self ECM_ItemIconsModule
@@ -109,32 +195,34 @@ end
 --- Builds the Item Icons options group.
 ---@return table itemIconsOptions AceConfig group for Item Icons section.
 function ItemIconsOptions.GetOptionsTable()
+    local args = {
+        itemIconsSettings = {
+            type = "group",
+            name = "Item Icons",
+            inline = true,
+            order = 1,
+            args = ItemIconsOptions.GetBasicOptionsArgs(),
+        },
+        equipmentSettings = {
+            type = "group",
+            name = "Equipment",
+            inline = true,
+            order = 2,
+            args = ItemIconsOptions.GetEquipmentOptionsArgs(),
+        },
+        consumableSettings = {
+            type = "group",
+            name = "Consumables",
+            inline = true,
+            order = 3,
+            args = ItemIconsOptions.GetConsumableOptionsArgs(),
+        },
+    }
+
     return {
         type = "group",
         name = "Item Icons",
         order = 6,
-        args = {
-            itemIconsSettings = {
-                type = "group",
-                name = "Item Icons",
-                inline = true,
-                order = 1,
-                args = ItemIconsOptions.GetBasicOptionsArgs(),
-            },
-            equipmentSettings = {
-                type = "group",
-                name = "Equipment",
-                inline = true,
-                order = 2,
-                args = ItemIconsOptions.GetEquipmentOptionsArgs(),
-            },
-            consumableSettings = {
-                type = "group",
-                name = "Consumables",
-                inline = true,
-                order = 3,
-                args = ItemIconsOptions.GetConsumableOptionsArgs(),
-            },
-        },
+        args = args,
     }
 end

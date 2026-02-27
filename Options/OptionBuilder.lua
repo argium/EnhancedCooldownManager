@@ -32,10 +32,6 @@ local function LayoutChanged()
     ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
 end
 
-local function NotifyOptionsChanged()
-    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-end
-
 local function MergeArgs(target, source)
     if type(target) ~= "table" then
         return target
@@ -61,7 +57,7 @@ local function ApplyPostSet(spec, value, ...)
     end
 
     if spec.notify then
-        NotifyOptionsChanged()
+        ECM.OptionUtil.NotifyOptionsChanged()
     end
 end
 
@@ -194,7 +190,7 @@ local function MakeLayoutSetHandler(setter, opts)
             LayoutChanged()
         end
         if opts.notify then
-            NotifyOptionsChanged()
+            ECM.OptionUtil.NotifyOptionsChanged()
         end
     end
 end
@@ -292,10 +288,10 @@ local function MakeDescription(spec)
     })
 end
 
-local function MakeSpacer(order, opts)
+local function MakeSpacer(order, height, opts)
     opts = opts or {}
     return MakeDescription({
-        name = opts.name or " ",
+        name = string.rep("\n", height or 1),
         order = order,
         hidden = opts.hidden,
         width = opts.width,
@@ -434,6 +430,7 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
         heightDesc = MakeDescription({
             name = "\nOverride the default bar height. Set to 0 to use the global default.",
             order = orderBase,
+            width = "full"
         }),
     }
 
@@ -441,7 +438,7 @@ local function BuildHeightOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".height",
         name = "Height Override",
         order = orderBase + 1,
-        width = "half",
+        width = "small",
         min = 0,
         max = 40,
         step = 1,
@@ -481,7 +478,6 @@ local function BuildFontOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".font",
         name = "Font",
         order = orderBase + 2,
-        width = "half",
         dialogControl = "LSM30_Font",
         values = ECM.SharedMediaOptions.GetFontValues,
         getTransform = function(value)
@@ -496,7 +492,6 @@ local function BuildFontOverrideArgs(sectionPath, orderBase)
         path = sectionPath .. ".fontSize",
         name = "Font Size",
         order = orderBase + 4,
-        width = "half",
         min = 6,
         max = 32,
         step = 1,
@@ -590,7 +585,6 @@ ECM.OptionBuilder = {
     MakePathColor = MakePathColor,
     MakeResetButton = MakeResetButton,
     MakeLayoutSetHandler = MakeLayoutSetHandler,
-    NotifyOptionsChanged = NotifyOptionsChanged,
     LayoutChanged = LayoutChanged,
     BuildPathRangeWithReset = BuildPathRangeWithReset,
     BuildPathSelectWithReset = BuildPathSelectWithReset,

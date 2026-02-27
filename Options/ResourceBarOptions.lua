@@ -7,9 +7,10 @@ local C = ECM.Constants
 local OB = ECM.OptionBuilder
 
 local RESOURCE_COLOR_DEFS = {
-    { key = "souls", name = "Soul Fragments (Demon Hunter)" },
-    { key = "devourerNormal", name = "Souls Fragments (Devourer)" },
-    { key = "devourerMeta", name = "Void Fragments (Devourer)" },
+    { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = "Soul Fragments (Demon Hunter)" },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Soul Fragments (Devourer)" },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = "Void Fragments (Devourer)" },
+    { key = C.RESOURCEBAR_TYPE_ICICLES, name = "Icicles (Frost Mage)" },
     { key = Enum.PowerType.ArcaneCharges, name = "Arcane Charges" },
     { key = Enum.PowerType.Chi, name = "Chi" },
     { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
@@ -31,18 +32,26 @@ local function GenerateResourceBarDisplayArgs()
             order = 2,
             width = "full",
         }),
-        borderSpacer = OB.MakeSpacer(3),
-        colorsSpacer = OB.MakeSpacer(8),
+    }
+
+    args.spacer9 = OB.MakeSpacer(9)
+    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 10))
+    args.spacer19 = OB.MakeSpacer(19)
+    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 20))
+
+    return args
+end
+
+local function GenerateResourceBarColorArgs()
+    local args = {
         colorsDescription = OB.MakeDescription({
             name = "Customize the color of each resource type. Colors only apply to the relevant class/spec.",
             fontSize = "medium",
-            order = 9,
+            order = 1,
         }),
     }
 
-    OB.MergeArgs(args, OB.BuildBorderArgs("resourceBar.border", 4))
-    OB.MergeArgs(args, OB.BuildFontOverrideArgs("resourceBar", 40))
-    OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 10))
+    OB.MergeArgs(args, OB.BuildColorPickerList("resourceBar.colors", RESOURCE_COLOR_DEFS, 2))
 
     return args
 end
@@ -64,6 +73,7 @@ function ResourceBarOptions.GetOptionsTable()
             basicSettings = OB.MakeInlineGroup("Basic Settings", 1, basicArgs),
             positioningSettings = ECM.OptionUtil.MakePositioningGroup("resourceBar", 2),
             displaySettings = OB.MakeInlineGroup("Display Options", 3, GenerateResourceBarDisplayArgs()),
+            colorSettings = OB.MakeInlineGroup("Colors", 4, GenerateResourceBarColorArgs()),
         },
     })
 end

@@ -207,9 +207,10 @@ local defaults = {
                 color = C.DEFAULT_BORDER_COLOR,
             },
             colors     = {
-                souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
-                devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                devourerMeta = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
+                [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
+                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
                 [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
                 [Enum.PowerType.Chi] = { r = 0.00, g = 1.00, b = 0.59, a = 1 },
                 [Enum.PowerType.ComboPoints] = { r = 1.00, g = 0.96, b = 0.41, a = 1 },

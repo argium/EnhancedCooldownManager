@@ -166,6 +166,8 @@ describe("PowerBarTickMarksOptions", function()
         _G.ECM = {
             Constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
+                CLASS_COLORS = { WARRIOR = "C79C6E" },
+                COLOR_WHITE_HEX = "FFFFFF",
             },
             OptionUtil = {
                 GetCurrentClassSpec = function()

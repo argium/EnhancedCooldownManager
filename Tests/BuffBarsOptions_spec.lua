@@ -29,8 +29,6 @@ describe("BuffBarsOptions", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
-            "ECM_debug_assert",
-            "ECM_log",
             "ECM_tostring",
             "LibStub",
         })
@@ -87,6 +85,9 @@ describe("BuffBarsOptions", function()
                     end
                     return target
                 end,
+                MakeSpacer = function(order)
+                    return { type = "description", name = "\n", order = order }
+                end,
                 BuildFontOverrideArgs = function()
                     return {
                         fontOverrideDesc = { type = "description", order = 14 },
@@ -124,8 +125,8 @@ describe("BuffBarsOptions", function()
             return 1000
         end
 
-        _G.ECM_debug_assert = function() end
-        _G.ECM_log = function() end
+        _G.ECM.DebugAssert = function() end
+        _G.ECM.Log = function() end
         _G.ECM_tostring = function(value)
             return tostring(value)
         end
@@ -430,16 +431,20 @@ describe("BuffBarsOptions", function()
     it("adds a free grow direction selector to positioning settings", function()
         local options = BuffBarsOptions.GetOptionsTable()
         local positioningArgs = options.args.positioningSettings.args
+        local desc = positioningArgs.freeGrowDirectionDesc
         local selector = positioningArgs.freeGrowDirection
         local reset = positioningArgs.freeGrowDirectionReset
 
+        assert.is_table(desc)
         assert.is_table(selector)
         assert.are.equal("select", selector.type)
         assert.are.equal("Free Grow Direction", selector.name)
+        assert.is_true(desc.hidden())
         assert.is_true(selector.hidden())
         assert.is_true(reset.hidden())
 
         addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_FREE
+        assert.is_false(desc.hidden())
         assert.is_false(selector.hidden())
 
         selector.set(nil, ECM.Constants.GROW_DIRECTION_UP)
@@ -450,6 +455,9 @@ describe("BuffBarsOptions", function()
             return true
         end
         assert.is_false(reset.hidden())
+
+        addonDB.profile.buffBars.anchorMode = ECM.Constants.ANCHORMODE_CHAIN
+        assert.is_true(reset.hidden())
     end)
 
     it("GetOptionsTable includes font override controls in display settings", function()

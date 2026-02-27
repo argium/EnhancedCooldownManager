@@ -87,8 +87,6 @@ describe("SpellColors", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
-            "ECM_debug_assert",
-            "ECM_log",
             "ECM_tostring",
         })
     end)
@@ -137,8 +135,8 @@ describe("SpellColors", function()
             return fakeNow
         end
 
-        _G.ECM_debug_assert = function() end
-        _G.ECM_log = function() end
+        _G.ECM.DebugAssert = function() end
+        _G.ECM.Log = function() end
         _G.ECM_tostring = function(value)
             return tostring(value)
         end
@@ -675,5 +673,58 @@ describe("SpellColors", function()
             return "Demon Hunter", "DEMONHUNTER", nil
         end
         assert.are.same({}, SpellColors.GetAllColorEntries())
+    end)
+
+    it("ClearCurrentSpecColors clears current class/spec entries across all tiers and reports count", function()
+        SpellColors.GetDefaultColor()
+
+        local otherClassID = currentClassID + 1
+        local otherSpecID = currentSpecID + 1
+        local tierDefs = {
+            { store = "byName", key = "clear-test-name" },
+            { store = "bySpellID", key = 100001 },
+            { store = "byCooldownID", key = 100002 },
+            { store = "byTexture", key = 100003 },
+        }
+
+        for _, tier in ipairs(tierDefs) do
+            local store = buffBarsConfig.colors[tier.store]
+
+            store[currentClassID] = store[currentClassID] or {}
+            store[currentClassID][currentSpecID] = store[currentClassID][currentSpecID] or {}
+            store[currentClassID][currentSpecID][tier.key] = { value = color(0.1, 0.2, 0.3), t = 1 }
+
+            store[otherClassID] = store[otherClassID] or {}
+            store[otherClassID][otherSpecID] = store[otherClassID][otherSpecID] or {}
+            store[otherClassID][otherSpecID][tier.key] = { value = color(0.9, 0.8, 0.7), t = 2 }
+        end
+
+        local cleared = SpellColors.ClearCurrentSpecColors()
+        assert.are.equal(4, cleared)
+
+        for _, tier in ipairs(tierDefs) do
+            local store = buffBarsConfig.colors[tier.store]
+            assert.is_table(store[currentClassID][currentSpecID])
+            assert.is_nil(next(store[currentClassID][currentSpecID]))
+            assert.is_not_nil(store[otherClassID][otherSpecID][tier.key])
+        end
+    end)
+
+    it("ClearCurrentSpecColors invalidates and rebuilds cached map for subsequent lookups", function()
+        local oldColor = color(0.2, 0.5, 0.8)
+        local newColor = color(0.8, 0.2, 0.5)
+        local key = SpellColors.MakeKey("Map Reset Spell", 543210, 654321, 765432)
+
+        SpellColors.SetColorByKey(key, oldColor)
+        assert.are.same(oldColor, SpellColors.GetColorByKey({ spellName = "Map Reset Spell" }))
+
+        local cleared = SpellColors.ClearCurrentSpecColors()
+        assert.is_true(cleared > 0)
+        assert.is_nil(SpellColors.GetColorByKey({ spellName = "Map Reset Spell" }))
+        assert.is_nil(SpellColors.GetColorByKey({ spellID = 543210 }))
+
+        SpellColors.SetColorByKey(key, newColor)
+        assert.are.same(newColor, SpellColors.GetColorByKey({ spellName = "Map Reset Spell" }))
+        assert.are.same(newColor, SpellColors.GetColorByKey({ spellID = 543210 }))
     end)
 end)

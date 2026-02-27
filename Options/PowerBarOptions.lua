@@ -41,7 +41,9 @@ local function GeneratePowerBarAppearanceArgs()
         }),
     }
 
+    args.spacer19 = OB.MakeSpacer(19)
     OB.MergeArgs(args, OB.BuildBorderArgs("powerBar.border", 20))
+    args.spacer29 = OB.MakeSpacer(29)
     OB.MergeArgs(args, OB.BuildFontOverrideArgs("powerBar", 30))
 
     return args

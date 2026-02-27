@@ -255,7 +255,7 @@ function BuffBarsOptions.GetOptionsTable()
     local spells = SpellOptionsTable()
     spells.name = "Colors"
     spells.inline = true
-    spells.order = 3
+    spells.order = 4
 
     local positioningSettings = ECM.OptionUtil.MakePositioningGroup("buffBars", 2, {
         modeDesc = "Choose how the aura bars are positioned. Automatic keeps them attached to the Cooldown Manager. Custom lets you position them anywhere on the screen and configure their size.",
@@ -268,7 +268,7 @@ function BuffBarsOptions.GetOptionsTable()
         type = "description",
         name = "\nChoose whether aura bars stack downward or upward in free positioning mode.",
         order = 6,
-        disabled = function()
+        hidden = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
     }
@@ -281,7 +281,7 @@ function BuffBarsOptions.GetOptionsTable()
             [C.GROW_DIRECTION_DOWN] = "Down",
             [C.GROW_DIRECTION_UP] = "Up",
         },
-        disabled = function()
+        hidden = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
         end,
         get = function()
@@ -297,7 +297,7 @@ function BuffBarsOptions.GetOptionsTable()
         name = "X",
         order = 8,
         width = 0.3,
-        disabled = function()
+        hidden = function()
             return (db.profile.buffBars.anchorMode or C.ANCHORMODE_CHAIN) ~= C.ANCHORMODE_FREE
                 or not ECM.OptionUtil.IsValueChanged("buffBars.freeGrowDirection")
         end,
@@ -375,16 +375,16 @@ function BuffBarsOptions.GetOptionsTable()
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end,
         },
+        spacer1 = OB.MakeSpacer(15),
         heightDesc = {
             type = "description",
             name = "\nOverride the default bar height. Set to 0 to use the global default.",
-            order = 15,
+            order = 16,
         },
         height = {
             type = "range",
             name = "Height Override",
-            order = 16,
-            width = "half",
+            order = 17,
             min = 0,
             max = 40,
             step = 1,
@@ -397,7 +397,7 @@ function BuffBarsOptions.GetOptionsTable()
         heightReset = {
             type = "execute",
             name = "X",
-            order = 17,
+            order = 18,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.height") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.height"),
@@ -405,13 +405,12 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingDesc = {
             type = "description",
             name = "\nVertical gap between aura bars. Set to 0 for no spacing.",
-            order = 18,
+            order = 19,
         },
         verticalSpacing = {
             type = "range",
             name = "Vertical Spacing",
-            order = 19,
-            width = "half",
+            order = 20,
             min = 0,
             max = 20,
             step = 1,
@@ -424,14 +423,14 @@ function BuffBarsOptions.GetOptionsTable()
         verticalSpacingReset = {
             type = "execute",
             name = "X",
-            order = 20,
+            order = 21,
             width = 0.3,
             hidden = function() return not ECM.OptionUtil.IsValueChanged("buffBars.verticalSpacing") end,
             func = ECM.OptionUtil.MakeResetHandler("buffBars.verticalSpacing"),
         },
     }
+    displayArgs.spacer2 = OB.MakeSpacer(29)
     OB.MergeArgs(displayArgs, OB.BuildFontOverrideArgs("buffBars", 30))
-    OB.MergeArgs(basicArgs, displayArgs)
 
     return {
         type = "group",
@@ -446,6 +445,13 @@ function BuffBarsOptions.GetOptionsTable()
                 args = basicArgs,
             },
             positioningSettings = positioningSettings,
+            displaySettings = {
+                type = "group",
+                name = "Display",
+                inline = true,
+                order = 3,
+                args = displayArgs,
+            },
             spells = spells,
         },
     }
