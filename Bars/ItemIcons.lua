@@ -322,7 +322,7 @@ local function GetUtilityViewerLayout()
     -- Read Edit Mode settings directly from the viewer frame.
     -- Blizzard's EditModeCooldownViewerSystemMixin stores these on the frame
     -- when processing settings (iconPadding, iconScale).
-    if viewer.iconPadding then
+    if viewer.iconPadding ~= nil then
         spacing = viewer.iconPadding
         isStable = true
         debugInfo.reason = "viewer_iconPadding"

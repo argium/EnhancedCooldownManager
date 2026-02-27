@@ -1119,6 +1119,10 @@ function Migration.ValidateRollback(targetVersion)
         return false, "No versioned settings found."
     end
 
+    if targetVersion ~= nil and (type(targetVersion) ~= "number" or targetVersion ~= math.floor(targetVersion)) then
+        return false, "Target version must be a whole number."
+    end
+
     local current = ECM.Constants.CURRENT_SCHEMA_VERSION
     local floor = targetVersion or (current - 1)
 
@@ -1164,6 +1168,10 @@ function Migration.Rollback(targetVersion)
     local sv = _G[ECM.Constants.SV_NAME]
     local versions = sv and sv._versions
     if not versions then
+        return
+    end
+
+    if targetVersion ~= nil and (type(targetVersion) ~= "number" or targetVersion ~= math.floor(targetVersion)) then
         return
     end
 

@@ -213,6 +213,23 @@ local function ParseToggleArg(arg, current)
     return nil, "Usage: expected on|off|toggle"
 end
 
+--- Parses an optional integer version argument.
+---@param arg string
+---@return number|nil version
+---@return string|nil error
+local function ParseVersionArg(arg)
+    if arg == "" then
+        return nil, nil
+    end
+
+    local value = tonumber(arg)
+    if not value or value ~= math.floor(value) then
+        return nil, "Usage: /ecm rollback [version_number]"
+    end
+
+    return value, nil
+end
+
 local function printhelp()
     ECM_print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
     ECM_print("/ecm help - show this message")
@@ -271,9 +288,9 @@ function mod:ChatCommand(input)
             ECM_print("Cannot rollback during combat (UI reload is blocked).")
             return
         end
-        local targetVersion = arg ~= "" and tonumber(arg) or nil
-        if arg ~= "" and not targetVersion then
-            ECM_print("Usage: /ecm rollback [version_number]")
+        local targetVersion, parseErr = ParseVersionArg(arg)
+        if parseErr then
+            ECM_print(parseErr)
             return
         end
         local ok, msg = ECM.Migration.ValidateRollback(targetVersion)
@@ -341,7 +358,8 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM.Log("Initialize", "Schema version:", profile and profile.schemaVersion or "none" .. " Current version: " .. ECM.Constants.CURRENT_SCHEMA_VERSION)
+    local schemaVersion = profile and profile.schemaVersion or "none"
+    ECM.Log("Initialize", "Schema version: " .. tostring(schemaVersion) .. " Current version: " .. tostring(ECM.Constants.CURRENT_SCHEMA_VERSION))
 
     if profile and profile.schemaVersion and profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)
