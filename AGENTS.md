@@ -31,7 +31,6 @@ They are on special lookout for:
 - Inefficiencies.
 - Tight coupling and poor or no boundaries between components.
 - Code duplication.
--
 - Low reusability; poor future extensibility.
 - Unnecessary complexity.
 - Test coverage; edge cases; gaps.
