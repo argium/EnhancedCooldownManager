@@ -217,27 +217,7 @@ function ItemIconsOptions.GetOptionsTable()
             order = 3,
             args = ItemIconsOptions.GetConsumableOptionsArgs(),
         },
-        potionPriorityHeading = {
-            type = "description",
-            name = "Potion priority (highest first)",
-            order = 90,
-        },
-        combatPotionList = {
-            type = "description",
-            name =  BuildPotionPriorityText(ECM.Constants.COMBAT_POTIONS),
-            order = 91,
-            fontSize = "medium",
-        },
-        healthPotionList = {
-            type = "description",
-            name = BuildPotionPriorityText(ECM.Constants.HEALTH_POTIONS),
-            order = 93,
-            fontSize = "medium",
-        },
     }
-
-    args.spacer89 = OB.MakeSpacer(89)
-    args.spacer92 = OB.MakeSpacer(92)
 
     return {
         type = "group",
