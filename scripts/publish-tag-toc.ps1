@@ -52,7 +52,7 @@ function Get-GitHubWorkflowsUrl {
         return $null
     }
 
-    return "https://github.com/$repoPath/actions/workflows"
+    return "https://github.com/$repoPath/actions"
 }
 
 function Open-GitHubWorkflowsPage {
