@@ -11,8 +11,10 @@ local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 local SB = LSB:New({
     getProfile = function() return mod.db and mod.db.profile end,
     getDefaults = function() return mod.db and mod.db.defaults and mod.db.defaults.profile end,
+    getNestedValue = ECM.OptionUtil.GetNestedValue,
+    setNestedValue = ECM.OptionUtil.SetNestedValue,
     varPrefix = "ECM",
-    onChanged = function(spec, value)
+    onChanged = function(spec)
         if spec.layout ~= false then
             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
@@ -32,12 +34,8 @@ local SB = LSB:New({
         },
         PositioningGroup = {
             positionModes = ECM.OptionUtil.POSITION_MODE_TEXT,
-            isAnchorModeFree = function(cfg)
-                return ECM.OptionUtil.IsAnchorModeFree(cfg)
-            end,
-            applyPositionMode = function(cfg, mode)
-                return ECM.OptionUtil.ApplyPositionModeToBar(cfg, mode)
-            end,
+            isAnchorModeFree = ECM.OptionUtil.IsAnchorModeFree,
+            applyPositionMode = ECM.OptionUtil.ApplyPositionModeToBar,
             defaultBarWidth = ECM.Constants.DEFAULT_BAR_WIDTH,
         },
     },

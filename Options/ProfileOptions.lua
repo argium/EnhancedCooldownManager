@@ -15,17 +15,19 @@ StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = {
     hideOnEscape = true,
 }
 
-StaticPopupDialogs["ECM_CONFIRM_RESET_PROFILE"] = {
-    text = "Are you sure you want to reset the current profile to defaults?",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
-
 local ProfileOptions = {}
+
+--- Creates a proxy-backed dropdown for transient profile selection (not stored in SavedVars).
+local function CreateProfilePicker(SB, cat, variable, name, tooltip, valuesGenerator)
+    local selected = nil
+    local setting = Settings.RegisterProxySetting(cat, variable,
+        Settings.VarType.String, name, "",
+        function() return selected or "" end,
+        function(value) selected = value end
+    )
+    Settings.CreateDropdown(cat, setting, valuesGenerator, tooltip)
+    return setting, function() return selected end, function() selected = nil end
+end
 
 function ProfileOptions.RegisterSettings(SB)
     local cat = SB.CreateSubcategory("Profiles")
@@ -48,78 +50,59 @@ function ProfileOptions.RegisterSettings(SB)
         return container:GetData()
     end, "Select a profile to switch to.")
 
-    -- New Profile
     SB.Button({
         name = "Create a new profile",
         buttonText = "New Profile",
         tooltip = "Create a new profile using your current character name.",
         onClick = function()
-            local newName = UnitName("player") .. " - " .. date("%H%M%S")
-            switchSetting:SetValue(newName)
+            switchSetting:SetValue(UnitName("player") .. " - " .. date("%H%M%S"))
         end,
     })
 
-    -- Copy From
+    -- Copy / Delete
     SB.Header("Profile Actions")
 
-    local selectedCopyProfile = nil
-
-    local copySetting = Settings.RegisterProxySetting(cat, "ECM_ProfileCopy",
-        Settings.VarType.String, "Copy From", "",
-        function() return selectedCopyProfile or "" end,
-        function(value) selectedCopyProfile = value end
-    )
-
-    --- Generates dropdown data listing all profiles except the active one.
     local function otherProfilesGenerator()
         local container = Settings.CreateControlTextContainer()
         local current = mod.db:GetCurrentProfile()
         for _, name in ipairs(mod.db:GetProfiles()) do
-            if name ~= current then
-                container:Add(name, name)
-            end
+            if name ~= current then container:Add(name, name) end
         end
         return container:GetData()
     end
 
-    Settings.CreateDropdown(cat, copySetting, otherProfilesGenerator,
-        "Select a profile to copy settings from.")
+    local _, getCopyProfile, clearCopyProfile = CreateProfilePicker(
+        SB, cat, "ECM_ProfileCopy", "Copy From",
+        "Select a profile to copy settings from.", otherProfilesGenerator)
 
     SB.Button({
         name = "Apply copy from selected profile",
         buttonText = "Copy",
         tooltip = "Copy all settings from the selected profile into the current one.",
         onClick = function()
-            if not selectedCopyProfile or selectedCopyProfile == "" then return end
-            mod.db:CopyProfile(selectedCopyProfile)
-            selectedCopyProfile = nil
+            local profile = getCopyProfile()
+            if not profile or profile == "" then return end
+            mod.db:CopyProfile(profile)
+            clearCopyProfile()
         end,
     })
 
-    -- Delete Profile
-    local selectedDeleteProfile = nil
-
-    local deleteSetting = Settings.RegisterProxySetting(cat, "ECM_ProfileDelete",
-        Settings.VarType.String, "Delete Profile", "",
-        function() return selectedDeleteProfile or "" end,
-        function(value) selectedDeleteProfile = value end
-    )
-
-    Settings.CreateDropdown(cat, deleteSetting, otherProfilesGenerator,
-        "Select a profile to delete.")
+    local _, getDeleteProfile, clearDeleteProfile = CreateProfilePicker(
+        SB, cat, "ECM_ProfileDelete", "Delete Profile",
+        "Select a profile to delete.", otherProfilesGenerator)
 
     SB.Button({
         name = "Delete the selected profile",
         buttonText = "Delete",
         tooltip = "Delete the selected profile. The active profile cannot be deleted.",
         onClick = function()
-            if not selectedDeleteProfile or selectedDeleteProfile == "" then return end
-            local name = selectedDeleteProfile
+            local profile = getDeleteProfile()
+            if not profile or profile == "" then return end
             local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
-            dialog.text = string.format("Are you sure you want to delete the profile '%s'?", name)
+            dialog.text = string.format("Are you sure you want to delete the profile '%s'?", profile)
             dialog.OnAccept = function()
-                mod.db:DeleteProfile(name)
-                selectedDeleteProfile = nil
+                mod.db:DeleteProfile(profile)
+                clearDeleteProfile()
             end
             StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE")
         end,
@@ -133,9 +116,7 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = "Reset Profile",
         tooltip = "Reset the current profile back to default settings. This cannot be undone.",
         confirm = "Are you sure you want to reset the current profile to defaults?",
-        onClick = function()
-            mod.db:ResetProfile()
-        end,
+        onClick = function() mod.db:ResetProfile() end,
     })
 
     -- Import / Export

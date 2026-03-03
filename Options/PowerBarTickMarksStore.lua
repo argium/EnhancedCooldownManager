@@ -6,87 +6,48 @@ local _, ns = ...
 local mod = ns.Addon
 local C = ECM.Constants
 
-local function EnsureTicksConfig()
-    local db = mod.db
-    db.profile = db.profile or {}
-    db.profile.powerBar = db.profile.powerBar or {}
+-- Lazily creates the ticks config structure if missing (e.g. empty test profiles)
+local function GetTicksConfig()
+    local powerBar = mod.db.profile.powerBar
+    if powerBar and powerBar.ticks then return powerBar.ticks end
 
-    local powerBarCfg = db.profile.powerBar
-    if not powerBarCfg.ticks then
-        powerBarCfg.ticks = {
-            mappings = {},
-            defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
-            defaultWidth = 1,
-        }
-    end
-
-    local ticksCfg = powerBarCfg.ticks
-    if not ticksCfg.mappings then
-        ticksCfg.mappings = {}
-    end
-    if ticksCfg.defaultColor == nil then
-        ticksCfg.defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR
-    end
-    if ticksCfg.defaultWidth == nil then
-        ticksCfg.defaultWidth = 1
-    end
-
-    return ticksCfg
-end
-
-local function GetCurrentClassSpecIds()
-    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
-    if not classID or not specIndex then
-        return nil, nil
-    end
-
-    return classID, specIndex
+    if not mod.db.profile.powerBar then mod.db.profile.powerBar = {} end
+    mod.db.profile.powerBar.ticks = {
+        mappings = {},
+        defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
+        defaultWidth = 1,
+    }
+    return mod.db.profile.powerBar.ticks
 end
 
 local function GetCurrentTicks()
-    local db = mod.db
-    local classID, specIndex = GetCurrentClassSpecIds()
-    if not classID or not specIndex then
-        return {}
-    end
+    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
+    if not classID or not specIndex then return {} end
 
-    local ticksCfg = db.profile.powerBar and db.profile.powerBar.ticks
-    if not ticksCfg or not ticksCfg.mappings then
-        return {}
-    end
+    local ticksCfg = mod.db.profile.powerBar and mod.db.profile.powerBar.ticks
+    if not ticksCfg or not ticksCfg.mappings then return {} end
 
     local classMappings = ticksCfg.mappings[classID]
-    if not classMappings then
-        return {}
-    end
-
-    return classMappings[specIndex] or {}
+    return classMappings and classMappings[specIndex] or {}
 end
 
 local function SetCurrentTicks(ticks)
-    local classID, specIndex = GetCurrentClassSpecIds()
-    if not classID or not specIndex then
-        return
-    end
+    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
+    if not classID or not specIndex then return end
 
-    local ticksCfg = EnsureTicksConfig()
-    if not ticksCfg.mappings[classID] then
-        ticksCfg.mappings[classID] = {}
-    end
-
+    local ticksCfg = GetTicksConfig()
+    if not ticksCfg.mappings[classID] then ticksCfg.mappings[classID] = {} end
     ticksCfg.mappings[classID][specIndex] = ticks
 end
 
 local function AddTick(value, color, width)
     local ticks = GetCurrentTicks()
-    local ticksCfg = EnsureTicksConfig()
-
-    local newTick = {
+    local ticksCfg = GetTicksConfig()
+    ticks[#ticks + 1] = {
         value = value,
         color = color or ECM_CloneValue(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
-    table.insert(ticks, newTick)
     SetCurrentTicks(ticks)
 end
 
@@ -106,30 +67,14 @@ local function UpdateTick(index, field, value)
     end
 end
 
-local function GetDefaultColor()
-    return EnsureTicksConfig().defaultColor
-end
-
-local function SetDefaultColor(color)
-    EnsureTicksConfig().defaultColor = color
-end
-
-local function GetDefaultWidth()
-    return EnsureTicksConfig().defaultWidth
-end
-
-local function SetDefaultWidth(width)
-    EnsureTicksConfig().defaultWidth = width
-end
-
 ECM.PowerBarTickMarksStore = {
     GetCurrentTicks = GetCurrentTicks,
     SetCurrentTicks = SetCurrentTicks,
     AddTick = AddTick,
     RemoveTick = RemoveTick,
     UpdateTick = UpdateTick,
-    GetDefaultColor = GetDefaultColor,
-    SetDefaultColor = SetDefaultColor,
-    GetDefaultWidth = GetDefaultWidth,
-    SetDefaultWidth = SetDefaultWidth,
+    GetDefaultColor = function() return GetTicksConfig().defaultColor end,
+    SetDefaultColor = function(color) GetTicksConfig().defaultColor = color end,
+    GetDefaultWidth = function() return GetTicksConfig().defaultWidth end,
+    SetDefaultWidth = function(width) GetTicksConfig().defaultWidth = width end,
 }

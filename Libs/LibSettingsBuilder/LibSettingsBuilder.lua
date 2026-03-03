@@ -390,50 +390,25 @@ end
 -- Factory
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
--- Built-in dot-path table accessors (used when config doesn't provide them)
---------------------------------------------------------------------------------
-
-local function defaultGetNestedValue(tbl, path)
-    local current = tbl
-    for segment in path:gmatch("[^.]+") do
-        if type(current) ~= "table" then return nil end
-        current = current[tonumber(segment) or segment]
-    end
-    return current
-end
-
-local function defaultSetNestedValue(tbl, path, value)
-    local keys = {}
-    for segment in path:gmatch("[^.]+") do keys[#keys + 1] = tonumber(segment) or segment end
-    local current = tbl
-    for i = 1, #keys - 1 do
-        if current[keys[i]] == nil then current[keys[i]] = {} end
-        current = current[keys[i]]
-    end
-    current[keys[#keys]] = value
-end
-
 --- Create a new SettingsBuilder instance.
 ---@param config table
 ---   Required fields:
 ---     getProfile     function() -> table
 ---     getDefaults    function() -> table
+---     getNestedValue function(tbl, path) -> any
+---     setNestedValue function(tbl, path, value)
 ---     varPrefix      string            e.g. "ECM"
 ---     onChanged      function(spec, value) called after each setter
 ---   Optional fields:
----     getNestedValue function(tbl, path) -> any   (default: built-in dot-path with tonumber)
----     setNestedValue function(tbl, path, value)    (default: built-in dot-path with tonumber)
 ---     compositeDefaults table keyed by composite function name
 ---@return table builder instance with the full SB API
 function lib:New(config)
     assert(config.getProfile, "LibSettingsBuilder: getProfile is required")
     assert(config.getDefaults, "LibSettingsBuilder: getDefaults is required")
+    assert(config.getNestedValue, "LibSettingsBuilder: getNestedValue is required")
+    assert(config.setNestedValue, "LibSettingsBuilder: setNestedValue is required")
     assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
     assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
-
-    config.getNestedValue = config.getNestedValue or defaultGetNestedValue
-    config.setNestedValue = config.setNestedValue or defaultSetNestedValue
 
     local SB = {}
     SB._rootCategory = nil
@@ -460,21 +435,10 @@ function lib:New(config)
         return string.format("%.1f", value)
     end
 
-    local function getProfile()
-        return config.getProfile()
-    end
-
-    local function getDefaults()
-        return config.getDefaults()
-    end
-
-    local function getNestedValue(tbl, path)
-        return config.getNestedValue(tbl, path)
-    end
-
-    local function setNestedValue(tbl, path, value)
-        return config.setNestedValue(tbl, path, value)
-    end
+    local getProfile = config.getProfile
+    local getDefaults = config.getDefaults
+    local getNestedValue = config.getNestedValue
+    local setNestedValue = config.setNestedValue
 
     local function makeVarName(path)
         return config.varPrefix .. "_" .. path:gsub("%.", "_")
@@ -609,23 +573,8 @@ function lib:New(config)
         return isParentEnabled(spec)
     end
 
-    local function setInitializerInteractive(initializer, enabled)
-        if initializer and initializer.SetEnabled then
-            initializer:SetEnabled(enabled)
-        end
-    end
-
-    local function applyCanvasState(canvas, enabled)
-        if canvas.SetAlpha then
-            canvas:SetAlpha(enabled and 1 or 0.5)
-        end
-        setCanvasInteractive(canvas, enabled)
-    end
-
     reevaluateReactiveControls = function()
         -- Force the WoW settings panel to re-evaluate visible control states.
-        -- This triggers EvaluateState() on each rendered frame, which re-runs
-        -- AddModifyPredicate functions (disabled) and ShouldShow (hidden).
         local panel = SettingsPanel
         if panel and panel:IsShown() then
             local settingsList = panel:GetSettingsList()
@@ -643,7 +592,10 @@ function lib:New(config)
             local init, s = entry[1], entry[2]
             if s.canvas then
                 local enabled = isControlEnabled(s)
-                applyCanvasState(s.canvas, enabled)
+                if s.canvas.SetAlpha then
+                    s.canvas:SetAlpha(enabled and 1 or 0.5)
+                end
+                setCanvasInteractive(s.canvas, enabled)
             end
         end
     end
@@ -654,17 +606,27 @@ function lib:New(config)
         if spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
                 local enabled = isControlEnabled(spec)
-                setInitializerInteractive(initializer, enabled)
+                if initializer.SetEnabled then
+                    initializer:SetEnabled(enabled)
+                end
                 if spec.canvas then
-                    applyCanvasState(spec.canvas, enabled)
+                    if spec.canvas.SetAlpha then
+                        spec.canvas:SetAlpha(enabled and 1 or 0.5)
+                    end
+                    setCanvasInteractive(spec.canvas, enabled)
                 end
                 return enabled
             end)
 
             local enabled = isControlEnabled(spec)
-            setInitializerInteractive(initializer, enabled)
+            if initializer.SetEnabled then
+                initializer:SetEnabled(enabled)
+            end
             if spec.canvas then
-                applyCanvasState(spec.canvas, enabled)
+                if spec.canvas.SetAlpha then
+                    spec.canvas:SetAlpha(enabled and 1 or 0.5)
+                end
+                setCanvasInteractive(spec.canvas, enabled)
             end
         end
 
@@ -782,13 +744,7 @@ function lib:New(config)
 
     function SB.GetSubcategoryID(name)
         local category = SB._subcategories[name]
-        if not category then
-            return nil
-        end
-        if type(category) == "table" and type(category.GetID) == "function" then
-            return category:GetID()
-        end
-        return category
+        return category and category:GetID()
     end
 
     ----------------------------------------------------------------------------
@@ -912,24 +868,16 @@ function lib:New(config)
         return initializer, setting
     end
 
-    --- Unified path-based proxy control. Dispatches to the appropriate factory
-    --- based on `spec.type`.
-    ---   type = "checkbox" | "slider" | "dropdown" | "color" | "custom"
+    --- Unified path-based proxy control dispatch table.
+    local PATH_DISPATCH = {
+        checkbox = "PathCheckbox", slider = "PathSlider",
+        dropdown = "PathDropdown", color = "PathColor", custom = "PathCustom",
+    }
+
     function SB.PathControl(spec)
-        local controlType = spec.type
-        if controlType == "checkbox" then
-            return SB.PathCheckbox(spec)
-        elseif controlType == "slider" then
-            return SB.PathSlider(spec)
-        elseif controlType == "dropdown" then
-            return SB.PathDropdown(spec)
-        elseif controlType == "color" then
-            return SB.PathColor(spec)
-        elseif controlType == "custom" then
-            return SB.PathCustom(spec)
-        else
-            error("PathControl: unknown type '" .. tostring(controlType) .. "'")
-        end
+        local fn = SB[PATH_DISPATCH[spec.type]]
+        assert(fn, "PathControl: unknown type '" .. tostring(spec.type) .. "'")
+        return fn(spec)
     end
 
     ----------------------------------------------------------------------------
@@ -1269,18 +1217,25 @@ function lib:New(config)
         description = "subheader",
     }
 
-    local COMPOSITE_TYPES = {
-        positioning = true,
-        border = true,
-        fontOverride = true,
-        heightOverride = true,
-        colorList = true,
-        canvas = true,
+    local SPEC_EXCLUDE = { type=true, order=true, _key=true, defs=true, label=true, condition=true }
+
+    -- Composite type dispatch: returns init, setting from a composite builder
+    local COMPOSITE_DISPATCH = {
+        positioning = function(path, spec)
+            local r = SB.PositioningGroup(path, spec); return r.modeInit, r.modeSetting
+        end,
+        border = function(path, spec)
+            local r = SB.BorderGroup(path, spec); return r.enabledInit, r.enabledSetting
+        end,
+        fontOverride = function(path, spec)
+            local r = SB.FontOverrideGroup(path, spec); return r.enabledInit, r.enabledSetting
+        end,
+        heightOverride = function(path, spec)
+            return SB.HeightOverrideSlider(path, spec)
+        end,
     }
 
     --- Walks an AceConfig-inspired option table and calls the imperative API.
-    --- Supports property inheritance (disabled, hidden), path prefixing,
-    --- parent references by key, type aliases, and LSB composite types.
     function SB.RegisterFromTable(tbl)
         assert(tbl.name, "RegisterFromTable: tbl.name is required")
 
@@ -1310,38 +1265,28 @@ function lib:New(config)
             return (a.order or 100) < (b.order or 100)
         end)
 
-        -- Registry for created initializers/settings (for parent refs by key)
         local created = {}
 
         for _, entry in ipairs(sorted) do
             local entryType = TYPE_ALIASES[entry.type] or entry.type
 
-            -- Skip entry if condition function returns false
-            local shouldProcess = true
-            if entry.condition ~= nil then
-                if type(entry.condition) == "function" then
-                    shouldProcess = entry.condition()
-                else
-                    shouldProcess = entry.condition
-                end
-            end
+            -- Evaluate condition (skip entry if false)
+            local condition = entry.condition
+            local shouldProcess = condition == nil
+                or (type(condition) == "function" and condition())
+                or (type(condition) ~= "function" and condition)
 
             if shouldProcess then
-                -- Build spec with inherited properties
                 local spec = {}
                 for k, v in pairs(entry) do
-                    if k ~= "type" and k ~= "order" and k ~= "_key" and k ~= "defs" and k ~= "label" and k ~= "condition" then
-                        spec[k] = v
-                    end
+                    if not SPEC_EXCLUDE[k] then spec[k] = v end
                 end
 
-                -- Alias desc → tooltip
                 if spec.desc and not spec.tooltip then
                     spec.tooltip = spec.desc
                     spec.desc = nil
                 end
 
-                -- Inherit disabled/hidden from group
                 if tbl.disabled and spec.disabled == nil then spec.disabled = tbl.disabled end
                 if tbl.hidden and spec.hidden == nil then spec.hidden = tbl.hidden end
 
@@ -1350,14 +1295,12 @@ function lib:New(config)
                     local ref = created[spec.parent]
                     if ref then
                         spec.parent = ref.initializer
-
-                        -- Shortcut parentCheck values
                         if spec.parentCheck == "checked" then
-                            local refSetting = ref.setting
-                            spec.parentCheck = function() return refSetting:GetValue() end
+                            local s = ref.setting
+                            spec.parentCheck = function() return s:GetValue() end
                         elseif spec.parentCheck == "notChecked" then
-                            local refSetting = ref.setting
-                            spec.parentCheck = function() return not refSetting:GetValue() end
+                            local s = ref.setting
+                            spec.parentCheck = function() return not s:GetValue() end
                         end
                     end
                 end
@@ -1373,24 +1316,6 @@ function lib:New(config)
                 elseif entryType == "button" then
                     init = SB.Button(spec)
 
-                elseif entryType == "positioning" then
-                    local result = SB.PositioningGroup(resolvePath(entry.path), spec)
-                    init = result.modeInit
-                    setting = result.modeSetting
-
-                elseif entryType == "border" then
-                    local result = SB.BorderGroup(resolvePath(entry.path), spec)
-                    init = result.enabledInit
-                    setting = result.enabledSetting
-
-                elseif entryType == "fontOverride" then
-                    local result = SB.FontOverrideGroup(resolvePath(entry.path), spec)
-                    init = result.enabledInit
-                    setting = result.enabledSetting
-
-                elseif entryType == "heightOverride" then
-                    init, setting = SB.HeightOverrideSlider(resolvePath(entry.path), spec)
-
                 elseif entryType == "canvas" then
                     init = SB.EmbedCanvas(entry.canvas, entry.height, spec)
 
@@ -1402,17 +1327,16 @@ function lib:New(config)
                     end
                     local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
                     if results[1] then
-                        init = results[1].initializer
-                        setting = results[1].setting
+                        init, setting = results[1].initializer, results[1].setting
                     end
 
-                elseif entryType == "checkbox" or entryType == "slider"
-                    or entryType == "dropdown" or entryType == "color"
-                    or entryType == "custom" then
+                elseif COMPOSITE_DISPATCH[entryType] then
+                    init, setting = COMPOSITE_DISPATCH[entryType](resolvePath(entry.path), spec)
+
+                elseif PATH_DISPATCH[entryType] then
                     spec.path = resolvePath(entry.path or spec.path)
                     spec.type = entryType
                     init, setting = SB.PathControl(spec)
-
                 end
 
                 created[entry._key] = { initializer = init, setting = setting }

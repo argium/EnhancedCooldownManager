@@ -104,10 +104,6 @@ end
 -- Export
 --------------------------------------------------------------------------------
 
-local function NotifyOptionsChanged()
-    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
-end
-
 --- Opens the Blizzard ColorPickerFrame with the given color.
 --- Calls onChange with the selected {r, g, b, a} table on both accept and cancel.
 ---@param currentColor {r:number, g:number, b:number, a:number|nil}
