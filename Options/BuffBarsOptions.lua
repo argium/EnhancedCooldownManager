@@ -10,42 +10,35 @@ local function IsEditLocked()
     return ECM.BuffBars:IsEditLocked()
 end
 
---- Generates the merged list of spell color rows from active bars and saved entries.
----@param activeBars ECM_SpellColorKey[]|nil
----@param savedEntries { key: ECM_SpellColorKey }[]|nil
+--- Generates the merged list of spell color rows from spell color entries.
+---@param entries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
-local function BuildSpellColorRows(activeBars, savedEntries)
+local function BuildSpellColorRows(entries)
     local rows = {}
 
-    local function AddDiscoveredKey(key)
-        local normalized = ECM.SpellColors.NormalizeKey(key)
-        if not normalized then
-            return
-        end
+    if type(entries) ~= "table" then
+        return rows
+    end
 
-        for _, row in ipairs(rows) do
-            if row.key:Matches(normalized) then
-                row.key = row.key:Merge(normalized) or row.key
-                row.textureFileID = row.key.textureFileID or row.textureFileID
-                return
+    for _, entry in ipairs(entries) do
+        local normalized = ECM.SpellColors.NormalizeKey(type(entry) == "table" and entry.key or nil)
+        if normalized then
+            local merged = false
+            for _, row in ipairs(rows) do
+                if row.key:Matches(normalized) then
+                    row.key = row.key:Merge(normalized) or row.key
+                    row.textureFileID = row.key.textureFileID or row.textureFileID
+                    merged = true
+                    break
+                end
             end
-        end
 
-        rows[#rows + 1] = {
-            key = normalized,
-            textureFileID = normalized.textureFileID,
-        }
-    end
-
-    if type(activeBars) == "table" then
-        for _, key in ipairs(activeBars) do
-            AddDiscoveredKey(key)
-        end
-    end
-
-    if type(savedEntries) == "table" then
-        for _, entry in ipairs(savedEntries) do
-            AddDiscoveredKey(type(entry) == "table" and entry.key or nil)
+            if not merged then
+                rows[#rows + 1] = {
+                    key = normalized,
+                    textureFileID = normalized.textureFileID,
+                }
+            end
         end
     end
 
@@ -159,7 +152,6 @@ local function CreateSpellColorCanvas(SB, subcatName)
 
     function frame:RefreshSpellList()
         local rows = BuildSpellColorRows(
-            ECM.BuffBars:GetActiveSpellData(),
             ECM.SpellColors.GetAllColorEntries()
         )
 
@@ -298,11 +290,10 @@ function BuffBarsOptions.RegisterSettings(SB)
     SB.Button({
         name = "Refresh spell list",
         buttonText = "Refresh",
-        tooltip = "Re-scan active aura bars and reconcile with saved spell color entries.",
+        tooltip = "Reconcile discovered aura bars with saved spell color entries and refresh the list.",
         onClick = function()
             if IsEditLocked() then return end
-            local activeKeys = ECM.BuffBars:GetActiveSpellData()
-            ECM.SpellColors.ReconcileAllKeys(activeKeys)
+            ECM.SpellColors.ReconcileDiscoveredKeys()
             colorsFrame:RefreshSpellList()
         end,
     })

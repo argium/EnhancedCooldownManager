@@ -205,6 +205,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         and issecretvalue(cooldownID) and issecretvalue(textureFileID)
     _editLocked = _editLocked or allSecret
 
+    ECM.SpellColors.DiscoverBar(frame)
+
     -- Purely diagnostics to help track down issues with secrets
     local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")

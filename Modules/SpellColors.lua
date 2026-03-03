@@ -14,6 +14,11 @@ local FrameUtil = ECM.FrameUtil
 local SpellColors = {}
 ECM.SpellColors = SpellColors
 
+--- Runtime cache of keys discovered from active bars during layout.
+--- Merged into GetAllColorEntries so the options UI sees all visible bars
+--- without reaching into BuffBars directly.
+local _discoveredKeys = {}
+
 --- Key tier definitions, ordered highest-priority first.
 --- Must match the field names returned by get_current_class_spec_stores().
 local KEY_DEFS = { "byName", "bySpellID", "byCooldownID", "byTexture" }
@@ -636,6 +641,22 @@ function SpellColors.GetAllColorEntries()
         end
     end
 
+    -- Merge runtime-discovered keys so the UI shows all visible bars
+    -- without BuffBarsOptions reaching into BuffBars directly.
+    for _, dKey in ipairs(_discoveredKeys) do
+        local merged = false
+        for _, row in ipairs(result) do
+            if row.key:Matches(dKey) then
+                row.key = row.key:Merge(dKey) or row.key
+                merged = true
+                break
+            end
+        end
+        if not merged then
+            result[#result + 1] = { key = dKey }
+        end
+    end
+
     for _, row in ipairs(result) do
         row._ts = nil
         row._tierIndex = nil
@@ -763,6 +784,37 @@ function SpellColors.ReconcileAllBars(frames)
         end
     end
     return SpellColors.ReconcileAllKeys(keys)
+end
+
+--- Registers a bar frame's identifying values in the runtime discovered cache.
+--- Called during layout so values are captured before they become secret.
+---@param frame ECM_BuffBarMixin
+function SpellColors.DiscoverBar(frame)
+    local key = make_key_from_bar(frame)
+    if not key then
+        return
+    end
+    for i, existing in ipairs(_discoveredKeys) do
+        if keys_match(existing, key) then
+            _discoveredKeys[i] = merge_keys(existing, key) or existing
+            return
+        end
+    end
+    _discoveredKeys[#_discoveredKeys + 1] = key
+end
+
+--- Wipes the runtime discovered keys cache.
+function SpellColors.ClearDiscoveredKeys()
+    wipe(_discoveredKeys)
+end
+
+--- Reconciles runtime-discovered keys with the persistent store.
+---@return number changed
+function SpellColors.ReconcileDiscoveredKeys()
+    if #_discoveredKeys == 0 then
+        return 0
+    end
+    return SpellColors.ReconcileAllKeys(_discoveredKeys)
 end
 
 --- Wipes all persisted spell color entries for the current class/spec and

@@ -165,17 +165,15 @@ describe("BuffBarsOptions", function()
 
     -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
 
-    it("_BuildSpellColorRows keeps active-bar order and appends persisted-only rows", function()
-        local activeBars = {
-            SpellColors.MakeKey("Active Name", 1001, nil, nil),
-            SpellColors.MakeKey(nil, nil, nil, 2002),
-        }
-        local savedEntries = {
+    it("_BuildSpellColorRows deduplicates matching entries and preserves order", function()
+        local entries = {
+            { key = SpellColors.MakeKey("Active Name", 1001, nil, nil) },
+            { key = SpellColors.MakeKey(nil, nil, nil, 2002) },
             { key = SpellColors.MakeKey("Active Name", 1001, 77, 9001) },
             { key = SpellColors.MakeKey("Persisted Only", 3003, nil, nil) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(activeBars, savedEntries)
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(3, #rows)
         assert.are.equal("Active Name", rows[1].key.primaryKey)
         assert.are.equal(2002, rows[2].key.primaryKey)
@@ -183,14 +181,12 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_BuildSpellColorRows merges matching keys and carries fallback identifiers", function()
-        local activeBars = {
-            SpellColors.MakeKey("Immolation Aura", 258920, nil, nil),
-        }
-        local savedEntries = {
+        local entries = {
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
             { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(activeBars, savedEntries)
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(1, #rows)
         assert.are.equal("spellName", rows[1].key.keyType)
         assert.are.equal("Immolation Aura", rows[1].key.primaryKey)
@@ -201,35 +197,31 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_BuildSpellColorRows does not merge unrelated rows that only share texture", function()
-        local activeBars = {
-            SpellColors.MakeKey("Spell A", nil, nil, 1234),
-        }
-        local savedEntries = {
+        local entries = {
+            { key = SpellColors.MakeKey("Spell A", nil, nil, 1234) },
             { key = SpellColors.MakeKey("Spell B", nil, nil, 1234) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(activeBars, savedEntries)
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(2, #rows)
         assert.are.equal("Spell A", rows[1].key.primaryKey)
         assert.are.equal("Spell B", rows[2].key.primaryKey)
     end)
 
     it("_BuildSpellColorRows merges texture-only keys", function()
-        local activeBars = {
-            SpellColors.MakeKey(nil, nil, nil, 4444),
-        }
-        local savedEntries = {
+        local entries = {
+            { key = SpellColors.MakeKey(nil, nil, nil, 4444) },
             { key = SpellColors.MakeKey(nil, nil, nil, 4444) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(activeBars, savedEntries)
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(1, #rows)
         assert.are.equal(4444, rows[1].key.primaryKey)
         assert.are.equal(4444, rows[1].textureFileID)
     end)
 
     it("_BuildSpellColorRows ignores invalid entries and handles nil inputs", function()
-        local rows = BuffBarsOptions._BuildSpellColorRows(nil, {
+        local rows = BuffBarsOptions._BuildSpellColorRows({
             {},
             { key = nil },
             { key = SpellColors.MakeKey("Valid", nil, nil, nil) },

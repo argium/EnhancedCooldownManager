@@ -727,4 +727,106 @@ describe("SpellColors", function()
         assert.are.same(newColor, SpellColors.GetColorByKey({ spellName = "Map Reset Spell" }))
         assert.are.same(newColor, SpellColors.GetColorByKey({ spellID = 543210 }))
     end)
+
+    ---------------------------------------------------------------------------
+    -- DiscoverBar / ClearDiscoveredKeys / GetAllColorEntries integration
+    ---------------------------------------------------------------------------
+
+    it("DiscoverBar adds keys to discovered cache and GetAllColorEntries includes them", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Demon Spikes",
+            spellID = 203720,
+        }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Demon Spikes", entries[1].key.spellName)
+        assert.are.equal(203720, entries[1].key.spellID)
+        assert.is_nil(entries[1].color)
+    end)
+
+    it("DiscoverBar deduplicates matching keys and merges identifiers", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Eye Beam",
+            spellID = 198013,
+        }))
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Eye Beam",
+            cooldownID = 55,
+            textureFileID = 1111,
+        }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Eye Beam", entries[1].key.spellName)
+        assert.are.equal(198013, entries[1].key.spellID)
+        assert.are.equal(55, entries[1].key.cooldownID)
+        assert.are.equal(1111, entries[1].key.textureFileID)
+    end)
+
+    it("discovered keys merge with persisted entries in GetAllColorEntries", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        local c = color(0.5, 0.6, 0.7)
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), c)
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Immolation Aura",
+            spellID = 258920,
+            cooldownID = 77,
+            textureFileID = 9001,
+        }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Immolation Aura", entries[1].key.spellName)
+        assert.are.equal(258920, entries[1].key.spellID)
+        assert.are.equal(77, entries[1].key.cooldownID)
+        assert.are.equal(9001, entries[1].key.textureFileID)
+        assert.are.same(c, entries[1].color)
+    end)
+
+    it("ClearDiscoveredKeys wipes the discovered cache", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({ spellName = "Temp Spell" }))
+        assert.are.equal(1, #SpellColors.GetAllColorEntries())
+
+        SpellColors.ClearDiscoveredKeys()
+        assert.are.equal(0, #SpellColors.GetAllColorEntries())
+    end)
+
+    it("DiscoverBar ignores frames with all secret values", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = markSecret("Secret Name"),
+            spellID = markSecret(12345),
+        }))
+
+        assert.are.equal(0, #SpellColors.GetAllColorEntries())
+    end)
+
+    it("ReconcileDiscoveredKeys reconciles discovered keys with persistent store", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        local c = color(0.3, 0.4, 0.5)
+        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 198013, nil, nil), c)
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Eye Beam",
+            spellID = 198013,
+            cooldownID = 55,
+        }))
+
+        local changed = SpellColors.ReconcileDiscoveredKeys()
+        assert.is_true(changed > 0)
+
+        -- After reconciliation, the color is accessible by spellName
+        assert.are.same(c, SpellColors.GetColorByKey({ spellName = "Eye Beam" }))
+    end)
 end)
