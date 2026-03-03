@@ -66,7 +66,7 @@ local function SetGloballyHidden(hidden, reason)
     _hideReason = reason
 
     -- Always enforce Blizzard frame state; the game may re-show them externally
-    ForEachBlizzardFrame(function(frame, name)
+    ForEachBlizzardFrame(function(frame)
         if hidden then
             if frame:IsShown() then
                 frame:Hide()

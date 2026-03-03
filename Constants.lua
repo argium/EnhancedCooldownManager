@@ -116,8 +116,6 @@ local constants = {
     ACTIVE_SV_KEY = "_ECM_DB",
 
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
-
-    ME = "Solar"
 }
 
 local BLIZZARD_FRAMES = {
@@ -127,64 +125,25 @@ local BLIZZARD_FRAMES = {
     "BuffBarCooldownViewer",
 }
 
-local CLASS = {
-    DEATHKNIGHT = "DEATHKNIGHT",
-    DEMONHUNTER = "DEMONHUNTER",
-    DRUID = "DRUID",
-    EVOKER = "EVOKER",
-    HUNTER = "HUNTER",
-    MAGE = "MAGE",
-    MONK = "MONK",
-    PALADIN = "PALADIN",
-    PRIEST = "PRIEST",
-    ROGUE = "ROGUE",
-    SHAMAN = "SHAMAN",
-    WARLOCK = "WARLOCK",
-    WARRIOR = "WARRIOR",
-}
-
 local CLASS_COLORS = {
-    [CLASS.DEATHKNIGHT] = "C41F3B",
-    [CLASS.DEMONHUNTER] = "A330C9",
-    [CLASS.DRUID]       = "FF7D0A",
-    [CLASS.EVOKER]      = "33937F",
-    [CLASS.HUNTER]      = "ABD473",
-    [CLASS.MAGE]        = "69CCF0",
-    [CLASS.MONK]        = "00FF96",
-    [CLASS.PALADIN]     = "F58CBA",
-    [CLASS.PRIEST]      = "FFFFFF",
-    [CLASS.ROGUE]       = "FFF569",
-    [CLASS.SHAMAN]      = "0070DE",
-    [CLASS.WARLOCK]     = "9482C9",
-    [CLASS.WARRIOR]     = "C79C6E",
-}
-
---- Chat channel colors keyed by channel name.
-local ChatChannelColors = {
-    SAY          = "FFFFFF",
-    YELL         = "FF3F40",
-    WHISPER      = "FF7EFF",
-    PARTY        = "AAABFE",
-    PARTY_LEADER = "77C8FF",
-    RAID         = "FF7F00",
-    RAID_WARNING = "FF4809",
-    INSTANCE     = "FF7D01",
-    GUILD        = "3CE13F",
-    OFFICER      = "40BC40",
-    EMOTE        = "FF7E40",
-    SYSTEM       = "FFFF00",
-    QUEST        = "CC9933",
-    LFG          = "FEC1C0",
-    BATTLENET    = "00FAF6",
-    GENERAL      = "FFC080",
-    TRADE        = "FFC080",
-    LOOT         = "00A956",
+    DEATHKNIGHT = "C41F3B",
+    DEMONHUNTER = "A330C9",
+    DRUID       = "FF7D0A",
+    EVOKER      = "33937F",
+    HUNTER      = "ABD473",
+    MAGE        = "69CCF0",
+    MONK        = "00FF96",
+    PALADIN     = "F58CBA",
+    PRIEST      = "FFFFFF",
+    ROGUE       = "FFF569",
+    SHAMAN      = "0070DE",
+    WARLOCK     = "9482C9",
+    WARRIOR     = "C79C6E",
 }
 
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
-constants.CLASS = CLASS
 constants.CLASS_COLORS = CLASS_COLORS
 
 ECM.Constants = constants

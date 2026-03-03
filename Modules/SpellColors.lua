@@ -411,15 +411,9 @@ function SpellColorKeyType:Merge(other)
 end
 
 function SpellColorKeyType:tostring()
-    -- return key type, and then all 4 values
-    local keyType = self.keyType
-    if keyType == nil then
-        keyType = "nil"
-    end
-
     return string.format(
         "SpellColorKey{type=%s, spellName=%s, spellID=%s, cooldownID=%s, textureFileID=%s}",
-        keyType,
+        tostring(self.keyType),
         tostring(self.spellName),
         tostring(self.spellID),
         tostring(self.cooldownID),

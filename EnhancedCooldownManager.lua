@@ -51,11 +51,6 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
         return
     end
 
-    if not StaticPopupDialogs or not StaticPopup_Show then
-        ECM_print("Unable to show confirmation dialog (StaticPopup API unavailable).")
-        return
-    end
-
     if not StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] then
         StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] = {
             text = "Reload the UI?",
@@ -83,13 +78,6 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
     StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
---- Safely gets the edit box from a StaticPopup dialog.
----@param dialog table
----@return EditBox editBox
-local function GetDialogEditBox(dialog)
-    return dialog.editBox or dialog:GetEditBox()
-end
-
 --- Creates or retrieves a StaticPopup dialog with common settings for editbox dialogs.
 ---@param key string
 ---@param config table
@@ -98,7 +86,7 @@ local function EnsureEditBoxDialog(key, config)
         return
     end
 
-    local defaults = {
+    StaticPopupDialogs[key] = {
         hasEditBox = true,
         editBoxWidth = 350,
         timeout = 0,
@@ -107,16 +95,9 @@ local function EnsureEditBoxDialog(key, config)
         preferredIndex = 3,
     }
 
-    -- Merge config into defaults
-    local dialog = {}
-    for k, v in pairs(defaults) do
-        dialog[k] = v
-    end
     for k, v in pairs(config or {}) do
-        dialog[k] = v
+        StaticPopupDialogs[key][k] = v
     end
-
-    StaticPopupDialogs[key] = dialog
 end
 
 --- Shows a dialog with the export string for copying.
@@ -134,7 +115,7 @@ function mod:ShowExportDialog(exportString)
 
     StaticPopupDialogs[POPUP_EXPORT_PROFILE].OnShow = function(self)
         self:SetFrameStrata("TOOLTIP")
-        local editBox = GetDialogEditBox(self)
+        local editBox = self.editBox or self:GetEditBox()
         editBox:SetText(exportString)
         editBox:HighlightText()
         editBox:SetFocus()
@@ -159,13 +140,13 @@ function mod:ShowImportDialog()
 
     StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnShow = function(self)
         self:SetFrameStrata("TOOLTIP")
-        local editBox = GetDialogEditBox(self)
+        local editBox = self.editBox or self:GetEditBox()
         editBox:SetText("")
         editBox:SetFocus()
     end
 
     StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnAccept = function(self)
-        local editBox = GetDialogEditBox(self)
+        local editBox = self.editBox or self:GetEditBox()
         local input = editBox:GetText() or ""
 
         if strtrim(input) == "" then
@@ -198,37 +179,17 @@ function mod:ShowImportDialog()
     StaticPopup_Show(POPUP_IMPORT_PROFILE)
 end
 
---- Parses on/off/toggle argument and returns the new boolean value.
----@param arg string
----@param current boolean
----@return boolean|nil newValue, string|nil error
-local function ParseToggleArg(arg, current)
-    if arg == "" or arg == "toggle" then
-        return not current, nil
-    elseif arg == "on" then
-        return true, nil
-    elseif arg == "off" then
-        return false, nil
-    end
-    return nil, "Usage: expected on|off|toggle"
-end
-
-local function printhelp()
-    ECM_print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
-    ECM_print("/ecm help - show this message")
-    ECM_print("/ecm options|config|settings|o - open the options menu")
-    ECM_print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
-    ECM_print("/ecm migrationlog - show the settings migration log")
-
-end
-
 --- Handles slash command input.
 ---@param input string|nil
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
-    if cmd == "help" then
-        printhelp()
+    if cmd == "help" or (cmd == "migration" and arg ~= "" and arg ~= "log") then
+        ECM_print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
+        ECM_print("/ecm help - show this message")
+        ECM_print("/ecm options|config|settings|o - open the options menu")
+        ECM_print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
+        ECM_print("/ecm migrationlog - show the settings migration log")
         return
     end
 
@@ -239,11 +200,7 @@ function mod:ChatCommand(input)
     end
 
     if cmd == "migration" then
-        if arg == "" or arg == "log" then
-            ECM.Migration.PrintLog()
-        else
-            printhelp()
-        end
+        ECM.Migration.PrintLog()
         return
     end
 
@@ -270,9 +227,15 @@ function mod:ChatCommand(input)
     end
 
     if cmd == "debug" then
-        local newVal, err = ParseToggleArg(arg, profile.debug)
-        if err then
-            ECM_print(err)
+        local newVal
+        if arg == "" or arg == "toggle" then
+            newVal = not profile.debug
+        elseif arg == "on" then
+            newVal = true
+        elseif arg == "off" then
+            newVal = false
+        else
+            ECM_print("Usage: expected on|off|toggle")
             return
         end
         profile.debug = newVal
@@ -296,7 +259,7 @@ function mod:HandleOpenOptionsAfterCombat()
 end
 
 function mod:GetECMModule(moduleName, silent)
-    local module = self[moduleName] or ECM[moduleName] or nil
+    local module = self[moduleName] or ECM[moduleName]
     if not module and not silent then
         ECM_print("Module not found:", moduleName)
     end
@@ -322,7 +285,7 @@ function mod:OnInitialize()
     ECM.Migration.FlushLog()
 
     -- Register bundled font with LibSharedMedia if present.
-    if LSM and LSM.Register then
+    if LSM then
         pcall(LSM.Register, LSM, "font", "Expressway",
             "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf")
     end

@@ -6,22 +6,20 @@ local C = ECM.Constants
 local ClassUtil = {}
 ECM.ClassUtil = ClassUtil
 
+--- Power types that have discrete values and should be displayed using the resource bar.
+local discreteResourceTypes = {
+    [Enum.PowerType.ArcaneCharges] = true,
+    [Enum.PowerType.Chi] = true,
+    [Enum.PowerType.ComboPoints] = true,
+    [Enum.PowerType.HolyPower] = true,
+    [Enum.PowerType.SoulShards] = true,
+    [Enum.PowerType.Essence] = true,
+}
+
 --- Gets the resource type for the class, spec and current shapeshift form (if applicable).
 --- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta, maelstrom weapon), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
 function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
-    --- Power types that have discrete values and should be displayed using the resource bar.
-    local discreteResourceTypes = {
-        [Enum.PowerType.ArcaneCharges] = true,
-        [Enum.PowerType.Chi] = true,
-        [Enum.PowerType.ComboPoints] = true,
-        [Enum.PowerType.HolyPower] = true,
-        [Enum.PowerType.SoulShards] = true,
-        [Enum.PowerType.Essence] = true,
-    }
-
-    local CLASS = C.CLASS
-
-    if class == CLASS.DEMONHUNTER then
+    if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
             if voidFragments then
@@ -32,37 +30,28 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         elseif specIndex == C.DEMONHUNTER_VENGEANCE_SPEC_INDEX then
             return C.RESOURCEBAR_TYPE_VENGEANCE_SOULS
         end
-    elseif (class == CLASS.MAGE) then
-        if (specIndex == C.MAGE_ARCANE_SPEC_INDEX) then
+    elseif class == "MAGE" then
+        if specIndex == C.MAGE_ARCANE_SPEC_INDEX then
             return Enum.PowerType.ArcaneCharges
         end
 
-        if (specIndex == C.MAGE_FROST_SPEC_INDEX) then
+        if specIndex == C.MAGE_FROST_SPEC_INDEX then
             return C.RESOURCEBAR_TYPE_ICICLES
         end
-
-        -- Fire mages don't use a discrete resource tracked by this bar.
-        -- Return nil explicitly to make this control flow clear.
-        return nil
-    elseif class == CLASS.SHAMAN then
+    elseif class == "SHAMAN" then
         -- Enhancement tracks Maelstrom Weapon stacks (aura-based), not Elemental's Maelstrom power type.
         if specIndex == C.SHAMAN_ENHANCEMENT_SPEC_INDEX then
             return C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
         end
-
-        return nil
-    elseif class == CLASS.MONK then
+    elseif class == "MONK" then
         if specIndex == C.MONK_WINDWALKER_SPEC_INDEX then
             return Enum.PowerType.Chi
-        else
-            -- Mistweaver and Brewmaster don't use chi.
-            return nil
         end
     else
         for powerType in pairs(discreteResourceTypes) do
             local max = UnitPowerMax("player", powerType)
             if max and max > 0 then
-                if class == CLASS.DRUID then
+                if class == "DRUID" then
                     if shapeshiftForm == C.DRUID_CAT_FORM_INDEX then
                         return powerType
                     end
@@ -72,8 +61,6 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
             end
         end
     end
-
-    return nil
 end
 
 --- Gets the resource type for the player given their class, spec and current shapeshift form (if applicable).
@@ -129,6 +116,4 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         local current = UnitPower("player", resourceType) or 0
         return max, current
     end
-
-    return nil, nil
 end

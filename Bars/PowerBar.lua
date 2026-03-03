@@ -111,7 +111,7 @@ function PowerBar:Refresh(why, force)
 end
 
 function PowerBar:ShouldShow()
-    local show = ECM.BarMixin.ShouldShow(self)
+    local show = ECM.ModuleMixin.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
         local powerType = self:GetCurrentPowerType()
@@ -137,7 +137,7 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
-    if unitID and unitID ~= "player" then
+    if unitID ~= "player" then
         return
     end
 
@@ -156,7 +156,6 @@ function PowerBar:OnEnable()
     end
 
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
-    ECM.Log(self.Name, "Enabled")
 end
 
 function PowerBar:OnDisable()
@@ -164,5 +163,4 @@ function PowerBar:OnDisable()
     if self.IsModuleMixin and ECM.UnregisterFrame then
         ECM.UnregisterFrame(self)
     end
-    ECM.Log(self.Name, "Disabled")
 end

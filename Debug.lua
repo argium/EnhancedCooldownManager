@@ -18,9 +18,6 @@ function ECM.Log(module, message, data)
         return
     end
 
-    ECM.DebugAssert(message and type(message) == "string", "ECM.Log: message must be a string")
-    ECM.DebugAssert(module == nil or type(module) == "string", "ECM.Log: module must be a string or nil")
-
     local prefix = "[" .. ECM.Constants.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
 
     if DevTool and DevTool.AddData then

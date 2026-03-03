@@ -11,10 +11,6 @@ ECM.FrameUtil = FrameUtil
 ---@param regionType string
 ---@return Region|nil
 local function TryGetRegion(frame, index, regionType)
-    if not frame or not frame.GetRegions then
-        return nil
-    end
-
     local region = select(index, frame:GetRegions())
     if region and region.IsObjectType and region:IsObjectType(regionType) then
         return region
@@ -182,10 +178,6 @@ end
 ---@param texture Texture|nil
 ---@return number|nil, number|nil, number|nil, number|nil
 local function get_texture_color(texture)
-    if not texture then
-        return nil, nil, nil, nil
-    end
-
     if texture.GetColorTexture then
         local r, g, b, a = texture:GetColorTexture()
         if r ~= nil then
@@ -201,19 +193,11 @@ local function get_texture_color(texture)
 end
 
 --- Reads status bar texture value (path/file id) from the underlying texture.
----@param bar StatusBar|nil
+---@param bar StatusBar
 ---@return any|nil
 local function get_statusbar_texture_value(bar)
-    if not bar or not bar.GetStatusBarTexture then
-        return nil
-    end
-
     local tex = bar:GetStatusBarTexture()
-    if tex and tex.GetTexture then
-        return tex:GetTexture()
-    end
-
-    return nil
+    return tex and tex:GetTexture() or nil
 end
 
 --- Sets height only if it differs from the current value.
@@ -221,7 +205,7 @@ end
 ---@param h number
 ---@return boolean changed
 function FrameUtil.LazySetHeight(frame, h)
-    if frame.GetHeight and frame:GetHeight() == h then
+    if frame:GetHeight() == h then
         return false
     end
     frame:SetHeight(h)
@@ -233,7 +217,7 @@ end
 ---@param w number
 ---@return boolean changed
 function FrameUtil.LazySetWidth(frame, w)
-    if frame.GetWidth and frame:GetWidth() == w then
+    if frame:GetWidth() == w then
         return false
     end
     frame:SetWidth(w)
@@ -245,7 +229,7 @@ end
 ---@param alpha number
 ---@return boolean changed
 function FrameUtil.LazySetAlpha(frame, alpha)
-    if frame.GetAlpha and frame:GetAlpha() == alpha then
+    if frame:GetAlpha() == alpha then
         return false
     end
     frame:SetAlpha(alpha)
@@ -301,12 +285,10 @@ function FrameUtil.LazySetBackgroundColor(frame, color)
 end
 
 --- Sets vertex color on a texture only if the color has changed.
----@param frame Frame Unused; retained for API compatibility
 ---@param texture Texture The texture object
----@param cacheKey string Unused; retained for API compatibility
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
-function FrameUtil.LazySetVertexColor(frame, texture, cacheKey, color)
+function FrameUtil.LazySetVertexColor(texture, color)
     local r, g, b, a = get_texture_color(texture)
     if color_equals_rgba(color, r, g, b, a) then
         return false
@@ -316,13 +298,12 @@ function FrameUtil.LazySetVertexColor(frame, texture, cacheKey, color)
 end
 
 --- Sets the status bar texture only if it differs from the current value.
----@param frame Frame Unused; retained for API compatibility
 ---@param bar StatusBar The status bar frame
 ---@param texturePath string Texture path or LSM key
 ---@return boolean changed
-function FrameUtil.LazySetStatusBarTexture(frame, bar, texturePath)
+function FrameUtil.LazySetStatusBarTexture(bar, texturePath)
     local currentTexture = get_statusbar_texture_value(bar)
-    if currentTexture ~= nil and currentTexture == texturePath then
+    if currentTexture == texturePath then
         return false
     end
     bar:SetStatusBarTexture(texturePath)
@@ -330,20 +311,17 @@ function FrameUtil.LazySetStatusBarTexture(frame, bar, texturePath)
 end
 
 --- Sets the status bar color only if RGBA has changed.
----@param frame Frame Unused; retained for API compatibility
 ---@param bar StatusBar The status bar frame
 ---@param r number Red component
 ---@param g number Green component
 ---@param b number Blue component
 ---@param a number|nil Alpha component (default 1)
 ---@return boolean changed
-function FrameUtil.LazySetStatusBarColor(frame, bar, r, g, b, a)
+function FrameUtil.LazySetStatusBarColor(bar, r, g, b, a)
     a = a or 1
-    if bar.GetStatusBarColor then
-        local cr, cg, cb, ca = bar:GetStatusBarColor()
-        if cr == r and cg == g and cb == b and (ca or 1) == a then
-            return false
-        end
+    local cr, cg, cb, ca = bar:GetStatusBarColor()
+    if cr == r and cg == g and cb == b and (ca or 1) == a then
+        return false
     end
     bar:SetStatusBarColor(r, g, b, a)
     return true
@@ -376,7 +354,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     end
 
     if borderConfig.enabled then
-        if liveEnabled == true and liveThickness == thickness and ECM_AreColorsEqual(borderConfig.color, liveColor) then
+        if liveEnabled == true and liveThickness == thickness and ColorUtil.AreEqual(borderConfig.color, liveColor) then
             return false
         end
     else
@@ -409,13 +387,11 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
 end
 
 --- Sets text on a FontString only if it differs from the current value.
----@param frame Frame Unused; retained for API compatibility
 ---@param fontString FontString The font string to update
----@param cacheKey string Unused; retained for API compatibility
 ---@param text string|nil The text to set
 ---@return boolean changed
-function FrameUtil.LazySetText(frame, fontString, cacheKey, text)
-    if fontString.GetText and fontString:GetText() == text then
+function FrameUtil.LazySetText(fontString, text)
+    if fontString:GetText() == text then
         return false
     end
     fontString:SetText(text)
@@ -433,7 +409,7 @@ end
 ---@param point string|nil
 ---@param fallback string
 ---@return string
-local function ChainRightPoint(point, fallback)
+function FrameUtil.ChainRightPoint(point, fallback)
     if point == "TOPLEFT" then
         return "TOPRIGHT"
     end
@@ -445,7 +421,7 @@ end
 
 ---@param direction string|nil
 ---@return string
-local function NormalizeGrowDirection(direction)
+function FrameUtil.NormalizeGrowDirection(direction)
     if direction == ECM.Constants.GROW_DIRECTION_UP then
         return ECM.Constants.GROW_DIRECTION_UP
     end
@@ -467,7 +443,7 @@ function FrameUtil.CalculateLayoutParams(self)
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local anchor, isFirst = self:GetNextChainAnchor(self.Name)
         local moduleSpacing = globalConfig.moduleSpacing or 0
-        local growDirection = NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
+        local growDirection = FrameUtil.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
         local growsUp = growDirection == ECM.Constants.GROW_DIRECTION_UP
         local firstGap = (globalConfig and globalConfig.offsetY) or 0
         local gap = isFirst and firstGap or moduleSpacing
@@ -524,8 +500,8 @@ function FrameUtil.ApplyFramePosition(self, frame)
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
         local leftAnchorPoint = anchorPoint or "TOPLEFT"
         local leftRelativePoint = anchorRelativePoint or "BOTTOMLEFT"
-        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
-        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
+        local rightAnchorPoint = FrameUtil.ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = FrameUtil.ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
         anchors = {
             { leftAnchorPoint, anchor, leftRelativePoint, offsetX, offsetY },
             { rightAnchorPoint, anchor, rightRelativePoint, offsetX, offsetY },
@@ -590,10 +566,7 @@ end
 ---@param force boolean|nil
 ---@return boolean
 function FrameUtil.BaseRefresh(self, why, force)
-    if not force and not self:ShouldShow() then
-        return false
-    end
-    return true
+    return force or self:ShouldShow()
 end
 
 --- Rate-limited refresh. Skips if called within updateFrequency window.
@@ -609,21 +582,4 @@ function FrameUtil.ThrottledRefresh(self, why)
     self:Refresh(why)
     self._lastUpdate = GetTime()
     return true
-end
-
---- Schedules a throttled layout update (debounced by updateFrequency).
----@param self ModuleMixin
----@param why string|nil
-function FrameUtil.ScheduleLayoutUpdate(self, why)
-    if self._layoutPending then
-        return
-    end
-    self._layoutPending = true
-
-    local globalConfig = self:GetGlobalConfig()
-    local freq = globalConfig and globalConfig.updateFrequency or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
-    C_Timer.After(freq, function()
-        self._layoutPending = nil
-        self:UpdateLayout(why)
-    end)
 end

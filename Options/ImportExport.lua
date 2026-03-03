@@ -248,24 +248,3 @@ function ImportExport.ApplyImportData(data)
 
     return true
 end
-
---- Imports profile data from a string and applies it to the current profile.
---- Note: This does NOT trigger a UI reload - caller must handle that.
---- Prefer using ValidateImportString + ApplyImportData for better UX.
----@param importString string The import string
----@return boolean success Whether import succeeded
----@return string|nil errorMessage Error message if import failed
----@return table|nil metadata Metadata from the import (if successful)
-function ImportExport.ImportProfile(importString)
-    local data, errorMsg = ImportExport.ValidateImportString(importString)
-    if not data then
-        return false, errorMsg
-    end
-
-    local success, applyErr = ImportExport.ApplyImportData(data)
-    if not success then
-        return false, applyErr
-    end
-
-    return true, nil, data.metadata
-end

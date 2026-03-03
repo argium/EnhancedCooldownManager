@@ -9,19 +9,11 @@ local ClassUtil = ECM.ClassUtil
 mod.ResourceBar = ResourceBar
 ECM.BarMixin.ApplyConfigMixin(ResourceBar, "ResourceBar")
 
---- Returns resource bar values based on class/power type.
----@return number|nil maxResources
----@return number|nil currentValue
-local function GetValues()
-    local resourceType = ClassUtil.GetPlayerResourceType()
-    return ClassUtil.GetCurrentMaxResourceValues(resourceType)
-end
-
 --------------------------------------------------------------------------------
 -- ModuleMixin/BarMixin Overrides
 --------------------------------------------------------------------------------
 function ResourceBar:ShouldShow()
-    local shouldShow = ECM.BarMixin.ShouldShow(self)
+    local shouldShow = ECM.ModuleMixin.ShouldShow(self)
 
     if not shouldShow then
         return false
@@ -31,7 +23,8 @@ function ResourceBar:ShouldShow()
 end
 
 function ResourceBar:GetStatusBarValues()
-    local maxResources, currentValue = GetValues()
+    local resourceType = ClassUtil.GetPlayerResourceType()
+    local maxResources, currentValue = ClassUtil.GetCurrentMaxResourceValues(resourceType)
 
     if not maxResources or maxResources <= 0 then
         return 0, 1, 0, false

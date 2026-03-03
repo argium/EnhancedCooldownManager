@@ -42,28 +42,6 @@ local function get_children_ordered(viewer)
     return result
 end
 
----@param point string|nil
----@param fallback string
----@return string
-local function chain_right_point(point, fallback)
-    if point == "TOPLEFT" then
-        return "TOPRIGHT"
-    end
-    if point == "BOTTOMLEFT" then
-        return "BOTTOMRIGHT"
-    end
-    return fallback
-end
-
----@param direction string|nil
----@return string
-local function normalize_grow_direction(direction)
-    if direction == ECM.Constants.GROW_DIRECTION_UP then
-        return ECM.Constants.GROW_DIRECTION_UP
-    end
-    return ECM.Constants.GROW_DIRECTION_DOWN
-end
-
 local function hook_child_frame(child, module)
     if child.__ecmHooked then
         return
@@ -97,52 +75,27 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
     if iconFrame.__ecmSquareStyled then return end
     if not iconTexture then return end
 
-    local info = {
-        hasIconTexture = iconTexture ~= nil,
-        hasIconOverlay = iconOverlay ~= nil,
-        hasDebuffBorder = debuffBorder ~= nil,
-        textureMaskCountBefore = 0,
-        textureMaskCountRemoved = 0,
-        frameMaskRegionCountBefore = 0,
-        frameMaskRegionsRemoved = 0,
-        usedSetMaskFallback = false,
-        overlayWasShown = iconOverlay and iconOverlay.IsShown and iconOverlay:IsShown() or false,
-        debuffBorderWasShown = debuffBorder and debuffBorder.IsShown and debuffBorder:IsShown() or false,
-    }
+    iconTexture:SetTexCoord(0, 1, 0, 1)
 
-    if iconTexture then
-        iconTexture:SetTexCoord(0, 1, 0, 1)
-
-        if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
-            local maskCount = iconTexture:GetNumMaskTextures() or 0
-            info.textureMaskCountBefore = maskCount
-            for i = maskCount, 1, -1 do
-                local mask = iconTexture:GetMaskTexture(i)
-                if mask then
-                    iconTexture:RemoveMaskTexture(mask)
-                    info.textureMaskCountRemoved = info.textureMaskCountRemoved + 1
-                    if mask.Hide then
-                        mask:Hide()
-                    end
-                end
+    -- Remove circular masks from the icon texture
+    if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
+        for i = (iconTexture:GetNumMaskTextures() or 0), 1, -1 do
+            local mask = iconTexture:GetMaskTexture(i)
+            if mask then
+                iconTexture:RemoveMaskTexture(mask)
+                if mask.Hide then mask:Hide() end
             end
-        elseif iconTexture.SetMask then
-            info.usedSetMaskFallback = true
-            pcall(iconTexture.SetMask, iconTexture, nil)
         end
+    elseif iconTexture.SetMask then
+        pcall(iconTexture.SetMask, iconTexture, nil)
+    end
 
-        if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
-            for _, region in ipairs({ iconFrame:GetRegions() }) do
-                if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
-                    info.frameMaskRegionCountBefore = info.frameMaskRegionCountBefore + 1
-                    local ok = pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                    if ok then
-                        info.frameMaskRegionsRemoved = info.frameMaskRegionsRemoved + 1
-                    end
-                    if region.Hide then
-                        region:Hide()
-                    end
-                end
+    -- Remove mask regions from the icon frame
+    if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
+        for _, region in ipairs({ iconFrame:GetRegions() }) do
+            if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
+                pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
+                if region.Hide then region:Hide() end
             end
         end
     end
@@ -155,15 +108,6 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
     if debuffBorder then
         debuffBorder:Hide()
         debuffBorder:SetAlpha(0)
-    end
-
-    local didWork = info.textureMaskCountBefore > 0
-        or info.frameMaskRegionCountBefore > 0
-        or info.usedSetMaskFallback
-        or info.hasIconOverlay
-        or info.hasDebuffBorder
-    if didWork then
-        ECM.Log(ECM.Constants.BUFFBARS, "Icon square cleanup", info)
     end
 
     iconFrame.__ecmSquareStyled = true
@@ -245,7 +189,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     --------------------------------------------------------------------------
     local textureName = globalConfig and globalConfig.texture
     local texture = ECM_GetTexture(textureName)
-    FrameUtil.LazySetStatusBarTexture(bar, bar, texture)
+    FrameUtil.LazySetStatusBarTexture(bar, texture)
 
     local barColor = ECM.SpellColors.GetColorForBar(frame)
     local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
@@ -289,7 +233,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         barColor = ECM.SpellColors.GetDefaultColor()
     end
     if barColor then
-        FrameUtil.LazySetStatusBarColor(bar, bar, barColor.r, barColor.g, barColor.b, 1.0)
+        FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
 
     --------------------------------------------------------------------------
@@ -372,33 +316,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         })
     end
 
-    ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "Applied style to bar", {
-        barIndex = barIndex,
-        height = height,
-        pipHidden = true,
-        pipTexture = nil,
-        barBgColor = (barBG and ((config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK)) or nil,
-        barBgTexture = barBG and ECM.Constants.FALLBACK_TEXTURE or nil,
-        barBgLayer = barBG and "BACKGROUND" or nil,
-        barBgSubLayer = barBG and 0 or nil,
-        textureName = textureName,
-        statusBarTexture = texture,
-        statusBarColor = barColor,
-        showIcon = showIcon,
-        showSpellName = showSpellName,
-        showDuration = showDuration,
-        iconAlpha = iconAlpha,
-        iconVisible = iconVisible,
-        iconShown = iconFrame and iconFrame:IsShown() or false,
-        iconSize = iconVisible and (iconFrame:GetHeight() or frame:GetHeight() or 0) or 0,
-        debuffBorderAlpha = frame.DebuffBorder and iconAlpha or nil,
-        applicationsAlpha = iconFrame.Applications and iconAlpha or nil,
-        nameShown = showSpellName,
-        durationShown = showDuration,
-        nameLeftInset = ECM.Constants.BUFFBARS_TEXT_PADDING,
-        nameRightPadding = ECM.Constants.BUFFBARS_TEXT_PADDING,
-        barAnchorMode = iconVisible and "icon" or "frame",
-    })
+    ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "styled")
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
@@ -413,9 +331,9 @@ local function layout_bars(self)
     local mode = (cfg and cfg.anchorMode) or ECM.Constants.ANCHORMODE_CHAIN
     local growDirection
     if mode == ECM.Constants.ANCHORMODE_FREE then
-        growDirection = normalize_grow_direction(cfg and cfg.freeGrowDirection)
+        growDirection = FrameUtil.NormalizeGrowDirection(cfg and cfg.freeGrowDirection)
     else
-        growDirection = normalize_grow_direction(globalConfig and globalConfig.moduleGrowDirection)
+        growDirection = FrameUtil.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
     end
     local growsUp = growDirection == ECM.Constants.GROW_DIRECTION_UP
     local verticalSpacing = 0
@@ -531,8 +449,8 @@ function BuffBars:UpdateLayout(why)
     if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
         local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
         local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
-        local rightAnchorPoint = chain_right_point(leftAnchorPoint, "TOPRIGHT")
-        local rightRelativePoint = chain_right_point(leftRelativePoint, "BOTTOMRIGHT")
+        local rightAnchorPoint = FrameUtil.ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = FrameUtil.ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
         FrameUtil.LazySetAnchors(viewer, {
             { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
             { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
@@ -706,10 +624,6 @@ function BuffBars:Enable()
 
     ECM.ModuleMixin.AddMixin(self, "BuffBars")
 
-    -- Listening to unit auras is expensive, and it doesn't appear strictly necessary due to the viewer
-    -- being hooked.
-    -- _eventFrame:RegisterEvent("UNIT_AURA")
-
     _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     _eventFrame:RegisterEvent("ZONE_CHANGED")
     _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
@@ -721,14 +635,8 @@ function BuffBars:Enable()
         self:HookEditMode()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
-
-    ECM.Log(self.Name, "Enable - module enabled")
 end
 
 _eventFrame:SetScript("OnEvent", function(_, event, ...)
-    -- if event == "UNIT_AURA" then
-    --     BuffBars:OnUnitAura(event, ...)
-    -- else
     BuffBars:OnZoneChanged()
-    -- end
 end)

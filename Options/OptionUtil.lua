@@ -29,17 +29,9 @@ local function SetModuleEnabled(moduleName, enabled)
     if not module then return end
 
     if enabled and not module:IsEnabled() then
-        if module.Enable then
-            module:Enable()
-        else
-            mod:EnableModule(moduleName)
-        end
+        module:Enable()
     elseif not enabled and module:IsEnabled() then
-        if module.Disable then
-            module:Disable()
-        elseif mod.DisableModule then
-            mod:DisableModule(moduleName)
-        end
+        module:Disable()
     end
 end
 

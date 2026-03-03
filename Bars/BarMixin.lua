@@ -16,16 +16,6 @@ ECM.BarMixin = BarMixin
 -- Tick Helpers
 --------------------------------------------------------------------------------
 
-local function GetTickPool(self, poolKey)
-    poolKey = poolKey or "tickPool"
-    local pool = self[poolKey]
-    if not pool then
-        pool = {}
-        self[poolKey] = pool
-    end
-    return pool
-end
-
 --- Ensures the tick pool has the required number of ticks.
 --- Creates new ticks as needed, shows required ticks, hides extras.
 ---@param self BarMixin
@@ -35,7 +25,12 @@ end
 function BarMixin:EnsureTicks(count, parentFrame, poolKey)
     assert(parentFrame, "parentFrame required for tick creation")
 
-    local pool = GetTickPool(self, poolKey)
+    poolKey = poolKey or "tickPool"
+    local pool = self[poolKey]
+    if not pool then
+        pool = {}
+        self[poolKey] = pool
+    end
 
     for i = 1, count do
         if not pool[i] then
@@ -192,11 +187,6 @@ end
 -- ModuleMixin Overrides
 --------------------------------------------------------------------------------
 
-function BarMixin:ShouldShow()
-    -- Pass through so derived classes don't have to override ModuleMixin
-    return ECM.ModuleMixin.ShouldShow(self)
-end
-
 --- Refreshes the bar frame layout and values.
 --- @param why string|nil Reason for refresh (for logging/debugging).
 --- @param force boolean|nil If true, forces a refresh even if not needed.
@@ -205,7 +195,6 @@ function BarMixin:Refresh(why, force)
     if not FrameUtil.BaseRefresh(self, why, force) then
         return false
     end
-    -- ECM.Log(self.Name, "Starting refresh (" .. (why or "") .. ")")
 
     local frame = self.InnerFrame
     local globalConfig = self:GetGlobalConfig()
@@ -236,22 +225,13 @@ function BarMixin:Refresh(why, force)
 
     -- Texture
     local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
-    FrameUtil.LazySetStatusBarTexture(frame, frame.StatusBar, tex)
+    FrameUtil.LazySetStatusBarTexture(frame.StatusBar, tex)
 
     -- Status bar color
     local statusBarColor = self:GetStatusBarColor()
-    FrameUtil.LazySetStatusBarColor(frame, frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
+    FrameUtil.LazySetStatusBarColor(frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
 
     frame:Show()
-    -- ECM.Log(self.Name, "BarMixin:Refresh", {
-    --     current = current,
-    --     max = max,
-    --     displayValue = displayValue,
-    --     isFraction = isFraction,
-    --     showText = showText,
-    --     texture = tex,
-    --     statusBarColor = statusBarColor,
-    -- })
 
     ECM.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
     return true
@@ -299,16 +279,6 @@ function BarMixin:CreateFrame()
 
     ECM.Log(self.Name, "Frame created.")
     return frame
-end
-
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
-
-function BarMixin:OnEnable()
-end
-
-function BarMixin:OnDisable()
 end
 
 --- Applies only the config-access portion of both BarMixin and ModuleMixin.

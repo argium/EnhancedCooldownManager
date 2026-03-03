@@ -4,16 +4,18 @@
 
 ColorUtil = ColorUtil or {}
 
-local function clamp(v, minV, maxV)
-    return math.max(minV, math.min(maxV, v))
+--- Compares two ECM_Color tables for equality.
+---@param c1 ECM_Color|nil
+---@param c2 ECM_Color|nil
+---@return boolean
+function ColorUtil.AreEqual(c1, c2)
+    if c1 == c2 then return true end
+    if not c1 or not c2 then return false end
+    return c1.r == c2.r and c1.g == c2.g and c1.b == c2.b and c1.a == c2.a
 end
 
----@param v number|string
----@return number
-local function tonumber_or_assert(v)
-    local n = tonumber(v)
-    assert(n, "ECM.Util: expected number")
-    return n
+local function clamp(v, minV, maxV)
+    return math.max(minV, math.min(maxV, v))
 end
 
 ---@param color string|table
@@ -39,13 +41,9 @@ local function normalize_rgb(color)
     end
 
     if type(color) == "table" then
-        local r = color.r or color[1]
-        local g = color.g or color[2]
-        local b = color.b or color[3]
-
-        r = tonumber_or_assert(r)
-        g = tonumber_or_assert(g)
-        b = tonumber_or_assert(b)
+        local r = assert(tonumber(color.r or color[1]), "ECM.Util: expected number")
+        local g = assert(tonumber(color.g or color[2]), "ECM.Util: expected number")
+        local b = assert(tonumber(color.b or color[3]), "ECM.Util: expected number")
 
         -- Treat values > 1 as 0..255.
         if r > 1 or g > 1 or b > 1 then

@@ -60,7 +60,6 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
         local BarMixin = barModule and barModule.InnerFrame
         local hasFrame = BarMixin ~= nil
-        local isVisible = BarMixin and BarMixin:IsVisible() or false
 
         if isEnabled and shouldShow and isChainMode and hasFrame then
             ECM.Log(self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
@@ -138,22 +137,10 @@ function ModuleMixin:ThrottledRefresh(why)
 end
 
 --- Checks if the module is ready for layout updates.
---- Base implementation checks: module enabled, InnerFrame exists, config exists.
 --- @return boolean ready True if the module is ready for updates.
 function ModuleMixin:IsReady()
-    if not self:IsEnabled() then
-        return false
-    end
-    if not self.InnerFrame then
-        return false
-    end
-    if not self:GetGlobalConfig() then
-        return false
-    end
-    if not self:GetModuleConfig() then
-        return false
-    end
-    return true
+    return self:IsEnabled() and self.InnerFrame ~= nil
+        and self:GetGlobalConfig() ~= nil and self:GetModuleConfig() ~= nil
 end
 
 --- Internal: checks readiness and runs the coalesced layout update.
@@ -199,12 +186,9 @@ function ModuleMixin:ThrottledUpdateLayout(reason, opts)
     end
 
     -- Keep the first reason that triggered this batch for tracing.
-    if not self._updateLayoutPending then
-        self._pendingWhy = reason
-    end
-
     -- Queue exactly once if not already queued.
     if not self._updateLayoutPending then
+        self._pendingWhy = reason
         self._updateLayoutPending = true
         C_Timer.After(0, function()
             update_layout_deferred(self)

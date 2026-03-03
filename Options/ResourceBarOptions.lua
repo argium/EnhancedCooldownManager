@@ -24,7 +24,7 @@ local ResourceBarOptions = {}
 
 local function isDeathKnight()
     local _, classToken = UnitClass("player")
-    return classToken == C.CLASS.DEATHKNIGHT
+    return classToken == "DEATHKNIGHT"
 end
 
 local function isDisabled()
