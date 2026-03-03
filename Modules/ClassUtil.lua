@@ -24,7 +24,7 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == CLASS.DEMONHUNTER then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
-            if voidFragments then
+            if voidFragments and voidFragments.applications and voidFragments.applications >= C.RESOURCEBAR_DEVOURER_NORMAL_MAX then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
                 return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL
