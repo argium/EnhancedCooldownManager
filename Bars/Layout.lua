@@ -33,9 +33,11 @@ local LAYOUT_EVENTS = {
 local _modules = {}
 local _globallyHidden = false
 local _hideReason = nil
+local _desiredAlpha = 1
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
 local _cooldownViewerSettingsHooked = false
+local _hookedBlizzardFrames = {}
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -52,6 +54,56 @@ local function ForEachBlizzardFrame(fn)
     end
 end
 
+--- Enforces the current desired visibility and alpha on all Blizzard frames.
+--- Single enforcement point called from state changes, OnShow hooks, and the
+--- watchdog ticker.
+local function EnforceBlizzardFrameState()
+    local alpha = _desiredAlpha
+    ForEachBlizzardFrame(function(frame)
+        if _globallyHidden then
+            if frame:IsShown() then
+                frame:Hide()
+                ECM.Log(nil, "Enforced hide on " .. (frame:GetName() or "?"))
+            end
+        else
+            if not frame:IsShown() then
+                frame:Show()
+                ECM.Log(nil, "Enforced show on " .. (frame:GetName() or "?"))
+            end
+            ECM.FrameUtil.LazySetAlpha(frame, alpha)
+        end
+    end)
+end
+
+--- Hooks a Blizzard frame's OnShow to immediately re-enforce desired state.
+--- Provides sub-frame correction when the game externally re-shows a frame.
+--- @param frame Frame
+--- @param name string
+local function HookBlizzardFrame(frame, name)
+    if _hookedBlizzardFrames[name] then
+        return
+    end
+
+    frame:HookScript("OnShow", function(self)
+        if _globallyHidden then
+            self:Hide()
+        else
+            ECM.FrameUtil.LazySetAlpha(self, _desiredAlpha)
+        end
+    end)
+
+    _hookedBlizzardFrames[name] = true
+    ECM.Log(nil, "Hooked Blizzard frame: " .. name)
+end
+
+--- Attempts to hook OnShow on all known Blizzard cooldown viewer frames.
+--- Frames may be created lazily; called periodically to catch latecomers.
+local function HookBlizzardFrames()
+    ForEachBlizzardFrame(function(frame, name)
+        HookBlizzardFrame(frame, name)
+    end)
+end
+
 --- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
@@ -65,33 +117,21 @@ local function SetGloballyHidden(hidden, reason)
     _globallyHidden = hidden
     _hideReason = reason
 
-    -- Always enforce Blizzard frame state; the game may re-show them externally
-    ForEachBlizzardFrame(function(frame)
-        if hidden then
-            if frame:IsShown() then
-                frame:Hide()
-            end
-        else
-            frame:Show()
-        end
-    end)
+    EnforceBlizzardFrameState()
 
-    -- Hide/show ModuleMixins
     for _, module in pairs(_modules) do
         module:SetHidden(hidden)
     end
 end
 
-
 --- Applies alpha to all managed frames.
 --- @param alpha number
 local function SetAlpha(alpha)
-    ForEachBlizzardFrame(function(frame)
-        ECM.FrameUtil.LazySetAlpha(frame, alpha)
-    end)
+    _desiredAlpha = alpha
+
+    EnforceBlizzardFrameState()
 
     for _, module in pairs(_modules) do
-        --- @type ModuleMixin
         if module.InnerFrame then
             ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
         end
@@ -225,9 +265,12 @@ local function RegisterFrame(frame)
     _modules[frame.Name] = frame
     ECM.Log(nil, "Frame registered: " .. frame.Name)
 
-    -- Sync current global hidden state to late-registered frames
+    -- Sync current global hidden and alpha state to late-registered frames
     if _globallyHidden then
         frame:SetHidden(true)
+    end
+    if frame.InnerFrame then
+        ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
     end
 end
 
@@ -310,3 +353,25 @@ end)
 ECM.RegisterFrame = RegisterFrame
 ECM.UnregisterFrame = UnregisterFrame
 ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate
+
+--------------------------------------------------------------------------------
+-- Watchdog — periodic state enforcement
+--
+-- Catches cases where the game externally re-shows or resets alpha on Blizzard
+-- cooldown viewer frames between layout events. The ticker is lightweight: lazy
+-- setters make no-op ticks nearly free (just a comparison per frame).
+--------------------------------------------------------------------------------
+
+C_Timer.NewTicker(ECM.Constants.WATCHDOG_INTERVAL, function()
+    HookBlizzardFrames()
+    HookCooldownViewerSettings()
+    EnforceBlizzardFrameState()
+
+    -- Re-enforce alpha on module frames in case of external resets
+    local alpha = _desiredAlpha
+    for _, module in pairs(_modules) do
+        if module.InnerFrame and not module.IsHidden then
+            ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+        end
+    end
+end)

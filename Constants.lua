@@ -24,6 +24,7 @@ local constants = {
     -- Default or fallback values for configuration
     DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
     DEFAULT_REFRESH_FREQUENCY = 0.066,
+    WATCHDOG_INTERVAL = 0.5,
     DEFAULT_BAR_HEIGHT = 20,
     DEFAULT_BAR_WIDTH = 250,
     DEFAULT_FREE_ANCHOR_OFFSET_Y = -300,
