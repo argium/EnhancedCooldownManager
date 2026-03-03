@@ -263,20 +263,6 @@ local function merge_keys(base, other)
     )
 end
 
----@param key ECM_SpellColorKey|table|nil
----@return string|nil spellName
----@return number|nil spellID
----@return number|nil cooldownID
----@return number|nil textureFileID
----@return ECM_SpellColorKey|nil normalized
-local function key_to_tuple(key)
-    local normalized = normalize_key(key)
-    if not normalized then
-        return nil, nil, nil, nil, nil
-    end
-    return normalized.spellName, normalized.spellID, normalized.cooldownID, normalized.textureFileID, normalized
-end
-
 ---@param entry any
 ---@return number
 local function entry_ts(entry)
@@ -426,6 +412,10 @@ function SpellColorKeyType:tostring()
     )
 end
 
+function SpellColorKeyType:ToArray()
+    return { self.spellName, self.spellID, self.cooldownID, self.textureFileID }
+end
+
 --- Returns the PriorityKeyMap instance, creating it on first call.
 ---@return PriorityKeyMap|nil
 local function get_map()
@@ -492,11 +482,7 @@ end
 ---@param textureFileID number|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
-    local validSpellName = validateKey(spellName)
-    local validSpellID = validateKey(spellID)
-    local validCooldownID = validateKey(cooldownID)
-    local validTextureID = validateKey(textureFileID)
-    return build_key(validSpellName, validSpellID, validCooldownID, validTextureID, nil)
+    return build_key(validateKey(spellName), validateKey(spellID), validateKey(cooldownID), validateKey(textureFileID), nil)
 end
 
 --- Normalizes a key payload into an opaque spell-color key object.
@@ -531,12 +517,11 @@ function SpellColors.GetColorByKey(key)
     if not map then
         return nil
     end
-
-    local spellName, spellID, cooldownID, textureFileID = key_to_tuple(key)
-    if not (spellName or spellID or cooldownID or textureFileID) then
+    local normalized = normalize_key(key)
+    if not normalized then
         return nil
     end
-    return map:Get({ spellName, spellID, cooldownID, textureFileID })
+    return map:Get(normalized:ToArray())
 end
 
 --- Extracts identifying values from a bar frame and returns a normalized key.
@@ -544,10 +529,10 @@ end
 ---@return ECM_SpellColorKey|nil
 local function make_key_from_bar(frame)
     return SpellColors.MakeKey(
-        validateKey(frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()),
-        validateKey(frame.cooldownInfo and frame.cooldownInfo.spellID),
-        validateKey(frame.cooldownID),
-        validateKey(FrameUtil.GetIconTextureFileID(frame))
+        frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText(),
+        frame.cooldownInfo and frame.cooldownInfo.spellID,
+        frame.cooldownID,
+        FrameUtil.GetIconTextureFileID(frame)
     )
 end
 
@@ -676,21 +661,13 @@ function SpellColors.SetColorByKey(key, color)
         return
     end
 
-    local spellName, spellID, cooldownID, textureFileID, normalized = key_to_tuple(key)
+    local normalized = normalize_key(key)
     if not normalized then
         return
     end
 
-    local storedColor = color
-    if has_legacy_color_metadata(color) then
-        storedColor = sanitize_color_value(color) or color
-    end
-
-    map:Set(
-        { spellName, spellID, cooldownID, textureFileID },
-        storedColor,
-        build_entry_meta(normalized)
-    )
+    local storedColor = has_legacy_color_metadata(color) and sanitize_color_value(color) or color
+    map:Set(normalized:ToArray(), storedColor, build_entry_meta(normalized))
 end
 
 --- Returns the default bar color.
@@ -725,11 +702,11 @@ function SpellColors.ResetColorByKey(key)
         return false, false, false, false
     end
 
-    local spellName, spellID, cooldownID, textureFileID = key_to_tuple(key)
-    if not (spellName or spellID or cooldownID or textureFileID) then
+    local normalized = normalize_key(key)
+    if not normalized then
         return false, false, false, false
     end
-    return map:Remove({ spellName, spellID, cooldownID, textureFileID })
+    return map:Remove(normalized:ToArray())
 end
 
 --- Reconciles the color entry for a single bar frame.
@@ -756,9 +733,9 @@ function SpellColors.ReconcileAllKeys(keys)
     local keys_list = {}
     if type(keys) == "table" then
         for _, key in ipairs(keys) do
-            local spellName, spellID, cooldownID, textureFileID, normalized = key_to_tuple(key)
+            local normalized = normalize_key(key)
             if normalized then
-                keys_list[#keys_list + 1] = { spellName, spellID, cooldownID, textureFileID }
+                keys_list[#keys_list + 1] = normalized:ToArray()
             end
         end
     end
@@ -834,12 +811,12 @@ function SpellColors.ClearCurrentSpecColors()
 
     local cleared = 0
     for _, def in ipairs(KEY_DEFS) do
-        local classTbl = cfg.colors[def] and cfg.colors[def][classID]
-        if classTbl and classTbl[specID] then
-            for _ in pairs(classTbl[specID]) do
+        local specTbl = cfg.colors[def] and cfg.colors[def][classID] and cfg.colors[def][classID][specID]
+        if specTbl then
+            for _ in pairs(specTbl) do
                 cleared = cleared + 1
             end
-            classTbl[specID] = {}
+            cfg.colors[def][classID][specID] = {}
         end
     end
 

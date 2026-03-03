@@ -102,12 +102,10 @@ local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debu
 
     if iconOverlay then
         iconOverlay:Hide()
-        iconOverlay:SetAlpha(0)
     end
 
     if debuffBorder then
         debuffBorder:Hide()
-        debuffBorder:SetAlpha(0)
     end
 
     iconFrame.__ecmSquareStyled = true
@@ -192,10 +190,10 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     FrameUtil.LazySetStatusBarTexture(bar, texture)
 
     local barColor = ECM.SpellColors.GetColorForBar(frame)
-    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or "nil"
-    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID or "nil"
-    local cooldownID = frame.cooldownID or "nil"
-    local textureFileID = FrameUtil.GetIconTextureFileID(frame) or "nil"
+    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()
+    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
+    local cooldownID = frame.cooldownID
+    local textureFileID = FrameUtil.GetIconTextureFileID(frame)
 
     -- When in a raid instance, and after exiting combat, all identifying
     -- values may remain secret.  Lock editing only when every key is
@@ -270,13 +268,12 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         end
     end
 
-    local iconAlpha = showIcon and 1 or 0
     if frame.DebuffBorder then
         FrameUtil.LazySetAlpha(frame.DebuffBorder, 0)
         frame.DebuffBorder:Hide()
     end
     if iconFrame.Applications then
-        FrameUtil.LazySetAlpha(iconFrame.Applications, iconAlpha)
+        FrameUtil.LazySetAlpha(iconFrame.Applications, showIcon and 1 or 0)
     end
 
     local showSpellName = config and config.showSpellName ~= false
@@ -347,34 +344,18 @@ local function layout_bars(self)
     local prev
 
     local function anchor_child(child)
-        if child:IsShown() then
-            if not prev then
-                if growsUp then
-                    FrameUtil.LazySetAnchors(child, {
-                        { "BOTTOMLEFT", viewer, "BOTTOMLEFT", 0, 0 },
-                        { "BOTTOMRIGHT", viewer, "BOTTOMRIGHT", 0, 0 },
-                    })
-                else
-                    FrameUtil.LazySetAnchors(child, {
-                        { "TOPLEFT", viewer, "TOPLEFT", 0, 0 },
-                        { "TOPRIGHT", viewer, "TOPRIGHT", 0, 0 },
-                    })
-                end
-            else
-                if growsUp then
-                    FrameUtil.LazySetAnchors(child, {
-                        { "BOTTOMLEFT", prev, "TOPLEFT", 0, verticalSpacing },
-                        { "BOTTOMRIGHT", prev, "TOPRIGHT", 0, verticalSpacing },
-                    })
-                else
-                    FrameUtil.LazySetAnchors(child, {
-                        { "TOPLEFT", prev, "BOTTOMLEFT", 0, -verticalSpacing },
-                        { "TOPRIGHT", prev, "BOTTOMRIGHT", 0, -verticalSpacing },
-                    })
-                end
-            end
-            prev = child
-        end
+        if not child:IsShown() then return end
+
+        local selfEdge = growsUp and "BOTTOM" or "TOP"
+        local relEdge = prev and (growsUp and "TOP" or "BOTTOM") or selfEdge
+        local anchor = prev or viewer
+        local spacing = not prev and 0 or (growsUp and verticalSpacing or -verticalSpacing)
+
+        FrameUtil.LazySetAnchors(child, {
+            { selfEdge .. "LEFT", anchor, relEdge .. "LEFT", 0, spacing },
+            { selfEdge .. "RIGHT", anchor, relEdge .. "RIGHT", 0, spacing },
+        })
+        prev = child
     end
 
     if growsUp then
@@ -525,10 +506,10 @@ function BuffBars:GetActiveSpellData()
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
         if frame and frame:IsShown() and frame.Bar then
-            local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText() or nil
-            local sid = frame.cooldownInfo and frame.cooldownInfo.spellID or nil
-            local cid = frame.cooldownID or nil
-            local tex = FrameUtil.GetIconTextureFileID(frame) or nil
+            local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()
+            local sid = frame.cooldownInfo and frame.cooldownInfo.spellID
+            local cid = frame.cooldownID
+            local tex = FrameUtil.GetIconTextureFileID(frame)
             local key = ECM.SpellColors.MakeKey(name, sid, cid, tex)
             if key then
                 result[#result + 1] = key
@@ -608,7 +589,7 @@ function BuffBars:OnZoneChanged()
 end
 
 function BuffBars:IsEnabled()
-    return self._enabled or false
+    return self._enabled
 end
 
 --- Gets a boolean indicating if editing is allowed.

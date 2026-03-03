@@ -6,22 +6,14 @@ local _, ns = ...
 local mod = ns.Addon
 local C = ECM.Constants
 
-local function IsEditLocked()
-    return ECM.BuffBars:IsEditLocked()
-end
-
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
 local function BuildSpellColorRows(entries)
     local rows = {}
 
-    if type(entries) ~= "table" then
-        return rows
-    end
-
-    for _, entry in ipairs(entries) do
-        local normalized = ECM.SpellColors.NormalizeKey(type(entry) == "table" and entry.key or nil)
+    for _, entry in ipairs(entries or {}) do
+        local normalized = ECM.SpellColors.NormalizeKey(type(entry) == "table" and entry.key)
         if normalized then
             local merged = false
             for _, row in ipairs(rows) do
@@ -102,8 +94,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
             rowFrame._resetBtn = resetBtn
 
             function rowFrame:UpdateSwatch()
-                local c = ECM.SpellColors.GetColorByKey(self._data.key)
-                if not c then c = ECM.SpellColors.GetDefaultColor() end
+                local c = ECM.SpellColors.GetColorByKey(self._data.key) or ECM.SpellColors.GetDefaultColor()
                 self._swatch._tex:SetColorTexture(c.r, c.g, c.b)
             end
 
@@ -128,7 +119,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
         rowFrame:UpdateSwatch()
 
         rowFrame._swatch:SetScript("OnClick", function()
-            if IsEditLocked() then return end
+            if ECM.BuffBars:IsEditLocked() then return end
             local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
             ECM.OptionUtil.OpenColorPicker(c, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
@@ -162,7 +153,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
 
         -- Build warning text
         local parts = {}
-        local locked, reason = IsEditLocked()
+        local locked, reason = ECM.BuffBars:IsEditLocked()
         if locked and reason == "combat" then
             parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
         elseif locked and reason == "secrets" then
@@ -292,7 +283,7 @@ function BuffBarsOptions.RegisterSettings(SB)
         buttonText = "Refresh",
         tooltip = "Reconcile discovered aura bars with saved spell color entries and refresh the list.",
         onClick = function()
-            if IsEditLocked() then return end
+            if ECM.BuffBars:IsEditLocked() then return end
             ECM.SpellColors.ReconcileDiscoveredKeys()
             colorsFrame:RefreshSpellList()
         end,
