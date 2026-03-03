@@ -5,10 +5,7 @@
 local _, ns = ...
 
 local ItemIconsOptions = {}
-
-local function isDisabled()
-    return not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "itemIcons.enabled")
-end
+local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("itemIcons")
 
 function ItemIconsOptions.RegisterSettings(SB)
     SB.RegisterFromTable({

@@ -71,7 +71,7 @@ end
 
 local function CreateSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
-    local frame = layout:GetFrame()
+    local frame = layout.frame
 
     local warningRow = layout:AddDescription("")
     local warningText = warningRow._text
@@ -203,9 +203,7 @@ ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
 BuffBarsOptions._HasUnlabeledBars = HasUnlabeledBars
 
-local function isDisabled()
-    return not ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars.enabled")
-end
+local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
     SB.RegisterFromTable({

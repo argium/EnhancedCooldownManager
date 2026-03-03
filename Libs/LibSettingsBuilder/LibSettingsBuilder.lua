@@ -146,12 +146,6 @@ function CanvasLayout:AddScrollList(elementExtent)
     return scrollBox, scrollBar, view
 end
 
---- Get the current Y position.
-function CanvasLayout:GetCurrentY() return self.yPos end
-
---- Get the canvas frame.
-function CanvasLayout:GetFrame() return self.frame end
-
 --------------------------------------------------------------------------------
 -- Static utilities (shared across all instances)
 --------------------------------------------------------------------------------
@@ -429,10 +423,7 @@ function lib:New(config)
     ----------------------------------------------------------------------------
 
     local function defaultSliderFormatter(value)
-        if value == math.floor(value) then
-            return tostring(math.floor(value))
-        end
-        return string.format("%.1f", value)
+        return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
     end
 
     local getProfile = config.getProfile
@@ -573,6 +564,11 @@ function lib:New(config)
         return isParentEnabled(spec)
     end
 
+    local function applyCanvasState(canvas, enabled)
+        if canvas.SetAlpha then canvas:SetAlpha(enabled and 1 or 0.5) end
+        setCanvasInteractive(canvas, enabled)
+    end
+
     reevaluateReactiveControls = function()
         -- Force the WoW settings panel to re-evaluate visible control states.
         local panel = SettingsPanel
@@ -589,15 +585,18 @@ function lib:New(config)
 
         -- Canvas controls aren't part of the settings list, handle directly
         for _, entry in ipairs(SB._reactiveControls) do
-            local init, s = entry[1], entry[2]
+            local s = entry[2]
             if s.canvas then
-                local enabled = isControlEnabled(s)
-                if s.canvas.SetAlpha then
-                    s.canvas:SetAlpha(enabled and 1 or 0.5)
-                end
-                setCanvasInteractive(s.canvas, enabled)
+                applyCanvasState(s.canvas, isControlEnabled(s))
             end
         end
+    end
+
+    local function applyEnabledState(initializer, spec)
+        local enabled = isControlEnabled(spec)
+        if initializer.SetEnabled then initializer:SetEnabled(enabled) end
+        if spec.canvas then applyCanvasState(spec.canvas, enabled) end
+        return enabled
     end
 
     local function applyModifiers(initializer, spec)
@@ -605,29 +604,9 @@ function lib:New(config)
 
         if spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
-                local enabled = isControlEnabled(spec)
-                if initializer.SetEnabled then
-                    initializer:SetEnabled(enabled)
-                end
-                if spec.canvas then
-                    if spec.canvas.SetAlpha then
-                        spec.canvas:SetAlpha(enabled and 1 or 0.5)
-                    end
-                    setCanvasInteractive(spec.canvas, enabled)
-                end
-                return enabled
+                return applyEnabledState(initializer, spec)
             end)
-
-            local enabled = isControlEnabled(spec)
-            if initializer.SetEnabled then
-                initializer:SetEnabled(enabled)
-            end
-            if spec.canvas then
-                if spec.canvas.SetAlpha then
-                    spec.canvas:SetAlpha(enabled and 1 or 0.5)
-                end
-                setCanvasInteractive(spec.canvas, enabled)
-            end
+            applyEnabledState(initializer, spec)
         end
 
         if spec.parent then
@@ -671,10 +650,6 @@ function lib:New(config)
         return category
     end
 
-    function SB.UseRootCategory()
-        SB._currentSubcategory = SB._rootCategory
-    end
-
     function SB.CreateSubcategory(name)
         local subcategory, layout = Settings.RegisterVerticalLayoutSubcategory(SB._rootCategory, name)
         SB._subcategories[name] = subcategory
@@ -698,7 +673,7 @@ function lib:New(config)
     --- controls to match Blizzard's vertical-layout settings pages.
     ---@param name string  Subcategory display name.
     ---@param parentCategory? table  Parent category (defaults to root).
-    ---@return table layout  CanvasLayout instance (layout:GetFrame() for the raw frame).
+    ---@return table layout  CanvasLayout instance (layout.frame for the raw frame).
     function SB.CreateCanvasLayout(name, parentCategory)
         local frame = CreateFrame("Frame", nil)
         SB.CreateCanvasSubcategory(frame, name, parentCategory)
@@ -1240,7 +1215,7 @@ function lib:New(config)
         assert(tbl.name, "RegisterFromTable: tbl.name is required")
 
         if tbl.rootCategory then
-            SB.UseRootCategory()
+            SB._currentSubcategory = SB._rootCategory
         else
             SB.CreateSubcategory(tbl.name)
         end

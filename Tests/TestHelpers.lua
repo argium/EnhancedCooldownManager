@@ -35,6 +35,7 @@ local function deepClone(value)
     for k, v in pairs(value) do out[k] = deepClone(v) end
     return out
 end
+TestHelpers.deepClone = deepClone
 
 --- Deep-equality comparison for two Lua values.
 local function deepEquals(a, b)
@@ -48,6 +49,7 @@ local function deepEquals(a, b)
     end
     return true
 end
+TestHelpers.deepEquals = deepEquals
 
 --- Create a minimal stub initializer returned by Settings.CreateCheckbox etc.
 local function makeInitializer(setting)

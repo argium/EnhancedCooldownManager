@@ -17,18 +17,6 @@ describe("PowerBarTickMarksStore", function()
     local currentClassID
     local currentSpecIndex
 
-    local function deepClone(value)
-        if type(value) ~= "table" then
-            return value
-        end
-
-        local out = {}
-        for k, v in pairs(value) do
-            out[k] = deepClone(v)
-        end
-        return out
-    end
-
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
@@ -54,7 +42,7 @@ describe("PowerBarTickMarksStore", function()
                 end,
             },
         }
-        _G.ECM_CloneValue = deepClone
+        _G.ECM_CloneValue = TestHelpers.deepClone
 
         addonNS = {
             Addon = {

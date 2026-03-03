@@ -18,7 +18,7 @@ local POWER_COLOR_DEFS = {
 
 
 local PowerBarOptions = {}
-local isDisabled = function() return not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "powerBar.enabled") end
+local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("powerBar")
 
 function PowerBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({

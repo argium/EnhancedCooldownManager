@@ -17,25 +17,6 @@ describe("SettingsBuilder", function()
     local layoutUpdateCalls
     local SB
 
-    local function deepClone(value)
-        if type(value) ~= "table" then return value end
-        local out = {}
-        for k, v in pairs(value) do out[k] = deepClone(v) end
-        return out
-    end
-
-    local function deepEquals(a, b)
-        if type(a) ~= type(b) then return false end
-        if type(a) ~= "table" then return a == b end
-        for k, v in pairs(a) do
-            if not deepEquals(v, b[k]) then return false end
-        end
-        for k in pairs(b) do
-            if a[k] == nil then return false end
-        end
-        return true
-    end
-
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM", "ECM_CloneValue", "ECM_DeepEquals",
@@ -60,8 +41,8 @@ describe("SettingsBuilder", function()
         TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
 
-        _G.ECM_CloneValue = deepClone
-        _G.ECM_DeepEquals = deepEquals
+        _G.ECM_CloneValue = TestHelpers.deepClone
+        _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
         _G.GameFontNormal = "GameFontNormal"
 
@@ -180,8 +161,8 @@ describe("SettingsBuilder", function()
         assert.has_no.errors(function() SB.RegisterCategories() end)
     end)
 
-    it("UseRootCategory sets current subcategory to root", function()
-        SB.UseRootCategory()
+    it("Setting current subcategory to root allows adding headers there", function()
+        SB._currentSubcategory = SB._rootCategory
         local init = SB.Header("Root Header")
         assert.is_not_nil(init)
         assert.are.equal("header", init._type)
@@ -386,8 +367,8 @@ describe("SettingsBuilder", function()
         assert.are.equal("Item Quality", init.data.name)
     end)
 
-    it("Subheader respects explicit category via UseRootCategory", function()
-        SB.UseRootCategory()
+    it("Subheader respects explicit category via root subcategory", function()
+        SB._currentSubcategory = SB._rootCategory
         local init = SB.Subheader({ name = "Root Sub" })
         assert.is_not_nil(init)
         assert.are.equal("Root Sub", init.data.name)

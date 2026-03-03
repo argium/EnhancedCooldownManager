@@ -45,7 +45,7 @@ end
 
 local function CreateTickMarksCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
-    local frame = layout:GetFrame()
+    local frame = layout.frame
 
     local descRow = layout:AddDescription(BASE_DESC_TEXT .. ".")
     local desc = descRow._text

@@ -95,10 +95,6 @@ Registers a top-level vertical-layout category. Sets it as the current target fo
 
 Returns the category object.
 
-### `SB.UseRootCategory()`
-
-Switches the current target back to the root category (for adding controls to the root page after creating subcategories).
-
 ### `SB.CreateSubcategory(name)`
 
 Creates a vertical-layout subcategory under the root. Sets it as the current target. Resets the page-enabled setting for the new page.
@@ -462,7 +458,7 @@ local SB = LSB:New({
 SB.CreateRootCategory("My Addon")
 
 -- Root page
-SB.UseRootCategory()
+SB._currentSubcategory = SB._rootCategory
 SB.PathCheckbox({ path = "general.welcomeMessage", name = "Show welcome message" })
 
 -- Power Bar subcategory

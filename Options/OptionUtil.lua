@@ -125,6 +125,16 @@ local function OpenColorPicker(currentColor, hasOpacity, onChange)
     })
 end
 
+--- Returns a closure that checks if the module at configPath is disabled.
+---@param configPath string e.g. "powerBar"
+---@return fun(): boolean
+local function GetIsDisabledDelegate(configPath)
+    local enabledPath = configPath .. ".enabled"
+    return function()
+        return not GetNestedValue(mod.db.profile, enabledPath)
+    end
+end
+
 ECM.OptionUtil = {
     GetNestedValue = GetNestedValue,
     SetNestedValue = SetNestedValue,
@@ -133,5 +143,6 @@ ECM.OptionUtil = {
     SetModuleEnabled = SetModuleEnabled,
     GetCurrentClassSpec = GetCurrentClassSpec,
     OpenColorPicker = OpenColorPicker,
+    GetIsDisabledDelegate = GetIsDisabledDelegate,
     POSITION_MODE_TEXT = POSITION_MODE_TEXT,
 }
