@@ -11,6 +11,173 @@ lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
 
 --------------------------------------------------------------------------------
+-- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
+-- Replicates Blizzard's Settings panel positioning so canvas pages are
+-- visually indistinguishable from vertical-layout pages.
+--
+-- Measurements from Blizzard_SettingControls.xml/.lua:
+--   Element height:      26   (all control types)
+--   Section header:      45   (GameFontHighlightLarge at TOPLEFT 7, -16)
+--   Label left offset:   indent + 37
+--   Label right bound:   CENTER - 85
+--   Control anchor:      CENTER - 80  (checkbox, slider, color swatch)
+--   Button anchor:       CENTER - 40  (width 200)
+--   Indent per level:    15
+--------------------------------------------------------------------------------
+
+local CANVAS_ELEMENT_HEIGHT = 26
+local CANVAS_HEADER_HEIGHT = 45
+local CANVAS_HEADER_TITLE_X = 7
+local CANVAS_HEADER_TITLE_Y = -16
+local CANVAS_LABEL_X = 37
+local CANVAS_CONTROL_CENTER_X = -80
+local CANVAS_BUTTON_CENTER_X = -40
+local CANVAS_BUTTON_WIDTH = 200
+local CANVAS_SLIDER_WIDTH = 250
+local CANVAS_SWATCH_CENTER_X = -73
+
+local CanvasLayout = {}
+lib.CanvasLayout = CanvasLayout
+
+function CanvasLayout:_Advance(h) self.yPos = self.yPos - h end
+
+function CanvasLayout:_CreateRow(h)
+    h = h or CANVAS_ELEMENT_HEIGHT
+    local row = CreateFrame("Frame", nil, self.frame)
+    row:SetPoint("TOPLEFT", 0, self.yPos)
+    row:SetPoint("RIGHT")
+    row:SetHeight(h)
+    self.elements[#self.elements + 1] = row
+    self:_Advance(h)
+    return row
+end
+
+function CanvasLayout:_AddLabel(row, text, fontObject)
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
+    label:SetPoint("RIGHT", row, "CENTER", -85, 0)
+    label:SetJustifyH("LEFT")
+    label:SetWordWrap(false)
+    label:SetText(text)
+    row._label = label
+    return label
+end
+
+--- Add a section header (matches SettingsListSectionHeaderTemplate).
+function CanvasLayout:AddHeader(text)
+    local row = self:_CreateRow(CANVAS_HEADER_HEIGHT)
+    local title = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    title:SetPoint("TOPLEFT", CANVAS_HEADER_TITLE_X, CANVAS_HEADER_TITLE_Y)
+    title:SetJustifyH("LEFT")
+    title:SetJustifyV("TOP")
+    title:SetText(text)
+    row._title = title
+    return row
+end
+
+--- Add a description / informational text row.
+function CanvasLayout:AddDescription(text, fontObject)
+    local row = self:_CreateRow()
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
+    label:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    label:SetJustifyH("LEFT")
+    label:SetText(text)
+    row._text = label
+    return row
+end
+
+--- Add a color swatch row (label + clickable swatch).
+---@return Frame row, Button swatch
+function CanvasLayout:AddColorSwatch(labelText)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local swatch = lib.CreateColorSwatch(row, 20)
+    swatch:SetPoint("LEFT", row, "CENTER", CANVAS_SWATCH_CENTER_X, 0)
+    row._swatch = swatch
+    return row, swatch
+end
+
+--- Add a slider row (label + MinimalSliderWithSteppers).
+---@return Frame row, Slider slider, FontString valueText
+function CanvasLayout:AddSlider(labelText, min, max, step)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
+    slider:SetWidth(CANVAS_SLIDER_WIDTH)
+    slider:SetPoint("LEFT", row, "CENTER", CANVAS_CONTROL_CENTER_X, 3)
+    slider:SetMinMaxValues(min, max)
+    slider:SetValueStep(step or 1)
+    slider:SetObeyStepOnDrag(true)
+    local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetPoint("LEFT", slider, "RIGHT", 8, 0)
+    valueText:SetWidth(40)
+    valueText:SetJustifyH("LEFT")
+    row._slider = slider
+    row._valueText = valueText
+    return row, slider, valueText
+end
+
+--- Add a button row (label + UIPanelButton).
+---@return Frame row, Button button
+function CanvasLayout:AddButton(labelText, buttonText)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    button:SetSize(CANVAS_BUTTON_WIDTH, 26)
+    button:SetPoint("LEFT", row, "CENTER", CANVAS_BUTTON_CENTER_X, 0)
+    button:SetText(buttonText)
+    row._button = button
+    return row, button
+end
+
+--- Add a scroll list that fills the remaining vertical space.
+---@return Frame scrollBox, EventFrame scrollBar, table view
+function CanvasLayout:AddScrollList(elementExtent)
+    local scrollBox = CreateFrame("Frame", nil, self.frame, "WowScrollBoxList")
+    scrollBox:SetPoint("TOPLEFT", CANVAS_LABEL_X, self.yPos)
+    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
+    local scrollBar = CreateFrame("EventFrame", nil, self.frame, "MinimalScrollBar")
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(elementExtent)
+    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+    return scrollBox, scrollBar, view
+end
+
+--- Get the current Y position.
+function CanvasLayout:GetCurrentY() return self.yPos end
+
+--- Get the canvas frame.
+function CanvasLayout:GetFrame() return self.frame end
+
+--------------------------------------------------------------------------------
+-- Static utilities (shared across all instances)
+--------------------------------------------------------------------------------
+
+--- Create a styled color swatch button with border and highlight.
+---@param parent Frame
+---@param size number
+---@return Button swatch  (swatch._tex is the inner color texture)
+function lib.CreateColorSwatch(parent, size)
+    local swatch = CreateFrame("Button", nil, parent)
+    swatch:SetSize(size, size)
+    local border = swatch:CreateTexture(nil, "BORDER")
+    border:SetAllPoints()
+    border:SetColorTexture(0, 0, 0, 1)
+    local colorTex = swatch:CreateTexture(nil, "ARTWORK")
+    colorTex:SetPoint("TOPLEFT", 1, -1)
+    colorTex:SetPoint("BOTTOMRIGHT", -1, 1)
+    colorTex:SetColorTexture(1, 1, 1)
+    local highlight = swatch:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 1, 1, 0.2)
+    swatch._tex = colorTex
+    return swatch
+end
+
+--------------------------------------------------------------------------------
 -- Subheader Mixin (global, shared across all instances)
 -- Renders as a normal control label (GameFontNormal) with no control widget.
 -- Used exclusively as a parent for sub-settings.
@@ -562,6 +729,27 @@ function lib:New(config)
         SB._layouts[subcategory] = layout
         return subcategory
     end
+
+    --- Creates a canvas subcategory with a CanvasLayout engine attached.
+    --- Returns a layout object with AddHeader, AddDescription, AddSlider,
+    --- AddColorSwatch, AddButton, AddScrollList methods that position
+    --- controls to match Blizzard's vertical-layout settings pages.
+    ---@param name string  Subcategory display name.
+    ---@param parentCategory? table  Parent category (defaults to root).
+    ---@return table layout  CanvasLayout instance (layout:GetFrame() for the raw frame).
+    function SB.CreateCanvasLayout(name, parentCategory)
+        local frame = CreateFrame("Frame", nil)
+        SB.CreateCanvasSubcategory(frame, name, parentCategory)
+        local layout = setmetatable({
+            frame = frame,
+            yPos = 0,
+            elements = {},
+        }, { __index = lib.CanvasLayout })
+        return layout
+    end
+
+    --- Static color swatch factory, forwarded from lib for convenience.
+    SB.CreateColorSwatch = lib.CreateColorSwatch
 
     --- Configures the root category to auto-redirect to a named subcategory.
     --- When the user selects the root addon entry, the settings panel will

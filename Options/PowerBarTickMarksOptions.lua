@@ -20,88 +20,49 @@ local function GetStore()
     return ECM.PowerBarTickMarksStore
 end
 
-local function CreateStyledColorSwatch(parent, size)
-    local swatch = CreateFrame("Button", nil, parent)
-    swatch:SetSize(size, size)
-
-    local border = swatch:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetColorTexture(0, 0, 0, 1)
-
-    local colorTex = swatch:CreateTexture(nil, "ARTWORK")
-    colorTex:SetPoint("TOPLEFT", 1, -1)
-    colorTex:SetPoint("BOTTOMRIGHT", -1, 1)
-    colorTex:SetColorTexture(1, 1, 1)
-
-    local highlight = swatch:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.2)
-
-    swatch._tex = colorTex
-    return swatch
-end
-
 local function RoundToStep(value)
     return math.floor(value + 0.5)
 end
 
-local function CreateTickMarksCanvas()
-    local frame = CreateFrame("Frame", "ECM_TickMarksCanvas", UIParent)
-    frame:SetSize(600, 400)
-    frame:Hide()
+--- Wires up a slider's OnValueChanged with rounding, refresh guards, and store persistence.
+local function BindTickSlider(rowFrame, slider, valueLabel, storeField)
+    slider:SetScript("OnValueChanged", function(_, value)
+        local rounded = RoundToStep(value)
+        valueLabel:SetText(tostring(rounded))
+        if rowFrame._isRefreshing then return end
+        if rounded ~= value then
+            rowFrame._isRefreshing = true
+            slider:SetValue(rounded)
+            rowFrame._isRefreshing = false
+            return
+        end
+        if rowFrame._rowIndex then
+            GetStore().UpdateTick(rowFrame._rowIndex, storeField, rounded)
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end
+    end)
+end
 
-    local desc = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    desc:SetPoint("TOPLEFT", 10, -10)
-    desc:SetWidth(560)
-    desc:SetJustifyH("LEFT")
-    desc:SetText(BASE_DESC_TEXT .. ".")
+local function CreateTickMarksCanvas(SB, subcatName)
+    local layout = SB.CreateCanvasLayout(subcatName)
+    local frame = layout:GetFrame()
 
-    local defaultColorLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    defaultColorLabel:SetPoint("TOPLEFT", 10, -78)
-    defaultColorLabel:SetWidth(120)
-    defaultColorLabel:SetJustifyH("LEFT")
-    defaultColorLabel:SetText("Default color:")
+    local descRow = layout:AddDescription(BASE_DESC_TEXT .. ".")
+    local desc = descRow._text
 
-    local defaultColorSwatch = CreateStyledColorSwatch(frame, 22)
-    defaultColorSwatch:SetPoint("LEFT", defaultColorLabel, "RIGHT", 8, 0)
+    local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
     local defaultSwatchTex = defaultColorSwatch._tex
 
     defaultColorSwatch:SetScript("OnClick", function()
         local store = GetStore()
         local c = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        ColorPickerFrame:SetupColorPickerAndShow({
-            r = c.r, g = c.g, b = c.b, opacity = c.a,
-            hasOpacity = true,
-            swatchFunc = function()
-                local r, g, b = ColorPickerFrame:GetColorRGB()
-                local a = ColorPickerFrame:GetColorAlpha()
-                store.SetDefaultColor({ r = r, g = g, b = b, a = a })
-                defaultSwatchTex:SetColorTexture(r, g, b)
-            end,
-            cancelFunc = function(prev)
-                store.SetDefaultColor({ r = prev.r, g = prev.g, b = prev.b, a = prev.opacity })
-                defaultSwatchTex:SetColorTexture(prev.r, prev.g, prev.b)
-            end,
-        })
+        ECM.OptionUtil.OpenColorPicker(c, true, function(color)
+            store.SetDefaultColor(color)
+            defaultSwatchTex:SetColorTexture(color.r, color.g, color.b)
+        end)
     end)
 
-    local defaultWidthLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    defaultWidthLabel:SetPoint("TOPLEFT", 10, -108)
-    defaultWidthLabel:SetWidth(120)
-    defaultWidthLabel:SetJustifyH("LEFT")
-    defaultWidthLabel:SetText("Default width:")
-
-    local defaultWidthSlider = CreateFrame("Slider", nil, frame, "MinimalSliderWithSteppersTemplate")
-    defaultWidthSlider:SetPoint("LEFT", defaultWidthLabel, "RIGHT", 8, 0)
-    defaultWidthSlider:SetWidth(180)
-    defaultWidthSlider:SetMinMaxValues(1, 5)
-    defaultWidthSlider:SetValueStep(1)
-    defaultWidthSlider:SetObeyStepOnDrag(true)
-
-    local defaultWidthValue = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    defaultWidthValue:SetPoint("LEFT", defaultWidthSlider, "RIGHT", 8, 0)
-    defaultWidthValue:SetWidth(24)
-    defaultWidthValue:SetJustifyH("LEFT")
+    local _, defaultWidthSlider, defaultWidthValue = layout:AddSlider("Default width", 1, 5, 1)
 
     defaultWidthSlider:SetScript("OnValueChanged", function(_, value)
         local rounded = RoundToStep(value)
@@ -109,19 +70,13 @@ local function CreateTickMarksCanvas()
         GetStore().SetDefaultWidth(rounded)
     end)
 
-    local addBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    addBtn:SetSize(120, 22)
-    addBtn:SetPoint("TOPLEFT", 10, -138)
-    addBtn:SetText("Add Tick Mark")
+    local _, addBtn = layout:AddButton("Add Tick Mark", "Add")
     addBtn:SetScript("OnClick", function()
         GetStore().AddTick(50, nil, nil)
         frame:RefreshTicks()
     end)
 
-    local clearBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    clearBtn:SetSize(120, 22)
-    clearBtn:SetPoint("LEFT", addBtn, "RIGHT", 10, 0)
-    clearBtn:SetText("Clear All Ticks")
+    local _, clearBtn = layout:AddButton("Clear All Ticks", "Clear")
     clearBtn:SetScript("OnClick", function()
         local dialog = StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"]
         dialog.OnAccept = function()
@@ -131,19 +86,11 @@ local function CreateTickMarksCanvas()
         StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS")
     end)
 
-    local tickCountLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    tickCountLabel:SetPoint("LEFT", clearBtn, "RIGHT", 10, 0)
+    local tickCountRow = layout:AddDescription("")
+    local tickCountLabel = tickCountRow._text
 
-    local scrollBox = CreateFrame("Frame", nil, frame, "WowScrollBoxList")
-    scrollBox:SetPoint("TOPLEFT", 10, -170)
-    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
+    local scrollBox, _, view = layout:AddScrollList(34)
 
-    local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
-    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
-
-    local view = CreateScrollBoxListLinearView()
-    view:SetElementExtent(34)
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then
             rowFrame:SetSize(scrollBox:GetWidth(), 34)
@@ -198,7 +145,7 @@ local function CreateTickMarksCanvas()
             widthValue:SetJustifyH("LEFT")
             rowFrame._widthValue = widthValue
 
-            local swatch = CreateStyledColorSwatch(rowFrame, 20)
+            local swatch = SB.CreateColorSwatch(rowFrame, 20)
             swatch:SetPoint("LEFT", widthValue, "RIGHT", 10, 0)
             rowFrame._swatch = swatch
 
@@ -208,49 +155,8 @@ local function CreateTickMarksCanvas()
             removeBtn:SetText("Remove")
             rowFrame._removeBtn = removeBtn
 
-            rowFrame._valueSlider:SetScript("OnValueChanged", function(_, value)
-                local rounded = RoundToStep(value)
-                rowFrame._valueValue:SetText(tostring(rounded))
-
-                if rowFrame._isRefreshing then
-                    return
-                end
-
-                if rounded ~= value then
-                    rowFrame._isRefreshing = true
-                    rowFrame._valueSlider:SetValue(rounded)
-                    rowFrame._isRefreshing = false
-                    return
-                end
-
-                local rowIndex = rowFrame._rowIndex
-                if rowIndex then
-                    GetStore().UpdateTick(rowIndex, "value", rounded)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end
-            end)
-
-            rowFrame._widthSlider:SetScript("OnValueChanged", function(_, value)
-                local rounded = RoundToStep(value)
-                rowFrame._widthValue:SetText(tostring(rounded))
-
-                if rowFrame._isRefreshing then
-                    return
-                end
-
-                if rounded ~= value then
-                    rowFrame._isRefreshing = true
-                    rowFrame._widthSlider:SetValue(rounded)
-                    rowFrame._isRefreshing = false
-                    return
-                end
-
-                local rowIndex = rowFrame._rowIndex
-                if rowIndex then
-                    GetStore().UpdateTick(rowIndex, "width", rounded)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end
-            end)
+            BindTickSlider(rowFrame, valueSlider, valueValue, "value")
+            BindTickSlider(rowFrame, widthSlider, widthValue, "width")
 
             rowFrame._initialized = true
         end
@@ -276,45 +182,22 @@ local function CreateTickMarksCanvas()
         rowFrame._currentColor = { r = tc.r, g = tc.g, b = tc.b, a = tc.a }
         rowFrame._swatch._tex:SetColorTexture(tc.r, tc.g, tc.b)
         rowFrame._swatch:SetScript("OnClick", function()
-            local rowIndex = rowFrame._rowIndex
-            if not rowIndex then
-                return
-            end
-
-            local c = rowFrame._currentColor
-            ColorPickerFrame:SetupColorPickerAndShow({
-                r = c.r, g = c.g, b = c.b, opacity = c.a,
-                hasOpacity = true,
-                swatchFunc = function()
-                    local r, g, b = ColorPickerFrame:GetColorRGB()
-                    local a = ColorPickerFrame:GetColorAlpha()
-                    rowFrame._currentColor = { r = r, g = g, b = b, a = a }
-                    store.UpdateTick(rowIndex, "color", rowFrame._currentColor)
-                    rowFrame._swatch._tex:SetColorTexture(r, g, b)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-                cancelFunc = function(prev)
-                    rowFrame._currentColor = { r = prev.r, g = prev.g, b = prev.b, a = prev.opacity }
-                    store.UpdateTick(rowIndex, "color", rowFrame._currentColor)
-                    rowFrame._swatch._tex:SetColorTexture(prev.r, prev.g, prev.b)
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-            })
+            if not rowFrame._rowIndex then return end
+            ECM.OptionUtil.OpenColorPicker(rowFrame._currentColor, true, function(color)
+                rowFrame._currentColor = color
+                store.UpdateTick(rowFrame._rowIndex, "color", color)
+                rowFrame._swatch._tex:SetColorTexture(color.r, color.g, color.b)
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end)
         end)
 
         rowFrame._removeBtn:SetScript("OnClick", function()
-            local rowIndex = rowFrame._rowIndex
-            if not rowIndex then
-                return
-            end
-
-            store.RemoveTick(rowIndex)
+            if not rowFrame._rowIndex then return end
+            store.RemoveTick(rowFrame._rowIndex)
             frame:RefreshTicks()
             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
-
-    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
 
     local dataProvider = CreateDataProvider()
     scrollBox:SetDataProvider(dataProvider)
@@ -350,25 +233,26 @@ local function CreateTickMarksCanvas()
         defaultWidthValue:SetText(tostring(RoundToStep(defaultWidth)))
     end
 
-    frame:EnableMouse(true)
-    frame:SetScript("OnEnter", function(self)
-        local parent = self:GetParent()
-        if parent and parent.Highlight then
-            parent.Highlight:Hide()
-        end
-    end)
-
     frame:SetScript("OnShow", function(self)
         self:RefreshTicks()
     end)
-
-    return frame
 end
 
 ECM.PowerBarTickMarksOptions = {
     RegisterSettings = function(SB)
+        local SUBCAT_NAME = "Tick Marks"
+        CreateTickMarksCanvas(SB, SUBCAT_NAME)
+
         SB.Header("Tick Marks")
-        local canvas = CreateTickMarksCanvas()
-        SB.EmbedCanvas(canvas, 400)
+        SB.Button({
+            name = "Configure Tick Marks",
+            buttonText = "Open",
+            onClick = function()
+                local catID = SB.GetSubcategoryID(SUBCAT_NAME)
+                if catID then
+                    Settings.OpenToCategory(catID)
+                end
+            end,
+        })
     end,
 }

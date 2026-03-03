@@ -108,6 +108,27 @@ local function NotifyOptionsChanged()
     AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
 end
 
+--- Opens the Blizzard ColorPickerFrame with the given color.
+--- Calls onChange with the selected {r, g, b, a} table on both accept and cancel.
+---@param currentColor {r:number, g:number, b:number, a:number|nil}
+---@param hasOpacity boolean
+---@param onChange fun(color: {r:number, g:number, b:number, a:number})
+local function OpenColorPicker(currentColor, hasOpacity, onChange)
+    ColorPickerFrame:SetupColorPickerAndShow({
+        r = currentColor.r, g = currentColor.g, b = currentColor.b,
+        opacity = currentColor.a,
+        hasOpacity = hasOpacity,
+        swatchFunc = function()
+            local r, g, b = ColorPickerFrame:GetColorRGB()
+            local a = hasOpacity and ColorPickerFrame:GetColorAlpha() or 1
+            onChange({ r = r, g = g, b = b, a = a })
+        end,
+        cancelFunc = function(prev)
+            onChange({ r = prev.r, g = prev.g, b = prev.b, a = hasOpacity and prev.opacity or 1 })
+        end,
+    })
+end
+
 ECM.OptionUtil = {
     GetNestedValue = GetNestedValue,
     SetNestedValue = SetNestedValue,
@@ -115,5 +136,6 @@ ECM.OptionUtil = {
     IsAnchorModeFree = IsAnchorModeFree,
     SetModuleEnabled = SetModuleEnabled,
     GetCurrentClassSpec = GetCurrentClassSpec,
+    OpenColorPicker = OpenColorPicker,
     POSITION_MODE_TEXT = POSITION_MODE_TEXT,
 }

@@ -6,16 +6,8 @@ local _, ns = ...
 local mod = ns.Addon
 local C = ECM.Constants
 
-local unlabeledBarsPresent = false
-
 local function IsEditLocked()
-    local locked, _ = ECM.BuffBars:IsEditLocked()
-    return locked
-end
-
-local function EditLockedReason()
-    local _, reason = ECM.BuffBars:IsEditLocked()
-    return reason
+    return ECM.BuffBars:IsEditLocked()
 end
 
 --- Generates the merged list of spell color rows from active bars and saved entries.
@@ -60,46 +52,37 @@ local function BuildSpellColorRows(activeBars, savedEntries)
     return rows
 end
 
+--- Scans rows for entries whose primary key is a secret or empty string.
+---@param rows { key: ECM_SpellColorKey }[]
+---@return boolean
+local function HasUnlabeledBars(rows)
+    for _, row in ipairs(rows) do
+        local key = row.key.primaryKey
+        if type(key) == "string" and (issecretvalue(key) or key == "") then
+            return true
+        end
+    end
+    return false
+end
+
 --------------------------------------------------------------------------------
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-local function CreateSpellColorCanvas()
-    local frame = CreateFrame("Frame", "ECM_BuffBarsColorsCanvas", UIParent)
-    frame:SetSize(600, 400)
-    frame:Hide()
+local function CreateSpellColorCanvas(SB, subcatName)
+    local layout = SB.CreateCanvasLayout(subcatName)
+    local frame = layout:GetFrame()
 
-    -- Warning labels
-    local combatWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontRed")
-    combatWarning:SetPoint("TOPLEFT", 10, -10)
-    combatWarning:SetText("These settings cannot be changed while in combat lockdown.")
-    combatWarning:Hide()
+    local warningRow = layout:AddDescription("")
+    local warningText = warningRow._text
+    warningText:SetWordWrap(true)
 
-    local secretsWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    secretsWarning:SetPoint("TOPLEFT", 10, -10)
-    secretsWarning:SetText("|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r")
-    secretsWarning:Hide()
+    local specRow = layout:AddDescription("")
+    local specLabel = specRow._text
+    specLabel:SetFontObject(GameFontNormalLarge)
 
-    local unlabeledWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    unlabeledWarning:SetPoint("TOPLEFT", 10, -30)
-    unlabeledWarning:SetText("|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\".|r")
-    unlabeledWarning:Hide()
+    local scrollBox, _, view = layout:AddScrollList(24)
 
-    -- Current spec label
-    local specLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    specLabel:SetPoint("TOPLEFT", 10, -55)
-
-    -- ScrollBox for spell list
-    local scrollBox = CreateFrame("Frame", nil, frame, "WowScrollBoxList")
-    scrollBox:SetPoint("TOPLEFT", 10, -80)
-    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
-
-    local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
-    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
-
-    local view = CreateScrollBoxListLinearView()
-    view:SetElementExtent(24)
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then
             rowFrame:SetSize(scrollBox:GetWidth(), 24)
@@ -115,13 +98,8 @@ local function CreateSpellColorCanvas()
             nameLabel:SetJustifyH("LEFT")
             rowFrame._nameLabel = nameLabel
 
-            local swatch = CreateFrame("Button", nil, rowFrame)
-            swatch:SetSize(20, 20)
+            local swatch = SB.CreateColorSwatch(rowFrame, 20)
             swatch:SetPoint("LEFT", nameLabel, "RIGHT", 5, 0)
-            local swatchTex = swatch:CreateTexture(nil, "BACKGROUND")
-            swatchTex:SetAllPoints()
-            swatchTex:SetColorTexture(1, 1, 1)
-            swatch._tex = swatchTex
             rowFrame._swatch = swatch
 
             local resetBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
@@ -130,8 +108,16 @@ local function CreateSpellColorCanvas()
             resetBtn:SetText("X")
             rowFrame._resetBtn = resetBtn
 
+            function rowFrame:UpdateSwatch()
+                local c = ECM.SpellColors.GetColorByKey(self._data.key)
+                if not c then c = ECM.SpellColors.GetDefaultColor() end
+                self._swatch._tex:SetColorTexture(c.r, c.g, c.b)
+            end
+
             rowFrame._initialized = true
         end
+
+        rowFrame._data = data
 
         -- Set icon
         if data.textureFileID then
@@ -146,68 +132,32 @@ local function CreateSpellColorCanvas()
         local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
         rowFrame._nameLabel:SetText(label)
 
-        -- Track unlabeled bars
-        if type(colorKey) == "string" and (issecretvalue(colorKey) or colorKey == "") then
-            unlabeledBarsPresent = true
-        end
-
-        -- Set color swatch
-        local function UpdateSwatch()
-            local c = ECM.SpellColors.GetColorByKey(data.key)
-            if not c then c = ECM.SpellColors.GetDefaultColor() end
-            rowFrame._swatch._tex:SetColorTexture(c.r, c.g, c.b)
-        end
-        UpdateSwatch()
+        rowFrame:UpdateSwatch()
 
         rowFrame._swatch:SetScript("OnClick", function()
             if IsEditLocked() then return end
             local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
-            ColorPickerFrame:SetupColorPickerAndShow({
-                r = c.r, g = c.g, b = c.b,
-                hasOpacity = false,
-                swatchFunc = function()
-                    local r, g, b = ColorPickerFrame:GetColorRGB()
-                    ECM.SpellColors.SetColorByKey(data.key, { r = r, g = g, b = b, a = 1 })
-                    UpdateSwatch()
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-                cancelFunc = function(prev)
-                    ECM.SpellColors.SetColorByKey(data.key, { r = prev.r, g = prev.g, b = prev.b, a = 1 })
-                    UpdateSwatch()
-                    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
-                end,
-            })
+            ECM.OptionUtil.OpenColorPicker(c, false, function(color)
+                ECM.SpellColors.SetColorByKey(data.key, color)
+                rowFrame:UpdateSwatch()
+                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            end)
         end)
 
         -- Reset button
-        local hasCustomColor = ECM.SpellColors.GetColorByKey(data.key) ~= nil
-        if hasCustomColor then
-            rowFrame._resetBtn:Show()
-        else
-            rowFrame._resetBtn:Hide()
-        end
+        rowFrame._resetBtn:SetShown(ECM.SpellColors.GetColorByKey(data.key) ~= nil)
         rowFrame._resetBtn:SetScript("OnClick", function()
             ECM.SpellColors.ResetColorByKey(data.key)
-            UpdateSwatch()
+            rowFrame:UpdateSwatch()
             rowFrame._resetBtn:Hide()
             ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 
-    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
-
     local dataProvider = CreateDataProvider()
     scrollBox:SetDataProvider(dataProvider)
 
-    frame._scrollBox = scrollBox
-    frame._dataProvider = dataProvider
-    frame._specLabel = specLabel
-    frame._combatWarning = combatWarning
-    frame._secretsWarning = secretsWarning
-    frame._unlabeledWarning = unlabeledWarning
-
     function frame:RefreshSpellList()
-        unlabeledBarsPresent = false
         local rows = BuildSpellColorRows(
             ECM.BuffBars:GetActiveSpellData(),
             ECM.SpellColors.GetAllColorEntries()
@@ -218,12 +168,18 @@ local function CreateSpellColorCanvas()
             dataProvider:Insert(row)
         end
 
-        -- Update warnings
-        local locked = IsEditLocked()
-        local reason = EditLockedReason()
-        combatWarning:SetShown(locked and reason == "combat")
-        secretsWarning:SetShown(locked and reason == "secrets")
-        unlabeledWarning:SetShown(unlabeledBarsPresent)
+        -- Build warning text
+        local parts = {}
+        local locked, reason = IsEditLocked()
+        if locked and reason == "combat" then
+            parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
+        elseif locked and reason == "secrets" then
+            parts[#parts + 1] = "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
+        end
+        if HasUnlabeledBars(rows) then
+            parts[#parts + 1] = "|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\".|r"
+        end
+        warningText:SetText(table.concat(parts, "\n"))
 
         -- Update spec label
         local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
@@ -245,6 +201,7 @@ end
 local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
+BuffBarsOptions._HasUnlabeledBars = HasUnlabeledBars
 
 local function isDisabled()
     return not ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars.enabled")
@@ -328,41 +285,38 @@ function BuffBarsOptions.RegisterSettings(SB)
         },
     })
 
-    -- Spell Colors (separate subcategory)
-    local colorsFrame = CreateSpellColorCanvas()
+    -- Spell Colors (canvas subcategory, opened via button)
+    local SPELL_COLORS_SUBCAT = "Spell Colors"
+    local colorsFrame = CreateSpellColorCanvas(SB, SPELL_COLORS_SUBCAT)
 
-    SB.RegisterFromTable({
-        name = "    Spell Colors",
-        path = "buffBars",
-        args = {
-            defaultColor = {
-                type = "color",
-                path = "colors.defaultColor",
-                name = "Default color",
-                desc = "The fallback color used for aura bars that do not have a custom color assigned.",
-                disabled = isDisabled,
-                order = 10,
-            },
-            refresh = {
-                type = "execute",
-                name = "Refresh spell list",
-                buttonText = "Refresh",
-                desc = "Re-scan active aura bars and reconcile with saved spell color entries.",
-                onClick = function()
-                    if IsEditLocked() then return end
-                    local activeKeys = ECM.BuffBars:GetActiveSpellData()
-                    ECM.SpellColors.ReconcileAllKeys(activeKeys)
-                    colorsFrame:RefreshSpellList()
-                end,
-                order = 20,
-            },
-            colors = {
-                type = "canvas",
-                canvas = colorsFrame,
-                height = 400,
-                order = 30,
-            },
-        },
+    SB.Header("Spell Colors")
+    SB.PathControl({
+        type = "color",
+        path = "buffBars.colors.defaultColor",
+        name = "Default color",
+        tooltip = "The fallback color used for aura bars that do not have a custom color assigned.",
+        disabled = isDisabled,
+    })
+    SB.Button({
+        name = "Refresh spell list",
+        buttonText = "Refresh",
+        tooltip = "Re-scan active aura bars and reconcile with saved spell color entries.",
+        onClick = function()
+            if IsEditLocked() then return end
+            local activeKeys = ECM.BuffBars:GetActiveSpellData()
+            ECM.SpellColors.ReconcileAllKeys(activeKeys)
+            colorsFrame:RefreshSpellList()
+        end,
+    })
+    SB.Button({
+        name = "Configure Spell Colors",
+        buttonText = "Open",
+        onClick = function()
+            local catID = SB.GetSubcategoryID(SPELL_COLORS_SUBCAT)
+            if catID then
+                Settings.OpenToCategory(catID)
+            end
+        end,
     })
 end
 
