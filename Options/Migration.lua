@@ -1107,3 +1107,78 @@ function Migration.PrintLog()
         print("- " .. entry)
     end
 end
+
+--- Validates whether a rollback to the given target version is possible.
+---@param targetVersion number|nil  Lowest version to keep.
+---@return boolean valid
+---@return string message
+function Migration.ValidateRollback(targetVersion)
+    local sv = _G[ECM.Constants.SV_NAME]
+    local versions = sv and sv._versions
+    if not versions then
+        return false, "No versioned settings found."
+    end
+
+    if targetVersion ~= nil and (type(targetVersion) ~= "number" or targetVersion ~= math.floor(targetVersion)) then
+        return false, "Target version must be a whole number."
+    end
+
+    local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+    local floor = targetVersion or (current - 1)
+
+    if floor >= current then
+        return false, "Target version must be less than the current version (V" .. current .. ")."
+    end
+
+    if floor < 1 then
+        return false, "Target version must be at least 1."
+    end
+
+    local hasSeedVersion = false
+    for k in pairs(versions) do
+        if type(k) == "number" and k <= floor then
+            hasSeedVersion = true
+            break
+        end
+    end
+
+    if not hasSeedVersion then
+        return false, "No prior version at or below V" .. floor .. " exists to restore from."
+    end
+
+    -- Build the list of versions that would be deleted
+    local toDelete = {}
+    for v = floor + 1, current do
+        if versions[v] then
+            toDelete[#toDelete + 1] = "V" .. v
+        end
+    end
+
+    if #toDelete == 0 then
+        return false, "No version slots to delete above V" .. floor .. "."
+    end
+
+    return true, "Will delete " .. table.concat(toDelete, ", ") .. " and re-migrate from V" .. floor .. "."
+end
+
+--- Deletes schema version slots to force re-migration on next reload.
+--- Call ValidateRollback first to check feasibility.
+---@param targetVersion number|nil  Lowest version to keep. Must be < CURRENT_SCHEMA_VERSION.
+function Migration.Rollback(targetVersion)
+    local sv = _G[ECM.Constants.SV_NAME]
+    local versions = sv and sv._versions
+    if not versions then
+        return
+    end
+
+    if targetVersion ~= nil and (type(targetVersion) ~= "number" or targetVersion ~= math.floor(targetVersion)) then
+        return
+    end
+
+    local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+    local floor = targetVersion or (current - 1)
+
+    for v = floor + 1, current do
+        versions[v] = nil
+    end
+end

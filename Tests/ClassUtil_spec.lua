@@ -269,6 +269,10 @@ describe("ClassUtil", function()
             assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 3)
         end)
 
+        it("returns icicles zero stacks when no aura is present", function()
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 0)
+        end)
+
         it("returns devourer meta values when collapsing star aura is active", function()
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 11 })
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_COLLAPSING_STAR, { applications = 7 })

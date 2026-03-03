@@ -16,6 +16,7 @@ local POWER_COLOR_DEFS = {
     { key = Enum.PowerType.Fury,       name = "Fury" },
 }
 
+
 local PowerBarOptions = {}
 local isDisabled = function() return not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "powerBar.enabled") end
 

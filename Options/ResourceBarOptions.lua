@@ -19,6 +19,7 @@ local RESOURCE_COLOR_DEFS = {
     { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
 }
 
+
 local ResourceBarOptions = {}
 
 local function isDeathKnight()

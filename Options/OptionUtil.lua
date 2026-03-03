@@ -99,9 +99,14 @@ local function GetCurrentClassSpec()
     return classID, specIndex, localisedClassName or "Unknown", specName or "None", className
 end
 
+
 --------------------------------------------------------------------------------
 -- Export
 --------------------------------------------------------------------------------
+
+local function NotifyOptionsChanged()
+    AceConfigRegistry:NotifyChange("EnhancedCooldownManager")
+end
 
 ECM.OptionUtil = {
     GetNestedValue = GetNestedValue,
