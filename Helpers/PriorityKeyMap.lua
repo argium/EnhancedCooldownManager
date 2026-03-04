@@ -154,13 +154,13 @@ function PriorityKeyMap:Reconcile(keys)
                 tables[i][vkeys[i]] = winner
                 changed = true
                 ECM.Log("PriorityKeyMap",
-                    "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM_tostring(vkeys[i]),
+                    "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]),
                     { value = unwrap(winner) })
             elseif ts(existing) < winnerTs then
                 tables[i][vkeys[i]] = winner
                 changed = true
                 ECM.Log("PriorityKeyMap",
-                    "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM_tostring(vkeys[i]) .. " to most recent",
+                    "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]) .. " to most recent",
                     { value = unwrap(winner) })
             end
         end
@@ -275,9 +275,9 @@ function PriorityKeyMap:Set(keys, value, meta)
 
     local parts = {}
     for i = 1, #self._keyDefs do
-        parts[i] = ECM_tostring(keys[i])
+        parts[i] = ECM.ToString(keys[i])
     end
-    ECM.Log("PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM_tostring(value))
+    ECM.Log("PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM.ToString(value))
 end
 
 ---------------------------------------------------------------------------

@@ -98,9 +98,9 @@ function BarMixin:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
         local tick = pool[i]
         if tick and tick:IsShown() then
             tick:ClearAllPoints()
-            local x = ECM_PixelSnap(step * i)
+            local x = ECM.PixelSnap(step * i)
             tick:SetPoint("LEFT", frame, "LEFT", x, 0)
-            tick:SetSize(math.max(1, ECM_PixelSnap(tickWidth)), barHeight)
+            tick:SetSize(math.max(1, ECM.PixelSnap(tickWidth)), barHeight)
             tick:SetColorTexture(tr, tg, tb, ta)
         end
     end
@@ -154,7 +154,7 @@ function BarMixin:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, def
                 local x = math.floor((value / maxValue) * barWidth)
                 tick:ClearAllPoints()
                 tick:SetPoint("LEFT", statusBar, "LEFT", x, 0)
-                tick:SetSize(math.max(1, ECM_PixelSnap(tickWidthVal)), barHeight)
+                tick:SetSize(math.max(1, ECM.PixelSnap(tickWidthVal)), barHeight)
                 tick:SetColorTexture(tr, tg, tb, ta)
                 tick:Show()
             else
@@ -219,12 +219,12 @@ function BarMixin:Refresh(why, force)
         frame:SetText(displayValue)
 
         -- Apply font settings
-        ECM_ApplyFont(frame.TextValue, globalConfig, moduleConfig)
+        ECM.ApplyFont(frame.TextValue, globalConfig, moduleConfig)
     end
     frame:SetTextVisible(showText)
 
     -- Texture
-    local tex = ECM_GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
+    local tex = ECM.GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
     FrameUtil.LazySetStatusBarTexture(frame.StatusBar, tex)
 
     -- Status bar color

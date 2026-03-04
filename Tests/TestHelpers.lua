@@ -129,7 +129,7 @@ function TestHelpers.setupSettingsStubs()
         "Settings", "CreateSettingsListSectionHeaderInitializer",
         "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
         "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
-        "ECM_CloneValue", "ECM_DeepEquals",
+        "ECM", "ECM_DeepEquals",
         "CreateFromMixins", "SettingsListElementInitializer",
     }
 
@@ -272,7 +272,8 @@ function TestHelpers.setupSettingsStubs()
     _G.YES = "Yes"
     _G.NO = "No"
 
-    _G.ECM_CloneValue = deepClone
+    _G.ECM = _G.ECM or {}
+    _G.ECM.CloneValue = deepClone
     _G.ECM_DeepEquals = deepEquals
 
     _G.CreateFromMixins = function(...)

@@ -16,7 +16,7 @@ describe("PowerBarTickMarksOptions", function()
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
-            "ECM", "ECM_CloneValue",
+            "ECM",
             "StaticPopupDialogs", "YES", "NO", "SETTINGS_DEFAULTS",
         })
     end)
@@ -30,13 +30,13 @@ describe("PowerBarTickMarksOptions", function()
         _G.YES = "Yes"
         _G.NO = "No"
         _G.SETTINGS_DEFAULTS = "Defaults"
-        _G.ECM_CloneValue = TestHelpers.deepClone
         _G.ECM = {
             Constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
                 CLASS_COLORS = { WARRIOR = "C79C6E" },
                 COLOR_WHITE_HEX = "FFFFFF",
             },
+            CloneValue = TestHelpers.deepClone,
             OptionUtil = {
                 GetCurrentClassSpec = function()
                     return 1, 2, "Warrior", "Fury", "WARRIOR"

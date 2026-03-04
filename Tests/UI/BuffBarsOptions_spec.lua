@@ -18,13 +18,13 @@ describe("BuffBarsOptions", function()
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
-            "ECM", "ECM_CloneValue", "ECM_DeepEquals",
+            "ECM", "ECM_DeepEquals",
             "Settings", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
             "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "issecretvalue", "issecrettable", "canaccessvalue", "canaccesstable",
-            "time", "ECM_tostring",
+            "time",
             "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
             "LibSettingsBuilder_EmbedCanvasMixin",
         })
@@ -47,12 +47,12 @@ describe("BuffBarsOptions", function()
         _G.canaccessvalue = function() return true end
         _G.canaccesstable = function() return true end
         _G.time = function() return 1000 end
-        _G.ECM_tostring = function(v) return tostring(v) end
 
         _G.ECM = {
             Constants = {},
             FrameUtil = { GetIconTextureFileID = function() return nil end },
             ScheduleLayoutUpdate = function() end,
+            ToString = function(v) return tostring(v) end,
             BuffBars = {
                 IsEditLocked = function() return false, nil end,
                 GetActiveSpellData = function() return {} end,
@@ -136,16 +136,10 @@ describe("BuffBarsOptions", function()
 
         -- Load OptionUtil (includes SettingsBuilder adapter)
         local optUtilChunk = TestHelpers.loadChunk(
-            { "../Options/OptionUtil.lua" },
+            { "../Helpers/OptionUtil.lua" },
             "Unable to load OptionUtil.lua"
         )
         optUtilChunk(nil, addonNS)
-
-        local sbChunk = TestHelpers.loadChunk(
-            { "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, addonNS)
 
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")

@@ -22,24 +22,23 @@ Libs\LibSharedMedia-3.0\lib.xml
 Libs\LibSettingsBuilder\LibSettingsBuilder.xml
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
-Constants.lua
-Defaults.lua
-Debug.lua
+ECM_Constants.lua
+ECM_Defaults.lua
 
 Helpers\ClassUtil.lua
 Helpers\ColorUtil.lua
-Helpers\Utilities.lua
 Helpers\FrameUtil.lua
 Helpers\ModuleMixin.lua
 Helpers\PriorityKeyMap.lua
 Helpers\SpellColors.lua
-Options\Migration.lua
-Options\ImportExport.lua
-Options\BarMixin.lua
+Helpers\Migration.lua
+Helpers\ImportExport.lua
+Helpers\BarMixin.lua
+Helpers\OptionUtil.lua
 
 Modules\BuffBars.lua
 
-EnhancedCooldownManager.lua
+ECM.lua
 
 Modules\PowerBar.lua
 Modules\ResourceBar.lua
@@ -47,14 +46,13 @@ Modules\RuneBar.lua
 Modules\ItemIcons.lua
 Modules\Layout.lua
 
-Options\OptionUtil.lua
-Options\PowerBarTickMarksOptions.lua
-Options\GeneralOptions.lua
-Options\PowerBarOptions.lua
-Options\ResourceBarOptions.lua
-Options\RuneBarOptions.lua
-Options\ProfileOptions.lua
-Options\AdvancedOptions.lua
-Options\ItemIconsOptions.lua
-Options\BuffBarsOptions.lua
-Options\Options.lua
+UI\PowerBarTickMarksOptions.lua
+UI\GeneralOptions.lua
+UI\PowerBarOptions.lua
+UI\ResourceBarOptions.lua
+UI\RuneBarOptions.lua
+UI\ProfileOptions.lua
+UI\AdvancedOptions.lua
+UI\ItemIconsOptions.lua
+UI\BuffBarsOptions.lua
+UI\Options.lua

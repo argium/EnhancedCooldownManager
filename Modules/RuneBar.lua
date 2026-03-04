@@ -149,7 +149,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         end
 
         local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
-        local tex = ECM_GetTexture(texKey)
+        local tex = ECM.GetTexture(texKey)
 
         -- Use same positioning logic as BarMixin tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
@@ -158,8 +158,8 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
             if frag then
                 frag:SetStatusBarTexture(tex)
                 frag:ClearAllPoints()
-                local leftX = ECM_PixelSnap((pos - 1) * step)
-                local rightX = ECM_PixelSnap(pos * step)
+                local leftX = ECM.PixelSnap((pos - 1) * step)
+                local rightX = ECM.PixelSnap(pos * step)
                 local w = rightX - leftX
                 frag:SetSize(w, barHeight)
                 frag:SetPoint("LEFT", bar, "LEFT", leftX, 0)
@@ -280,7 +280,7 @@ function RuneBar:Refresh(why, force)
     frame.StatusBar:SetMinMaxValues(0, maxRunes)
 
     local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
-    local tex = ECM_GetTexture(texKey)
+    local tex = ECM.GetTexture(texKey)
     EnsureFragmentedBars(frame, maxRunes, tex)
 
     local tickCount = math.max(0, maxRunes - 1)

@@ -120,10 +120,9 @@ describe("Migration", function()
 
         local migrationChunk = TestHelpers.loadChunk(
             {
-                "Options/Migration.lua",
-                "../Options/Migration.lua",
+                "../../Helpers/Migration.lua",
             },
-            "Unable to load Options/Migration.lua"
+            "Unable to load Helpers/Migration.lua"
         )
         migrationChunk()
 

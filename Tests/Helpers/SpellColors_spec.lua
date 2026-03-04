@@ -87,7 +87,6 @@ describe("SpellColors", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
-            "ECM_tostring",
         })
     end)
 
@@ -137,7 +136,7 @@ describe("SpellColors", function()
 
         _G.ECM.DebugAssert = function() end
         _G.ECM.Log = function() end
-        _G.ECM_tostring = function(value)
+        _G.ECM.ToString = function(value)
             return tostring(value)
         end
 

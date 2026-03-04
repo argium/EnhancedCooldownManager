@@ -186,7 +186,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     -- StatusBar texture & color
     --------------------------------------------------------------------------
     local textureName = globalConfig and globalConfig.texture
-    local texture = ECM_GetTexture(textureName)
+    local texture = ECM.GetTexture(textureName)
     FrameUtil.LazySetStatusBarTexture(bar, texture)
 
     local barColor = ECM.SpellColors.GetColorForBar(frame)
@@ -207,7 +207,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
     local logPrefix = "GetColorForBar[".. barIndex .."] "
-    local logLine = logPrefix .. "(" .. ECM_tostring(spellName) .. ", " .. ECM_tostring(spellID) .. ", " .. ECM_tostring(cooldownID) .. ", " .. ECM_tostring(textureFileID) .. ") = " .. colorLog
+    local logLine = logPrefix .. "(" .. ECM.ToString(spellName) .. ", " .. ECM.ToString(spellID) .. ", " .. ECM.ToString(cooldownID) .. ", " .. ECM.ToString(textureFileID) .. ") = " .. colorLog
     ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
 
     if allSecret and not InCombatLockdown() then
@@ -237,8 +237,8 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     --------------------------------------------------------------------------
     -- Fonts (before visibility/positioning — font changes affect layout)
     --------------------------------------------------------------------------
-    ECM_ApplyFont(bar.Name, globalConfig, config)
-    ECM_ApplyFont(bar.Duration, globalConfig, config)
+    ECM.ApplyFont(bar.Name, globalConfig, config)
+    ECM.ApplyFont(bar.Duration, globalConfig, config)
 
     --------------------------------------------------------------------------
     -- Icon anchor

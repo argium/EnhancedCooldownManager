@@ -3,6 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local ADDON_NAME, ns = ...
+ECM = ECM or {}
 
 local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
 ns.Addon = mod
@@ -12,9 +13,180 @@ local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
 local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
-assert(ECM.defaults, "Defaults.lua must be loaded before ECM.lua")
-assert(ECM.Constants, "Constants.lua must be loaded before ECM.lua")
+assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
+assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
+
+local function is_debug_enabled()
+    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
+end
+
+local function safe_str_tostring(x)
+    if x == nil then
+        return "nil"
+    elseif issecretvalue(x) then
+        return "[secret]"
+    else
+        return tostring(x)
+    end
+end
+
+local function safe_table_tostring(tbl, depth, seen)
+    if issecrettable(tbl) then
+        return "[secrettable]"
+    end
+
+    if seen[tbl] then
+        return "<cycle>"
+    end
+
+    if depth >= 3 then
+        return "{...}"
+    end
+
+    seen[tbl] = true
+
+    local ok, pairsOrErr = pcall(function()
+        local parts = {}
+        local count = 0
+
+        for k, x in pairs(tbl) do
+            count = count + 1
+            if count > 25 then
+                parts[#parts + 1] = "..."
+                break
+            end
+
+            local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
+            local valueStr = type(x) == "table" and safe_table_tostring(x, depth + 1, seen) or safe_str_tostring(x)
+            parts[#parts + 1] = keyStr .. "=" .. valueStr
+        end
+
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end)
+
+    seen[tbl] = nil
+
+    if not ok then
+        return "<table_error>"
+    end
+
+    return pairsOrErr
+end
+
+local function get_lsm_media(mediaType, key)
+    if LSM and key then
+        return LSM:Fetch(mediaType, key, true)
+    end
+end
+
+function ECM.ToString(v)
+    if type(v) == "table" then
+        return safe_table_tostring(v, 0, {})
+    end
+    return safe_str_tostring(v)
+end
+
+function ECM.GetTexture(texture)
+    if texture then
+        local fetched = get_lsm_media("statusbar", texture)
+        if fetched then
+            return fetched
+        end
+
+        if texture:find("\\") then
+            return texture
+        end
+    end
+
+    return get_lsm_media("statusbar", "Blizzard") or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
+end
+
+function ECM.DebugAssert(condition, message, data)
+    if not is_debug_enabled() then
+        return
+    end
+
+    if data and not condition and DevTool and DevTool.AddData then
+        pcall(DevTool.AddData, DevTool, data, "|cff" .. ECM.Constants.DEBUG_COLOR .. "[ASSERT]|r " .. message)
+    end
+    assert(condition, message)
+end
+
+function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
+    local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
+    local useModuleOverride = moduleConfig and moduleConfig.overrideFont == true
+    local fontPath = get_lsm_media("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or ECM.Constants.DEFAULT_FONT
+    local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or 11
+    local fontOutline = (config and config.fontOutline)
+
+    if fontOutline == "NONE" then
+        fontOutline = ""
+    end
+
+    local hasShadow = config and config.fontShadow
+
+    ECM.DebugAssert(fontPath, "Font path cannot be nil")
+    ECM.DebugAssert(fontSize, "Font size cannot be nil")
+    ECM.DebugAssert(fontOutline, "Font outline cannot be nil")
+
+    fontString:SetFont(fontPath, fontSize, fontOutline)
+
+    if hasShadow then
+        fontString:SetShadowColor(0, 0, 0, 1)
+        fontString:SetShadowOffset(1, -1)
+    else
+        fontString:SetShadowOffset(0, 0)
+    end
+end
+
+function ECM.PixelSnap(v)
+    local scale = UIParent:GetEffectiveScale()
+    local snapped = math.floor(((tonumber(v) or 0) * scale) + 0.5)
+    return snapped / scale
+end
+
+function ECM.CloneValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for k, v in pairs(value) do
+        copy[k] = ECM.CloneValue(v)
+    end
+    return copy
+end
+
+function ECM.Print(...)
+    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. ":")
+    local args = { ... }
+    for i = 1, #args do
+        args[i] = tostring(args[i])
+    end
+    local message = table.concat(args, " ")
+    print(prefix .. " " .. message)
+end
+
+function ECM.Log(module, message, data)
+    if not is_debug_enabled() then
+        return
+    end
+
+    local prefix = "[" .. ECM.Constants.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
+
+    if DevTool and DevTool.AddData then
+        local payload = {
+            module = module or "nil",
+            message = message,
+            timestamp = GetTime(),
+            data = ECM.ToString(data),
+        }
+        pcall(DevTool.AddData, DevTool, payload, "|cff" .. ECM.Constants.DEBUG_COLOR .. prefix .. "|r " .. message)
+    end
+
+    print("|cff" .. ECM.Constants.DEBUG_COLOR .. prefix .. "|r " .. message)
+end
 
 local function RegisterAddonCompartmentEntry()
     if mod._addonCompartmentRegistered then
@@ -47,7 +219,7 @@ end
 ---@param onCancel fun()|nil
 function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        ECM_print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        ECM.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
         return
     end
 
@@ -95,7 +267,7 @@ local function EnsureEditBoxDialog(key, config)
         preferredIndex = 3,
     }
 
-    for k, v in pairs(config or {}) do
+    for k, v in pairs(config) do
         StaticPopupDialogs[key][k] = v
     end
 end
@@ -104,7 +276,7 @@ end
 ---@param exportString string
 function mod:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        ECM_print("Invalid export string provided")
+        ECM.Print("Invalid export string provided")
         return
     end
 
@@ -185,17 +357,17 @@ function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" or (cmd == "migration" and arg ~= "" and arg ~= "log") then
-        ECM_print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
-        ECM_print("/ecm help - show this message")
-        ECM_print("/ecm options|config|settings|o - open the options menu")
-        ECM_print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
-        ECM_print("/ecm migrationlog - show the settings migration log")
+        ECM.Print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
+        ECM.Print("/ecm help - show this message")
+        ECM.Print("/ecm options|config|settings|o - open the options menu")
+        ECM.Print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
+        ECM.Print("/ecm migrationlog - show the settings migration log")
         return
     end
 
     if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
         ECM.ScheduleLayoutUpdate(0, "ChatCommand")
-        ECM_print("Refreshing all modules.")
+        ECM.Print("Refreshing all modules.")
         return
     end
 
@@ -206,7 +378,7 @@ function mod:ChatCommand(input)
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
-            ECM_print("Options cannot be opened during combat. They will open when combat ends.")
+            ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
             if not self._openOptionsAfterCombat then
                 self._openOptionsAfterCombat = true
                 self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
@@ -235,11 +407,11 @@ function mod:ChatCommand(input)
         elseif arg == "off" then
             newVal = false
         else
-            ECM_print("Usage: expected on|off|toggle")
+            ECM.Print("Usage: expected on|off|toggle")
             return
         end
         profile.global.debug = newVal
-        ECM_print("Debug:", profile.global.debug and "ON" or "OFF")
+        ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
         return
     end
 end
@@ -261,7 +433,7 @@ end
 function mod:GetECMModule(moduleName, silent)
     local module = self[moduleName] or ECM[moduleName]
     if not module and not silent then
-        ECM_print("Module not found:", moduleName)
+        ECM.Print("Module not found:", moduleName)
     end
     return module
 end

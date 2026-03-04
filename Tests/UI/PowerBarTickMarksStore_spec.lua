@@ -20,7 +20,6 @@ describe("PowerBarTickMarksStore", function()
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
             "ECM",
-            "ECM_CloneValue",
         })
     end)
 
@@ -38,6 +37,7 @@ describe("PowerBarTickMarksStore", function()
                 CLASS_COLORS = { WARRIOR = "C79C6E" },
                 COLOR_WHITE_HEX = "FFFFFF",
             },
+            CloneValue = TestHelpers.deepClone,
             OptionUtil = {
                 GetCurrentClassSpec = function()
                     return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
@@ -45,7 +45,6 @@ describe("PowerBarTickMarksStore", function()
             },
             ScheduleLayoutUpdate = function() end,
         }
-        _G.ECM_CloneValue = TestHelpers.deepClone
 
         _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
         _G.YES = "Yes"

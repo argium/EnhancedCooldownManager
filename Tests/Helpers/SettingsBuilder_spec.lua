@@ -19,7 +19,7 @@ describe("SettingsBuilder", function()
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
-            "ECM", "ECM_CloneValue", "ECM_DeepEquals",
+            "ECM", "ECM_DeepEquals",
             "Settings", "SettingsPanel", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
             "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
@@ -41,7 +41,6 @@ describe("SettingsBuilder", function()
         TestHelpers.setupLibStub()
         TestHelpers.setupSettingsStubs()
 
-        _G.ECM_CloneValue = TestHelpers.deepClone
         _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
         _G.GameFontNormal = "GameFontNormal"
@@ -72,6 +71,7 @@ describe("SettingsBuilder", function()
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
             },
+            CloneValue = TestHelpers.deepClone,
             ScheduleLayoutUpdate = function()
                 layoutUpdateCalls = layoutUpdateCalls + 1
             end,
@@ -133,16 +133,10 @@ describe("SettingsBuilder", function()
         }
 
         local optionUtilChunk = TestHelpers.loadChunk(
-            { "../Options/OptionUtil.lua" },
-            "Unable to load Options/OptionUtil.lua"
+            { "Helpers/OptionUtil.lua" },
+            "Unable to load Helpers/OptionUtil.lua"
         )
         optionUtilChunk(nil, addonNS)
-
-        local sbChunk = TestHelpers.loadChunk(
-            { "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, addonNS)
 
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")

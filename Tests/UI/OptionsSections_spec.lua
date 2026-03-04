@@ -16,7 +16,7 @@ describe("Options sections and root assembly", function()
 
     setup(function()
         originalGlobals = TestHelpers.captureGlobals({
-            "ECM", "ECM_CloneValue", "ECM_DeepEquals",
+            "ECM", "ECM_DeepEquals",
             "Settings", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
             "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
@@ -64,7 +64,7 @@ describe("Options sections and root assembly", function()
         }
 
         _G.ECM_DeepEquals = function(a, b) return a == b end
-        _G.ECM_CloneValue = function(v) return v end
+        _G.ECM.CloneValue = function(v) return v end
 
         _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
         _G.GetSpecialization = function() return 1 end
@@ -90,18 +90,12 @@ describe("Options sections and root assembly", function()
             OptionsSections = {},
         }
 
-        -- Load OptionUtil first (SB depends on it)
+        -- Load OptionUtil first (defines ECM.SettingsBuilder)
         local optionUtilChunk = TestHelpers.loadChunk(
-            { "OptionUtil.lua", "../Options/OptionUtil.lua" },
-            "Unable to load OptionUtil.lua"
+            { "Helpers/OptionUtil.lua" },
+            "Unable to load Helpers/OptionUtil.lua"
         )
         optionUtilChunk(nil, ns)
-
-        local sbChunk = TestHelpers.loadChunk(
-            { "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, ns)
 
         -- Register mock sections
         for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
@@ -114,8 +108,8 @@ describe("Options sections and root assembly", function()
 
         -- Load Options.lua
         local optionsChunk = TestHelpers.loadChunk(
-            { "../Options/Options.lua" },
-            "Unable to load Options.lua"
+            { "UI/Options.lua" },
+            "Unable to load UI/Options.lua"
         )
         optionsChunk(nil, ns)
 
@@ -200,20 +194,17 @@ describe("Options sections and root assembly", function()
             OptionsSections = {},
         }
 
-        -- Load OptionUtil and SettingsBuilder
-        local optUtil = TestHelpers.loadChunk({ "../UI/OptionUtil.lua" }, "OptionUtil")
+        -- Load OptionUtil (defines ECM.SettingsBuilder)
+        local optUtil = TestHelpers.loadChunk({ "Helpers/OptionUtil.lua" }, "OptionUtil")
         optUtil(nil, ns)
-
-        local sbChunk = TestHelpers.loadChunk({ "../UI/SettingsBuilder.lua" }, "SettingsBuilder")
-        sbChunk(nil, ns)
 
         -- Set up root category so subcategories can be created
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
         -- Load ResourceBarOptions and RuneBarOptions
-        local resChunk = TestHelpers.loadChunk({ "../UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
+        local resChunk = TestHelpers.loadChunk({ "UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
         resChunk(nil, ns)
-        local runeChunk = TestHelpers.loadChunk({ "../UI/RuneBarOptions.lua" }, "RuneBarOptions")
+        local runeChunk = TestHelpers.loadChunk({ "UI/RuneBarOptions.lua" }, "RuneBarOptions")
         runeChunk(nil, ns)
 
         -- Both should have registered themselves

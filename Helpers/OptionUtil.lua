@@ -5,12 +5,7 @@
 local _, ns = ...
 local mod = ns.Addon
 
-local LSB = LibStub("LibSettingsBuilder-1.0")
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
-
-local function ApplyPositionModeToBar(cfg, mode)
-    cfg.anchorMode = mode
-end
 
 local function IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
@@ -83,7 +78,6 @@ local function GetCurrentClassSpec()
     return classID, specIndex, localisedClassName or "Unknown", specName or "None", className
 end
 
-
 --------------------------------------------------------------------------------
 -- Export
 --------------------------------------------------------------------------------
@@ -132,7 +126,7 @@ ECM.OptionUtil = {
 -- SettingsBuilder instance
 --------------------------------------------------------------------------------
 
-ECM.SettingsBuilder = LSB:New({
+ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
     getProfile = function() return mod.db and mod.db.profile end,
     getDefaults = function() return mod.db and mod.db.defaults and mod.db.defaults.profile end,
     getNestedValue = GetNestedValue,
@@ -162,7 +156,7 @@ ECM.SettingsBuilder = LSB:New({
                 [ECM.Constants.ANCHORMODE_FREE] = "Movable via Edit Mode",
             },
             isAnchorModeFree = IsAnchorModeFree,
-            applyPositionMode = ApplyPositionModeToBar,
+            applyPositionMode = function(cfg, mode) cfg.anchorMode = mode end,
         },
     },
 })

@@ -45,7 +45,7 @@ function store.AddTick(value, color, width)
     local ticksCfg = GetTicksConfig()
     ticks[#ticks + 1] = {
         value = value,
-        color = color or ECM_CloneValue(ticksCfg.defaultColor),
+        color = color or ECM.CloneValue(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
     store.SetCurrentTicks(ticks)
