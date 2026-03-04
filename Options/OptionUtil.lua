@@ -5,18 +5,10 @@
 local _, ns = ...
 local mod = ns.Addon
 
-local POSITION_MODE_TEXT = {
-    [ECM.Constants.ANCHORMODE_CHAIN] = "Automatic",
-    [ECM.Constants.ANCHORMODE_FREE] = "Manual",
-}
+local LSB = LibStub("LibSettingsBuilder-1.0")
+local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local function ApplyPositionModeToBar(cfg, mode)
-    if mode == ECM.Constants.ANCHORMODE_FREE then
-        if cfg.width == nil then
-            cfg.width = ECM.Constants.DEFAULT_BAR_WIDTH
-        end
-    end
-
     cfg.anchorMode = mode
 end
 
@@ -129,12 +121,48 @@ end
 
 ECM.OptionUtil = {
     GetNestedValue = GetNestedValue,
-    SetNestedValue = SetNestedValue,
-    ApplyPositionModeToBar = ApplyPositionModeToBar,
     IsAnchorModeFree = IsAnchorModeFree,
     SetModuleEnabled = SetModuleEnabled,
     GetCurrentClassSpec = GetCurrentClassSpec,
     OpenColorPicker = OpenColorPicker,
     GetIsDisabledDelegate = GetIsDisabledDelegate,
-    POSITION_MODE_TEXT = POSITION_MODE_TEXT,
 }
+
+--------------------------------------------------------------------------------
+-- SettingsBuilder instance
+--------------------------------------------------------------------------------
+
+ECM.SettingsBuilder = LSB:New({
+    getProfile = function() return mod.db and mod.db.profile end,
+    getDefaults = function() return mod.db and mod.db.defaults and mod.db.defaults.profile end,
+    getNestedValue = GetNestedValue,
+    setNestedValue = SetNestedValue,
+    varPrefix = "ECM",
+    onChanged = function(spec)
+        if spec.layout ~= false then
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end
+    end,
+    compositeDefaults = {
+        FontOverrideGroup = {
+            fontValues = LSMW.GetFontValues,
+            fontFallback = function()
+                local profile = mod.db and mod.db.profile
+                return profile and GetNestedValue(profile, "global.font") or "Expressway"
+            end,
+            fontSizeFallback = function()
+                local profile = mod.db and mod.db.profile
+                return profile and GetNestedValue(profile, "global.fontSize") or 11
+            end,
+            fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
+        },
+        PositioningGroup = {
+            positionModes = {
+                [ECM.Constants.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
+                [ECM.Constants.ANCHORMODE_FREE] = "Movable via Edit Mode",
+            },
+            isAnchorModeFree = IsAnchorModeFree,
+            applyPositionMode = ApplyPositionModeToBar,
+        },
+    },
+})

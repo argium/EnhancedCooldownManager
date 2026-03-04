@@ -48,7 +48,6 @@ Bars\ItemIcons.lua
 Bars\Layout.lua
 
 Options\OptionUtil.lua
-Options\SettingsBuilder.lua
 Options\PowerBarTickMarksStore.lua
 Options\PowerBarTickMarksOptions.lua
 Options\GeneralOptions.lua
