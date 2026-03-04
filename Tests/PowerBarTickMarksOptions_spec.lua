@@ -15,17 +15,22 @@ describe("PowerBarTickMarksOptions", function()
     local originalGlobals
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({ "ECM", "StaticPopupDialogs", "YES", "NO" })
+        originalGlobals = TestHelpers.captureGlobals({
+            "ECM", "ECM_CloneValue",
+            "StaticPopupDialogs", "YES", "NO", "SETTINGS_DEFAULTS",
+        })
     end)
 
     teardown(function()
         TestHelpers.restoreGlobals(originalGlobals)
     end)
 
-    it("module loads and exposes RegisterSettings", function()
+    it("module loads and exposes RegisterSettings and Store", function()
         _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
         _G.YES = "Yes"
         _G.NO = "No"
+        _G.SETTINGS_DEFAULTS = "Defaults"
+        _G.ECM_CloneValue = TestHelpers.deepClone
         _G.ECM = {
             Constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
@@ -37,21 +42,14 @@ describe("PowerBarTickMarksOptions", function()
                     return 1, 2, "Warrior", "Fury", "WARRIOR"
                 end,
             },
-            PowerBarTickMarksStore = {
-                GetCurrentTicks = function() return {} end,
-                SetCurrentTicks = function() end,
-                AddTick = function() end,
-                RemoveTick = function() end,
-                UpdateTick = function() end,
-                GetDefaultColor = function() return { r = 1, g = 1, b = 1, a = 1 } end,
-                SetDefaultColor = function() end,
-                GetDefaultWidth = function() return 1 end,
-                SetDefaultWidth = function() end,
-            },
             ScheduleLayoutUpdate = function() end,
         }
 
-        local addonNS = { Addon = {} }
+        local addonNS = {
+            Addon = {
+                db = { profile = {} },
+            },
+        }
         local chunk = TestHelpers.loadChunk(
             { "Options/PowerBarTickMarksOptions.lua", "../Options/PowerBarTickMarksOptions.lua" },
             "Unable to load PowerBarTickMarksOptions.lua"
@@ -60,5 +58,9 @@ describe("PowerBarTickMarksOptions", function()
 
         assert.is_table(ECM.PowerBarTickMarksOptions)
         assert.is_function(ECM.PowerBarTickMarksOptions.RegisterSettings)
+
+        assert.is_table(ECM.PowerBarTickMarksStore)
+        assert.is_function(ECM.PowerBarTickMarksStore.GetCurrentTicks)
+        assert.is_function(ECM.PowerBarTickMarksStore.AddTick)
     end)
 end)

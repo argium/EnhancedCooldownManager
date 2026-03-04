@@ -9,7 +9,7 @@ local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
 local C = ECM.Constants
 mod.RuneBar = RuneBar
 ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
-
+        
 local function GetRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
     if runeReady or not start or start == 0 or not duration or duration == 0 then

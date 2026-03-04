@@ -86,7 +86,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
         StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
     end)
 
-    layout:AddSpacer(6)
+    layout:AddSpacer(2)
 
     local descRow = layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight")
     descRow._text:SetWordWrap(true)
@@ -272,28 +272,6 @@ function BuffBarsOptions.RegisterSettings(SB)
         },
     })
 
-    -- Spell Colors (canvas subcategory, opened via button)
-    local SPELL_COLORS_SUBCAT = "Spell Colors"
-    local colorsFrame = CreateSpellColorCanvas(SB, SPELL_COLORS_SUBCAT)
-
-    SB.Header("Spell Colors")
-    SB.PathControl({
-        type = "color",
-        path = "buffBars.colors.defaultColor",
-        name = "Default color",
-        tooltip = "The fallback color used for aura bars that do not have a custom color assigned.",
-        disabled = isDisabled,
-    })
-    SB.Button({
-        name = "Refresh spell list",
-        buttonText = "Refresh",
-        tooltip = "Reconcile discovered aura bars with saved spell color entries and refresh the list.",
-        onClick = function()
-            if ECM.BuffBars:IsEditLocked() then return end
-            ECM.SpellColors.ReconcileDiscoveredKeys()
-            colorsFrame:RefreshSpellList()
-        end,
-    })
     SB.Button({
         name = "Configure Spell Colors",
         buttonText = "Open",

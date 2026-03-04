@@ -22,7 +22,7 @@ function Options:OnInitialize()
         "BuffBars",
         "ItemIcons",
         "Profile",
-        "About",
+        "Advanced Options",
     }
 
     for _, key in ipairs(sectionOrder) do
@@ -32,7 +32,7 @@ function Options:OnInitialize()
         end
     end
 
-    SB.SetRootRedirect("General")
+    SB.SetRootRedirect("General")  -- TODO: the redirect doesn't work. replace it with the old about section.
     SB.RegisterCategories()
 
     local db = mod.db

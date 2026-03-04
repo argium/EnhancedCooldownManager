@@ -104,7 +104,7 @@ describe("Options sections and root assembly", function()
         sbChunk(nil, ns)
 
         -- Register mock sections
-        for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "About" }) do
+        for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
             ns.OptionsSections[key] = {
                 RegisterSettings = function(SB)
                     registerSettingsCalls[#registerSettingsCalls + 1] = key
@@ -131,7 +131,7 @@ describe("Options sections and root assembly", function()
             "BuffBars",
             "ItemIcons",
             "Profile",
-            "About",
+            "Advanced Options",
         }, registerSettingsCalls)
 
         -- DB callbacks registered

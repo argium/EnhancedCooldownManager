@@ -35,14 +35,22 @@ describe("PowerBarTickMarksStore", function()
         _G.ECM = {
             Constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 0.9, g = 0.8, b = 0.7, a = 0.6 },
+                CLASS_COLORS = { WARRIOR = "C79C6E" },
+                COLOR_WHITE_HEX = "FFFFFF",
             },
             OptionUtil = {
                 GetCurrentClassSpec = function()
                     return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
                 end,
             },
+            ScheduleLayoutUpdate = function() end,
         }
         _G.ECM_CloneValue = TestHelpers.deepClone
+
+        _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
+        _G.YES = "Yes"
+        _G.NO = "No"
+        _G.SETTINGS_DEFAULTS = "Defaults"
 
         addonNS = {
             Addon = {
@@ -53,8 +61,8 @@ describe("PowerBarTickMarksStore", function()
         }
 
         local chunk = TestHelpers.loadChunk(
-            { "Options/PowerBarTickMarksStore.lua", "../Options/PowerBarTickMarksStore.lua" },
-            "Unable to load Options/PowerBarTickMarksStore.lua"
+            { "Options/PowerBarTickMarksOptions.lua", "../Options/PowerBarTickMarksOptions.lua" },
+            "Unable to load Options/PowerBarTickMarksOptions.lua"
         )
         chunk(nil, addonNS)
     end)
