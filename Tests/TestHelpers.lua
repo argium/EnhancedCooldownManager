@@ -4,14 +4,18 @@
 
 local TestHelpers = {}
 
-function TestHelpers.LoadChunk(paths, errorMessage)
-    for _, path in ipairs(paths) do
-        local chunk = loadfile(path)
-        if chunk then
-            return chunk
-        end
-    end
+function TestHelpers.LoadChunk(path, errorMessage)
+    local chunk = loadfile(path)
+    if chunk then return chunk end
     error(errorMessage)
+end
+
+--- Load a stub from Tests/stubs/.
+function TestHelpers.LoadStub(name)
+    return TestHelpers.LoadChunk(
+        "Tests/stubs/" .. name,
+        "Unable to load Tests/stubs/" .. name
+    )()
 end
 
 function TestHelpers.CaptureGlobals(names)
@@ -53,49 +57,37 @@ TestHelpers.deepEquals = deepEquals
 
 --- Create a minimal stub initializer returned by Settings.CreateCheckbox etc.
 local function makeInitializer(setting)
-    local init = {}
-    init._parentInit = nil
-    init._modifyPredicates = {}
-    init._shownPredicates = {}
-
-    function init:SetParentInitializer(parent, predicate)
-        self._parentInit = parent
-        self._parentPredicate = predicate
-    end
-
-    function init:AddModifyPredicate(fn)
-        self._modifyPredicates[#self._modifyPredicates + 1] = fn
-    end
-
-    function init:AddShownPredicate(fn)
-        self._shownPredicates[#self._shownPredicates + 1] = fn
-    end
-
-    function init:GetSetting()
-        return setting
-    end
-
-    function init:EvaluateModifyPredicates()
-        for _, fn in ipairs(self._modifyPredicates) do
-            if not fn() then return false end
-        end
-        return true
-    end
-
-    return init
+    return {
+        _parentInit = nil,
+        _modifyPredicates = {},
+        _shownPredicates = {},
+        SetParentInitializer = function(self, parent, predicate)
+            self._parentInit = parent
+            self._parentPredicate = predicate
+        end,
+        AddModifyPredicate = function(self, fn)
+            self._modifyPredicates[#self._modifyPredicates + 1] = fn
+        end,
+        AddShownPredicate = function(self, fn)
+            self._shownPredicates[#self._shownPredicates + 1] = fn
+        end,
+        GetSetting = function() return setting end,
+        EvaluateModifyPredicates = function(self)
+            for _, fn in ipairs(self._modifyPredicates) do
+                if not fn() then return false end
+            end
+            return true
+        end,
+    }
 end
 
 --- Create a minimal stub setting returned by Settings.RegisterProxySetting.
 local function makeSetting(getter, setter, default)
-    local setting = {}
-    function setting:GetValue()
-        return getter()
-    end
-    function setting:SetValue(value)
-        setter(value)
-    end
-    setting._default = default
-    return setting
+    return {
+        GetValue = function() return getter() end,
+        SetValue = function(_, value) setter(value) end,
+        _default = default,
+    }
 end
 
 --- Setup a minimal LibStub stub for tests.
@@ -133,51 +125,43 @@ function TestHelpers.SetupSettingsStubs()
         "CreateFromMixins", "SettingsListElementInitializer",
     }
 
+    local function makeLayout()
+        local layout = { _initializers = {} }
+        layout.AddInitializer = function(self, init) self._initializers[#self._initializers + 1] = init end
+        return layout
+    end
+
     _G.Settings = {
         VarType = { Boolean = "boolean", Number = "number", String = "string" },
 
         RegisterVerticalLayoutCategory = function(name)
-            local layout = { _initializers = {} }
-            function layout:AddInitializer(init)
-                self._initializers[#self._initializers + 1] = init
-            end
+            local layout = makeLayout()
             return {
-                _name = name,
-                _id = name,
+                _name = name, _id = name,
                 GetID = function(self) return self._id end,
                 GetLayout = function() return layout end,
             }, layout
         end,
 
         RegisterVerticalLayoutSubcategory = function(parent, name)
-            local layout = { _initializers = {} }
-            function layout:AddInitializer(init)
-                self._initializers[#self._initializers + 1] = init
-            end
+            local layout = makeLayout()
             return {
-                _name = name,
-                _parent = parent,
+                _name = name, _parent = parent,
                 GetLayout = function() return layout end,
             }, layout
         end,
 
         RegisterCanvasLayoutSubcategory = function(parent, frame, name)
-            return {
-                _name = name,
-                _parent = parent,
-                _frame = frame,
-            }
+            return { _name = name, _parent = parent, _frame = frame }
         end,
 
         RegisterAddOnCategory = function() end,
         OpenToCategory = function() end,
 
         RegisterInitializer = function(category, initializer)
-            if category and category.GetLayout then
-                local layout = category:GetLayout()
-                if layout and layout.AddInitializer then
-                    layout:AddInitializer(initializer)
-                end
+            local layout = category and category.GetLayout and category:GetLayout()
+            if layout and layout.AddInitializer then
+                layout:AddInitializer(initializer)
             end
         end,
 
@@ -192,27 +176,19 @@ function TestHelpers.SetupSettingsStubs()
             return makeSetting(getter, setter, default)
         end,
 
-        CreateCheckbox = function(cat, setting, tooltip)
-            return makeInitializer(setting)
-        end,
+        CreateCheckbox = function(cat, setting) return makeInitializer(setting) end,
+        CreateSlider = function(cat, setting) return makeInitializer(setting) end,
+        CreateColorSwatch = function(cat, setting) return makeInitializer(setting) end,
 
-        CreateSlider = function(cat, setting, options, tooltip)
-            return makeInitializer(setting)
-        end,
-
-        CreateDropdown = function(cat, setting, optionsGen, tooltip)
+        CreateDropdown = function(cat, setting, optionsGen)
             local init = makeInitializer(setting)
             init._optionsGen = optionsGen
             return init
         end,
 
-        CreateColorSwatch = function(cat, setting, tooltip)
-            return makeInitializer(setting)
-        end,
-
         CreateSliderOptions = function(min, max, step)
-            local opts = { min = min, max = max, step = step, _labelFormatter = nil, _labelFormatterLocation = nil }
-            function opts:SetLabelFormatter(location, formatter)
+            local opts = { min = min, max = max, step = step }
+            opts.SetLabelFormatter = function(self, location, formatter)
                 self._labelFormatterLocation = location
                 self._labelFormatter = formatter
             end
@@ -222,12 +198,8 @@ function TestHelpers.SetupSettingsStubs()
         CreateControlTextContainer = function()
             local data = {}
             return {
-                Add = function(self, value, label)
-                    data[#data + 1] = { value = value, label = label }
-                end,
-                GetData = function()
-                    return data
-                end,
+                Add = function(_, value, label) data[#data + 1] = { value = value, label = label } end,
+                GetData = function() return data end,
             }
         end,
     }
@@ -236,7 +208,7 @@ function TestHelpers.SetupSettingsStubs()
         return { _type = "header", _text = text }
     end
 
-    _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip, fullWidth)
+    _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
         local init = makeInitializer(nil)
         init._type = "button"
         init._name = name
@@ -246,13 +218,9 @@ function TestHelpers.SetupSettingsStubs()
         return init
     end
 
-    _G.MinimalSliderWithSteppersMixin = {
-        Label = { Right = 1 },
-    }
+    _G.MinimalSliderWithSteppersMixin = { Label = { Right = 1 } }
 
-    _G.CreateColor = function(r, g, b, a)
-        return { r = r, g = g, b = b, a = a or 1 }
-    end
+    _G.CreateColor = function(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 
     _G.CreateColorFromHexString = function(hex)
         local a = tonumber(hex:sub(1, 2), 16) / 255
@@ -265,9 +233,7 @@ function TestHelpers.SetupSettingsStubs()
     _G.StaticPopupDialogs = {}
     _G.StaticPopup_Show = function(name)
         local dialog = _G.StaticPopupDialogs[name]
-        if dialog and dialog.OnAccept then
-            dialog.OnAccept()
-        end
+        if dialog and dialog.OnAccept then dialog.OnAccept() end
     end
     _G.YES = "Yes"
     _G.NO = "No"
@@ -281,9 +247,7 @@ function TestHelpers.SetupSettingsStubs()
         for i = 1, select("#", ...) do
             local mixin = select(i, ...)
             if mixin then
-                for k, v in pairs(mixin) do
-                    result[k] = v
-                end
+                for k, v in pairs(mixin) do result[k] = v end
             end
         end
         return result
@@ -310,9 +274,7 @@ function TestHelpers.SetupSettingsStubs()
             self._shownPredicates = self._shownPredicates or {}
             self._shownPredicates[#self._shownPredicates + 1] = fn
         end,
-        GetSetting = function(self)
-            return self.data and self.data.setting
-        end,
+        GetSetting = function(self) return self.data and self.data.setting end,
     }
 
     return globals

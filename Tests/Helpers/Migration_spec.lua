@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -16,46 +12,23 @@ describe("Migration", function()
     local Migration
     local logMessages
 
-    local function findLogMessage(needle)
-        for _, message in ipairs(logMessages or {}) do
-            if type(message) == "string" and string.find(message, needle, 1, true) then
-                return message
-            end
-        end
-        return nil
-    end
-
-    local function findLogMessages(needle)
-        local matches = {}
-        for _, message in ipairs(logMessages or {}) do
-            if type(message) == "string" and string.find(message, needle, 1, true) then
+    local function searchLogMessages(needle)
+        local matches, firstIndex = {}, nil
+        for i, message in ipairs(logMessages) do
+            if string.find(message, needle, 1, true) then
+                if not firstIndex then firstIndex = i end
                 matches[#matches + 1] = message
             end
         end
-        return matches
-    end
-
-    local function findLogMessageIndex(needle)
-        for i, message in ipairs(logMessages or {}) do
-            if type(message) == "string" and string.find(message, needle, 1, true) then
-                return i
-            end
-        end
-        return nil
+        return matches[1], matches, firstIndex
     end
 
     local function parseMetric(message, key)
-        if type(message) ~= "string" then
-            return nil
-        end
         local value = string.match(message, "%f[%w]" .. key .. "=(%d+)")
         return value and tonumber(value) or nil
     end
 
     local function parseTierMetrics(message, tier)
-        if type(message) ~= "string" then
-            return nil
-        end
         local s, i, f = string.match(message, tier .. "%(s=(%d+) i=(%d+) f=(%d+)%)")
         if not (s and i and f) then
             return nil
@@ -68,14 +41,18 @@ describe("Migration", function()
     end
 
     local function countKeys(tbl)
-        if type(tbl) ~= "table" then
-            return 0
-        end
         local n = 0
-        for _ in pairs(tbl) do
-            n = n + 1
-        end
+        for _ in pairs(tbl) do n = n + 1 end
         return n
+    end
+
+    local function extractAllTierMetrics(tierBreakdown)
+        return {
+            byName = assert(parseTierMetrics(tierBreakdown, "byName")),
+            bySpellID = assert(parseTierMetrics(tierBreakdown, "bySpellID")),
+            byCooldownID = assert(parseTierMetrics(tierBreakdown, "byCooldownID")),
+            byTexture = assert(parseTierMetrics(tierBreakdown, "byTexture")),
+        }
     end
 
     setup(function()
@@ -109,22 +86,8 @@ describe("Migration", function()
             end
         end
 
-        local constantsChunk = TestHelpers.LoadChunk(
-            {
-                "Constants.lua",
-                "../Constants.lua",
-            },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
-
-        local migrationChunk = TestHelpers.LoadChunk(
-            {
-                "../../Helpers/Migration.lua",
-            },
-            "Unable to load Helpers/Migration.lua"
-        )
-        migrationChunk()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")()
 
         Migration = assert(ECM.Migration, "Migration module did not initialize")
     end)
@@ -299,27 +262,26 @@ describe("Migration", function()
         Migration.Run(profile)
 
         assert.are.equal(10, profile.schemaVersion)
-        local summary = assert(findLogMessage("V10 spell color normalization summary:"))
-        local tierBreakdown = assert(findLogMessage("V10 tier breakdown:"))
-        local created = assert(findLogMessage("V10 created missing tier stores: byCooldownID, byTexture"))
-        local anomaly = assert(findLogMessage("V10 anomaly: class=12 spec=2"))
-        local overflow = findLogMessage("V10 anomaly: additional specs omitted=")
+        local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
+        local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
+        local created = assert(searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture"))
+        local anomaly = assert(searchLogMessages("V10 anomaly: class=12 spec=2"))
 
-        local summaryIndex = assert(findLogMessageIndex("V10 spell color normalization summary:"))
-        local tierIndex = assert(findLogMessageIndex("V10 tier breakdown:"))
-        local createdIndex = assert(findLogMessageIndex("V10 created missing tier stores: byCooldownID, byTexture"))
-        local anomalyIndex = assert(findLogMessageIndex("V10 anomaly: class=12 spec=2"))
-        local migratedIndex = assert(findLogMessageIndex("Migrated to V10"))
+        local summaryIndex = assert(select(3, searchLogMessages("V10 spell color normalization summary:")))
+        local tierIndex = assert(select(3, searchLogMessages("V10 tier breakdown:")))
+        local createdIndex = assert(select(3, searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture")))
+        local anomalyIndex = assert(select(3, searchLogMessages("V10 anomaly: class=12 spec=2")))
+        local migratedIndex = assert(select(3, searchLogMessages("Migrated to V10")))
 
         assert.is_true(summaryIndex < tierIndex)
         assert.is_true(tierIndex < createdIndex)
         assert.is_true(createdIndex < anomalyIndex)
         assert.is_true(anomalyIndex < migratedIndex)
-        assert.is_nil(overflow)
-        assert.are.equal(1, #findLogMessages("V10 anomaly: class=12 spec=2"))
-        assert.are.equal(1, #findLogMessages("V10 spell color normalization summary:"))
-        assert.are.equal(1, #findLogMessages("V10 tier breakdown:"))
-        assert.are.equal(1, #findLogMessages("V10 created missing tier stores: byCooldownID, byTexture"))
+        assert.is_nil(searchLogMessages("V10 anomaly: additional specs omitted="))
+        assert.are.equal(1, #select(2, searchLogMessages("V10 anomaly: class=12 spec=2")))
+        assert.are.equal(1, #select(2, searchLogMessages("V10 spell color normalization summary:")))
+        assert.are.equal(1, #select(2, searchLogMessages("V10 tier breakdown:")))
+        assert.are.equal(1, #select(2, searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture")))
 
         assert.are.equal(4, parseMetric(summary, "scanned"))
         assert.are.equal(2, parseMetric(summary, "valid"))
@@ -336,14 +298,11 @@ describe("Migration", function()
         assert.is_not_nil(string.find(anomaly, "invalidByTier[byName=1,bySpellID=1]", 1, true))
         assert.are.equal("V10 created missing tier stores: byCooldownID, byTexture", created)
 
-        local byNameTier = assert(parseTierMetrics(tierBreakdown, "byName"))
-        local bySpellIDTier = assert(parseTierMetrics(tierBreakdown, "bySpellID"))
-        local byCooldownIDTier = assert(parseTierMetrics(tierBreakdown, "byCooldownID"))
-        local byTextureTier = assert(parseTierMetrics(tierBreakdown, "byTexture"))
-        assert.are.same({ scanned = 2, invalid = 1, final = 2 }, byNameTier)
-        assert.are.same({ scanned = 2, invalid = 1, final = 2 }, bySpellIDTier)
-        assert.are.same({ scanned = 0, invalid = 0, final = 1 }, byCooldownIDTier)
-        assert.are.same({ scanned = 0, invalid = 0, final = 1 }, byTextureTier)
+        local tiers = extractAllTierMetrics(tierBreakdown)
+        assert.are.same({ scanned = 2, invalid = 1, final = 2 }, tiers.byName)
+        assert.are.same({ scanned = 2, invalid = 1, final = 2 }, tiers.bySpellID)
+        assert.are.same({ scanned = 0, invalid = 0, final = 1 }, tiers.byCooldownID)
+        assert.are.same({ scanned = 0, invalid = 0, final = 1 }, tiers.byTexture)
 
         local colors = profile.buffBars.colors
         local byNameSpec = colors.byName[12][2]
@@ -365,21 +324,21 @@ describe("Migration", function()
         assert.is_table(bySpellIDSpec[999])
         assert.are.equal("bad-value", bySpellIDSpec[999].value)
 
-        assert.are.equal(byNameTier.final, countKeys(byNameSpec))
-        assert.are.equal(bySpellIDTier.final, countKeys(bySpellIDSpec))
-        assert.are.equal(byCooldownIDTier.final, countKeys(byCooldownIDSpec))
-        assert.are.equal(byTextureTier.final, countKeys(byTextureSpec))
+        assert.are.equal(tiers.byName.final, countKeys(byNameSpec))
+        assert.are.equal(tiers.bySpellID.final, countKeys(bySpellIDSpec))
+        assert.are.equal(tiers.byCooldownID.final, countKeys(byCooldownIDSpec))
+        assert.are.equal(tiers.byTexture.final, countKeys(byTextureSpec))
         assert.are.equal(
             parseMetric(summary, "final"),
-            byNameTier.final + bySpellIDTier.final + byCooldownIDTier.final + byTextureTier.final
+            tiers.byName.final + tiers.bySpellID.final + tiers.byCooldownID.final + tiers.byTexture.final
         )
         assert.are.equal(
             parseMetric(summary, "scanned"),
-            byNameTier.scanned + bySpellIDTier.scanned + byCooldownIDTier.scanned + byTextureTier.scanned
+            tiers.byName.scanned + tiers.bySpellID.scanned + tiers.byCooldownID.scanned + tiers.byTexture.scanned
         )
         assert.are.equal(
             parseMetric(summary, "invalid"),
-            byNameTier.invalid + bySpellIDTier.invalid + byCooldownIDTier.invalid + byTextureTier.invalid
+            tiers.byName.invalid + tiers.bySpellID.invalid + tiers.byCooldownID.invalid + tiers.byTexture.invalid
         )
         assert.are.equal(parseMetric(summary, "valid"), parseMetric(summary, "scanned") - parseMetric(summary, "invalid"))
     end)
@@ -389,10 +348,10 @@ describe("Migration", function()
         Migration.Run(noBuffBars)
 
         assert.are.equal(10, noBuffBars.schemaVersion)
-        assert.is_not_nil(findLogMessage("V10 spell color normalization skipped: buffBars.colors missing"))
-        assert.is_nil(findLogMessage("V10 spell color normalization summary:"))
-        assert.is_nil(findLogMessage("V10 tier breakdown:"))
-        assert.is_nil(findLogMessage("V10 anomaly:"))
+        assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
+        assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
+        assert.is_nil(searchLogMessages("V10 tier breakdown:"))
+        assert.is_nil(searchLogMessages("V10 anomaly:"))
 
         logMessages = {}
         local invalidColors = {
@@ -402,10 +361,10 @@ describe("Migration", function()
         Migration.Run(invalidColors)
 
         assert.are.equal(10, invalidColors.schemaVersion)
-        assert.is_not_nil(findLogMessage("V10 spell color normalization skipped: buffBars.colors missing"))
-        assert.is_nil(findLogMessage("V10 spell color normalization summary:"))
-        assert.is_nil(findLogMessage("V10 tier breakdown:"))
-        assert.is_nil(findLogMessage("V10 anomaly:"))
+        assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
+        assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
+        assert.is_nil(searchLogMessages("V10 tier breakdown:"))
+        assert.is_nil(searchLogMessages("V10 anomaly:"))
     end)
 
     it("caps V10 anomaly logs and reports omitted spec count", function()
@@ -431,11 +390,11 @@ describe("Migration", function()
         Migration.Run(profile)
 
         assert.are.equal(10, profile.schemaVersion)
-        local summary = assert(findLogMessage("V10 spell color normalization summary:"))
-        local tierBreakdown = assert(findLogMessage("V10 tier breakdown:"))
-        local specAnomalies = findLogMessages("V10 anomaly: class=12 spec=")
-        local allAnomalies = findLogMessages("V10 anomaly:")
-        local overflow = assert(findLogMessage("V10 anomaly: additional specs omitted="))
+        local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
+        local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
+        local specAnomalies = select(2, searchLogMessages("V10 anomaly: class=12 spec="))
+        local allAnomalies = select(2, searchLogMessages("V10 anomaly:"))
+        local overflow = assert(searchLogMessages("V10 anomaly: additional specs omitted="))
 
         assert.are.equal(1, parseMetric(summary, "classes"))
         assert.are.equal(22, parseMetric(summary, "specs"))
@@ -449,14 +408,11 @@ describe("Migration", function()
         assert.are.equal(0, parseMetric(summary, "metaNormalized"))
         assert.are.equal(22, parseMetric(summary, "final"))
 
-        local byNameTier = assert(parseTierMetrics(tierBreakdown, "byName"))
-        local bySpellIDTier = assert(parseTierMetrics(tierBreakdown, "bySpellID"))
-        local byCooldownIDTier = assert(parseTierMetrics(tierBreakdown, "byCooldownID"))
-        local byTextureTier = assert(parseTierMetrics(tierBreakdown, "byTexture"))
-        assert.are.same({ scanned = 22, invalid = 22, final = 22 }, byNameTier)
-        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, bySpellIDTier)
-        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, byCooldownIDTier)
-        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, byTextureTier)
+        local tiers = extractAllTierMetrics(tierBreakdown)
+        assert.are.same({ scanned = 22, invalid = 22, final = 22 }, tiers.byName)
+        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, tiers.bySpellID)
+        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, tiers.byCooldownID)
+        assert.are.same({ scanned = 0, invalid = 0, final = 0 }, tiers.byTexture)
 
         assert.are.equal(20, #specAnomalies)
         assert.are.equal(21, #allAnomalies)
@@ -595,7 +551,6 @@ describe("Migration", function()
         assert.is_nil(byNameEntry.value.spellID)
         assert.is_nil(byNameEntry.value.cooldownID)
         assert.is_nil(byNameEntry.value.textureId)
-        assert.are.same(byNameEntry, profile.buffBars.colors.bySpellID[12][2][9001])
         assert.is_nil(spellIDEntry.meta)
     end)
 

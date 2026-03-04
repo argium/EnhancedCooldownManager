@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -40,11 +36,7 @@ describe("LibLSMSettingsWidgets", function()
             lsm.Fetch = function() return nil end
         end
 
-        local chunk = TestHelpers.LoadChunk(
-            { "Libs/LibLSMSettingsWidgets/LibLSMSettingsWidgets.lua" },
-            "Unable to load LibLSMSettingsWidgets.lua"
-        )
-        chunk()
+        TestHelpers.LoadChunk("Libs/LibLSMSettingsWidgets/LibLSMSettingsWidgets.lua", "Unable to load LibLSMSettingsWidgets.lua")()
     end)
 
     local pickerCases = {

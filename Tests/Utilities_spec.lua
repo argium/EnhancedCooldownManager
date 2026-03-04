@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -108,23 +104,8 @@ describe("Utilities", function()
             },
         }
 
-        local constantsChunk = TestHelpers.LoadChunk(
-            {
-                "ECM_Constants.lua",
-                "../ECM_Constants.lua",
-            },
-            "Unable to load ECM_Constants.lua"
-        )
-        constantsChunk()
-
-        local mainChunk = TestHelpers.LoadChunk(
-            {
-                "ECM.lua",
-                "../ECM.lua",
-            },
-            "Unable to load ECM.lua"
-        )
-        mainChunk("EnhancedCooldownManager", addonNS)
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", addonNS)
     end)
 
     it("ECM.ApplyFont uses global font settings by default", function()

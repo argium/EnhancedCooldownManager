@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -31,23 +27,19 @@ describe("Options sections and root assembly", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    it("root Options module creates categories and calls RegisterSettings on sections", function()
+    local function setupLibs()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
-
-        local libChunk = TestHelpers.LoadChunk(
-            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
-            "Unable to load LibSettingsBuilder.lua"
-        )
-        libChunk()
-
+        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        if lsmw then
-            lsmw.GetFontValues = function() return {} end
-            lsmw.GetStatusbarValues = function() return {} end
-            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
-        end
+        lsmw.GetFontValues = function() return {} end
+        lsmw.GetStatusbarValues = function() return {} end
+        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+        lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+    end
+
+    it("root Options module creates categories and calls RegisterSettings on sections", function()
+        setupLibs()
 
         local registerSettingsCalls = {}
         local dbCallbacks = {}
@@ -60,7 +52,6 @@ describe("Options sections and root assembly", function()
                 DEFAULT_BAR_WIDTH = 300,
             },
             ScheduleLayoutUpdate = function() end,
-            SettingsBuilder = nil, -- Will be loaded
         }
 
         _G.ECM_DeepEquals = function(a, b) return a == b end
@@ -85,76 +76,35 @@ describe("Options sections and root assembly", function()
             end,
         }
 
-        local ns = {
-            Addon = mod,
-            OptionsSections = {},
-        }
+        local ns = { Addon = mod, OptionsSections = {} }
 
-        -- Load OptionUtil first (defines ECM.SettingsBuilder)
-        local optionUtilChunk = TestHelpers.LoadChunk(
-            { "Helpers/OptionUtil.lua" },
-            "Unable to load Helpers/OptionUtil.lua"
-        )
-        optionUtilChunk(nil, ns)
+        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, ns)
 
-        -- Register mock sections
         for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
             ns.OptionsSections[key] = {
-                RegisterSettings = function(SB)
+                RegisterSettings = function()
                     registerSettingsCalls[#registerSettingsCalls + 1] = key
                 end,
             }
         end
 
-        -- Load Options.lua
-        local optionsChunk = TestHelpers.LoadChunk(
-            { "UI/Options.lua" },
-            "Unable to load UI/Options.lua"
-        )
-        optionsChunk(nil, ns)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
         assert.is_table(createdModule)
         createdModule:OnInitialize()
 
-        -- All 8 sections should have been called, in order
         assert.are.same({
-            "General",
-            "PowerBar",
-            "ResourceBar",
-            "RuneBar",
-            "BuffBars",
-            "ItemIcons",
-            "Profile",
-            "Advanced Options",
+            "General", "PowerBar", "ResourceBar", "RuneBar",
+            "BuffBars", "ItemIcons", "Profile", "Advanced Options",
         }, registerSettingsCalls)
-
-        -- DB callbacks registered
         assert.are.equal(3, #dbCallbacks)
-
-        -- GetRootCategoryID returns something
         assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
+        setupLibs()
 
-        local libChunk = TestHelpers.LoadChunk(
-            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
-            "Unable to load LibSettingsBuilder.lua"
-        )
-        libChunk()
-
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        if lsmw then
-            lsmw.GetFontValues = function() return {} end
-            lsmw.GetStatusbarValues = function() return {} end
-            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
-        end
-
-        local className = "WARRIOR"
-        _G.UnitClass = function() return "Player", className, 1 end
+        _G.UnitClass = function() return "Player", "WARRIOR", 1 end
         _G.GetSpecialization = function() return 1 end
         _G.GetSpecializationInfo = function() return nil, "Arms" end
 
@@ -176,38 +126,35 @@ describe("Options sections and root assembly", function()
             ScheduleLayoutUpdate = function() end,
         }
 
+        local border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }
+        local profileData = {
+            resourceBar = { enabled = true, anchorMode = 1, border = border },
+            runeBar = {
+                enabled = true, useSpecColor = false, anchorMode = 1,
+                border = TestHelpers.deepClone(border),
+                color = { r = 0.77, g = 0.12, b = 0.23, a = 1 },
+                colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+                colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
+                colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 },
+            },
+        }
+
         local ns = {
             Addon = {
                 db = {
-                    profile = {
-                        resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
-                        runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }, color = { r = 0.77, g = 0.12, b = 0.23, a = 1 }, colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 }, colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 } },
-                    },
-                    defaults = {
-                        profile = {
-                            resourceBar = { enabled = true, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } } },
-                            runeBar = { enabled = true, useSpecColor = false, anchorMode = 1, border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }, color = { r = 0.77, g = 0.12, b = 0.23, a = 1 }, colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 }, colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 }, colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 } },
-                        },
-                    },
+                    profile = profileData,
+                    defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
             },
             OptionsSections = {},
         }
 
-        -- Load OptionUtil (defines ECM.SettingsBuilder)
-        local optUtil = TestHelpers.LoadChunk({ "Helpers/OptionUtil.lua" }, "OptionUtil")
-        optUtil(nil, ns)
-
-        -- Set up root category so subcategories can be created
+        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "OptionUtil")(nil, ns)
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
-        -- Load ResourceBarOptions and RuneBarOptions
-        local resChunk = TestHelpers.LoadChunk({ "UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
-        resChunk(nil, ns)
-        local runeChunk = TestHelpers.LoadChunk({ "UI/RuneBarOptions.lua" }, "RuneBarOptions")
-        runeChunk(nil, ns)
+        TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
+        TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
 
-        -- Both should have registered themselves
         assert.is_not_nil(ns.OptionsSections.ResourceBar)
         assert.is_not_nil(ns.OptionsSections.RuneBar)
         assert.is_function(ns.OptionsSections.ResourceBar.RegisterSettings)

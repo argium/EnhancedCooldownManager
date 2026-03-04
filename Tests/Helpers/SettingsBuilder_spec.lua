@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -16,6 +12,31 @@ describe("SettingsBuilder", function()
     local addonNS
     local layoutUpdateCalls
     local SB
+
+    local function createSB2(varPrefix, categoryName)
+        local LSB2 = LibStub("LibSettingsBuilder-1.0")
+        local SB2 = LSB2:New({
+            getProfile = function() return addonNS.Addon.db.profile end,
+            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            varPrefix = varPrefix,
+            onChanged = function() end,
+        })
+        SB2.CreateRootCategory(categoryName or "Test")
+        return SB2
+    end
+
+    local function createSettingsPanelMock()
+        local frames = {}
+        _G.SettingsPanel = {
+            IsShown = function() return true end,
+            GetSettingsList = function()
+                return { ScrollBox = { ForEachFrame = function(_, fn)
+                    for _, f in ipairs(frames) do fn(f) end
+                end } }
+            end,
+        }
+        return frames
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -50,20 +71,14 @@ describe("SettingsBuilder", function()
         _G.GetSpecializationInfo = function() return nil, "Arms" end
 
         -- Load the library
-        local libChunk = TestHelpers.LoadChunk(
-            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
-            "Unable to load LibSettingsBuilder.lua"
-        )
-        libChunk()
+        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
         -- Register LSMW stub
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        if lsmw then
-            lsmw.GetFontValues = function() return { Expressway = "Expressway" } end
-            lsmw.GetStatusbarValues = function() return { Blizzard = "Blizzard" } end
-            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
-        end
+        lsmw.GetFontValues = function() return { Expressway = "Expressway" } end
+        lsmw.GetStatusbarValues = function() return { Blizzard = "Blizzard" } end
+        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+        lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
 
         _G.ECM = {
             Constants = {
@@ -77,66 +92,40 @@ describe("SettingsBuilder", function()
             end,
         }
 
+        local profileData = {
+            global = {
+                hideWhenMounted = true,
+                value = 5,
+                mode = "solid",
+                font = "Global Font",
+                fontSize = 11,
+                color = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
+                nested = { enabled = true },
+            },
+            powerBar = {
+                enabled = true,
+                height = 10,
+                overrideFont = false,
+                border = {
+                    enabled = false,
+                    thickness = 2,
+                    color = { r = 0, g = 0, b = 0, a = 1 },
+                },
+                anchorMode = 1,
+                colors = {},
+            },
+        }
+
         addonNS = {
             Addon = {
                 db = {
-                    profile = {
-                        global = {
-                            hideWhenMounted = true,
-                            value = 5,
-                            mode = "solid",
-                            font = "Global Font",
-                            fontSize = 11,
-                            color = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
-                            nested = { enabled = true },
-                        },
-                        powerBar = {
-                            enabled = true,
-                            height = 10,
-                            overrideFont = false,
-                            border = {
-                                enabled = false,
-                                thickness = 2,
-                                color = { r = 0, g = 0, b = 0, a = 1 },
-                            },
-                            anchorMode = 1,
-                            colors = {},
-                        },
-                    },
-                    defaults = {
-                        profile = {
-                            global = {
-                                hideWhenMounted = true,
-                                value = 5,
-                                mode = "solid",
-                                font = "Global Font",
-                                fontSize = 11,
-                                color = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
-                                nested = { enabled = true },
-                            },
-                            powerBar = {
-                                enabled = true,
-                                height = 10,
-                                overrideFont = false,
-                                border = {
-                                    enabled = false,
-                                    thickness = 2,
-                                    color = { r = 0, g = 0, b = 0, a = 1 },
-                                },
-                                anchorMode = 1,
-                                colors = {},
-                            },
-                        },
-                    },
+                    profile = profileData,
+                    defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
             },
         }
 
-        local optionUtilChunk = TestHelpers.LoadChunk(
-            { "Helpers/OptionUtil.lua" },
-            "Unable to load Helpers/OptionUtil.lua"
-        )
-        optionUtilChunk(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, addonNS)
 
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")
@@ -145,7 +134,6 @@ describe("SettingsBuilder", function()
 
     -- Category lifecycle
     it("CreateRootCategory, CreateSubcategory, GetRootCategoryID, GetSubcategoryID", function()
-        assert.is_not_nil(SB.GetRootCategoryID())
         assert.are.equal("TestAddon", SB.GetRootCategoryID())
         assert.is_not_nil(SB.GetSubcategoryID("TestSection"))
         assert.is_nil(SB.GetSubcategoryID("MissingSection"))
@@ -158,7 +146,6 @@ describe("SettingsBuilder", function()
     it("Setting current subcategory to root allows adding headers there", function()
         SB._currentSubcategory = SB._rootCategory
         local init = SB.Header("Root Header")
-        assert.is_not_nil(init)
         assert.are.equal("header", init._type)
         assert.are.equal("Root Header", init._text)
     end)
@@ -225,7 +212,6 @@ describe("SettingsBuilder", function()
 
         Settings.CreateSlider = origCreate
 
-        assert.is_not_nil(capturedOpts._labelFormatter)
         assert.are.equal(MinimalSliderWithSteppersMixin.Label.Right, capturedOpts._labelFormatterLocation)
         -- Default formatter renders integers without decimals
         assert.are.equal("5", capturedOpts._labelFormatter(5))
@@ -348,7 +334,6 @@ describe("SettingsBuilder", function()
     -- Header
     it("Header adds initializer to current layout", function()
         local init = SB.Header("Test Header")
-        assert.is_not_nil(init)
         assert.are.equal("header", init._type)
         assert.are.equal("Test Header", init._text)
     end)
@@ -356,7 +341,6 @@ describe("SettingsBuilder", function()
     -- Subheader
     it("Subheader adds element initializer with normal font template", function()
         local init = SB.Subheader({ name = "Item Quality" })
-        assert.is_not_nil(init)
         assert.are.equal("LibSettingsBuilder_SubheaderTemplate", init._template)
         assert.are.equal("Item Quality", init.data.name)
     end)
@@ -364,7 +348,6 @@ describe("SettingsBuilder", function()
     it("Subheader respects explicit category via root subcategory", function()
         SB._currentSubcategory = SB._rootCategory
         local init = SB.Subheader({ name = "Root Sub" })
-        assert.is_not_nil(init)
         assert.are.equal("Root Sub", init.data.name)
     end)
 
@@ -484,20 +467,7 @@ describe("SettingsBuilder", function()
 
     -- Reactive disabled predicate
     it("disabled predicate re-evaluates when another setting changes", function()
-        -- Set up a SettingsPanel mock that tracks frames for EvaluateState
-        local frames = {}
-        _G.SettingsPanel = {
-            IsShown = function() return true end,
-            GetSettingsList = function()
-                return {
-                    ScrollBox = {
-                        ForEachFrame = function(_, fn)
-                            for _, f in ipairs(frames) do fn(f) end
-                        end,
-                    },
-                }
-            end,
-        }
+        local frames = createSettingsPanelMock()
 
         local _, enabledSetting = SB.PathCheckbox({
             path = "powerBar.enabled",
@@ -547,19 +517,7 @@ describe("SettingsBuilder", function()
 
     -- Reactive hidden predicate
     it("hidden predicate re-evaluates when another setting changes", function()
-        local frames = {}
-        _G.SettingsPanel = {
-            IsShown = function() return true end,
-            GetSettingsList = function()
-                return {
-                    ScrollBox = {
-                        ForEachFrame = function(_, fn)
-                            for _, f in ipairs(frames) do fn(f) end
-                        end,
-                    },
-                }
-            end,
-        }
+        local frames = createSettingsPanelMock()
 
         local _, toggleSetting = SB.PathCheckbox({
             path = "powerBar.enabled",
@@ -713,14 +671,7 @@ describe("SettingsBuilder", function()
 
     -- Built-in path accessors (getNestedValue/setNestedValue now optional)
     it("works without getNestedValue/setNestedValue in config", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TEST2",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("Test2")
+        local SB2 = createSB2("TEST2", "Test2")
         SB2.CreateSubcategory("Sub2")
 
         local _, setting = SB2.PathCheckbox({
@@ -737,14 +688,7 @@ describe("SettingsBuilder", function()
         addonNS.Addon.db.profile.powerBar.colors[0] = { r = 0, g = 0, b = 1, a = 1 }
         addonNS.Addon.db.defaults.profile.powerBar.colors[0] = { r = 0, g = 0, b = 1, a = 1 }
 
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TEST3",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("Test3")
+        local SB2 = createSB2("TEST3", "Test3")
         SB2.CreateSubcategory("Sub3")
 
         local _, setting = SB2.PathColor({
@@ -759,7 +703,6 @@ describe("SettingsBuilder", function()
     -- Header "Display" no longer suppressed
     it("Header('Display') returns initializer (no longer suppressed)", function()
         local init = SB.Header("Display")
-        assert.is_not_nil(init)
         assert.are.equal("header", init._type)
         assert.are.equal("Display", init._text)
     end)
@@ -896,14 +839,7 @@ describe("SettingsBuilder", function()
     -- RegisterFromTable
     it("RegisterFromTable creates subcategory and controls from table", function()
         local init, setting
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL1",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("TableTest")
+        local SB2 = createSB2("TBL1", "TableTest")
 
         SB2.RegisterFromTable({
             name = "Test Section",
@@ -923,14 +859,7 @@ describe("SettingsBuilder", function()
     it("RegisterFromTable inherits disabled from group", function()
         local disabledFn = function() return true end
         local capturedSpecs = {}
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL2",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("InheritTest")
+        local SB2 = createSB2("TBL2", "InheritTest")
 
         SB2.RegisterFromTable({
             name = "Inherit Section",
@@ -947,14 +876,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable resolves parent references by key", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL3",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("ParentRefTest")
+        local SB2 = createSB2("TBL3", "ParentRefTest")
 
         assert.has_no.errors(function()
             SB2.RegisterFromTable({
@@ -971,14 +893,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable supports type aliases", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL4",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("AliasTest")
+        local SB2 = createSB2("TBL4", "AliasTest")
 
         -- All AceConfig type aliases should work without error
         assert.has_no.errors(function()
@@ -1004,14 +919,7 @@ describe("SettingsBuilder", function()
             return origCreateCheckbox(cat, setting, tooltip)
         end
 
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL5",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("DescTest")
+        local SB2 = createSB2("TBL5", "DescTest")
 
         SB2.RegisterFromTable({
             name = "Desc Section",
@@ -1027,14 +935,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable path prefixing works", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "TBL7",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("PrefixTest")
+        local SB2 = createSB2("TBL7", "PrefixTest")
 
         SB2.RegisterFromTable({
             name = "Prefix Section",
@@ -1057,14 +958,7 @@ describe("SettingsBuilder", function()
             return origHeader(text)
         end
 
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "COND1",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("CondTest")
+        local SB2 = createSB2("COND1", "CondTest")
 
         SB2.RegisterFromTable({
             name = "Cond Section",
@@ -1087,14 +981,7 @@ describe("SettingsBuilder", function()
             return origHeader(text)
         end
 
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "COND2",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("CondTest2")
+        local SB2 = createSB2("COND2", "CondTest2")
 
         SB2.RegisterFromTable({
             name = "Cond Section 2",
@@ -1109,14 +996,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable rootCategory=true uses root instead of subcategory", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "ROOT1",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("RootTest")
+        local SB2 = createSB2("ROOT1", "RootTest")
 
         SB2.RegisterFromTable({
             name = "Root Section",
@@ -1132,14 +1012,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable canvas type embeds a canvas frame", function()
-        local LSB2 = LibStub("LibSettingsBuilder-1.0")
-        local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            varPrefix = "CANVAS1",
-            onChanged = function() end,
-        })
-        SB2.CreateRootCategory("CanvasTest")
+        local SB2 = createSB2("CANVAS1", "CanvasTest")
 
         local canvasFrame = { GetHeight = function() return 200 end }
 
@@ -1179,7 +1052,6 @@ describe("SettingsBuilder", function()
         -- Trigger the setter via SetValue which calls the proxy setter → postSet → onSet
         setting:SetValue(false)
         assert.are.equal(false, receivedValue)
-        assert.is_not_nil(receivedSetting)
         assert.are.equal(setting, receivedSetting)
     end)
 

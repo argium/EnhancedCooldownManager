@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -89,11 +85,7 @@ describe("BuffBarsOptions", function()
         }
 
         -- Load library
-        local libChunk = TestHelpers.LoadChunk(
-            { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
-            "Unable to load LibSettingsBuilder.lua"
-        )
-        libChunk()
+        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
         if lsmw then
@@ -104,18 +96,10 @@ describe("BuffBarsOptions", function()
         end
 
         -- Load Constants
-        local constantsChunk = TestHelpers.LoadChunk(
-            { "Constants.lua", "../Constants.lua" },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
 
         -- Load PriorityKeyMap
-        local priorityMapChunk = TestHelpers.LoadChunk(
-            { "Helpers/PriorityKeyMap.lua", "../Helpers/PriorityKeyMap.lua" },
-            "Unable to load PriorityKeyMap.lua"
-        )
-        priorityMapChunk()
+        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
 
         -- Load SpellColors
         local addonNS = {
@@ -127,19 +111,11 @@ describe("BuffBarsOptions", function()
             },
         }
 
-        local spellColorsChunk = TestHelpers.LoadChunk(
-            { "Helpers/SpellColors.lua", "../Helpers/SpellColors.lua" },
-            "Unable to load SpellColors.lua"
-        )
-        spellColorsChunk(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
         SpellColors = ECM.SpellColors
 
         -- Load OptionUtil (includes SettingsBuilder adapter)
-        local optUtilChunk = TestHelpers.LoadChunk(
-            { "../Helpers/OptionUtil.lua" },
-            "Unable to load OptionUtil.lua"
-        )
-        optUtilChunk(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, addonNS)
 
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")
@@ -149,11 +125,7 @@ describe("BuffBarsOptions", function()
             Addon = addonNS.Addon,
             OptionsSections = {},
         }
-        local buffChunk = TestHelpers.LoadChunk(
-            { "../UI/BuffBarsOptions.lua" },
-            "Unable to load BuffBarsOptions.lua"
-        )
-        buffChunk(nil, optionsNS)
+        TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, optionsNS)
         BuffBarsOptions = optionsNS.BuffBarsOptions
     end)
 

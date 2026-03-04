@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -50,11 +46,7 @@ describe("PowerBarTickMarksOptions", function()
                 db = { profile = {} },
             },
         }
-        local chunk = TestHelpers.LoadChunk(
-            { "../UI/PowerBarTickMarksOptions.lua" },
-            "Unable to load PowerBarTickMarksOptions.lua"
-        )
-        chunk(nil, addonNS)
+        TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
 
         assert.is_table(ECM.PowerBarTickMarksOptions)
         assert.is_function(ECM.PowerBarTickMarksOptions.RegisterSettings)

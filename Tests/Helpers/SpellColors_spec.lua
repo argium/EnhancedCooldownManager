@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -15,7 +11,6 @@ describe("SpellColors", function()
     local originalGlobals
 
     local SpellColors
-    local addonNS
     local buffBarsConfig
 
     local currentClassID
@@ -72,9 +67,17 @@ describe("SpellColors", function()
         }
     end
 
-    local function setClassSpec(classID, specID)
-        currentClassID = classID
-        currentSpecID = specID
+    --- Iterates every 4-bit secret-mask permutation (0…15), resetting
+    --- secretValues each iteration and passing the boolean mask to `fn`.
+    local function forEachSecretPermutation(fn)
+        for bits = 0, 15 do
+            secretValues = {}
+            local mask = {
+                bitIsSet(bits, 0), bitIsSet(bits, 1),
+                bitIsSet(bits, 2), bitIsSet(bits, 3),
+            }
+            fn(mask)
+        end
     end
 
     setup(function()
@@ -140,26 +143,11 @@ describe("SpellColors", function()
             return tostring(value)
         end
 
-        local constantsChunk = TestHelpers.LoadChunk(
-            {
-                "Constants.lua",
-                "../Constants.lua",
-            },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
-
-        local priorityMapChunk = TestHelpers.LoadChunk(
-            {
-                "Helpers/PriorityKeyMap.lua",
-                "../Helpers/PriorityKeyMap.lua",
-            },
-            "Unable to load Helpers/PriorityKeyMap.lua"
-        )
-        priorityMapChunk()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
 
         buffBarsConfig = {}
-        addonNS = {
+        local addonNS = {
             Addon = {
                 db = {
                     profile = {
@@ -169,14 +157,7 @@ describe("SpellColors", function()
             },
         }
 
-        local spellColorsChunk = TestHelpers.LoadChunk(
-            {
-                "Helpers/SpellColors.lua",
-                "../Helpers/SpellColors.lua",
-            },
-            "Unable to load Helpers/SpellColors.lua"
-        )
-        spellColorsChunk(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
 
         SpellColors = assert(ECM.SpellColors, "SpellColors module did not initialize")
     end)
@@ -225,14 +206,7 @@ describe("SpellColors", function()
         local base = { "Permutation Spell", 1101, 2202, 3303 }
         local expectedTypeOrder = { "spellName", "spellID", "cooldownID", "textureFileID" }
 
-        for bits = 0, 15 do
-            secretValues = {}
-            local mask = {
-                bitIsSet(bits, 0),
-                bitIsSet(bits, 1),
-                bitIsSet(bits, 2),
-                bitIsSet(bits, 3),
-            }
+        forEachSecretPermutation(function(mask)
             local keys = applySecretMask(base, mask)
             local k = SpellColors.MakeKey(keys[1], keys[2], keys[3], keys[4])
 
@@ -251,7 +225,7 @@ describe("SpellColors", function()
                 assert.are.equal(expectedTypeOrder[expectedIndex], k.keyType)
                 assert.are.equal(base[expectedIndex], k.primaryKey)
             end
-        end
+        end)
     end)
 
     it("NormalizeKey returns opaque key objects with methods", function()
@@ -262,8 +236,8 @@ describe("SpellColors", function()
         assert.are.equal(777, key.primaryKey)
         assert.are.equal(777, key.spellID)
         assert.are.equal(9090, key.textureFileID)
-        assert.is_true(type(key.Matches) == "function")
-        assert.is_true(type(key.Merge) == "function")
+        assert.is_function(key.Matches)
+        assert.is_function(key.Merge)
     end)
 
     it("KeysMatch compares key identity by non-fallback identifiers", function()
@@ -362,11 +336,7 @@ describe("SpellColors", function()
         local key = SpellColors.MakeKey("Sigil of Flame", 204596, 44, 8888)
         SpellColors.SetColorByKey(key, c)
 
-        local nameCleared, spellIDCleared, cooldownIDCleared, textureCleared = SpellColors.ResetColorByKey(key)
-        assert.is_true(nameCleared)
-        assert.is_true(spellIDCleared)
-        assert.is_true(cooldownIDCleared)
-        assert.is_true(textureCleared)
+        assert.are.same({ true, true, true, true }, { SpellColors.ResetColorByKey(key) })
 
         assert.is_nil(SpellColors.GetColorByKey({ spellName = "Sigil of Flame" }))
         assert.is_nil(SpellColors.GetColorByKey({ spellID = 204596 }))
@@ -375,17 +345,8 @@ describe("SpellColors", function()
     end)
 
     it("ResetColorByKey returns all false for unknown or invalid keys", function()
-        local a, b, c, d = SpellColors.ResetColorByKey({ spellName = "never-set" })
-        assert.is_false(a)
-        assert.is_false(b)
-        assert.is_false(c)
-        assert.is_false(d)
-
-        local w, x, y, z = SpellColors.ResetColorByKey(nil)
-        assert.is_false(w)
-        assert.is_false(x)
-        assert.is_false(y)
-        assert.is_false(z)
+        assert.are.same({ false, false, false, false }, { SpellColors.ResetColorByKey({ spellName = "never-set" }) })
+        assert.are.same({ false, false, false, false }, { SpellColors.ResetColorByKey(nil) })
     end)
 
     it("GetDefaultColor initializes missing profile color storage", function()
@@ -459,14 +420,7 @@ describe("SpellColors", function()
         local base = { "Permutation Bar Spell", 9090, 8080, 7070 }
         SpellColors.SetColorByKey(SpellColors.MakeKey(base[1], base[2], base[3], base[4]), c)
 
-        for bits = 0, 15 do
-            secretValues = {}
-            local mask = {
-                bitIsSet(bits, 0),
-                bitIsSet(bits, 1),
-                bitIsSet(bits, 2),
-                bitIsSet(bits, 3),
-            }
+        forEachSecretPermutation(function(mask)
             local keys = applySecretMask(base, mask)
             local frame = makeFrame({
                 spellName = keys[1],
@@ -481,7 +435,7 @@ describe("SpellColors", function()
             else
                 assert.are.same(c, got)
             end
-        end
+        end)
     end)
 
     it("ReconcileBar unifies conflicting entries to the most recent write", function()
@@ -642,17 +596,17 @@ describe("SpellColors", function()
     end)
 
     it("isolates stored colors by class and specialization", function()
-        setClassSpec(12, 1)
+        currentClassID, currentSpecID = 12, 1
         local c = color(0.3, 0.8, 0.1)
         SpellColors.SetColorByKey(SpellColors.MakeKey("Shared Name", nil, nil, nil), c)
 
-        setClassSpec(12, 2)
+        currentClassID, currentSpecID = 12, 2
         assert.is_nil(SpellColors.GetColorByKey({ spellName = "Shared Name" }))
 
-        setClassSpec(11, 1)
+        currentClassID, currentSpecID = 11, 1
         assert.is_nil(SpellColors.GetColorByKey({ spellName = "Shared Name" }))
 
-        setClassSpec(12, 1)
+        currentClassID, currentSpecID = 12, 1
         assert.are.same(c, SpellColors.GetColorByKey({ spellName = "Shared Name" }))
     end)
 

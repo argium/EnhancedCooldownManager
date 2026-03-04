@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -39,57 +35,13 @@ describe("ClassUtil", function()
             return 0
         end
 
-        local constantsChunk = TestHelpers.LoadChunk(
-            {
-                "Constants.lua",
-                "../Constants.lua",
-            },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadStub("Enums.lua")
 
-        local enumChunk = TestHelpers.LoadChunk(
-            {
-                "Tests/stubs/Enums.lua",
-                "stubs/Enums.lua",
-                "Enums.lua",
-            },
-            "Unable to load Tests/stubs/Enums.lua"
-        )
-        enumChunk()
-
-        UnitStub = TestHelpers.LoadChunk(
-            {
-                "Tests/stubs/Unit.lua",
-                "stubs/Unit.lua",
-                "Unit.lua",
-            },
-            "Unable to load Tests/stubs/Unit.lua"
-        )()
-        CSpellStub = TestHelpers.LoadChunk(
-            {
-                "Tests/stubs/C_Spell.lua",
-                "stubs/C_Spell.lua",
-                "C_Spell.lua",
-            },
-            "Unable to load Tests/stubs/C_Spell.lua"
-        )()
-        CUnitAurasStub = TestHelpers.LoadChunk(
-            {
-                "Tests/stubs/C_UnitAuras.lua",
-                "stubs/C_UnitAuras.lua",
-                "C_UnitAuras.lua",
-            },
-            "Unable to load Tests/stubs/C_UnitAuras.lua"
-        )()
-        CSpellBookStub = TestHelpers.LoadChunk(
-            {
-                "Tests/stubs/C_SpellBook.lua",
-                "stubs/C_SpellBook.lua",
-                "C_SpellBook.lua",
-            },
-            "Unable to load Tests/stubs/C_SpellBook.lua"
-        )()
+        UnitStub = TestHelpers.LoadStub("Unit.lua")
+        CSpellStub = TestHelpers.LoadStub("C_Spell.lua")
+        CUnitAurasStub = TestHelpers.LoadStub("C_UnitAuras.lua")
+        CSpellBookStub = TestHelpers.LoadStub("C_SpellBook.lua")
 
         UnitStub.Install()
         CSpellStub.Install()
@@ -121,14 +73,6 @@ describe("ClassUtil", function()
             if powerType then
                 UnitStub.SetPowerMax(powerType, 10)
             end
-        end
-
-        local function setAura(spellID, aura)
-            CUnitAurasStub.SetAura(spellID, aura)
-        end
-
-        local function setSpellKnown(spellID, isKnown)
-            CSpellBookStub.SetSpellKnown(spellID, isKnown)
         end
 
         local function assertResourceType(classToken, specIndex, expectedResourceType, shapeshiftForm)
@@ -167,8 +111,8 @@ describe("ClassUtil", function()
         end)
 
         it("returns devourerNormal for devourer demon hunters when void fragments are inactive", function()
-            setAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, nil)
-            setSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, false)
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, nil)
+            CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, false)
             assertResourceType(
                 ECM.Constants.CLASS.DEMONHUNTER,
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
@@ -177,8 +121,8 @@ describe("ClassUtil", function()
         end)
 
         it("returns devourerMeta for devourer demon hunters when void fragments are active", function()
-            setAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 1 })
-            setSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, true)
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 1 })
+            CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, true)
             assertResourceType(
                 ECM.Constants.CLASS.DEMONHUNTER,
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,

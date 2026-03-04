@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -30,7 +26,7 @@ describe("FrameUtil", function()
     end
 
     local function color(r, g, b, a)
-        return { r = r, g = g, b = b, a = a == nil and 1 or a }
+        return { r = r, g = g, b = b, a = a or 1 }
     end
 
     local function makeRegion(regionType)
@@ -63,28 +59,19 @@ describe("FrameUtil", function()
             return self.__textureFileID
         end
 
-        function texture:SetColorTexture(r, g, b, a)
-            incCalls(self, "SetColorTexture")
-            self.__colorTexture = { r, g, b, a }
-        end
-
-        function texture:GetColorTexture()
-            if not self.__colorTexture then
-                return nil
+        for _, prop in ipairs({
+            { "ColorTexture", "__colorTexture" },
+            { "VertexColor", "__vertexColor" },
+        }) do
+            texture["Set" .. prop[1]] = function(self, r, g, b, a)
+                incCalls(self, "Set" .. prop[1])
+                self[prop[2]] = { r, g, b, a }
             end
-            return self.__colorTexture[1], self.__colorTexture[2], self.__colorTexture[3], self.__colorTexture[4]
-        end
-
-        function texture:SetVertexColor(r, g, b, a)
-            incCalls(self, "SetVertexColor")
-            self.__vertexColor = { r, g, b, a }
-        end
-
-        function texture:GetVertexColor()
-            if not self.__vertexColor then
-                return nil
+            texture["Get" .. prop[1]] = function(self)
+                if self[prop[2]] then
+                    return self[prop[2]][1], self[prop[2]][2], self[prop[2]][3], self[prop[2]][4]
+                end
             end
-            return self.__vertexColor[1], self.__vertexColor[2], self.__vertexColor[3], self.__vertexColor[4]
         end
 
         function texture:SetTexture(tex)
@@ -99,24 +86,20 @@ describe("FrameUtil", function()
         return texture
     end
 
-    local function cloneAnchors(anchors)
-        local out = {}
-        for i = 1, #anchors do
-            local a = anchors[i]
-            out[i] = { a[1], a[2], a[3], a[4], a[5] }
-        end
-        return out
-    end
-
     local function makeFrame(opts)
         opts = opts or {}
+        local anchors = {}
+        for i = 1, #(opts.anchors or {}) do
+            local a = opts.anchors[i]
+            anchors[i] = { a[1], a[2], a[3], a[4], a[5] }
+        end
         local frame = {
             __name = opts.name,
             __shown = opts.shown ~= false,
             __height = opts.height or 0,
             __width = opts.width or 0,
             __alpha = opts.alpha == nil and 1 or opts.alpha,
-            __anchors = cloneAnchors(opts.anchors or {}),
+            __anchors = anchors,
             __regions = opts.regions or {},
             __calls = {},
         }
@@ -125,31 +108,13 @@ describe("FrameUtil", function()
             return self.__name
         end
 
-        function frame:SetHeight(h)
-            incCalls(self, "SetHeight")
-            self.__height = h
-        end
-
-        function frame:GetHeight()
-            return self.__height
-        end
-
-        function frame:SetWidth(w)
-            incCalls(self, "SetWidth")
-            self.__width = w
-        end
-
-        function frame:GetWidth()
-            return self.__width
-        end
-
-        function frame:SetAlpha(a)
-            incCalls(self, "SetAlpha")
-            self.__alpha = a
-        end
-
-        function frame:GetAlpha()
-            return self.__alpha
+        for _, prop in ipairs({
+            { "Height", "__height" },
+            { "Width", "__width" },
+            { "Alpha", "__alpha" },
+        }) do
+            frame["Set" .. prop[1]] = function(self, val) incCalls(self, "Set" .. prop[1]); self[prop[2]] = val end
+            frame["Get" .. prop[1]] = function(self) return self[prop[2]] end
         end
 
         function frame:Show()
@@ -182,10 +147,7 @@ describe("FrameUtil", function()
 
         function frame:GetPoint(index)
             local a = self.__anchors[index]
-            if not a then
-                return nil
-            end
-            return a[1], a[2], a[3], a[4], a[5]
+            if a then return a[1], a[2], a[3], a[4], a[5] end
         end
 
         function frame:GetRegions()
@@ -199,12 +161,9 @@ describe("FrameUtil", function()
         opts = opts or {}
         local bar = makeFrame(opts)
         bar.__statusTexture = opts.statusTexture or makeTexture({ texture = opts.texturePath })
-        bar.__statusBarColor = opts.statusBarColor and {
-            opts.statusBarColor[1],
-            opts.statusBarColor[2],
-            opts.statusBarColor[3],
-            opts.statusBarColor[4],
-        } or { 1, 1, 1, 1 }
+        bar.__statusBarColor = opts.statusBarColor and
+            { opts.statusBarColor[1], opts.statusBarColor[2], opts.statusBarColor[3], opts.statusBarColor[4] }
+            or { 1, 1, 1, 1 }
 
         function bar:SetStatusBarTexture(texturePath)
             incCalls(self, "SetStatusBarTexture")
@@ -236,12 +195,9 @@ describe("FrameUtil", function()
             shown = opts.shown ~= false,
         })
         border.__backdrop = opts.backdrop
-        border.__borderColor = opts.borderColor and {
-            opts.borderColor[1],
-            opts.borderColor[2],
-            opts.borderColor[3],
-            opts.borderColor[4],
-        } or { 0, 0, 0, 1 }
+        border.__borderColor = opts.borderColor and
+            { opts.borderColor[1], opts.borderColor[2], opts.borderColor[3], opts.borderColor[4] }
+            or { 0, 0, 0, 1 }
 
         function border:SetBackdrop(backdrop)
             incCalls(self, "SetBackdrop")
@@ -333,17 +289,8 @@ describe("FrameUtil", function()
             return secretValues[value] == true
         end
 
-        local constantsChunk = TestHelpers.LoadChunk(
-            { "Constants.lua", "../Constants.lua" },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
-
-        local frameUtilChunk = TestHelpers.LoadChunk(
-            { "Helpers/FrameUtil.lua", "../Helpers/FrameUtil.lua" },
-            "Unable to load Helpers/FrameUtil.lua"
-        )
-        frameUtilChunk()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
 
         FrameUtil = assert(ECM.FrameUtil, "FrameUtil module did not initialize")
     end)
@@ -446,38 +393,21 @@ describe("FrameUtil", function()
     end)
 
     describe("lazy setters", function()
-        it("LazySetHeight uses the live frame height and avoids redundant SetHeight calls", function()
-            local frame = makeFrame({ height = 20 })
-
-            assert.is_false(FrameUtil.LazySetHeight(frame, 20))
-            assert.are.equal(0, getCalls(frame, "SetHeight"))
-
-            assert.is_true(FrameUtil.LazySetHeight(frame, 25))
-            assert.are.equal(1, getCalls(frame, "SetHeight"))
-            assert.are.equal(25, frame:GetHeight())
-        end)
-
-        it("LazySetWidth uses the live frame width and avoids redundant SetWidth calls", function()
-            local frame = makeFrame({ width = 40 })
-
-            assert.is_false(FrameUtil.LazySetWidth(frame, 40))
-            assert.are.equal(0, getCalls(frame, "SetWidth"))
-
-            assert.is_true(FrameUtil.LazySetWidth(frame, 55))
-            assert.are.equal(1, getCalls(frame, "SetWidth"))
-            assert.are.equal(55, frame:GetWidth())
-        end)
-
-        it("LazySetAlpha uses the live alpha and avoids redundant SetAlpha calls", function()
-            local frame = makeFrame({ alpha = 0.5 })
-
-            assert.is_false(FrameUtil.LazySetAlpha(frame, 0.5))
-            assert.are.equal(0, getCalls(frame, "SetAlpha"))
-
-            assert.is_true(FrameUtil.LazySetAlpha(frame, 0.8))
-            assert.are.equal(1, getCalls(frame, "SetAlpha"))
-            assert.are.equal(0.8, frame:GetAlpha())
-        end)
+        local lazySetScalarCases = {
+            { fn = "LazySetHeight", opts = { height = 20 }, same = 20, diff = 25, setter = "SetHeight", getter = "GetHeight" },
+            { fn = "LazySetWidth", opts = { width = 40 }, same = 40, diff = 55, setter = "SetWidth", getter = "GetWidth" },
+            { fn = "LazySetAlpha", opts = { alpha = 0.5 }, same = 0.5, diff = 0.8, setter = "SetAlpha", getter = "GetAlpha" },
+        }
+        for _, case in ipairs(lazySetScalarCases) do
+            it(case.fn .. " skips redundant calls and applies changes", function()
+                local frame = makeFrame(case.opts)
+                assert.is_false(FrameUtil[case.fn](frame, case.same))
+                assert.are.equal(0, getCalls(frame, case.setter))
+                assert.is_true(FrameUtil[case.fn](frame, case.diff))
+                assert.are.equal(1, getCalls(frame, case.setter))
+                assert.are.equal(case.diff, frame[case.getter](frame))
+            end)
+        end
 
         it("LazySetAnchors no-ops when the live anchor set already matches", function()
             local anchor = makeFrame({ name = "AnchorA" })
@@ -521,12 +451,8 @@ describe("FrameUtil", function()
         it("LazySetAnchors reapplies anchors when frame anchor getters are unavailable", function()
             local frame = {
                 __calls = {},
-                ClearAllPoints = function(self)
-                    incCalls(self, "ClearAllPoints")
-                end,
-                SetPoint = function(self)
-                    incCalls(self, "SetPoint")
-                end,
+                ClearAllPoints = function(self) incCalls(self, "ClearAllPoints") end,
+                SetPoint = function(self) incCalls(self, "SetPoint") end,
             }
             local anchors = {
                 { "CENTER", UIParent, "CENTER", 0, 0 },
@@ -555,9 +481,7 @@ describe("FrameUtil", function()
 
             frame.GetPoint = function(self, index)
                 local a = self.__anchors[index]
-                if not a then
-                    return nil
-                end
+                if not a then return nil end
                 return secretPoint, a[2], secretRelativePoint, a[4], a[5]
             end
 
@@ -712,17 +636,9 @@ describe("FrameUtil", function()
 
         it("LazySetText reads live text before writing", function()
             local owner = {}
-            local fontString = {
-                __text = "Hello",
-                __calls = {},
-                GetText = function(self)
-                    return self.__text
-                end,
-                SetText = function(self, text)
-                    incCalls(self, "SetText")
-                    self.__text = text
-                end,
-            }
+            local fontString = { __text = "Hello", __calls = {} }
+            fontString.GetText = function(self) return self.__text end
+            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
 
             assert.is_false(FrameUtil.LazySetText(owner, fontString, "label", "Hello"))
             assert.are.equal(0, getCalls(fontString, "SetText"))
