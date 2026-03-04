@@ -6,7 +6,7 @@ local _, ns = ...
 ECM = ECM or {}
 
 local function is_debug_enabled()
-    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.debug
+    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
 end
 
 --- Logs a debug message to DevTool and, when debug mode is enabled, to the chat window.

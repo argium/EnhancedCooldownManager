@@ -140,9 +140,9 @@ powerBarTickMappings[ECM.Constants.DEMONHUNTER_CLASS_ID] = {
 
 local defaults = {
     profile = {
-        debug = false,
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
+            debug = false,
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
             updateFrequency = 0.04,

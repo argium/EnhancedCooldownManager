@@ -229,7 +229,7 @@ function mod:ChatCommand(input)
     if cmd == "debug" then
         local newVal
         if arg == "" or arg == "toggle" then
-            newVal = not profile.debug
+            newVal = not profile.global.debug
         elseif arg == "on" then
             newVal = true
         elseif arg == "off" then
@@ -238,8 +238,8 @@ function mod:ChatCommand(input)
             ECM_print("Usage: expected on|off|toggle")
             return
         end
-        profile.debug = newVal
-        ECM_print("Debug:", profile.debug and "ON" or "OFF")
+        profile.global.debug = newVal
+        ECM_print("Debug:", profile.global.debug and "ON" or "OFF")
         return
     end
 end
@@ -273,7 +273,7 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM.Log("Initialize", {
+    ECM.Log("Initialize", "Database loaded", {
         schemaVersion = profile and profile.schemaVersion or "nil",
         currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
     })
