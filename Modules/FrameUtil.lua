@@ -456,10 +456,11 @@ function FrameUtil.CalculateLayoutParams(self)
         params.height = moduleConfig.height or globalConfig.barHeight
         params.width = nil -- Width set by dual-point anchoring
     elseif mode == ECM.Constants.ANCHORMODE_FREE then
+        local freePoint = moduleConfig.freeAnchorPoint or "CENTER"
         params.anchor = UIParent
         params.isFirst = false
-        params.anchorPoint = "CENTER"
-        params.anchorRelativePoint = "CENTER"
+        params.anchorPoint = freePoint
+        params.anchorRelativePoint = freePoint
         params.offsetX = moduleConfig.offsetX or 0
         params.offsetY = moduleConfig.offsetY or ECM.Constants.DEFAULT_FREE_ANCHOR_OFFSET_Y
         params.height = moduleConfig.height or globalConfig.barHeight
@@ -507,7 +508,6 @@ function FrameUtil.ApplyFramePosition(self, frame)
             { rightAnchorPoint, anchor, rightRelativePoint, offsetX, offsetY },
         }
     else
-        assert(anchor ~= nil, "anchor required for free anchor mode")
         anchors = {
             { anchorPoint, anchor, anchorRelativePoint, offsetX, offsetY },
         }

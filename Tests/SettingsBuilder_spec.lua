@@ -138,12 +138,6 @@ describe("SettingsBuilder", function()
         )
         optionUtilChunk(nil, addonNS)
 
-        local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, addonNS)
-
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")
         SB.CreateSubcategory("TestSection")
@@ -691,22 +685,11 @@ describe("SettingsBuilder", function()
     end)
 
     -- PositioningGroup
-    it("PositioningGroup creates mode, width, offsetX, offsetY controls", function()
-        ECM.OptionUtil.POSITION_MODE_TEXT = {
-            [1] = "Automatic",
-            [2] = "Free",
-        }
-        ECM.OptionUtil.ApplyPositionModeToBar = function() end
-        ECM.OptionUtil.IsAnchorModeFree = function(cfg)
-            return cfg and cfg.anchorMode == 2
-        end
+    it("PositioningGroup creates mode dropdown only (offsets handled by Edit Mode)", function()
 
         local result = SB.PositioningGroup("powerBar")
         assert.is_not_nil(result.modeInit)
         assert.is_not_nil(result.modeSetting)
-        assert.is_not_nil(result.widthInit)
-        assert.is_not_nil(result.offsetXInit)
-        assert.is_not_nil(result.offsetYInit)
     end)
 
     -- RegisterSection

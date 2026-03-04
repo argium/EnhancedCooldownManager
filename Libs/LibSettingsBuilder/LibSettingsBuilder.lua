@@ -1005,13 +1005,13 @@ function lib:New(config)
         return results
     end
 
-    --- Positioning group.
+    --- Positioning group — anchor mode dropdown only.
+    --- Width and offset controls are handled by Edit Mode.
     --- Required spec fields:
     ---   positionModes     table         value → label map
     ---   isAnchorModeFree  function(cfg) -> bool
     --- Optional spec fields:
     ---   applyPositionMode function(cfg, mode)
-    ---   defaultBarWidth   number (default 250)
     function SB.PositioningGroup(configPath, spec)
         spec = mergeCompositeDefaults("PositioningGroup", spec)
         assert(spec.positionModes, "PositioningGroup: spec.positionModes is required")
@@ -1020,7 +1020,7 @@ function lib:New(config)
         local modeSpec = {
             path = configPath .. ".anchorMode",
             name = spec.modeName or "Position Mode",
-            tooltip = spec.modeTooltip,
+            tooltip = spec.modeTooltip or "Automatic chains bars below the cooldown viewer. Manual lets you drag the bar in Edit Mode.",
             values = spec.positionModes,
             onSet = function(value)
                 if spec.applyPositionMode then
@@ -1032,68 +1032,9 @@ function lib:New(config)
         propagateModifiers(modeSpec, spec)
         local modeInit, modeSetting = SB.PathDropdown(modeSpec)
 
-        local function isFreeMode()
-            return spec.isAnchorModeFree(
-                getNestedValue(getProfile(), configPath))
-        end
-
-        local defaultBarWidth = spec.defaultBarWidth or 250
-
-        local widthSpec = {
-            path = configPath .. ".width",
-            name = spec.widthName or "Width",
-            tooltip = spec.widthTooltip or "Width when free positioning is enabled.",
-            min = spec.widthMin or 100,
-            max = spec.widthMax or 600,
-            step = spec.widthStep or 1,
-            parent = modeInit,
-            parentCheck = isFreeMode,
-            getTransform = function(value)
-                return value or defaultBarWidth
-            end,
-        }
-        propagateModifiers(widthSpec, spec)
-        local widthInit = SB.PathSlider(widthSpec)
-
-        local offsetXInit
-        if spec.includeOffsetX ~= false then
-            local offsetXSpec = {
-                path = configPath .. ".offsetX",
-                name = spec.offsetXName or "Offset X",
-                tooltip = spec.offsetXTooltip or "Horizontal offset when free positioning is enabled.",
-                min = -800,
-                max = 800,
-                step = 1,
-                parent = modeInit,
-                parentCheck = isFreeMode,
-                getTransform = function(value) return value or 0 end,
-                setTransform = function(value) return value ~= 0 and value or nil end,
-            }
-            propagateModifiers(offsetXSpec, spec)
-            offsetXInit = SB.PathSlider(offsetXSpec)
-        end
-
-        local offsetYSpec = {
-            path = configPath .. ".offsetY",
-            name = spec.offsetYName or "Offset Y",
-            tooltip = spec.offsetYTooltip or "Vertical offset when free positioning is enabled.",
-            min = -800,
-            max = 800,
-            step = 1,
-            parent = modeInit,
-            parentCheck = isFreeMode,
-            getTransform = function(value) return value or 0 end,
-            setTransform = function(value) return value ~= 0 and value or nil end,
-        }
-        propagateModifiers(offsetYSpec, spec)
-        local offsetYInit = SB.PathSlider(offsetYSpec)
-
         return {
             modeInit = modeInit,
             modeSetting = modeSetting,
-            widthInit = widthInit,
-            offsetXInit = offsetXInit,
-            offsetYInit = offsetYInit,
         }
     end
 

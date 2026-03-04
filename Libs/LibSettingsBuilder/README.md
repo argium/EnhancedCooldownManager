@@ -316,25 +316,19 @@ Returns an array of `{ key, initializer, setting }`.
 
 ### `SB.PositioningGroup(configPath, spec)`
 
-Creates controls for bar positioning:
-
-1. **Dropdown** at `configPath .. ".anchorMode"`.
-2. **Width slider** at `configPath .. ".width"` — visible only in free mode.
-3. **Offset X slider** at `configPath .. ".offsetX"` — visible only in free mode (omitted if `spec.includeOffsetX == false`).
-4. **Offset Y slider** at `configPath .. ".offsetY"` — visible only in free mode.
+Creates the anchor mode dropdown at `configPath .. ".anchorMode"`.
+Width and offset controls are handled by Edit Mode (via LibEQOLEditMode).
 
 | Required Spec Field | Type | Description |
 |---|---|---|
 | `positionModes` | `table` | Value → label map for the anchor mode dropdown. |
-| `isAnchorModeFree` | `function(cfg) -> bool` | Returns whether the current mode is "free" (shows offset/width controls). |
+| `isAnchorModeFree` | `function(cfg) -> bool` | Returns whether the current mode is "free". |
 
 | Optional Spec Field | Type | Description |
 |---|---|---|
 | `applyPositionMode` | `function(cfg, mode)` | Called when the mode changes. |
-| `defaultBarWidth` | `number` | Default width value (default: 250). |
-| `includeOffsetX` | `bool` | Set to `false` to omit the X offset slider. |
 
-Returns `{ modeInit, modeSetting, widthInit, offsetXInit, offsetYInit }`.
+Returns `{ modeInit, modeSetting }`.
 
 ---
 

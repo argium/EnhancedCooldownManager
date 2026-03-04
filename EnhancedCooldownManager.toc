@@ -31,6 +31,7 @@ Modules\ColorUtil.lua
 Modules\Utilities.lua
 Modules\FrameUtil.lua
 Modules\ModuleMixin.lua
+Modules\EditModeBridge.lua
 Modules\PriorityKeyMap.lua
 Modules\SpellColors.lua
 Options\Migration.lua

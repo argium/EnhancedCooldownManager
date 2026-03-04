@@ -227,6 +227,7 @@ function ModuleMixin.AddMixin(target, name)
 
     -- Registering this frame allows us to receive layout update events such as global hideWhenMounted.
     ECM.RegisterFrame(target)
+    ECM.EditModeBridge.Register(target)
 
     C_Timer.After(0, function()
         target:ThrottledUpdateLayout("ModuleInit")

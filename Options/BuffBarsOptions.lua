@@ -222,7 +222,7 @@ function BuffBarsOptions.RegisterSettings(SB)
 
             -- Layout
             layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning       = { type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 11 },
+            positioning       = { type = "positioning", disabled = isDisabled, order = 11 },
             freeGrowDirection = {
                 type = "select",
                 path = "freeGrowDirection",

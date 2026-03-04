@@ -141,12 +141,6 @@ describe("BuffBarsOptions", function()
         )
         optUtilChunk(nil, addonNS)
 
-        local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
-            "Unable to load SettingsBuilder.lua"
-        )
-        sbChunk(nil, addonNS)
-
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
