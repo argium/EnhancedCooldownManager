@@ -10,8 +10,6 @@ ns.Addon = mod
 local LSM = LibStub("LibSharedMedia-3.0", true)
 
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
-local POPUP_EXPORT_PROFILE = "ECM_EXPORT_PROFILE"
-local POPUP_IMPORT_PROFILE = "ECM_IMPORT_PROFILE"
 
 assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
@@ -506,9 +504,6 @@ local function enableLayoutEvents()
     end)
 end
 
---------------------------------------------------------------------------------
--- Addon Compartment
---------------------------------------------------------------------------------
 
 local function registerAddonCompartmentEntry()
     if mod._addonCompartmentRegistered then
@@ -572,27 +567,51 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
     StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
---- Creates or retrieves a StaticPopup dialog with common settings for editbox dialogs.
----@param key string
----@param config table
-local function ensureEditBoxDialog(key, config)
-    if StaticPopupDialogs[key] then
-        return
-    end
+local function createDialogFrame(name, titleText, explainText)
+    local C = ECM.Constants
+    local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    f:SetSize(C.DIALOG_FRAME_WIDTH, C.DIALOG_FRAME_HEIGHT)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetBackdrop(C.DIALOG_BACKDROP)
+    f:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    f:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    f:EnableMouse(true)
+    f:Hide()
+    tinsert(UISpecialFrames, name)
 
-    StaticPopupDialogs[key] = {
-        hasEditBox = true,
-        editBoxWidth = 350,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,
-    }
+    local title = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
+    title:SetPoint("TOP", 0, -16)
+    title:SetText(titleText)
 
-    for k, v in pairs(config) do
-        StaticPopupDialogs[key][k] = v
-    end
+    local explain = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    explain:SetPoint("TOP", 0, -40)
+    explain:SetPoint("LEFT", 24, 0)
+    explain:SetPoint("RIGHT", -24, 0)
+    explain:SetJustifyH("LEFT")
+    explain:SetJustifyV("TOP")
+    explain:SetText(explainText)
+
+    local scroll = CreateFrame("Frame", nil, f, "ScrollingEditBoxTemplate")
+    scroll.hideCharCount = true
+    scroll.maxLetters = 0
+    scroll:SetPoint("TOPLEFT", 16, -88)
+    scroll:SetPoint("BOTTOMRIGHT", -16, 48)
+    f.Scroll = scroll
+
+    return f
 end
+
+local function addButton(parent, label, anchor, onClick)
+    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    btn:SetSize(96, 22)
+    btn:SetPoint(unpack(anchor))
+    btn:SetText(label)
+    btn:SetScript("OnClick", onClick)
+    return btn
+end
+
+local exportFrame
 
 --- Shows a dialog with the export string for copying.
 ---@param exportString string
@@ -602,75 +621,69 @@ function mod:ShowExportDialog(exportString)
         return
     end
 
-    ensureEditBoxDialog(POPUP_EXPORT_PROFILE, {
-        text = "Press Ctrl+C to copy the export string:",
-        button1 = CLOSE or "Close",
-    })
+    if not exportFrame then
+        exportFrame = createDialogFrame("ECMExportFrame", "Export Profile",
+            "Press Ctrl+C to copy. The dialog will close automatically.")
+        addButton(exportFrame, CLOSE, {"BOTTOMRIGHT", -16, 8}, function() exportFrame:Hide() end)
 
-    StaticPopupDialogs[POPUP_EXPORT_PROFILE].OnShow = function(self)
-        self:SetFrameStrata("TOOLTIP")
-        local editBox = self.editBox or self:GetEditBox()
-        editBox:SetText(exportString)
-        editBox:HighlightText()
-        editBox:SetFocus()
+        -- Auto-close after Ctrl+C
+        exportFrame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
+            if key == "C" and IsControlKeyDown() then
+                C_Timer.After(0.1, function() exportFrame:Hide() end)
+            end
+        end)
     end
 
-    StaticPopup_Show(POPUP_EXPORT_PROFILE)
+    exportFrame:Show()
+    local editBox = exportFrame.Scroll.ScrollBox.EditBox
+    editBox:SetText(exportString)
+    editBox:HighlightText()
+    editBox:SetFocus()
 end
+
+local importFrame
 
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
-    ensureEditBoxDialog(POPUP_IMPORT_PROFILE, {
-        text = "Paste your import string:",
-        button1 = OKAY or "Import",
-        button2 = CANCEL or "Cancel",
-        EditBoxOnEnterPressed = function(editBox)
-            local parent = editBox:GetParent()
-            if parent and parent.button1 then
-                parent.button1:Click()
-            end
-        end,
-    })
+    if not importFrame then
+        importFrame = createDialogFrame("ECMImportFrame", "Import Profile",
+            "Paste your import string below and click Import.")
 
-    StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnShow = function(self)
-        self:SetFrameStrata("TOOLTIP")
-        local editBox = self.editBox or self:GetEditBox()
-        editBox:SetText("")
-        editBox:SetFocus()
+        local cancelBtn = addButton(importFrame, CANCEL, {"BOTTOMRIGHT", -16, 8}, function() importFrame:Hide() end)
+        addButton(importFrame, OKAY, {"RIGHT", cancelBtn, "LEFT", -4, 0}, function()
+            local input = importFrame.Scroll.ScrollBox.EditBox:GetText()
+
+            if strtrim(input) == "" then
+                mod:Print("Import cancelled: no string provided")
+                return
+            end
+
+            local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
+            if not data then
+                mod:Print("Import failed: " .. (errorMsg or "unknown error"))
+                return
+            end
+
+            importFrame:Hide()
+
+            local versionStr = data.metadata and data.metadata.addonVersion or "unknown"
+            local confirmText = string.format(
+                "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI.",
+                versionStr
+            )
+
+            mod:ConfirmReloadUI(confirmText, function()
+                local success, applyErr = ECM.ImportExport.ApplyImportData(data)
+                if not success then
+                    mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                end
+            end, nil)
+        end)
     end
 
-    StaticPopupDialogs[POPUP_IMPORT_PROFILE].OnAccept = function(self)
-        local editBox = self.editBox or self:GetEditBox()
-        local input = editBox:GetText() or ""
-
-        if strtrim(input) == "" then
-            mod:Print("Import cancelled: no string provided")
-            return
-        end
-
-        -- Validate first WITHOUT applying
-        local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
-        if not data then
-            mod:Print("Import failed: " .. (errorMsg or "unknown error"))
-            return
-        end
-
-        local versionStr = data.metadata and data.metadata.addonVersion or "unknown"
-        local confirmText = string.format(
-            "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI.",
-            versionStr
-        )
-
-        -- Only apply the import AFTER user confirms reload
-        mod:ConfirmReloadUI(confirmText, function()
-            local success, applyErr = ECM.ImportExport.ApplyImportData(data)
-            if not success then
-                mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
-            end
-        end, nil)
-    end
-
-    StaticPopup_Show(POPUP_IMPORT_PROFILE)
+    importFrame:Show()
+    importFrame.Scroll.ScrollBox.EditBox:SetText("")
+    importFrame.Scroll.ScrollBox.EditBox:SetFocus()
 end
 
 --- Handles slash command input.

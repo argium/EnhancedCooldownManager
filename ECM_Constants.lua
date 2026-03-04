@@ -117,6 +117,16 @@ local constants = {
     ACTIVE_SV_KEY = "_ECM_DB",
 
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
+
+    -- Dialog frame
+    DIALOG_FRAME_WIDTH = 480,
+    DIALOG_FRAME_HEIGHT = 360,
+    DIALOG_BACKDROP = {
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    },
 }
 
 local BLIZZARD_FRAMES = {
