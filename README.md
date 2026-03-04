@@ -90,7 +90,7 @@ Legend: 🟢 supported
 
 ## Troubleshooting
 
-If you run into a problem, enable debug tracing with the command `/ecm debug on` and reload your UI. When the issue occurs again, type `/ecm bug`, copy the trace log and please include it when you open an issue.
+If you run into a problem, enable debug tracing with the command `/ecm debug on` and reload your UI. Include any output when reporting an issue.
 
 ## License
 
