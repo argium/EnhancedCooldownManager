@@ -96,7 +96,7 @@ describe("ClassUtil", function()
         CUnitAurasStub.Install()
         CSpellBookStub.Install()
 
-        local chunk = assert(loadfile("Modules/ClassUtil.lua"))
+        local chunk = assert(loadfile("Helpers/ClassUtil.lua"))
         chunk()
     end)
 

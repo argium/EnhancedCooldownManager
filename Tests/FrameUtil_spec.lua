@@ -340,8 +340,8 @@ describe("FrameUtil", function()
         constantsChunk()
 
         local frameUtilChunk = TestHelpers.loadChunk(
-            { "Modules/FrameUtil.lua", "../Modules/FrameUtil.lua" },
-            "Unable to load Modules/FrameUtil.lua"
+            { "Helpers/FrameUtil.lua", "../Helpers/FrameUtil.lua" },
+            "Unable to load Helpers/FrameUtil.lua"
         )
         frameUtilChunk()
 

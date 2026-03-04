@@ -92,13 +92,13 @@ describe("Options sections and root assembly", function()
 
         -- Load OptionUtil first (SB depends on it)
         local optionUtilChunk = TestHelpers.loadChunk(
-            { "Options/OptionUtil.lua", "../Options/OptionUtil.lua" },
+            { "OptionUtil.lua", "../Options/OptionUtil.lua" },
             "Unable to load OptionUtil.lua"
         )
         optionUtilChunk(nil, ns)
 
         local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            { "../Options/SettingsBuilder.lua" },
             "Unable to load SettingsBuilder.lua"
         )
         sbChunk(nil, ns)
@@ -114,7 +114,7 @@ describe("Options sections and root assembly", function()
 
         -- Load Options.lua
         local optionsChunk = TestHelpers.loadChunk(
-            { "Options/Options.lua", "../Options/Options.lua" },
+            { "../Options/Options.lua" },
             "Unable to load Options.lua"
         )
         optionsChunk(nil, ns)
@@ -201,19 +201,19 @@ describe("Options sections and root assembly", function()
         }
 
         -- Load OptionUtil and SettingsBuilder
-        local optUtil = TestHelpers.loadChunk({ "Options/OptionUtil.lua" }, "OptionUtil")
+        local optUtil = TestHelpers.loadChunk({ "../UI/OptionUtil.lua" }, "OptionUtil")
         optUtil(nil, ns)
 
-        local sbChunk = TestHelpers.loadChunk({ "Options/SettingsBuilder.lua" }, "SettingsBuilder")
+        local sbChunk = TestHelpers.loadChunk({ "../UI/SettingsBuilder.lua" }, "SettingsBuilder")
         sbChunk(nil, ns)
 
         -- Set up root category so subcategories can be created
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
         -- Load ResourceBarOptions and RuneBarOptions
-        local resChunk = TestHelpers.loadChunk({ "Options/ResourceBarOptions.lua" }, "ResourceBarOptions")
+        local resChunk = TestHelpers.loadChunk({ "../UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
         resChunk(nil, ns)
-        local runeChunk = TestHelpers.loadChunk({ "Options/RuneBarOptions.lua" }, "RuneBarOptions")
+        local runeChunk = TestHelpers.loadChunk({ "../UI/RuneBarOptions.lua" }, "RuneBarOptions")
         runeChunk(nil, ns)
 
         -- Both should have registered themselves

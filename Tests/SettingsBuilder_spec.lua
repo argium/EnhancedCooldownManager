@@ -133,13 +133,13 @@ describe("SettingsBuilder", function()
         }
 
         local optionUtilChunk = TestHelpers.loadChunk(
-            { "Options/OptionUtil.lua", "../Options/OptionUtil.lua" },
+            { "../Options/OptionUtil.lua" },
             "Unable to load Options/OptionUtil.lua"
         )
         optionUtilChunk(nil, addonNS)
 
         local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            { "../Options/SettingsBuilder.lua" },
             "Unable to load SettingsBuilder.lua"
         )
         sbChunk(nil, addonNS)

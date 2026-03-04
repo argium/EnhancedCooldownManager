@@ -152,10 +152,10 @@ describe("SpellColors", function()
 
         local priorityMapChunk = TestHelpers.loadChunk(
             {
-                "Modules/PriorityKeyMap.lua",
-                "../Modules/PriorityKeyMap.lua",
+                "Helpers/PriorityKeyMap.lua",
+                "../Helpers/PriorityKeyMap.lua",
             },
-            "Unable to load Modules/PriorityKeyMap.lua"
+            "Unable to load Helpers/PriorityKeyMap.lua"
         )
         priorityMapChunk()
 
@@ -172,10 +172,10 @@ describe("SpellColors", function()
 
         local spellColorsChunk = TestHelpers.loadChunk(
             {
-                "Modules/SpellColors.lua",
-                "../Modules/SpellColors.lua",
+                "Helpers/SpellColors.lua",
+                "../Helpers/SpellColors.lua",
             },
-            "Unable to load Modules/SpellColors.lua"
+            "Unable to load Helpers/SpellColors.lua"
         )
         spellColorsChunk(nil, addonNS)
 

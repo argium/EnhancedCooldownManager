@@ -103,10 +103,10 @@ describe("Utilities", function()
 
         local utilitiesChunk = TestHelpers.loadChunk(
             {
-                "Modules/Utilities.lua",
-                "../Modules/Utilities.lua",
+                "Helpers/Utilities.lua",
+                "../Helpers/Utilities.lua",
             },
-            "Unable to load Modules/Utilities.lua"
+            "Unable to load Helpers/Utilities.lua"
         )
         utilitiesChunk(nil, addonNS)
     end)

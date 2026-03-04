@@ -112,7 +112,7 @@ describe("BuffBarsOptions", function()
 
         -- Load PriorityKeyMap
         local priorityMapChunk = TestHelpers.loadChunk(
-            { "Modules/PriorityKeyMap.lua", "../Modules/PriorityKeyMap.lua" },
+            { "Helpers/PriorityKeyMap.lua", "../Helpers/PriorityKeyMap.lua" },
             "Unable to load PriorityKeyMap.lua"
         )
         priorityMapChunk()
@@ -128,7 +128,7 @@ describe("BuffBarsOptions", function()
         }
 
         local spellColorsChunk = TestHelpers.loadChunk(
-            { "Modules/SpellColors.lua", "../Modules/SpellColors.lua" },
+            { "Helpers/SpellColors.lua", "../Helpers/SpellColors.lua" },
             "Unable to load SpellColors.lua"
         )
         spellColorsChunk(nil, addonNS)
@@ -136,13 +136,13 @@ describe("BuffBarsOptions", function()
 
         -- Load OptionUtil (includes SettingsBuilder adapter)
         local optUtilChunk = TestHelpers.loadChunk(
-            { "Options/OptionUtil.lua", "../Options/OptionUtil.lua" },
+            { "../Options/OptionUtil.lua" },
             "Unable to load OptionUtil.lua"
         )
         optUtilChunk(nil, addonNS)
 
         local sbChunk = TestHelpers.loadChunk(
-            { "Options/SettingsBuilder.lua", "../Options/SettingsBuilder.lua" },
+            { "../Options/SettingsBuilder.lua" },
             "Unable to load SettingsBuilder.lua"
         )
         sbChunk(nil, addonNS)
@@ -156,7 +156,7 @@ describe("BuffBarsOptions", function()
             OptionsSections = {},
         }
         local buffChunk = TestHelpers.loadChunk(
-            { "Options/BuffBarsOptions.lua", "../Options/BuffBarsOptions.lua" },
+            { "../UI/BuffBarsOptions.lua" },
             "Unable to load BuffBarsOptions.lua"
         )
         buffChunk(nil, optionsNS)

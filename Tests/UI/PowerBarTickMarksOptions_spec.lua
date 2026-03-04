@@ -51,7 +51,7 @@ describe("PowerBarTickMarksOptions", function()
             },
         }
         local chunk = TestHelpers.loadChunk(
-            { "Options/PowerBarTickMarksOptions.lua", "../Options/PowerBarTickMarksOptions.lua" },
+            { "../UI/PowerBarTickMarksOptions.lua" },
             "Unable to load PowerBarTickMarksOptions.lua"
         )
         chunk(nil, addonNS)
