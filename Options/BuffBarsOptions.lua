@@ -54,87 +54,90 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
+local BASE_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization."
+
+StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
+    text = "Are you sure you want to reset all spell colors for this spec?",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
 local function CreateSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
     local frame = layout.frame
+
+    local function resetAllSpellColors()
+        ECM.SpellColors.ClearCurrentSpecColors()
+        frame:RefreshSpellList()
+        ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+    end
+
+    -- Header — uses SettingsListTemplate's built-in Title, divider, and DefaultsButton
+    local headerRow = layout:AddHeader(subcatName)
+    local defaultsBtn = headerRow._defaultsButton
+    defaultsBtn:SetText(SETTINGS_DEFAULTS)
+    defaultsBtn:SetScript("OnClick", function()
+        if ECM.BuffBars:IsEditLocked() then return end
+        StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"].OnAccept = resetAllSpellColors
+        StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
+    end)
+
+    layout:AddSpacer(6)
+
+    local descRow = layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight")
+    descRow._text:SetWordWrap(true)
 
     local warningRow = layout:AddDescription("")
     local warningText = warningRow._text
     warningText:SetWordWrap(true)
 
-    local specRow = layout:AddDescription("")
-    local specLabel = specRow._text
-    specLabel:SetFontObject(GameFontNormalLarge)
+    -- Default color swatch (above the per-spell list)
+    local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
+    defaultColorSwatch:SetScript("OnClick", function()
+        if ECM.BuffBars:IsEditLocked() then return end
+        local c = ECM.SpellColors.GetDefaultColor()
+        ECM.OptionUtil.OpenColorPicker(c, false, function(color)
+            ECM.SpellColors.SetDefaultColor(color)
+            defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
+            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        end)
+    end)
 
-    local scrollBox, _, view = layout:AddScrollList(24)
+    -- Scroll list using Blizzard's SettingsColorSwatchControlTemplate per element
+    local scrollBox, _, view = layout:AddScrollList(26)
 
-    view:SetElementInitializer("Frame", function(rowFrame, data)
-        if not rowFrame._initialized then
-            rowFrame:SetSize(scrollBox:GetWidth(), 24)
-
-            local icon = rowFrame:CreateTexture(nil, "ARTWORK")
-            icon:SetSize(20, 20)
-            icon:SetPoint("LEFT", 2, 0)
-            rowFrame._icon = icon
-
-            local nameLabel = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            nameLabel:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-            nameLabel:SetWidth(300)
-            nameLabel:SetJustifyH("LEFT")
-            rowFrame._nameLabel = nameLabel
-
-            local swatch = SB.CreateColorSwatch(rowFrame, 20)
-            swatch:SetPoint("LEFT", nameLabel, "RIGHT", 5, 0)
-            rowFrame._swatch = swatch
-
-            local resetBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
-            resetBtn:SetSize(20, 20)
-            resetBtn:SetPoint("LEFT", swatch, "RIGHT", 5, 0)
-            resetBtn:SetText("X")
-            rowFrame._resetBtn = resetBtn
-
-            function rowFrame:UpdateSwatch()
-                local c = ECM.SpellColors.GetColorByKey(self._data.key) or ECM.SpellColors.GetDefaultColor()
-                self._swatch._tex:SetColorTexture(c.r, c.g, c.b)
-            end
-
-            rowFrame._initialized = true
+    view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
+        -- Position label (matches SettingsListElementMixin:Init positioning)
+        if not control._ecmPositioned then
+            control.Text:SetFontObject(GameFontNormal)
+            control.Text:ClearAllPoints()
+            control.Text:SetPoint("LEFT", 37, 0)
+            control.Text:SetPoint("RIGHT", control, "CENTER", -85, 0)
+            control._ecmPositioned = true
         end
 
-        rowFrame._data = data
-
-        -- Set icon
-        if data.textureFileID then
-            rowFrame._icon:SetTexture(data.textureFileID)
-            rowFrame._icon:Show()
-        else
-            rowFrame._icon:Hide()
-        end
-
-        -- Set name
         local colorKey = data.key.primaryKey
-        local label = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
-        rowFrame._nameLabel:SetText(label)
+        local name = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
+        local label = data.textureFileID
+            and ("|T" .. data.textureFileID .. ":14:14|t  " .. name)
+            or name
+        control.Text:SetText(label)
 
-        rowFrame:UpdateSwatch()
+        local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
+        control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
 
-        rowFrame._swatch:SetScript("OnClick", function()
+        control.ColorSwatch:SetScript("OnClick", function()
             if ECM.BuffBars:IsEditLocked() then return end
-            local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
-            ECM.OptionUtil.OpenColorPicker(c, false, function(color)
+            local current = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
+            ECM.OptionUtil.OpenColorPicker(current, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
-                rowFrame:UpdateSwatch()
+                control.ColorSwatch:SetColorRGB(color.r, color.g, color.b)
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
-        end)
-
-        -- Reset button
-        rowFrame._resetBtn:SetShown(ECM.SpellColors.GetColorByKey(data.key) ~= nil)
-        rowFrame._resetBtn:SetScript("OnClick", function()
-            ECM.SpellColors.ResetColorByKey(data.key)
-            rowFrame:UpdateSwatch()
-            rowFrame._resetBtn:Hide()
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 
@@ -164,11 +167,14 @@ local function CreateSpellColorCanvas(SB, subcatName)
         end
         warningText:SetText(table.concat(parts, "\n"))
 
-        -- Update spec label
-        local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
-        local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
-        specLabel:SetText("|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown"))
+        local dc = ECM.SpellColors.GetDefaultColor()
+        defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
+
+        defaultsBtn:SetEnabled(not locked)
     end
+
+    -- Blizzard's panel calls OnDefault on canvas frames during global defaults
+    frame.OnDefault = resetAllSpellColors
 
     frame:SetScript("OnShow", function(self)
         self:RefreshSpellList()

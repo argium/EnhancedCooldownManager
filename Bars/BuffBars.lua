@@ -203,8 +203,6 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
         and issecretvalue(cooldownID) and issecretvalue(textureFileID)
     _editLocked = _editLocked or allSecret
 
-    ECM.SpellColors.DiscoverBar(frame)
-
     -- Purely diagnostics to help track down issues with secrets
     local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
@@ -422,6 +420,15 @@ function BuffBars:UpdateLayout(why)
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
 
+    -- Discover bars regardless of visibility so the spell colours options
+    -- panel has the full list even when hidden (e.g. resting).
+    local visibleChildren = get_children_ordered(viewer)
+    for _, entry in ipairs(visibleChildren) do
+        if entry.frame.Bar then
+            ECM.SpellColors.DiscoverBar(entry.frame)
+        end
+    end
+
     if not self:ShouldShow() then
         viewer:Hide()
         return false
@@ -465,7 +472,6 @@ function BuffBars:UpdateLayout(why)
     -- Style all visible children (lazy setters make redundant calls no-ops)
     _warned = false
     _editLocked = false
-    local visibleChildren = get_children_ordered(viewer)
     for barIndex, entry in ipairs(visibleChildren) do
         -- Some children of the viewer do not have a Bar so might be some other part of the UI.
         if entry.frame.Bar then

@@ -51,14 +51,13 @@ local function CreateTickMarksCanvas(SB, subcatName)
     local desc = descRow._text
 
     local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
-    local defaultSwatchTex = defaultColorSwatch._tex
 
     defaultColorSwatch:SetScript("OnClick", function()
         local store = GetStore()
         local c = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
         ECM.OptionUtil.OpenColorPicker(c, true, function(color)
             store.SetDefaultColor(color)
-            defaultSwatchTex:SetColorTexture(color.r, color.g, color.b)
+            defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
         end)
     end)
 
@@ -145,7 +144,7 @@ local function CreateTickMarksCanvas(SB, subcatName)
             widthValue:SetJustifyH("LEFT")
             rowFrame._widthValue = widthValue
 
-            local swatch = SB.CreateColorSwatch(rowFrame, 20)
+            local swatch = SB.CreateColorSwatch(rowFrame)
             swatch:SetPoint("LEFT", widthValue, "RIGHT", 10, 0)
             rowFrame._swatch = swatch
 
@@ -180,13 +179,13 @@ local function CreateTickMarksCanvas(SB, subcatName)
 
         local tc = data.tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
         rowFrame._currentColor = { r = tc.r, g = tc.g, b = tc.b, a = tc.a }
-        rowFrame._swatch._tex:SetColorTexture(tc.r, tc.g, tc.b)
+        rowFrame._swatch:SetColorRGB(tc.r, tc.g, tc.b)
         rowFrame._swatch:SetScript("OnClick", function()
             if not rowFrame._rowIndex then return end
             ECM.OptionUtil.OpenColorPicker(rowFrame._currentColor, true, function(color)
                 rowFrame._currentColor = color
                 store.UpdateTick(rowFrame._rowIndex, "color", color)
-                rowFrame._swatch._tex:SetColorTexture(color.r, color.g, color.b)
+                rowFrame._swatch:SetColorRGB(color.r, color.g, color.b)
                 ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
         end)
@@ -226,7 +225,7 @@ local function CreateTickMarksCanvas(SB, subcatName)
         desc:SetText(BASE_DESC_TEXT .. " (" .. classSpecText .. ").")
 
         local dc = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        defaultSwatchTex:SetColorTexture(dc.r, dc.g, dc.b)
+        defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
 
         local defaultWidth = store.GetDefaultWidth() or 1
         defaultWidthSlider:SetValue(defaultWidth)

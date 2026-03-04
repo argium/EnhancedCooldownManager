@@ -26,9 +26,7 @@ lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
 --------------------------------------------------------------------------------
 
 local CANVAS_ELEMENT_HEIGHT = 26
-local CANVAS_HEADER_HEIGHT = 45
-local CANVAS_HEADER_TITLE_X = 7
-local CANVAS_HEADER_TITLE_Y = -16
+local CANVAS_HEADER_HEIGHT = 50
 local CANVAS_LABEL_X = 37
 local CANVAS_CONTROL_CENTER_X = -80
 local CANVAS_BUTTON_CENTER_X = -40
@@ -63,16 +61,24 @@ function CanvasLayout:_AddLabel(row, text, fontObject)
     return label
 end
 
---- Add a section header (matches SettingsListSectionHeaderTemplate).
+--- Add a page header using Blizzard's SettingsListTemplate.Header.
+--- Provides Title, Options_HorizontalDivider, and DefaultsButton.
+---@return Frame row  (row._title, row._defaultsButton exposed)
 function CanvasLayout:AddHeader(text)
     local row = self:_CreateRow(CANVAS_HEADER_HEIGHT)
-    local title = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-    title:SetPoint("TOPLEFT", CANVAS_HEADER_TITLE_X, CANVAS_HEADER_TITLE_Y)
-    title:SetJustifyH("LEFT")
-    title:SetJustifyV("TOP")
-    title:SetText(text)
-    row._title = title
+    local settingsList = CreateFrame("Frame", nil, row, "SettingsListTemplate")
+    settingsList:SetAllPoints(row)
+    settingsList.ScrollBox:Hide()
+    settingsList.ScrollBar:Hide()
+    settingsList.Header.Title:SetText(text)
+    row._title = settingsList.Header.Title
+    row._defaultsButton = settingsList.Header.DefaultsButton
     return row
+end
+
+--- Add vertical spacing.
+function CanvasLayout:AddSpacer(height)
+    self:_Advance(height)
 end
 
 --- Add a description / informational text row.
@@ -92,7 +98,7 @@ end
 function CanvasLayout:AddColorSwatch(labelText)
     local row = self:_CreateRow()
     self:_AddLabel(row, labelText)
-    local swatch = lib.CreateColorSwatch(row, 20)
+    local swatch = lib.CreateColorSwatch(row)
     swatch:SetPoint("LEFT", row, "CENTER", CANVAS_SWATCH_CENTER_X, 0)
     row._swatch = swatch
     return row, swatch
@@ -150,24 +156,14 @@ end
 -- Static utilities (shared across all instances)
 --------------------------------------------------------------------------------
 
---- Create a styled color swatch button with border and highlight.
+--- Create a color swatch button using Blizzard's SettingsColorSwatchTemplate.
+--- Inherits ColorSwatchTemplate (SwatchBg/InnerBorder/Color layers) and
+--- SettingsColorSwatchMixin (hover effects, color picker integration).
 ---@param parent Frame
----@param size number
----@return Button swatch  (swatch._tex is the inner color texture)
-function lib.CreateColorSwatch(parent, size)
-    local swatch = CreateFrame("Button", nil, parent)
-    swatch:SetSize(size, size)
-    local border = swatch:CreateTexture(nil, "BORDER")
-    border:SetAllPoints()
-    border:SetColorTexture(0, 0, 0, 1)
-    local colorTex = swatch:CreateTexture(nil, "ARTWORK")
-    colorTex:SetPoint("TOPLEFT", 1, -1)
-    colorTex:SetPoint("BOTTOMRIGHT", -1, 1)
-    colorTex:SetColorTexture(1, 1, 1)
-    local highlight = swatch:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.2)
-    swatch._tex = colorTex
+---@return Button swatch  (swatch._tex points to swatch.Color for backward compat)
+function lib.CreateColorSwatch(parent)
+    local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
+    swatch._tex = swatch.Color
     return swatch
 end
 
