@@ -282,7 +282,7 @@ describe("FrameUtil", function()
     end
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "ColorUtil",
             "C_Timer",
@@ -293,7 +293,7 @@ describe("FrameUtil", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
@@ -333,13 +333,13 @@ describe("FrameUtil", function()
             return secretValues[value] == true
         end
 
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             { "Constants.lua", "../Constants.lua" },
             "Unable to load Constants.lua"
         )
         constantsChunk()
 
-        local frameUtilChunk = TestHelpers.loadChunk(
+        local frameUtilChunk = TestHelpers.LoadChunk(
             { "Helpers/FrameUtil.lua", "../Helpers/FrameUtil.lua" },
             "Unable to load Helpers/FrameUtil.lua"
         )

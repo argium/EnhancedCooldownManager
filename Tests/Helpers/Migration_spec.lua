@@ -79,7 +79,7 @@ describe("Migration", function()
     end
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "date",
             "strtrim",
@@ -88,7 +88,7 @@ describe("Migration", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
@@ -109,7 +109,7 @@ describe("Migration", function()
             end
         end
 
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             {
                 "Constants.lua",
                 "../Constants.lua",
@@ -118,7 +118,7 @@ describe("Migration", function()
         )
         constantsChunk()
 
-        local migrationChunk = TestHelpers.loadChunk(
+        local migrationChunk = TestHelpers.LoadChunk(
             {
                 "../../Helpers/Migration.lua",
             },

@@ -71,7 +71,7 @@ function ClassUtil.GetPlayerResourceType()
 end
 
 --- Gets the max Maelstrom value that can diff based on talents
-local function GetMaelstromWeaponMax()
+local function getMaelstromWeaponMax()
     if C_SpellBook.IsSpellKnown(C.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then
         return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED
     end
@@ -107,7 +107,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         -- The max can be 5 or 10 depending on talent choices
         local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_MAELSTROM_WEAPON)
         local stacks = aura and aura.applications or 0
-        return GetMaelstromWeaponMax(), stacks
+        return getMaelstromWeaponMax(), stacks
     end
 
     ECM.DebugAssert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")

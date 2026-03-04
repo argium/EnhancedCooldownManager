@@ -18,13 +18,13 @@ describe("PowerBarTickMarksStore", function()
     local currentSpecIndex
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
         })
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
@@ -59,7 +59,7 @@ describe("PowerBarTickMarksStore", function()
             },
         }
 
-        local chunk = TestHelpers.loadChunk(
+        local chunk = TestHelpers.LoadChunk(
             { "../UI/PowerBarTickMarksOptions.lua" },
             "Unable to load PowerBarTickMarksOptions.lua"
         )

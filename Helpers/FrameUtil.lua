@@ -10,7 +10,7 @@ ECM.FrameUtil = FrameUtil
 ---@param index number
 ---@param regionType string
 ---@return Region|nil
-local function TryGetRegion(frame, index, regionType)
+local function tryGetRegion(frame, index, regionType)
     local region = select(index, frame:GetRegions())
     if region and region.IsObjectType and region:IsObjectType(regionType) then
         return region
@@ -30,14 +30,14 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconOverlay(frame)
-    return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconTexture(frame)
-    return TryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
@@ -85,7 +85,7 @@ end
 ---@param frame Frame
 ---@param anchors table[] Array of anchors
 ---@return boolean|nil
-local function live_anchors_equal(frame, anchors)
+local function liveAnchorsEqual(frame, anchors)
     if not frame or not frame.GetNumPoints or not frame.GetPoint then
         return false
     end
@@ -120,7 +120,7 @@ end
 
 ---@param anchors table[]|nil
 ---@return table[]|nil
-local function clone_anchors(anchors)
+local function cloneAnchors(anchors)
     if not anchors then
         return nil
     end
@@ -136,7 +136,7 @@ end
 ---@param lhs table[]|nil
 ---@param rhs table[]|nil
 ---@return boolean
-local function anchors_equal(lhs, rhs)
+local function anchorsEqual(lhs, rhs)
     if not lhs or not rhs then
         return false
     end
@@ -167,7 +167,7 @@ end
 ---@param b number|nil
 ---@param a number|nil
 ---@return boolean
-local function color_equals_rgba(color, r, g, b, a)
+local function colorEqualsRgba(color, r, g, b, a)
     if not color then
         return false
     end
@@ -177,7 +177,7 @@ end
 --- Reads a texture color via available getters. Returns nil if unavailable.
 ---@param texture Texture|nil
 ---@return number|nil, number|nil, number|nil, number|nil
-local function get_texture_color(texture)
+local function getTextureColor(texture)
     if texture.GetColorTexture then
         local r, g, b, a = texture:GetColorTexture()
         if r ~= nil then
@@ -195,7 +195,7 @@ end
 --- Reads status bar texture value (path/file id) from the underlying texture.
 ---@param bar StatusBar
 ---@return any|nil
-local function get_statusbar_texture_value(bar)
+local function getStatusbarTextureValue(bar)
     local tex = bar:GetStatusBarTexture()
     return tex and tex:GetTexture() or nil
 end
@@ -242,17 +242,17 @@ end
 ---@param anchors table[] Array of anchors
 ---@return boolean changed
 function FrameUtil.LazySetAnchors(frame, anchors)
-    local liveEqual = live_anchors_equal(frame, anchors)
+    local liveEqual = liveAnchorsEqual(frame, anchors)
     if liveEqual == true then
-        if not anchors_equal(frame.__ecmAnchorCache, anchors) then
-            frame.__ecmAnchorCache = clone_anchors(anchors)
+        if not anchorsEqual(frame.__ecmAnchorCache, anchors) then
+            frame.__ecmAnchorCache = cloneAnchors(anchors)
         end
         return false
     end
 
     -- Some Blizzard frames return secret point strings from GetPoint(). We cannot
     -- safely compare those in tainted code, so fall back to our last applied anchors.
-    if liveEqual == nil and anchors_equal(frame.__ecmAnchorCache, anchors) then
+    if liveEqual == nil and anchorsEqual(frame.__ecmAnchorCache, anchors) then
         return false
     end
     frame:ClearAllPoints()
@@ -260,7 +260,7 @@ function FrameUtil.LazySetAnchors(frame, anchors)
         local a = anchors[i]
         frame:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
     end
-    frame.__ecmAnchorCache = clone_anchors(anchors)
+    frame.__ecmAnchorCache = cloneAnchors(anchors)
     return true
 end
 
@@ -275,8 +275,8 @@ function FrameUtil.LazySetBackgroundColor(frame, color)
         return false
     end
 
-    local r, g, b, a = get_texture_color(background)
-    if color_equals_rgba(color, r, g, b, a) then
+    local r, g, b, a = getTextureColor(background)
+    if colorEqualsRgba(color, r, g, b, a) then
         return false
     end
 
@@ -289,8 +289,8 @@ end
 ---@param color ECM_Color Table with r, g, b, a fields
 ---@return boolean changed
 function FrameUtil.LazySetVertexColor(texture, color)
-    local r, g, b, a = get_texture_color(texture)
-    if color_equals_rgba(color, r, g, b, a) then
+    local r, g, b, a = getTextureColor(texture)
+    if colorEqualsRgba(color, r, g, b, a) then
         return false
     end
     texture:SetVertexColor(color.r, color.g, color.b, color.a)
@@ -302,7 +302,7 @@ end
 ---@param texturePath string Texture path or LSM key
 ---@return boolean changed
 function FrameUtil.LazySetStatusBarTexture(bar, texturePath)
-    local currentTexture = get_statusbar_texture_value(bar)
+    local currentTexture = getStatusbarTextureValue(bar)
     if currentTexture == texturePath then
         return false
     end

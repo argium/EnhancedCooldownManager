@@ -20,7 +20,7 @@ ECM.SpellColors = SpellColors
 local _discoveredKeys = {}
 
 --- Key tier definitions, ordered highest-priority first.
---- Must match the field names returned by get_current_class_spec_stores().
+--- Must match the field names returned by getCurrentClassSpecStores().
 local KEY_DEFS = { "byName", "bySpellID", "byCooldownID", "byTexture" }
 local KEY_TYPE_TO_STORE = {
     byName = "spellName",
@@ -55,12 +55,12 @@ end
 --- Ensures the color storage tables exist for the current class/spec.
 ---@param cfg table  buffBars config table
 ---@return table|nil classSpecStores  Keyed by KEY_DEFS field names; each value is the current class/spec storage table.
-local function get_current_class_spec_stores(cfg)
+local function getCurrentClassSpecStores(cfg)
     local _, _, classID = UnitClass("player")
     local specID = GetSpecialization()
 
     if not classID or not specID then
-        ECM.DebugAssert(false, "SpellColors.get_current_class_spec_stores - unable to determine player class/spec", {
+        ECM.DebugAssert(false, "SpellColors.getCurrentClassSpecStores - unable to determine player class/spec", {
             classID = classID,
             specID = specID,
         })
@@ -78,7 +78,7 @@ end
 
 --- Ensures nested tables exist for color storage.
 ---@param cfg table  buffBars config table
-local function ensure_profile_is_setup(cfg)
+local function ensureProfileIsSetup(cfg)
     if not cfg.colors then
         cfg.colors = {
             byName = {},
@@ -111,7 +111,7 @@ local function config()
         ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil
     end
-    ensure_profile_is_setup(cfg)
+    ensureProfileIsSetup(cfg)
     return cfg
 end
 
@@ -139,7 +139,7 @@ SpellColorKeyType.__index = SpellColorKeyType
 ---@param textureId number|nil
 ---@return string|number|nil primaryKey
 ---@return "spellName"|"spellID"|"cooldownID"|"textureFileID"|nil keyType
-local function select_primary_key(spellName, spellID, cooldownID, textureId)
+local function selectPrimaryKey(spellName, spellID, cooldownID, textureId)
     if spellName then
         return spellName, "spellName"
     end
@@ -161,7 +161,7 @@ end
 ---@param textureFileID number|nil
 ---@param preferredType "spellName"|"spellID"|"cooldownID"|"textureFileID"|nil
 ---@return ECM_SpellColorKey|nil
-local function build_key(spellName, spellID, cooldownID, textureFileID, preferredType)
+local function buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
     local keyType = preferredType
     local primaryKey
     if keyType == "spellName" then primaryKey = spellName
@@ -170,7 +170,7 @@ local function build_key(spellName, spellID, cooldownID, textureFileID, preferre
     elseif keyType == "textureFileID" then primaryKey = textureFileID
     end
     if not primaryKey then
-        primaryKey, keyType = select_primary_key(spellName, spellID, cooldownID, textureFileID)
+        primaryKey, keyType = selectPrimaryKey(spellName, spellID, cooldownID, textureFileID)
     end
     if not (keyType and primaryKey) then
         return nil
@@ -188,7 +188,7 @@ end
 
 ---@param key ECM_SpellColorKey|table|nil
 ---@return ECM_SpellColorKey|nil
-local function normalize_key(key)
+local function normalizeKey(key)
     if type(key) ~= "table" then
         return nil
     end
@@ -210,13 +210,13 @@ local function normalize_key(key)
         textureFileID = primaryKey
     end
 
-    return build_key(spellName, spellID, cooldownID, textureFileID, keyType)
+    return buildKey(spellName, spellID, cooldownID, textureFileID, keyType)
 end
 
 ---@param a ECM_SpellColorKey|nil
 ---@param b ECM_SpellColorKey|nil
 ---@return boolean
-local function keys_match(a, b)
+local function keysMatch(a, b)
     if not (a and b) then
         return false
     end
@@ -243,18 +243,18 @@ end
 ---@param base ECM_SpellColorKey|nil
 ---@param other ECM_SpellColorKey|nil
 ---@return ECM_SpellColorKey|nil
-local function merge_keys(base, other)
+local function mergeKeys(base, other)
     if base == nil then
         return other
     end
     if other == nil then
         return base
     end
-    if not keys_match(base, other) then
+    if not keysMatch(base, other) then
         return nil
     end
 
-    return build_key(
+    return buildKey(
         base.spellName or other.spellName,
         base.spellID or other.spellID,
         base.cooldownID or other.cooldownID,
@@ -265,13 +265,13 @@ end
 
 ---@param entry any
 ---@return number
-local function entry_ts(entry)
+local function entryTs(entry)
     return (type(entry) == "table" and type(entry.t) == "number") and entry.t or 0
 end
 
 ---@param color table|nil
 ---@return ECM_Color|nil
-local function sanitize_color_value(color)
+local function sanitizeColorValue(color)
     if type(color) ~= "table" then
         return nil
     end
@@ -282,7 +282,7 @@ local LEGACY_METADATA_FIELDS = { "keyType", "primaryKey", "spellName", "spellID"
 
 ---@param value table|nil
 ---@return boolean changed
-local function scrub_legacy_color_metadata(value)
+local function scrubLegacyColorMetadata(value)
     if type(value) ~= "table" then
         return false
     end
@@ -299,7 +299,7 @@ end
 
 ---@param normalized ECM_SpellColorKey|nil
 ---@return table|nil
-local function build_entry_meta(normalized)
+local function buildEntryMeta(normalized)
     if not normalized then
         return nil
     end
@@ -317,7 +317,7 @@ end
 ---@param tierKeyType "spellName"|"spellID"|"cooldownID"|"textureFileID"
 ---@param rawKey string|number|nil
 ---@return ECM_SpellColorKey|nil
-local function build_key_from_entry(entry, tierKeyType, rawKey)
+local function buildKeyFromEntry(entry, tierKeyType, rawKey)
     if type(entry) ~= "table" or type(entry.value) ~= "table" then
         return nil
     end
@@ -347,19 +347,19 @@ local function build_key_from_entry(entry, tierKeyType, rawKey)
         textureFileID = validRawKey
     end
 
-    return build_key(spellName, spellID, cooldownID, textureFileID, preferredType)
+    return buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
 end
 
 ---@param entry table|nil
 ---@param normalized ECM_SpellColorKey|nil
 ---@return boolean changed
-local function normalize_entry_metadata(entry, normalized)
+local function normalizeEntryMetadata(entry, normalized)
     if type(entry) ~= "table" or type(entry.value) ~= "table" or not normalized then
         return false
     end
 
-    local changed = scrub_legacy_color_metadata(entry.value)
-    local desired = build_entry_meta(normalized)
+    local changed = scrubLegacyColorMetadata(entry.value)
+    local desired = buildEntryMeta(normalized)
     local current = type(entry.meta) == "table" and entry.meta or nil
     if not current
         or current.keyType ~= desired.keyType
@@ -377,7 +377,7 @@ end
 
 ---@param value table|nil
 ---@return boolean
-local function has_legacy_color_metadata(value)
+local function hasLegacyColorMetadata(value)
     if type(value) ~= "table" then
         return false
     end
@@ -392,16 +392,16 @@ end
 ---@param other ECM_SpellColorKey|table|nil
 ---@return boolean
 function SpellColorKeyType:Matches(other)
-    return keys_match(self, normalize_key(other))
+    return keysMatch(self, normalizeKey(other))
 end
 
 ---@param other ECM_SpellColorKey|table|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColorKeyType:Merge(other)
-    return merge_keys(self, normalize_key(other))
+    return mergeKeys(self, normalizeKey(other))
 end
 
-function SpellColorKeyType:tostring()
+function SpellColorKeyType:ToString()
     return string.format(
         "SpellColorKey{type=%s, spellName=%s, spellID=%s, cooldownID=%s, textureFileID=%s}",
         tostring(self.keyType),
@@ -418,7 +418,7 @@ end
 
 --- Returns the PriorityKeyMap instance, creating it on first call.
 ---@return PriorityKeyMap|nil
-local function get_map()
+local function getMap()
     if _map then
         return _map
     end
@@ -433,7 +433,7 @@ local function get_map()
         function()
             local cfg = config()
             if not cfg then return nil end
-            return get_current_class_spec_stores(cfg)
+            return getCurrentClassSpecStores(cfg)
         end,
         validateKey
     )
@@ -441,13 +441,13 @@ local function get_map()
 end
 
 ---@return number changed
-local function repair_current_spec_store_metadata()
+local function repairCurrentSpecStoreMetadata()
     local cfg = config()
     if not cfg then
         return 0
     end
 
-    local classSpecStores = get_current_class_spec_stores(cfg)
+    local classSpecStores = getCurrentClassSpecStores(cfg)
     if not classSpecStores then
         return 0
     end
@@ -458,10 +458,10 @@ local function repair_current_spec_store_metadata()
         local storeTable = classSpecStores[scopeKey]
         if type(storeTable) == "table" then
             for rawKey, entry in pairs(storeTable) do
-                local normalized = build_key_from_entry(entry, tierKeyType, rawKey)
-                if normalized and normalize_entry_metadata(entry, normalized) then
+                local normalized = buildKeyFromEntry(entry, tierKeyType, rawKey)
+                if normalized and normalizeEntryMetadata(entry, normalized) then
                     changed = changed + 1
-                elseif type(entry) == "table" and type(entry.value) == "table" and scrub_legacy_color_metadata(entry.value) then
+                elseif type(entry) == "table" and type(entry.value) == "table" and scrubLegacyColorMetadata(entry.value) then
                     changed = changed + 1
                 end
             end
@@ -482,14 +482,14 @@ end
 ---@param textureFileID number|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
-    return build_key(validateKey(spellName), validateKey(spellID), validateKey(cooldownID), validateKey(textureFileID), nil)
+    return buildKey(validateKey(spellName), validateKey(spellID), validateKey(cooldownID), validateKey(textureFileID), nil)
 end
 
 --- Normalizes a key payload into an opaque spell-color key object.
 ---@param key ECM_SpellColorKey|table|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColors.NormalizeKey(key)
-    return normalize_key(key)
+    return normalizeKey(key)
 end
 
 --- Returns true when two keys identify the same logical spell-color entry.
@@ -497,7 +497,7 @@ end
 ---@param right ECM_SpellColorKey|table|nil
 ---@return boolean
 function SpellColors.KeysMatch(left, right)
-    return keys_match(normalize_key(left), normalize_key(right))
+    return keysMatch(normalizeKey(left), normalizeKey(right))
 end
 
 --- Merges identifiers from matching keys into a single normalized key.
@@ -506,18 +506,18 @@ end
 ---@param other ECM_SpellColorKey|table|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColors.MergeKeys(base, other)
-    return merge_keys(normalize_key(base), normalize_key(other))
+    return mergeKeys(normalizeKey(base), normalizeKey(other))
 end
 
 --- Gets the custom color for a spell by a normalized key object.
 ---@param key ECM_SpellColorKey|table|nil
 ---@return ECM_Color|nil
 function SpellColors.GetColorByKey(key)
-    local map = get_map()
+    local map = getMap()
     if not map then
         return nil
     end
-    local normalized = normalize_key(key)
+    local normalized = normalizeKey(key)
     if not normalized then
         return nil
     end
@@ -527,7 +527,7 @@ end
 --- Extracts identifying values from a bar frame and returns a normalized key.
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_SpellColorKey|nil
-local function make_key_from_bar(frame)
+local function makeKeyFromBar(frame)
     return SpellColors.MakeKey(
         frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText(),
         frame.cooldownInfo and frame.cooldownInfo.spellID,
@@ -551,33 +551,33 @@ function SpellColors.GetColorForBar(frame)
         return nil
     end
 
-    return SpellColors.GetColorByKey(make_key_from_bar(frame))
+    return SpellColors.GetColorByKey(makeKeyFromBar(frame))
 end
 
 --- Returns deduplicated color entries for the current class/spec.
 ---@return { key: ECM_SpellColorKey, color: ECM_Color }[]
 function SpellColors.GetAllColorEntries()
     -- Ensure the map is initialized before enumerating the current scope.
-    get_map()
+    getMap()
     local cfg = config()
     if not cfg then
         return {}
     end
-    local classSpecStores = get_current_class_spec_stores(cfg)
+    local classSpecStores = getCurrentClassSpecStores(cfg)
     if not classSpecStores then
         return {}
     end
 
     local result = {}
 
-    local function maybe_sanitize_output_color(value)
-        if has_legacy_color_metadata(value) then
-            return sanitize_color_value(value) or value
+    local function maybeSanitizeOutputColor(value)
+        if hasLegacyColorMetadata(value) then
+            return sanitizeColorValue(value) or value
         end
         return value
     end
 
-    local function candidate_wins(row, tsValue, tierIndex)
+    local function candidateWins(row, tsValue, tierIndex)
         if tsValue > (row._ts or 0) then
             return true
         end
@@ -593,16 +593,16 @@ function SpellColors.GetAllColorEntries()
         if storeTable then
             for rawKey, entry in pairs(storeTable) do
                 if type(entry) == "table" and type(entry.value) == "table" then
-                    local key = build_key_from_entry(entry, keyType, rawKey)
+                    local key = buildKeyFromEntry(entry, keyType, rawKey)
                     if key then
-                        local rowTs = entry_ts(entry)
-                        local rowColor = maybe_sanitize_output_color(entry.value)
+                        local rowTs = entryTs(entry)
+                        local rowColor = maybeSanitizeOutputColor(entry.value)
                         local merged = false
 
                         for _, row in ipairs(result) do
                             if row.key:Matches(key) then
                                 row.key = row.key:Merge(key) or row.key
-                                if candidate_wins(row, rowTs, tierIndex) then
+                                if candidateWins(row, rowTs, tierIndex) then
                                     row.color = rowColor
                                     row._ts = rowTs
                                     row._tierIndex = tierIndex
@@ -656,18 +656,18 @@ end
 function SpellColors.SetColorByKey(key, color)
     ECM.DebugAssert(type(color) == "table", "Expected color to be a table")
 
-    local map = get_map()
+    local map = getMap()
     if not map then
         return
     end
 
-    local normalized = normalize_key(key)
+    local normalized = normalizeKey(key)
     if not normalized then
         return
     end
 
-    local storedColor = has_legacy_color_metadata(color) and sanitize_color_value(color) or color
-    map:Set(normalized:ToArray(), storedColor, build_entry_meta(normalized))
+    local storedColor = hasLegacyColorMetadata(color) and sanitizeColorValue(color) or color
+    map:Set(normalized:ToArray(), storedColor, buildEntryMeta(normalized))
 end
 
 --- Returns the default bar color.
@@ -697,12 +697,12 @@ end
 ---@return boolean cooldownIDCleared
 ---@return boolean textureCleared
 function SpellColors.ResetColorByKey(key)
-    local map = get_map()
+    local map = getMap()
     if not map then
         return false, false, false, false
     end
 
-    local normalized = normalize_key(key)
+    local normalized = normalizeKey(key)
     if not normalized then
         return false, false, false, false
     end
@@ -715,7 +715,7 @@ function SpellColors.ReconcileBar(frame)
     if not (frame and frame.__ecmHooked) then
         return
     end
-    local key = make_key_from_bar(frame)
+    local key = makeKeyFromBar(frame)
     if key then
         SpellColors.ReconcileAllKeys({ key })
     end
@@ -725,7 +725,7 @@ end
 ---@param keys ECM_SpellColorKey[]|nil
 ---@return number changed
 function SpellColors.ReconcileAllKeys(keys)
-    local map = get_map()
+    local map = getMap()
     if not map then
         return 0
     end
@@ -733,7 +733,7 @@ function SpellColors.ReconcileAllKeys(keys)
     local keys_list = {}
     if type(keys) == "table" then
         for _, key in ipairs(keys) do
-            local normalized = normalize_key(key)
+            local normalized = normalizeKey(key)
             if normalized then
                 keys_list[#keys_list + 1] = normalized:ToArray()
             end
@@ -744,7 +744,7 @@ function SpellColors.ReconcileAllKeys(keys)
     if #keys_list > 0 then
         changed = map:ReconcileAll(keys_list)
     end
-    return changed + repair_current_spec_store_metadata()
+    return changed + repairCurrentSpecStoreMetadata()
 end
 
 --- Reconciles color entries for a list of bar frames.
@@ -754,7 +754,7 @@ function SpellColors.ReconcileAllBars(frames)
     local keys = {}
     for _, frame in ipairs(frames) do
         if frame and frame.__ecmHooked then
-            local key = make_key_from_bar(frame)
+            local key = makeKeyFromBar(frame)
             if key then
                 keys[#keys + 1] = key
             end
@@ -767,13 +767,13 @@ end
 --- Called during layout so values are captured before they become secret.
 ---@param frame ECM_BuffBarMixin
 function SpellColors.DiscoverBar(frame)
-    local key = make_key_from_bar(frame)
+    local key = makeKeyFromBar(frame)
     if not key then
         return
     end
     for i, existing in ipairs(_discoveredKeys) do
-        if keys_match(existing, key) then
-            _discoveredKeys[i] = merge_keys(existing, key) or existing
+        if keysMatch(existing, key) then
+            _discoveredKeys[i] = mergeKeys(existing, key) or existing
             return
         end
     end

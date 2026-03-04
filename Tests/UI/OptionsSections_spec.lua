@@ -15,7 +15,7 @@ describe("Options sections and root assembly", function()
     local originalGlobals
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM", "ECM_DeepEquals",
             "Settings", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
@@ -28,14 +28,14 @@ describe("Options sections and root assembly", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     it("root Options module creates categories and calls RegisterSettings on sections", function()
-        TestHelpers.setupLibStub()
-        TestHelpers.setupSettingsStubs()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
 
-        local libChunk = TestHelpers.loadChunk(
+        local libChunk = TestHelpers.LoadChunk(
             { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
             "Unable to load LibSettingsBuilder.lua"
         )
@@ -91,7 +91,7 @@ describe("Options sections and root assembly", function()
         }
 
         -- Load OptionUtil first (defines ECM.SettingsBuilder)
-        local optionUtilChunk = TestHelpers.loadChunk(
+        local optionUtilChunk = TestHelpers.LoadChunk(
             { "Helpers/OptionUtil.lua" },
             "Unable to load Helpers/OptionUtil.lua"
         )
@@ -107,7 +107,7 @@ describe("Options sections and root assembly", function()
         end
 
         -- Load Options.lua
-        local optionsChunk = TestHelpers.loadChunk(
+        local optionsChunk = TestHelpers.LoadChunk(
             { "UI/Options.lua" },
             "Unable to load UI/Options.lua"
         )
@@ -136,10 +136,10 @@ describe("Options sections and root assembly", function()
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
-        TestHelpers.setupLibStub()
-        TestHelpers.setupSettingsStubs()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
 
-        local libChunk = TestHelpers.loadChunk(
+        local libChunk = TestHelpers.LoadChunk(
             { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
             "Unable to load LibSettingsBuilder.lua"
         )
@@ -195,16 +195,16 @@ describe("Options sections and root assembly", function()
         }
 
         -- Load OptionUtil (defines ECM.SettingsBuilder)
-        local optUtil = TestHelpers.loadChunk({ "Helpers/OptionUtil.lua" }, "OptionUtil")
+        local optUtil = TestHelpers.LoadChunk({ "Helpers/OptionUtil.lua" }, "OptionUtil")
         optUtil(nil, ns)
 
         -- Set up root category so subcategories can be created
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
         -- Load ResourceBarOptions and RuneBarOptions
-        local resChunk = TestHelpers.loadChunk({ "UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
+        local resChunk = TestHelpers.LoadChunk({ "UI/ResourceBarOptions.lua" }, "ResourceBarOptions")
         resChunk(nil, ns)
-        local runeChunk = TestHelpers.loadChunk({ "UI/RuneBarOptions.lua" }, "RuneBarOptions")
+        local runeChunk = TestHelpers.LoadChunk({ "UI/RuneBarOptions.lua" }, "RuneBarOptions")
         runeChunk(nil, ns)
 
         -- Both should have registered themselves

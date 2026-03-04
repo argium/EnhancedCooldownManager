@@ -15,14 +15,14 @@ describe("PowerBarTickMarksOptions", function()
     local originalGlobals
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "StaticPopupDialogs", "YES", "NO", "SETTINGS_DEFAULTS",
         })
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     it("module loads and exposes RegisterSettings and Store", function()
@@ -50,7 +50,7 @@ describe("PowerBarTickMarksOptions", function()
                 db = { profile = {} },
             },
         }
-        local chunk = TestHelpers.loadChunk(
+        local chunk = TestHelpers.LoadChunk(
             { "../UI/PowerBarTickMarksOptions.lua" },
             "Unable to load PowerBarTickMarksOptions.lua"
         )

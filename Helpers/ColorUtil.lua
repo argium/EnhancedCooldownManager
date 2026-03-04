@@ -22,7 +22,7 @@ end
 ---@return number r 0..1
 ---@return number g 0..1
 ---@return number b 0..1
-local function normalize_rgb(color)
+local function normalizeRgb(color)
     assert(color ~= nil, "ECM.Util: color is required")
 
     if type(color) == "string" then
@@ -59,18 +59,17 @@ end
 ---@param g number 0..1
 ---@param b number 0..1
 ---@return string hex
-local function rgb_to_hex(r, g, b)
+local function rgbToHex(r, g, b)
     local ri = clamp(math.floor((r * 255) + 0.5), 0, 255)
     local gi = clamp(math.floor((g * 255) + 0.5), 0, 255)
     local bi = clamp(math.floor((b * 255) + 0.5), 0, 255)
     return string.format("%02x%02x%02x", ri, gi, bi)
 end
 
-
 ---@param color ECM_Color
 ---@return string hex
-function ColorUtil.color_to_hex(color)
-    return rgb_to_hex(color.r, color.g, color.b)
+function ColorUtil.ColorToHex(color)
+    return rgbToHex(color.r, color.g, color.b)
 end
 
 ---@param t number 0..1
@@ -81,7 +80,7 @@ end
 ---@param g2 number
 ---@param b2 number
 ---@return number r, number g, number b
-local function lerp_rgb(t, r1, g1, b1, r2, g2, b2)
+local function lerpRgb(t, r1, g1, b1, r2, g2, b2)
     return (r1 + (r2 - r1) * t), (g1 + (g2 - g1) * t), (b1 + (b2 - b1) * t)
 end
 
@@ -96,7 +95,7 @@ end
 ---@param eg number
 ---@param eb number
 ---@return number r, number g, number b
-local function three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
+local function threeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
     if t <= 0 then
         return sr, sg, sb
     end
@@ -105,9 +104,9 @@ local function three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
     end
 
     if t <= 0.5 then
-        return lerp_rgb(t * 2, sr, sg, sb, mr, mg, mb)
+        return lerpRgb(t * 2, sr, sg, sb, mr, mg, mb)
     end
-    return lerp_rgb((t - 0.5) * 2, mr, mg, mb, er, eg, eb)
+    return lerpRgb((t - 0.5) * 2, mr, mg, mb, er, eg, eb)
 end
 
 --- Returns `text` with each character wrapped in a 3-stop gradient color.
@@ -123,7 +122,7 @@ end
 ---@param midColor string|table|nil
 ---@param endColor string|table|nil
 ---@return string
-ColorUtil.Sparkle = function(text, startColor, midColor, endColor)
+function ColorUtil.Sparkle(text, startColor, midColor, endColor)
     assert(type(text) == "string", "text must be a string")
     startColor = startColor or { r = 0.25, g = 0.82, b = 1.00, a = 1 }
     midColor = midColor or { r = 0.62, g = 0.45, b = 1.00, a = 1 }
@@ -134,9 +133,9 @@ ColorUtil.Sparkle = function(text, startColor, midColor, endColor)
         return ""
     end
 
-    local sr, sg, sb = normalize_rgb(startColor)
-    local mr, mg, mb = normalize_rgb(midColor )
-    local er, eg, eb = normalize_rgb(endColor)
+    local sr, sg, sb = normalizeRgb(startColor)
+    local mr, mg, mb = normalizeRgb(midColor )
+    local er, eg, eb = normalizeRgb(endColor)
 
     local effectiveLen = clamp(charCount, 4, 60)
     local parts = {}
@@ -146,8 +145,8 @@ ColorUtil.Sparkle = function(text, startColor, midColor, endColor)
             or (1 + math.floor(((i - 1) * (effectiveLen - 1) / (charCount - 1)) + 0.5))
 
         local t = (effectiveLen == 1) and 0 or ((pos - 1) / (effectiveLen - 1))
-        local r, g, b = three_stop_gradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
-        parts[i] = "|cff" .. rgb_to_hex(r, g, b) .. text:sub(i, i) .. "|r"
+        local r, g, b = threeStopGradient(t, sr, sg, sb, mr, mg, mb, er, eg, eb)
+        parts[i] = "|cff" .. rgbToHex(r, g, b) .. text:sub(i, i) .. "|r"
     end
 
     return table.concat(parts)

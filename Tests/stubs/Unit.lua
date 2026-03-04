@@ -6,7 +6,7 @@ local state = {
     powerByType = {},
 }
 
-local function ResolvePowerType(powerType)
+local function resolvePowerType(powerType)
     if powerType ~= nil then
         return powerType
     end
@@ -36,11 +36,11 @@ function Unit.SetClass(unit, classToken)
 end
 
 function Unit.SetPowerMax(powerType, value)
-    state.powerMaxByType[ResolvePowerType(powerType)] = value
+    state.powerMaxByType[resolvePowerType(powerType)] = value
 end
 
 function Unit.SetPower(powerType, value)
-    state.powerByType[ResolvePowerType(powerType)] = value
+    state.powerByType[resolvePowerType(powerType)] = value
 end
 
 function Unit.Install()
@@ -49,7 +49,7 @@ function Unit.Install()
     end
 
     _G.UnitPowerMax = function(_, powerType)
-        local value = state.powerMaxByType[ResolvePowerType(powerType)]
+        local value = state.powerMaxByType[resolvePowerType(powerType)]
         if value == nil then
             return 0
         end
@@ -57,7 +57,7 @@ function Unit.Install()
     end
 
     _G.UnitPower = function(_, powerType)
-        local value = state.powerByType[ResolvePowerType(powerType)]
+        local value = state.powerByType[resolvePowerType(powerType)]
         if value == nil then
             return 0
         end

@@ -30,7 +30,7 @@ ECM.ModuleMixin.ApplyConfigMixin(ItemIcons, "ItemIcons")
 --- Checks if a trinket slot has an on-use effect.
 ---@param slotId number Inventory slot ID (13 or 14).
 ---@return ECM_IconData|nil iconData Icon data if on-use, nil otherwise.
-local function GetTrinketData(slotId)
+local function getTrinketData(slotId)
     local itemId = GetInventoryItemID("player", slotId)
     if not itemId then
         return nil
@@ -52,7 +52,7 @@ end
 --- Returns the first item from priorityList that exists in the player's bags.
 ---@param priorityList { itemID: number, quality: number|nil }[] Array of priority entries, ordered by priority.
 ---@return ECM_IconData|nil iconData Icon data if found, nil otherwise.
-local function GetBestConsumable(priorityList)
+local function getBestConsumable(priorityList)
     for _, entry in ipairs(priorityList) do
         local itemId = entry.itemID
         if C_Item.GetItemCount(itemId) > 0 then
@@ -70,19 +70,19 @@ end
 --- Returns all display items in display order: Trinkets > Combat Potion > Health Potion > Healthstone.
 ---@param moduleConfig table Module configuration.
 ---@return ECM_IconData[] items Array of icon data.
-local function GetDisplayItems(moduleConfig)
+local function getDisplayItems(moduleConfig)
     local items = {}
 
     -- Trinkets first
     if moduleConfig.showTrinket1 then
-        local data = GetTrinketData(ECM.Constants.TRINKET_SLOT_1)
+        local data = getTrinketData(ECM.Constants.TRINKET_SLOT_1)
         if data then
             items[#items + 1] = data
         end
     end
 
     if moduleConfig.showTrinket2 then
-        local data = GetTrinketData(ECM.Constants.TRINKET_SLOT_2)
+        local data = getTrinketData(ECM.Constants.TRINKET_SLOT_2)
         if data then
             items[#items + 1] = data
         end
@@ -90,7 +90,7 @@ local function GetDisplayItems(moduleConfig)
 
     -- Combat potion
     if moduleConfig.showCombatPotion then
-        local data = GetBestConsumable(ECM.Constants.COMBAT_POTIONS)
+        local data = getBestConsumable(ECM.Constants.COMBAT_POTIONS)
         if data then
             items[#items + 1] = data
         end
@@ -98,7 +98,7 @@ local function GetDisplayItems(moduleConfig)
 
     -- Health potion
     if moduleConfig.showHealthPotion then
-        local data = GetBestConsumable(ECM.Constants.HEALTH_POTIONS)
+        local data = getBestConsumable(ECM.Constants.HEALTH_POTIONS)
         if data then
             items[#items + 1] = data
         end
@@ -123,7 +123,7 @@ end
 ---@param parent Frame Parent frame to attach to.
 ---@param size number Icon size in pixels.
 ---@return ECM_ItemIcon icon The created icon frame.
-local function CreateItemIcon(parent, size)
+local function createItemIcon(parent, size)
     local icon = CreateFrame("Button", nil, parent)
     icon:SetSize(size, size)
 
@@ -165,7 +165,7 @@ end
 
 --- Updates the cooldown display on an item icon.
 ---@param icon ECM_ItemIcon The icon to update.
-local function UpdateIconCooldown(icon)
+local function updateIconCooldown(icon)
     local start, duration, enable
 
     if icon.slotId then
@@ -189,7 +189,7 @@ end
 --- Gets cooldown number font info from a Blizzard utility cooldown icon.
 --- @param utilityViewer Frame
 --- @return string|nil fontPath, number|nil fontSize, string|nil fontFlags
-local function GetSiblingCooldownNumberFont(utilityViewer)
+local function getSiblingCooldownNumberFont(utilityViewer)
     if not utilityViewer then
         return nil, nil, nil
     end
@@ -215,7 +215,7 @@ end
 --- @param fontPath string
 --- @param fontSize number
 --- @param fontFlags string|nil
-local function ApplyCooldownNumberFont(icon, fontPath, fontSize, fontFlags)
+local function applyCooldownNumberFont(icon, fontPath, fontSize, fontFlags)
     if not (icon and icon.Cooldown and icon.Cooldown.GetRegions) then
         return
     end
@@ -228,7 +228,7 @@ end
 
 --- Restores UtilityCooldownViewer to its original position.
 ---@param self ECM_ItemIconsModule
-local function RestoreViewerPosition(self)
+local function restoreViewerPosition(self)
     if not self._viewerOriginalPoint then
         return
     end
@@ -249,7 +249,7 @@ end
 ---@param totalWidth number Container width (unscaled) for visible item icons.
 ---@param spacing number Gap between viewer and item icons (unscaled).
 ---@param viewerScale number Scale applied to UtilityCooldownViewer icons.
-local function ApplyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
+local function applyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
     if not utilityViewer then
         return
     end
@@ -271,7 +271,7 @@ end
 --- Returns whether Blizzard Edit Mode is currently active.
 ---@param self ECM_ItemIconsModule|nil
 ---@return boolean
-local function IsEditModeActive(self)
+local function isEditModeActive(self)
     if self and self._isEditModeActive ~= nil then
         return self._isEditModeActive
     end
@@ -289,7 +289,7 @@ end
 ---@return number scale The icon scale factor from Edit Mode IconSize.
 ---@return boolean isStable True when settings were read from the live viewer.
 ---@return table debugInfo Debug payload for logs.
-local function GetUtilityViewerLayout()
+local function getUtilityViewerLayout()
     local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
         return ECM.Constants.DEFAULT_ITEM_ICON_SIZE, ECM.Constants.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
@@ -352,7 +352,7 @@ function ItemIcons:CreateFrame()
     frame._iconPool = {}
     local initialSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
     for i = 1, ECM.Constants.ITEM_ICONS_MAX do
-        frame._iconPool[i] = CreateItemIcon(frame, initialSize)
+        frame._iconPool[i] = createItemIcon(frame, initialSize)
     end
 
     return frame
@@ -385,12 +385,12 @@ function ItemIcons:UpdateLayout(why)
 
     local moduleConfig = self:GetModuleConfig()
     if not moduleConfig then
-        RestoreViewerPosition(self)
+        restoreViewerPosition(self)
         return false
     end
 
-    if IsEditModeActive(self) then
-        RestoreViewerPosition(self)
+    if isEditModeActive(self) then
+        restoreViewerPosition(self)
         self._viewerOriginalPoint = nil
         frame:Hide()
         return false
@@ -398,24 +398,24 @@ function ItemIcons:UpdateLayout(why)
 
     -- Check visibility
     if not self:ShouldShow() then
-        RestoreViewerPosition(self)
+        restoreViewerPosition(self)
         frame:Hide()
         return false
     end
 
     local utilityViewer = _G["UtilityCooldownViewer"]
     if not utilityViewer then
-        RestoreViewerPosition(self)
+        restoreViewerPosition(self)
         frame:Hide()
         return false
     end
 
-    local siblingFontPath, siblingFontSize, siblingFontFlags = GetSiblingCooldownNumberFont(utilityViewer)
+    local siblingFontPath, siblingFontSize, siblingFontFlags = getSiblingCooldownNumberFont(utilityViewer)
 
     -- Get display items
-    local items = GetDisplayItems(moduleConfig)
+    local items = getDisplayItems(moduleConfig)
     local numItems = #items
-    local iconSize, spacing, viewerScale, layoutStable, layoutDebug = GetUtilityViewerLayout()
+    local iconSize, spacing, viewerScale, layoutStable, layoutDebug = getUtilityViewerLayout()
 
     -- Apply the same scale as the viewer to match Edit Mode settings
     frame:SetScale(viewerScale)
@@ -427,7 +427,7 @@ function ItemIcons:UpdateLayout(why)
 
     -- If no items, hide container
     if numItems == 0 then
-        RestoreViewerPosition(self)
+        restoreViewerPosition(self)
         frame:Hide()
         return false
     end
@@ -436,7 +436,7 @@ function ItemIcons:UpdateLayout(why)
     local totalWidth = (numItems * iconSize) + ((numItems - 1) * spacing)
     local totalHeight = iconSize
     frame:SetSize(totalWidth, totalHeight)
-    ApplyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
+    applyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
 
     -- Position and configure each icon
     local xOffset = 0
@@ -462,7 +462,7 @@ function ItemIcons:UpdateLayout(why)
         icon:Show()
 
         if siblingFontPath and siblingFontSize then
-            ApplyCooldownNumberFont(icon, siblingFontPath, siblingFontSize, siblingFontFlags)
+            applyCooldownNumberFont(icon, siblingFontPath, siblingFontSize, siblingFontFlags)
         end
 
         xOffset = xOffset + iconSize + spacing
@@ -516,7 +516,7 @@ function ItemIcons:Refresh(why)
     -- Update cooldowns on all visible icons
     for _, icon in ipairs(frame._iconPool) do
         if icon:IsShown() and (icon.slotId or icon.itemId) then
-            UpdateIconCooldown(icon)
+            updateIconCooldown(icon)
         end
     end
 

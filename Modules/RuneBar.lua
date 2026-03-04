@@ -10,7 +10,7 @@ local C = ECM.Constants
 mod.RuneBar = RuneBar
 ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
         
-local function GetRuneCooldownState(index, now)
+local function getRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
     if runeReady or not start or start == 0 or not duration or duration == 0 then
         return true, nil, nil
@@ -22,12 +22,12 @@ local function GetRuneCooldownState(index, now)
     return false, remaining, frac
 end
 
-local function BuildRuneStateTables(maxRunes, now)
+local function buildRuneStateTables(maxRunes, now)
     local readySet = {}
     local cdLookup = {}
 
     for i = 1, maxRunes do
-        local isReady, remaining, frac = GetRuneCooldownState(i, now)
+        local isReady, remaining, frac = getRuneCooldownState(i, now)
         if isReady then
             readySet[i] = true
         else
@@ -38,7 +38,7 @@ local function BuildRuneStateTables(maxRunes, now)
     return readySet, cdLookup
 end
 
-local function RuneReadyStatesDiffer(lastReadySet, readySet, maxRunes)
+local function runeReadyStatesDiffer(lastReadySet, readySet, maxRunes)
     for i = 1, maxRunes do
         if (readySet[i] or false) ~= ((lastReadySet and lastReadySet[i]) or false) then
             return true
@@ -47,7 +47,7 @@ local function RuneReadyStatesDiffer(lastReadySet, readySet, maxRunes)
     return false
 end
 
-local function ApplyRuneFragmentVisual(frag, isReady, cd, color)
+local function applyRuneFragmentVisual(frag, isReady, cd, color)
     if isReady then
         frag:SetValue(1)
         frag:SetStatusBarColor(color.r, color.g, color.b)
@@ -62,7 +62,7 @@ end
 ---@param bar Frame
 ---@param maxResources number
 ---@param tex string Texture path
-local function EnsureFragmentedBars(bar, maxResources, tex)
+local function ensureFragmentedBars(bar, maxResources, tex)
     for i = 1, maxResources do
         if not bar.FragmentedBars[i] then
             local frag = CreateFrame("StatusBar", nil, bar)
@@ -82,7 +82,7 @@ local function EnsureFragmentedBars(bar, maxResources, tex)
     end
 end
 
-local function GetColor(cfg)
+local function getColor(cfg)
     local specId = GetSpecialization()
 
     local specColor
@@ -106,7 +106,7 @@ end
 ---@param maxRunes number
 ---@param moduleConfig table
 ---@param globalConfig table
-local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalConfig)
+local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalConfig)
     if not GetRuneCooldown then
         return
     end
@@ -122,9 +122,9 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     end
 
     local now = GetTime()
-    local color = GetColor(moduleConfig)
-    local readySet, cdLookup = BuildRuneStateTables(maxRunes, now)
-    local statesChanged = (bar._lastReadySet == nil) or RuneReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
+    local color = getColor(moduleConfig)
+    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
+    local statesChanged = (bar._lastReadySet == nil) or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
 
     if statesChanged then
         bar._lastReadySet = readySet
@@ -172,7 +172,7 @@ local function UpdateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     for i = 1, maxRunes do
         local frag = bar.FragmentedBars[i]
         if frag then
-            ApplyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
+            applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
 end
@@ -182,7 +182,7 @@ end
 --- Triggers a full layout refresh when rune ready/CD states change.
 ---@param self RuneBar
 ---@param frame Frame
-local function UpdateRuneValues(self, frame)
+local function updateRuneValues(self, frame)
     if not GetRuneCooldown then
         return
     end
@@ -207,11 +207,11 @@ local function UpdateRuneValues(self, frame)
     frame._lastValueUpdate = now
 
     local cfg = self:GetModuleConfig()
-    local color = GetColor(cfg)
-    local readySet, cdLookup = BuildRuneStateTables(maxRunes, now)
+    local color = getColor(cfg)
+    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
 
     -- Detect state transitions to trigger full reorder/reposition
-    if RuneReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
+    if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
         -- A rune just finished or started CD — trigger full refresh for reorder/reposition
         self:ThrottledUpdateLayout("RuneStateChange")
         return
@@ -221,7 +221,7 @@ local function UpdateRuneValues(self, frame)
     for i = 1, maxRunes do
         local frag = frags[i]
         if frag then
-            ApplyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
+            applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
 end
@@ -281,12 +281,12 @@ function RuneBar:Refresh(why, force)
 
     local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
     local tex = ECM.GetTexture(texKey)
-    EnsureFragmentedBars(frame, maxRunes, tex)
+    ensureFragmentedBars(frame, maxRunes, tex)
 
     local tickCount = math.max(0, maxRunes - 1)
     self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
 
-    UpdateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
+    updateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
     self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
 
     frame:Show()
@@ -313,7 +313,7 @@ function RuneBar:OnEnable()
     -- DK-only: lightweight per-frame rune value updates and power events
     if self.InnerFrame then
         self.InnerFrame:SetScript("OnUpdate", function()
-            UpdateRuneValues(self, self.InnerFrame)
+            updateRuneValues(self, self.InnerFrame)
         end)
     end
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")

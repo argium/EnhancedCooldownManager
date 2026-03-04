@@ -12,7 +12,7 @@ local migrationLog = {}
 --- Appends a timestamped message to the migration log buffer and sends it to
 --- the normal debug log.
 ---@param message string
-local function Log(message)
+local function log(message)
     migrationLog[#migrationLog + 1] = date("%Y-%m-%d %H:%M:%S") .. "  " .. message
     ECM.Log("Migration", message)
 end
@@ -26,7 +26,7 @@ end
 ---@param value any
 ---@param seen table|nil
 ---@return any
-local function DeepCopy(value, seen)
+local function deepCopy(value, seen)
     if type(value) ~= "table" then
         return value
     end
@@ -39,14 +39,14 @@ local function DeepCopy(value, seen)
 
     local copy = {}
     for k, v in pairs(value) do
-        copy[k] = DeepCopy(v, seen)
+        copy[k] = deepCopy(v, seen)
     end
 
     seen[value] = nil
     return copy
 end
 
-local function NormalizeLegacyColor(color, defaultAlpha)
+local function normalizeLegacyColor(color, defaultAlpha)
     if color == nil then
         return nil
     end
@@ -83,12 +83,12 @@ end
 ---@param b number
 ---@param a number|nil
 ---@return boolean
-local function IsColorMatch(color, r, g, b, a)
+local function isColorMatch(color, r, g, b, a)
     if type(color) ~= "table" then
         return false
     end
 
-    local resolved = NormalizeLegacyColor(color, a)
+    local resolved = normalizeLegacyColor(color, a)
     if not resolved then
         return false
     end
@@ -104,34 +104,34 @@ local function IsColorMatch(color, r, g, b, a)
     return resolved.a == a
 end
 
-local function NormalizeColorTable(colorTable, defaultAlpha)
+local function normalizeColorTable(colorTable, defaultAlpha)
     if type(colorTable) ~= "table" then
         return
     end
 
     for key, value in pairs(colorTable) do
-        colorTable[key] = NormalizeLegacyColor(value, defaultAlpha)
+        colorTable[key] = normalizeLegacyColor(value, defaultAlpha)
     end
 end
 
-local function NormalizeBarConfig(cfg)
+local function normalizeBarConfig(cfg)
     if not cfg then
         return
     end
 
-    cfg.bgColor = NormalizeLegacyColor(cfg.bgColor, 1)
+    cfg.bgColor = normalizeLegacyColor(cfg.bgColor, 1)
     if cfg.border and cfg.border.color then
-        cfg.border.color = NormalizeLegacyColor(cfg.border.color, 1)
+        cfg.border.color = normalizeLegacyColor(cfg.border.color, 1)
     end
     if cfg.colors then
-        NormalizeColorTable(cfg.colors, 1)
+        normalizeColorTable(cfg.colors, 1)
     end
     if cfg.color then
-        cfg.color = NormalizeLegacyColor(cfg.color, 1)
+        cfg.color = normalizeLegacyColor(cfg.color, 1)
     end
 end
 
-local function NormalizeBuffBarsCache(cfg)
+local function normalizeBuffBarsCache(cfg)
     if not (cfg and cfg.colors and type(cfg.colors.cache) == "table") then
         return
     end
@@ -167,7 +167,7 @@ end
 
 --- Migrates profiles from the per-bar color settings to per-spell.
 ---@param profile table The profile to migrate
-local function MigrateToPerSpellColors(profile)
+local function migrateToPerSpellColors(profile)
     local cfg = profile.buffBars
     if not cfg then
         return
@@ -186,7 +186,7 @@ local function MigrateToPerSpellColors(profile)
 
     local perSpell = cfg.colors.perSpell
 
-    local function DoSpellMigration(perBar, perSpell, cache)
+    local function doSpellMigration(perBar, perSpell, cache)
         for i, v in ipairs(cache) do
             if not v.color and v.spellName then
                 local bc = perBar[i]
@@ -210,7 +210,7 @@ local function MigrateToPerSpellColors(profile)
                 perSpell[classID][specID] = {}
             end
             if cache[classID] and cache[classID][specID] then
-                DoSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
+                doSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
             end
         end
     end
@@ -221,7 +221,7 @@ end
 --- Repairs spell-color metadata and fallback tier links for all class/spec stores.
 --- This migration runs once and replaces the previous runtime-only repair path.
 ---@param profile table The profile to repair
-local function RepairSpellColorStores(profile)
+local function repairSpellColorStores(profile)
     local buffBars = profile.buffBars
     if not (buffBars and type(buffBars.colors) == "table") then
         return
@@ -272,7 +272,7 @@ local function RepairSpellColorStores(profile)
         end
     end
 
-    local function EnsureClassSpecStore(store, classID, specID)
+    local function ensureClassSpecStore(store, classID, specID)
         if type(store[classID]) ~= "table" then
             store[classID] = {}
         end
@@ -287,9 +287,9 @@ local function RepairSpellColorStores(profile)
         if type(classMap) == "table" then
             for specID, specMap in pairs(classMap) do
                 if type(specMap) == "table" then
-                    local bySpellIDSpec = EnsureClassSpecStore(colors.bySpellID, classID, specID)
-                    local byCooldownIDSpec = EnsureClassSpecStore(colors.byCooldownID, classID, specID)
-                    local byTextureSpec = EnsureClassSpecStore(colors.byTexture, classID, specID)
+                    local bySpellIDSpec = ensureClassSpecStore(colors.bySpellID, classID, specID)
+                    local byCooldownIDSpec = ensureClassSpecStore(colors.byCooldownID, classID, specID)
+                    local byTextureSpec = ensureClassSpecStore(colors.byTexture, classID, specID)
 
                     for _, entry in pairs(specMap) do
                         if type(entry) == "table" and type(entry.value) == "table" then
@@ -315,7 +315,7 @@ end
 --- Normalizes spell-color wrapper metadata and collapses duplicate entries.
 --- Stored color payloads become color-only (r/g/b/a); identifiers move to entry.meta.
 ---@param profile table The profile to repair
-local function NormalizeSpellColorStoresV10(profile)
+local function normalizeSpellColorStoresV10(profile)
     local stats = {
         skipped = false,
         skipReason = nil,
@@ -395,7 +395,7 @@ local function NormalizeSpellColorStoresV10(profile)
         return type(k) == "number" and k or nil
     end
 
-    local function CountEntries(map)
+    local function countEntries(map)
         if type(map) ~= "table" then
             return 0
         end
@@ -662,7 +662,7 @@ local function NormalizeSpellColorStoresV10(profile)
                         scrubValue(entry.value)
                     end
                 end
-                local finalCount = CountEntries(newPerTier[tierIndex])
+                local finalCount = countEntries(newPerTier[tierIndex])
                 stats.finalEntries = stats.finalEntries + finalCount
                 stats.perTier[tier.storeKey].final = stats.perTier[tier.storeKey].final + finalCount
             end
@@ -718,12 +718,12 @@ function Migration.Run(profile)
     end
 
     local startVersion = profile.schemaVersion
-    Log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
+    log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
 
     -- Migration: buffBarColors -> buffBars.colors (schema 2 -> 3)
     if profile.schemaVersion < 3 then
         if profile.buffBarColors then
-            Log("Migrating buffBarColors to buffBars.colors")
+            log("Migrating buffBarColors to buffBars.colors")
 
             profile.buffBars = profile.buffBars or {}
             profile.buffBars.colors = profile.buffBars.colors or {}
@@ -740,19 +740,19 @@ function Migration.Run(profile)
         -- Migration: colors.colors -> colors.perBar (rename within buffBars.colors)
         local colorsConfig = profile.buffBars and profile.buffBars.colors
         if colorsConfig and colorsConfig.colors and not colorsConfig.perBar then
-            Log("Renaming buffBars.colors.colors to buffBars.colors.perBar")
+            log("Renaming buffBars.colors.colors to buffBars.colors.perBar")
             colorsConfig.perBar = colorsConfig.colors
             colorsConfig.colors = nil
         end
 
-        Log("Migrated to V3")
+        log("Migrated to V3")
         profile.schemaVersion = 3
     end
 
     if profile.schemaVersion < 4 then
         -- Migration: powerBarTicks.defaultColor -> bold semi-transparent white (schema 3 -> 4)
         local ticksCfg = profile.powerBarTicks
-        if ticksCfg and IsColorMatch(ticksCfg.defaultColor, 0, 0, 0, 0.5) then
+        if ticksCfg and isColorMatch(ticksCfg.defaultColor, 0, 0, 0, 0.5) then
             ticksCfg.defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }
         end
 
@@ -760,7 +760,7 @@ function Migration.Run(profile)
         local resourceCfg = profile.resourceBar
         local colors = resourceCfg and resourceCfg.colors
         local soulsColor = colors and colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
-        if IsColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
+        if isColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
             colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
         end
 
@@ -776,23 +776,23 @@ function Migration.Run(profile)
         -- Normalize stored colors to ECM_Color (legacy conversion happens once here)
         local gbl = profile.global
         if gbl then
-            gbl.barBgColor = NormalizeLegacyColor(gbl.barBgColor, 1)
+            gbl.barBgColor = normalizeLegacyColor(gbl.barBgColor, 1)
         end
 
-        NormalizeBarConfig(profile.powerBar)
-        NormalizeBarConfig(profile.resourceBar)
-        NormalizeBarConfig(profile.runeBar)
+        normalizeBarConfig(profile.powerBar)
+        normalizeBarConfig(profile.resourceBar)
+        normalizeBarConfig(profile.runeBar)
 
         local powerBar = profile.powerBar
         if powerBar and powerBar.ticks then
             local tickCfg = powerBar.ticks
-            tickCfg.defaultColor = NormalizeLegacyColor(tickCfg.defaultColor, 1)
+            tickCfg.defaultColor = normalizeLegacyColor(tickCfg.defaultColor, 1)
             if tickCfg.mappings then
                 for _, specMap in pairs(tickCfg.mappings) do
                     for _, ticks in pairs(specMap) do
                         for _, tick in ipairs(ticks) do
                             if tick and tick.color then
-                                tick.color = NormalizeLegacyColor(tick.color, tickCfg.defaultColor and tickCfg.defaultColor.a or 1)
+                                tick.color = normalizeLegacyColor(tick.color, tickCfg.defaultColor and tickCfg.defaultColor.a or 1)
                             end
                         end
                     end
@@ -802,14 +802,14 @@ function Migration.Run(profile)
 
         local buffBars = profile.buffBars
         if buffBars and buffBars.colors then
-            buffBars.colors.defaultColor = NormalizeLegacyColor(buffBars.colors.defaultColor, 1)
+            buffBars.colors.defaultColor = normalizeLegacyColor(buffBars.colors.defaultColor, 1)
             local perBar = buffBars.colors.perBar
             if type(perBar) == "table" then
                 for _, specMap in pairs(perBar) do
                     for _, bars in pairs(specMap) do
                         if type(bars) == "table" then
                             for index, color in pairs(bars) do
-                                bars[index] = NormalizeLegacyColor(color, 1)
+                                bars[index] = normalizeLegacyColor(color, 1)
                             end
                         end
                     end
@@ -817,7 +817,7 @@ function Migration.Run(profile)
             end
         end
 
-        Log("Migrated to V4")
+        log("Migrated to V4")
         profile.schemaVersion = 4
     end
 
@@ -845,15 +845,15 @@ function Migration.Run(profile)
             profile.combatFade = nil
         end
 
-        Log("Migrated to V5")
+        log("Migrated to V5")
         profile.schemaVersion = 5
     end
 
     if profile.schemaVersion < 6 then
         -- Migration: perBar -> perSpell
-        MigrateToPerSpellColors(profile)
+        migrateToPerSpellColors(profile)
 
-        Log("Migrated to V6")
+        log("Migrated to V6")
         profile.schemaVersion = 6
     end
 
@@ -861,10 +861,10 @@ function Migration.Run(profile)
         -- Migration: normalize buff bar cache entries (remove legacy cache.color and unknown names)
         local buffBars = profile.buffBars
         if buffBars then
-            NormalizeBuffBarsCache(buffBars)
+            normalizeBuffBarsCache(buffBars)
         end
 
-        Log("Migrated to V7")
+        log("Migrated to V7")
         profile.schemaVersion = 7
     end
 
@@ -921,23 +921,23 @@ function Migration.Run(profile)
             end
         end
 
-        Log("Migrated to V8")
+        log("Migrated to V8")
         profile.schemaVersion = 8
     end
 
     if profile.schemaVersion < 9 then
         -- Migration: repair spell color metadata and fallback tier links.
-        RepairSpellColorStores(profile)
+        repairSpellColorStores(profile)
 
-        Log("Migrated to V9")
+        log("Migrated to V9")
         profile.schemaVersion = 9
     end
 
     if profile.schemaVersion < 10 then
         -- Migration: normalize spell color wrapper metadata and collapse fragmented entries.
-        local v10Stats = NormalizeSpellColorStoresV10(profile)
+        local v10Stats = normalizeSpellColorStoresV10(profile)
         if v10Stats and v10Stats.skipped then
-            Log("V10 spell color normalization skipped: " .. (v10Stats.skipReason or "unknown reason"))
+            log("V10 spell color normalization skipped: " .. (v10Stats.skipReason or "unknown reason"))
         elseif v10Stats then
             local createdTiers = {}
             for _, tier in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
@@ -946,7 +946,7 @@ function Migration.Run(profile)
                 end
             end
 
-            Log(string.format(
+            log(string.format(
                 "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
                 v10Stats.classesProcessed,
                 v10Stats.specsProcessed,
@@ -960,7 +960,7 @@ function Migration.Run(profile)
                 v10Stats.entriesMetaNormalized,
                 v10Stats.finalEntries
             ))
-            Log(string.format(
+            log(string.format(
                 "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
                 v10Stats.perTier.byName.scanned, v10Stats.perTier.byName.invalid, v10Stats.perTier.byName.final,
                 v10Stats.perTier.bySpellID.scanned, v10Stats.perTier.bySpellID.invalid, v10Stats.perTier.bySpellID.final,
@@ -968,21 +968,21 @@ function Migration.Run(profile)
                 v10Stats.perTier.byTexture.scanned, v10Stats.perTier.byTexture.invalid, v10Stats.perTier.byTexture.final
             ))
             if #createdTiers > 0 then
-                Log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
+                log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
             end
             for _, msg in ipairs(v10Stats.anomalySpecs) do
-                Log("V10 anomaly: " .. msg)
+                log("V10 anomaly: " .. msg)
             end
             if v10Stats.anomalySpecsOverflow > 0 then
-                Log("V10 anomaly: additional specs omitted=" .. v10Stats.anomalySpecsOverflow)
+                log("V10 anomaly: additional specs omitted=" .. v10Stats.anomalySpecsOverflow)
             end
         end
 
-        Log("Migrated to V10")
+        log("Migrated to V10")
         profile.schemaVersion = 10
     end
 
-    Log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
+    log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
 end
 
 --------------------------------------------------------------------------------
@@ -993,7 +993,7 @@ end
 ---@param versions table The _versions sub-table.
 ---@param belowVersion number Only consider versions below this number.
 ---@return number|nil bestVersion The highest version found, or nil.
-local function FindBestPriorVersion(versions, belowVersion)
+local function findBestPriorVersion(versions, belowVersion)
     local best = nil
     for k in pairs(versions) do
         if type(k) == "number" and k < belowVersion and (not best or k > best) then
@@ -1033,10 +1033,10 @@ function Migration.PrepareDatabase()
     -- Seed the current version's slot if it doesn't exist yet
     if not versions[version] then
         -- Try the most recent prior version in the store
-        local priorVersion = FindBestPriorVersion(versions, version)
+        local priorVersion = findBestPriorVersion(versions, version)
         if priorVersion and versions[priorVersion] then
-            Log("Copying from schema V" .. priorVersion .. " to V" .. version)
-            versions[version] = DeepCopy(versions[priorVersion])
+            log("Copying from schema V" .. priorVersion .. " to V" .. version)
+            versions[version] = deepCopy(versions[priorVersion])
         elseif sv.profiles then
             -- Seed from legacy top-level AceDB data (pre-versioning addon builds)
             local hasProfiles = false
@@ -1046,10 +1046,10 @@ function Migration.PrepareDatabase()
             end
 
             if hasProfiles then
-                Log("Copying legacy profiles to versioned store V" .. version)
+                log("Copying legacy profiles to versioned store V" .. version)
                 versions[version] = {
-                    profiles = DeepCopy(sv.profiles),
-                    profileKeys = sv.profileKeys and DeepCopy(sv.profileKeys) or nil,
+                    profiles = deepCopy(sv.profiles),
+                    profileKeys = sv.profileKeys and deepCopy(sv.profileKeys) or nil,
                 }
             end
         end

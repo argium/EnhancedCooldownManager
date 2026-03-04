@@ -78,7 +78,7 @@ describe("SpellColors", function()
     end
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "UnitClass",
             "GetSpecialization",
@@ -91,7 +91,7 @@ describe("SpellColors", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
@@ -140,7 +140,7 @@ describe("SpellColors", function()
             return tostring(value)
         end
 
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             {
                 "Constants.lua",
                 "../Constants.lua",
@@ -149,7 +149,7 @@ describe("SpellColors", function()
         )
         constantsChunk()
 
-        local priorityMapChunk = TestHelpers.loadChunk(
+        local priorityMapChunk = TestHelpers.LoadChunk(
             {
                 "Helpers/PriorityKeyMap.lua",
                 "../Helpers/PriorityKeyMap.lua",
@@ -169,7 +169,7 @@ describe("SpellColors", function()
             },
         }
 
-        local spellColorsChunk = TestHelpers.loadChunk(
+        local spellColorsChunk = TestHelpers.LoadChunk(
             {
                 "Helpers/SpellColors.lua",
                 "../Helpers/SpellColors.lua",

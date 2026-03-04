@@ -7,11 +7,11 @@ local mod = ns.Addon
 
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
-local function IsAnchorModeFree(cfg)
+local function isAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
 end
 
-local function SetModuleEnabled(moduleName, enabled)
+local function setModuleEnabled(moduleName, enabled)
     local module = mod[moduleName] or ECM[moduleName]
     if not module then return end
 
@@ -25,7 +25,7 @@ end
 --- Normalize a path key by converting numeric strings to numbers, leaving other strings unchanged.
 ---@param key string The path key to normalize
 ---@return number|string The normalized key
-local function NormalizePathKey(key)
+local function normalizePathKey(key)
     return tonumber(key) or key
 end
 
@@ -33,11 +33,11 @@ end
 ---@param tbl table The table to get the value from
 ---@param path string The dot-separated path to the value
 ---@return any The value at the specified path, or nil if any part of the path is invalid
-local function GetNestedValue(tbl, path)
+local function getNestedValue(tbl, path)
     local current = tbl
     for segment in path:gmatch("[^.]+") do
         if type(current) ~= "table" then return nil end
-        current = current[NormalizePathKey(segment)]
+        current = current[normalizePathKey(segment)]
     end
     return current
 end
@@ -46,20 +46,20 @@ end
 ---@param tbl table The table to set the value in
 ---@param path string The dot-separated path to the value
 ---@param value any The value to set at the specified path
-local function SetNestedValue(tbl, path, value)
+local function setNestedValue(tbl, path, value)
     local segments = {}
     for segment in path:gmatch("[^.]+") do
         segments[#segments + 1] = segment
     end
     local current = tbl
     for i = 1, #segments - 1 do
-        local key = NormalizePathKey(segments[i])
+        local key = normalizePathKey(segments[i])
         if current[key] == nil then
             current[key] = {}
         end
         current = current[key]
     end
-    current[NormalizePathKey(segments[#segments])] = value
+    current[normalizePathKey(segments[#segments])] = value
 end
 
 --- Gets the current player's class and specialization information.
@@ -68,7 +68,7 @@ end
 ---@return string localisedClassName
 ---@return string specName
 ---@return string className
-local function GetCurrentClassSpec()
+local function getCurrentClassSpec()
     local localisedClassName, className, classID = UnitClass("player")
     local specIndex = GetSpecialization()
     local specName
@@ -87,7 +87,7 @@ end
 ---@param currentColor {r:number, g:number, b:number, a:number|nil}
 ---@param hasOpacity boolean
 ---@param onChange fun(color: {r:number, g:number, b:number, a:number})
-local function OpenColorPicker(currentColor, hasOpacity, onChange)
+local function openColorPicker(currentColor, hasOpacity, onChange)
     ColorPickerFrame:SetupColorPickerAndShow({
         r = currentColor.r, g = currentColor.g, b = currentColor.b,
         opacity = currentColor.a,
@@ -106,20 +106,20 @@ end
 --- Returns a closure that checks if the module at configPath is disabled.
 ---@param configPath string e.g. "powerBar"
 ---@return fun(): boolean
-local function GetIsDisabledDelegate(configPath)
+local function getIsDisabledDelegate(configPath)
     local enabledPath = configPath .. ".enabled"
     return function()
-        return not GetNestedValue(mod.db.profile, enabledPath)
+        return not getNestedValue(mod.db.profile, enabledPath)
     end
 end
 
 ECM.OptionUtil = {
-    GetNestedValue = GetNestedValue,
-    IsAnchorModeFree = IsAnchorModeFree,
-    SetModuleEnabled = SetModuleEnabled,
-    GetCurrentClassSpec = GetCurrentClassSpec,
-    OpenColorPicker = OpenColorPicker,
-    GetIsDisabledDelegate = GetIsDisabledDelegate,
+    GetNestedValue = getNestedValue,
+    IsAnchorModeFree = isAnchorModeFree,
+    SetModuleEnabled = setModuleEnabled,
+    GetCurrentClassSpec = getCurrentClassSpec,
+    OpenColorPicker = openColorPicker,
+    GetIsDisabledDelegate = getIsDisabledDelegate,
 }
 
 --------------------------------------------------------------------------------
@@ -129,8 +129,8 @@ ECM.OptionUtil = {
 ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
     getProfile = function() return mod.db and mod.db.profile end,
     getDefaults = function() return mod.db and mod.db.defaults and mod.db.defaults.profile end,
-    getNestedValue = GetNestedValue,
-    setNestedValue = SetNestedValue,
+    getNestedValue = getNestedValue,
+    setNestedValue = setNestedValue,
     varPrefix = "ECM",
     onChanged = function(spec)
         if spec.layout ~= false then
@@ -142,11 +142,11 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
             fontValues = LSMW.GetFontValues,
             fontFallback = function()
                 local profile = mod.db and mod.db.profile
-                return profile and GetNestedValue(profile, "global.font") or "Expressway"
+                return profile and getNestedValue(profile, "global.font") or "Expressway"
             end,
             fontSizeFallback = function()
                 local profile = mod.db and mod.db.profile
-                return profile and GetNestedValue(profile, "global.fontSize") or 11
+                return profile and getNestedValue(profile, "global.fontSize") or 11
             end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },
@@ -155,7 +155,7 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
                 [ECM.Constants.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
                 [ECM.Constants.ANCHORMODE_FREE] = "Movable via Edit Mode",
             },
-            isAnchorModeFree = IsAnchorModeFree,
+            isAnchorModeFree = isAnchorModeFree,
             applyPositionMode = function(cfg, mode) cfg.anchorMode = mode end,
         },
     },

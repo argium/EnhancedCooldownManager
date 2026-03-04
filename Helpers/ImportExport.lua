@@ -26,7 +26,7 @@ assert(LibDeflate, "ImportExport: LibDeflate not loaded")
 ---@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBars.colors.cache"})
 ---@param currentPath string|nil Current path in recursion (internal use)
 ---@return table copy The deep copy
-local function DeepCopyExcluding(source, excludePaths, currentPath)
+local function deepCopyExcluding(source, excludePaths, currentPath)
     if type(source) ~= "table" then
         return source
     end
@@ -49,7 +49,7 @@ local function DeepCopyExcluding(source, excludePaths, currentPath)
 
         if not shouldExclude then
             if type(value) == "table" then
-                copy[key] = DeepCopyExcluding(value, excludePaths, keyPath)
+                copy[key] = deepCopyExcluding(value, excludePaths, keyPath)
             else
                 copy[key] = value
             end
@@ -61,7 +61,7 @@ end
 
 --- Generates metadata for export string.
 ---@return table metadata Metadata about the export
-local function GenerateMetadata()
+local function generateMetadata()
     local version = C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "unknown"
 
     return {
@@ -157,15 +157,15 @@ end
 --- Prepares a profile for export by creating a clean copy and excluding cache data.
 ---@param profile table The profile to prepare
 ---@return table exportData Data ready for export
-local function PrepareProfileForExport(profile)
+local function prepareProfileForExport(profile)
     assert(profile, "profile is nil")
 
     -- Exclude runtime cache data
     local excludePaths = {"buffBars.colors.cache"}
-    local cleanedProfile = DeepCopyExcluding(profile, excludePaths)
+    local cleanedProfile = deepCopyExcluding(profile, excludePaths)
 
     return {
-        metadata = GenerateMetadata(),
+        metadata = generateMetadata(),
         profile = cleanedProfile,
     }
 end
@@ -180,7 +180,7 @@ function ImportExport.ExportCurrentProfile()
         return nil, "No active profile found"
     end
 
-    local exportData = PrepareProfileForExport(db.profile)
+    local exportData = prepareProfileForExport(db.profile)
     return ImportExport.EncodeData(exportData)
 end
 
@@ -224,7 +224,7 @@ function ImportExport.ApplyImportData(data)
         and db.profile.buffBars.colors
         and db.profile.buffBars.colors.cache
     if existingCache then
-        existingCache = DeepCopyExcluding(existingCache)
+        existingCache = deepCopyExcluding(existingCache)
     end
 
     -- Clear and replace profile

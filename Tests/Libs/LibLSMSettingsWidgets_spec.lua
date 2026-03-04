@@ -15,7 +15,7 @@ describe("LibLSMSettingsWidgets", function()
     local originalGlobals
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "LibStub",
             "SettingsListElementMixin",
             "LibLSMSettingsWidgets_FontPickerMixin",
@@ -24,11 +24,11 @@ describe("LibLSMSettingsWidgets", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
-        TestHelpers.setupLibStub()
+        TestHelpers.SetupLibStub()
         _G.SettingsListElementMixin = {
             OnLoad = function() end,
             Init = function() end,
@@ -40,7 +40,7 @@ describe("LibLSMSettingsWidgets", function()
             lsm.Fetch = function() return nil end
         end
 
-        local chunk = TestHelpers.loadChunk(
+        local chunk = TestHelpers.LoadChunk(
             { "Libs/LibLSMSettingsWidgets/LibLSMSettingsWidgets.lua" },
             "Unable to load LibLSMSettingsWidgets.lua"
         )

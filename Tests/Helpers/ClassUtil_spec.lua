@@ -20,7 +20,7 @@ describe("ClassUtil", function()
     local CSpellBookStub
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ClassUtil",
             "ECM",
             "Enum",
@@ -39,7 +39,7 @@ describe("ClassUtil", function()
             return 0
         end
 
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             {
                 "Constants.lua",
                 "../Constants.lua",
@@ -48,7 +48,7 @@ describe("ClassUtil", function()
         )
         constantsChunk()
 
-        local enumChunk = TestHelpers.loadChunk(
+        local enumChunk = TestHelpers.LoadChunk(
             {
                 "Tests/stubs/Enums.lua",
                 "stubs/Enums.lua",
@@ -58,7 +58,7 @@ describe("ClassUtil", function()
         )
         enumChunk()
 
-        UnitStub = TestHelpers.loadChunk(
+        UnitStub = TestHelpers.LoadChunk(
             {
                 "Tests/stubs/Unit.lua",
                 "stubs/Unit.lua",
@@ -66,7 +66,7 @@ describe("ClassUtil", function()
             },
             "Unable to load Tests/stubs/Unit.lua"
         )()
-        CSpellStub = TestHelpers.loadChunk(
+        CSpellStub = TestHelpers.LoadChunk(
             {
                 "Tests/stubs/C_Spell.lua",
                 "stubs/C_Spell.lua",
@@ -74,7 +74,7 @@ describe("ClassUtil", function()
             },
             "Unable to load Tests/stubs/C_Spell.lua"
         )()
-        CUnitAurasStub = TestHelpers.loadChunk(
+        CUnitAurasStub = TestHelpers.LoadChunk(
             {
                 "Tests/stubs/C_UnitAuras.lua",
                 "stubs/C_UnitAuras.lua",
@@ -82,7 +82,7 @@ describe("ClassUtil", function()
             },
             "Unable to load Tests/stubs/C_UnitAuras.lua"
         )()
-        CSpellBookStub = TestHelpers.loadChunk(
+        CSpellBookStub = TestHelpers.LoadChunk(
             {
                 "Tests/stubs/C_SpellBook.lua",
                 "stubs/C_SpellBook.lua",
@@ -101,7 +101,7 @@ describe("ClassUtil", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()

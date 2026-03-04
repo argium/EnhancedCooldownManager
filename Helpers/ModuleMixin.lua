@@ -144,7 +144,7 @@ function ModuleMixin:IsReady()
 end
 
 --- Internal: checks readiness and runs the coalesced layout update.
-local function update_layout_deferred(self)
+local function updateLayoutDeferred(self)
     if not self:IsReady() then
         ECM.Log(self.Name, "Layout update skipped (not ready)")
         self._updateLayoutPending = false
@@ -191,7 +191,7 @@ function ModuleMixin:ThrottledUpdateLayout(reason, opts)
         self._pendingWhy = reason
         self._updateLayoutPending = true
         C_Timer.After(0, function()
-            update_layout_deferred(self)
+            updateLayoutDeferred(self)
         end)
     end
 end

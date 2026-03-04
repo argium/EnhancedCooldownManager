@@ -4,7 +4,7 @@
 
 local TestHelpers = {}
 
-function TestHelpers.loadChunk(paths, errorMessage)
+function TestHelpers.LoadChunk(paths, errorMessage)
     for _, path in ipairs(paths) do
         local chunk = loadfile(path)
         if chunk then
@@ -14,7 +14,7 @@ function TestHelpers.loadChunk(paths, errorMessage)
     error(errorMessage)
 end
 
-function TestHelpers.captureGlobals(names)
+function TestHelpers.CaptureGlobals(names)
     local snapshot = {}
     for _, name in ipairs(names) do
         snapshot[name] = _G[name]
@@ -22,7 +22,7 @@ function TestHelpers.captureGlobals(names)
     return snapshot
 end
 
-function TestHelpers.restoreGlobals(snapshot)
+function TestHelpers.RestoreGlobals(snapshot)
     for name, value in pairs(snapshot) do
         _G[name] = value
     end
@@ -99,7 +99,7 @@ local function makeSetting(getter, setter, default)
 end
 
 --- Setup a minimal LibStub stub for tests.
-function TestHelpers.setupLibStub()
+function TestHelpers.SetupLibStub()
     local libs = {}
     local LibStub = {
         NewLibrary = function(self, major, minor)
@@ -124,7 +124,7 @@ end
 
 --- Install all Settings API stubs into _G. Returns the list of global names
 --- that were set, so they can be captured/restored.
-function TestHelpers.setupSettingsStubs()
+function TestHelpers.SetupSettingsStubs()
     local globals = {
         "Settings", "CreateSettingsListSectionHeaderInitializer",
         "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",

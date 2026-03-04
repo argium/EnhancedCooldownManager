@@ -18,7 +18,7 @@ describe("SettingsBuilder", function()
     local SB
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM", "ECM_DeepEquals",
             "Settings", "SettingsPanel", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
@@ -32,14 +32,14 @@ describe("SettingsBuilder", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
         layoutUpdateCalls = 0
 
-        TestHelpers.setupLibStub()
-        TestHelpers.setupSettingsStubs()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
 
         _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
@@ -50,7 +50,7 @@ describe("SettingsBuilder", function()
         _G.GetSpecializationInfo = function() return nil, "Arms" end
 
         -- Load the library
-        local libChunk = TestHelpers.loadChunk(
+        local libChunk = TestHelpers.LoadChunk(
             { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
             "Unable to load LibSettingsBuilder.lua"
         )
@@ -132,7 +132,7 @@ describe("SettingsBuilder", function()
             },
         }
 
-        local optionUtilChunk = TestHelpers.loadChunk(
+        local optionUtilChunk = TestHelpers.LoadChunk(
             { "Helpers/OptionUtil.lua" },
             "Unable to load Helpers/OptionUtil.lua"
         )

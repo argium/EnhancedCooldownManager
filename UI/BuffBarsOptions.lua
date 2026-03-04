@@ -9,7 +9,7 @@ local C = ECM.Constants
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
-local function BuildSpellColorRows(entries)
+local function buildSpellColorRows(entries)
     local rows = {}
 
     for _, entry in ipairs(entries or {}) do
@@ -40,7 +40,7 @@ end
 --- Scans rows for entries whose primary key is a secret or empty string.
 ---@param rows { key: ECM_SpellColorKey }[]
 ---@return boolean
-local function HasUnlabeledBars(rows)
+local function hasUnlabeledBars(rows)
     for _, row in ipairs(rows) do
         local key = row.key.primaryKey
         if type(key) == "string" and (issecretvalue(key) or key == "") then
@@ -66,7 +66,7 @@ StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
     hideOnEscape = true,
 }
 
-local function CreateSpellColorCanvas(SB, subcatName)
+local function createSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
     local frame = layout.frame
 
@@ -145,7 +145,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
     scrollBox:SetDataProvider(dataProvider)
 
     function frame:RefreshSpellList()
-        local rows = BuildSpellColorRows(
+        local rows = buildSpellColorRows(
             ECM.SpellColors.GetAllColorEntries()
         )
 
@@ -162,7 +162,7 @@ local function CreateSpellColorCanvas(SB, subcatName)
         elseif locked and reason == "secrets" then
             parts[#parts + 1] = "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
         end
-        if HasUnlabeledBars(rows) then
+        if hasUnlabeledBars(rows) then
             parts[#parts + 1] = "|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\".|r"
         end
         warningText:SetText(table.concat(parts, "\n"))
@@ -189,8 +189,8 @@ end
 
 local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
-BuffBarsOptions._BuildSpellColorRows = BuildSpellColorRows
-BuffBarsOptions._HasUnlabeledBars = HasUnlabeledBars
+BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
+BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
 
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 

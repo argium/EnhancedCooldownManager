@@ -17,7 +17,7 @@ local _editLocked = false
 ---@field cooldownID number|nil
 ---@field cooldownInfo { spellID: number|nil }|nil
 
-local function get_children_ordered(viewer)
+local function getChildrenOrdered(viewer)
     local result = {}
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
         -- There are other children that are present but don't appear to be valid. I'm not sure what they are
@@ -42,7 +42,7 @@ local function get_children_ordered(viewer)
     return result
 end
 
-local function hook_child_frame(child, module)
+local function hookChildFrame(child, module)
     if child.__ecmHooked then
         return
     end
@@ -70,7 +70,7 @@ end
 ---@param iconTexture Texture|nil
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
-local function apply_square_icon_style(iconFrame, iconTexture, iconOverlay, debuffBorder)
+local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)
     if not iconFrame then return end
     if iconFrame.__ecmSquareStyled then return end
     if not iconTexture then return end
@@ -118,7 +118,7 @@ end
 ---@param globalConfig table Global config
 ---@param barIndex number Index of the bar (for logging)
 ---@param retryCount number|nil Number of times this function has been retried
-local function style_child_frame(frame, config, globalConfig, barIndex, retryCount)
+local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
         ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
         return
@@ -204,7 +204,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     _editLocked = _editLocked or allSecret
 
     -- Purely diagnostics to help track down issues with secrets
-    local hex = barColor and string.upper(ColorUtil.color_to_hex(barColor)) or nil
+    local hex = barColor and string.upper(ColorUtil.ColorToHex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
     local logPrefix = "GetColorForBar[".. barIndex .."] "
     local logLine = logPrefix .. "(" .. ECM.ToString(spellName) .. ", " .. ECM.ToString(spellID) .. ", " .. ECM.ToString(cooldownID) .. ", " .. ECM.ToString(textureFileID) .. ") = " .. colorLog
@@ -213,7 +213,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
-                style_child_frame(frame, config, globalConfig, barIndex, retryCount + 1)
+                styleChildFrame(frame, config, globalConfig, barIndex, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
@@ -256,7 +256,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
     if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
-        apply_square_icon_style(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
+        applySquareIconStyle(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
         iconFrame:SetShown(showIcon)
         if iconTexture then
             iconTexture:SetShown(showIcon)
@@ -317,7 +317,7 @@ local function style_child_frame(frame, config, globalConfig, barIndex, retryCou
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
-local function layout_bars(self)
+local function layoutBars(self)
     local viewer = _G["BuffBarCooldownViewer"]
     if not viewer then
         return
@@ -338,10 +338,10 @@ local function layout_bars(self)
         verticalSpacing = math.max(0, cfg.verticalSpacing)
     end
 
-    local children = get_children_ordered(viewer)
+    local children = getChildrenOrdered(viewer)
     local prev
 
-    local function anchor_child(child)
+    local function anchorChild(child)
         if not child:IsShown() then return end
 
         local selfEdge = growsUp and "BOTTOM" or "TOP"
@@ -358,11 +358,11 @@ local function layout_bars(self)
 
     if growsUp then
         for i = #children, 1, -1 do
-            anchor_child(children[i].frame)
+            anchorChild(children[i].frame)
         end
     else
         for _, entry in ipairs(children) do
-            anchor_child(entry.frame)
+            anchorChild(entry.frame)
         end
     end
 end
@@ -422,7 +422,7 @@ function BuffBars:UpdateLayout(why)
 
     -- Discover bars regardless of visibility so the spell colours options
     -- panel has the full list even when hidden (e.g. resting).
-    local visibleChildren = get_children_ordered(viewer)
+    local visibleChildren = getChildrenOrdered(viewer)
     for _, entry in ipairs(visibleChildren) do
         if entry.frame.Bar then
             ECM.SpellColors.DiscoverBar(entry.frame)
@@ -475,12 +475,12 @@ function BuffBars:UpdateLayout(why)
     for barIndex, entry in ipairs(visibleChildren) do
         -- Some children of the viewer do not have a Bar so might be some other part of the UI.
         if entry.frame.Bar then
-            hook_child_frame(entry.frame, self)
-            style_child_frame(entry.frame, cfg, globalConfig, barIndex)
+            hookChildFrame(entry.frame, self)
+            styleChildFrame(entry.frame, cfg, globalConfig, barIndex)
         end
     end
 
-    layout_bars(self)
+    layoutBars(self)
 
     self._layoutRunning = nil
     viewer:Show()
@@ -507,7 +507,7 @@ function BuffBars:GetActiveSpellData()
         return {}
     end
 
-    local ordered = get_children_ordered(viewer)
+    local ordered = getChildrenOrdered(viewer)
     local result = {}
     for _, entry in ipairs(ordered) do
         local frame = entry.frame

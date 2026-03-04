@@ -17,11 +17,11 @@ assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 
-local function is_debug_enabled()
+local function isDebugEnabled()
     return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
 end
 
-local function safe_str_tostring(x)
+local function safeStrTostring(x)
     if x == nil then
         return "nil"
     elseif issecretvalue(x) then
@@ -31,7 +31,7 @@ local function safe_str_tostring(x)
     end
 end
 
-local function safe_table_tostring(tbl, depth, seen)
+local function safeTableTostring(tbl, depth, seen)
     if issecrettable(tbl) then
         return "[secrettable]"
     end
@@ -58,7 +58,7 @@ local function safe_table_tostring(tbl, depth, seen)
             end
 
             local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
-            local valueStr = type(x) == "table" and safe_table_tostring(x, depth + 1, seen) or safe_str_tostring(x)
+            local valueStr = type(x) == "table" and safeTableTostring(x, depth + 1, seen) or safeStrTostring(x)
             parts[#parts + 1] = keyStr .. "=" .. valueStr
         end
 
@@ -74,7 +74,7 @@ local function safe_table_tostring(tbl, depth, seen)
     return pairsOrErr
 end
 
-local function get_lsm_media(mediaType, key)
+local function getLsmMedia(mediaType, key)
     if LSM and key then
         return LSM:Fetch(mediaType, key, true)
     end
@@ -82,14 +82,14 @@ end
 
 function ECM.ToString(v)
     if type(v) == "table" then
-        return safe_table_tostring(v, 0, {})
+        return safeTableTostring(v, 0, {})
     end
-    return safe_str_tostring(v)
+    return safeStrTostring(v)
 end
 
 function ECM.GetTexture(texture)
     if texture then
-        local fetched = get_lsm_media("statusbar", texture)
+        local fetched = getLsmMedia("statusbar", texture)
         if fetched then
             return fetched
         end
@@ -99,11 +99,11 @@ function ECM.GetTexture(texture)
         end
     end
 
-    return get_lsm_media("statusbar", "Blizzard") or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
+    return getLsmMedia("statusbar", "Blizzard") or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
 end
 
 function ECM.DebugAssert(condition, message, data)
-    if not is_debug_enabled() then
+    if not isDebugEnabled() then
         return
     end
 
@@ -116,7 +116,7 @@ end
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
     local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
     local useModuleOverride = moduleConfig and moduleConfig.overrideFont == true
-    local fontPath = get_lsm_media("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or ECM.Constants.DEFAULT_FONT
+    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or ECM.Constants.DEFAULT_FONT
     local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or 11
     local fontOutline = (config and config.fontOutline)
 
@@ -169,7 +169,7 @@ function ECM.Print(...)
 end
 
 function ECM.Log(module, message, data)
-    if not is_debug_enabled() then
+    if not isDebugEnabled() then
         return
     end
 
@@ -188,7 +188,7 @@ function ECM.Log(module, message, data)
     print("|cff" .. ECM.Constants.DEBUG_COLOR .. prefix .. "|r " .. message)
 end
 
-local function RegisterAddonCompartmentEntry()
+local function registerAddonCompartmentEntry()
     if mod._addonCompartmentRegistered then
         return
     end
@@ -253,7 +253,7 @@ end
 --- Creates or retrieves a StaticPopup dialog with common settings for editbox dialogs.
 ---@param key string
 ---@param config table
-local function EnsureEditBoxDialog(key, config)
+local function ensureEditBoxDialog(key, config)
     if StaticPopupDialogs[key] then
         return
     end
@@ -280,7 +280,7 @@ function mod:ShowExportDialog(exportString)
         return
     end
 
-    EnsureEditBoxDialog(POPUP_EXPORT_PROFILE, {
+    ensureEditBoxDialog(POPUP_EXPORT_PROFILE, {
         text = "Press Ctrl+C to copy the export string:",
         button1 = CLOSE or "Close",
     })
@@ -298,7 +298,7 @@ end
 
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
-    EnsureEditBoxDialog(POPUP_IMPORT_PROFILE, {
+    ensureEditBoxDialog(POPUP_IMPORT_PROFILE, {
         text = "Paste your import string:",
         button1 = OKAY or "Import",
         button2 = CANCEL or "Cancel",
@@ -469,7 +469,7 @@ end
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
 function mod:OnEnable()
     pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
-    RegisterAddonCompartmentEntry()
+    registerAddonCompartmentEntry()
     local profile = self.db and self.db.profile
 
     local moduleOrder = {

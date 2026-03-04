@@ -6,12 +6,6 @@ local FrameUtil = ECM.FrameUtil
 local BarMixin = {}
 ECM.BarMixin = BarMixin
 
--- owns:
---  StatusBar
---  Appearance (bg color, texture)
---  Text overlay
---  Tick marks
-
 --------------------------------------------------------------------------------
 -- Tick Helpers
 --------------------------------------------------------------------------------

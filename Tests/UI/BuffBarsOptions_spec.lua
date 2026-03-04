@@ -17,7 +17,7 @@ describe("BuffBarsOptions", function()
     local SpellColors
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM", "ECM_DeepEquals",
             "Settings", "CreateSettingsListSectionHeaderInitializer",
             "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
@@ -31,12 +31,12 @@ describe("BuffBarsOptions", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
-        TestHelpers.setupLibStub()
-        TestHelpers.setupSettingsStubs()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
 
         _G.UnitClass = function() return "Demon Hunter", "DEMONHUNTER", 12 end
         _G.GetSpecialization = function() return 2 end
@@ -89,7 +89,7 @@ describe("BuffBarsOptions", function()
         }
 
         -- Load library
-        local libChunk = TestHelpers.loadChunk(
+        local libChunk = TestHelpers.LoadChunk(
             { "Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "../Libs/LibSettingsBuilder/LibSettingsBuilder.lua" },
             "Unable to load LibSettingsBuilder.lua"
         )
@@ -104,14 +104,14 @@ describe("BuffBarsOptions", function()
         end
 
         -- Load Constants
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             { "Constants.lua", "../Constants.lua" },
             "Unable to load Constants.lua"
         )
         constantsChunk()
 
         -- Load PriorityKeyMap
-        local priorityMapChunk = TestHelpers.loadChunk(
+        local priorityMapChunk = TestHelpers.LoadChunk(
             { "Helpers/PriorityKeyMap.lua", "../Helpers/PriorityKeyMap.lua" },
             "Unable to load PriorityKeyMap.lua"
         )
@@ -127,7 +127,7 @@ describe("BuffBarsOptions", function()
             },
         }
 
-        local spellColorsChunk = TestHelpers.loadChunk(
+        local spellColorsChunk = TestHelpers.LoadChunk(
             { "Helpers/SpellColors.lua", "../Helpers/SpellColors.lua" },
             "Unable to load SpellColors.lua"
         )
@@ -135,7 +135,7 @@ describe("BuffBarsOptions", function()
         SpellColors = ECM.SpellColors
 
         -- Load OptionUtil (includes SettingsBuilder adapter)
-        local optUtilChunk = TestHelpers.loadChunk(
+        local optUtilChunk = TestHelpers.LoadChunk(
             { "../Helpers/OptionUtil.lua" },
             "Unable to load OptionUtil.lua"
         )
@@ -149,7 +149,7 @@ describe("BuffBarsOptions", function()
             Addon = addonNS.Addon,
             OptionsSections = {},
         }
-        local buffChunk = TestHelpers.loadChunk(
+        local buffChunk = TestHelpers.LoadChunk(
             { "../UI/BuffBarsOptions.lua" },
             "Unable to load BuffBarsOptions.lua"
         )

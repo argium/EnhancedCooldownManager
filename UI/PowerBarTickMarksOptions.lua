@@ -8,7 +8,7 @@ local C = ECM.Constants
 
 local BASE_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization."
 
-local function GetTicksConfig()
+local function getTicksConfig()
     local powerBar = mod.db.profile.powerBar
     if powerBar and powerBar.ticks then return powerBar.ticks end
     if not mod.db.profile.powerBar then mod.db.profile.powerBar = {} end
@@ -35,14 +35,14 @@ end
 function store.SetCurrentTicks(ticks)
     local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then return end
-    local ticksCfg = GetTicksConfig()
+    local ticksCfg = getTicksConfig()
     if not ticksCfg.mappings[classID] then ticksCfg.mappings[classID] = {} end
     ticksCfg.mappings[classID][specIndex] = ticks
 end
 
 function store.AddTick(value, color, width)
     local ticks = store.GetCurrentTicks()
-    local ticksCfg = GetTicksConfig()
+    local ticksCfg = getTicksConfig()
     ticks[#ticks + 1] = {
         value = value,
         color = color or ECM.CloneValue(ticksCfg.defaultColor),
@@ -66,19 +66,19 @@ function store.UpdateTick(index, field, value)
 end
 
 function store.GetDefaultColor()
-    return GetTicksConfig().defaultColor
+    return getTicksConfig().defaultColor
 end
 
 function store.SetDefaultColor(color)
-    GetTicksConfig().defaultColor = color
+    getTicksConfig().defaultColor = color
 end
 
 function store.GetDefaultWidth()
-    return GetTicksConfig().defaultWidth
+    return getTicksConfig().defaultWidth
 end
 
 function store.SetDefaultWidth(width)
-    GetTicksConfig().defaultWidth = width
+    getTicksConfig().defaultWidth = width
 end
 
 ECM.PowerBarTickMarksStore = store
@@ -93,11 +93,11 @@ StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = {
     hideOnEscape = true,
 }
 
-local function RoundToStep(value)
+local function roundToStep(value)
     return math.floor(value + 0.5)
 end
 
-local function CreateTickRowWidgets(rowFrame, SB)
+local function createTickRowWidgets(rowFrame, SB)
     rowFrame:SetHeight(34)
 
     local highlight = rowFrame:CreateTexture(nil, "BACKGROUND")
@@ -156,7 +156,7 @@ local function CreateTickRowWidgets(rowFrame, SB)
 
     local function bindSlider(slider, textLabel, storeField)
         slider:SetScript("OnValueChanged", function(_, val)
-            local rounded = RoundToStep(val)
+            local rounded = roundToStep(val)
             textLabel:SetText(tostring(rounded))
             if rowFrame._isRefreshing then return end
             if rounded ~= val then
@@ -174,7 +174,7 @@ local function CreateTickRowWidgets(rowFrame, SB)
     bindSlider(widthSlider, widthText, "width")
 end
 
-local function CreateTickMarksCanvas(SB, subcatName)
+local function createTickMarksCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
     local frame = layout.frame
 
@@ -211,7 +211,7 @@ local function CreateTickMarksCanvas(SB, subcatName)
 
     local _, defaultWidthSlider, defaultWidthText = layout:AddSlider("Default width", 1, 5, 1)
     defaultWidthSlider:SetScript("OnValueChanged", function(_, value)
-        local rounded = RoundToStep(value)
+        local rounded = roundToStep(value)
         defaultWidthText:SetText(tostring(rounded))
         store.SetDefaultWidth(rounded)
     end)
@@ -226,7 +226,7 @@ local function CreateTickMarksCanvas(SB, subcatName)
 
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then
-            CreateTickRowWidgets(rowFrame, SB)
+            createTickRowWidgets(rowFrame, SB)
             rowFrame._initialized = true
         end
 
@@ -240,9 +240,9 @@ local function CreateTickMarksCanvas(SB, subcatName)
 
         rowFrame._isRefreshing = true
         rowFrame._valueSlider:SetValue(tickValue)
-        rowFrame._valueText:SetText(tostring(RoundToStep(tickValue)))
+        rowFrame._valueText:SetText(tostring(roundToStep(tickValue)))
         rowFrame._widthSlider:SetValue(tickWidth)
-        rowFrame._widthText:SetText(tostring(RoundToStep(tickWidth)))
+        rowFrame._widthText:SetText(tostring(roundToStep(tickWidth)))
         rowFrame._isRefreshing = false
 
         local tc = data.tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
@@ -292,7 +292,7 @@ local function CreateTickMarksCanvas(SB, subcatName)
 
         local dw = store.GetDefaultWidth() or 1
         defaultWidthSlider:SetValue(dw)
-        defaultWidthText:SetText(tostring(RoundToStep(dw)))
+        defaultWidthText:SetText(tostring(roundToStep(dw)))
     end
 
     frame.OnDefault = clearAllTicks
@@ -304,6 +304,6 @@ end
 
 ECM.PowerBarTickMarksOptions = {
     RegisterSettings = function(SB)
-        CreateTickMarksCanvas(SB, "Tick Marks")
+        createTickMarksCanvas(SB, "Tick Marks")
     end,
 }

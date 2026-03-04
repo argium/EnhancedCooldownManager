@@ -45,7 +45,7 @@ local _hookedBlizzardFrames = {}
 
 --- Iterates over all Blizzard cooldown viewer frames.
 --- @param fn fun(frame: Frame, name: string)
-local function ForEachBlizzardFrame(fn)
+local function forEachBlizzardFrame(fn)
     for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
@@ -57,9 +57,9 @@ end
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
-local function EnforceBlizzardFrameState()
+local function enforceBlizzardFrameState()
     local alpha = _desiredAlpha
-    ForEachBlizzardFrame(function(frame)
+    forEachBlizzardFrame(function(frame)
         if _globallyHidden then
             if frame:IsShown() then
                 frame:Hide()
@@ -79,7 +79,7 @@ end
 --- Provides sub-frame correction when the game externally re-shows a frame.
 --- @param frame Frame
 --- @param name string
-local function HookBlizzardFrame(frame, name)
+local function hookBlizzardFrame(frame, name)
     if _hookedBlizzardFrames[name] then
         return
     end
@@ -98,16 +98,16 @@ end
 
 --- Attempts to hook OnShow on all known Blizzard cooldown viewer frames.
 --- Frames may be created lazily; called periodically to catch latecomers.
-local function HookBlizzardFrames()
-    ForEachBlizzardFrame(function(frame, name)
-        HookBlizzardFrame(frame, name)
+local function hookBlizzardFrames()
+    forEachBlizzardFrame(function(frame, name)
+        hookBlizzardFrame(frame, name)
     end)
 end
 
 --- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
-local function SetGloballyHidden(hidden, reason)
+local function setGloballyHidden(hidden, reason)
     local stateChanged = _globallyHidden ~= hidden or _hideReason ~= reason
 
     if stateChanged then
@@ -117,7 +117,7 @@ local function SetGloballyHidden(hidden, reason)
     _globallyHidden = hidden
     _hideReason = reason
 
-    EnforceBlizzardFrameState()
+    enforceBlizzardFrameState()
 
     for _, module in pairs(_modules) do
         module:SetHidden(hidden)
@@ -126,10 +126,10 @@ end
 
 --- Applies alpha to all managed frames.
 --- @param alpha number
-local function SetAlpha(alpha)
+local function setAlpha(alpha)
     _desiredAlpha = alpha
 
-    EnforceBlizzardFrameState()
+    enforceBlizzardFrameState()
 
     for _, module in pairs(_modules) do
         if module.InnerFrame then
@@ -139,7 +139,7 @@ local function SetAlpha(alpha)
 end
 
 --- Checks all fade and hide conditions and updates global state.
-local function UpdateFadeAndHiddenStates()
+local function updateFadeAndHiddenStates()
     local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
     if not globalConfig then
         return
@@ -147,23 +147,23 @@ local function UpdateFadeAndHiddenStates()
 
     -- Check CVar first
     if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
-        SetGloballyHidden(true, "cvar")
+        setGloballyHidden(true, "cvar")
         return
     end
 
     -- Check mounted or in vehicle
     if globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player")) then
-        SetGloballyHidden(true, "mounted")
+        setGloballyHidden(true, "mounted")
         return
     end
 
     if not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting() then
-        SetGloballyHidden(true, "rest")
+        setGloballyHidden(true, "rest")
         return
     end
 
     -- No hide reason, show everything
-    SetGloballyHidden(false, nil)
+    setGloballyHidden(false, nil)
 
     local alpha = 1
     local fadeConfig = globalConfig.outOfCombatFade
@@ -190,13 +190,13 @@ local function UpdateFadeAndHiddenStates()
         end
     end
 
-    SetAlpha(alpha)
+    setAlpha(alpha)
 end
 
 local UpdateAllLayouts
 
 --- Hooks CooldownViewerSettings hide to force alpha/layout reapplication.
-local function HookCooldownViewerSettings()
+local function hookCooldownViewerSettings()
     if _cooldownViewerSettingsHooked then
         return
     end
@@ -207,7 +207,7 @@ local function HookCooldownViewerSettings()
     end
 
     settingsFrame:HookScript("OnHide", function()
-        UpdateFadeAndHiddenStates()
+        updateFadeAndHiddenStates()
         UpdateAllLayouts("OnHide:CooldownViewerSettings")
     end)
 
@@ -239,7 +239,7 @@ end
 --- Schedules a layout update after a delay (debounced).
 --- @param delay number Delay in seconds
 --- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
-local function ScheduleLayoutUpdate(delay, reason)
+local function scheduleLayoutUpdate(delay, reason)
     if _layoutPending then
         return
     end
@@ -247,8 +247,8 @@ local function ScheduleLayoutUpdate(delay, reason)
     _layoutPending = true
     C_Timer.After(delay or 0, function()
         _layoutPending = false
-        HookCooldownViewerSettings()
-        UpdateFadeAndHiddenStates()
+        hookCooldownViewerSettings()
+        updateFadeAndHiddenStates()
         UpdateAllLayouts(reason)
     end)
 end
@@ -259,9 +259,9 @@ end
 
 --- Registers a ModuleMixin to receive layout update events.
 --- @param frame ModuleMixin The frame to register
-local function RegisterFrame(frame)
-    assert(frame and type(frame) == "table" and frame.IsModuleMixin, "RegisterFrame: invalid ModuleMixin")
-    assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
+local function registerFrame(frame)
+    assert(frame and type(frame) == "table" and frame.IsModuleMixin, "registerFrame: invalid ModuleMixin")
+    assert(_modules[frame.Name] == nil, "registerFrame: frame with name '" .. frame.Name .. "' is already registered")
     _modules[frame.Name] = frame
     ECM.Log(nil, "Frame registered: " .. frame.Name)
 
@@ -276,7 +276,7 @@ end
 
 --- Unregisters a ModuleMixin from layout update events.
 --- @param frame ModuleMixin The frame to unregister
-local function UnregisterFrame(frame)
+local function unregisterFrame(frame)
     if not frame or type(frame) ~= "table" then
         return
     end
@@ -310,16 +310,16 @@ end
 eventFrame:RegisterEvent("CVAR_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
-    HookCooldownViewerSettings()
+    hookCooldownViewerSettings()
 
-    if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
+    if (event == "UNIT_ENTERED_VEHICLE"or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
         return
     end
 
     -- Handle CVAR_UPDATE specially
     if event == "CVAR_UPDATE" then
         if arg1 == "cooldownViewerEnabled" then
-            ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
+            scheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
         end
         return
     end
@@ -336,11 +336,11 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
 
     if config.delay and config.delay > 0 then
         C_Timer.After(config.delay, function()
-            UpdateFadeAndHiddenStates()
+            updateFadeAndHiddenStates()
             UpdateAllLayouts(event)
         end)
     else
-        UpdateFadeAndHiddenStates()
+        updateFadeAndHiddenStates()
         UpdateAllLayouts(event)
     end
 
@@ -350,9 +350,9 @@ end)
 -- Module Lifecycle
 --------------------------------------------------------------------------------
 
-ECM.RegisterFrame = RegisterFrame
-ECM.UnregisterFrame = UnregisterFrame
-ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate
+ECM.RegisterFrame = registerFrame
+ECM.UnregisterFrame = unregisterFrame
+ECM.ScheduleLayoutUpdate = scheduleLayoutUpdate
 
 --------------------------------------------------------------------------------
 -- Watchdog — periodic state enforcement
@@ -363,9 +363,9 @@ ECM.ScheduleLayoutUpdate = ScheduleLayoutUpdate
 --------------------------------------------------------------------------------
 
 C_Timer.NewTicker(ECM.Constants.WATCHDOG_INTERVAL, function()
-    HookBlizzardFrames()
-    HookCooldownViewerSettings()
-    EnforceBlizzardFrameState()
+    hookBlizzardFrames()
+    hookCooldownViewerSettings()
+    enforceBlizzardFrameState()
 
     -- Re-enforce alpha on module frames in case of external resets
     local alpha = _desiredAlpha

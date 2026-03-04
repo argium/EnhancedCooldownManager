@@ -46,7 +46,7 @@ describe("Utilities", function()
     end
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "LibStub",
             "issecretvalue",
@@ -56,7 +56,7 @@ describe("Utilities", function()
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
@@ -108,7 +108,7 @@ describe("Utilities", function()
             },
         }
 
-        local constantsChunk = TestHelpers.loadChunk(
+        local constantsChunk = TestHelpers.LoadChunk(
             {
                 "ECM_Constants.lua",
                 "../ECM_Constants.lua",
@@ -117,7 +117,7 @@ describe("Utilities", function()
         )
         constantsChunk()
 
-        local mainChunk = TestHelpers.loadChunk(
+        local mainChunk = TestHelpers.LoadChunk(
             {
                 "ECM.lua",
                 "../ECM.lua",
