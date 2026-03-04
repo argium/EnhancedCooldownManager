@@ -612,13 +612,9 @@ end
 --------------------------------------------------------------------------------
 
 function ItemIcons:OnEnable()
-    if not self.IsModuleMixin then
-        ECM.ModuleMixin.AddMixin(self, "ItemIcons")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
+    ECM.ModuleMixin.AddFrameMixin(self, "ItemIcons")
+    ECM.RegisterFrame(self)
 
-    -- Register events
     self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items
     self:RegisterEvent("BAG_UPDATE_DELAYED", "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnPlayerEquipmentChanged")
@@ -634,19 +630,12 @@ end
 
 function ItemIcons:OnDisable()
     self:UnregisterAllEvents()
-
     self:UpdateLayout("OnDisable")
 
-    if self.IsModuleMixin and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
-    end
+    ECM.UnregisterFrame(self)
 
     self._viewerOriginalPoint = nil
     self._isEditModeActive = nil
     self._layoutRetryPending = nil
     self._layoutRetryCount = 0
-
-    if self.InnerFrame then
-        self.InnerFrame:Hide()
-    end
 end

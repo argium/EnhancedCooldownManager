@@ -611,7 +611,7 @@ function BuffBars:Enable()
     if self._enabled then return end
     self._enabled = true
 
-    ECM.ModuleMixin.AddMixin(self, "BuffBars")
+    ECM.ModuleMixin.AddFrameMixin(self, "BuffBars")
 
     _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     _eventFrame:RegisterEvent("ZONE_CHANGED")

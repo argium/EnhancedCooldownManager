@@ -9,7 +9,7 @@ local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
 local C = ECM.Constants
 mod.RuneBar = RuneBar
 ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
-        
+
 local function getRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
     if runeReady or not start or start == 0 or not duration or duration == 0 then
@@ -299,16 +299,13 @@ function RuneBar:OnEvent(event)
 end
 
 function RuneBar:OnEnable()
-    if not self.IsModuleMixin then
-        ECM.BarMixin.AddMixin(self, "RuneBar")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
-
     local _, class = UnitClass("player")
     if class ~= "DEATHKNIGHT" then
         return
     end
+
+    ECM.BarMixin.AddMixin(self, "RuneBar")
+    ECM.RegisterFrame(self)
 
     -- DK-only: lightweight per-frame rune value updates and power events
     if self.InnerFrame then
@@ -325,12 +322,9 @@ end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsModuleMixin and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
-    end
+    ECM.UnregisterFrame(self)
 
-    local frame = self.InnerFrame
-    if frame then
-        frame:SetScript("OnUpdate", nil)
+    if self.InnerFrame then
+        self.InnerFrame:SetScript("OnUpdate", nil)
     end
 end

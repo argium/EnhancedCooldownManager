@@ -295,6 +295,6 @@ function BarMixin.AddMixin(module, name)
     -- Ensure config methods are available (idempotent).
     BarMixin.ApplyConfigMixin(module, name)
 
-    ECM.ModuleMixin.AddMixin(module, name)
+    ECM.ModuleMixin.AddFrameMixin(module, name)
     module._lastUpdate = GetTime()
 end

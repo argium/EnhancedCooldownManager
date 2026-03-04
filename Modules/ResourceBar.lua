@@ -96,11 +96,8 @@ end
 --------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
-    if not self.IsModuleMixin then
-        ECM.BarMixin.AddMixin(self, "ResourceBar")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
+    ECM.BarMixin.AddMixin(self, "ResourceBar")
+    ECM.RegisterFrame(self)
 
     self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnEventUpdate")
@@ -108,7 +105,5 @@ end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsModuleMixin and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
-    end
+    ECM.UnregisterFrame(self)
 end

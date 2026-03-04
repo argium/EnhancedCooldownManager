@@ -13,7 +13,6 @@ ECM.ModuleMixin = ModuleMixin
 ---@class ModuleMixin : AceModule Frame mixin that owns visibility and config access.
 ---@field _configKey string|nil Config key for this frame's section.
 ---@field IsHidden boolean|nil Whether the frame is currently hidden.
----@field IsModuleMixin boolean True to identify this as a ModuleMixin instance.
 ---@field InnerFrame Frame|nil Inner WoW frame owned by this mixin.
 ---@field Name string Name of the frame.
 
@@ -58,12 +57,11 @@ function ModuleMixin:GetNextChainAnchor(frameName)
         local shouldShow = barModule and barModule:ShouldShow() or false
         local moduleConfig = barModule and barModule:GetModuleConfig()
         local isChainMode = moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN
-        local BarMixin = barModule and barModule.InnerFrame
-        local hasFrame = BarMixin ~= nil
+        local innerFrame = barModule and barModule.InnerFrame
 
-        if isEnabled and shouldShow and isChainMode and hasFrame then
+        if isEnabled and shouldShow and isChainMode and innerFrame then
             ECM.Log(self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
-            return BarMixin, false
+            return innerFrame, false
         end
     end
 
@@ -74,12 +72,6 @@ end
 
 function ModuleMixin:SetHidden(hide)
     self.IsHidden = hide
-end
-
-function ModuleMixin:SetAlpha(alpha)
-    if self.InnerFrame then
-        self.InnerFrame:SetAlpha(alpha)
-    end
 end
 
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.
@@ -216,19 +208,20 @@ function ModuleMixin.ApplyConfigMixin(target, name)
     target.IsHidden = false
 end
 
-function ModuleMixin.AddMixin(target, name)
+function ModuleMixin.AddFrameMixin(target, name)
+    assert(target, "target required")
+    assert(name, "name required")
+
+    -- Get this at the last moment because this method may be called before ECM has fully initialized.
     mod = mod or ns.Addon
 
-    -- Ensure config methods are available (idempotent).
-    ModuleMixin.ApplyConfigMixin(target, name)
+    -- Callers (BarMixin.AddMixin, BuffBars) already call ApplyConfigMixin before
+    -- this point, but direct callers (ItemIcons) may not — so keep idempotent call.
+    if not target.Name then
+        ModuleMixin.ApplyConfigMixin(target, name)
+    end
 
-    target.InnerFrame = target:CreateFrame()
-    target.IsModuleMixin = true
-
-    -- Registering this frame allows us to receive layout update events such as global hideWhenMounted.
-    ECM.RegisterFrame(target)
-
-    C_Timer.After(0, function()
-        target:ThrottledUpdateLayout("ModuleInit")
-    end)
+    if not target.InnerFrame then
+        target.InnerFrame = target:CreateFrame()
+    end
 end

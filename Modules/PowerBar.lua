@@ -149,18 +149,13 @@ end
 --------------------------------------------------------------------------------
 
 function PowerBar:OnEnable()
-    if not self.IsModuleMixin then
-        ECM.BarMixin.AddMixin(self, "PowerBar")
-    elseif ECM.RegisterFrame then
-        ECM.RegisterFrame(self)
-    end
+    ECM.BarMixin.AddMixin(self, "PowerBar")
+    ECM.RegisterFrame(self)
 
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
 end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
-    if self.IsModuleMixin and ECM.UnregisterFrame then
-        ECM.UnregisterFrame(self)
-    end
+    ECM.UnregisterFrame(self)
 end
