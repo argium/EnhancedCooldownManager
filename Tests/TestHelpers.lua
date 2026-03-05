@@ -282,4 +282,144 @@ function TestHelpers.SetupSettingsStubs()
     return globals
 end
 
+--------------------------------------------------------------------------------
+-- Shared mock builders for frame/texture test stubs
+--------------------------------------------------------------------------------
+
+local unpack_fn = table.unpack or unpack
+
+function TestHelpers.incCalls(obj, name)
+    obj.__calls = obj.__calls or {}
+    obj.__calls[name] = (obj.__calls[name] or 0) + 1
+end
+
+function TestHelpers.getCalls(obj, name)
+    return (obj.__calls and obj.__calls[name]) or 0
+end
+
+function TestHelpers.color(r, g, b, a)
+    return { r = r, g = g, b = b, a = a or 1 }
+end
+
+function TestHelpers.makeRegion(regionType)
+    local region = { __objectType = regionType or "Texture", __calls = {} }
+    function region:IsObjectType(expected) return self.__objectType == expected end
+    return region
+end
+
+function TestHelpers.makeTexture(opts)
+    local incCalls = TestHelpers.incCalls
+    opts = opts or {}
+    local texture = TestHelpers.makeRegion("Texture")
+    texture.__atlas = opts.atlas
+    texture.__texture = opts.texture
+    texture.__textureFileID = opts.textureFileID
+    texture.__colorTexture = opts.colorTexture and { opts.colorTexture[1], opts.colorTexture[2], opts.colorTexture[3], opts.colorTexture[4] } or nil
+    texture.__vertexColor = opts.vertexColor and { opts.vertexColor[1], opts.vertexColor[2], opts.vertexColor[3], opts.vertexColor[4] } or nil
+
+    function texture:GetAtlas() return self.__atlas end
+    function texture:GetTextureFileID() return self.__textureFileID end
+
+    for _, prop in ipairs({ { "ColorTexture", "__colorTexture" }, { "VertexColor", "__vertexColor" } }) do
+        texture["Set" .. prop[1]] = function(self, r, g, b, a) incCalls(self, "Set" .. prop[1]); self[prop[2]] = { r, g, b, a } end
+        texture["Get" .. prop[1]] = function(self) if self[prop[2]] then return self[prop[2]][1], self[prop[2]][2], self[prop[2]][3], self[prop[2]][4] end end
+    end
+
+    function texture:SetTexture(tex) incCalls(self, "SetTexture"); self.__texture = tex end
+    function texture:GetTexture() return self.__texture end
+
+    return texture
+end
+
+function TestHelpers.makeFrame(opts)
+    local incCalls = TestHelpers.incCalls
+    opts = opts or {}
+    local anchors = {}
+    for i = 1, #(opts.anchors or {}) do
+        local a = opts.anchors[i]
+        anchors[i] = { a[1], a[2], a[3], a[4], a[5] }
+    end
+    local frame = {
+        __name = opts.name,
+        __shown = opts.shown ~= false,
+        __height = opts.height or 0,
+        __width = opts.width or 0,
+        __alpha = opts.alpha == nil and 1 or opts.alpha,
+        __anchors = anchors,
+        __regions = opts.regions or {},
+        __calls = {},
+    }
+
+    function frame:GetName() return self.__name end
+
+    for _, prop in ipairs({ { "Height", "__height" }, { "Width", "__width" }, { "Alpha", "__alpha" } }) do
+        frame["Set" .. prop[1]] = function(self, val) incCalls(self, "Set" .. prop[1]); self[prop[2]] = val end
+        frame["Get" .. prop[1]] = function(self) return self[prop[2]] end
+    end
+
+    function frame:Show() incCalls(self, "Show"); self.__shown = true end
+    function frame:Hide() incCalls(self, "Hide"); self.__shown = false end
+    function frame:IsShown() return self.__shown end
+    function frame:ClearAllPoints() incCalls(self, "ClearAllPoints"); self.__anchors = {} end
+    function frame:SetPoint(point, relativeTo, relativePoint, x, y) incCalls(self, "SetPoint"); self.__anchors[#self.__anchors + 1] = { point, relativeTo, relativePoint, x or 0, y or 0 } end
+    function frame:GetNumPoints() return #self.__anchors end
+    function frame:GetPoint(index) local a = self.__anchors[index]; if a then return a[1], a[2], a[3], a[4], a[5] end end
+    function frame:GetRegions() return unpack_fn(self.__regions) end
+
+    return frame
+end
+
+function TestHelpers.makeStatusBar(opts)
+    local incCalls = TestHelpers.incCalls
+    opts = opts or {}
+    local bar = TestHelpers.makeFrame(opts)
+    bar.__statusTexture = opts.statusTexture or TestHelpers.makeTexture({ texture = opts.texturePath })
+    bar.__statusBarColor = opts.statusBarColor and
+        { opts.statusBarColor[1], opts.statusBarColor[2], opts.statusBarColor[3], opts.statusBarColor[4] }
+        or { 1, 1, 1, 1 }
+
+    function bar:SetStatusBarTexture(texturePath) incCalls(self, "SetStatusBarTexture"); if self.__statusTexture and self.__statusTexture.SetTexture then self.__statusTexture:SetTexture(texturePath) end end
+    function bar:GetStatusBarTexture() return self.__statusTexture end
+    function bar:SetStatusBarColor(r, g, b, a) incCalls(self, "SetStatusBarColor"); self.__statusBarColor = { r, g, b, a or 1 } end
+    function bar:GetStatusBarColor() return self.__statusBarColor[1], self.__statusBarColor[2], self.__statusBarColor[3], self.__statusBarColor[4] end
+
+    return bar
+end
+
+function TestHelpers.makeBorder(opts)
+    local incCalls = TestHelpers.incCalls
+    opts = opts or {}
+    local border = TestHelpers.makeFrame({ name = opts.name, shown = opts.shown ~= false })
+    border.__backdrop = opts.backdrop
+    border.__borderColor = opts.borderColor and
+        { opts.borderColor[1], opts.borderColor[2], opts.borderColor[3], opts.borderColor[4] }
+        or { 0, 0, 0, 1 }
+
+    function border:SetBackdrop(backdrop) incCalls(self, "SetBackdrop"); self.__backdrop = backdrop end
+    function border:GetBackdrop() return self.__backdrop end
+    function border:SetBackdropBorderColor(r, g, b, a) incCalls(self, "SetBackdropBorderColor"); self.__borderColor = { r, g, b, a or 1 } end
+    function border:GetBackdropBorderColor() return self.__borderColor[1], self.__borderColor[2], self.__borderColor[3], self.__borderColor[4] end
+
+    return border
+end
+
+--- Asserts anchor values match. Uses busted's assert when available, plain assert otherwise.
+function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint, x, y)
+    local ap, ar, arp, ax, ay = frame:GetPoint(index)
+    local eq = (type(assert) == "table" and assert.are and assert.are.equal)
+    if eq then
+        eq(point, ap)
+        eq(relativeTo, ar)
+        eq(relativePoint, arp)
+        eq(x, ax)
+        eq(y, ay)
+    else
+        assert(point == ap, ("anchor point: expected %s, got %s"):format(tostring(point), tostring(ap)))
+        assert(relativeTo == ar, ("relativeTo: expected %s, got %s"):format(tostring(relativeTo), tostring(ar)))
+        assert(relativePoint == arp, ("relativePoint: expected %s, got %s"):format(tostring(relativePoint), tostring(arp)))
+        assert(x == ax, ("x: expected %s, got %s"):format(tostring(x), tostring(ax)))
+        assert(y == ay, ("y: expected %s, got %s"):format(tostring(y), tostring(ay)))
+    end
+end
+
 return TestHelpers
