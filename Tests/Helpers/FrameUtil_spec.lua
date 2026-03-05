@@ -515,54 +515,39 @@ describe("FrameUtil", function()
             assert.is_false(FrameUtil.LazySetBackgroundColor(frame, c))
         end)
 
-        it("LazySetVertexColor reads live vertex color and reapplies when getters are unavailable", function()
-            local owner = {}
+        it("LazySetVertexColor reapplies every call when getters are unavailable", function()
             local texture = makeTexture({ vertexColor = { 0.5, 0.5, 0.5, 1 } })
 
-            assert.is_false(FrameUtil.LazySetVertexColor(owner, texture, "iconColor", color(0.5, 0.5, 0.5, 1)))
+            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.5, 0.5, 0.5, 1)))
             assert.are.equal(0, getCalls(texture, "SetVertexColor"))
 
             texture.GetColorTexture = nil
             texture.GetVertexColor = nil
 
-            assert.is_true(FrameUtil.LazySetVertexColor(owner, texture, "iconColor", color(1, 0, 0, 1)))
-            assert.is_true(FrameUtil.LazySetVertexColor(owner, texture, "iconColor", color(1, 0, 0, 1)))
+            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 0, 0, 1)))
+            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 0, 0, 1)))
             assert.are.equal(2, getCalls(texture, "SetVertexColor"))
         end)
 
-        it("LazySetStatusBarTexture reads the live texture object and reapplies when getters are unavailable", function()
-            local owner = {}
+        it("LazySetStatusBarTexture no-ops when texture matches and applies when different", function()
             local bar = makeStatusBar({ texturePath = "TexA" })
 
-            assert.is_false(FrameUtil.LazySetStatusBarTexture(owner, bar, "TexA"))
+            assert.is_false(FrameUtil.LazySetStatusBarTexture(bar, "TexA"))
             assert.are.equal(0, getCalls(bar, "SetStatusBarTexture"))
 
-            assert.is_true(FrameUtil.LazySetStatusBarTexture(owner, bar, "TexB"))
+            assert.is_true(FrameUtil.LazySetStatusBarTexture(bar, "TexB"))
             assert.are.equal(1, getCalls(bar, "SetStatusBarTexture"))
             assert.are.equal("TexB", bar:GetStatusBarTexture():GetTexture())
-
-            local fallbackBar = makeStatusBar({ texturePath = "X" })
-            fallbackBar.GetStatusBarTexture = nil
-            local fallbackOwner = {}
-            assert.is_true(FrameUtil.LazySetStatusBarTexture(fallbackOwner, fallbackBar, "TexC"))
-            assert.is_true(FrameUtil.LazySetStatusBarTexture(fallbackOwner, fallbackBar, "TexC"))
         end)
 
-        it("LazySetStatusBarColor reads live status bar color and reapplies when getters are unavailable", function()
-            local owner = {}
+        it("LazySetStatusBarColor no-ops when color matches and applies when different", function()
             local bar = makeStatusBar({ statusBarColor = { 0.2, 0.3, 0.4, 1 } })
 
-            assert.is_false(FrameUtil.LazySetStatusBarColor(owner, bar, 0.2, 0.3, 0.4))
+            assert.is_false(FrameUtil.LazySetStatusBarColor(bar, 0.2, 0.3, 0.4))
             assert.are.equal(0, getCalls(bar, "SetStatusBarColor"))
 
-            assert.is_true(FrameUtil.LazySetStatusBarColor(owner, bar, 1, 0, 0, 0.9))
+            assert.is_true(FrameUtil.LazySetStatusBarColor(bar, 1, 0, 0, 0.9))
             assert.are.equal(1, getCalls(bar, "SetStatusBarColor"))
-
-            local fallbackOwner = {}
-            local fallbackBar = makeStatusBar()
-            fallbackBar.GetStatusBarColor = nil
-            assert.is_true(FrameUtil.LazySetStatusBarColor(fallbackOwner, fallbackBar, 0.1, 0.1, 0.1, 1))
-            assert.is_true(FrameUtil.LazySetStatusBarColor(fallbackOwner, fallbackBar, 0.1, 0.1, 0.1, 1))
         end)
 
         it("LazySetBorder returns false when no border frame exists", function()
@@ -635,15 +620,14 @@ describe("FrameUtil", function()
         end)
 
         it("LazySetText reads live text before writing", function()
-            local owner = {}
             local fontString = { __text = "Hello", __calls = {} }
             fontString.GetText = function(self) return self.__text end
             fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
 
-            assert.is_false(FrameUtil.LazySetText(owner, fontString, "label", "Hello"))
+            assert.is_false(FrameUtil.LazySetText(fontString, "Hello"))
             assert.are.equal(0, getCalls(fontString, "SetText"))
 
-            assert.is_true(FrameUtil.LazySetText(owner, fontString, "label", "World"))
+            assert.is_true(FrameUtil.LazySetText(fontString, "World"))
             assert.are.equal(1, getCalls(fontString, "SetText"))
         end)
     end)
@@ -1023,42 +1007,5 @@ describe("FrameUtil", function()
             assert.are.equal(1, refreshCalls)
         end)
 
-        it("ScheduleLayoutUpdate coalesces calls and schedules UpdateLayout after updateFrequency", function()
-            local layoutCalls = {}
-            local selfObj = {
-                GetGlobalConfig = function()
-                    return { updateFrequency = 0.15 }
-                end,
-                UpdateLayout = function(_, why)
-                    layoutCalls[#layoutCalls + 1] = why
-                end,
-            }
-
-            FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-1")
-            FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-2")
-
-            assert.is_true(selfObj._layoutPending)
-            assert.are.equal(1, #scheduledTimers)
-            assert.are.equal(0.15, scheduledTimers[1].delay)
-
-            flushTimers()
-            assert.is_nil(selfObj._layoutPending)
-            assert.are.same({ "layout-1" }, layoutCalls)
-        end)
-
-        it("ScheduleLayoutUpdate uses the default refresh frequency when global config is missing", function()
-            local selfObj = {
-                GetGlobalConfig = function()
-                    return nil
-                end,
-                UpdateLayout = function()
-                end,
-            }
-
-            FrameUtil.ScheduleLayoutUpdate(selfObj, "layout-default")
-
-            assert.are.equal(1, #scheduledTimers)
-            assert.are.equal(ECM.Constants.DEFAULT_REFRESH_FREQUENCY, scheduledTimers[1].delay)
-        end)
     end)
 end)

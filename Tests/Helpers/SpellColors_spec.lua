@@ -90,6 +90,7 @@ describe("SpellColors", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
+            "wipe",
         })
     end)
 
@@ -141,6 +142,10 @@ describe("SpellColors", function()
         _G.ECM.Log = function() end
         _G.ECM.ToString = function(value)
             return tostring(value)
+        end
+
+        _G.wipe = function(t)
+            for k in pairs(t) do t[k] = nil end
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()

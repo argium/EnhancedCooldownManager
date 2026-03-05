@@ -48,6 +48,7 @@ describe("Utilities", function()
             "issecretvalue",
             "issecrettable",
             "ColorUtil",
+            "InCombatLockdown",
         })
     end)
 
@@ -60,11 +61,26 @@ describe("Utilities", function()
             defaults = {},
             Migration = {},
         }
+        addonNS = {
+            Addon = {
+                db = {
+                    profile = {
+                        global = {
+                            font = "Global Font",
+                            fontSize = 11,
+                            fontOutline = "OUTLINE",
+                            fontShadow = false,
+                        },
+                    },
+                },
+            },
+        }
+
         _G.LibStub = function(name)
             if name == "AceAddon-3.0" then
                 return {
                     NewAddon = function()
-                        return {}
+                        return addonNS.Addon
                     end,
                 }
             end
@@ -88,21 +104,7 @@ describe("Utilities", function()
         _G.ECM.DebugAssert = function() end
         _G.issecretvalue = function() return false end
         _G.issecrettable = function() return false end
-
-        addonNS = {
-            Addon = {
-                db = {
-                    profile = {
-                        global = {
-                            font = "Global Font",
-                            fontSize = 11,
-                            fontOutline = "OUTLINE",
-                            fontShadow = false,
-                        },
-                    },
-                },
-            },
-        }
+        _G.InCombatLockdown = function() return false end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", addonNS)

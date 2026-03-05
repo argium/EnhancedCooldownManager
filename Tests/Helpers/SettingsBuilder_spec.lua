@@ -13,11 +13,39 @@ describe("SettingsBuilder", function()
     local layoutUpdateCalls
     local SB
 
+    local function getNestedValue(tbl, path)
+        local current = tbl
+        for segment in path:gmatch("[^.]+") do
+            if type(current) ~= "table" then return nil end
+            local val = current[segment]
+            if val == nil then
+                local num = tonumber(segment)
+                if num then val = current[num] end
+            end
+            current = val
+        end
+        return current
+    end
+
+    local function setNestedValue(tbl, path, value)
+        local current, lastKey = tbl, nil
+        for segment in path:gmatch("[^.]+") do
+            if lastKey then
+                if current[lastKey] == nil then current[lastKey] = {} end
+                current = current[lastKey]
+            end
+            lastKey = segment
+        end
+        current[lastKey] = value
+    end
+
     local function createSB2(varPrefix, categoryName)
         local LSB2 = LibStub("LibSettingsBuilder-1.0")
         local SB2 = LSB2:New({
             getProfile = function() return addonNS.Addon.db.profile end,
             getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            getNestedValue = getNestedValue,
+            setNestedValue = setNestedValue,
             varPrefix = varPrefix,
             onChanged = function() end,
         })
@@ -670,8 +698,8 @@ describe("SettingsBuilder", function()
         assert.are.same(section, ns.OptionsSections.Foo)
     end)
 
-    -- Built-in path accessors (getNestedValue/setNestedValue now optional)
-    it("works without getNestedValue/setNestedValue in config", function()
+    -- Built-in path accessors
+    it("path accessors read and write nested values", function()
         local SB2 = createSB2("TEST2", "Test2")
         SB2.CreateSubcategory("Sub2")
 

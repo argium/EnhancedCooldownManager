@@ -93,18 +93,18 @@ describe("ClassUtil", function()
         it("returns nil for all death knight specs", function()
             -- I'm not sure what the live game returns so test all
             setAvailablePowerType(Enum.PowerType.Runes)
-            assertResourceForSpecs(ECM.Constants.CLASS.DEATHKNIGHT, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("DEATHKNIGHT", { 1, 2, 3 }, nil)
             setAvailablePowerType(Enum.PowerType.RuneBlood)
-            assertResourceForSpecs(ECM.Constants.CLASS.DEATHKNIGHT, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("DEATHKNIGHT", { 1, 2, 3 }, nil)
             setAvailablePowerType(Enum.PowerType.RuneFrost)
-            assertResourceForSpecs(ECM.Constants.CLASS.DEATHKNIGHT, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("DEATHKNIGHT", { 1, 2, 3 }, nil)
             setAvailablePowerType(Enum.PowerType.RuneUnholy)
-            assertResourceForSpecs(ECM.Constants.CLASS.DEATHKNIGHT, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("DEATHKNIGHT", { 1, 2, 3 }, nil)
         end)
 
         it("returns souls for vengeance demon hunters", function()
             assertResourceType(
-                ECM.Constants.CLASS.DEMONHUNTER,
+                "DEMONHUNTER",
                 ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX,
                 ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS
             )
@@ -114,7 +114,7 @@ describe("ClassUtil", function()
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, nil)
             CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, false)
             assertResourceType(
-                ECM.Constants.CLASS.DEMONHUNTER,
+                "DEMONHUNTER",
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
                 ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
             )
@@ -124,7 +124,7 @@ describe("ClassUtil", function()
             CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 1 })
             CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, true)
             assertResourceType(
-                ECM.Constants.CLASS.DEMONHUNTER,
+                "DEMONHUNTER",
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
                 ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
             )
@@ -132,63 +132,63 @@ describe("ClassUtil", function()
 
         it("returns combo points for feral druids in cat form", function()
             setAvailablePowerType(Enum.PowerType.ComboPoints)
-            assertResourceType(ECM.Constants.CLASS.DRUID, 2, Enum.PowerType.ComboPoints, ECM.Constants.DRUID_CAT_FORM_INDEX)
+            assertResourceType("DRUID", 2, Enum.PowerType.ComboPoints, ECM.Constants.DRUID_CAT_FORM_INDEX)
         end)
 
         it("returns essence for all evoker specs", function()
             setAvailablePowerType(Enum.PowerType.Essence)
-            assertResourceForSpecs(ECM.Constants.CLASS.EVOKER, { 1, 2, 3 }, Enum.PowerType.Essence)
+            assertResourceForSpecs("EVOKER", { 1, 2, 3 }, Enum.PowerType.Essence)
         end)
 
         it("returns nil for all hunter specs", function()
-            assertResourceForSpecs(ECM.Constants.CLASS.HUNTER, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("HUNTER", { 1, 2, 3 }, nil)
         end)
 
         it("returns arcane charges for arcane mages, nil for fire, and icicles for frost", function()
-            assertResourceType(ECM.Constants.CLASS.MAGE, 1, Enum.PowerType.ArcaneCharges)
-            assertResourceType(ECM.Constants.CLASS.MAGE, 2, nil)
-            assertResourceType(ECM.Constants.CLASS.MAGE, 3, ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
+            assertResourceType("MAGE", 1, Enum.PowerType.ArcaneCharges)
+            assertResourceType("MAGE", 2, nil)
+            assertResourceType("MAGE", 3, ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
         end)
 
         it("returns chi for windwalker monks, nil for brewmaster and mistweaver", function()
             setAvailablePowerType(Enum.PowerType.Chi)
-            assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_WINDWALKER_SPEC_INDEX, Enum.PowerType.Chi)
-            assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_BREWMASTER_SPEC_INDEX, nil)
-            assertResourceType(ECM.Constants.CLASS.MONK, ECM.Constants.MONK_MISTWEAVER_SPEC_INDEX, nil)
+            assertResourceType("MONK", ECM.Constants.MONK_WINDWALKER_SPEC_INDEX, Enum.PowerType.Chi)
+            assertResourceType("MONK", ECM.Constants.MONK_BREWMASTER_SPEC_INDEX, nil)
+            assertResourceType("MONK", ECM.Constants.MONK_MISTWEAVER_SPEC_INDEX, nil)
         end)
 
         it("returns holy power for all paladin specs", function()
             setAvailablePowerType(Enum.PowerType.HolyPower)
-            assertResourceForSpecs(ECM.Constants.CLASS.PALADIN, { 1, 2, 3 }, Enum.PowerType.HolyPower)
+            assertResourceForSpecs("PALADIN", { 1, 2, 3 }, Enum.PowerType.HolyPower)
         end)
 
         it("returns nil for all priest specs", function()
-            assertResourceForSpecs(ECM.Constants.CLASS.PRIEST, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("PRIEST", { 1, 2, 3 }, nil)
         end)
 
         it("returns combo points for all rogue specs", function()
             setAvailablePowerType(Enum.PowerType.ComboPoints)
-            assertResourceForSpecs(ECM.Constants.CLASS.ROGUE, { 1, 2, 3 }, Enum.PowerType.ComboPoints)
+            assertResourceForSpecs("ROGUE", { 1, 2, 3 }, Enum.PowerType.ComboPoints)
         end)
 
         it("returns maelstrom weapon for enhancement shamans and nil for elemental/restoration", function()
             setAvailablePowerType(Enum.PowerType.Maelstrom)
             assertResourceType(
-                ECM.Constants.CLASS.SHAMAN,
+                "SHAMAN",
                 ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX,
                 ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
             )
-            assertResourceType(ECM.Constants.CLASS.SHAMAN, ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX, nil)
-            assertResourceType(ECM.Constants.CLASS.SHAMAN, ECM.Constants.SHAMAN_RESTORATION_SPEC_INDEX, nil)
+            assertResourceType("SHAMAN", ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX, nil)
+            assertResourceType("SHAMAN", ECM.Constants.SHAMAN_RESTORATION_SPEC_INDEX, nil)
         end)
 
         it("returns soul shards for all warlock specs", function()
             setAvailablePowerType(Enum.PowerType.SoulShards)
-            assertResourceForSpecs(ECM.Constants.CLASS.WARLOCK, { 1, 2, 3 }, Enum.PowerType.SoulShards)
+            assertResourceForSpecs("WARLOCK", { 1, 2, 3 }, Enum.PowerType.SoulShards)
         end)
 
         it("returns nil for all warrior specs", function()
-            assertResourceForSpecs(ECM.Constants.CLASS.WARRIOR, { 1, 2, 3 }, nil)
+            assertResourceForSpecs("WARRIOR", { 1, 2, 3 }, nil)
         end)
     end)
 

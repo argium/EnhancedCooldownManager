@@ -123,7 +123,7 @@ function ProfileOptions.RegisterSettings(SB)
     SB.Header("Import / Export")
 
     SB.Button({
-        name = "Import a profile from a string",
+        name = "Import profile from clipboard",
         buttonText = "Import",
         tooltip = "Paste a previously exported profile string to import settings.",
         onClick = function()
@@ -136,7 +136,7 @@ function ProfileOptions.RegisterSettings(SB)
     })
 
     SB.Button({
-        name = "Export the current profile as a string",
+        name = "Export profile to clipboard",
         buttonText = "Export",
         tooltip = "Generate a shareable string that can be imported on another character.",
         onClick = function()

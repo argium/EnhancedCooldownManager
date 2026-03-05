@@ -145,8 +145,10 @@ function TestHelpers.SetupSettingsStubs()
 
         RegisterVerticalLayoutSubcategory = function(parent, name)
             local layout = makeLayout()
+            local id = parent._id .. "." .. name
             return {
-                _name = name, _parent = parent,
+                _name = name, _parent = parent, _id = id,
+                GetID = function(self) return self._id end,
                 GetLayout = function() return layout end,
             }, layout
         end,
