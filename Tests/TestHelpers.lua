@@ -422,4 +422,311 @@ function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint
     end
 end
 
+--------------------------------------------------------------------------------
+-- Options test environment
+--------------------------------------------------------------------------------
+
+--- Standard list of globals captured/restored by option tests.
+TestHelpers.OPTIONS_GLOBALS = {
+    "ECM", "ECM_DeepEquals",
+    "Settings", "CreateSettingsListSectionHeaderInitializer",
+    "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
+    "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
+    "UnitClass", "GetSpecialization", "GetSpecializationInfo",
+    "Enum", "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+    "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
+    "LibSettingsBuilder_ScrollDropdownMixin",
+    "GameFontHighlightSmall", "GameFontNormal",
+    "SETTINGS_DEFAULTS", "InCombatLockdown", "UnitName", "date",
+    "ColorPickerFrame", "CreateFrame", "CreateDataProvider",
+    "hooksecurefunc", "CreateScrollBoxListLinearView", "ScrollUtil",
+}
+
+--- Create a full default profile for option tests.
+function TestHelpers.MakeOptionsProfile()
+    local border = { enabled = false, thickness = 4, color = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 } }
+    local profile = {
+        schemaVersion = 10,
+        global = {
+            debug = false,
+            hideWhenMounted = true,
+            hideOutOfCombatInRestAreas = false,
+            updateFrequency = 0.04,
+            barHeight = 22,
+            barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
+            offsetY = 4,
+            moduleSpacing = 0,
+            moduleGrowDirection = "down",
+            texture = "Solid",
+            font = "Expressway",
+            fontSize = 11,
+            fontOutline = "OUTLINE",
+            fontShadow = false,
+            outOfCombatFade = {
+                enabled = false,
+                opacity = 60,
+                exceptIfTargetCanBeAttacked = true,
+                exceptIfTargetCanBeHelped = false,
+                exceptInInstance = true,
+            },
+        },
+        powerBar = {
+            enabled = true,
+            anchorMode = "chain",
+            width = 300,
+            offsetY = -275,
+            showText = true,
+            overrideFont = false,
+            showManaAsPercent = true,
+            border = deepClone(border),
+            ticks = { mappings = {}, defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }, defaultWidth = 1 },
+            colors = {
+                [0] = { r = 0, g = 0, b = 1, a = 1 },
+                [1] = { r = 1, g = 0, b = 0, a = 1 },
+                [2] = { r = 1, g = 0.57, b = 0.31, a = 1 },
+                [3] = { r = 0.85, g = 0.65, b = 0.13, a = 1 },
+                [6] = { r = 0, g = 0.82, b = 1, a = 1 },
+                [8] = { r = 0.3, g = 0.52, b = 0.9, a = 1 },
+                [11] = { r = 0, g = 0.439, b = 0.871, a = 1 },
+                [13] = { r = 0.4, g = 0, b = 0.8, a = 1 },
+                [17] = { r = 0.788, g = 0.259, b = 0.992, a = 1 },
+            },
+        },
+        resourceBar = {
+            enabled = true,
+            showText = false,
+            overrideFont = false,
+            anchorMode = "chain",
+            width = 300,
+            offsetY = -300,
+            border = deepClone(border),
+            colors = {
+                souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
+                devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
+                devourerMeta = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
+                icicles = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
+                [16] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
+                [12] = { r = 0, g = 1, b = 0.59, a = 1 },
+                [4]  = { r = 1, g = 0.96, b = 0.41, a = 1 },
+                [19] = { r = 0.2, g = 0.58, b = 0.5, a = 1 },
+                [9]  = { r = 0.886, g = 0.824, b = 0.239, a = 1 },
+                maelstromWeapon = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
+                [7]  = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
+            },
+        },
+        runeBar = {
+            enabled = true,
+            anchorMode = "chain",
+            width = 300,
+            offsetY = -325,
+            overrideFont = false,
+            useSpecColor = true,
+            color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
+            colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
+            colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 },
+        },
+        buffBars = {
+            enabled = true,
+            anchorMode = "chain",
+            width = 300,
+            offsetY = -350,
+            verticalSpacing = 0,
+            freeGrowDirection = "down",
+            showIcon = false,
+            showSpellName = true,
+            showDuration = true,
+            overrideFont = false,
+            colors = {
+                byName = {}, bySpellID = {}, byCooldownID = {}, byTexture = {},
+                cache = {},
+                defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
+            },
+        },
+        itemIcons = {
+            enabled = true,
+            showTrinket1 = true,
+            showTrinket2 = true,
+            showCombatPotion = true,
+            showHealthPotion = true,
+            showHealthstone = true,
+        },
+    }
+    return profile, deepClone(profile)
+end
+
+--- Install common WoW globals for option tests.
+function TestHelpers.SetupOptionsGlobals()
+    TestHelpers.SetupLibStub()
+    TestHelpers.SetupSettingsStubs()
+
+    _G.ECM_DeepEquals = deepEquals
+    _G.GameFontHighlightSmall = "GameFontHighlightSmall"
+    _G.GameFontNormal = "GameFontNormal"
+    _G.SETTINGS_DEFAULTS = "Defaults"
+    _G.InCombatLockdown = function() return false end
+    _G.UnitName = function() return "TestPlayer" end
+    _G.date = function() return "120000" end
+    _G.ColorPickerFrame = {
+        SetupColorPickerAndShow = function() end,
+        GetColorRGB = function() return 1, 1, 1 end,
+        GetColorAlpha = function() return 1 end,
+    }
+
+    _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
+    _G.GetSpecialization = function() return 1 end
+    _G.GetSpecializationInfo = function() return nil, "Arms" end
+
+    -- Minimal CreateFrame stub for canvas layouts
+    local function makeFrameStub()
+        local f = { scripts = {}, _children = {} }
+        local noop = function() end
+        f.SetScript = function(self, event, fn) self.scripts[event] = fn end
+        f.GetHeight = function() return 0 end
+        f.SetHeight = noop
+        f.SetWidth = noop
+        f.SetSize = noop
+        f.SetPoint = noop
+        f.SetAllPoints = noop
+        f.ClearAllPoints = noop
+        f.Show = noop
+        f.Hide = noop
+        f.IsShown = function() return false end
+        f.SetEnabled = noop
+        f.SetText = noop
+        f.GetText = function() return "" end
+        f.SetWordWrap = noop
+        f.SetJustifyH = noop
+        f.SetColorRGB = noop
+        f.SetBackdrop = noop
+        f.SetBackdropBorderColor = noop
+        f.SetMinMaxValues = noop
+        f.SetValueStep = noop
+        f.SetObeyStepOnDrag = noop
+        f.SetDataProvider = noop
+        f.CreateFontString = function() return makeFrameStub() end
+        f.CreateTexture = function() return makeFrameStub() end
+        -- Auto-create sub-tables on access for template frames
+        setmetatable(f, { __index = function(t, k)
+            if type(k) == "string" and k:sub(1, 1):match("%u") then
+                local child = makeFrameStub()
+                rawset(t, k, child)
+                return child
+            end
+        end })
+        return f
+    end
+    _G.CreateFrame = function() return makeFrameStub() end
+
+    _G.CreateDataProvider = function()
+        local data = {}
+        return {
+            Flush = function() data = {} end,
+            Insert = function(_, item) data[#data + 1] = item end,
+            GetSize = function() return #data end,
+        }
+    end
+
+    _G.hooksecurefunc = function() end
+
+    _G.CreateScrollBoxListLinearView = function()
+        local view = {}
+        view.SetElementExtent = function() end
+        view.SetElementInitializer = function(self, template, fn) self._initFn = fn end
+        return view
+    end
+    _G.ScrollUtil = { InitScrollBoxListWithScrollBar = function() end }
+
+    _G.Enum = {
+        PowerType = {
+            Mana = 0, Rage = 1, Focus = 2, Energy = 3,
+            RunicPower = 6, LunarPower = 8, Maelstrom = 11,
+            Insanity = 13, Fury = 17,
+            ArcaneCharges = 16, Chi = 12, ComboPoints = 4,
+            Essence = 19, HolyPower = 9, SoulShards = 7,
+        },
+    }
+end
+
+--- Load LibSettingsBuilder + Options.lua and return the SB and ns.
+--- @param profile table Profile data
+--- @param defaults table Default profile data
+--- @return table SB SettingsBuilder instance
+--- @return table ns Addon namespace
+function TestHelpers.SetupOptionsEnv(profile, defaults)
+    TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+
+    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+    lsmw.GetFontValues = function() return { Expressway = "Expressway" } end
+    lsmw.GetStatusbarValues = function() return { Solid = "Solid" } end
+    lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+    lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+
+    _G.ECM = {
+        Constants = {
+            ADDON_NAME = "Enhanced Cooldown Manager",
+            ANCHORMODE_CHAIN = "chain",
+            ANCHORMODE_FREE = "free",
+            GROW_DIRECTION_DOWN = "down",
+            GROW_DIRECTION_UP = "up",
+            DEFAULT_BAR_WIDTH = 250,
+            DEFAULT_BAR_HEIGHT = 20,
+            DEFAULT_BORDER_THICKNESS = 4,
+            DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
+            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
+            RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
+            RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
+            RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
+            RESOURCEBAR_TYPE_ICICLES = "icicles",
+            RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
+            DEMONHUNTER_CLASS_ID = 12,
+            DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
+            CURRENT_SCHEMA_VERSION = 10,
+        },
+        CloneValue = deepClone,
+        ScheduleLayoutUpdate = function() end,
+    }
+
+    local mod = {
+        db = {
+            profile = profile,
+            defaults = { profile = defaults },
+            GetCurrentProfile = function() return "Default" end,
+            SetProfile = function() end,
+            GetProfiles = function() return { "Default", "Other" } end,
+            CopyProfile = function() end,
+            DeleteProfile = function() end,
+            ResetProfile = function() end,
+            RegisterCallback = function() end,
+        },
+        NewModule = function(_, name) return { moduleName = name } end,
+    }
+
+    local ns = { Addon = mod, OptionsSections = {} }
+
+    TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
+
+    local SB = ECM.SettingsBuilder
+    SB.CreateRootCategory("Test")
+
+    return SB, ns
+end
+
+--- Collect all proxy settings created during a function call.
+--- Wraps Settings.RegisterProxySetting to capture variable → setting pairs.
+--- @param fn function The function to run (e.g., RegisterSettings)
+--- @return table Map of variable name → setting object
+function TestHelpers.CollectSettings(fn)
+    local captured = {}
+    local orig = Settings.RegisterProxySetting
+    Settings.RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
+        local setting = orig(cat, variable, varType, name, default, getter, setter)
+        captured[variable] = setting
+        return setting
+    end
+    fn()
+    Settings.RegisterProxySetting = orig
+    return captured
+end
+
 return TestHelpers

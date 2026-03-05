@@ -93,7 +93,6 @@ local constants = {
         { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
         { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
         { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
-
     },
     HEALTH_POTIONS = {
         { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
