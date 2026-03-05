@@ -627,7 +627,10 @@ function mod:ShowExportDialog(exportString)
         -- Auto-close after Ctrl+C
         exportFrame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
             if key == "C" and IsControlKeyDown() then
-                C_Timer.After(0.1, function() exportFrame:Hide() end)
+                C_Timer.After(0.1, function()
+                    exportFrame:Hide()
+                    ECM.Print("Import string copied to clipboard.")
+                end)
             end
         end)
     end
