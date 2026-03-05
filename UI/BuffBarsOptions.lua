@@ -231,7 +231,13 @@ function BuffBarsOptions.RegisterSettings(SB)
 
             -- Layout
             layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning       = { type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 11 },
+            positioning       = {
+                type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 11,
+                positionModes = {
+                    [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
+                    [C.ANCHORMODE_FREE] = "Manual using Edit Mode",
+                },
+            },
             freeGrowDirection = {
                 type = "select",
                 path = "freeGrowDirection",

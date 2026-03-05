@@ -156,7 +156,7 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
         PositioningGroup = {
             positionModes = {
                 [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
-                [C.ANCHORMODE_FREE] = "Movable via Edit Mode",
+                [C.ANCHORMODE_FREE] = "Manual",
             },
             isAnchorModeFree = isAnchorModeFree,
             applyPositionMode = function(cfg, mode) cfg.anchorMode = mode end,
