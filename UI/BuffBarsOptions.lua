@@ -81,7 +81,7 @@ local function createSpellColorCanvas(SB, subcatName)
     local defaultsBtn = headerRow._defaultsButton
     defaultsBtn:SetText(SETTINGS_DEFAULTS)
     defaultsBtn:SetScript("OnClick", function()
-        if ECM.BuffBars:IsEditLocked() then return end
+        if mod.BuffBars:IsEditLocked() then return end
         StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"].OnAccept = resetAllSpellColors
         StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
     end)
@@ -98,7 +98,7 @@ local function createSpellColorCanvas(SB, subcatName)
     -- Default color swatch (above the per-spell list)
     local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
     defaultColorSwatch:SetScript("OnClick", function()
-        if ECM.BuffBars:IsEditLocked() then return end
+        if mod.BuffBars:IsEditLocked() then return end
         local c = ECM.SpellColors.GetDefaultColor()
         ECM.OptionUtil.OpenColorPicker(c, false, function(color)
             ECM.SpellColors.SetDefaultColor(color)
@@ -131,7 +131,7 @@ local function createSpellColorCanvas(SB, subcatName)
         control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
 
         control.ColorSwatch:SetScript("OnClick", function()
-            if ECM.BuffBars:IsEditLocked() then return end
+            if mod.BuffBars:IsEditLocked() then return end
             local current = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
             ECM.OptionUtil.OpenColorPicker(current, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
@@ -156,7 +156,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
         -- Build warning text
         local parts = {}
-        local locked, reason = ECM.BuffBars:IsEditLocked()
+        local locked, reason = mod.BuffBars:IsEditLocked()
         if locked and reason == "combat" then
             parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
         elseif locked and reason == "secrets" then

@@ -49,10 +49,6 @@ describe("BuffBarsOptions", function()
             FrameUtil = { GetIconTextureFileID = function() return nil end },
             ScheduleLayoutUpdate = function() end,
             ToString = function(v) return tostring(v) end,
-            BuffBars = {
-                IsEditLocked = function() return false, nil end,
-                GetActiveSpellData = function() return {} end,
-            },
             OptionUtil = {
                 GetCurrentClassSpec = function() return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER" end,
                 SetModuleEnabled = function() end,
@@ -107,6 +103,10 @@ describe("BuffBarsOptions", function()
                 db = {
                     profile = { buffBars = {} },
                     defaults = { profile = { buffBars = {} } },
+                },
+                BuffBars = {
+                    IsEditLocked = function() return false, nil end,
+                    GetActiveSpellData = function() return {} end,
                 },
             },
         }

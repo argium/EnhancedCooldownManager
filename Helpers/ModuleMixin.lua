@@ -166,8 +166,7 @@ end
 function ModuleMixin:ThrottledUpdateLayout(reason, opts)
     ECM.DebugAssert(reason, "ThrottledUpdateLayout: reason is required")
 
-    -- Bail immediately if the module is disabled (safe for plain-table modules
-    -- like BuffBars that lack IsEnabled).
+    -- Bail immediately if the module is disabled.
     if self.IsEnabled and not self:IsEnabled() then
         return
     end

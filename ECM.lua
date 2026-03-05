@@ -3,17 +3,16 @@
 -- Licensed under the GNU General Public License v3.0
 
 local ADDON_NAME, ns = ...
-ECM = ECM or {}
-
 local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
 ns.Addon = mod
-local LSM = LibStub("LibSharedMedia-3.0", true)
-
-local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
-
+ECM = ECM or {}
 assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
+
+local LSM = LibStub("LibSharedMedia-3.0", true)
+local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
+local C = ECM.Constants
 
 local function isDebugEnabled()
     return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
@@ -97,7 +96,7 @@ function ECM.GetTexture(texture)
         end
     end
 
-    return getLsmMedia("statusbar", "Blizzard") or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
+    return getLsmMedia("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
 end
 
 function ECM.DebugAssert(condition, message, data)
@@ -106,7 +105,7 @@ function ECM.DebugAssert(condition, message, data)
     end
 
     if data and not condition and DevTool and DevTool.AddData then
-        pcall(DevTool.AddData, DevTool, data, "|cff" .. ECM.Constants.DEBUG_COLOR .. "[ASSERT]|r " .. message)
+        pcall(DevTool.AddData, DevTool, data, "|cff" .. C.DEBUG_COLOR .. "[ASSERT]|r " .. message)
     end
     assert(condition, message)
 end
@@ -114,7 +113,7 @@ end
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
     local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
     local useModuleOverride = moduleConfig and moduleConfig.overrideFont == true
-    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or ECM.Constants.DEFAULT_FONT
+    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or C.DEFAULT_FONT
     local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or 11
     local fontOutline = (config and config.fontOutline)
 
@@ -157,7 +156,7 @@ function ECM.CloneValue(value)
 end
 
 function ECM.Print(...)
-    local prefix = ColorUtil.Sparkle(ECM.Constants.ADDON_ABRV .. ":")
+    local prefix = ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
     local args = { ... }
     for i = 1, #args do
         args[i] = tostring(args[i])
@@ -171,7 +170,7 @@ function ECM.Log(module, message, data)
         return
     end
 
-    local prefix = "[" .. ECM.Constants.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
+    local prefix = "[" .. C.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
 
     if DevTool and DevTool.AddData then
         local payload = {
@@ -180,10 +179,10 @@ function ECM.Log(module, message, data)
             timestamp = GetTime(),
             data = ECM.ToString(data),
         }
-        pcall(DevTool.AddData, DevTool, payload, "|cff" .. ECM.Constants.DEBUG_COLOR .. prefix .. "|r " .. message)
+        pcall(DevTool.AddData, DevTool, payload, "|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
     end
 
-    print("|cff" .. ECM.Constants.DEBUG_COLOR .. prefix .. "|r " .. message)
+    print("|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
 end
 
 --------------------------------------------------------------------------------
@@ -216,14 +215,14 @@ local _cooldownViewerSettingsHooked = false
 local _hookedBlizzardFrames = {}
 
 local _chainSet = {}
-for _, name in ipairs(ECM.Constants.CHAIN_ORDER) do _chainSet[name] = true end
+for _, name in ipairs(C.CHAIN_ORDER) do _chainSet[name] = true end
 
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
 local function enforceBlizzardFrameState()
     local alpha = _desiredAlpha
-    for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+    for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
             if _globallyHidden then
@@ -266,7 +265,7 @@ end
 --- Attempts to hook OnShow on all known Blizzard cooldown viewer frames.
 --- Frames may be created lazily; called periodically to catch latecomers.
 local function hookBlizzardFrames()
-    for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+    for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
             hookBlizzardFrame(frame, name)
@@ -357,7 +356,7 @@ end
 local function updateAllLayouts(reason)
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
-    for _, moduleName in ipairs(ECM.Constants.CHAIN_ORDER) do
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
         local module = _modules[moduleName]
         if module then
             module:ThrottledUpdateLayout(reason)
@@ -490,7 +489,7 @@ local function enableLayoutEvents()
 
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
-    C_Timer.NewTicker(ECM.Constants.WATCHDOG_INTERVAL, function()
+    C_Timer.NewTicker(C.WATCHDOG_INTERVAL, function()
         hookBlizzardFrames()
         hookCooldownViewerSettings()
         enforceBlizzardFrameState()
@@ -514,10 +513,10 @@ local function registerAddonCompartmentEntry()
         return
     end
 
-    local text = ColorUtil.Sparkle(ECM.Constants.ADDON_NAME)
+    local text = ColorUtil.Sparkle(C.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
-        icon = ECM.Constants.ADDON_ICON_TEXTURE,
+        icon = C.ADDON_ICON_TEXTURE,
         notCheckable = true,
         func = function()
             mod:ChatCommand("options")
@@ -568,7 +567,6 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
 end
 
 local function createDialogFrame(name, titleText, explainText)
-    local C = ECM.Constants
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
     f:SetSize(C.DIALOG_FRAME_WIDTH, C.DIALOG_FRAME_HEIGHT)
     f:SetPoint("CENTER")
@@ -777,15 +775,12 @@ function mod:OnInitialize()
     -- Set up versioned SV store and point the active key at the current version.
     ECM.Migration.PrepareDatabase()
 
-    self.db = LibStub("AceDB-3.0"):New(ECM.Constants.ACTIVE_SV_KEY, ECM.defaults, true)
+    self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM.Log("Initialize", "Database loaded", {
-        schemaVersion = profile and profile.schemaVersion or "nil",
-        currentSchemaVersion = ECM.Constants.CURRENT_SCHEMA_VERSION
-    })
+    ECM.Log("Initialize", "Database loaded. Latest schema = " .. C.CURRENT_SCHEMA_VERSION .. ". Profile Schema = " .. (profile and profile.schemaVersion or "nil"))
 
-    if profile and profile.schemaVersion and profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
+    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)
     end
 
@@ -808,11 +803,11 @@ function mod:OnEnable()
     local profile = self.db and self.db.profile
 
     local moduleOrder = {
-        ECM.Constants.POWERBAR,
-        ECM.Constants.RESOURCEBAR,
-        ECM.Constants.RUNEBAR,
-        ECM.Constants.BUFFBARS,
-        ECM.Constants.ITEMICONS,
+        C.POWERBAR,
+        C.RESOURCEBAR,
+        C.RUNEBAR,
+        C.BUFFBARS,
+        C.ITEMICONS,
     }
 
     for _, moduleName in ipairs(moduleOrder) do

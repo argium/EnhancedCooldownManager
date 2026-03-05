@@ -2,9 +2,11 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local _, ns = ...
+local mod = ns.Addon
 local FrameUtil = ECM.FrameUtil
-local BuffBars = {}
-ECM.BuffBars = BuffBars
+local BuffBars = mod:NewModule("BuffBars", "AceEvent-3.0")
+mod.BuffBars = BuffBars
 ECM.ModuleMixin.ApplyConfigMixin(BuffBars, "BuffBars")
 local _warned = false
 local _editLocked = false
@@ -594,10 +596,6 @@ function BuffBars:OnZoneChanged()
     self:ThrottledUpdateLayout("OnZoneChanged")
 end
 
-function BuffBars:IsEnabled()
-    return self._enabled
-end
-
 --- Gets a boolean indicating if editing is allowed.
 --- @return boolean isEditLocked Whether editing is locked due to combat or secrets
 --- @return string reason Reason editing is locked ("combat", "secrets", or nil)
@@ -606,17 +604,14 @@ function BuffBars:IsEditLocked()
     return reason ~= nil, reason
 end
 
-local _eventFrame = CreateFrame("Frame")
-function BuffBars:Enable()
-    if self._enabled then return end
-    self._enabled = true
-
+function BuffBars:OnEnable()
     ECM.ModuleMixin.AddFrameMixin(self, "BuffBars")
+    ECM.RegisterFrame(self)
 
-    _eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-    _eventFrame:RegisterEvent("ZONE_CHANGED")
-    _eventFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
-    _eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
+    self:RegisterEvent("ZONE_CHANGED", "OnZoneChanged")
+    self:RegisterEvent("ZONE_CHANGED_INDOORS", "OnZoneChanged")
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnZoneChanged")
 
     -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
@@ -626,6 +621,7 @@ function BuffBars:Enable()
     end)
 end
 
-_eventFrame:SetScript("OnEvent", function(_, event, ...)
-    BuffBars:OnZoneChanged()
-end)
+function BuffBars:OnDisable()
+    self:UnregisterAllEvents()
+    ECM.UnregisterFrame(self)
+end
