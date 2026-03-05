@@ -630,6 +630,242 @@ describe("FrameUtil", function()
             assert.is_true(FrameUtil.LazySetText(fontString, "World"))
             assert.are.equal(1, getCalls(fontString, "SetText"))
         end)
+
+        -- Edge case: scalar setters detect external mutation
+        for _, case in ipairs({
+            { fn = "LazySetHeight", initial = 20, target = 20, external = 25, setter = "SetHeight", getter = "GetHeight", opts = { height = 20 } },
+            { fn = "LazySetWidth", initial = 40, target = 40, external = 50, setter = "SetWidth", getter = "GetWidth", opts = { width = 40 } },
+            { fn = "LazySetAlpha", initial = 0.5, target = 0.5, external = 1.0, setter = "SetAlpha", getter = "GetAlpha", opts = { alpha = 0.5 } },
+        }) do
+            it(case.fn .. " re-applies after external mutation", function()
+                local frame = makeFrame(case.opts)
+                assert.is_false(FrameUtil[case.fn](frame, case.target))
+
+                -- External actor changes the value
+                frame[case.setter](frame, case.external)
+
+                -- Next lazy call detects drift and re-applies
+                assert.is_true(FrameUtil[case.fn](frame, case.target))
+                assert.are.equal(case.target, frame[case.getter](frame))
+            end)
+        end
+
+        -- Edge case: LazySetBackgroundColor falls back to GetVertexColor
+        it("LazySetBackgroundColor falls back to GetVertexColor when GetColorTexture returns nil", function()
+            local bg = makeTexture({ vertexColor = { 0.5, 0.6, 0.7, 1 } })
+            bg.GetColorTexture = function() return nil end
+            local frame = { Background = bg }
+
+            assert.is_false(FrameUtil.LazySetBackgroundColor(frame, color(0.5, 0.6, 0.7, 1)))
+            assert.are.equal(0, getCalls(bg, "SetColorTexture"))
+
+            assert.is_true(FrameUtil.LazySetBackgroundColor(frame, color(0.9, 0.8, 0.7, 0.6)))
+            assert.are.equal(1, getCalls(bg, "SetColorTexture"))
+        end)
+
+        -- Edge case: LazySetBackgroundColor implicit alpha=1 matching
+        it("LazySetBackgroundColor treats implicit alpha as 1", function()
+            local bg = makeTexture({ colorTexture = { 0.1, 0.2, 0.3, 1 } })
+            local frame = { Background = bg }
+
+            -- color.a is explicitly 1, stored alpha is 1 → no-op
+            assert.is_false(FrameUtil.LazySetBackgroundColor(frame, color(0.1, 0.2, 0.3, 1)))
+            assert.are.equal(0, getCalls(bg, "SetColorTexture"))
+        end)
+
+        -- Edge case: LazySetVertexColor prefers GetColorTexture
+        it("LazySetVertexColor reads via GetColorTexture when available", function()
+            local texture = makeTexture({ colorTexture = { 0.3, 0.4, 0.5, 1 }, vertexColor = { 0, 0, 0, 1 } })
+
+            -- Match is against colorTexture, not vertexColor
+            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.3, 0.4, 0.5, 1)))
+            assert.are.equal(0, getCalls(texture, "SetVertexColor"))
+        end)
+
+        -- Edge case: LazySetVertexColor falls back to GetVertexColor when GetColorTexture returns nil values
+        it("LazySetVertexColor falls back to GetVertexColor when GetColorTexture returns nil", function()
+            local texture = makeTexture({ vertexColor = { 0.2, 0.3, 0.4, 0.8 } })
+            texture.GetColorTexture = function() return nil end
+
+            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.2, 0.3, 0.4, 0.8)))
+            assert.are.equal(0, getCalls(texture, "SetVertexColor"))
+
+            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 1, 1, 1)))
+            assert.are.equal(1, getCalls(texture, "SetVertexColor"))
+        end)
+
+        -- Edge case: LazySetVertexColor applies when only alpha differs
+        it("LazySetVertexColor applies when only alpha differs", function()
+            local texture = makeTexture({ vertexColor = { 0.5, 0.5, 0.5, 1 } })
+
+            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(0.5, 0.5, 0.5, 0.5)))
+            assert.are.equal(1, getCalls(texture, "SetVertexColor"))
+        end)
+
+        -- Edge case: LazySetStatusBarTexture when GetStatusBarTexture returns nil
+        it("LazySetStatusBarTexture always applies when GetStatusBarTexture returns nil", function()
+            local bar = makeStatusBar({ texturePath = "TexA" })
+            bar.GetStatusBarTexture = function() return nil end
+
+            assert.is_true(FrameUtil.LazySetStatusBarTexture(bar, "TexA"))
+            assert.are.equal(1, getCalls(bar, "SetStatusBarTexture"))
+
+            assert.is_true(FrameUtil.LazySetStatusBarTexture(bar, "TexA"))
+            assert.are.equal(2, getCalls(bar, "SetStatusBarTexture"))
+        end)
+
+        -- Edge case: LazySetStatusBarColor nil alpha matches stored 1
+        it("LazySetStatusBarColor treats nil alpha as 1", function()
+            local bar = makeStatusBar({ statusBarColor = { 0.5, 0.6, 0.7, 1 } })
+
+            -- Omitted alpha (nil) should match stored alpha of 1
+            assert.is_false(FrameUtil.LazySetStatusBarColor(bar, 0.5, 0.6, 0.7))
+            assert.are.equal(0, getCalls(bar, "SetStatusBarColor"))
+
+            -- Explicit alpha of 1 should also match
+            assert.is_false(FrameUtil.LazySetStatusBarColor(bar, 0.5, 0.6, 0.7, 1))
+            assert.are.equal(0, getCalls(bar, "SetStatusBarColor"))
+        end)
+
+        -- Edge case: LazySetBorder when disabled and already hidden.
+        -- Note: the `and/or` idiom in liveEnabled causes re-hide on every call;
+        -- this test documents the current behaviour.
+        it("LazySetBorder re-hides when disabled and already hidden", function()
+            local border = makeBorder({
+                shown = false,
+                backdrop = { edgeSize = 2 },
+                borderColor = { 1, 1, 1, 1 },
+            })
+            local frame = { Border = border }
+            local cfg = {
+                enabled = false,
+                thickness = 2,
+                color = color(1, 1, 1, 1),
+            }
+
+            assert.is_true(FrameUtil.LazySetBorder(frame, cfg))
+            assert.are.equal(1, getCalls(border, "Hide"))
+        end)
+
+        -- Edge case: LazySetBorder skips SetBackdrop when only color changed
+        it("LazySetBorder skips SetBackdrop when only the color has changed", function()
+            local border = makeBorder({
+                shown = true,
+                backdrop = { edgeSize = 3 },
+                borderColor = { 0.1, 0.2, 0.3, 0.4 },
+            })
+            local frame = { Border = border }
+            local cfg = {
+                enabled = true,
+                thickness = 3,
+                color = color(0.9, 0.8, 0.7, 0.6),
+            }
+
+            assert.is_true(FrameUtil.LazySetBorder(frame, cfg))
+            assert.are.equal(0, getCalls(border, "SetBackdrop"))
+            assert.are.equal(1, getCalls(border, "SetBackdropBorderColor"))
+        end)
+
+        -- Edge case: LazySetBorder re-applies when GetBackdrop is unavailable
+        it("LazySetBorder re-applies when GetBackdrop is unavailable", function()
+            local border = makeBorder({
+                shown = true,
+                backdrop = { edgeSize = 2 },
+                borderColor = { 1, 1, 1, 1 },
+            })
+            border.GetBackdrop = nil
+            local frame = { Border = border }
+            local cfg = {
+                enabled = true,
+                thickness = 2,
+                color = color(1, 1, 1, 1),
+            }
+
+            -- Cannot read live thickness, so cannot confirm match → applies
+            assert.is_true(FrameUtil.LazySetBorder(frame, cfg))
+            assert.are.equal(1, getCalls(border, "SetBackdropBorderColor"))
+        end)
+
+        -- Edge case: LazySetBorder re-applies when GetBackdropBorderColor is unavailable
+        it("LazySetBorder re-applies when GetBackdropBorderColor is unavailable", function()
+            local border = makeBorder({
+                shown = true,
+                backdrop = { edgeSize = 2 },
+                borderColor = { 1, 1, 1, 1 },
+            })
+            border.GetBackdropBorderColor = nil
+            local frame = { Border = border }
+            local cfg = {
+                enabled = true,
+                thickness = 2,
+                color = color(1, 1, 1, 1),
+            }
+
+            -- Cannot read live color, so cannot confirm match → applies
+            assert.is_true(FrameUtil.LazySetBorder(frame, cfg))
+        end)
+
+        -- Edge case: LazySetText nil→non-nil
+        it("LazySetText applies when text changes from nil to non-nil", function()
+            local fontString = { __text = nil, __calls = {} }
+            fontString.GetText = function(self) return self.__text end
+            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
+
+            assert.is_true(FrameUtil.LazySetText(fontString, "Hello"))
+            assert.are.equal(1, getCalls(fontString, "SetText"))
+            assert.are.equal("Hello", fontString:GetText())
+        end)
+
+        -- Edge case: LazySetText non-nil→nil
+        it("LazySetText applies when text changes from non-nil to nil", function()
+            local fontString = { __text = "Hello", __calls = {} }
+            fontString.GetText = function(self) return self.__text end
+            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
+
+            assert.is_true(FrameUtil.LazySetText(fontString, nil))
+            assert.are.equal(1, getCalls(fontString, "SetText"))
+        end)
+
+        -- Edge case: LazySetAnchors detects external anchor mutation
+        it("LazySetAnchors detects external anchor mutation even when cache matches", function()
+            local anchorA = makeFrame({ name = "AnchorA" })
+            local anchorB = makeFrame({ name = "AnchorB" })
+            local desired = {
+                { "TOPLEFT", anchorA, "BOTTOMLEFT", 0, 0 },
+            }
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchorA, "BOTTOMLEFT", 0, 0 },
+                },
+            })
+
+            -- First call: matches live → no-op, caches
+            assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
+
+            -- External actor changes the anchor
+            frame:ClearAllPoints()
+            frame:SetPoint("CENTER", anchorB, "CENTER", 5, 5)
+
+            -- Next call: cache matches desired but live differs → reapplies
+            assert.is_true(FrameUtil.LazySetAnchors(frame, desired))
+        end)
+
+        -- Edge case: LazySetAnchors with different anchor count
+        it("LazySetAnchors reapplies when anchor count differs", function()
+            local anchor = makeFrame({ name = "AnchorA" })
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchor, "BOTTOMLEFT", 0, 0 },
+                    { "TOPRIGHT", anchor, "BOTTOMRIGHT", 0, 0 },
+                },
+            })
+            local desired = {
+                { "CENTER", anchor, "CENTER", 0, 0 },
+            }
+
+            assert.is_true(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(1, frame:GetNumPoints())
+        end)
     end)
 
     describe("layout helpers", function()
