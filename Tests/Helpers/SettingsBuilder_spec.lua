@@ -122,10 +122,11 @@ describe("SettingsBuilder", function()
                     profile = profileData,
                     defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
+                NewModule = function(_, name) return { moduleName = name } end,
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         SB = ECM.SettingsBuilder
         SB.CreateRootCategory("TestAddon")

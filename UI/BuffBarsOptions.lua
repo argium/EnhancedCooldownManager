@@ -96,7 +96,14 @@ local function createSpellColorCanvas(SB, subcatName)
     warningText:SetWordWrap(true)
 
     -- Default color swatch (above the per-spell list)
-    local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
+    -- Reposition to align with the scroll list items below, which sit inside
+    -- a scrollbox indented by CANVAS_LABEL_X (37px) from the canvas edge.
+    local defaultColorRow, defaultColorSwatch = layout:AddColorSwatch("Default color")
+    defaultColorRow._label:ClearAllPoints()
+    defaultColorRow._label:SetPoint("LEFT", 74, 0)
+    defaultColorRow._label:SetPoint("RIGHT", defaultColorRow, "CENTER", -85, 0)
+    defaultColorSwatch:ClearAllPoints()
+    defaultColorSwatch:SetPoint("LEFT", defaultColorRow, "CENTER", -70, 0)
     defaultColorSwatch:SetScript("OnClick", function()
         if mod.BuffBars:IsEditLocked() then return end
         local c = ECM.SpellColors.GetDefaultColor()
@@ -192,6 +199,8 @@ ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
 BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
 
+local SPELL_COLORS_SUBCAT = "Spell Colors"
+
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
@@ -271,6 +280,8 @@ function BuffBarsOptions.RegisterSettings(SB)
             fontOverride      = { type = "fontOverride", disabled = isDisabled, order = 26 },
         },
     })
+
+    createSpellColorCanvas(SB, SPELL_COLORS_SUBCAT)
 
     SB.Button({
         name = "Configure Spell Colors",

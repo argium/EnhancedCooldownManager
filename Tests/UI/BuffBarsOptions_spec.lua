@@ -108,14 +108,15 @@ describe("BuffBarsOptions", function()
                     IsEditLocked = function() return false, nil end,
                     GetActiveSpellData = function() return {} end,
                 },
+                NewModule = function(_, name) return { moduleName = name } end,
             },
         }
 
         TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
         SpellColors = ECM.SpellColors
 
-        -- Load OptionUtil (includes SettingsBuilder adapter)
-        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, addonNS)
+        -- Load Options (includes SettingsBuilder adapter)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         -- Create root category so subcategory calls work
         ECM.SettingsBuilder.CreateRootCategory("Test")

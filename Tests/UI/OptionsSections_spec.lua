@@ -78,8 +78,6 @@ describe("Options sections and root assembly", function()
 
         local ns = { Addon = mod, OptionsSections = {} }
 
-        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "Unable to load Helpers/OptionUtil.lua")(nil, ns)
-
         for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
             ns.OptionsSections[key] = {
                 RegisterSettings = function()
@@ -145,11 +143,12 @@ describe("Options sections and root assembly", function()
                     profile = profileData,
                     defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
+                NewModule = function(_, name) return { moduleName = name } end,
             },
             OptionsSections = {},
         }
 
-        TestHelpers.LoadChunk("Helpers/OptionUtil.lua", "OptionUtil")(nil, ns)
+        TestHelpers.LoadChunk("UI/Options.lua", "Options")(nil, ns)
         ECM.SettingsBuilder.CreateRootCategory("Test")
 
         TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
