@@ -89,17 +89,16 @@ local constants = {
 
     -- Consumable item IDs (priority-ordered: best first)
     COMBAT_POTIONS = {
-        { itemID = 212265, quality = 3 }, -- Tempered Potion R3
-        { itemID = 212264, quality = 2 }, -- Tempered Potion R2
-        { itemID = 212263, quality = 1 }, -- Tempered Potion R1
+        { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
+        { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
+        { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
+        { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
+
     },
     HEALTH_POTIONS = {
-        { itemID = 211880, quality = 3 }, -- Algari Healing Potion R3
-        { itemID = 211879, quality = 2 }, -- Algari Healing Potion R2
-        { itemID = 211878, quality = 1 }, -- Algari Healing Potion R1
-        { itemID = 212244, quality = 3 }, -- Cavedweller's Delight R3
-        { itemID = 212243, quality = 2 }, -- Cavedweller's Delight R2
-        { itemID = 212242, quality = 1 }, -- Cavedweller's Delight R1
+        { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
+        { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
+        { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
     },
     HEALTHSTONE_ITEM_ID = 5512,
     ITEM_ICONS_MAX = 5,
