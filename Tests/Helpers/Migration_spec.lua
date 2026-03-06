@@ -116,7 +116,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_nil(persistedColor.keyType)
         assert.is_nil(persistedColor.spellID)
         assert.is_nil(persistedColor.cooldownID)
@@ -150,7 +150,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellID", spellIDEntry.meta.keyType)
         assert.are.equal(2468, spellIDEntry.meta.spellID)
         assert.are.equal("cooldownID", cooldownEntry.meta.keyType)
@@ -183,7 +183,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.same(byNameEntry, profile.buffBars.colors.byName[12][2]["Do Not Replace"])
         assert.are.same(byNameEntry, profile.buffBars.colors.bySpellID[12][2][1001])
         assert.are.same(byNameEntry, profile.buffBars.colors.byCooldownID[12][2][1002])
@@ -197,7 +197,7 @@ describe("Migration", function()
             schemaVersion = 8,
         }
         Migration.Run(noBuffBars)
-        assert.are.equal(10, noBuffBars.schemaVersion)
+        assert.are.equal(11, noBuffBars.schemaVersion)
 
         local invalidColors = {
             schemaVersion = 8,
@@ -206,7 +206,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidColors)
-        assert.are.equal(10, invalidColors.schemaVersion)
+        assert.are.equal(11, invalidColors.schemaVersion)
         assert.are.equal("invalid", invalidColors.buffBars.colors)
 
         local invalidByName = {
@@ -221,7 +221,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidByName)
-        assert.are.equal(10, invalidByName.schemaVersion)
+        assert.are.equal(11, invalidByName.schemaVersion)
         assert.is_table(invalidByName.buffBars.colors.byName)
     end)
 
@@ -261,7 +261,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local created = assert(searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture"))
@@ -347,7 +347,7 @@ describe("Migration", function()
         local noBuffBars = { schemaVersion = 9 }
         Migration.Run(noBuffBars)
 
-        assert.are.equal(10, noBuffBars.schemaVersion)
+        assert.are.equal(11, noBuffBars.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -360,7 +360,7 @@ describe("Migration", function()
         }
         Migration.Run(invalidColors)
 
-        assert.are.equal(10, invalidColors.schemaVersion)
+        assert.are.equal(11, invalidColors.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -389,7 +389,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local specAnomalies = select(2, searchLogMessages("V10 anomaly: class=12 spec="))
@@ -435,7 +435,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID)
         assert.is_table(profile.buffBars.colors.byCooldownID)
         assert.is_table(profile.buffBars.colors.byTexture)
@@ -469,7 +469,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal("KeepNameMetadata", byNameEntry.meta.spellName)
         assert.are.equal("spellID", bySpellIDEntry.meta.keyType)
@@ -509,7 +509,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID[12][2])
         assert.is_table(profile.buffBars.colors.byCooldownID[12][2])
         assert.is_table(profile.buffBars.colors.byTexture[12][2])
@@ -540,7 +540,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal(9001, byNameEntry.meta.spellID)
         assert.are.equal(9002, byNameEntry.meta.cooldownID)
@@ -592,7 +592,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local winner = profile.buffBars.colors.bySpellID[12][2][203720]
         assert.are.same(bySpellEntry, winner)
         assert.are.same(winner, profile.buffBars.colors.byName[12][2]["Demon Spikes"])
@@ -606,6 +606,100 @@ describe("Migration", function()
         assert.is_nil(winner.value.spellID)
         assert.is_nil(winner.value.cooldownID)
         assert.is_nil(winner.value.textureId)
+    end)
+
+    -- V11 migration tests: itemIcons boolean toggles → ordered entry lists
+    it("V11 migrates all enabled toggles into utility with potions and healthstone", function()
+        local profile = {
+            schemaVersion = 10,
+            itemIcons = {
+                enabled = true,
+                showTrinket1 = true,
+                showTrinket2 = true,
+                showCombatPotion = true,
+                showHealthPotion = true,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        assert.is_true(profile.itemIcons.enabled)
+        assert.are.same({}, profile.itemIcons.essential)
+
+        local utility = profile.itemIcons.utility
+        local expectedCount = #ECM.Constants.COMBAT_POTIONS
+            + #ECM.Constants.HEALTH_POTIONS
+            + 1 -- healthstone
+        assert.are.equal(expectedCount, #utility)
+
+        -- First entries are combat potions
+        for i, p in ipairs(ECM.Constants.COMBAT_POTIONS) do
+            assert.are.same({ type = "item", id = p.itemID }, utility[i])
+        end
+    end)
+
+    it("V11 respects disabled toggles and omits corresponding entries", function()
+        local profile = {
+            schemaVersion = 10,
+            itemIcons = {
+                enabled = true,
+                showCombatPotion = false,
+                showHealthPotion = false,
+                showHealthstone = false,
+            },
+        }
+
+        Migration.Run(profile)
+
+        local utility = profile.itemIcons.utility
+        assert.are.equal(0, #utility)
+    end)
+
+    it("V11 handles nil itemIcons by creating defaults", function()
+        local profile = { schemaVersion = 10 }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        assert.is_true(profile.itemIcons.enabled)
+        assert.are.same({}, profile.itemIcons.essential)
+
+        local expectedCount = #ECM.Constants.COMBAT_POTIONS
+            + #ECM.Constants.HEALTH_POTIONS
+            + 1
+        assert.are.equal(expectedCount, #profile.itemIcons.utility)
+    end)
+
+    it("V11 preserves enabled = false", function()
+        local profile = {
+            schemaVersion = 10,
+            itemIcons = { enabled = false },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        assert.is_false(profile.itemIcons.enabled)
+    end)
+
+    it("V11 selectively includes healthstone when only showHealthstone is enabled", function()
+        local profile = {
+            schemaVersion = 10,
+            itemIcons = {
+                enabled = true,
+                showCombatPotion = false,
+                showHealthPotion = false,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        local utility = profile.itemIcons.utility
+        assert.are.equal(1, #utility)
+        assert.are.same({ type = "item", id = ECM.Constants.HEALTHSTONE_ITEM_ID }, utility[1])
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

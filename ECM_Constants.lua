@@ -1,3 +1,7 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
 ECM = ECM or {} -- this file is probably loaded before everything else so this initializes the global table.
 
 local constants = {
@@ -83,9 +87,10 @@ local constants = {
     MAGE_FROST_SPEC_INDEX = 3,
     DRUID_CAT_FORM_INDEX = 2,
 
-    -- Trinket slots
+    -- Trinket and equipment slots
     TRINKET_SLOT_1 = 13,
     TRINKET_SLOT_2 = 14,
+    MAX_EQUIPMENT_SLOT_ID = 19,
 
     -- Consumable item IDs (priority-ordered: best first)
     COMBAT_POTIONS = {
@@ -100,17 +105,23 @@ local constants = {
         { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
     },
     HEALTHSTONE_ITEM_ID = 5512,
-    ITEM_ICONS_MAX = 5,
+
+    -- Item icon entry types
+    ITEM_ICON_TYPE_ITEM = "item",
+    ITEM_ICON_TYPE_SPELL = "spell",
 
     -- Item icon defaults
+    ITEM_ICON_INITIAL_POOL_SIZE = 8,
     DEFAULT_ITEM_ICON_SIZE = 32,
     DEFAULT_ITEM_ICON_SPACING = 2,
     ITEM_ICON_BORDER_SCALE = 1.35,
+    ITEM_ICON_QUALITY_SCALE = 0.8,
+    ITEM_ICON_QUALITY_ATLAS = "Professions-Icon-Quality-12-Tier%d-Inv",
     ITEM_ICON_LAYOUT_REMEASURE_DELAY = 0.1,
     ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS = 2,
 
     -- Schema migration
-    CURRENT_SCHEMA_VERSION = 10,
+    CURRENT_SCHEMA_VERSION = 11,
     SV_NAME = "EnhancedCooldownManagerDB",
     ACTIVE_SV_KEY = "_ECM_DB",
 
@@ -150,9 +161,84 @@ local CLASS_COLORS = {
     WARRIOR     = "C79C6E",
 }
 
+-- Maps UnitRace() file name -> racial spell IDs for the "Add Racial" button
+local RACE_RACIALS = {
+    Human              = { 59752 },
+    Dwarf              = { 20594 },
+    NightElf           = { 58984 },
+    Gnome              = { 20589 },
+    Draenei            = { 28880 },
+    Worgen             = { 68992 },
+    VoidElf            = { 256948 },
+    LightforgedDraenei = { 255647 },
+    DarkIronDwarf      = { 265221 },
+    KulTiran           = { 287712 },
+    Mechagnome         = { 312924 },
+    Orc                = { 33697 },
+    Scourge            = { 7744 },
+    Tauren             = { 20549 },
+    Troll              = { 26297 },
+    BloodElf           = { 28730 },
+    Goblin             = { 69041 },
+    Nightborne         = { 260364 },
+    HighmountainTauren = { 255654 },
+    MagharOrc          = { 274738 },
+    ZandalariTroll     = { 291944 },
+    Vulpera            = { 312411 },
+    Pandaren           = { 107079 },
+    Dracthyr           = { 368970 },
+    Earthen            = { 446280 },
+}
+
+-- Derive flat racial abilities list from RACE_RACIALS (single source of truth)
+local RACIAL_ABILITIES = {}
+for _, spellIds in pairs(RACE_RACIALS) do
+    for _, id in ipairs(spellIds) do
+        RACIAL_ABILITIES[#RACIAL_ABILITIES + 1] = { type = "spell", id = id }
+    end
+end
+
+--- Shallow-copies an array of {type, id} entries.
+local function copyItemIconEntries(entries)
+    local result = {}
+    for i, entry in ipairs(entries) do
+        result[i] = { type = entry.type, id = entry.id }
+    end
+    return result
+end
+
+--- Builds {type, id} item entries from a source array, extracting IDs via idKey.
+local function buildItemEntries(source, idKey)
+    local result = {}
+    for i, entry in ipairs(source) do
+        result[i] = { type = constants.ITEM_ICON_TYPE_ITEM, id = entry[idKey] }
+    end
+    return result
+end
+
+local ITEM_ICON_ENTRY_GROUPS = {
+    combatPotions = buildItemEntries(constants.COMBAT_POTIONS, "itemID"),
+    healthPotions = buildItemEntries(constants.HEALTH_POTIONS, "itemID"),
+    healthstone = { { type = constants.ITEM_ICON_TYPE_ITEM, id = constants.HEALTHSTONE_ITEM_ID } },
+    racials = RACIAL_ABILITIES,
+}
+
+-- Default utility entries: potions + healthstone (built once at load time)
+local ITEM_ICONS_DEFAULT_UTILITY = {}
+for _, groupKey in ipairs({ "combatPotions", "healthPotions", "healthstone" }) do
+    for _, entry in ipairs(ITEM_ICON_ENTRY_GROUPS[groupKey]) do
+        ITEM_ICONS_DEFAULT_UTILITY[#ITEM_ICONS_DEFAULT_UTILITY + 1] = { type = entry.type, id = entry.id }
+    end
+end
+
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS
-
+constants.copyItemIconEntries = copyItemIconEntries
+constants.RACIAL_ABILITIES = RACIAL_ABILITIES
+constants.ITEM_ICON_ENTRY_GROUPS = ITEM_ICON_ENTRY_GROUPS
+constants.RACE_RACIALS = RACE_RACIALS
+constants.ITEM_ICONS_DEFAULT_UTILITY = ITEM_ICONS_DEFAULT_UTILITY
+constants.ITEM_ICONS_DEFAULT_RACIALS = RACIAL_ABILITIES
 ECM.Constants = constants

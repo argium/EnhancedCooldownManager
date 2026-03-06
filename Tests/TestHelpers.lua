@@ -437,16 +437,18 @@ TestHelpers.OPTIONS_GLOBALS = {
     "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
     "LibSettingsBuilder_ScrollDropdownMixin",
     "GameFontHighlightSmall", "GameFontNormal",
-    "SETTINGS_DEFAULTS", "InCombatLockdown", "UnitName", "date",
-    "ColorPickerFrame", "CreateFrame", "CreateDataProvider",
+    "SETTINGS_DEFAULTS", "InCombatLockdown", "UnitName", "UnitRace", "date",
+    "ColorPickerFrame", "GameTooltip", "CreateFrame", "CreateDataProvider",
+    "C_Spell", "C_Item", "C_TradeSkillUI",
     "hooksecurefunc", "CreateScrollBoxListLinearView", "ScrollUtil",
+    "SetCursor", "ResetCursor",
 }
 
 --- Create a full default profile for option tests.
 function TestHelpers.MakeOptionsProfile()
     local border = { enabled = false, thickness = 4, color = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 } }
     local profile = {
-        schemaVersion = 10,
+        schemaVersion = 11,
         global = {
             debug = false,
             hideWhenMounted = true,
@@ -545,14 +547,39 @@ function TestHelpers.MakeOptionsProfile()
         },
         itemIcons = {
             enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
+            essential = {},
+            utility = {
+                { type = "item", id = 245898 },
+                { type = "item", id = 245897 },
+                { type = "item", id = 241308 },
+                { type = "item", id = 241309 },
+                { type = "item", id = 258138 },
+                { type = "item", id = 241305 },
+                { type = "item", id = 241304 },
+                { type = "item", id = 5512 },
+            },
         },
     }
     return profile, deepClone(profile)
+end
+
+function TestHelpers.SetupItemIconsConstants(constants)
+    constants.ITEM_ICON_TYPE_ITEM = "item"
+    constants.ITEM_ICON_TYPE_SPELL = "spell"
+    constants.ITEM_ICON_QUALITY_ATLAS = "Professions-Icon-Quality-12-Tier%d-Inv"
+    constants.ITEM_ICONS_DEFAULT_UTILITY = {
+        { type = "item", id = 245898 },
+        { type = "item", id = 5512 },
+    }
+    constants.ITEM_ICONS_DEFAULT_RACIALS = {
+        { type = "spell", id = 20549 },
+        { type = "spell", id = 26297 },
+    }
+    constants.RACE_RACIALS = {
+        Human = { 59752 },
+        Tauren = { 20549 },
+    }
+    return constants
 end
 
 --- Install common WoW globals for option tests.
@@ -566,16 +593,37 @@ function TestHelpers.SetupOptionsGlobals()
     _G.SETTINGS_DEFAULTS = "Defaults"
     _G.InCombatLockdown = function() return false end
     _G.UnitName = function() return "TestPlayer" end
+    _G.UnitRace = function() return "Human", "Human" end
     _G.date = function() return "120000" end
     _G.ColorPickerFrame = {
         SetupColorPickerAndShow = function() end,
         GetColorRGB = function() return 1, 1, 1 end,
         GetColorAlpha = function() return 1 end,
     }
+    _G.GameTooltip = {
+        SetOwner = function() end,
+        SetItemByID = function() end,
+        SetSpellByID = function() end,
+        Show = function() end,
+        Hide = function() end,
+    }
 
     _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
     _G.GetSpecialization = function() return 1 end
     _G.GetSpecializationInfo = function() return nil, "Arms" end
+
+    _G.SetCursor = function() end
+    _G.ResetCursor = function() end
+
+    -- WoW API stubs for item/spell info (used by ItemIconsOptions at registration time)
+    _G.C_Spell = _G.C_Spell or {}
+    _G.C_Spell.GetSpellName = _G.C_Spell.GetSpellName or function() return "Test Spell" end
+    _G.C_Spell.GetSpellTexture = _G.C_Spell.GetSpellTexture or function() return "Interface\\Icons\\Spell_Nature_Healing" end
+    _G.C_Item = _G.C_Item or {}
+    _G.C_Item.GetItemIconByID = _G.C_Item.GetItemIconByID or function() return "Interface\\Icons\\INV_Misc_QuestionMark" end
+    _G.C_Item.GetItemNameByID = _G.C_Item.GetItemNameByID or function() return "Test Item" end
+    _G.C_TradeSkillUI = _G.C_TradeSkillUI or {}
+    _G.C_TradeSkillUI.GetItemReagentQualityByItemInfo = _G.C_TradeSkillUI.GetItemReagentQualityByItemInfo or function() return nil end
 
     -- Minimal CreateFrame stub for canvas layouts
     local function makeFrameStub()
@@ -593,6 +641,8 @@ function TestHelpers.SetupOptionsGlobals()
         f.Hide = noop
         f.IsShown = function() return false end
         f.SetEnabled = noop
+        f.SetAlpha = noop
+        f.GetChildren = function() return end
         f.SetText = noop
         f.GetText = function() return "" end
         f.SetWordWrap = noop
@@ -604,6 +654,16 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetValueStep = noop
         f.SetObeyStepOnDrag = noop
         f.SetDataProvider = noop
+        f.SetAutoFocus = noop
+        f.SetNumeric = noop
+        f.GetNumber = function() return 0 end
+        f.EnableMouse = noop
+        f.RegisterForDrag = noop
+        f.SetMovable = noop
+        f.GetParent = function() return nil end
+        f.Disable = noop
+        f.Enable = noop
+        f.SetNormalAtlas = noop
         f.CreateFontString = function() return makeFrameStub() end
         f.CreateTexture = function() return makeFrameStub() end
         -- Auto-create sub-tables on access for template frames

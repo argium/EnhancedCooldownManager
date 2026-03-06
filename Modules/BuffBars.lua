@@ -113,6 +113,21 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
     iconFrame.__ecmSquareStyled = true
 end
 
+--- Formats a spell name with its application count for display when the icon
+--- is hidden. Returns nil if no formatting is needed (count <= 1 or missing).
+---@param nameText string|nil The spell name text
+---@param appText string|nil The application count text
+---@return string|nil formatted The formatted name, or nil
+function BuffBars.FormatNameWithApplications(nameText, appText)
+    if not appText then return nil end
+    if not issecretvalue(appText) then
+        local count = tonumber(appText)
+        if not count or count <= 1 then return nil end
+    end
+    if not issecretvalue(nameText) and not nameText then return nil end
+    return nameText .. " (" .. appText .. ")"
+end
+
 --- Applies all sizing, styling, visibility, and anchoring to a single buff bar
 --- child frame. Lazy setters ensure no-ops when values haven't changed.
 ---@param frame ECM_BuffBarMixin
@@ -283,6 +298,17 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     end
     if bar.Duration then
         bar.Duration:SetShown(showDuration)
+    end
+
+    -- When icon is hidden, show application count inline with the spell name
+    if not showIcon and showSpellName and bar.Name
+            and iconFrame and iconFrame.Applications
+            and iconFrame.Applications.GetText then
+        local formatted = BuffBars.FormatNameWithApplications(
+            spellName, iconFrame.Applications:GetText())
+        if formatted then
+            bar.Name:SetText(formatted)
+        end
     end
 
     --------------------------------------------------------------------------

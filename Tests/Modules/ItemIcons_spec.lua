@@ -16,7 +16,7 @@ describe("ItemIcons module", function()
     local createdFrames
 
     -- Fake WoW API state
-    local itemCounts, itemIcons, equippableItems, equippedItems, inventorySlots
+    local itemCounts, itemIcons, equippedItems, inventoryItemIDs
     local playerSpells, spellTextures, spellCooldowns
     local inventoryCooldowns, itemCooldowns
     local reagentQualities
@@ -26,7 +26,8 @@ describe("ItemIcons module", function()
 
     local globalNames = {
         "ECM", "C_Timer", "GetTime", "UIParent", "CreateFrame", "C_Item",
-        "C_Spell", "IsPlayerSpell", "IsEquippedItem", "GetInventoryItemCooldown",
+        "C_Spell", "IsPlayerSpell", "IsEquippedItem", "GetInventoryItemID",
+        "GetInventoryItemCooldown",
         "C_TradeSkillUI", "EditModeManagerFrame", "EssentialCooldownViewer",
         "UtilityCooldownViewer", "issecretvalue", "Enum",
     }
@@ -135,9 +136,8 @@ describe("ItemIcons module", function()
 
         itemCounts = {}
         itemIcons = {}
-        equippableItems = {}
         equippedItems = {}
-        inventorySlots = {}
+        inventoryItemIDs = {}
         playerSpells = {}
         spellTextures = {}
         spellCooldowns = {}
@@ -158,8 +158,6 @@ describe("ItemIcons module", function()
         _G.C_Item = {
             GetItemCount = function(id) return itemCounts[id] or 0 end,
             GetItemIconByID = function(id) return itemIcons[id] end,
-            IsEquippableItem = function(id) return equippableItems[id] or false end,
-            GetItemInventorySlotInfo = function(id) return inventorySlots[id] end,
             GetItemCooldown = function(id)
                 local cd = itemCooldowns[id]
                 if cd then return cd.start, cd.duration, cd.enable end
@@ -168,6 +166,7 @@ describe("ItemIcons module", function()
         }
 
         _G.IsEquippedItem = function(id) return equippedItems[id] or false end
+        _G.GetInventoryItemID = function(_, slot) return inventoryItemIDs[slot] end
 
         _G.GetInventoryItemCooldown = function(_, slotId)
             local cd = inventoryCooldowns[slotId]
@@ -239,8 +238,6 @@ describe("ItemIcons module", function()
         -- Set up ECM globals
         _G.ECM = {
             Constants = {
-                ITEM_ICON_TYPE_ITEM = "item",
-                ITEM_ICON_TYPE_SPELL = "spell",
                 ITEM_ICON_INITIAL_POOL_SIZE = 8,
                 ITEM_ICON_BORDER_SCALE = 1.35,
                 DEFAULT_ITEM_ICON_SIZE = 32,
@@ -286,6 +283,7 @@ describe("ItemIcons module", function()
                 if not cond then error(msg or "DebugAssert failed") end
             end,
         }
+        TestHelpers.SetupItemIconsConstants(_G.ECM.Constants)
 
         -- Load the module with stubs
         local ns = { Addon = {
@@ -337,8 +335,16 @@ describe("ItemIcons module", function()
     end
 
     describe("resolveEntries", function()
-        -- We test resolveEntries indirectly by loading the module file.
-        -- For isolated testing, replicate the logic here:
+        -- Replicate the module's resolveEntries logic for isolated testing.
+        local function findEquippedSlot(itemId)
+            for slot = 1, 19 do
+                if GetInventoryItemID("player", slot) == itemId then
+                    return slot
+                end
+            end
+            return nil
+        end
+
         local function resolveEntries(entries)
             local resolved = {}
             for _, entry in ipairs(entries) do
@@ -346,11 +352,9 @@ describe("ItemIcons module", function()
                     local id = entry.id
                     local texture = C_Item.GetItemIconByID(id)
                     if texture then
-                        if C_Item.IsEquippableItem(id) and IsEquippedItem(id) then
-                            local invSlot = C_Item.GetItemInventorySlotInfo(id)
-                            if invSlot then
-                                resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = invSlot }
-                            end
+                        local equippedSlot = IsEquippedItem(id) and findEquippedSlot(id)
+                        if equippedSlot then
+                            resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = equippedSlot }
                         elseif C_Item.GetItemCount(id) > 0 then
                             resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = nil }
                         end
@@ -394,9 +398,8 @@ describe("ItemIcons module", function()
         end)
 
         it("resolves equipped items with slot ID", function()
-            equippableItems[12345] = true
             equippedItems[12345] = true
-            inventorySlots[12345] = 13
+            inventoryItemIDs[13] = 12345
             itemIcons[12345] = 999
 
             local result = resolveEntries({ { type = "item", id = 12345 } })
@@ -405,10 +408,9 @@ describe("ItemIcons module", function()
             assert.are.equal(999, result[1].texture)
         end)
 
-        it("skips equipped items when slot info unavailable", function()
-            equippableItems[12345] = true
+        it("skips equipped items when slot cannot be found", function()
             equippedItems[12345] = true
-            inventorySlots[12345] = nil
+            -- inventoryItemIDs has no slot mapping for 12345
             itemIcons[12345] = 999
             itemCounts[12345] = 0
 
@@ -416,8 +418,7 @@ describe("ItemIcons module", function()
             assert.are.equal(0, #result)
         end)
 
-        it("skips equippable items that are not equipped and not in bags", function()
-            equippableItems[12345] = true
+        it("skips items that are not equipped and not in bags", function()
             equippedItems[12345] = false
             itemIcons[12345] = 999
             itemCounts[12345] = 0
@@ -484,33 +485,28 @@ describe("ItemIcons module", function()
     end)
 
     describe("updateIconCooldown", function()
-        -- Replicate the cooldown update logic for isolated testing
+        -- Replicate the secret-safe cooldown update logic for isolated testing.
+        -- Values from cooldown APIs are secret and must not be compared;
+        -- they are passed directly to SetCooldown.
         local function updateIconCooldown(icon)
             if icon.type == "spell" then
                 local cooldownInfo = C_Spell.GetSpellCooldown(icon.spellId)
-                if cooldownInfo and cooldownInfo.duration > 0 then
+                if cooldownInfo then
                     icon.Cooldown:SetCooldown(cooldownInfo.startTime, cooldownInfo.duration)
-                else
-                    icon.Cooldown:Clear()
                 end
                 return
             end
 
-            local start, duration, enable
+            local start, duration
             if icon.slotId then
-                start, duration, enable = GetInventoryItemCooldown("player", icon.slotId)
-                enable = (enable == 1)
+                start, duration = GetInventoryItemCooldown("player", icon.slotId)
             elseif icon.itemId then
-                start, duration, enable = C_Item.GetItemCooldown(icon.itemId)
+                start, duration = C_Item.GetItemCooldown(icon.itemId)
             else
                 return
             end
 
-            if enable and duration > 0 then
-                icon.Cooldown:SetCooldown(start, duration)
-            else
-                icon.Cooldown:Clear()
-            end
+            icon.Cooldown:SetCooldown(start, duration)
         end
 
         it("handles spell cooldowns", function()
@@ -524,14 +520,15 @@ describe("ItemIcons module", function()
             assert.are.equal(30, icon.Cooldown.__duration)
         end)
 
-        it("clears spell cooldown when not on cooldown", function()
+        it("passes zero-duration spell cooldown to SetCooldown", function()
             local icon = makeIconFrame()
             icon.type = "spell"
             icon.spellId = 20549
             spellCooldowns[20549] = { startTime = 0, duration = 0 }
 
             updateIconCooldown(icon)
-            assert.is_nil(icon.Cooldown.__start)
+            assert.are.equal(0, icon.Cooldown.__start)
+            assert.are.equal(0, icon.Cooldown.__duration)
         end)
 
         it("handles equipped item cooldowns", function()
@@ -558,14 +555,15 @@ describe("ItemIcons module", function()
             assert.are.equal(60, icon.Cooldown.__duration)
         end)
 
-        it("clears cooldown for disabled equipped items", function()
+        it("passes zero-duration item cooldown to SetCooldown", function()
             local icon = makeIconFrame()
             icon.type = "item"
             icon.slotId = 13
             inventoryCooldowns[13] = { start = 0, duration = 0, enable = 0 }
 
             updateIconCooldown(icon)
-            assert.is_nil(icon.Cooldown.__start)
+            assert.are.equal(0, icon.Cooldown.__start)
+            assert.are.equal(0, icon.Cooldown.__duration)
         end)
 
         it("does nothing for icon with no type data", function()
@@ -587,7 +585,7 @@ describe("ItemIcons module", function()
             then
                 local quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(iconData.id)
                 if quality and quality > 0 then
-                    icon.QualityBadge:SetAtlas("Professions-Icon-Quality-Tier" .. quality .. "-Small")
+                    icon.QualityBadge:SetAtlas(string.format(ECM.Constants.ITEM_ICON_QUALITY_ATLAS, quality))
                     icon.QualityBadge:Show()
                     return
                 end
@@ -600,7 +598,7 @@ describe("ItemIcons module", function()
             local icon = makeIconFrame()
             applyQualityBadge(icon, { type = "item", id = 241308 })
             assert.is_true(icon.QualityBadge.__shown)
-            assert.are.equal("Professions-Icon-Quality-Tier2-Small", icon.QualityBadge.__atlas)
+            assert.are.equal("Professions-Icon-Quality-12-Tier2-Inv", icon.QualityBadge.__atlas)
         end)
 
         it("hides quality badge for non-quality items", function()

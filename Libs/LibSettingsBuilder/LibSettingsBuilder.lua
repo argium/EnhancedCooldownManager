@@ -82,8 +82,11 @@ function CanvasLayout:AddSpacer(height)
 end
 
 --- Add a description / informational text row.
-function CanvasLayout:AddDescription(text, fontObject)
-    local row = self:_CreateRow()
+---@param text string
+---@param fontObject? string
+---@param rowHeight? number
+function CanvasLayout:AddDescription(text, fontObject, rowHeight)
+    local row = self:_CreateRow(rowHeight)
     local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
     label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
     label:SetPoint("RIGHT", row, "RIGHT", -10, 0)

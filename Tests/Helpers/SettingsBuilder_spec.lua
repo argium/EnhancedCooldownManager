@@ -374,6 +374,34 @@ describe("SettingsBuilder", function()
         assert.are.equal("Item Quality", init.data.name)
     end)
 
+    it("CanvasLayout:AddDescription supports explicit row height", function()
+        local originalCreateFrame = _G.CreateFrame
+        local lastSetHeight
+
+        local function makeFrameStub()
+            local f = {}
+            f.SetPoint = function() end
+            f.SetHeight = function(_, h) lastSetHeight = h end
+            f.CreateFontString = function()
+                return {
+                    SetPoint = function() end,
+                    SetJustifyH = function() end,
+                    SetText = function() end,
+                }
+            end
+            return f
+        end
+
+        _G.CreateFrame = function() return makeFrameStub() end
+
+        local layout = SB.CreateCanvasLayout("Canvas Height Test")
+        layout:AddDescription("Description", "GameFontNormal", 36)
+
+        _G.CreateFrame = originalCreateFrame
+
+        assert.are.equal(36, lastSetHeight)
+    end)
+
     it("Subheader respects explicit category via root subcategory", function()
         SB._currentSubcategory = SB._rootCategory
         local init = SB.Subheader({ name = "Root Sub" })

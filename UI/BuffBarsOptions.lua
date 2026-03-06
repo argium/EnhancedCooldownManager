@@ -6,6 +6,12 @@ local _, ns = ...
 local mod = ns.Addon
 local C = ECM.Constants
 
+local SPACER_HEIGHT = 6
+local DESC_HEIGHT = 47
+local SCROLL_ITEM_HEIGHT = 26
+local LABEL_X = 37
+local CENTER_OFFSET_X = -85
+
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
@@ -54,7 +60,10 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-local BASE_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization."
+local BASE_DESC_TEXT =
+    "Customize colors for individual spells. Colors are saved per class and specialization.\n" ..
+    "If a bar is showing up without a name, it may be secret. You can customise it but the spell name\n" ..
+    "may not appear until after reloading the UI."
 
 StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
     text = "Are you sure you want to reset all spell colors for this spec?",
@@ -86,14 +95,10 @@ local function createSpellColorCanvas(SB, subcatName)
         StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
     end)
 
-    layout:AddSpacer(2)
+    layout:AddSpacer(SPACER_HEIGHT)
 
-    local descRow = layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight")
+    local descRow = layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight", DESC_HEIGHT)
     descRow._text:SetWordWrap(true)
-
-    local warningRow = layout:AddDescription("")
-    local warningText = warningRow._text
-    warningText:SetWordWrap(true)
 
     -- Default color swatch (above the per-spell list)
     -- Reposition to align with the scroll list items below, which sit inside
@@ -101,7 +106,7 @@ local function createSpellColorCanvas(SB, subcatName)
     local defaultColorRow, defaultColorSwatch = layout:AddColorSwatch("Default color")
     defaultColorRow._label:ClearAllPoints()
     defaultColorRow._label:SetPoint("LEFT", 74, 0)
-    defaultColorRow._label:SetPoint("RIGHT", defaultColorRow, "CENTER", -85, 0)
+    defaultColorRow._label:SetPoint("RIGHT", defaultColorRow, "CENTER", CENTER_OFFSET_X, 0)
     defaultColorSwatch:ClearAllPoints()
     defaultColorSwatch:SetPoint("LEFT", defaultColorRow, "CENTER", -70, 0)
     defaultColorSwatch:SetScript("OnClick", function()
@@ -115,15 +120,15 @@ local function createSpellColorCanvas(SB, subcatName)
     end)
 
     -- Scroll list using Blizzard's SettingsColorSwatchControlTemplate per element
-    local scrollBox, _, view = layout:AddScrollList(26)
+    local scrollBox, _, view = layout:AddScrollList(SCROLL_ITEM_HEIGHT)
 
     view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
         -- Position label (matches SettingsListElementMixin:Init positioning)
         if not control._ecmPositioned then
             control.Text:SetFontObject(GameFontNormal)
             control.Text:ClearAllPoints()
-            control.Text:SetPoint("LEFT", 37, 0)
-            control.Text:SetPoint("RIGHT", control, "CENTER", -85, 0)
+            control.Text:SetPoint("LEFT", LABEL_X, 0)
+            control.Text:SetPoint("RIGHT", control, "CENTER", CENTER_OFFSET_X, 0)
             control._ecmPositioned = true
         end
 

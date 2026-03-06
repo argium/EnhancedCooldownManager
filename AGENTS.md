@@ -32,6 +32,7 @@ They are on special lookout for:
 - Low reusability; poor future extensibility.
 - Unnecessary complexity.
 - Test coverage; edge cases; gaps.
+- UI/UX that is inconsistent with the project or WoW's conventions (immediately rejected) including control types, apperaance, and positioning.
 
 Fewer lines but are meaningful (without being obtuse with formatting); simplicity; simple simple simple. Remove dead code; duplicated code; trivial wrappers; dead and needless type checking; remove anything that a senior software engineer would look at and raise their eye brows because it's stupid or unnecessary. Do not break functionality.
 

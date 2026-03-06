@@ -1,5 +1,8 @@
--- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V10).
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
 
 local Migration = {}
 ECM.Migration = Migration
@@ -44,6 +47,12 @@ local function deepCopy(value, seen)
 
     seen[value] = nil
     return copy
+end
+
+local function appendItemIconEntries(target, source)
+    for _, entry in ipairs(source) do
+        target[#target + 1] = { type = entry.type, id = entry.id }
+    end
 end
 
 local function normalizeLegacyColor(color, defaultAlpha)
@@ -980,6 +989,30 @@ function Migration.Run(profile)
 
         log("Migrated to V10")
         profile.schemaVersion = 10
+    end
+
+    if profile.schemaVersion < 11 then
+        -- Migration: convert flat itemIcons boolean toggles to ordered entry lists.
+        local old = profile.itemIcons or {}
+        local groups = ECM.Constants.ITEM_ICON_ENTRY_GROUPS
+        local oldEnabled = old.enabled
+        if oldEnabled == nil then oldEnabled = true end
+
+        local utility = {}
+        if old.showCombatPotion ~= false then
+            appendItemIconEntries(utility, groups.combatPotions)
+        end
+        if old.showHealthPotion ~= false then
+            appendItemIconEntries(utility, groups.healthPotions)
+        end
+        if old.showHealthstone ~= false then
+            appendItemIconEntries(utility, groups.healthstone)
+        end
+
+        profile.itemIcons = { enabled = oldEnabled, essential = {}, utility = utility }
+
+        log("Migrated to V11")
+        profile.schemaVersion = 11
     end
 
     log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")

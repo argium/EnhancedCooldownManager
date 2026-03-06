@@ -202,4 +202,78 @@ describe("BuffBarsOptions", function()
         -- BuffBarsOptions should have registered itself
         assert.is_function(BuffBarsOptions.RegisterSettings)
     end)
+
+    it("RegisterSettings uses a 44px spell color description row", function()
+        local capturedDescHeight
+        local originalCreateDataProvider = _G.CreateDataProvider
+
+        _G.CreateDataProvider = function()
+            return {
+                Flush = function() end,
+                Insert = function() end,
+            }
+        end
+
+        local mockLayout = {
+            frame = {
+                SetScript = function() end,
+            },
+        }
+
+        function mockLayout:AddHeader()
+            return {
+                _defaultsButton = {
+                    SetText = function() end,
+                    SetScript = function() end,
+                    SetEnabled = function() end,
+                },
+            }
+        end
+
+        function mockLayout:AddSpacer() end
+
+        function mockLayout:AddDescription(_, _, rowHeight)
+            capturedDescHeight = rowHeight
+            return {
+                _text = {
+                    SetWordWrap = function() end,
+                },
+            }
+        end
+
+        function mockLayout:AddColorSwatch()
+            return {
+                _label = {
+                    ClearAllPoints = function() end,
+                    SetPoint = function() end,
+                },
+            }, {
+                ClearAllPoints = function() end,
+                SetPoint = function() end,
+                SetScript = function() end,
+                SetColorRGB = function() end,
+            }
+        end
+
+        function mockLayout:AddScrollList()
+            return {
+                SetDataProvider = function() end,
+            }, nil, {
+                SetElementInitializer = function() end,
+            }
+        end
+
+        local mockSB = {
+            RegisterFromTable = function() end,
+            CreateCanvasLayout = function() return mockLayout end,
+            Button = function() end,
+            GetSubcategoryID = function() return nil end,
+        }
+
+        BuffBarsOptions.RegisterSettings(mockSB)
+
+        _G.CreateDataProvider = originalCreateDataProvider
+
+        assert.are.equal(44, capturedDescHeight)
+    end)
 end)

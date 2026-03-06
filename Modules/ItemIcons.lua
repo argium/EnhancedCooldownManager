@@ -43,6 +43,18 @@ ECM.ModuleMixin.ApplyConfigMixin(ItemIcons, "ItemIcons")
 --- Resolves config entries into display-ready data, preserving config order.
 ---@param entries ECM_ItemIconEntry[] Ordered entry list from config.
 ---@return ECM_ResolvedEntry[] resolved Available entries with textures.
+--- Finds the inventory slot of an equipped item by ID, or nil if not equipped.
+---@param itemId number
+---@return number|nil slotId
+local function findEquippedSlot(itemId)
+    for slot = 1, ECM.Constants.MAX_EQUIPMENT_SLOT_ID do
+        if GetInventoryItemID("player", slot) == itemId then
+            return slot
+        end
+    end
+    return nil
+end
+
 local function resolveEntries(entries)
     local resolved = {}
     for _, entry in ipairs(entries) do
@@ -50,14 +62,11 @@ local function resolveEntries(entries)
             local id = entry.id
             local texture = C_Item.GetItemIconByID(id)
             if texture then
-                -- Check if equipped (only include if slot can be determined)
-                if C_Item.IsEquippableItem(id) and IsEquippedItem(id) then
-                    local invSlot = C_Item.GetItemInventorySlotInfo(id)
-                    if invSlot then
-                        resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = invSlot }
-                    end
+                local equippedSlot = IsEquippedItem(id) and findEquippedSlot(id)
+                if equippedSlot then
+                    resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = equippedSlot }
                 elseif C_Item.GetItemCount(id) > 0 then
-                    resolved[#resolved + 1] = { type = "item", id = id, texture = texture, slotId = nil }
+                    resolved[#resolved + 1] = { type = "item", id = id, texture = texture }
                 end
             end
         elseif entry.type == ECM.Constants.ITEM_ICON_TYPE_SPELL then
@@ -65,7 +74,7 @@ local function resolveEntries(entries)
             if IsPlayerSpell(id) then
                 local texture = C_Spell.GetSpellTexture(id)
                 if texture then
-                    resolved[#resolved + 1] = { type = "spell", id = id, texture = texture, slotId = nil }
+                    resolved[#resolved + 1] = { type = "spell", id = id, texture = texture }
                 end
             end
         end
@@ -110,41 +119,37 @@ local function createItemIcon(parent, size)
     icon.Shadow:Hide()
 
     icon.QualityBadge = icon:CreateTexture(nil, "OVERLAY", nil, 2)
-    icon.QualityBadge:SetSize(size * 0.4, size * 0.4)
-    icon.QualityBadge:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -2)
+    icon.QualityBadge:SetSize(size * ECM.Constants.ITEM_ICON_QUALITY_SCALE, size * ECM.Constants.ITEM_ICON_QUALITY_SCALE)
+    icon.QualityBadge:SetPoint("TOPLEFT", icon, "TOPLEFT", -4, 4)
     icon.QualityBadge:Hide()
 
     return icon
 end
 
 --- Updates the cooldown display on an item icon.
+--- Cooldown API return values are secret numbers in tainted code; they must not
+--- be compared or tested. Pass them straight through to SetCooldown, which
+--- accepts secrets. A zero-duration cooldown naturally shows no swipe.
 ---@param icon ECM_ItemIcon The icon to update.
 local function updateIconCooldown(icon)
     if icon.type == ECM.Constants.ITEM_ICON_TYPE_SPELL then
         local cooldownInfo = C_Spell.GetSpellCooldown(icon.spellId)
-        if cooldownInfo and cooldownInfo.duration > 0 then
+        if cooldownInfo then
             icon.Cooldown:SetCooldown(cooldownInfo.startTime, cooldownInfo.duration)
-        else
-            icon.Cooldown:Clear()
         end
         return
     end
 
-    local start, duration, enable
+    local start, duration
     if icon.slotId then
-        start, duration, enable = GetInventoryItemCooldown("player", icon.slotId)
-        enable = (enable == 1)
+        start, duration = GetInventoryItemCooldown("player", icon.slotId)
     elseif icon.itemId then
-        start, duration, enable = C_Item.GetItemCooldown(icon.itemId)
+        start, duration = C_Item.GetItemCooldown(icon.itemId)
     else
         return
     end
 
-    if enable and duration > 0 then
-        icon.Cooldown:SetCooldown(start, duration)
-    else
-        icon.Cooldown:Clear()
-    end
+    icon.Cooldown:SetCooldown(start, duration)
 end
 
 --- Gets cooldown number font info from a Blizzard cooldown viewer icon.
@@ -322,7 +327,7 @@ local function applyQualityBadge(icon, iconData)
     then
         local quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(iconData.id)
         if quality and quality > 0 then
-            icon.QualityBadge:SetAtlas("Professions-Icon-Quality-Tier" .. quality .. "-Small")
+            icon.QualityBadge:SetAtlas(string.format(ECM.Constants.ITEM_ICON_QUALITY_ATLAS, quality))
             icon.QualityBadge:Show()
             return
         end

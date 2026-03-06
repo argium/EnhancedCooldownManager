@@ -92,13 +92,14 @@
 ---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
+---@class ECM_ItemIconEntry
+---@field type "item"|"spell" Entry type.
+---@field id number Item ID or Spell ID.
+
 ---@class ECM_ItemIconsConfig Item icons configuration.
 ---@field enabled boolean Whether item icons are enabled.
----@field showTrinket1 boolean Whether to show trinket slot 1 (if on-use).
----@field showTrinket2 boolean Whether to show trinket slot 2 (if on-use).
----@field showCombatPotion boolean Whether to show combat potions.
----@field showHealthPotion boolean Whether to show health potions.
----@field showHealthstone boolean Whether to show healthstone.
+---@field essential ECM_ItemIconEntry[] Ordered entries for EssentialCooldownViewer.
+---@field utility ECM_ItemIconEntry[] Ordered entries for UtilityCooldownViewer.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -254,11 +255,8 @@ local defaults = {
         },
         itemIcons = {
             enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
+            essential = {},
+            utility = C.copyItemIconEntries(C.ITEM_ICONS_DEFAULT_UTILITY),
         },
     },
 }
