@@ -6,8 +6,7 @@ local _, ns = ...
 local ImportExport = {}
 ECM.ImportExport = ImportExport
 
-local EXPORT_PREFIX = "EnhancedCooldownManager"
-local EXPORT_VERSION = 1
+local C = ECM.Constants
 
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
@@ -20,11 +19,19 @@ local LibDeflate = LibStub("LibDeflate")
 ---@param source table The table to copy
 ---@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBars.colors.cache"})
 ---@param currentPath string|nil Current path in recursion (internal use)
+---@param seen table|nil Cycle-detection set (internal use)
 ---@return table copy The deep copy
-local function deepCopyExcluding(source, excludePaths, currentPath)
+local function deepCopyExcluding(source, excludePaths, currentPath, seen)
     if type(source) ~= "table" then
         return source
     end
+
+    seen = seen or {}
+    if seen[source] then
+        ECM.Log("ImportExport", "Circular reference detected at path: " .. (currentPath or ""))
+        return nil
+    end
+    seen[source] = true
 
     currentPath = currentPath or ""
     excludePaths = excludePaths or {}
@@ -33,7 +40,6 @@ local function deepCopyExcluding(source, excludePaths, currentPath)
     for key, value in pairs(source) do
         local keyPath = currentPath == "" and tostring(key) or currentPath .. "." .. tostring(key)
 
-        -- Check if this path should be excluded
         local shouldExclude = false
         for _, excludePath in ipairs(excludePaths) do
             if keyPath == excludePath then
@@ -44,13 +50,14 @@ local function deepCopyExcluding(source, excludePaths, currentPath)
 
         if not shouldExclude then
             if type(value) == "table" then
-                copy[key] = deepCopyExcluding(value, excludePaths, keyPath)
+                copy[key] = deepCopyExcluding(value, excludePaths, keyPath, seen)
             else
                 copy[key] = value
             end
         end
     end
 
+    seen[source] = nil
     return copy
 end
 
@@ -61,7 +68,7 @@ local function generateMetadata()
 
     return {
         addonVersion = version,
-        exportVersion = EXPORT_VERSION,
+        exportVersion = C.EXPORT_VERSION,
         exportedAt = time(),
     }
 end
@@ -95,7 +102,7 @@ function ImportExport.EncodeData(data)
         return nil, "Encoding failed"
     end
 
-    return EXPORT_PREFIX .. ":" .. EXPORT_VERSION .. ":" .. encoded
+    return C.EXPORT_PREFIX .. ":" .. C.EXPORT_VERSION .. ":" .. encoded
 end
 
 --- Decodes an import string back into data.
@@ -115,13 +122,13 @@ function ImportExport.DecodeData(importString)
         return nil, "Invalid import string format"
     end
 
-    if prefix ~= EXPORT_PREFIX then
+    if prefix ~= C.EXPORT_PREFIX then
         return nil, "This import string is not for Enhanced Cooldown Manager (prefix: " .. tostring(prefix) .. ")"
     end
 
     local version = tonumber(versionStr)
-    if not version or version > EXPORT_VERSION then
-        return nil, "Incompatible import string version (expected " .. EXPORT_VERSION .. ", got " .. tostring(versionStr) .. ")"
+    if not version or version > C.EXPORT_VERSION then
+        return nil, "Incompatible import string version (expected " .. C.EXPORT_VERSION .. ", got " .. tostring(versionStr) .. ")"
     end
 
     -- Decode
