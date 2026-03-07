@@ -95,9 +95,9 @@ local constants = {
         { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
     },
     HEALTH_POTIONS = {
-        { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
         { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
         { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
+        { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
     },
     HEALTHSTONE_ITEM_ID = 5512,
     ITEM_ICONS_MAX = 5,
