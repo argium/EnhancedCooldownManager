@@ -2,10 +2,6 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-if type(describe) ~= "function" or type(it) ~= "function" then
-    return
-end
-
 local TestHelpers = assert(
     loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
     "Unable to load Tests/TestHelpers.lua"
@@ -46,37 +42,25 @@ describe("Utilities", function()
     end
 
     setup(function()
-        originalGlobals = TestHelpers.captureGlobals({
+        originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "LibStub",
             "issecretvalue",
             "issecrettable",
+            "ColorUtil",
+            "InCombatLockdown",
         })
     end)
 
     teardown(function()
-        TestHelpers.restoreGlobals(originalGlobals)
+        TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
     before_each(function()
-        _G.ECM = {}
-        _G.LibStub = function(name)
-            if name == "LibSharedMedia-3.0" then
-                return {
-                    Fetch = function(_, mediaType, key)
-                        if mediaType == "font" and type(key) == "string" then
-                            return "FONT:" .. key
-                        end
-                        return nil
-                    end,
-                }
-            end
-            return nil
-        end
-        _G.ECM.DebugAssert = function() end
-        _G.issecretvalue = function() return false end
-        _G.issecrettable = function() return false end
-
+        _G.ECM = {
+            defaults = {},
+            Migration = {},
+        }
         addonNS = {
             Addon = {
                 db = {
@@ -92,28 +76,46 @@ describe("Utilities", function()
             },
         }
 
-        local constantsChunk = TestHelpers.loadChunk(
-            {
-                "Constants.lua",
-                "../Constants.lua",
-            },
-            "Unable to load Constants.lua"
-        )
-        constantsChunk()
+        _G.LibStub = function(name)
+            if name == "AceAddon-3.0" then
+                return {
+                    NewAddon = function()
+                        return addonNS.Addon
+                    end,
+                }
+            end
+            if name == "LibSharedMedia-3.0" then
+                return {
+                    Fetch = function(_, mediaType, key)
+                        if mediaType == "font" and type(key) == "string" then
+                            return "FONT:" .. key
+                        end
+                        return nil
+                    end,
+                }
+            end
+            return nil
+        end
+        _G.ColorUtil = {
+            Sparkle = function(text)
+                return text
+            end,
+        }
+        _G.ECM.DebugAssert = function() end
+        _G.issecretvalue = function() return false end
+        _G.issecrettable = function() return false end
+        _G.InCombatLockdown = function() return false end
 
-        local utilitiesChunk = TestHelpers.loadChunk(
-            {
-                "Modules/Utilities.lua",
-                "../Modules/Utilities.lua",
-            },
-            "Unable to load Modules/Utilities.lua"
-        )
-        utilitiesChunk(nil, addonNS)
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", addonNS)
     end)
 
-    it("ECM_ApplyFont uses global font settings by default", function()
+    it("ECM.ApplyFont uses global font settings by default", function()
         local fontString = newFontStringSpy()
-        ECM_ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
             overrideFont = false,
             font = "Module Font",
             fontSize = 20,
@@ -130,9 +132,9 @@ describe("Utilities", function()
         assert.are.equal(0, #fontString.shadowColorCalls)
     end)
 
-    it("ECM_ApplyFont applies module font and size when overrideFont is enabled", function()
+    it("ECM.ApplyFont applies module font and size when overrideFont is enabled", function()
         local fontString = newFontStringSpy()
-        ECM_ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = 18,
@@ -144,10 +146,10 @@ describe("Utilities", function()
         assert.are.equal("OUTLINE", call.outline)
     end)
 
-    it("ECM_ApplyFont falls back to global values for missing module fields", function()
+    it("ECM.ApplyFont falls back to global values for missing module fields", function()
         local fontString = newFontStringSpy()
         addonNS.Addon.db.profile.global.fontSize = 13
-        ECM_ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = nil,
@@ -158,12 +160,12 @@ describe("Utilities", function()
         assert.are.equal(13, call.size)
     end)
 
-    it("ECM_ApplyFont keeps outline and shadow sourced from global config", function()
+    it("ECM.ApplyFont keeps outline and shadow sourced from global config", function()
         local fontString = newFontStringSpy()
         addonNS.Addon.db.profile.global.fontOutline = "NONE"
         addonNS.Addon.db.profile.global.fontShadow = true
 
-        ECM_ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = 17,
@@ -177,12 +179,12 @@ describe("Utilities", function()
         assert.are.same({ x = 1, y = -1 }, fontString.shadowOffsetCalls[1])
     end)
 
-    it("ECM_ApplyFont falls back to addon global config when globalConfig is omitted", function()
+    it("ECM.ApplyFont falls back to addon global config when globalConfig is omitted", function()
         local fontString = newFontStringSpy()
         addonNS.Addon.db.profile.global.font = "DB Global Font"
         addonNS.Addon.db.profile.global.fontSize = 15
 
-        ECM_ApplyFont(fontString)
+        ECM.ApplyFont(fontString)
 
         local call = fontString.setFontCalls[1]
         assert.are.equal("FONT:DB Global Font", call.path)

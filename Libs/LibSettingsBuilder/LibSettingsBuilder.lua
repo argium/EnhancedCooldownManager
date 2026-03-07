@@ -1,0 +1,1325 @@
+-- LibSettingsBuilder: A standalone path-based settings builder for the
+-- World of Warcraft Settings API.  Provides proxy controls, composite groups
+-- and utility helpers.
+
+local MAJOR, MINOR = "LibSettingsBuilder-1.0", 1
+local lib = LibStub:NewLibrary(MAJOR, MINOR)
+if not lib then return end
+
+lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
+lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
+lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
+
+--------------------------------------------------------------------------------
+-- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
+-- Replicates Blizzard's Settings panel positioning so canvas pages are
+-- visually indistinguishable from vertical-layout pages.
+--
+-- Measurements from Blizzard_SettingControls.xml/.lua:
+--   Element height:      26   (all control types)
+--   Section header:      45   (GameFontHighlightLarge at TOPLEFT 7, -16)
+--   Label left offset:   indent + 37
+--   Label right bound:   CENTER - 85
+--   Control anchor:      CENTER - 80  (checkbox, slider, color swatch)
+--   Button anchor:       CENTER - 40  (width 200)
+--   Indent per level:    15
+--------------------------------------------------------------------------------
+
+local CANVAS_ELEMENT_HEIGHT = 26
+local CANVAS_HEADER_HEIGHT = 50
+local CANVAS_LABEL_X = 37
+local CANVAS_CONTROL_CENTER_X = -80
+local CANVAS_BUTTON_CENTER_X = -40
+local CANVAS_BUTTON_WIDTH = 200
+local CANVAS_SLIDER_WIDTH = 250
+local CANVAS_SWATCH_CENTER_X = -73
+
+local CanvasLayout = {}
+lib.CanvasLayout = CanvasLayout
+
+function CanvasLayout:_Advance(h) self.yPos = self.yPos - h end
+
+function CanvasLayout:_CreateRow(h)
+    h = h or CANVAS_ELEMENT_HEIGHT
+    local row = CreateFrame("Frame", nil, self.frame)
+    row:SetPoint("TOPLEFT", 0, self.yPos)
+    row:SetPoint("RIGHT")
+    row:SetHeight(h)
+    self.elements[#self.elements + 1] = row
+    self:_Advance(h)
+    return row
+end
+
+function CanvasLayout:_AddLabel(row, text, fontObject)
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
+    label:SetPoint("RIGHT", row, "CENTER", -85, 0)
+    label:SetJustifyH("LEFT")
+    label:SetWordWrap(false)
+    label:SetText(text)
+    row._label = label
+    return label
+end
+
+--- Add a page header using Blizzard's SettingsListTemplate.Header.
+--- Provides Title, Options_HorizontalDivider, and DefaultsButton.
+---@return Frame row  (row._title, row._defaultsButton exposed)
+function CanvasLayout:AddHeader(text)
+    local row = self:_CreateRow(CANVAS_HEADER_HEIGHT)
+    local settingsList = CreateFrame("Frame", nil, row, "SettingsListTemplate")
+    settingsList:SetAllPoints(row)
+    settingsList.ScrollBox:Hide()
+    settingsList.ScrollBar:Hide()
+    settingsList.Header.Title:SetText(text)
+    row._title = settingsList.Header.Title
+    row._defaultsButton = settingsList.Header.DefaultsButton
+    return row
+end
+
+--- Add vertical spacing.
+function CanvasLayout:AddSpacer(height)
+    self:_Advance(height)
+end
+
+--- Add a description / informational text row.
+function CanvasLayout:AddDescription(text, fontObject)
+    local row = self:_CreateRow()
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
+    label:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    label:SetJustifyH("LEFT")
+    label:SetText(text)
+    row._text = label
+    return row
+end
+
+--- Add a color swatch row (label + clickable swatch).
+---@return Frame row, Button swatch
+function CanvasLayout:AddColorSwatch(labelText)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local swatch = lib.CreateColorSwatch(row)
+    swatch:SetPoint("LEFT", row, "CENTER", CANVAS_SWATCH_CENTER_X, 0)
+    row._swatch = swatch
+    return row, swatch
+end
+
+--- Add a slider row (label + MinimalSliderWithSteppers).
+---@return Frame row, Slider slider, FontString valueText
+function CanvasLayout:AddSlider(labelText, min, max, step)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
+    slider:SetWidth(CANVAS_SLIDER_WIDTH)
+    slider:SetPoint("LEFT", row, "CENTER", CANVAS_CONTROL_CENTER_X, 3)
+    slider:SetMinMaxValues(min, max)
+    slider:SetValueStep(step or 1)
+    slider:SetObeyStepOnDrag(true)
+    local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetPoint("LEFT", slider, "RIGHT", 8, 0)
+    valueText:SetWidth(40)
+    valueText:SetJustifyH("LEFT")
+    row._slider = slider
+    row._valueText = valueText
+    return row, slider, valueText
+end
+
+--- Add a button row (label + UIPanelButton).
+---@return Frame row, Button button
+function CanvasLayout:AddButton(labelText, buttonText)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    button:SetSize(CANVAS_BUTTON_WIDTH, 26)
+    button:SetPoint("LEFT", row, "CENTER", CANVAS_BUTTON_CENTER_X, 0)
+    button:SetText(buttonText)
+    row._button = button
+    return row, button
+end
+
+--- Add a scroll list that fills the remaining vertical space.
+---@return Frame scrollBox, EventFrame scrollBar, table view
+function CanvasLayout:AddScrollList(elementExtent)
+    local scrollBox = CreateFrame("Frame", nil, self.frame, "WowScrollBoxList")
+    scrollBox:SetPoint("TOPLEFT", CANVAS_LABEL_X, self.yPos)
+    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
+    local scrollBar = CreateFrame("EventFrame", nil, self.frame, "MinimalScrollBar")
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(elementExtent)
+    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+    return scrollBox, scrollBar, view
+end
+
+--------------------------------------------------------------------------------
+-- Static utilities (shared across all instances)
+--------------------------------------------------------------------------------
+
+--- Create a color swatch button using Blizzard's SettingsColorSwatchTemplate.
+--- Inherits ColorSwatchTemplate (SwatchBg/InnerBorder/Color layers) and
+--- SettingsColorSwatchMixin (hover effects, color picker integration).
+---@param parent Frame
+---@return Button swatch  (swatch._tex points to swatch.Color for backward compat)
+function lib.CreateColorSwatch(parent)
+    local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
+    swatch._tex = swatch.Color
+    return swatch
+end
+
+--------------------------------------------------------------------------------
+-- Subheader Mixin (global, shared across all instances)
+-- Renders as a normal control label (GameFontNormal) with no control widget.
+-- Used exclusively as a parent for sub-settings.
+--------------------------------------------------------------------------------
+
+LibSettingsBuilder_SubheaderMixin = LibSettingsBuilder_SubheaderMixin or {}
+
+function LibSettingsBuilder_SubheaderMixin:Init(initializer)
+    local name = initializer:GetData().name
+    self.Title:SetText(name)
+    self.Title:SetFontObject(GameFontNormal)
+end
+
+--------------------------------------------------------------------------------
+-- EmbedCanvas Mixin (global, shared across all instances)
+--------------------------------------------------------------------------------
+
+LibSettingsBuilder_EmbedCanvasMixin = LibSettingsBuilder_EmbedCanvasMixin or {}
+
+function LibSettingsBuilder_EmbedCanvasMixin:OnLoad()
+    SettingsListElementMixin.OnLoad(self)
+end
+
+function LibSettingsBuilder_EmbedCanvasMixin:Init(initializer)
+    SettingsListElementMixin.Init(self, initializer)
+
+    local canvas = initializer:GetData().canvas
+    if not canvas then return end
+
+    canvas:SetParent(self)
+    canvas:ClearAllPoints()
+    canvas:SetPoint("TOPLEFT", 0, 0)
+    canvas:SetPoint("TOPRIGHT", 0, 0)
+    canvas:SetHeight(initializer:GetExtent())
+    canvas:Show()
+end
+
+--------------------------------------------------------------------------------
+-- ScrollDropdown Mixin (global, shared across all instances)
+-- Minimal scroll-enabled dropdown: SetScrollMode + CreateRadio per option.
+-- Unlike LibEQOL's 264-line version, this handles only simple value→label
+-- pairs without option normalization, grid modes, or custom generators.
+--------------------------------------------------------------------------------
+
+LibSettingsBuilder_ScrollDropdownMixin = CreateFromMixins(SettingsDropdownControlMixin)
+
+function LibSettingsBuilder_ScrollDropdownMixin:OnLoad()
+    SettingsDropdownControlMixin.OnLoad(self)
+end
+
+function LibSettingsBuilder_ScrollDropdownMixin:Init(initializer)
+    if not initializer or not initializer.GetData then return end
+    self.initializer = initializer
+    self.lsbData = initializer:GetData() or {}
+    SettingsDropdownControlMixin.Init(self, initializer)
+end
+
+function LibSettingsBuilder_ScrollDropdownMixin:GetSetting()
+    if self.initializer and self.initializer.GetSetting then
+        return self.initializer:GetSetting()
+    end
+    return self.lsbData and self.lsbData.setting or nil
+end
+
+function LibSettingsBuilder_ScrollDropdownMixin:RefreshDropdownText(value)
+    local dropdown = self.Control and self.Control.Dropdown
+    if not dropdown then return end
+
+    local setting = self:GetSetting()
+    local currentValue = value
+    if currentValue == nil and setting and setting.GetValue then
+        currentValue = setting:GetValue()
+    end
+
+    local values = self.lsbData and self.lsbData.values
+    if type(values) == "function" then values = values() end
+    local text = values and values[currentValue] or tostring(currentValue or "")
+
+    if dropdown.OverrideText then
+        dropdown:OverrideText(text)
+    elseif dropdown.SetText then
+        dropdown:SetText(text)
+    end
+end
+
+-- Avoid regenerating the dropdown menu on value changes when using scroll mode.
+function LibSettingsBuilder_ScrollDropdownMixin:SetValue(value)
+    self:RefreshDropdownText(value)
+end
+
+function LibSettingsBuilder_ScrollDropdownMixin:InitDropdown()
+    local setting = self:GetSetting()
+    local data = self.lsbData or {}
+    local scrollHeight = data.scrollHeight or 200
+
+    local dropdown = self.Control and self.Control.Dropdown
+    if not dropdown or not setting then return end
+
+    dropdown:SetupMenu(function(_, rootDescription)
+        rootDescription:SetScrollMode(scrollHeight)
+
+        local values = data.values
+        if type(values) == "function" then values = values() end
+        if not values then return end
+
+        for optValue, label in pairs(values) do
+            rootDescription:CreateRadio(label, function()
+                return setting:GetValue() == optValue
+            end, function()
+                setting:SetValue(optValue)
+                self:RefreshDropdownText(optValue)
+            end, optValue)
+        end
+    end)
+
+    self:RefreshDropdownText()
+end
+
+--------------------------------------------------------------------------------
+-- Slider editable-value hook (global, runs once per lib version)
+--------------------------------------------------------------------------------
+
+if not lib._sliderHookInstalled then
+    local function setupSliderEditableValue()
+        if not SettingsSliderControlMixin then return end
+
+        local function findValueLabel(sliderWithSteppers)
+            if sliderWithSteppers._label then return sliderWithSteppers._label end
+            if sliderWithSteppers.RightText then return sliderWithSteppers.RightText end
+            if sliderWithSteppers.Label then return sliderWithSteppers.Label end
+            for i = 1, select("#", sliderWithSteppers:GetRegions()) do
+                local region = select(i, sliderWithSteppers:GetRegions())
+                if region and region:IsObjectType("FontString") then
+                    return region
+                end
+            end
+            return nil
+        end
+
+        hooksecurefunc(SettingsSliderControlMixin, "Init", function(self, initializer)
+            local sliderWithSteppers = self.SliderWithSteppers
+            if not sliderWithSteppers then return end
+
+            local valueLabel = findValueLabel(sliderWithSteppers)
+            if not valueLabel then return end
+
+            if not self._lsbValueButton then
+                local btn = CreateFrame("Button", nil, sliderWithSteppers)
+                btn:SetAllPoints(valueLabel)
+                btn:RegisterForClicks("LeftButtonDown")
+                self._lsbValueButton = btn
+
+                local editBox = CreateFrame("EditBox", nil, sliderWithSteppers, "InputBoxTemplate")
+                editBox:SetAutoFocus(false)
+                editBox:SetNumeric(false)
+                editBox:SetSize(50, 20)
+                editBox:SetPoint("CENTER", valueLabel, "CENTER")
+                editBox:SetJustifyH("CENTER")
+                editBox:Hide()
+                self._lsbEditBox = editBox
+
+                local function hideEditBox()
+                    editBox:ClearFocus()
+                    editBox:Hide()
+                    valueLabel:Show()
+                end
+
+                local function applyValue()
+                    local text = editBox:GetText()
+                    local num = tonumber(text)
+                    if num and self._lsbCurrentSetting then
+                        local slider = sliderWithSteppers.Slider
+                        local min, max = slider:GetMinMaxValues()
+                        num = math.max(min, math.min(max, num))
+                        local step = slider:GetValueStep()
+                        if step and step > 0 then
+                            num = math.floor(num / step + 0.5) * step
+                        end
+                        self._lsbCurrentSetting:SetValue(num)
+                    end
+                    hideEditBox()
+                end
+
+                editBox:SetScript("OnEnterPressed", applyValue)
+                editBox:SetScript("OnEscapePressed", hideEditBox)
+                editBox:SetScript("OnEditFocusLost", hideEditBox)
+
+                btn:SetScript("OnClick", function()
+                    local setting = self._lsbCurrentSetting
+                    if not setting then return end
+                    editBox:SetText(tostring(setting:GetValue()))
+                    valueLabel:Hide()
+                    editBox:Show()
+                    editBox:SetFocus()
+                    editBox:HighlightText()
+                end)
+            end
+
+            self._lsbCurrentSetting = initializer:GetSetting()
+            self._lsbEditBox:Hide()
+            valueLabel:Show()
+        end)
+    end
+
+    setupSliderEditableValue()
+    lib._sliderHookInstalled = true
+end
+
+--------------------------------------------------------------------------------
+-- Factory
+--------------------------------------------------------------------------------
+
+--- Create a new SettingsBuilder instance.
+---@param config table
+---   Required fields:
+---     getProfile     function() -> table
+---     getDefaults    function() -> table
+---     getNestedValue function(tbl, path) -> any
+---     setNestedValue function(tbl, path, value)
+---     varPrefix      string            e.g. "ECM"
+---     onChanged      function(spec, value) called after each setter
+---   Optional fields:
+---     compositeDefaults table keyed by composite function name
+---@return table builder instance with the full SB API
+function lib:New(config)
+    assert(config.getProfile, "LibSettingsBuilder: getProfile is required")
+    assert(config.getDefaults, "LibSettingsBuilder: getDefaults is required")
+    assert(config.getNestedValue, "LibSettingsBuilder: getNestedValue is required")
+    assert(config.setNestedValue, "LibSettingsBuilder: setNestedValue is required")
+    assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
+    assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
+
+    local SB = {}
+    SB._rootCategory = nil
+    SB._rootCategoryName = nil
+    SB._currentSubcategory = nil
+    SB._subcategories = {}
+    SB._subcategoryNames = {}
+    SB._layouts = {}
+    SB._firstHeaderAdded = {}
+    SB._reactiveControls = {}
+
+    SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
+    SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
+    SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
+
+    ----------------------------------------------------------------------------
+    -- Internal helpers
+    ----------------------------------------------------------------------------
+
+    local function defaultSliderFormatter(value)
+        return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
+    end
+
+    local getProfile = config.getProfile
+    local getDefaults = config.getDefaults
+    local getNestedValue = config.getNestedValue
+    local setNestedValue = config.setNestedValue
+
+    local function makeVarName(path)
+        return config.varPrefix .. "_" .. path:gsub("%.", "_")
+    end
+
+    local function resolveCategory(spec)
+        return spec.category or SB._currentSubcategory or SB._rootCategory
+    end
+
+    local reevaluateReactiveControls
+
+    local function postSet(spec, value, setting)
+        if spec.onSet then
+            spec.onSet(value, setting)
+        end
+        config.onChanged(spec, value)
+        reevaluateReactiveControls()
+    end
+
+    --- Consolidates the getter/setter/default/transform/register boilerplate
+    --- shared by PathCheckbox, PathSlider, PathDropdown, and PathCustom.
+    local function makeProxySetting(spec, varType, defaultFallback)
+        local variable = makeVarName(spec.path)
+        local cat = resolveCategory(spec)
+        local settingRef
+
+        local function getter()
+            local val = getNestedValue(getProfile(), spec.path)
+            if spec.getTransform then val = spec.getTransform(val) end
+            return val
+        end
+
+        local function setter(value)
+            if spec.setTransform then value = spec.setTransform(value) end
+            setNestedValue(getProfile(), spec.path, value)
+            postSet(spec, value, settingRef)
+        end
+
+        local default = getNestedValue(getDefaults(), spec.path)
+        if spec.getTransform then default = spec.getTransform(default) end
+
+        local setting = Settings.RegisterProxySetting(cat, variable,
+            varType, spec.name, default ~= nil and default or defaultFallback, getter, setter)
+        settingRef = setting
+
+        return setting, cat
+    end
+
+    --- Copies inherited modifier keys from a composite spec onto a child spec
+    --- when the child hasn't set them explicitly.
+    local MODIFIER_KEYS = { "category", "parent", "parentCheck", "disabled", "hidden", "layout" }
+    local function propagateModifiers(target, source)
+        for _, key in ipairs(MODIFIER_KEYS) do
+            if target[key] == nil then target[key] = source[key] end
+        end
+    end
+
+    --- Merges compositeDefaults for the given composite function name onto spec.
+    --- Spec values win over defaults.
+    local function mergeCompositeDefaults(functionName, spec)
+        local defaults = config.compositeDefaults and config.compositeDefaults[functionName]
+        if not defaults then return spec or {} end
+        local merged = {}
+        for k, v in pairs(defaults) do merged[k] = v end
+        if spec then for k, v in pairs(spec) do merged[k] = v end end
+        return merged
+    end
+
+    ----------------------------------------------------------------------------
+    -- Debug spec validation (active only when LSB_DEBUG is truthy)
+    ----------------------------------------------------------------------------
+
+    local COMMON_SPEC_FIELDS = {
+        path = true, name = true, tooltip = true, category = true,
+        onSet = true, getTransform = true, setTransform = true,
+        parent = true, parentCheck = true, disabled = true, hidden = true,
+        layout = true, type = true, desc = true,
+    }
+
+    local EXTRA_FIELDS_BY_TYPE = {
+        checkbox = {},
+        slider = { min = true, max = true, step = true, formatter = true },
+        dropdown = { values = true, scrollHeight = true },
+        color = {},
+        custom = { template = true, varType = true },
+    }
+
+    local function validateSpecFields(controlType, spec)
+        if not LSB_DEBUG then return end
+        local allowed = EXTRA_FIELDS_BY_TYPE[controlType]
+        if not allowed then return end
+        for key in pairs(spec) do
+            if not COMMON_SPEC_FIELDS[key] and not allowed[key] then
+                print("|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
+                    .. tostring(key) .. "' on " .. controlType
+                    .. " control '" .. tostring(spec.name or spec.path) .. "'")
+            end
+        end
+    end
+
+    local function setCanvasInteractive(frame, enabled)
+        if frame.SetEnabled then
+            frame:SetEnabled(enabled)
+        end
+        if frame.EnableMouse then
+            frame:EnableMouse(enabled)
+        end
+        if frame.GetChildren then
+            for _, child in ipairs({ frame:GetChildren() }) do
+                setCanvasInteractive(child, enabled)
+            end
+        end
+    end
+
+    local function isParentEnabled(spec)
+        if not spec.parent then
+            return true
+        end
+
+        if spec.parentCheck then
+            return spec.parentCheck()
+        end
+
+        if not spec.parent.GetSetting then return true end
+        local setting = spec.parent:GetSetting()
+        if not setting then return true end
+        return setting:GetValue()
+    end
+
+    local function isControlEnabled(spec)
+        if spec.disabled and spec.disabled() then return false end
+        return isParentEnabled(spec)
+    end
+
+    local function applyCanvasState(canvas, enabled)
+        if canvas.SetAlpha then canvas:SetAlpha(enabled and 1 or 0.5) end
+        setCanvasInteractive(canvas, enabled)
+    end
+
+    reevaluateReactiveControls = function()
+        -- Force the WoW settings panel to re-evaluate visible control states.
+        local panel = SettingsPanel
+        if panel and panel:IsShown() then
+            local settingsList = panel:GetSettingsList()
+            if settingsList and settingsList.ScrollBox then
+                settingsList.ScrollBox:ForEachFrame(function(frame)
+                    if frame.EvaluateState then
+                        frame:EvaluateState()
+                    end
+                end)
+            end
+        end
+
+        -- Canvas controls aren't part of the settings list, handle directly
+        for _, entry in ipairs(SB._reactiveControls) do
+            local s = entry[2]
+            if s.canvas then
+                applyCanvasState(s.canvas, isControlEnabled(s))
+            end
+        end
+    end
+
+    local function applyEnabledState(initializer, spec)
+        local enabled = isControlEnabled(spec)
+        if initializer.SetEnabled then initializer:SetEnabled(enabled) end
+        if spec.canvas then applyCanvasState(spec.canvas, enabled) end
+        return enabled
+    end
+
+    local function applyModifiers(initializer, spec)
+        if not initializer then return end
+
+        if spec.disabled or spec.canvas or spec.parent then
+            initializer:AddModifyPredicate(function()
+                return applyEnabledState(initializer, spec)
+            end)
+            applyEnabledState(initializer, spec)
+        end
+
+        if spec.parent then
+            local predicate = function()
+                return isParentEnabled(spec)
+            end
+            initializer:SetParentInitializer(spec.parent, predicate)
+        end
+
+        if spec.hidden then
+            initializer:AddShownPredicate(function()
+                return not spec.hidden()
+            end)
+        end
+
+        if spec.canvas then
+            SB._reactiveControls[#SB._reactiveControls + 1] = { initializer, spec }
+        end
+    end
+
+    local function colorTableToHex(tbl)
+        if not tbl then return "FFFFFFFF" end
+        return string.format("%02X%02X%02X%02X",
+            math.floor((tbl.a or 1) * 255 + 0.5),
+            math.floor((tbl.r or 1) * 255 + 0.5),
+            math.floor((tbl.g or 1) * 255 + 0.5),
+            math.floor((tbl.b or 1) * 255 + 0.5))
+    end
+
+    ----------------------------------------------------------------------------
+    -- Category management
+    ----------------------------------------------------------------------------
+
+    function SB.CreateRootCategory(name)
+        local category, layout = Settings.RegisterVerticalLayoutCategory(name)
+        SB._rootCategory = category
+        SB._rootCategoryName = name
+        SB._layouts[category] = layout
+        SB._currentSubcategory = nil
+        SB._firstHeaderAdded = {}
+        return category
+    end
+
+    function SB.CreateSubcategory(name)
+        local subcategory, layout = Settings.RegisterVerticalLayoutSubcategory(SB._rootCategory, name)
+        SB._subcategories[name] = subcategory
+        SB._subcategoryNames[subcategory] = name
+        SB._layouts[subcategory] = layout
+        SB._currentSubcategory = subcategory
+        return subcategory
+    end
+
+    function SB.CreateCanvasSubcategory(frame, name, parentCategory)
+        local parent = parentCategory or SB._rootCategory
+        local subcategory, layout = Settings.RegisterCanvasLayoutSubcategory(parent, frame, name)
+        SB._subcategories[name] = subcategory
+        SB._layouts[subcategory] = layout
+        return subcategory
+    end
+
+    --- Creates a canvas subcategory with a CanvasLayout engine attached.
+    --- Returns a layout object with AddHeader, AddDescription, AddSlider,
+    --- AddColorSwatch, AddButton, AddScrollList methods that position
+    --- controls to match Blizzard's vertical-layout settings pages.
+    ---@param name string  Subcategory display name.
+    ---@param parentCategory? table  Parent category (defaults to root).
+    ---@return table layout  CanvasLayout instance (layout.frame for the raw frame).
+    function SB.CreateCanvasLayout(name, parentCategory)
+        local frame = CreateFrame("Frame", nil)
+        SB.CreateCanvasSubcategory(frame, name, parentCategory)
+        local layout = setmetatable({
+            frame = frame,
+            yPos = 0,
+            elements = {},
+        }, { __index = lib.CanvasLayout })
+        return layout
+    end
+
+    --- Static color swatch factory, forwarded from lib for convenience.
+    SB.CreateColorSwatch = lib.CreateColorSwatch
+
+    --- Configures the root category to auto-redirect to a named subcategory.
+    --- When the user selects the root addon entry, the settings panel will
+    --- immediately navigate to the specified subcategory instead.
+    function SB.SetRootRedirect(subcategoryName)
+        SB._rootRedirect = subcategoryName
+    end
+
+    function SB.RegisterCategories()
+        if SB._rootCategory then
+            Settings.RegisterAddOnCategory(SB._rootCategory)
+        end
+
+        if SB._rootRedirect and SB._rootCategory then
+            local target = SB._subcategories[SB._rootRedirect]
+            if target and SettingsPanel and SettingsPanel.CategoryList then
+                local categoryID = SB._rootCategory:GetID()
+                hooksecurefunc(SettingsPanel.CategoryList, "SetCurrentCategory", function(_, category)
+                    if category and category:GetID() == categoryID then
+                        Settings.OpenToCategory(target:GetID())
+                    end
+                end)
+            end
+        end
+    end
+
+    function SB.GetRootCategoryID()
+        return SB._rootCategory and SB._rootCategory:GetID()
+    end
+
+    function SB.GetSubcategoryID(name)
+        local category = SB._subcategories[name]
+        return category and category:GetID()
+    end
+
+    ----------------------------------------------------------------------------
+    -- Path-based proxy controls
+    ----------------------------------------------------------------------------
+
+    function SB.PathCheckbox(spec)
+        validateSpecFields("checkbox", spec)
+        local setting, cat = makeProxySetting(spec, Settings.VarType.Boolean, false)
+        local initializer = Settings.CreateCheckbox(cat, setting, spec.tooltip)
+        applyModifiers(initializer, spec)
+        return initializer, setting
+    end
+
+    function SB.PathSlider(spec)
+        validateSpecFields("slider", spec)
+        local setting, cat = makeProxySetting(spec, Settings.VarType.Number, 0)
+
+        local options = Settings.CreateSliderOptions(spec.min, spec.max, spec.step or 1)
+        options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, spec.formatter or defaultSliderFormatter)
+
+        local initializer = Settings.CreateSlider(cat, setting, options, spec.tooltip)
+        applyModifiers(initializer, spec)
+
+        return initializer, setting
+    end
+
+    function SB.PathDropdown(spec)
+        validateSpecFields("dropdown", spec)
+        local cat = resolveCategory(spec)
+        local default = getNestedValue(getDefaults(), spec.path)
+        if spec.getTransform then default = spec.getTransform(default) end
+
+        local varType = type(default) == "number"
+            and Settings.VarType.Number
+            or Settings.VarType.String
+
+        local setting = makeProxySetting(spec, varType, "")
+
+        if spec.scrollHeight then
+            -- Scroll-enabled dropdown using the built-in scroll template
+            local initializer = Settings.CreateElementInitializer(
+                lib.SCROLL_DROPDOWN_TEMPLATE,
+                { setting = setting, values = spec.values, scrollHeight = spec.scrollHeight,
+                  name = spec.name, tooltip = spec.tooltip })
+            if initializer.SetSetting then
+                initializer:SetSetting(setting)
+            end
+            Settings.RegisterInitializer(cat, initializer)
+            applyModifiers(initializer, spec)
+            return initializer, setting
+        end
+
+        local function optionsGenerator()
+            local container = Settings.CreateControlTextContainer()
+            local values = type(spec.values) == "function" and spec.values() or spec.values
+            if values then
+                for value, label in pairs(values) do
+                    container:Add(value, label)
+                end
+            end
+            return container:GetData()
+        end
+
+        local initializer = Settings.CreateDropdown(cat, setting, optionsGenerator, spec.tooltip)
+        applyModifiers(initializer, spec)
+
+        return initializer, setting
+    end
+
+    function SB.PathColor(spec)
+        validateSpecFields("color", spec)
+        local variable = makeVarName(spec.path)
+        local cat = resolveCategory(spec)
+
+        local function getter()
+            local tbl = getNestedValue(getProfile(), spec.path)
+            return colorTableToHex(tbl)
+        end
+
+        local settingRef
+
+        local function setter(hexValue)
+            local color = CreateColorFromHexString(hexValue)
+            local tbl = { r = color.r, g = color.g, b = color.b, a = color.a }
+            setNestedValue(getProfile(), spec.path, tbl)
+            postSet(spec, tbl, settingRef)
+        end
+
+        local defaultTbl = getNestedValue(getDefaults(), spec.path) or {}
+        local defaultHex = colorTableToHex(defaultTbl)
+
+        local setting = Settings.RegisterProxySetting(cat, variable,
+            Settings.VarType.String, spec.name, defaultHex, getter, setter)
+        settingRef = setting
+
+        -- Note: Settings.CreateColorSwatch does not support a hasAlpha parameter.
+        -- Alpha channel selection is not available through the Blizzard Settings API.
+        local initializer = Settings.CreateColorSwatch(cat, setting, spec.tooltip)
+        applyModifiers(initializer, spec)
+
+        return initializer, setting
+    end
+
+    --- Creates a proxy setting backed by a custom frame template.
+    --- The template's Init receives initializer data containing {setting, name, tooltip}.
+    function SB.PathCustom(spec)
+        validateSpecFields("custom", spec)
+        assert(spec.template, "PathCustom: spec.template is required")
+        local setting, cat = makeProxySetting(spec, spec.varType or Settings.VarType.String, "")
+
+        local initializer = Settings.CreateElementInitializer(spec.template,
+            { name = spec.name, tooltip = spec.tooltip })
+        if initializer.SetSetting then
+            initializer:SetSetting(setting)
+        end
+
+        Settings.RegisterInitializer(cat, initializer)
+        applyModifiers(initializer, spec)
+
+        return initializer, setting
+    end
+
+    --- Unified path-based proxy control dispatch table.
+    local PATH_DISPATCH = {
+        checkbox = "PathCheckbox", slider = "PathSlider",
+        dropdown = "PathDropdown", color = "PathColor", custom = "PathCustom",
+    }
+
+    function SB.PathControl(spec)
+        local fn = SB[PATH_DISPATCH[spec.type]]
+        assert(fn, "PathControl: unknown type '" .. tostring(spec.type) .. "'")
+        return fn(spec)
+    end
+
+    ----------------------------------------------------------------------------
+    -- Composite builders
+    ----------------------------------------------------------------------------
+
+    function SB.HeightOverrideSlider(sectionPath, spec)
+        spec = spec or {}
+        local childSpec = {
+            path = sectionPath .. ".height",
+            name = spec.name or "Height Override",
+            tooltip = spec.tooltip or "Override the default bar height. Set to 0 to use the global default.",
+            min = spec.min or 0,
+            max = spec.max or 40,
+            step = spec.step or 1,
+            getTransform = function(value) return value or 0 end,
+            setTransform = function(value) return value > 0 and value or nil end,
+        }
+        propagateModifiers(childSpec, spec)
+        return SB.PathSlider(childSpec)
+    end
+
+    --- Font override group.
+    --- Optional spec fields:
+    ---   fontValues        function() -> table     (choices for the dropdown)
+    ---   fontFallback      function() -> string    (fallback font name)
+    ---   fontSizeFallback  function() -> number    (fallback font size)
+    ---   fontTemplate      string                  (custom template for the font picker)
+    function SB.FontOverrideGroup(sectionPath, spec)
+        spec = mergeCompositeDefaults("FontOverrideGroup", spec)
+        local overridePath = sectionPath .. ".overrideFont"
+
+        local enabledSpec = {
+            path = overridePath,
+            name = spec.enabledName or "Override font",
+            tooltip = spec.enabledTooltip or "Override the global font settings for this module.",
+            getTransform = function(value) return value == true end,
+        }
+        propagateModifiers(enabledSpec, spec)
+        local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
+
+        -- Children stay visible but disabled when override is off.
+        -- The font picker's SetEnabled hides the preview automatically.
+        local outerDisabled = spec.disabled
+        local function isOverrideDisabled()
+            if outerDisabled and outerDisabled() then return true end
+            return not enabledSetting:GetValue()
+        end
+
+        local fontSpec = {
+            path = sectionPath .. ".font",
+            name = spec.fontName or "Font",
+            tooltip = spec.fontTooltip,
+            values = spec.fontValues,
+            disabled = isOverrideDisabled,
+            getTransform = function(value)
+                if value then return value end
+                if spec.fontFallback then return spec.fontFallback() end
+                return nil
+            end,
+        }
+        propagateModifiers(fontSpec, spec)
+
+        local fontInit
+        if spec.fontTemplate then
+            fontSpec.template = spec.fontTemplate
+            fontInit = SB.PathCustom(fontSpec)
+        else
+            fontInit = SB.PathDropdown(fontSpec)
+        end
+
+        local sizeSpec = {
+            path = sectionPath .. ".fontSize",
+            name = spec.sizeName or "Font Size",
+            tooltip = spec.sizeTooltip,
+            min = spec.sizeMin or 6,
+            max = spec.sizeMax or 32,
+            step = spec.sizeStep or 1,
+            disabled = isOverrideDisabled,
+            getTransform = function(value)
+                if value then return value end
+                if spec.fontSizeFallback then return spec.fontSizeFallback() end
+                return 11
+            end,
+        }
+        propagateModifiers(sizeSpec, spec)
+        local sizeInit = SB.PathSlider(sizeSpec)
+
+        return {
+            enabledInit = enabledInit,
+            enabledSetting = enabledSetting,
+            fontInit = fontInit,
+            sizeInit = sizeInit,
+        }
+    end
+
+    function SB.BorderGroup(borderPath, spec)
+        spec = spec or {}
+
+        local enabledSpec = {
+            path = borderPath .. ".enabled",
+            name = spec.enabledName or "Show border",
+            tooltip = spec.enabledTooltip,
+        }
+        propagateModifiers(enabledSpec, spec)
+        local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
+
+        local thicknessSpec = {
+            path = borderPath .. ".thickness",
+            name = spec.thicknessName or "Border width",
+            tooltip = spec.thicknessTooltip,
+            min = spec.thicknessMin or 1,
+            max = spec.thicknessMax or 10,
+            step = spec.thicknessStep or 1,
+            parent = enabledInit,
+            parentCheck = function() return enabledSetting:GetValue() end,
+        }
+        propagateModifiers(thicknessSpec, spec)
+        local thicknessInit = SB.PathSlider(thicknessSpec)
+
+        local colorSpec = {
+            path = borderPath .. ".color",
+            name = spec.colorName or "Border color",
+            tooltip = spec.colorTooltip,
+            parent = enabledInit,
+            parentCheck = function() return enabledSetting:GetValue() end,
+        }
+        propagateModifiers(colorSpec, spec)
+        local colorInit = SB.PathColor(colorSpec)
+
+        return {
+            enabledInit = enabledInit,
+            enabledSetting = enabledSetting,
+            thicknessInit = thicknessInit,
+            colorInit = colorInit,
+        }
+    end
+
+    function SB.ColorPickerList(basePath, defs, spec)
+        spec = spec or {}
+        local results = {}
+
+        for _, def in ipairs(defs) do
+            local childSpec = {
+                path = basePath .. "." .. tostring(def.key),
+                name = def.name,
+                tooltip = def.tooltip,
+            }
+            propagateModifiers(childSpec, spec)
+            local init, setting = SB.PathColor(childSpec)
+            results[#results + 1] = { key = def.key, initializer = init, setting = setting }
+        end
+
+        return results
+    end
+
+    --- Positioning group.
+    --- Required spec fields:
+    ---   positionModes     table         value → label map
+    ---   isAnchorModeFree  function(cfg) -> bool
+    --- Optional spec fields:
+    ---   applyPositionMode function(cfg, mode)
+    ---   defaultBarWidth   number (default 250)
+    function SB.PositioningGroup(configPath, spec)
+        spec = mergeCompositeDefaults("PositioningGroup", spec)
+        assert(spec.positionModes, "PositioningGroup: spec.positionModes is required")
+        assert(spec.isAnchorModeFree, "PositioningGroup: spec.isAnchorModeFree is required")
+
+        local modeSpec = {
+            path = configPath .. ".anchorMode",
+            name = spec.modeName or "Position Mode",
+            tooltip = spec.modeTooltip,
+            values = spec.positionModes,
+            onSet = function(value)
+                if spec.applyPositionMode then
+                    spec.applyPositionMode(
+                        getNestedValue(getProfile(), configPath), value)
+                end
+            end,
+        }
+        propagateModifiers(modeSpec, spec)
+        local modeInit, modeSetting = SB.PathDropdown(modeSpec)
+
+        local function isFreeMode()
+            return spec.isAnchorModeFree(
+                getNestedValue(getProfile(), configPath))
+        end
+
+        local defaultBarWidth = spec.defaultBarWidth or 250
+
+        local widthSpec = {
+            path = configPath .. ".width",
+            name = spec.widthName or "Width",
+            tooltip = spec.widthTooltip or "Width when free positioning is enabled.",
+            min = spec.widthMin or 100,
+            max = spec.widthMax or 600,
+            step = spec.widthStep or 1,
+            parent = modeInit,
+            parentCheck = isFreeMode,
+            getTransform = function(value)
+                return value or defaultBarWidth
+            end,
+        }
+        propagateModifiers(widthSpec, spec)
+        local widthInit = SB.PathSlider(widthSpec)
+
+        local offsetXInit
+        if spec.includeOffsetX ~= false then
+            local offsetXSpec = {
+                path = configPath .. ".offsetX",
+                name = spec.offsetXName or "Offset X",
+                tooltip = spec.offsetXTooltip or "Horizontal offset when free positioning is enabled.",
+                min = -800,
+                max = 800,
+                step = 1,
+                parent = modeInit,
+                parentCheck = isFreeMode,
+                getTransform = function(value) return value or 0 end,
+                setTransform = function(value) return value ~= 0 and value or nil end,
+            }
+            propagateModifiers(offsetXSpec, spec)
+            offsetXInit = SB.PathSlider(offsetXSpec)
+        end
+
+        local offsetYSpec = {
+            path = configPath .. ".offsetY",
+            name = spec.offsetYName or "Offset Y",
+            tooltip = spec.offsetYTooltip or "Vertical offset when free positioning is enabled.",
+            min = -800,
+            max = 800,
+            step = 1,
+            parent = modeInit,
+            parentCheck = isFreeMode,
+            getTransform = function(value) return value or 0 end,
+            setTransform = function(value) return value ~= 0 and value or nil end,
+        }
+        propagateModifiers(offsetYSpec, spec)
+        local offsetYInit = SB.PathSlider(offsetYSpec)
+
+        return {
+            modeInit = modeInit,
+            modeSetting = modeSetting,
+            widthInit = widthInit,
+            offsetXInit = offsetXInit,
+            offsetYInit = offsetYInit,
+        }
+    end
+
+    ----------------------------------------------------------------------------
+    -- Utility helpers
+    ----------------------------------------------------------------------------
+
+    function SB.Header(text, category)
+        local cat = category or SB._currentSubcategory or SB._rootCategory
+
+        if not SB._firstHeaderAdded[cat] then
+            SB._firstHeaderAdded[cat] = true
+            local catName = SB._subcategoryNames[cat] or (cat == SB._rootCategory and SB._rootCategoryName)
+            if catName and text == catName then return nil end
+        end
+
+        local layout = SB._layouts[cat]
+        local initializer = CreateSettingsListSectionHeaderInitializer(text)
+        layout:AddInitializer(initializer)
+        return initializer
+    end
+
+    function SB.Subheader(spec)
+        local cat = resolveCategory(spec)
+        local layout = SB._layouts[cat]
+        local initializer = Settings.CreateElementInitializer(lib.SUBHEADER_TEMPLATE, { name = spec.name })
+        layout:AddInitializer(initializer)
+        applyModifiers(initializer, spec)
+        return initializer
+    end
+
+    function SB.EmbedCanvas(canvas, height, spec)
+        spec = spec or {}
+        local cat = spec.category or SB._currentSubcategory or SB._rootCategory
+
+        local modifiers = {}
+        for k, v in pairs(spec) do
+            modifiers[k] = v
+        end
+        modifiers.canvas = canvas
+
+        local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE,
+            { canvas = canvas })
+        local extent = height or canvas:GetHeight()
+        initializer.GetExtent = function() return extent end
+
+        Settings.RegisterInitializer(cat, initializer)
+        applyModifiers(initializer, modifiers)
+
+        return initializer
+    end
+
+    function SB.Button(spec)
+        local cat = spec.category or SB._currentSubcategory or SB._rootCategory
+
+        local onClick = spec.onClick
+        if spec.confirm then
+            local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
+            local originalClick = onClick
+            onClick = function()
+                StaticPopupDialogs["LSB_SETTINGS_CONFIRM"] = {
+                    text = confirmText,
+                    button1 = YES,
+                    button2 = NO,
+                    OnAccept = originalClick,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                }
+                StaticPopup_Show("LSB_SETTINGS_CONFIRM")
+            end
+        end
+
+        local layout = SB._layouts[cat]
+        local initializer = CreateSettingsButtonInitializer(
+            spec.name, spec.buttonText or spec.name, onClick, spec.tooltip, true)
+        layout:AddInitializer(initializer)
+        applyModifiers(initializer, spec)
+
+        return initializer
+    end
+
+    ----------------------------------------------------------------------------
+    -- Table-driven registration (AceConfig-inspired)
+    ----------------------------------------------------------------------------
+
+    local TYPE_ALIASES = {
+        toggle = "checkbox",
+        range = "slider",
+        select = "dropdown",
+        execute = "button",
+        description = "subheader",
+    }
+
+    local SPEC_EXCLUDE = { type=true, order=true, _key=true, defs=true, label=true, condition=true }
+
+    -- Composite type dispatch: returns init, setting from a composite builder
+    local COMPOSITE_DISPATCH = {
+        positioning = function(path, spec)
+            local r = SB.PositioningGroup(path, spec); return r.modeInit, r.modeSetting
+        end,
+        border = function(path, spec)
+            local r = SB.BorderGroup(path, spec); return r.enabledInit, r.enabledSetting
+        end,
+        fontOverride = function(path, spec)
+            local r = SB.FontOverrideGroup(path, spec); return r.enabledInit, r.enabledSetting
+        end,
+        heightOverride = function(path, spec)
+            return SB.HeightOverrideSlider(path, spec)
+        end,
+    }
+
+    --- Walks an AceConfig-inspired option table and calls the imperative API.
+    function SB.RegisterFromTable(tbl)
+        assert(tbl.name, "RegisterFromTable: tbl.name is required")
+
+        if tbl.rootCategory then
+            SB._currentSubcategory = SB._rootCategory
+        else
+            SB.CreateSubcategory(tbl.name)
+        end
+
+        local groupPath = tbl.path or ""
+
+        local function resolvePath(entryPath)
+            if not entryPath then return groupPath end
+            if entryPath:find("%.") or groupPath == "" then return entryPath end
+            return groupPath .. "." .. entryPath
+        end
+
+        if not tbl.args then return end
+
+        -- Sort entries by order field
+        local sorted = {}
+        for key, entry in pairs(tbl.args) do
+            entry._key = key
+            sorted[#sorted + 1] = entry
+        end
+        table.sort(sorted, function(a, b)
+            return (a.order or 100) < (b.order or 100)
+        end)
+
+        local created = {}
+
+        for _, entry in ipairs(sorted) do
+            local entryType = TYPE_ALIASES[entry.type] or entry.type
+
+            -- Evaluate condition (skip entry if false)
+            local condition = entry.condition
+            local shouldProcess = condition == nil
+                or (type(condition) == "function" and condition())
+                or (type(condition) ~= "function" and condition)
+
+            if shouldProcess then
+                local spec = {}
+                for k, v in pairs(entry) do
+                    if not SPEC_EXCLUDE[k] then spec[k] = v end
+                end
+
+                if spec.desc and not spec.tooltip then
+                    spec.tooltip = spec.desc
+                    spec.desc = nil
+                end
+
+                if tbl.disabled and spec.disabled == nil then spec.disabled = tbl.disabled end
+                if tbl.hidden and spec.hidden == nil then spec.hidden = tbl.hidden end
+
+                -- Resolve parent string references
+                if type(spec.parent) == "string" then
+                    local ref = created[spec.parent]
+                    if ref then
+                        spec.parent = ref.initializer
+                        if spec.parentCheck == "checked" then
+                            local s = ref.setting
+                            spec.parentCheck = function() return s:GetValue() end
+                        elseif spec.parentCheck == "notChecked" then
+                            local s = ref.setting
+                            spec.parentCheck = function() return not s:GetValue() end
+                        end
+                    end
+                end
+
+                local init, setting
+
+                if entryType == "header" then
+                    init = SB.Header(spec.name)
+
+                elseif entryType == "subheader" then
+                    init = SB.Subheader(spec)
+
+                elseif entryType == "button" then
+                    init = SB.Button(spec)
+
+                elseif entryType == "canvas" then
+                    init = SB.EmbedCanvas(entry.canvas, entry.height, spec)
+
+                elseif entryType == "colorList" then
+                    local defs = entry.defs or {}
+                    if entry.label then
+                        local labelInit = SB.Subheader({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
+                        spec.parent = spec.parent or labelInit
+                    end
+                    local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
+                    if results[1] then
+                        init, setting = results[1].initializer, results[1].setting
+                    end
+
+                elseif COMPOSITE_DISPATCH[entryType] then
+                    init, setting = COMPOSITE_DISPATCH[entryType](resolvePath(entry.path), spec)
+
+                elseif PATH_DISPATCH[entryType] then
+                    spec.path = resolvePath(entry.path or spec.path)
+                    spec.type = entryType
+                    init, setting = SB.PathControl(spec)
+                end
+
+                created[entry._key] = { initializer = init, setting = setting }
+            end
+        end
+    end
+
+    function SB.RegisterSection(nsTable, key, section)
+        nsTable.OptionsSections = nsTable.OptionsSections or {}
+        nsTable.OptionsSections[key] = section
+        return section
+    end
+
+    return SB
+end

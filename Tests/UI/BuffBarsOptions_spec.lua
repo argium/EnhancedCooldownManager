@@ -1,0 +1,204 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
+local TestHelpers = assert(
+    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
+    "Unable to load Tests/TestHelpers.lua"
+)()
+
+describe("BuffBarsOptions", function()
+    local originalGlobals
+    local BuffBarsOptions
+    local SpellColors
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({
+            "ECM", "ECM_DeepEquals",
+            "Settings", "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
+            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
+            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
+            "issecretvalue", "issecrettable", "canaccessvalue", "canaccesstable",
+            "time",
+            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "LibSettingsBuilder_EmbedCanvasMixin",
+        })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+
+        _G.UnitClass = function() return "Demon Hunter", "DEMONHUNTER", 12 end
+        _G.GetSpecialization = function() return 2 end
+        _G.GetSpecializationInfo = function() return nil, "Havoc" end
+
+        _G.issecretvalue = function() return false end
+        _G.issecrettable = function() return false end
+        _G.canaccessvalue = function() return true end
+        _G.canaccesstable = function() return true end
+        _G.time = function() return 1000 end
+
+        _G.ECM = {
+            Constants = {},
+            FrameUtil = { GetIconTextureFileID = function() return nil end },
+            ScheduleLayoutUpdate = function() end,
+            ToString = function(v) return tostring(v) end,
+            OptionUtil = {
+                GetCurrentClassSpec = function() return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER" end,
+                GetNestedValue = function(tbl, path)
+                    local current = tbl
+                    for key in path:gmatch("[^.]+") do
+                        if type(current) ~= "table" then return nil end
+                        current = current[key]
+                    end
+                    return current
+                end,
+                SetNestedValue = function(tbl, path, value)
+                    local parts = {}
+                    for key in path:gmatch("[^.]+") do parts[#parts + 1] = key end
+                    local current = tbl
+                    for i = 1, #parts - 1 do
+                        if current[parts[i]] == nil then current[parts[i]] = {} end
+                        current = current[parts[i]]
+                    end
+                    current[parts[#parts]] = value
+                end,
+                IsAnchorModeFree = function() return false end,
+                POSITION_MODE_TEXT = {},
+                ApplyPositionModeToBar = function() end,
+                IsValueChanged = function() return false end,
+            },
+
+            DebugAssert = function() end,
+            Log = function() end,
+        }
+
+        -- Load library
+        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        if lsmw then
+            lsmw.GetFontValues = function() return {} end
+            lsmw.GetStatusbarValues = function() return {} end
+            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
+            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        end
+
+        -- Load Constants
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+
+        -- Load PriorityKeyMap
+        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
+
+        -- Load SpellColors
+        local addonNS = {
+            Addon = {
+                db = {
+                    profile = { buffBars = {} },
+                    defaults = { profile = { buffBars = {} } },
+                },
+                BuffBars = {
+                    IsEditLocked = function() return false, nil end,
+                    GetActiveSpellData = function() return {} end,
+                },
+                NewModule = function(_, name) return { moduleName = name } end,
+            },
+        }
+
+        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
+        SpellColors = ECM.SpellColors
+
+        -- Load Options (includes SettingsBuilder adapter)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
+
+        -- Create root category so subcategory calls work
+        ECM.SettingsBuilder.CreateRootCategory("Test")
+
+        -- Load BuffBarsOptions
+        local optionsNS = {
+            Addon = addonNS.Addon,
+            OptionsSections = {},
+        }
+        TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, optionsNS)
+        BuffBarsOptions = optionsNS.BuffBarsOptions
+    end)
+
+    -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
+
+    it("_BuildSpellColorRows deduplicates matching entries and preserves order", function()
+        local entries = {
+            { key = SpellColors.MakeKey("Active Name", 1001, nil, nil) },
+            { key = SpellColors.MakeKey(nil, nil, nil, 2002) },
+            { key = SpellColors.MakeKey("Active Name", 1001, 77, 9001) },
+            { key = SpellColors.MakeKey("Persisted Only", 3003, nil, nil) },
+        }
+
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        assert.are.equal(3, #rows)
+        assert.are.equal("Active Name", rows[1].key.primaryKey)
+        assert.are.equal(2002, rows[2].key.primaryKey)
+        assert.are.equal("Persisted Only", rows[3].key.primaryKey)
+    end)
+
+    it("_BuildSpellColorRows merges matching keys and carries fallback identifiers", function()
+        local entries = {
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
+            { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
+        }
+
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        assert.are.equal(1, #rows)
+        assert.are.equal("spellName", rows[1].key.keyType)
+        assert.are.equal("Immolation Aura", rows[1].key.primaryKey)
+        assert.are.equal(258920, rows[1].key.spellID)
+        assert.are.equal(77, rows[1].key.cooldownID)
+        assert.are.equal(9001, rows[1].key.textureFileID)
+        assert.are.equal(9001, rows[1].textureFileID)
+    end)
+
+    it("_BuildSpellColorRows does not merge unrelated rows that only share texture", function()
+        local entries = {
+            { key = SpellColors.MakeKey("Spell A", nil, nil, 1234) },
+            { key = SpellColors.MakeKey("Spell B", nil, nil, 1234) },
+        }
+
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        assert.are.equal(2, #rows)
+        assert.are.equal("Spell A", rows[1].key.primaryKey)
+        assert.are.equal("Spell B", rows[2].key.primaryKey)
+    end)
+
+    it("_BuildSpellColorRows merges texture-only keys", function()
+        local entries = {
+            { key = SpellColors.MakeKey(nil, nil, nil, 4444) },
+            { key = SpellColors.MakeKey(nil, nil, nil, 4444) },
+        }
+
+        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        assert.are.equal(1, #rows)
+        assert.are.equal(4444, rows[1].key.primaryKey)
+        assert.are.equal(4444, rows[1].textureFileID)
+    end)
+
+    it("_BuildSpellColorRows ignores invalid entries and handles nil inputs", function()
+        local rows = BuffBarsOptions._BuildSpellColorRows({
+            {},
+            { key = nil },
+            { key = SpellColors.MakeKey("Valid", nil, nil, nil) },
+        })
+
+        assert.are.equal(1, #rows)
+        assert.are.equal("Valid", rows[1].key.primaryKey)
+    end)
+
+    it("section registers with key BuffBars", function()
+        -- BuffBarsOptions should have registered itself
+        assert.is_function(BuffBarsOptions.RegisterSettings)
+    end)
+end)
