@@ -105,8 +105,7 @@ end
 --- Returns the buffBars config table, or nil if unavailable.
 ---@return table|nil cfg
 local function config()
-    local mod = ns.Addon
-    local cfg = mod and mod.db and mod.db.profile and mod.db.profile.buffBars or nil
+    local cfg = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
     if type(cfg) ~= "table" then
         ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil

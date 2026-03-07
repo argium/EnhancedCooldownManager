@@ -304,6 +304,7 @@ end
 function TestHelpers.makeRegion(regionType)
     local region = { __objectType = regionType or "Texture", __calls = {} }
     function region:IsObjectType(expected) return self.__objectType == expected end
+    function region:SetAllPoints() end
     return region
 end
 
@@ -360,6 +361,7 @@ function TestHelpers.makeFrame(opts)
     function frame:Show() incCalls(self, "Show"); self.__shown = true end
     function frame:Hide() incCalls(self, "Hide"); self.__shown = false end
     function frame:IsShown() return self.__shown end
+    function frame:SetAllPoints() end
     function frame:ClearAllPoints() incCalls(self, "ClearAllPoints"); self.__anchors = {} end
     function frame:SetPoint(point, relativeTo, relativePoint, x, y) incCalls(self, "SetPoint"); self.__anchors[#self.__anchors + 1] = { point, relativeTo, relativePoint, x or 0, y or 0 } end
     function frame:GetNumPoints() return #self.__anchors end
@@ -685,6 +687,9 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
         },
         CloneValue = deepClone,
         ScheduleLayoutUpdate = function() end,
+        ClassUtil = {
+            IsDeathKnight = function() return false end,
+        },
     }
 
     local mod = {
@@ -700,6 +705,8 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
             RegisterCallback = function() end,
         },
         NewModule = function(_, name) return { moduleName = name } end,
+        EnableModule = function() end,
+        DisableModule = function() end,
     }
 
     local ns = { Addon = mod, OptionsSections = {} }

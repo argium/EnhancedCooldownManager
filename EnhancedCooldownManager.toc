@@ -28,11 +28,13 @@ ECM_Defaults.lua
 Helpers\ClassUtil.lua
 Helpers\ColorUtil.lua
 Helpers\FrameUtil.lua
-Helpers\ModuleMixin.lua
 Helpers\PriorityKeyMap.lua
 Helpers\SpellColors.lua
 Helpers\Migration.lua
 Helpers\ImportExport.lua
+
+Helpers\ModuleMixin.lua
+Helpers\FrameMixin.lua
 Helpers\BarMixin.lua
 
 ECM.lua

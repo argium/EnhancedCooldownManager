@@ -3,8 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
-
 local AdvancedOptions = {}
 
 function AdvancedOptions.RegisterSettings(SB)

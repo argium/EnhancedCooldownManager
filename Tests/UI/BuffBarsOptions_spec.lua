@@ -51,7 +51,6 @@ describe("BuffBarsOptions", function()
             ToString = function(v) return tostring(v) end,
             OptionUtil = {
                 GetCurrentClassSpec = function() return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER" end,
-                SetModuleEnabled = function() end,
                 GetNestedValue = function(tbl, path)
                     local current = tbl
                     for key in path:gmatch("[^.]+") do

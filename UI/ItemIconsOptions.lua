@@ -18,7 +18,14 @@ function ItemIconsOptions.RegisterSettings(SB)
                 name = "Enable item icons",
                 desc = "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns.",
                 order = 0,
-                onSet = function(value) ECM.OptionUtil.SetModuleEnabled("ItemIcons", value) end,
+                onSet = function(value)
+                    if value then
+                        ns.Addon:EnableModule("ItemIcons")
+                        return
+                    end
+
+                    ns.Addon:DisableModule("ItemIcons")
+                end,
             },
             equipmentHeader = {
                 type = "header",

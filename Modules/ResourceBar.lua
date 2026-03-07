@@ -3,23 +3,12 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
-local ResourceBar = mod:NewModule("ResourceBar", "AceEvent-3.0")
+local ResourceBar = ns.Addon:NewModule("ResourceBar", "AceEvent-3.0")
 local ClassUtil = ECM.ClassUtil
-mod.ResourceBar = ResourceBar
-ECM.BarMixin.ApplyConfigMixin(ResourceBar, "ResourceBar")
+ns.Addon.ResourceBar = ResourceBar
 
---------------------------------------------------------------------------------
--- ModuleMixin/BarMixin Overrides
---------------------------------------------------------------------------------
 function ResourceBar:ShouldShow()
-    local shouldShow = ECM.ModuleMixin.ShouldShow(self)
-
-    if not shouldShow then
-        return false
-    end
-
-    return ClassUtil.GetPlayerResourceType() ~= nil
+    return ECM.FrameMixin.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
 end
 
 function ResourceBar:GetStatusBarValues()
@@ -35,7 +24,6 @@ function ResourceBar:GetStatusBarValues()
 end
 
 --- Gets the color for the resource bar based on resource type.
---- Handles DH souls (Vengeance, Devourer normal/meta).
 ---@return ECM_Color
 function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
@@ -76,10 +64,6 @@ function ResourceBar:Refresh(why, force)
     return true
 end
 
---------------------------------------------------------------------------------
--- Event Handling
---------------------------------------------------------------------------------
-
 function ResourceBar:OnEventUpdate(event, ...)
     if event == "UNIT_AURA" then
         local unit = ...
@@ -90,10 +74,6 @@ function ResourceBar:OnEventUpdate(event, ...)
 
     self:ThrottledUpdateLayout(event or "OnEventUpdate")
 end
-
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
 
 function ResourceBar:OnEnable()
     ECM.BarMixin.AddMixin(self, "ResourceBar")

@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
 local C = ECM.Constants
 
 --- Generates the merged list of spell color rows from spell color entries.
@@ -81,7 +80,7 @@ local function createSpellColorCanvas(SB, subcatName)
     local defaultsBtn = headerRow._defaultsButton
     defaultsBtn:SetText(SETTINGS_DEFAULTS)
     defaultsBtn:SetScript("OnClick", function()
-        if mod.BuffBars:IsEditLocked() then return end
+        if ns.Addon.BuffBars:IsEditLocked() then return end
         StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"].OnAccept = resetAllSpellColors
         StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
     end)
@@ -105,7 +104,7 @@ local function createSpellColorCanvas(SB, subcatName)
     defaultColorSwatch:ClearAllPoints()
     defaultColorSwatch:SetPoint("LEFT", defaultColorRow, "CENTER", -70, 0)
     defaultColorSwatch:SetScript("OnClick", function()
-        if mod.BuffBars:IsEditLocked() then return end
+        if ns.Addon.BuffBars:IsEditLocked() then return end
         local c = ECM.SpellColors.GetDefaultColor()
         ECM.OptionUtil.OpenColorPicker(c, false, function(color)
             ECM.SpellColors.SetDefaultColor(color)
@@ -138,7 +137,7 @@ local function createSpellColorCanvas(SB, subcatName)
         control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
 
         control.ColorSwatch:SetScript("OnClick", function()
-            if mod.BuffBars:IsEditLocked() then return end
+            if ns.Addon.BuffBars:IsEditLocked() then return end
             local current = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
             ECM.OptionUtil.OpenColorPicker(current, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
@@ -163,7 +162,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
         -- Build warning text
         local parts = {}
-        local locked, reason = mod.BuffBars:IsEditLocked()
+        local locked, reason = ns.Addon.BuffBars:IsEditLocked()
         if locked and reason == "combat" then
             parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
         elseif locked and reason == "secrets" then
@@ -216,13 +215,13 @@ function BuffBarsOptions.RegisterSettings(SB)
                 order = 0,
                 onSet = function(value, setting)
                     if value then
-                        ECM.OptionUtil.SetModuleEnabled("BuffBars", true)
+                        ns.Addon:EnableModule("BuffBars")
                     else
                         setting:SetValue(true)
-                        mod:ConfirmReloadUI(
+                        ns.Addon:ConfirmReloadUI(
                             "Disabling aura bars requires a UI reload. Reload now?",
                             function()
-                                ECM.OptionUtil.SetModuleEnabled("BuffBars", false)
+                                ns.Addon:DisableModule("BuffBars")
                             end
                         )
                     end
@@ -252,7 +251,7 @@ function BuffBarsOptions.RegisterSettings(SB)
                 parent = "positioning",
                 parentCheck = function()
                     return ECM.OptionUtil.IsAnchorModeFree(
-                        ECM.OptionUtil.GetNestedValue(mod.db.profile, "buffBars"))
+                        ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars"))
                 end,
                 order = 12,
             },

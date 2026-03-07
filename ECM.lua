@@ -9,6 +9,7 @@ ECM = ECM or {}
 assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
+assert(ECM.FrameMixin, "FrameMixin.lua must be loaded before ECM.lua")
 
 local LSM = LibStub("LibSharedMedia-3.0", true)
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
@@ -407,40 +408,27 @@ function ECM.ScheduleLayoutUpdate(delay, reason)
     end)
 end
 
---- Registers a ModuleMixin to receive layout update events.
---- @param frame ModuleMixin The frame to register
+--- Registers a FrameMixin to receive layout update events.
+--- @param frame FrameMixin The frame to register
 function ECM.RegisterFrame(frame)
-    assert(frame and type(frame) == "table" and frame.Name, "RegisterFrame: invalid module (missing Name)")
+    ECM.FrameMixin.AssertValid(frame)
     assert(_modules[frame.Name] == nil, "registerFrame: frame with name '" .. frame.Name .. "' is already registered")
-    _modules[frame.Name] = frame
-    ECM.Log(nil, "Frame registered: " .. frame.Name)
 
-    if _globallyHidden then
-        frame:SetHidden(true)
-    end
-    if frame.InnerFrame then
-        ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
-    end
+    _modules[frame.Name] = frame
+    frame:SetHidden(_globallyHidden)
+    ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
+    ECM.Log(nil, "Frame registered: " .. frame.Name)
 end
 
---- Unregisters a ModuleMixin from layout update events.
---- @param frame ModuleMixin The frame to unregister
+--- Unregisters a FrameMixin from layout update events.
+--- @param frame FrameMixin The frame to unregister
 function ECM.UnregisterFrame(frame)
-    if not frame or type(frame) ~= "table" then
-        return
-    end
+    ECM.FrameMixin.AssertValid(frame)
+    assert(_modules[frame.Name] ~= nil, "UnregisterFrame: frame with name '" .. frame.Name .. "' is not registered")
 
     local name = frame.Name
-    if not name or _modules[name] ~= frame then
-        return
-    end
-
     _modules[name] = nil
-
-    if frame.InnerFrame then
-        frame.InnerFrame:Hide()
-    end
-
+    frame:SetHidden(true)
     ECM.Log(nil, "Frame unregistered: " .. name)
 end
 
@@ -814,13 +802,14 @@ function mod:OnEnable()
     }
 
     for _, moduleName in ipairs(moduleOrder) do
-        local module = self:GetECMModule(moduleName)
-        assert(module, "Module not found: " .. moduleName)
-
         local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
-        ECM.OptionUtil.SetModuleEnabled(moduleName, shouldEnable)
+        if shouldEnable then
+            self:EnableModule(moduleName)
+        else
+            self:DisableModule(moduleName)
+        end
     end
 
     enableLayoutEvents()

@@ -3,6 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local FrameUtil = ECM.FrameUtil
+local FrameMixin = ECM.FrameMixin
 local BarMixin = {}
 ECM.BarMixin = BarMixin
 
@@ -171,22 +172,19 @@ end
 --- Gets the color for the status bar. Override for custom color logic.
 ---@return ECM_Color Color table with r, g, b, a fields
 function BarMixin:GetStatusBarColor()
-    local resource = UnitPowerType("player")
+    local powerType = UnitPowerType("player")
     local moduleConfig = self:GetModuleConfig()
-    local color = moduleConfig and moduleConfig.colors and moduleConfig.colors[resource]
+    local color = moduleConfig and moduleConfig.colors and moduleConfig.colors[powerType]
     return color or ECM.Constants.COLOR_WHITE
 end
-
---------------------------------------------------------------------------------
--- ModuleMixin Overrides
---------------------------------------------------------------------------------
 
 --- Refreshes the bar frame layout and values.
 --- @param why string|nil Reason for refresh (for logging/debugging).
 --- @param force boolean|nil If true, forces a refresh even if not needed.
 --- @return boolean continue True if refresh completed, false if skipped
 function BarMixin:Refresh(why, force)
-    if not FrameUtil.BaseRefresh(self, why, force) then
+    -- call the frame mixin to check pre-conditions
+    if not FrameMixin.Refresh(self, why, force) then
         return false
     end
 
@@ -231,16 +229,12 @@ function BarMixin:Refresh(why, force)
     return true
 end
 
---------------------------------------------------------------------------------
--- Layout and Refresh
---------------------------------------------------------------------------------
-
 function BarMixin:CreateFrame()
-    local frame = ECM.ModuleMixin.CreateFrame(self)
+    local frame = ECM.FrameMixin.CreateFrame(self)
 
     -- StatusBar for value display
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
-    frame.StatusBar:SetAllPoints()
+    frame.StatusBar:SetAllPoints(frame)
     frame.StatusBar:SetFrameLevel(frame:GetFrameLevel() + 1)
 
     -- TicksFrame for tick marks
@@ -258,43 +252,26 @@ function BarMixin:CreateFrame()
     frame.TextValue:SetJustifyH("CENTER")
     frame.TextValue:SetJustifyV("MIDDLE")
 
-    -- Attach text methods to the frame
     function frame:SetText(text)
-        if self.TextValue then
-            self.TextValue:SetText(text)
-        end
+        self.TextValue:SetText(text)
     end
 
     function frame:SetTextVisible(shown)
-        if self.TextFrame then
-            self.TextFrame:SetShown(shown)
-        end
+        self.TextFrame:SetShown(shown)
     end
 
     ECM.Log(self.Name, "Frame created.")
     return frame
 end
 
---- Applies only the config-access portion of both BarMixin and ModuleMixin.
---- Safe to call at module creation time before OnEnable.
-function BarMixin.ApplyConfigMixin(module, name)
-    assert(module, "module required")
-    assert(name, "name required")
+function BarMixin.AddMixin(module, name)
+    ECM.FrameMixin.AddMixin(module, name)
 
-    -- Copy BarMixin methods to module if not already defined
     for k, v in pairs(BarMixin) do
         if type(v) == "function" and module[k] == nil then
             module[k] = v
         end
     end
 
-    ECM.ModuleMixin.ApplyConfigMixin(module, name)
-end
-
-function BarMixin.AddMixin(module, name)
-    -- Ensure config methods are available (idempotent).
-    BarMixin.ApplyConfigMixin(module, name)
-
-    ECM.ModuleMixin.AddFrameMixin(module, name)
     module._lastUpdate = GetTime()
 end

@@ -7,7 +7,7 @@ local TestHelpers = assert(
     "Unable to load Tests/TestHelpers.lua"
 )()
 
-describe("ModuleMixin", function()
+describe("FrameMixin", function()
     local originalGlobals
     local FrameUtil
     local fakeTime
@@ -75,8 +75,27 @@ describe("ModuleMixin", function()
                 Refresh = function() end,
             }
 
-            function selfObj:UpdateLayout(why) return FrameUtil.ApplyStandardLayout(self, why) end
-            function selfObj:ThrottledRefresh(why) return FrameUtil.ThrottledRefresh(self, why) end
+            function selfObj:UpdateLayout(why)
+                if not self:ShouldShow() then self.InnerFrame:Hide(); return false end
+                if not self.InnerFrame:IsShown() then self.InnerFrame:Show() end
+                local params = self:CalculateLayoutParams()
+                if params.height then FrameUtil.LazySetHeight(self.InnerFrame, params.height) end
+                if params.width then FrameUtil.LazySetWidth(self.InnerFrame, params.width) end
+                local mc = self:GetModuleConfig()
+                local gc = self:GetGlobalConfig()
+                local bgColor = (mc and mc.bgColor) or (gc and gc.barBgColor)
+                if bgColor then FrameUtil.LazySetBackgroundColor(self.InnerFrame, bgColor) end
+                self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
+                return true
+            end
+            function selfObj:ThrottledRefresh(why)
+                local gc = self:GetGlobalConfig()
+                local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+                if GetTime() - (self._lastUpdate or 0) < freq then return false end
+                self:Refresh(why)
+                self._lastUpdate = GetTime()
+                return true
+            end
             return selfObj
         end
 

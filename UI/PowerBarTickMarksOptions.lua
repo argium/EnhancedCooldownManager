@@ -3,22 +3,21 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
 local C = ECM.Constants
 
 local BASE_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization."
 
 local function getTicksConfig()
-    local powerBar = mod.db.profile.powerBar
+    local powerBar = ns.Addon.db.profile.powerBar
     if powerBar and powerBar.ticks then return powerBar.ticks end
-    if not mod.db.profile.powerBar then mod.db.profile.powerBar = {} end
+    if not ns.Addon.db.profile.powerBar then ns.Addon.db.profile.powerBar = {} end
 
-    mod.db.profile.powerBar.ticks = {
+    ns.Addon.db.profile.powerBar.ticks = {
         mappings = {},
         defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
         defaultWidth = 1,
     }
-    return mod.db.profile.powerBar.ticks
+    return ns.Addon.db.profile.powerBar.ticks
 end
 
 local store = {}
@@ -26,7 +25,7 @@ local store = {}
 function store.GetCurrentTicks()
     local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then return {} end
-    local ticksCfg = mod.db.profile.powerBar and mod.db.profile.powerBar.ticks
+    local ticksCfg = ns.Addon.db.profile.powerBar and ns.Addon.db.profile.powerBar.ticks
     local mappings = ticksCfg and ticksCfg.mappings
     local classMappings = mappings and mappings[classID]
     return classMappings and classMappings[specIndex] or {}

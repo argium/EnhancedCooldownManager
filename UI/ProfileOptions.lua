@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
 
 StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = {
     text = "",
@@ -37,14 +36,14 @@ function ProfileOptions.RegisterSettings(SB)
 
     local switchSetting = Settings.RegisterProxySetting(cat, "ECM_ProfileSwitch",
         Settings.VarType.String, "Switch Profile",
-        mod.db:GetCurrentProfile(),
-        function() return mod.db:GetCurrentProfile() end,
-        function(value) mod.db:SetProfile(value) end
+        ns.Addon.db:GetCurrentProfile(),
+        function() return ns.Addon.db:GetCurrentProfile() end,
+        function(value) ns.Addon.db:SetProfile(value) end
     )
 
     Settings.CreateDropdown(cat, switchSetting, function()
         local container = Settings.CreateControlTextContainer()
-        for _, name in ipairs(mod.db:GetProfiles()) do
+        for _, name in ipairs(ns.Addon.db:GetProfiles()) do
             container:Add(name, name)
         end
         return container:GetData()
@@ -64,8 +63,8 @@ function ProfileOptions.RegisterSettings(SB)
 
     local function otherProfilesGenerator()
         local container = Settings.CreateControlTextContainer()
-        local current = mod.db:GetCurrentProfile()
-        for _, name in ipairs(mod.db:GetProfiles()) do
+        local current = ns.Addon.db:GetCurrentProfile()
+        for _, name in ipairs(ns.Addon.db:GetProfiles()) do
             if name ~= current then container:Add(name, name) end
         end
         return container:GetData()
@@ -82,7 +81,7 @@ function ProfileOptions.RegisterSettings(SB)
         onClick = function()
             local profile = getCopyProfile()
             if not profile or profile == "" then return end
-            mod.db:CopyProfile(profile)
+            ns.Addon.db:CopyProfile(profile)
             clearCopyProfile()
         end,
     })
@@ -101,7 +100,7 @@ function ProfileOptions.RegisterSettings(SB)
             local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
             dialog.text = string.format("Are you sure you want to delete the profile '%s'?", profile)
             dialog.OnAccept = function()
-                mod.db:DeleteProfile(profile)
+                ns.Addon.db:DeleteProfile(profile)
                 clearDeleteProfile()
             end
             StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE")
@@ -116,7 +115,7 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = "Reset Profile",
         tooltip = "Reset the current profile back to default settings. This cannot be undone.",
         confirm = "Are you sure you want to reset the current profile to defaults?",
-        onClick = function() mod.db:ResetProfile() end,
+        onClick = function() ns.Addon.db:ResetProfile() end,
     })
 
     -- Import / Export
@@ -128,10 +127,10 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = "Paste a previously exported profile string to import settings.",
         onClick = function()
             if InCombatLockdown() then
-                mod:Print("Cannot import during combat (reload blocked)")
+                ns.Addon:Print("Cannot import during combat (reload blocked)")
                 return
             end
-            mod:ShowImportDialog()
+            ns.Addon:ShowImportDialog()
         end,
     })
 
@@ -142,10 +141,10 @@ function ProfileOptions.RegisterSettings(SB)
         onClick = function()
             local exportString, err = ECM.ImportExport.ExportCurrentProfile()
             if not exportString then
-                mod:Print("Export failed: " .. (err or "Unknown error"))
+                ns.Addon:Print("Export failed: " .. (err or "Unknown error"))
                 return
             end
-            mod:ShowExportDialog(exportString)
+            ns.Addon:ShowExportDialog(exportString)
         end,
     })
 end

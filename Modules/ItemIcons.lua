@@ -3,12 +3,11 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
+local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
-local ItemIcons = mod:NewModule("ItemIcons", "AceEvent-3.0")
-mod.ItemIcons = ItemIcons
-ItemIcons:SetEnabledState(false)
-ECM.ModuleMixin.ApplyConfigMixin(ItemIcons, "ItemIcons")
+local ItemIcons = ns.Addon:NewModule("ItemIcons", "AceEvent-3.0")
+ns.Addon.ItemIcons = ItemIcons
+-- ItemIcons:SetEnabledState(false) -- TODO: why was this necessary?
 
 ---@class ECM_ItemIconsModule : ModuleMixin
 
@@ -22,10 +21,6 @@ ECM.ModuleMixin.ApplyConfigMixin(ItemIcons, "ItemIcons")
 ---@field itemId number|nil Item ID this icon represents (bag items only).
 ---@field Icon Texture The icon texture.
 ---@field Cooldown Cooldown The cooldown overlay frame.
-
---------------------------------------------------------------------------------
--- Helpers
---------------------------------------------------------------------------------
 
 --- Checks if a trinket slot has an on-use effect.
 ---@param slotId number Inventory slot ID (13 or 14).
@@ -337,10 +332,6 @@ local function getUtilityViewerLayout()
     return iconSize or ECM.Constants.DEFAULT_ITEM_ICON_SIZE, spacing, iconScale, isStable, debugInfo
 end
 
---------------------------------------------------------------------------------
--- ECM.ModuleMixin Overrides
---------------------------------------------------------------------------------
-
 --- Override CreateFrame to create the container for item icons.
 ---@return Frame container The container frame.
 function ItemIcons:CreateFrame()
@@ -361,7 +352,7 @@ end
 --- Override ShouldShow to check module enabled state and item availability.
 ---@return boolean shouldShow Whether the frame should be shown.
 function ItemIcons:ShouldShow()
-    if not ECM.ModuleMixin.ShouldShow(self) then
+    if not ECM.FrameMixin.ShouldShow(self) then
         return false
     end
 
@@ -496,15 +487,15 @@ function ItemIcons:UpdateLayout(why)
         end)
     end
 
-    -- Update cooldowns after layout is complete (CLAUDE.md mandate)
     self:ThrottledRefresh("UpdateLayout")
 
     return true
 end
 
 --- Override Refresh to update cooldown states.
-function ItemIcons:Refresh(why)
-    if not FrameUtil.BaseRefresh(self, why) then
+function ItemIcons:Refresh(why, force)
+    -- call the frame mixin to check pre-conditions
+    if not FrameMixin.Refresh(self, why, force) then
         return false
     end
 
@@ -523,10 +514,6 @@ function ItemIcons:Refresh(why)
     ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
-
---------------------------------------------------------------------------------
--- Event Handlers
---------------------------------------------------------------------------------
 
 function ItemIcons:OnBagUpdateCooldown()
     if self.InnerFrame then
@@ -607,12 +594,8 @@ function ItemIcons:HookUtilityViewer()
     ECM.Log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
---------------------------------------------------------------------------------
--- Module Lifecycle
---------------------------------------------------------------------------------
-
 function ItemIcons:OnEnable()
-    ECM.ModuleMixin.AddFrameMixin(self, "ItemIcons")
+    ECM.FrameMixin.AddMixin(self, "ItemIcons")
     ECM.RegisterFrame(self)
 
     self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items

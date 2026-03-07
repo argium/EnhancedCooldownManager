@@ -23,7 +23,20 @@ function RuneBarOptions.RegisterSettings(SB)
         disabled = isNotDeathKnight,
         args = {
             dkWarning = { type = "subheader", name = "|cffFF8800These settings are only applicable to Death Knights.|r", condition = isNotDeathKnight, order = 0 },
-            enabled = { type = "toggle", path = "enabled", name = "Enable rune bar", order = 1, onSet = function(value) ECM.OptionUtil.SetModuleEnabled("RuneBar", value) end },
+            enabled = {
+                type = "toggle",
+                path = "enabled",
+                name = "Enable rune bar",
+                order = 1,
+                onSet = function(value)
+                    if value then
+                        ns.Addon:EnableModule("RuneBar")
+                        return
+                    end
+
+                    ns.Addon:DisableModule("RuneBar")
+                end,
+            },
             layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
             positioning = { type = "positioning", disabled = isDisabled, order = 11 },
             appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },

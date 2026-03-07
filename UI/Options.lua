@@ -3,9 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
 local C = ECM.Constants
-
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 --------------------------------------------------------------------------------
@@ -14,17 +12,6 @@ local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local function isAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
-end
-
-local function setModuleEnabled(moduleName, enabled)
-    local module = mod[moduleName] or ECM[moduleName]
-    if not module then return end
-
-    if enabled and not module:IsEnabled() then
-        module:Enable()
-    elseif not enabled and module:IsEnabled() then
-        module:Disable()
-    end
 end
 
 --- Gets the nested value from table using dot-separated path
@@ -118,14 +105,13 @@ end
 local function getIsDisabledDelegate(configPath)
     local enabledPath = configPath .. ".enabled"
     return function()
-        return not getNestedValue(mod.db.profile, enabledPath)
+        return not getNestedValue(ns.Addon.db.profile, enabledPath)
     end
 end
 
 ECM.OptionUtil = {
     GetNestedValue = getNestedValue,
     IsAnchorModeFree = isAnchorModeFree,
-    SetModuleEnabled = setModuleEnabled,
     GetCurrentClassSpec = getCurrentClassSpec,
     OpenColorPicker = openColorPicker,
     GetIsDisabledDelegate = getIsDisabledDelegate,
@@ -136,8 +122,8 @@ ECM.OptionUtil = {
 --------------------------------------------------------------------------------
 
 ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
-    getProfile = function() return mod.db and mod.db.profile end,
-    getDefaults = function() return mod.db and mod.db.defaults and mod.db.defaults.profile end,
+    getProfile = function() return ns.Addon.db and ns.Addon.db.profile end,
+    getDefaults = function() return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile end,
     getNestedValue = getNestedValue,
     setNestedValue = setNestedValue,
     varPrefix = "ECM",
@@ -149,8 +135,8 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
     compositeDefaults = {
         FontOverrideGroup = {
             fontValues = LSMW.GetFontValues,
-            fontFallback = function() return mod.db.profile.global.font end,
-            fontSizeFallback = function() return mod.db.profile.global.fontSize end,
+            fontFallback = function() return ns.Addon.db.profile.global.font end,
+            fontSizeFallback = function() return ns.Addon.db.profile.global.fontSize end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },
         PositioningGroup = {
@@ -170,7 +156,7 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
 
 ns.OptionsSections = ns.OptionsSections or {}
 
-local Options = mod:NewModule("Options")
+local Options = ns.Addon:NewModule("Options")
 
 function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
@@ -198,7 +184,7 @@ function Options:OnInitialize()
     SB.SetRootRedirect("General")  -- TODO: the redirect doesn't work. replace it with the old about section.
     SB.RegisterCategories()
 
-    local db = mod.db
+    local db = ns.Addon.db
     db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")

@@ -3,11 +3,12 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
+local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
-local BuffBars = mod:NewModule("BuffBars", "AceEvent-3.0")
-mod.BuffBars = BuffBars
-ECM.ModuleMixin.ApplyConfigMixin(BuffBars, "BuffBars")
+local ChainRightPoint = FrameMixin.ChainRightPoint
+local NormalizeGrowDirection = FrameMixin.NormalizeGrowDirection
+local BuffBars = ns.Addon:NewModule("BuffBars", "AceEvent-3.0")
+ns.Addon.BuffBars = BuffBars
 local _warned = false
 local _editLocked = false
 
@@ -263,9 +264,6 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         if iconTexture then
             iconTexture:SetShown(showIcon)
         end
-        if iconOverlay then
-            iconOverlay:SetShown(false)
-        end
     end
 
     if frame.DebuffBorder then
@@ -318,28 +316,20 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "styled")
 end
 
---- Positions all bar children in a vertical stack, preserving edit mode order.
-local function layoutBars(self)
-    local viewer = _G["BuffBarCooldownViewer"]
-    if not viewer then
-        return
-    end
-
-    local cfg = self:GetModuleConfig()
-    local globalConfig = self:GetGlobalConfig()
-    local mode = (cfg and cfg.anchorMode) or ECM.Constants.ANCHORMODE_CHAIN
-    local growDirection
-    if mode == ECM.Constants.ANCHORMODE_FREE then
-        growDirection = FrameUtil.NormalizeGrowDirection(cfg and cfg.freeGrowDirection)
+local function getLayoutState(params, cfg)
+    local growsUp
+    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+        growsUp = params.anchorPoint == "BOTTOMLEFT"
     else
-        growDirection = FrameUtil.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
-    end
-    local growsUp = growDirection == ECM.Constants.GROW_DIRECTION_UP
-    local verticalSpacing = 0
-    if cfg and type(cfg.verticalSpacing) == "number" then
-        verticalSpacing = math.max(0, cfg.verticalSpacing)
+        growsUp = NormalizeGrowDirection(cfg and cfg.freeGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
     end
 
+    local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
+    return growsUp, verticalSpacing
+end
+
+--- Positions all bar children in a vertical stack, preserving edit mode order.
+local function layoutBars(viewer, growsUp, verticalSpacing)
     local children = getChildrenOrdered(viewer)
     local prev
 
@@ -369,28 +359,57 @@ local function layoutBars(self)
     end
 end
 
+local function applyViewerPosition(viewer, params, cfg, globalConfig)
+    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+        local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
+        local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
+        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
+        FrameUtil.LazySetAnchors(viewer, {
+            { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
+            { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
+        })
+        return
+    end
+
+    -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
+    -- override explicit width. If stale chain anchors remain,
+    -- collapse to the first anchor point so SetWidth can work.
+    -- Blizzard's edit mode manages positioning from here on.
+    if viewer:GetNumPoints() > 1 then
+        local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
+        viewer:ClearAllPoints()
+        if point and relativeTo then
+            viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
+        end
+    end
+
+    local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
+    if width and width > 0 then
+        FrameUtil.LazySetWidth(viewer, width)
+    end
+end
+
 --- Override to support custom anchor points in free mode.
 ---@return table params Layout parameters
 function BuffBars:CalculateLayoutParams()
     local cfg = self:GetModuleConfig()
     local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
-    local params = { mode = mode }
-
     if mode == ECM.Constants.ANCHORMODE_CHAIN then
-        return FrameUtil.CalculateLayoutParams(self)
-    else
-        -- Free mode: BuffBars supports custom anchor points from config
-        params.anchor = UIParent
-        params.isFirst = false
-        params.anchorPoint = cfg.anchorPoint or "CENTER"
-        params.anchorRelativePoint = cfg.relativePoint or "CENTER"
-        params.offsetX = cfg.offsetX or 0
-        params.offsetY = cfg.offsetY or 0
-        params.width = cfg.width
+        return FrameMixin.CalculateLayoutParams(self)
     end
 
-    return params
+    return {
+        mode = mode,
+        anchor = UIParent,
+        isFirst = false,
+        anchorPoint = cfg.anchorPoint or "CENTER",
+        anchorRelativePoint = cfg.relativePoint or "CENTER",
+        offsetX = cfg.offsetX or 0,
+        offsetY = cfg.offsetY or 0,
+        width = cfg.width,
+    }
 end
 
 function BuffBars:CreateFrame()
@@ -398,7 +417,7 @@ function BuffBars:CreateFrame()
 end
 
 function BuffBars:IsReady()
-    if not ECM.ModuleMixin.IsReady(self) then
+    if not ECM.FrameMixin.IsReady(self) then
         return false
     end
 
@@ -418,7 +437,7 @@ end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
 function BuffBars:UpdateLayout(why)
-    local viewer = self.InnerFrame
+    local viewer = _G["BuffBarCooldownViewer"]
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
 
@@ -426,9 +445,7 @@ function BuffBars:UpdateLayout(why)
     -- panel has the full list even when hidden (e.g. resting).
     local visibleChildren = getChildrenOrdered(viewer)
     for _, entry in ipairs(visibleChildren) do
-        if entry.frame.Bar then
-            ECM.SpellColors.DiscoverBar(entry.frame)
-        end
+        ECM.SpellColors.DiscoverBar(entry.frame)
     end
 
     if not self:ShouldShow() then
@@ -436,36 +453,9 @@ function BuffBars:UpdateLayout(why)
         return false
     end
 
-    -- Only apply anchoring in chain mode; free mode is handled by Blizzard's edit mode
     local params = self:CalculateLayoutParams()
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
-        local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
-        local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
-        local rightAnchorPoint = FrameUtil.ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
-        local rightRelativePoint = FrameUtil.ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
-        FrameUtil.LazySetAnchors(viewer, {
-            { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
-            { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
-        })
-    elseif params.mode == ECM.Constants.ANCHORMODE_FREE then
-        -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
-        -- override explicit width.  If stale chain anchors remain,
-        -- collapse to the first anchor point so SetWidth can work.
-        -- Blizzard's edit mode manages positioning from here on.
-        if viewer:GetNumPoints() > 1 then
-            local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
-            viewer:ClearAllPoints()
-            if point and relativeTo then
-                viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
-            end
-        end
-
-        local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
-
-        if width and width > 0 then
-            FrameUtil.LazySetWidth(viewer, width)
-        end
-    end
+    local growsUp, verticalSpacing = getLayoutState(params, cfg)
+    applyViewerPosition(viewer, params, cfg, globalConfig)
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
     -- while we are actively styling and positioning bars.
@@ -475,14 +465,11 @@ function BuffBars:UpdateLayout(why)
     _warned = false
     _editLocked = false
     for barIndex, entry in ipairs(visibleChildren) do
-        -- Some children of the viewer do not have a Bar so might be some other part of the UI.
-        if entry.frame.Bar then
-            hookChildFrame(entry.frame, self)
-            styleChildFrame(entry.frame, cfg, globalConfig, barIndex)
-        end
+        hookChildFrame(entry.frame, self)
+        styleChildFrame(entry.frame, cfg, globalConfig, barIndex)
     end
 
-    layoutBars(self)
+    layoutBars(viewer, growsUp, verticalSpacing)
 
     self._layoutRunning = nil
     viewer:Show()
@@ -513,7 +500,7 @@ function BuffBars:GetActiveSpellData()
     local result = {}
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
-        if frame and frame:IsShown() and frame.Bar then
+        if frame:IsShown() then
             local name = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()
             local sid = frame.cooldownInfo and frame.cooldownInfo.spellID
             local cid = frame.cooldownID
@@ -540,7 +527,7 @@ function BuffBars:HookViewer()
     self._viewerHooked = true
 
     -- Hook OnShow for initial layout
-    viewer:HookScript("OnShow", function(f)
+    viewer:HookScript("OnShow", function()
         self:ThrottledUpdateLayout("viewer:OnShow")
     end)
 
@@ -551,9 +538,6 @@ function BuffBars:HookViewer()
         end
         self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
     end)
-
-    -- Hook edit mode transitions
-    self:HookEditMode()
 
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
@@ -605,7 +589,7 @@ function BuffBars:IsEditLocked()
 end
 
 function BuffBars:OnEnable()
-    ECM.ModuleMixin.AddFrameMixin(self, "BuffBars")
+    ECM.FrameMixin.AddMixin(self, "BuffBars")
     ECM.RegisterFrame(self)
 
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
@@ -613,7 +597,6 @@ function BuffBars:OnEnable()
     self:RegisterEvent("ZONE_CHANGED_INDOORS", "OnZoneChanged")
     self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnZoneChanged")
 
-    -- Hook the viewer and edit mode after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()
         self:HookViewer()
         self:HookEditMode()

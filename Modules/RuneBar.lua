@@ -3,12 +3,10 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local mod = ns.Addon
-local FrameUtil = ECM.FrameUtil
-local RuneBar = mod:NewModule("RuneBar", "AceEvent-3.0")
-local C = ECM.Constants
-mod.RuneBar = RuneBar
-ECM.BarMixin.ApplyConfigMixin(RuneBar, "RuneBar")
+local RuneBar = ns.Addon:NewModule("RuneBar", "AceEvent-3.0")
+local ClassUtil = ECM.ClassUtil
+local C, FrameMixin = ECM.Constants, ECM.FrameMixin
+ns.Addon.RuneBar = RuneBar
 
 local function getRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
@@ -183,10 +181,6 @@ end
 ---@param self RuneBar
 ---@param frame Frame
 local function updateRuneValues(self, frame)
-    if not GetRuneCooldown then
-        return
-    end
-
     local frags = frame.FragmentedBars
     if not frags then
         return
@@ -226,13 +220,9 @@ local function updateRuneValues(self, frame)
     end
 end
 
---------------------------------------------------------------------------------
--- ModuleMixin/BarMixin Overrides
---------------------------------------------------------------------------------
-
 function RuneBar:CreateFrame()
-    -- Create base frame using ModuleMixin (not BarMixin, since we manage StatusBar ourselves)
-    local frame = ECM.ModuleMixin.CreateFrame(self)
+    -- Create base frame using FrameMixin (not BarMixin, since we manage StatusBar ourselves)
+    local frame = ECM.FrameMixin.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -252,17 +242,11 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    local _, class = UnitClass("player")
-    return ECM.ModuleMixin.ShouldShow(self) and class == "DEATHKNIGHT"
+    return ECM.FrameMixin.ShouldShow(self) and ClassUtil.IsDeathKnight()
 end
 
 function RuneBar:Refresh(why, force)
-    local _, class = UnitClass("player")
-    assert(class == "DEATHKNIGHT", "RuneBar should only be enabled for Death Knights")
-
-    -- Use BaseRefresh instead of BarMixin.Refresh since we manage
-    -- our own fragmented bars and don't use the standard StatusBar
-    if not FrameUtil.BaseRefresh(self, why, force) then
+    if not FrameMixin.Refresh(self, why, force) then
         return false
     end
 
@@ -294,25 +278,19 @@ function RuneBar:Refresh(why, force)
     return true
 end
 
-function RuneBar:OnEvent(event)
-    self:ThrottledUpdateLayout(event, { secondPass = true })
-end
-
 function RuneBar:OnEnable()
-    local _, class = UnitClass("player")
-    if class ~= "DEATHKNIGHT" then
+    if not ClassUtil.IsDeathKnight() then
         return
     end
 
     ECM.BarMixin.AddMixin(self, "RuneBar")
     ECM.RegisterFrame(self)
 
-    -- DK-only: lightweight per-frame rune value updates and power events
-    if self.InnerFrame then
-        self.InnerFrame:SetScript("OnUpdate", function()
+    self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
+        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
             updateRuneValues(self, self.InnerFrame)
-        end)
-    end
+        end
+    end)
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
 end
 
@@ -324,7 +302,8 @@ function RuneBar:OnDisable()
     self:UnregisterAllEvents()
     ECM.UnregisterFrame(self)
 
-    if self.InnerFrame then
-        self.InnerFrame:SetScript("OnUpdate", nil)
+    if self._valueTicker then
+        self._valueTicker:Cancel()
+        self._valueTicker = nil
     end
 end

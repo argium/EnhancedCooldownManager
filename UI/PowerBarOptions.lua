@@ -25,7 +25,20 @@ function PowerBarOptions.RegisterSettings(SB)
         name = "Power Bar",
         path = "powerBar",
         args = {
-            enabled           = { type = "toggle", path = "enabled", name = "Enable power bar", order = 0, onSet = function(value) ECM.OptionUtil.SetModuleEnabled("PowerBar", value) end },
+            enabled           = {
+                type = "toggle",
+                path = "enabled",
+                name = "Enable power bar",
+                order = 0,
+                onSet = function(value)
+                    if value then
+                        ns.Addon:EnableModule("PowerBar")
+                        return
+                    end
+
+                    ns.Addon:DisableModule("PowerBar")
+                end,
+            },
             layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
             positioning       = { type = "positioning", disabled = isDisabled, order = 11 },
             appearanceHeader  = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },

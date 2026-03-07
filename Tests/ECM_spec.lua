@@ -71,11 +71,40 @@ describe("ECM layout system", function()
         function mod:IsEnabled() return true end
         function mod:GetGlobalConfig() local p = _G._testDB and _G._testDB.profile; return p and p.global end
         function mod:GetModuleConfig() local p = _G._testDB and _G._testDB.profile; return p and p[self._configKey] end
-        function mod:CalculateLayoutParams() return ECM.FrameUtil.CalculateLayoutParams(self) end
+        function mod:CalculateLayoutParams()
+            local gc = self:GetGlobalConfig()
+            local mc = self:GetModuleConfig()
+            return {
+                mode = mc.anchorMode,
+                anchor = _G.UIParent,
+                isFirst = true,
+                anchorPoint = "TOPLEFT",
+                anchorRelativePoint = "BOTTOMLEFT",
+                offsetX = 0,
+                offsetY = -((gc and gc.offsetY) or 0),
+                height = (mc and mc.height) or (gc and gc.barHeight),
+                width = mc.anchorMode == ECM.Constants.ANCHORMODE_FREE and ((mc and mc.width) or (gc and gc.barWidth)) or nil,
+            }
+        end
         function mod:GetNextChainAnchor() return _G.UIParent, true end
-        function mod:UpdateLayout(why) return ECM.FrameUtil.ApplyStandardLayout(self, why) end
+        function mod:UpdateLayout(why)
+            if not self:ShouldShow() then self.InnerFrame:Hide(); return false end
+            if not self.InnerFrame:IsShown() then self.InnerFrame:Show() end
+            local params = self:CalculateLayoutParams()
+            if params.height then ECM.FrameUtil.LazySetHeight(self.InnerFrame, params.height) end
+            if params.width then ECM.FrameUtil.LazySetWidth(self.InnerFrame, params.width) end
+            self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
+            return true
+        end
         function mod:Refresh() return true end
-        function mod:ThrottledRefresh(why) return ECM.FrameUtil.ThrottledRefresh(self, why) end
+        function mod:ThrottledRefresh(why)
+            local gc = self:GetGlobalConfig()
+            local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+            if GetTime() - (self._lastUpdate or 0) < freq then return false end
+            self:Refresh(why)
+            self._lastUpdate = GetTime()
+            return true
+        end
         function mod:ThrottledUpdateLayout(reason) if self:IsEnabled() then self:UpdateLayout(reason) end end
 
         return mod
@@ -180,6 +209,8 @@ describe("ECM layout system", function()
         TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
         _G.ECM.Migration = { PrepareDatabase = function() end, Run = function() end, FlushLog = function() end, PrintLog = function() end }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, { Addon = fakeAddon })
+        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, { Addon = fakeAddon })
 
         local profile = TestHelpers.deepClone(ECM.defaults.profile)
         _G._testDB = { profile = profile }

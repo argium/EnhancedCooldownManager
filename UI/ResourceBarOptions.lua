@@ -19,25 +19,32 @@ local RESOURCE_COLOR_DEFS = {
     { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
 }
 
-
 local ResourceBarOptions = {}
 
-local function isDeathKnight()
-    local _, classToken = UnitClass("player")
-    return classToken == "DEATHKNIGHT"
-end
-
 local function isDisabled()
-    return isDeathKnight() or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
+    return ECM.ClassUtil.IsDeathKnight() or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
 end
 
 function ResourceBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = "Resource Bar",
         path = "resourceBar",
-        disabled = isDeathKnight,
+        disabled = ECM.ClassUtil.IsDeathKnight,
         args = {
-            enabled         = { type = "toggle", path = "enabled", name = "Enable resource bar", order = 0, onSet = function(value) ECM.OptionUtil.SetModuleEnabled("ResourceBar", value) end },
+            enabled         = {
+                type = "toggle",
+                path = "enabled",
+                name = "Enable resource bar",
+                order = 0,
+                onSet = function(value)
+                    if value then
+                        ns.Addon:EnableModule("ResourceBar")
+                        return
+                    end
+
+                    ns.Addon:DisableModule("ResourceBar")
+                end,
+            },
             layoutHeader    = { type = "header", name = "Layout", disabled = isDisabled, order = 1 },
             positioning     = { type = "positioning", disabled = isDisabled, order = 2 },
             appearHeader    = { type = "header", name = "Appearance", disabled = isDisabled, order = 3 },
