@@ -26,34 +26,18 @@ local function isDisabled()
 end
 
 function ResourceBarOptions.RegisterSettings(SB)
+    local args = ECM.OptionUtil.CreateBarArgs(isDisabled)
+    args.enabled = {
+        type = "toggle", path = "enabled", name = "Enable resource bar",
+        order = 0, onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+    }
+    args.colors = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", disabled = isDisabled, order = 30 }
+
     SB.RegisterFromTable({
         name = "Resource Bar",
         path = "resourceBar",
         disabled = ECM.ClassUtil.IsDeathKnight,
-        args = {
-            enabled         = {
-                type = "toggle",
-                path = "enabled",
-                name = "Enable resource bar",
-                order = 0,
-                onSet = function(value)
-                    if value then
-                        ns.Addon:EnableModule("ResourceBar")
-                        return
-                    end
-
-                    ns.Addon:DisableModule("ResourceBar")
-                end,
-            },
-            layoutHeader    = { type = "header", name = "Layout", disabled = isDisabled, order = 1 },
-            positioning     = { type = "positioning", disabled = isDisabled, order = 2 },
-            appearHeader    = { type = "header", name = "Appearance", disabled = isDisabled, order = 3 },
-            showText        = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", disabled = isDisabled, order = 4 },
-            heightOverride  = { type = "heightOverride", disabled = isDisabled, order = 5 },
-            border          = { type = "border", path = "border", disabled = isDisabled, order = 6 },
-            fontOverride    = { type = "fontOverride", disabled = isDisabled, order = 7 },
-            colors          = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", disabled = isDisabled, order = 8 },
-        },
+        args = args,
     })
 end
 

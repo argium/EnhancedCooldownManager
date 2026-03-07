@@ -271,7 +271,7 @@ function RuneBar:Refresh(why, force)
     self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
 
     updateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
-    self:LayoutResourceTicks(maxRunes, { r = 0, g = 0, b = 0, a = 1 }, 1, "tickPool")
+    self:LayoutResourceTicks(maxRunes, C.COLOR_BLACK, 1, "tickPool")
 
     frame:Show()
     ECM.Log(self.Name, "Refresh complete.")
@@ -286,6 +286,9 @@ function RuneBar:OnEnable()
     ECM.BarMixin.AddMixin(self, "RuneBar")
     ECM.RegisterFrame(self)
 
+    if self._valueTicker then
+        self._valueTicker:Cancel()
+    end
     self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
         if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
             updateRuneValues(self, self.InnerFrame)

@@ -21,37 +21,19 @@ local PowerBarOptions = {}
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("powerBar")
 
 function PowerBarOptions.RegisterSettings(SB)
-    SB.RegisterFromTable({
-        name = "Power Bar",
-        path = "powerBar",
-        args = {
-            enabled           = {
-                type = "toggle",
-                path = "enabled",
-                name = "Enable power bar",
-                order = 0,
-                onSet = function(value)
-                    if value then
-                        ns.Addon:EnableModule("PowerBar")
-                        return
-                    end
+    local args = ECM.OptionUtil.CreateBarArgs(isDisabled)
+    args.enabled = {
+        type = "toggle", path = "enabled", name = "Enable power bar",
+        order = 0, onSet = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
+    }
+    args.showManaAsPercent = {
+        type = "toggle", path = "showManaAsPercent", name = "Show mana as percent",
+        desc = "Display mana as percentage instead of raw value.",
+        disabled = isDisabled, order = 22,
+    }
+    args.colors = { type = "colorList", path = "colors", label = "Colors", defs = POWER_COLOR_DEFS, disabled = isDisabled, order = 30 }
 
-                    ns.Addon:DisableModule("PowerBar")
-                end,
-            },
-            layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning       = { type = "positioning", disabled = isDisabled, order = 11 },
-            appearanceHeader  = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },
-            showText          = { type = "toggle", path = "showText", name = "Show text", desc = "Display the current value on the bar.", disabled = isDisabled, order = 21 },
-            showManaAsPercent = { type = "toggle", path = "showManaAsPercent", name = "Show mana as percent", desc = "Display mana as percentage instead of raw value.", disabled = isDisabled, order = 22 },
-            height            = { type = "heightOverride", disabled = isDisabled, order = 23 },
-            border            = { type = "border", path = "border", disabled = isDisabled, order = 24 },
-            font              = { type = "fontOverride", disabled = isDisabled, order = 25 },
-            colors            = { type = "colorList", path = "colors", label = "Colors", defs = POWER_COLOR_DEFS, disabled = isDisabled, order = 30 },
-        },
-    })
-
-    -- Tick Marks (canvas subcategory)
+    SB.RegisterFromTable({ name = "Power Bar", path = "powerBar", args = args })
     ECM.PowerBarTickMarksOptions.RegisterSettings(SB)
 end
 

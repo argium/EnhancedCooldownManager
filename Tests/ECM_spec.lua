@@ -127,7 +127,7 @@ describe("ECM layout system", function()
     end
 
     local CAPTURED_GLOBALS = {
-        "ECM", "ColorUtil", "LibStub", "C_Timer", "C_CVar", "GetTime",
+        "ECM", "LibStub", "C_Timer", "C_CVar", "GetTime",
         "UIParent", "CreateFrame", "IsMounted", "UnitInVehicle", "IsResting",
         "InCombatLockdown", "UnitExists", "UnitIsDead", "UnitCanAttack",
         "UnitCanAssist", "IsInInstance", "issecretvalue", "issecrettable",
@@ -185,7 +185,7 @@ describe("ECM layout system", function()
         _G.C_Timer = { After = function(_, callback) callback() end, NewTicker = function() end }
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.CreateFrame = function() return makeFrame() end
-        _G.ColorUtil = {
+        _G.ECM.ColorUtil = {
             Sparkle = function(text) return text end,
             AreEqual = function(a, b)
                 if a == nil and b == nil then return true end

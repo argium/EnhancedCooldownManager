@@ -5,8 +5,6 @@
 local _, ns = ...
 local C = ECM.Constants
 
-local BASE_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization."
-
 local function getTicksConfig()
     local powerBar = ns.Addon.db.profile.powerBar
     if powerBar and powerBar.ticks then return powerBar.ticks end
@@ -193,7 +191,7 @@ local function createTickMarksCanvas(SB, subcatName)
 
     layout:AddSpacer(2)
 
-    layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight")._text:SetWordWrap(true)
+    layout:AddDescription(C.TICK_MARKS_DESC_TEXT, "GameFontHighlight")._text:SetWordWrap(true)
 
     local infoRow = layout:AddDescription("")
     local infoText = infoRow._text
@@ -221,7 +219,7 @@ local function createTickMarksCanvas(SB, subcatName)
         frame:RefreshTicks()
     end)
 
-    local scrollBox, _, view = layout:AddScrollList(34)
+    local scrollBox, _, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_WITH_CONTROLS)
 
     view:SetElementInitializer("Frame", function(rowFrame, data)
         if not rowFrame._initialized then

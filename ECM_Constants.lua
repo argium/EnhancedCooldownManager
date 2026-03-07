@@ -1,3 +1,7 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
 ECM = ECM or {} -- this file is probably loaded before everything else so this initializes the global table.
 
 local constants = {
@@ -14,6 +18,7 @@ local constants = {
     BUFFBARS = "BuffBars",
     ITEMICONS = "ItemIcons",
 
+    -- Module name to config key mapping
     -- Configuration
     CONFIG_SECTION_GLOBAL = "global",
     ANCHORMODE_CHAIN = "chain",
@@ -115,6 +120,35 @@ local constants = {
     ACTIVE_SV_KEY = "_ECM_DB",
 
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
+
+    -- Debug serialization limits
+    TOSTRING_MAX_DEPTH = 3,
+    TOSTRING_MAX_ITEMS = 25,
+
+    -- Font fallback
+    DEFAULT_FONT_SIZE = 11,
+
+    -- Layout event delays
+    LAYOUT_ENTERING_WORLD_DELAY = 0.4,
+    LAYOUT_COMBAT_END_DELAY = 0.1,
+    LAYOUT_ZONE_CHANGE_DELAY = 0.1,
+
+    -- Opacity
+    OPACITY_MAX_PERCENT = 100,
+
+    -- Popup dialog
+    POPUP_PREFERRED_INDEX = 3,
+
+    -- Import/Export
+    EXPORT_PREFIX = "EnhancedCooldownManager",
+    EXPORT_VERSION = 1,
+
+    -- UI Options
+    SPELL_COLORS_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization.",
+    SPELL_COLORS_SUBCAT = "Spell Colors",
+    SCROLL_ROW_HEIGHT_COMPACT = 26,
+    TICK_MARKS_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization.",
+    SCROLL_ROW_HEIGHT_WITH_CONTROLS = 34,
 
     -- Dialog frame
     DIALOG_FRAME_WIDTH = 480,

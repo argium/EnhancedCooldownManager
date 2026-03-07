@@ -49,7 +49,7 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         end
     else
         for powerType in pairs(discreteResourceTypes) do
-            local max = UnitPowerMax("player", powerType)
+            local max = UnitPowerMax("player", powerType, false, CurveConstants.ScaleTo100)
             if max and max > 0 then
                 if class == "DRUID" then
                     if shapeshiftForm == C.DRUID_CAT_FORM_INDEX then
@@ -78,18 +78,27 @@ local function getMaelstromWeaponMax()
     return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
+--- Returns max, current, and a safe discrete count for the given resource type.
+--- The 3rd return (safeMax) is always a non-secret number suitable for comparison
+--- and arithmetic (e.g., tick layout). For special resource types, max and safeMax
+--- are identical constants. For standard power types, max may be secret while
+--- safeMax will be nil when the value is tainted.
+---@param resourceType string|number|nil
+---@return number|nil max
+---@return number|nil current
+---@return number|nil safeMax Non-secret discrete count for tick layout
 function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     -- Demon hunter souls can still be tracked by their aura stacks (thank the lord)
     if resourceType == C.RESOURCEBAR_TYPE_VENGEANCE_SOULS then
         -- Vengeance use the same type of soul fragments. The value can be tracked by checking
         -- the number of times spirit bomb can be cast, of all things.
         local count = C_Spell.GetSpellCastCount(C.RESOURCEBAR_SPIRIT_BOMB_SPELLID) or 0
-        return C.RESOURCEBAR_VENGEANCE_SOULS_MAX, count
+        return C.RESOURCEBAR_VENGEANCE_SOULS_MAX, count, C.RESOURCEBAR_VENGEANCE_SOULS_MAX
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_ICICLES then
         local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.RESOURCEBAR_ICICLES_SPELLID)
-        return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0
+        return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0, C.RESOURCEBAR_ICICLES_MAX
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL or resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
@@ -97,24 +106,26 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
         local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
         if collapsingStar then
-            return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0
+            return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0, C.RESOURCEBAR_DEVOURER_META_MAX
         end
 
-        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX, voidFragments and voidFragments.applications or 0
+        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX, voidFragments and voidFragments.applications or 0, C.RESOURCEBAR_DEVOURER_NORMAL_MAX
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then
         -- The max can be 5 or 10 depending on talent choices
         local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_MAELSTROM_WEAPON)
         local stacks = aura and aura.applications or 0
-        return getMaelstromWeaponMax(), stacks
+        local mwMax = getMaelstromWeaponMax()
+        return mwMax, stacks, mwMax
     end
 
     ECM.DebugAssert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
     if resourceType then
-        local max = UnitPowerMax("player", resourceType) or 0
-        local current = UnitPower("player", resourceType) or 0
-        return max, current
+        local max = UnitPowerMax("player", resourceType)
+        local current = UnitPower("player", resourceType)
+        local safeMax = issecretvalue(max) and nil or max
+        return max, current, safeMax
     end
 end
 

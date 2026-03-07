@@ -16,7 +16,7 @@ describe("BuffBars", function()
     local unregisteredFrames
 
     local CAPTURED_GLOBALS = {
-        "ECM", "ColorUtil", "C_Timer", "GetTime", "UIParent",
+        "ECM", "C_Timer", "GetTime", "UIParent",
         "CreateFrame", "issecretvalue", "InCombatLockdown",
         "hooksecurefunc", "EditModeManagerFrame",
     }
@@ -41,13 +41,6 @@ describe("BuffBars", function()
         _G.InCombatLockdown = function() return false end
         _G.hooksecurefunc = function() end
         _G.EditModeManagerFrame = nil
-        _G.ColorUtil = {
-            AreEqual = function(a, b)
-                if a == nil and b == nil then return true end
-                if a == nil or b == nil then return false end
-                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
-            end,
-        }
 
         -- Capture timer callbacks without executing them
         _G.C_Timer = {
@@ -58,6 +51,13 @@ describe("BuffBars", function()
 
         -- Minimal ECM setup
         _G.ECM = {}
+        _G.ECM.ColorUtil = {
+            AreEqual = function(a, b)
+                if a == nil and b == nil then return true end
+                if a == nil or b == nil then return false end
+                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
+            end,
+        }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()

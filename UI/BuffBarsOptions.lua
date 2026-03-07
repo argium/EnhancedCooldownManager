@@ -53,8 +53,6 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-local BASE_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization."
-
 StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
     text = "Are you sure you want to reset all spell colors for this spec?",
     button1 = YES,
@@ -87,7 +85,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
     layout:AddSpacer(2)
 
-    local descRow = layout:AddDescription(BASE_DESC_TEXT, "GameFontHighlight")
+    local descRow = layout:AddDescription(C.SPELL_COLORS_DESC_TEXT, "GameFontHighlight")
     descRow._text:SetWordWrap(true)
 
     local warningRow = layout:AddDescription("")
@@ -95,9 +93,9 @@ local function createSpellColorCanvas(SB, subcatName)
     warningText:SetWordWrap(true)
 
     -- Default color swatch (above the per-spell list)
-    -- Reposition to align with the scroll list items below, which sit inside
-    -- a scrollbox indented by CANVAS_LABEL_X (37px) from the canvas edge.
     local defaultColorRow, defaultColorSwatch = layout:AddColorSwatch("Default color")
+    -- Reposition the default color swatch to align with the scroll list rows below,
+    -- which are indented by the canvas label margin (37px from canvas edge).
     defaultColorRow._label:ClearAllPoints()
     defaultColorRow._label:SetPoint("LEFT", 74, 0)
     defaultColorRow._label:SetPoint("RIGHT", defaultColorRow, "CENTER", -85, 0)
@@ -114,7 +112,7 @@ local function createSpellColorCanvas(SB, subcatName)
     end)
 
     -- Scroll list using Blizzard's SettingsColorSwatchControlTemplate per element
-    local scrollBox, _, view = layout:AddScrollList(26)
+    local scrollBox, _, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_COMPACT)
 
     view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
         -- Position label (matches SettingsListElementMixin:Init positioning)
@@ -198,8 +196,6 @@ ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
 BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
 
-local SPELL_COLORS_SUBCAT = "Spell Colors"
-
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
@@ -213,19 +209,8 @@ function BuffBarsOptions.RegisterSettings(SB)
                 name = "Enable aura bars",
                 desc = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
                 order = 0,
-                onSet = function(value, setting)
-                    if value then
-                        ns.Addon:EnableModule("BuffBars")
-                    else
-                        setting:SetValue(true)
-                        ns.Addon:ConfirmReloadUI(
-                            "Disabling aura bars requires a UI reload. Reload now?",
-                            function()
-                                ns.Addon:DisableModule("BuffBars")
-                            end
-                        )
-                    end
-                end,
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars",
+                    "Disabling aura bars requires a UI reload. Reload now?"),
             },
 
             -- Layout
@@ -286,13 +271,13 @@ function BuffBarsOptions.RegisterSettings(SB)
         },
     })
 
-    createSpellColorCanvas(SB, SPELL_COLORS_SUBCAT)
+    createSpellColorCanvas(SB, C.SPELL_COLORS_SUBCAT)
 
     SB.Button({
         name = "Configure Spell Colors",
         buttonText = "Open",
         onClick = function()
-            local catID = SB.GetSubcategoryID(SPELL_COLORS_SUBCAT)
+            local catID = SB.GetSubcategoryID(C.SPELL_COLORS_SUBCAT)
             if catID then
                 Settings.OpenToCategory(catID)
             end

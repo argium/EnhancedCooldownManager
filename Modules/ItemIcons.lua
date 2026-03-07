@@ -7,7 +7,6 @@ local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
 local ItemIcons = ns.Addon:NewModule("ItemIcons", "AceEvent-3.0")
 ns.Addon.ItemIcons = ItemIcons
--- ItemIcons:SetEnabledState(false) -- TODO: why was this necessary?
 
 ---@class ECM_ItemIconsModule : ModuleMixin
 
@@ -473,7 +472,7 @@ function ItemIcons:UpdateLayout(why)
         layoutDebug = layoutDebug,
     })
 
-    -- TODO: there really must be a better way to handling this. I doubt this level of shit-hackery is required.
+    -- Retry layout measurement when the viewer hasn't stabilized yet.
     if layoutStable then
         self._layoutRetryCount = 0
     elseif not self._layoutRetryPending and (self._layoutRetryCount or 0) < ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS then
@@ -621,4 +620,6 @@ function ItemIcons:OnDisable()
     self._isEditModeActive = nil
     self._layoutRetryPending = nil
     self._layoutRetryCount = 0
+    self._viewerHooked = nil
+    self._editModeHooked = nil
 end

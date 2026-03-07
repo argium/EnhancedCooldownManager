@@ -19,7 +19,7 @@ describe("FrameMixin", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "ColorUtil", "C_Timer", "GetTime", "UIParent", "issecretvalue",
+            "ECM", "C_Timer", "GetTime", "UIParent", "issecretvalue",
         })
     end)
 
@@ -31,7 +31,7 @@ describe("FrameMixin", function()
         fakeTime = 0
 
         _G.ECM = {}
-        _G.ColorUtil = { AreEqual = function(a, b)
+        _G.ECM.ColorUtil = { AreEqual = function(a, b)
             if a == nil and b == nil then return true end
             if a == nil or b == nil then return false end
             return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a

@@ -15,11 +15,10 @@ function ResourceBar:GetStatusBarValues()
     local resourceType = ClassUtil.GetPlayerResourceType()
     local maxResources, currentValue = ClassUtil.GetCurrentMaxResourceValues(resourceType)
 
-    if not maxResources or maxResources <= 0 then
+    if not maxResources then
         return 0, 1, 0, false
     end
 
-    currentValue = currentValue or 0
     return currentValue, maxResources, currentValue, false
 end
 
@@ -29,7 +28,6 @@ function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local resourceType = ClassUtil.GetPlayerResourceType()
     local color = cfg.colors and cfg.colors[resourceType]
-    ECM.DebugAssert(color, "Expected color to be defined for resourceType " .. tostring(resourceType))
     return color or ECM.Constants.COLOR_WHITE
 end
 
@@ -39,8 +37,11 @@ function ResourceBar:Refresh(why, force)
         return false
     end
 
-    -- Handle ticks (Devourer has no ticks, others have dividers)
+    -- Use the safe discrete count (3rd return) for tick layout to avoid
+    -- secret value comparison/arithmetic. Devourer types have large counts
+    -- (30/35) that should not produce tick dividers.
     local resourceType = ClassUtil.GetPlayerResourceType()
+    local _, _, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
     local isDevourer = (
         resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
         or resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
@@ -48,16 +49,13 @@ function ResourceBar:Refresh(why, force)
 
     if isDevourer then
         self:HideAllTicks("tickPool")
-    else
+    elseif safeMax and safeMax > 1 then
         local frame = self.InnerFrame
-        local maxResources = select(2, self:GetStatusBarValues())
-        if maxResources > 1 then
-            local tickCount = maxResources - 1
-            self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
-            self:LayoutResourceTicks(maxResources, ECM.Constants.COLOR_BLACK, 1, "tickPool")
-        else
-            self:HideAllTicks("tickPool")
-        end
+        local tickCount = safeMax - 1
+        self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
+        self:LayoutResourceTicks(safeMax, ECM.Constants.COLOR_BLACK, 1, "tickPool")
+    else
+        self:HideAllTicks("tickPool")
     end
 
     ECM.Log(self.Name, "Refresh complete.")

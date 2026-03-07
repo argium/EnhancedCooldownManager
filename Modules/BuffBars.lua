@@ -207,7 +207,7 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     _editLocked = _editLocked or allSecret
 
     -- Purely diagnostics to help track down issues with secrets
-    local hex = barColor and string.upper(ColorUtil.ColorToHex(barColor)) or nil
+    local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
     local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
     local logPrefix = "GetColorForBar[".. barIndex .."] "
     local logLine = logPrefix .. "(" .. ECM.ToString(spellName) .. ", " .. ECM.ToString(spellID) .. ", " .. ECM.ToString(cooldownID) .. ", " .. ECM.ToString(textureFileID) .. ") = " .. colorLog
@@ -589,6 +589,10 @@ function BuffBars:IsEditLocked()
 end
 
 function BuffBars:OnEnable()
+    ECM.SpellColors.SetConfigAccessor(function()
+        return self:GetModuleConfig()
+    end)
+
     ECM.FrameMixin.AddMixin(self, "BuffBars")
     ECM.RegisterFrame(self)
 
@@ -605,6 +609,7 @@ function BuffBars:OnEnable()
 end
 
 function BuffBars:OnDisable()
+    ECM.SpellColors.SetConfigAccessor(nil)
     self:UnregisterAllEvents()
     ECM.UnregisterFrame(self)
 end

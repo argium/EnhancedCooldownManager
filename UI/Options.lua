@@ -109,12 +109,76 @@ local function getIsDisabledDelegate(configPath)
     end
 end
 
+--- Creates a standard onSet handler for module enable/disable toggles.
+--- For modules that require a reload to disable, pass requiresReload with a message.
+---@param moduleName string The module name (e.g., "PowerBar")
+---@param requiresReload string|nil If set, disabling shows a reload confirmation with this message
+---@return fun(value: boolean, setting: table)
+local function createModuleEnabledHandler(moduleName, requiresReload)
+    return function(value, setting)
+        if value then
+            ns.Addon:EnableModule(moduleName)
+            return
+        end
+
+        if requiresReload then
+            setting:SetValue(true)
+            ns.Addon:ConfirmReloadUI(requiresReload, function()
+                ns.Addon:DisableModule(moduleName)
+            end)
+        else
+            ns.Addon:DisableModule(moduleName)
+        end
+    end
+end
+
+--- Generates standard layout and appearance args shared by bar-type modules.
+--- Callers can override individual entries or omit features via the options table.
+---@param isDisabled fun(): boolean
+---@param options table|nil { showText: boolean, border: boolean, layoutOrder: number, appearanceOrder: number }
+---@return table args Partial args table to merge into RegisterFromTable
+local function createBarArgs(isDisabled, options)
+    options = options or {}
+    local layoutOrder = options.layoutOrder or 10
+    local appearanceOrder = options.appearanceOrder or 20
+
+    local args = {
+        layoutHeader     = { type = "header", name = "Layout", disabled = isDisabled, order = layoutOrder },
+        positioning      = { type = "positioning", disabled = isDisabled, order = layoutOrder + 1 },
+        appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = appearanceOrder },
+        heightOverride   = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
+        fontOverride     = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
+    }
+
+    if options.showText ~= false then
+        args.showText = {
+            type = "toggle",
+            path = "showText",
+            name = "Show text",
+            desc = "Display the current value on the bar.",
+            disabled = isDisabled,
+            order = appearanceOrder + 1,
+        }
+        args.heightOverride.order = appearanceOrder + 2
+        args.fontOverride.order = appearanceOrder + 3
+    end
+
+    if options.border ~= false then
+        args.border = { type = "border", path = "border", disabled = isDisabled, order = args.fontOverride.order + 1 }
+    end
+
+    return args
+end
+
 ECM.OptionUtil = {
     GetNestedValue = getNestedValue,
+    SetNestedValue = setNestedValue,
     IsAnchorModeFree = isAnchorModeFree,
     GetCurrentClassSpec = getCurrentClassSpec,
     OpenColorPicker = openColorPicker,
     GetIsDisabledDelegate = getIsDisabledDelegate,
+    CreateModuleEnabledHandler = createModuleEnabledHandler,
+    CreateBarArgs = createBarArgs,
 }
 
 --------------------------------------------------------------------------------

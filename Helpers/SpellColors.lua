@@ -102,10 +102,26 @@ local function ensureProfileIsSetup(cfg)
     end
 end
 
+--- Config accessor — defaults to reading from the addon's profile, but can be
+--- overridden via SetConfigAccessor for testing or decoupling.
+local _configAccessor
+
+--- Allows callers (e.g., BuffBars module) to inject a config accessor,
+--- decoupling SpellColors from direct db.profile access.
+---@param accessor fun(): table|nil
+function SpellColors.SetConfigAccessor(accessor)
+    _configAccessor = accessor
+end
+
 --- Returns the buffBars config table, or nil if unavailable.
 ---@return table|nil cfg
 local function config()
-    local cfg = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
+    local cfg
+    if _configAccessor then
+        cfg = _configAccessor()
+    else
+        cfg = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
+    end
     if type(cfg) ~= "table" then
         ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil

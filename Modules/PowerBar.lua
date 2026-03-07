@@ -76,11 +76,13 @@ function PowerBar:Refresh(why, force)
         return false
     end
 
-    -- Update ticks specific to PowerBar
+    -- Update ticks specific to PowerBar (skip when max is a secret value)
     local frame = self.InnerFrame
     local powerType = ECM.ClassUtil.GetCurrentPowerType()
     local max = UnitPowerMax("player", powerType)
-    self:UpdateTicks(frame, powerType, max)
+    if not issecretvalue(max) then
+        self:UpdateTicks(frame, powerType, max)
+    end
 
     ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true

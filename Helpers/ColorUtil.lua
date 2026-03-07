@@ -2,7 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-ColorUtil = ColorUtil or {}
+local ColorUtil = {}
+ECM.ColorUtil = ColorUtil
 
 --- Compares two ECM_Color tables for equality.
 ---@param c1 ECM_Color|nil
@@ -141,6 +142,8 @@ function ColorUtil.Sparkle(text, startColor, midColor, endColor)
     local parts = {}
 
     for i = 1, charCount do
+        -- Map character index i (1..charCount) to gradient position (1..effectiveLen)
+        -- with rounding, so each character samples from the correct gradient stop.
         local pos = (charCount == 1) and math.ceil(effectiveLen / 2)
             or (1 + math.floor(((i - 1) * (effectiveLen - 1) / (charCount - 1)) + 0.5))
 

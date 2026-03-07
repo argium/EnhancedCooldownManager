@@ -38,7 +38,7 @@ local function safeTableTostring(tbl, depth, seen)
         return "<cycle>"
     end
 
-    if depth >= 3 then
+    if depth >= C.TOSTRING_MAX_DEPTH then
         return "{...}"
     end
 
@@ -50,7 +50,7 @@ local function safeTableTostring(tbl, depth, seen)
 
         for k, x in pairs(tbl) do
             count = count + 1
-            if count > 25 then
+            if count > C.TOSTRING_MAX_ITEMS then
                 parts[#parts + 1] = "..."
                 break
             end
@@ -62,8 +62,6 @@ local function safeTableTostring(tbl, depth, seen)
 
         return "{" .. table.concat(parts, ", ") .. "}"
     end)
-
-    seen[tbl] = nil
 
     if not ok then
         return "<table_error>"
@@ -113,9 +111,9 @@ end
 
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
     local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
-    local useModuleOverride = moduleConfig and moduleConfig.overrideFont == true
+    local useModuleOverride = moduleConfig and moduleConfig.overrideFont
     local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or C.DEFAULT_FONT
-    local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or 11
+    local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or C.DEFAULT_FONT_SIZE
     local fontOutline = (config and config.fontOutline)
 
     if fontOutline == "NONE" then
@@ -157,7 +155,7 @@ function ECM.CloneValue(value)
 end
 
 function ECM.Print(...)
-    local prefix = ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
+    local prefix = ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
     local args = { ... }
     for i = 1, #args do
         args[i] = tostring(args[i])
@@ -197,13 +195,13 @@ local LAYOUT_EVENTS = {
     VEHICLE_UPDATE = { delay = 0 },
     PLAYER_UPDATE_RESTING = { delay = 0 },
     PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
-    PLAYER_ENTERING_WORLD = { delay = 0.4 },
+    PLAYER_ENTERING_WORLD = { delay = C.LAYOUT_ENTERING_WORLD_DELAY },
     PLAYER_TARGET_CHANGED = { delay = 0 },
-    PLAYER_REGEN_ENABLED = { delay = 0.1, combatChange = true },
+    PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true },
     PLAYER_REGEN_DISABLED = { delay = 0, combatChange = true },
-    ZONE_CHANGED_NEW_AREA = { delay = 0.1 },
-    ZONE_CHANGED = { delay = 0.1 },
-    ZONE_CHANGED_INDOORS = { delay = 0.1 },
+    ZONE_CHANGED_NEW_AREA = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
+    ZONE_CHANGED = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
+    ZONE_CHANGED_INDOORS = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
     UPDATE_SHAPESHIFT_FORM = { delay = 0 },
 }
 
@@ -342,8 +340,8 @@ local function updateFadeAndHiddenStates()
             end
 
             if not shouldSkipFade then
-                local opacity = fadeConfig.opacity or 100
-                alpha = math.max(0, math.min(1, opacity / 100))
+                local opacity = fadeConfig.opacity or C.OPACITY_MAX_PERCENT
+                alpha = math.max(0, math.min(1, opacity / C.OPACITY_MAX_PERCENT))
             end
         end
     end
@@ -501,7 +499,7 @@ local function registerAddonCompartmentEntry()
         return
     end
 
-    local text = ColorUtil.Sparkle(C.ADDON_NAME)
+    local text = ECM.ColorUtil.Sparkle(C.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
         icon = C.ADDON_ICON_TEXTURE,
@@ -546,7 +544,7 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
             timeout = 0,
             whileDead = 1,
             hideOnEscape = 1,
-            preferredIndex = 3,
+            preferredIndex = C.POPUP_PREFERRED_INDEX,
         }
     end
 

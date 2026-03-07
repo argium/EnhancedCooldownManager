@@ -27,6 +27,8 @@ describe("ClassUtil", function()
             "C_UnitAuras",
             "C_Spell",
             "C_SpellBook",
+            "CurveConstants",
+            "issecretvalue",
         })
 
         _G.ECM = {}
@@ -34,6 +36,8 @@ describe("ClassUtil", function()
         _G.GetShapeshiftForm = function()
             return 0
         end
+        _G.CurveConstants = { ScaleTo100 = 1 }
+        _G.issecretvalue = function() return false end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadStub("Enums.lua")
@@ -268,6 +272,66 @@ describe("ClassUtil", function()
             local maxValue, currentValue = ECM.ClassUtil.GetCurrentMaxResourceValues(nil)
             assert.is_nil(maxValue)
             assert.is_nil(currentValue)
+        end)
+    end)
+
+    describe("GetCurrentMaxResourceValues safeMax (3rd return)", function()
+        it("returns vengeance souls max as safeMax", function()
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, safeMax)
+        end)
+
+        it("returns icicles max as safeMax", function()
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_ICICLES_MAX, safeMax)
+        end)
+
+        it("returns devourer normal max as safeMax", function()
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, safeMax)
+        end)
+
+        it("returns devourer meta max as safeMax", function()
+            _G.C_UnitAuras = { GetUnitAuraBySpellID = function(_, spellID)
+                if spellID == ECM.Constants.SPELLID_COLLAPSING_STAR then
+                    return { applications = 10 }
+                end
+            end }
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, safeMax)
+        end)
+
+        it("returns base maelstrom max when talent is unknown", function()
+            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE, safeMax)
+        end)
+
+        it("returns talented maelstrom max when raging maelstrom is known", function()
+            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED, safeMax)
+        end)
+
+        it("returns UnitPowerMax as safeMax for standard types when not secret", function()
+            UnitStub.SetPowerMax(Enum.PowerType.HolyPower, 5)
+            _G.issecretvalue = function() return false end
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
+            assert.are.equal(5, safeMax)
+        end)
+
+        it("returns nil safeMax for standard types when value is secret", function()
+            UnitStub.SetPowerMax(Enum.PowerType.HolyPower, 5)
+            _G.issecretvalue = function() return true end
+            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
+            assert.is_nil(safeMax)
+        end)
+
+        it("returns nil for nil resource type", function()
+            local max, current, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(nil)
+            assert.is_nil(max)
+            assert.is_nil(current)
+            assert.is_nil(safeMax)
         end)
     end)
 end)
