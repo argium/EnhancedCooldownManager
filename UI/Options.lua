@@ -85,7 +85,9 @@ end
 ---@param onChange fun(color: {r:number, g:number, b:number, a:number})
 local function openColorPicker(currentColor, hasOpacity, onChange)
     ColorPickerFrame:SetupColorPickerAndShow({
-        r = currentColor.r, g = currentColor.g, b = currentColor.b,
+        r = currentColor.r,
+        g = currentColor.g,
+        b = currentColor.b,
         opacity = currentColor.a,
         hasOpacity = hasOpacity,
         swatchFunc = function()
@@ -117,16 +119,24 @@ end
 local function createModuleEnabledHandler(moduleName, requiresReload)
     return function(value, setting)
         if value then
+            setting:SetValue(true)
             ns.Addon:EnableModule(moduleName)
             return
-        end
-
-        if requiresReload then
-            setting:SetValue(true)
-            ns.Addon:ConfirmReloadUI(requiresReload, function()
-                ns.Addon:DisableModule(moduleName)
-            end)
+        elseif requiresReload then
+            -- Some modules require a reload to disable them. In those cases, the user can click accept or cancel. Cancelling will switch the module back on.
+            ns.Addon:ConfirmReloadUI(
+                requiresReload,
+                function()
+                    -- On accept, disable the module and set the toggle to false
+                    setting:SetValue(false)
+                    ns.Addon:DisableModule(moduleName)
+                end,
+                function()
+                    -- On cancel, revert the toggle back to enabled
+                    setting:SetValue(true)
+                end)
         else
+            setting:SetValue(false)
             ns.Addon:DisableModule(moduleName)
         end
     end
@@ -245,7 +255,7 @@ function Options:OnInitialize()
         end
     end
 
-    SB.SetRootRedirect("General")  -- TODO: the redirect doesn't work. replace it with the old about section.
+    SB.SetRootRedirect("General") -- TODO: the redirect doesn't work. replace it with the old about section.
     SB.RegisterCategories()
 
     local db = ns.Addon.db

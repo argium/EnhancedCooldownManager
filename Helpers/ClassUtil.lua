@@ -49,7 +49,7 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
         end
     else
         for powerType in pairs(discreteResourceTypes) do
-            local max = UnitPowerMax("player", powerType, false, CurveConstants.ScaleTo100)
+            local max = UnitPowerMax("player", powerType)
             if max and max > 0 then
                 if class == "DRUID" then
                     if shapeshiftForm == C.DRUID_CAT_FORM_INDEX then
@@ -149,5 +149,6 @@ function ClassUtil.GetCurrentPowerType()
         return Enum.PowerType.Mana
     end
 
-    return UnitPowerType("player")
+    local powerType = UnitPowerType("player")
+    return powerType
 end

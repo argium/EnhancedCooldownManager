@@ -4,7 +4,7 @@
 - MANDATORY: DO NOT UNDER ANY CIRCUMSTANCE NIL CHECK AND WRAP BUILT IN FUNCTIONS such as issecretvalue, issecrettable.
 - MANDATORY: New features or regression fixes in `/Bars`, `/Modules`, `/UI`, and `ECM.lua` MUST include corresponding test cases
 - MANDATORY: All lua files must include the standard copyright header
-- Anything more than a small, targetted fix MUST perform a code review as described below as the final step after completing all tasks.
+- Anything more than a small, targeted fix MUST perform a code review as described below as the final step after completing all tasks.
 - Modules that utilize ModuleMixin, must use the live config accessors and never `mod.db` or `mod.db.profile` directly. NEVER create an intermediate table for profile/config.
   - `self:GetGlobalConfig()` for the `global` config block
   - `self:GetModuleConfig()` for the module's specific block

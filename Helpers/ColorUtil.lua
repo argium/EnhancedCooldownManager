@@ -24,7 +24,7 @@ end
 ---@return number g 0..1
 ---@return number b 0..1
 local function normalizeRgb(color)
-    assert(color ~= nil, "ECM.Util: color is required")
+    assert(color ~= nil, "ECM.ColorUtil: color is required")
 
     if type(color) == "string" then
         local hex = color:gsub("^#", "")
@@ -32,19 +32,19 @@ local function normalizeRgb(color)
             -- Accept AARRGGBB and ignore alpha.
             hex = hex:sub(3, 8)
         end
-        assert(#hex == 6, "ECM.Util: hex color must be RRGGBB or #RRGGBB")
+        assert(#hex == 6, "ECM.ColorUtil: hex color must be RRGGBB or #RRGGBB")
 
         local r = tonumber(hex:sub(1, 2), 16)
         local g = tonumber(hex:sub(3, 4), 16)
         local b = tonumber(hex:sub(5, 6), 16)
-        assert(r and g and b, "ECM.Util: invalid hex color")
+        assert(r and g and b, "ECM.ColorUtil: invalid hex color")
         return r / 255, g / 255, b / 255
     end
 
     if type(color) == "table" then
-        local r = assert(tonumber(color.r or color[1]), "ECM.Util: expected number")
-        local g = assert(tonumber(color.g or color[2]), "ECM.Util: expected number")
-        local b = assert(tonumber(color.b or color[3]), "ECM.Util: expected number")
+        local r = assert(tonumber(color.r or color[1]), "ECM.ColorUtil: expected number")
+        local g = assert(tonumber(color.g or color[2]), "ECM.ColorUtil: expected number")
+        local b = assert(tonumber(color.b or color[3]), "ECM.ColorUtil: expected number")
 
         -- Treat values > 1 as 0..255.
         if r > 1 or g > 1 or b > 1 then
@@ -53,7 +53,7 @@ local function normalizeRgb(color)
         return clamp(r, 0, 1), clamp(g, 0, 1), clamp(b, 0, 1)
     end
 
-    error("ECM.Util: unsupported color type: " .. type(color))
+    error("ECM.ColorUtil: unsupported color type: " .. type(color))
 end
 
 ---@param r number 0..1

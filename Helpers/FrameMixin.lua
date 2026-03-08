@@ -54,6 +54,14 @@ end
 
 function FrameMixin:SetHidden(hide)
     self.IsHidden = hide
+    if self.InnerFrame then
+        -- Hide immediately, but defer showing until the next layout pass to ensure proper anchoring.
+        if hide then
+            self.InnerFrame:Hide()
+        else
+            self:ThrottledUpdateLayout("SetHidden")
+        end
+    end
 end
 
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.

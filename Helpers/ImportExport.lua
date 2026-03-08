@@ -28,8 +28,10 @@ local function deepCopyExcluding(source, excludePaths, currentPath, seen)
 
     seen = seen or {}
     if seen[source] then
-        ECM.Log("ImportExport", "Circular reference detected at path: " .. (currentPath or ""))
-        return nil
+        local path = currentPath or ""
+        local message = "Circular reference detected at path: " .. path
+        ECM.Log("ImportExport", message)
+        error(message)
     end
     seen[source] = true
 
