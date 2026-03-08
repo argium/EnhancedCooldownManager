@@ -51,11 +51,13 @@ describe("BarMixin", function()
                 fs.SetText = function() end
                 fs.SetJustifyH = function() end
                 fs.SetJustifyV = function() end
+                fs.SetPoint = function() end
                 return fs
             end
             f.SetFrameStrata = function() end
             f.SetFrameLevel = function() end
             f.GetFrameLevel = function() return 1 end
+            f.SetAllPoints = function() end
             f.SetMinMaxValues = function() end
             f.SetValue = function() end
             f.SetStatusBarTexture = function() end
@@ -119,6 +121,14 @@ describe("BarMixin", function()
             BarMixin.AddMixin(mod, "TestBar")
 
             assert.are.equal(42, mod._lastUpdate)
+        end)
+
+        it("creates InnerFrame with StatusBar for modules without custom CreateFrame", function()
+            local mod = makeModule()
+            BarMixin.AddMixin(mod, "TestBar")
+
+            assert.is_not_nil(mod.InnerFrame, "InnerFrame should exist")
+            assert.is_not_nil(mod.InnerFrame.StatusBar, "InnerFrame.StatusBar should exist")
         end)
     end)
 end)

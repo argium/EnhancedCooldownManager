@@ -242,7 +242,7 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    return ECM.FrameMixin.ShouldShow(self) and ClassUtil.IsDeathKnight()
+    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
@@ -303,7 +303,10 @@ end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+
+    if self.InnerFrame then
+        ECM.UnregisterFrame(self)
+    end
 
     if self._valueTicker then
         self._valueTicker:Cancel()

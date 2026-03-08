@@ -265,13 +265,14 @@ function BarMixin:CreateFrame()
 end
 
 function BarMixin.AddMixin(module, name)
-    ECM.FrameMixin.AddMixin(module, name)
-
+    -- Copy BarMixin methods first so CreateFrame is available when
+    -- FrameMixin.AddMixin creates the InnerFrame.
     for k, v in pairs(BarMixin) do
         if type(v) == "function" and module[k] == nil then
             module[k] = v
         end
     end
 
+    ECM.FrameMixin.AddMixin(module, name)
     module._lastUpdate = GetTime()
 end
