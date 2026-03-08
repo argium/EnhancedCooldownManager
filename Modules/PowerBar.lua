@@ -85,6 +85,8 @@ function PowerBar:Refresh(why, force)
     local max = UnitPowerMax("player", powerType)
     if not issecretvalue(max) then
         self:UpdateTicks(frame, powerType, max)
+    else
+        self:HideAllTicks("tickPool")
     end
 
     ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")

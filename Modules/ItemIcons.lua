@@ -630,6 +630,4 @@ function ItemIcons:OnDisable()
     self._isEditModeActive = nil
     self._layoutRetryPending = nil
     self._layoutRetryCount = 0
-    self._viewerHooked = nil
-    self._editModeHooked = nil
 end

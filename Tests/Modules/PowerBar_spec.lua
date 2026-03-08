@@ -56,11 +56,18 @@ describe("PowerBar", function()
             tickPool = {},
             _updateTicksCalled = false,
             _updateTicksMax = nil,
+            _hideAllTicksCalled = false,
+            _hideAllTicksPoolKey = nil,
         }
 
         function mod:UpdateTicks(frame, powerType, max)
             self._updateTicksCalled = true
             self._updateTicksMax = max
+        end
+
+        function mod:HideAllTicks(poolKey)
+            self._hideAllTicksCalled = true
+            self._hideAllTicksPoolKey = poolKey
         end
 
         -- Mirror the production Refresh tick logic
@@ -69,6 +76,8 @@ describe("PowerBar", function()
             local max = UnitPowerMax("player", powerType)
             if not issecretvalue(max) then
                 self:UpdateTicks(self.InnerFrame, powerType, max)
+            else
+                self:HideAllTicks("tickPool")
             end
         end
 
@@ -100,6 +109,19 @@ describe("PowerBar", function()
 
             assert.is_false(mod._updateTicksCalled)
             assert.is_nil(mod._updateTicksMax)
+        end)
+
+        it("hides stale ticks when max becomes a secret value", function()
+            UnitStub.SetClass("player", "ROGUE")
+            _G.UnitPowerType = function() return Enum.PowerType.Energy end
+            UnitStub.SetPowerMax(Enum.PowerType.Energy, 100)
+            _G.issecretvalue = function() return true end
+
+            local mod = makePowerBar()
+            mod:RefreshTicks()
+
+            assert.is_true(mod._hideAllTicksCalled)
+            assert.are.equal("tickPool", mod._hideAllTicksPoolKey)
         end)
 
         it("calls UpdateTicks with correct max value", function()
