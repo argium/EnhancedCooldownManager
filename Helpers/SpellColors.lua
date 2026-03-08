@@ -102,10 +102,22 @@ local function ensureProfileIsSetup(cfg)
     end
 end
 
+--- Accessor for the buffBars config block. Overrideable for testing.
+---@type fun(): table|nil
+local _configAccessor = function()
+    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
+end
+
+--- Overrides the buffBars config accessor. Primarily for testing.
+---@param fn fun(): table|nil
+function SpellColors.SetConfigAccessor(fn)
+    _configAccessor = fn
+end
+
 --- Returns the buffBars config table, or nil if unavailable.
 ---@return table|nil cfg
 local function config()
-    local cfg = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
+    local cfg = _configAccessor()
     if type(cfg) ~= "table" then
         ECM.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
         return nil

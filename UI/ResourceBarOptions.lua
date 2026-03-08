@@ -36,14 +36,7 @@ function ResourceBarOptions.RegisterSettings(SB)
                 path = "enabled",
                 name = "Enable resource bar",
                 order = 0,
-                onSet = function(value)
-                    if value then
-                        ns.Addon:EnableModule("ResourceBar")
-                        return
-                    end
-
-                    ns.Addon:DisableModule("ResourceBar")
-                end,
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
             },
             layoutHeader    = { type = "header", name = "Layout", disabled = isDisabled, order = 1 },
             positioning     = { type = "positioning", disabled = isDisabled, order = 2 },

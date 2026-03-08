@@ -109,12 +109,27 @@ local function getIsDisabledDelegate(configPath)
     end
 end
 
+--- Returns a standard onSet handler for a module-enabled toggle.
+--- Calls EnableModule on true and DisableModule on false.
+---@param moduleName string e.g. "PowerBar"
+---@return fun(value: boolean)
+local function createModuleEnabledHandler(moduleName)
+    return function(value)
+        if value then
+            ns.Addon:EnableModule(moduleName)
+            return
+        end
+        ns.Addon:DisableModule(moduleName)
+    end
+end
+
 ECM.OptionUtil = {
     GetNestedValue = getNestedValue,
     IsAnchorModeFree = isAnchorModeFree,
     GetCurrentClassSpec = getCurrentClassSpec,
     OpenColorPicker = openColorPicker,
     GetIsDisabledDelegate = getIsDisabledDelegate,
+    CreateModuleEnabledHandler = createModuleEnabledHandler,
 }
 
 --------------------------------------------------------------------------------

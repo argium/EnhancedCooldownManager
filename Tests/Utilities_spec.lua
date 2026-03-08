@@ -47,7 +47,6 @@ describe("Utilities", function()
             "LibStub",
             "issecretvalue",
             "issecrettable",
-            "ColorUtil",
             "InCombatLockdown",
         })
     end)
@@ -96,7 +95,7 @@ describe("Utilities", function()
             end
             return nil
         end
-        _G.ColorUtil = {
+        _G.ECM.ColorUtil = {
             Sparkle = function(text)
                 return text
             end,

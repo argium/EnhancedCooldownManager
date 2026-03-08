@@ -28,14 +28,7 @@ function RuneBarOptions.RegisterSettings(SB)
                 path = "enabled",
                 name = "Enable rune bar",
                 order = 1,
-                onSet = function(value)
-                    if value then
-                        ns.Addon:EnableModule("RuneBar")
-                        return
-                    end
-
-                    ns.Addon:DisableModule("RuneBar")
-                end,
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("RuneBar"),
             },
             layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
             positioning = { type = "positioning", disabled = isDisabled, order = 11 },

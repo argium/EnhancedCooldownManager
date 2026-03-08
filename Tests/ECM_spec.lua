@@ -127,7 +127,7 @@ describe("ECM layout system", function()
     end
 
     local CAPTURED_GLOBALS = {
-        "ECM", "ColorUtil", "LibStub", "C_Timer", "C_CVar", "GetTime",
+        "ECM", "LibStub", "C_Timer", "C_CVar", "GetTime",
         "UIParent", "CreateFrame", "IsMounted", "UnitInVehicle", "IsResting",
         "InCombatLockdown", "UnitExists", "UnitIsDead", "UnitCanAttack",
         "UnitCanAssist", "IsInInstance", "issecretvalue", "issecrettable",
@@ -185,14 +185,6 @@ describe("ECM layout system", function()
         _G.C_Timer = { After = function(_, callback) callback() end, NewTicker = function() end }
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.CreateFrame = function() return makeFrame() end
-        _G.ColorUtil = {
-            Sparkle = function(text) return text end,
-            AreEqual = function(a, b)
-                if a == nil and b == nil then return true end
-                if a == nil or b == nil then return false end
-                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
-            end,
-        }
 
         local fakeAddon = { RegisterChatCommand = function() end, RegisterEvent = function() end, UnregisterEvent = function() end }
         _G.LibStub = setmetatable({}, {
@@ -208,6 +200,14 @@ describe("ECM layout system", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
         _G.ECM.Migration = { PrepareDatabase = function() end, Run = function() end, FlushLog = function() end, PrintLog = function() end }
+        _G.ECM.ColorUtil = {
+            Sparkle = function(text) return text end,
+            AreEqual = function(a, b)
+                if a == nil and b == nil then return true end
+                if a == nil or b == nil then return false end
+                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
+            end,
+        }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, { Addon = fakeAddon })
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, { Addon = fakeAddon })

@@ -16,7 +16,7 @@ describe("BuffBars", function()
     local unregisteredFrames
 
     local CAPTURED_GLOBALS = {
-        "ECM", "ColorUtil", "C_Timer", "GetTime", "UIParent",
+        "ECM", "C_Timer", "GetTime", "UIParent",
         "CreateFrame", "issecretvalue", "InCombatLockdown",
         "hooksecurefunc", "EditModeManagerFrame",
     }
@@ -41,13 +41,6 @@ describe("BuffBars", function()
         _G.InCombatLockdown = function() return false end
         _G.hooksecurefunc = function() end
         _G.EditModeManagerFrame = nil
-        _G.ColorUtil = {
-            AreEqual = function(a, b)
-                if a == nil and b == nil then return true end
-                if a == nil or b == nil then return false end
-                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
-            end,
-        }
 
         -- Capture timer callbacks without executing them
         _G.C_Timer = {
@@ -63,6 +56,14 @@ describe("BuffBars", function()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
 
+        _G.ECM.ColorUtil = {
+            AreEqual = function(a, b)
+                if a == nil and b == nil then return true end
+                if a == nil or b == nil then return false end
+                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
+            end,
+            ColorToHex = function(c) return string.format("%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) end,
+        }
         _G.ECM.Log = function() end
         _G.ECM.DebugAssert = function(condition, message)
             if not condition then error(message or "ECM.DebugAssert failed") end

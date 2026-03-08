@@ -347,7 +347,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     end
 
     if borderConfig.enabled then
-        if liveEnabled == true and liveThickness == thickness and ColorUtil.AreEqual(borderConfig.color, liveColor) then
+        if liveEnabled == true and liveThickness == thickness and ECM.ColorUtil.AreEqual(borderConfig.color, liveColor) then
             return false
         end
     else

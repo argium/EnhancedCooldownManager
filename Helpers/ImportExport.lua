@@ -20,11 +20,18 @@ local LibDeflate = LibStub("LibDeflate")
 ---@param source table The table to copy
 ---@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBars.colors.cache"})
 ---@param currentPath string|nil Current path in recursion (internal use)
+---@param visited table|nil Cycle-detection set (internal use)
 ---@return table copy The deep copy
-local function deepCopyExcluding(source, excludePaths, currentPath)
+local function deepCopyExcluding(source, excludePaths, currentPath, visited)
     if type(source) ~= "table" then
         return source
     end
+
+    visited = visited or {}
+    if visited[source] then
+        return {}
+    end
+    visited[source] = true
 
     currentPath = currentPath or ""
     excludePaths = excludePaths or {}
@@ -44,13 +51,14 @@ local function deepCopyExcluding(source, excludePaths, currentPath)
 
         if not shouldExclude then
             if type(value) == "table" then
-                copy[key] = deepCopyExcluding(value, excludePaths, keyPath)
+                copy[key] = deepCopyExcluding(value, excludePaths, keyPath, visited)
             else
                 copy[key] = value
             end
         end
     end
 
+    visited[source] = nil
     return copy
 end
 

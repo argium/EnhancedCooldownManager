@@ -157,7 +157,7 @@ function ECM.CloneValue(value)
 end
 
 function ECM.Print(...)
-    local prefix = ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
+    local prefix = ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
     local args = { ... }
     for i = 1, #args do
         args[i] = tostring(args[i])
@@ -501,7 +501,7 @@ local function registerAddonCompartmentEntry()
         return
     end
 
-    local text = ColorUtil.Sparkle(C.ADDON_NAME)
+    local text = ECM.ColorUtil.Sparkle(C.ADDON_NAME)
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
         icon = C.ADDON_ICON_TEXTURE,
