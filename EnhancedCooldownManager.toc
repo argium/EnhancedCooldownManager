@@ -2,7 +2,7 @@
 ## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7A|r|cff7a84f7r|r|cff4cc9f0g|r|cff22c55ei|r
 ## Notes: Standalone resource bars anchored to Blizzard's Cooldown Manager.
 ## Author: Argi
-## Version: v0.5.16
+## Version: v0.6.0-beta1
 ## SavedVariables: EnhancedCooldownManagerDB
 ## OptionalDeps: Ace3, LibSharedMedia-3.0
 ## Category-enUS: User Interface
