@@ -9,11 +9,7 @@ function CSpellBook.Reset()
 end
 
 function CSpellBook.SetSpellKnown(spellID, isKnown)
-    if isKnown then
-        state.knownSpells[spellID] = true
-    else
-        state.knownSpells[spellID] = nil
-    end
+    state.knownSpells[spellID] = isKnown or nil
 end
 
 function CSpellBook.Install()

@@ -1,0 +1,182 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
+local TestHelpers = assert(
+    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
+    "Unable to load Tests/TestHelpers.lua"
+)()
+
+describe("BuffBarsOptions settings getters/setters/defaults", function()
+    local originalGlobals
+    local profile, defaults, SB, ns, settings
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        TestHelpers.SetupOptionsGlobals()
+        profile, defaults = TestHelpers.MakeOptionsProfile()
+        SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+
+        ECM.SpellColors = {
+            NormalizeKey = function() end,
+            GetAllColorEntries = function() return {} end,
+            GetDefaultColor = function() return { r = 1, g = 1, b = 1, a = 1 } end,
+            ClearCurrentSpecColors = function() end,
+            GetColorByKey = function() return nil end,
+            SetColorByKey = function() end,
+            SetDefaultColor = function() end,
+        }
+        ns.Addon.BuffBars = {
+            IsEditLocked = function() return false end,
+            IsEnabled = function() return true end,
+            Enable = function() end,
+            Disable = function() end,
+        }
+        ns.Addon.ConfirmReloadUI = function(_, _, cb) if cb then cb() end end
+
+        settings = TestHelpers.CollectSettings(function()
+            TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "BuffBarsOptions")(nil, ns)
+            ns.OptionsSections.BuffBars.RegisterSettings(SB)
+        end)
+    end)
+
+    describe("enabled", function()
+        it("getter returns profile value", function()
+            assert.is_true(settings["ECM_buffBars_enabled"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            -- Enable → disable triggers reload UI confirmation, so test enable path
+            profile.buffBars.enabled = false
+            settings["ECM_buffBars_enabled"]:SetValue(true)
+            assert.is_true(profile.buffBars.enabled)
+        end)
+        it("default matches expected", function()
+            assert.is_true(settings["ECM_buffBars_enabled"]._default)
+        end)
+    end)
+
+    -- Positioning composite
+    describe("anchorMode", function()
+        it("getter returns profile value", function()
+            assert.are.equal("chain", settings["ECM_buffBars_anchorMode"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_anchorMode"]:SetValue("free")
+            assert.are.equal("free", profile.buffBars.anchorMode)
+        end)
+    end)
+
+    describe("width", function()
+        it("getter returns profile value", function()
+            assert.are.equal(300, settings["ECM_buffBars_width"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_width"]:SetValue(400)
+            assert.are.equal(400, profile.buffBars.width)
+        end)
+    end)
+
+    describe("offsetY", function()
+        it("getter returns profile value", function()
+            assert.are.equal(-350, settings["ECM_buffBars_offsetY"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_offsetY"]:SetValue(-400)
+            assert.are.equal(-400, profile.buffBars.offsetY)
+        end)
+    end)
+
+    describe("freeGrowDirection", function()
+        it("getter returns profile value", function()
+            assert.are.equal("down", settings["ECM_buffBars_freeGrowDirection"]:GetValue())
+        end)
+        it("getter applies transform for nil", function()
+            profile.buffBars.freeGrowDirection = nil
+            assert.are.equal("down", settings["ECM_buffBars_freeGrowDirection"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_freeGrowDirection"]:SetValue("up")
+            assert.are.equal("up", profile.buffBars.freeGrowDirection)
+        end)
+    end)
+
+    -- Appearance toggles
+    describe("showIcon", function()
+        it("getter returns profile value", function()
+            assert.is_false(settings["ECM_buffBars_showIcon"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_showIcon"]:SetValue(true)
+            assert.is_true(profile.buffBars.showIcon)
+        end)
+    end)
+
+    describe("showSpellName", function()
+        it("getter returns profile value", function()
+            assert.is_true(settings["ECM_buffBars_showSpellName"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_showSpellName"]:SetValue(false)
+            assert.is_false(profile.buffBars.showSpellName)
+        end)
+    end)
+
+    describe("showDuration", function()
+        it("getter returns profile value", function()
+            assert.is_true(settings["ECM_buffBars_showDuration"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_showDuration"]:SetValue(false)
+            assert.is_false(profile.buffBars.showDuration)
+        end)
+    end)
+
+    -- Height with transform
+    describe("height", function()
+        it("getter applies transform for nil", function()
+            profile.buffBars.height = nil
+            assert.are.equal(0, settings["ECM_buffBars_height"]:GetValue())
+        end)
+        it("setter transforms zero to nil", function()
+            settings["ECM_buffBars_height"]:SetValue(0)
+            assert.is_nil(profile.buffBars.height)
+        end)
+        it("setter writes non-zero to profile", function()
+            settings["ECM_buffBars_height"]:SetValue(18)
+            assert.are.equal(18, profile.buffBars.height)
+        end)
+    end)
+
+    -- Vertical spacing with transform
+    describe("verticalSpacing", function()
+        it("getter returns profile value", function()
+            assert.are.equal(0, settings["ECM_buffBars_verticalSpacing"]:GetValue())
+        end)
+        it("getter applies transform for nil", function()
+            profile.buffBars.verticalSpacing = nil
+            assert.are.equal(0, settings["ECM_buffBars_verticalSpacing"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_verticalSpacing"]:SetValue(5)
+            assert.are.equal(5, profile.buffBars.verticalSpacing)
+        end)
+    end)
+
+    -- Font override composite
+    describe("overrideFont", function()
+        it("getter returns profile value", function()
+            assert.is_false(settings["ECM_buffBars_overrideFont"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_buffBars_overrideFont"]:SetValue(true)
+            assert.is_true(profile.buffBars.overrideFont)
+        end)
+    end)
+end)

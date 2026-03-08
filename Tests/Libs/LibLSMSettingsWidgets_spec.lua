@@ -1,0 +1,136 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
+local TestHelpers = assert(
+    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
+    "Unable to load Tests/TestHelpers.lua"
+)()
+
+describe("LibLSMSettingsWidgets", function()
+    local originalGlobals
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({
+            "LibStub",
+            "SettingsListElementMixin",
+            "LibLSMSettingsWidgets_FontPickerMixin",
+            "LibLSMSettingsWidgets_TexturePickerMixin",
+        })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        TestHelpers.SetupLibStub()
+        _G.SettingsListElementMixin = {
+            OnLoad = function() end,
+            Init = function() end,
+        }
+
+        local lsm = LibStub:NewLibrary("LibSharedMedia-3.0", 1)
+        if lsm then
+            lsm.List = function() return {} end
+            lsm.Fetch = function() return nil end
+        end
+
+        TestHelpers.LoadChunk("Libs/LibLSMSettingsWidgets/LibLSMSettingsWidgets.lua", "Unable to load LibLSMSettingsWidgets.lua")()
+    end)
+
+    local pickerCases = {
+        { name = "FontPicker",    global = "LibLSMSettingsWidgets_FontPickerMixin" },
+        { name = "TexturePicker", global = "LibLSMSettingsWidgets_TexturePickerMixin" },
+    }
+
+    for _, case in ipairs(pickerCases) do
+        it(case.name .. " SetEnabled disables dropdown and hides preview", function()
+            local dropdownEnabled, dropdownMouse
+            local hostEnabled, hostMouse
+            local previewShown = true
+
+            local picker = {
+                DropDown = {
+                    SetEnabled = function(_, enabled) dropdownEnabled = enabled end,
+                    EnableMouse = function(_, enabled) dropdownMouse = enabled end,
+                },
+                DropDownHost = {
+                    SetEnabled = function(_, enabled) hostEnabled = enabled end,
+                    EnableMouse = function(_, enabled) hostMouse = enabled end,
+                },
+                Preview = {
+                    Show = function() previewShown = true end,
+                    Hide = function() previewShown = false end,
+                },
+            }
+
+            local mixin = _G[case.global]
+            mixin.SetEnabled(picker, false)
+            assert.is_false(dropdownEnabled)
+            assert.is_false(dropdownMouse)
+            assert.is_false(hostEnabled)
+            assert.is_false(hostMouse)
+            assert.is_false(previewShown)
+
+            mixin.SetEnabled(picker, true)
+            assert.is_true(dropdownEnabled)
+            assert.is_true(dropdownMouse)
+            assert.is_true(hostEnabled)
+            assert.is_true(hostMouse)
+            assert.is_true(previewShown)
+        end)
+
+        it(case.name .. " Init bridges initializer.SetEnabled to frame", function()
+            local dropdownEnabled, previewShown
+
+            local setting = {
+                GetValue = function() return "TestFont" end,
+                SetValue = function() end,
+            }
+
+            local initializer = {
+                GetData = function() return { name = "Test", setting = setting } end,
+                GetSetting = function() return setting end,
+            }
+
+            local picker = {
+                Text = { SetText = function() end },
+                DropDown = {
+                    SetupMenu = function() end,
+                    OverrideText = function() end,
+                    SetEnabled = function(_, enabled) dropdownEnabled = enabled end,
+                    EnableMouse = function() end,
+                },
+                DropDownHost = {
+                    SetEnabled = function() end,
+                    EnableMouse = function() end,
+                },
+                Preview = {
+                    SetFont = function() end,
+                    SetText = function() end,
+                    Show = function() previewShown = true end,
+                    Hide = function() previewShown = false end,
+                },
+                SetupDropdown = function() end,
+                UpdatePreview = function() end,
+            }
+
+            local mixin = _G[case.global]
+            picker.SetEnabled = mixin.SetEnabled
+            mixin.Init(picker, initializer)
+
+            -- Init should have bridged SetEnabled onto the initializer
+            assert.is_function(initializer.SetEnabled)
+
+            -- Calling initializer:SetEnabled propagates to the frame
+            initializer:SetEnabled(false)
+            assert.is_false(dropdownEnabled)
+            assert.is_false(previewShown)
+
+            initializer:SetEnabled(true)
+            assert.is_true(dropdownEnabled)
+            assert.is_true(previewShown)
+        end)
+    end
+end)

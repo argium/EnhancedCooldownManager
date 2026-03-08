@@ -1,25 +1,27 @@
-# Coding
+Be concise with your responses.
+Be professional but honest.
+Use mermaid diagrams and tables to explain complex concepts and architecture.
 
-The profile is split into GLOBAL and a SECTION specific to the module (typically matching the file name, in camel case).  See [Defaults.lua](Defaults.lua)
+# Coding
 
 - MANDATORY: **ALL constants** are to be stored in Constants.lua.
 - MANDATORY: DO NOT UNDER ANY CIRCUMSTANCE NIL CHECK AND WRAP BUILT IN FUNCTIONS such as issecretvalue, issecrettable.
-- MANDATORY: DO NOT ADD NIL GUARDS UNLESS THE DOCUMENTATION EXPLCITLY STATES THAT RETURNING NIL IS POSSIBLE.
+- MANDATORY: New features or regression fixes in `/Bars`, `/Modules`, `/UI`, and `ECM.lua` MUST include corresponding test cases
 - MANDATORY: All lua files must include the standard copyright header
+- Anything more than a small, targeted fix MUST perform a code review as described below as the final step after completing all tasks.
+- Modules that utilize ModuleMixin, must use the live config accessors and never `mod.db` or `mod.db.profile` directly. NEVER create an intermediate table for profile/config.
+  - `self:GetGlobalConfig()` for the `global` config block
+  - `self:GetModuleConfig()` for the module's specific block
+- NEVER listen to the expensive `OnUpdate` event.
+- Do not use forward declarations.
 
+<CopyrightHeader>
 ```
 -- Enhanced Cooldown Manager addon for World of Warcraft
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 ```
-
-- Modules that utilize ModuleMixin, must use the live config accessors and never `mod.db` or `mod.db.profile` directly. NEVER create an intermediate table for profile/config.
-  - `self:GetGlobalConfig()` for the `global` config block
-  - `self:GetModuleConfig()` for the module's specific block
-- Module `enabled` config should drive module lifecycle (enable/disable), not just visibility, so disabled modules are unregistered from Layout.
-- Layout/refresh/throttle logic lives in `FrameUtil` as stateless utility functions. ModuleMixin provides thin overrideable wrappers. Modules that override `Refresh` should call `FrameUtil.BaseRefresh(self, why, force)` as the guard, not `ModuleMixin.Refresh`.
-- NEVER listen to the expensive "OnUpdate" event.
-- Do not create local functions that are exported later. All exported functions must be created using the `VAR:FunctionName(...)` pattern.
+</CopyrightHeader>
 
 # Code Review
 
@@ -35,6 +37,8 @@ They are on special lookout for:
 - Unnecessary complexity.
 - Test coverage; edge cases; gaps.
 
+Fewer lines but are meaningful (without being obtuse with formatting); simplicity; simple simple simple. Remove dead code; duplicated code; trivial wrappers; dead and needless type checking; remove anything that a senior software engineer would look at and raise their eye brows because it's stupid or unnecessary. Do not break functionality.
+
 # Secret Values
 
 Do not perform any operations except nil checking (including reads) on the following secret values except for passing them into other built-in functions:
@@ -44,6 +48,7 @@ Do not perform any operations except nil checking (including reads) on the follo
 - C_UnitAuras.GetUnitAuraBySpellID
 
 Most functions have a CurveConstant parameter that will return an adjusted value. eg.
+
 ```lua
 UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 ```
@@ -77,7 +82,6 @@ UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 **A few additional APIs exist to handle table secrecy.**
 
 - canaccesstable(table) returns true if the calling function would not error if attempting to access the table.
-
 
 ## Unit tests
 
