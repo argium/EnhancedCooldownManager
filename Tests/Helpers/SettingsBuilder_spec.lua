@@ -42,10 +42,12 @@ describe("SettingsBuilder", function()
     local function createSB2(varPrefix, categoryName)
         local LSB2 = LibStub("LibSettingsBuilder-1.0")
         local SB2 = LSB2:New({
-            getProfile = function() return addonNS.Addon.db.profile end,
-            getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-            getNestedValue = getNestedValue,
-            setNestedValue = setNestedValue,
+            pathAdapter = LSB2.PathAdapter({
+                getStore = function() return addonNS.Addon.db.profile end,
+                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                getNestedValue = getNestedValue,
+                setNestedValue = setNestedValue,
+            }),
             varPrefix = varPrefix,
             onChanged = function() end,
         })
@@ -179,9 +181,9 @@ describe("SettingsBuilder", function()
         assert.are.equal("Root Header", init._text)
     end)
 
-    -- PathCheckbox
-    it("PathCheckbox reads and writes profile value", function()
-        local init, setting = SB.PathCheckbox({
+    -- Checkbox
+    it("Checkbox reads and writes profile value", function()
+        local init, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
         })
@@ -193,9 +195,9 @@ describe("SettingsBuilder", function()
         assert.are.equal(1, layoutUpdateCalls)
     end)
 
-    it("PathCheckbox onSet callback is invoked on set", function()
+    it("Checkbox onSet callback is invoked on set", function()
         local onSetValue
-        local _, setting = SB.PathCheckbox({
+        local _, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
             onSet = function(v) onSetValue = v end,
@@ -205,9 +207,9 @@ describe("SettingsBuilder", function()
         assert.are.equal(false, onSetValue)
     end)
 
-    -- PathSlider
-    it("PathSlider reads/writes with getTransform and setTransform", function()
-        local init, setting = SB.PathSlider({
+    -- Slider
+    it("Slider reads/writes with getTransform and setTransform", function()
+        local init, setting = SB.Slider({
             path = "powerBar.height",
             name = "Height",
             min = 0,
@@ -223,7 +225,7 @@ describe("SettingsBuilder", function()
         assert.is_nil(addonNS.Addon.db.profile.powerBar.height)
     end)
 
-    it("PathSlider applies default formatter when none specified", function()
+    it("Slider applies default formatter when none specified", function()
         local capturedOpts
         local origCreate = Settings.CreateSlider
         Settings.CreateSlider = function(cat, setting, options, tooltip)
@@ -231,7 +233,7 @@ describe("SettingsBuilder", function()
             return origCreate(cat, setting, options, tooltip)
         end
 
-        SB.PathSlider({
+        SB.Slider({
             path = "global.value",
             name = "Value",
             min = 0,
@@ -249,7 +251,7 @@ describe("SettingsBuilder", function()
         assert.are.equal("2.5", capturedOpts._labelFormatter(2.5))
     end)
 
-    it("PathSlider uses custom formatter when specified", function()
+    it("Slider uses custom formatter when specified", function()
         local capturedOpts
         local origCreate = Settings.CreateSlider
         Settings.CreateSlider = function(cat, setting, options, tooltip)
@@ -258,7 +260,7 @@ describe("SettingsBuilder", function()
         end
 
         local customFormatter = function(value) return value .. "%%" end
-        SB.PathSlider({
+        SB.Slider({
             path = "global.value",
             name = "Value",
             min = 0,
@@ -272,9 +274,9 @@ describe("SettingsBuilder", function()
         assert.are.equal(customFormatter, capturedOpts._labelFormatter)
     end)
 
-    -- PathDropdown
-    it("PathDropdown creates dropdown with values", function()
-        local init, setting = SB.PathDropdown({
+    -- Dropdown
+    it("Dropdown creates dropdown with values", function()
+        local init, setting = SB.Dropdown({
             path = "global.mode",
             name = "Mode",
             values = { solid = "Solid", flat = "Flat" },
@@ -286,9 +288,9 @@ describe("SettingsBuilder", function()
         assert.are.equal("flat", addonNS.Addon.db.profile.global.mode)
     end)
 
-    -- PathColor
-    it("PathColor reads/writes color as AARRGGBB hex", function()
-        local init, setting = SB.PathColor({
+    -- Color
+    it("Color reads/writes color as AARRGGBB hex", function()
+        local init, setting = SB.Color({
             path = "global.color",
             name = "Color",
         })
@@ -302,9 +304,9 @@ describe("SettingsBuilder", function()
         assert.are.equal(0.4, math.floor(stored.r * 255 + 0.5) / 255)
     end)
 
-    -- PathControl dispatcher
-    it("PathControl dispatches to checkbox", function()
-        local init, setting = SB.PathControl({
+    -- Control dispatcher
+    it("Control dispatches to checkbox", function()
+        local init, setting = SB.Control({
             type = "checkbox",
             path = "global.hideWhenMounted",
             name = "Hide",
@@ -312,8 +314,8 @@ describe("SettingsBuilder", function()
         assert.is_true(setting:GetValue())
     end)
 
-    it("PathControl dispatches to slider", function()
-        local init, setting = SB.PathControl({
+    it("Control dispatches to slider", function()
+        local init, setting = SB.Control({
             type = "slider",
             path = "global.value",
             name = "Value",
@@ -322,8 +324,8 @@ describe("SettingsBuilder", function()
         assert.are.equal(5, setting:GetValue())
     end)
 
-    it("PathControl dispatches to dropdown", function()
-        local init, setting = SB.PathControl({
+    it("Control dispatches to dropdown", function()
+        local init, setting = SB.Control({
             type = "dropdown",
             path = "global.mode",
             name = "Mode",
@@ -332,8 +334,8 @@ describe("SettingsBuilder", function()
         assert.are.equal("solid", setting:GetValue())
     end)
 
-    it("PathControl dispatches to color", function()
-        local init, setting = SB.PathControl({
+    it("Control dispatches to color", function()
+        local init, setting = SB.Control({
             type = "color",
             path = "global.color",
             name = "Color",
@@ -343,15 +345,15 @@ describe("SettingsBuilder", function()
         assert.are.equal(8, #hex)
     end)
 
-    it("PathControl errors on unknown type", function()
+    it("Control errors on unknown type", function()
         assert.has_error(function()
-            SB.PathControl({ type = "bogus", path = "x", name = "X" })
+            SB.Control({ type = "bogus", path = "x", name = "X" })
         end)
     end)
 
     -- layout=false
     it("layout=false skips ScheduleLayoutUpdate", function()
-        local _, setting = SB.PathCheckbox({
+        local _, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
             layout = false,
@@ -382,7 +384,7 @@ describe("SettingsBuilder", function()
 
     it("Subheader as parent — isParentEnabled returns true", function()
         local labelInit = SB.Subheader({ name = "Colors" })
-        local childInit = SB.PathCheckbox({
+        local childInit = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Child",
             parent = labelInit,
@@ -420,11 +422,11 @@ describe("SettingsBuilder", function()
 
     -- ApplyModifiers
     it("ApplyModifiers sets parent, disabled, and hidden predicates", function()
-        local parentInit, _ = SB.PathCheckbox({
+        local parentInit, _ = SB.Checkbox({
             path = "global.nested.enabled",
             name = "Parent",
         })
-        local childInit, _ = SB.PathCheckbox({
+        local childInit, _ = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Child",
             parent = parentInit,
@@ -439,12 +441,12 @@ describe("SettingsBuilder", function()
     end)
 
     it("Parent-controlled dropdown is disabled when parent is unchecked", function()
-        local parentInit, parentSetting = SB.PathCheckbox({
+        local parentInit, parentSetting = SB.Checkbox({
             path = "global.nested.enabled",
             name = "Parent",
         })
 
-        local childInit = SB.PathDropdown({
+        local childInit = SB.Dropdown({
             path = "global.mode",
             name = "Child",
             values = { solid = "Solid", flat = "Flat" },
@@ -460,7 +462,7 @@ describe("SettingsBuilder", function()
     end)
 
     it("Parent-controlled custom picker is disabled when parent is unchecked", function()
-        local parentInit, parentSetting = SB.PathCheckbox({
+        local parentInit, parentSetting = SB.Checkbox({
             path = "global.nested.enabled",
             name = "Parent",
         })
@@ -475,7 +477,7 @@ describe("SettingsBuilder", function()
             return init
         end
 
-        local childInit = SB.PathCustom({
+        local childInit = SB.Custom({
             path = "global.font",
             name = "Custom picker",
             template = "TestTexturePickerTemplate",
@@ -498,7 +500,7 @@ describe("SettingsBuilder", function()
     it("disabled predicate re-evaluates when another setting changes", function()
         local frames = createSettingsPanelMock()
 
-        local _, enabledSetting = SB.PathCheckbox({
+        local _, enabledSetting = SB.Checkbox({
             path = "powerBar.enabled",
             name = "Enable",
         })
@@ -512,7 +514,7 @@ describe("SettingsBuilder", function()
             return init
         end
 
-        SB.PathCheckbox({
+        SB.Checkbox({
             path = "powerBar.showText",
             name = "Show text",
             disabled = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
@@ -548,7 +550,7 @@ describe("SettingsBuilder", function()
     it("hidden predicate re-evaluates when another setting changes", function()
         local frames = createSettingsPanelMock()
 
-        local _, toggleSetting = SB.PathCheckbox({
+        local _, toggleSetting = SB.Checkbox({
             path = "powerBar.enabled",
             name = "Enable",
         })
@@ -561,7 +563,7 @@ describe("SettingsBuilder", function()
             return init
         end
 
-        SB.PathCheckbox({
+        SB.Checkbox({
             path = "powerBar.showText",
             name = "Show text",
             hidden = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
@@ -703,7 +705,7 @@ describe("SettingsBuilder", function()
         local SB2 = createSB2("TEST2", "Test2")
         SB2.CreateSubcategory("Sub2")
 
-        local _, setting = SB2.PathCheckbox({
+        local _, setting = SB2.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
         })
@@ -720,7 +722,7 @@ describe("SettingsBuilder", function()
         local SB2 = createSB2("TEST3", "Test3")
         SB2.CreateSubcategory("Sub3")
 
-        local _, setting = SB2.PathColor({
+        local _, setting = SB2.Color({
             path = "powerBar.colors.0",
             name = "Mana",
         })
@@ -747,8 +749,8 @@ describe("SettingsBuilder", function()
         assert.is_not_nil(init2)
     end)
 
-    -- PathCustom with varType override
-    it("PathCustom respects varType override", function()
+    -- Custom with varType override
+    it("Custom respects varType override", function()
         local capturedVarType
         local origRegister = Settings.RegisterProxySetting
         Settings.RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
@@ -756,7 +758,7 @@ describe("SettingsBuilder", function()
             return origRegister(cat, variable, varType, name, default, getter, setter)
         end
 
-        SB.PathCustom({
+        SB.Custom({
             path = "global.value",
             name = "Custom Numeric",
             template = "TestTemplate",
@@ -786,7 +788,7 @@ describe("SettingsBuilder", function()
         end
         _G.LSB_DEBUG = true
 
-        SB.PathCheckbox({
+        SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Test",
             bogusField = true,
@@ -809,7 +811,7 @@ describe("SettingsBuilder", function()
         end
         _G.LSB_DEBUG = nil
 
-        SB.PathCheckbox({
+        SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Test",
             bogusField = true,
@@ -819,8 +821,8 @@ describe("SettingsBuilder", function()
         assert.are.equal(0, #warnings)
     end)
 
-    -- PathDropdown with scrollHeight
-    it("PathDropdown with scrollHeight uses scroll template", function()
+    -- Dropdown with scrollHeight
+    it("Dropdown with scrollHeight uses scroll template", function()
         local capturedTemplate
         local origCreateElementInitializer = Settings.CreateElementInitializer
         Settings.CreateElementInitializer = function(template, data)
@@ -828,7 +830,7 @@ describe("SettingsBuilder", function()
             return origCreateElementInitializer(template, data)
         end
 
-        local init, setting = SB.PathDropdown({
+        local init, setting = SB.Dropdown({
             path = "global.mode",
             name = "Scrollable Mode",
             values = { solid = "Solid", flat = "Flat" },
@@ -844,7 +846,7 @@ describe("SettingsBuilder", function()
         assert.are.equal("flat", addonNS.Addon.db.profile.global.mode)
     end)
 
-    it("PathDropdown without scrollHeight uses standard dropdown", function()
+    it("Dropdown without scrollHeight uses standard dropdown", function()
         local capturedTemplate = nil
         local origCreateElementInitializer = Settings.CreateElementInitializer
         Settings.CreateElementInitializer = function(template, data)
@@ -852,7 +854,7 @@ describe("SettingsBuilder", function()
             return origCreateElementInitializer(template, data)
         end
 
-        SB.PathDropdown({
+        SB.Dropdown({
             path = "global.mode",
             name = "Standard Mode",
             values = { solid = "Solid", flat = "Flat" },
@@ -1069,7 +1071,7 @@ describe("SettingsBuilder", function()
         local receivedSetting
         local receivedValue
 
-        local init, setting = SB.PathCheckbox({
+        local init, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Test onSet",
             onSet = function(value, s)
@@ -1082,6 +1084,176 @@ describe("SettingsBuilder", function()
         setting:SetValue(false)
         assert.are.equal(false, receivedValue)
         assert.are.equal(setting, receivedSetting)
+    end)
+
+    -- PathAdapter
+    describe("PathAdapter", function()
+        it("resolve returns get/set/default for nested path", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local pa = LSB.PathAdapter({
+                getStore = function() return addonNS.Addon.db.profile end,
+                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            })
+
+            local binding = pa:resolve("global.hideWhenMounted")
+            assert.is_function(binding.get)
+            assert.is_function(binding.set)
+            assert.are.equal(true, binding.default)
+            assert.are.equal(true, binding.get())
+
+            binding.set(false)
+            assert.are.equal(false, addonNS.Addon.db.profile.global.hideWhenMounted)
+        end)
+
+        it("read returns nested value", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local pa = LSB.PathAdapter({
+                getStore = function() return addonNS.Addon.db.profile end,
+                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+            })
+
+            assert.are.equal(5, pa:read("global.value"))
+        end)
+
+        it("falls back to nil when defaults table missing", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local pa = LSB.PathAdapter({
+                getStore = function() return addonNS.Addon.db.profile end,
+                getDefaults = function() return nil end,
+            })
+
+            local binding = pa:resolve("global.hideWhenMounted")
+            assert.is_nil(binding.default)
+        end)
+    end)
+
+    -- Handler mode
+    describe("handler mode", function()
+        it("Checkbox with get/set/key works without pathAdapter", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({
+                varPrefix = "Handler",
+                onChanged = function() end,
+            })
+            SBH.CreateRootCategory("HandlerTest")
+            SBH.CreateSubcategory("HandlerSection")
+
+            local store = { myVal = true }
+            local _, setting = SBH.Checkbox({
+                get = function() return store.myVal end,
+                set = function(v) store.myVal = v end,
+                key = "myVal",
+                default = true,
+                name = "Handler Checkbox",
+            })
+
+            assert.are.equal(true, setting:GetValue())
+            setting:SetValue(false)
+            assert.are.equal(false, store.myVal)
+        end)
+
+        it("Slider with get/set/key and transforms", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({
+                varPrefix = "Handler",
+                onChanged = function() end,
+            })
+            SBH.CreateRootCategory("HandlerTest2")
+            SBH.CreateSubcategory("HandlerSection2")
+
+            local store = { scale = 0.75 }
+            local _, setting = SBH.Slider({
+                get = function() return store.scale end,
+                set = function(v) store.scale = v end,
+                key = "scale",
+                default = 1.0,
+                name = "Handler Slider",
+                min = 0, max = 2, step = 0.01,
+                getTransform = function(v) return v * 100 end,
+                setTransform = function(v) return v / 100 end,
+            })
+
+            assert.are.equal(75, setting:GetValue())
+            setting:SetValue(50)
+            assert.are.equal(0.5, store.scale)
+        end)
+
+        it("errors when spec has both path and get", function()
+            assert.has.errors(function()
+                SB.Checkbox({
+                    path = "global.hideWhenMounted",
+                    get = function() return true end,
+                    set = function() end,
+                    key = "x",
+                    name = "Bad Spec",
+                })
+            end)
+        end)
+
+        it("errors when handler mode missing set", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({ varPrefix = "H", onChanged = function() end })
+            SBH.CreateRootCategory("HErr")
+            SBH.CreateSubcategory("HErrS")
+
+            assert.has.errors(function()
+                SBH.Checkbox({
+                    get = function() return true end,
+                    key = "x",
+                    name = "Missing Set",
+                })
+            end)
+        end)
+
+        it("errors when handler mode missing key", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({ varPrefix = "H2", onChanged = function() end })
+            SBH.CreateRootCategory("HErr2")
+            SBH.CreateSubcategory("HErrS2")
+
+            assert.has.errors(function()
+                SBH.Checkbox({
+                    get = function() return true end,
+                    set = function() end,
+                    name = "Missing Key",
+                })
+            end)
+        end)
+
+        it("path mode errors without pathAdapter", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({ varPrefix = "NP", onChanged = function() end })
+            SBH.CreateRootCategory("NoPath")
+            SBH.CreateSubcategory("NoPathS")
+
+            assert.has.errors(function()
+                SBH.Checkbox({
+                    path = "some.path",
+                    name = "No Adapter",
+                })
+            end)
+        end)
+
+        it("Control dispatches handler-mode checkbox", function()
+            local LSB = LibStub("LibSettingsBuilder-1.0")
+            local SBH = LSB:New({ varPrefix = "Disp", onChanged = function() end })
+            SBH.CreateRootCategory("DispTest")
+            SBH.CreateSubcategory("DispSect")
+
+            local store = { flag = false }
+            local _, setting = SBH.Control({
+                type = "checkbox",
+                get = function() return store.flag end,
+                set = function(v) store.flag = v end,
+                key = "flag",
+                default = false,
+                name = "Dispatched Handler",
+            })
+
+            assert.are.equal(false, setting:GetValue())
+            setting:SetValue(true)
+            assert.are.equal(true, store.flag)
+        end)
     end)
 
 end)

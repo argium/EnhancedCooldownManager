@@ -1,6 +1,10 @@
 # LibSettingsBuilder-1.0
 
-A path-based settings builder for the World of Warcraft [Settings API](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua). Wraps Blizzard's vertical-list settings system with proxy controls, composite groups, and utility helpers — eliminating the boilerplate of registering individual `Settings.RegisterProxySetting` / `Settings.CreateCheckbox` / `Settings.CreateSlider` / etc. calls for each setting.
+A settings builder for the World of Warcraft [Settings API](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua). Wraps Blizzard's vertical-list settings system with proxy controls, composite groups, and utility helpers — eliminating the boilerplate of registering individual `Settings.RegisterProxySetting` / `Settings.CreateCheckbox` / `Settings.CreateSlider` / etc. calls for each setting.
+
+Supports two binding modes:
+- **Path mode** — dot-delimited paths into a nested profile table (e.g. AceDB), resolved via a `PathAdapter`.
+- **Handler mode** — explicit `get`/`set`/`key` callbacks for arbitrary storage.
 
 Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
@@ -15,29 +19,57 @@ Libs\LibSettingsBuilder\LibSettingsBuilder.xml
 
 ## Quick Start
 
+### Path mode (AceDB-style nested profiles)
+
 ```lua
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
 local SB = LSB:New({
-    getProfile     = function() return MyAddonDB.profile end,
-    getDefaults    = function() return MyAddonDefaults.profile end,
-    varPrefix      = "MYADDON",
-    onChanged      = function(spec, value) MyAddon:ApplySettings() end,
+    pathAdapter = LSB.PathAdapter({
+        getStore    = function() return MyAddonDB.profile end,
+        getDefaults = function() return MyAddonDefaults.profile end,
+    }),
+    varPrefix  = "MYADDON",
+    onChanged  = function(spec, value) MyAddon:ApplySettings() end,
 })
 
 SB.CreateRootCategory("My Addon")
 SB.CreateSubcategory("General")
 
-SB.PathCheckbox({
+SB.Checkbox({
     path    = "general.enabled",
     name    = "Enable",
     tooltip = "Enable or disable the addon.",
 })
 
-SB.PathSlider({
+SB.Slider({
     path = "general.opacity",
     name = "Opacity",
     min  = 0, max = 100, step = 1,
+})
+
+SB.RegisterCategories()
+```
+
+### Handler mode (arbitrary storage)
+
+```lua
+local LSB = LibStub("LibSettingsBuilder-1.0")
+
+local SB = LSB:New({
+    varPrefix = "MYADDON",
+    onChanged = function(spec, value) MyAddon:ApplySettings() end,
+})
+
+SB.CreateRootCategory("My Addon")
+SB.CreateSubcategory("General")
+
+SB.Checkbox({
+    get     = function() return MyStore.enabled end,
+    set     = function(v) MyStore.enabled = v end,
+    key     = "enabled",
+    default = true,
+    name    = "Enable",
 })
 
 SB.RegisterCategories()
@@ -54,8 +86,8 @@ SB.RegisterCategories()
 | **Proxy setting** | A `Settings.RegisterProxySetting` object with explicit getter/setter functions, as opposed to an addon setting that reads/writes a saved-variable key directly. All LibSettingsBuilder controls use proxy settings. |
 | **Initializer** | The object returned by `Settings.CreateCheckbox`, `Settings.CreateSlider`, etc. Represents a single row in the vertical list. Supports modifiers like `SetParentInitializer`, `AddModifyPredicate`, and `AddShownPredicate`. |
 | **Setting** | The data object returned by `Settings.RegisterProxySetting`. Holds the current value and exposes `GetValue()` / `SetValue(value)`. |
-| **Spec** | The configuration table passed to every path-based control (`PathCheckbox`, `PathSlider`, etc.). Contains the `path`, `name`, modifiers, and optional transforms. |
-| **Path** | A dot-delimited string (`"powerBar.border.color"`) addressing a value in the nested profile table. LibSettingsBuilder resolves it via the `getNestedValue`/`setNestedValue` callbacks. |
+| **Spec** | The configuration table passed to every control (`Checkbox`, `Slider`, etc.). Contains binding fields (`path` or `get`/`set`/`key`), `name`, modifiers, and optional transforms. |
+| **Path** | A dot-delimited string (`"powerBar.border.color"`) addressing a value in the nested profile table. Resolved by a `PathAdapter`. |
 | **Modifier** | A predicate function attached to an initializer that controls visibility (`AddShownPredicate`), enabled state (`AddModifyPredicate`), or parent-child nesting (`SetParentInitializer`). |
 | **Page-enabled setting** | A setting (typically from `ModuleEnabledCheckbox`) that automatically greys out all other controls on the same page when disabled. |
 | **Composite builder** | A higher-level helper (`FontOverrideGroup`, `BorderGroup`, `PositioningGroup`, etc.) that creates multiple related controls in one call. |
@@ -68,8 +100,6 @@ Creates a new builder instance.
 
 | Field | Type | Description |
 |---|---|---|
-| `getProfile` | `function() -> table` | Returns the current profile table (the live saved-variables table that settings read from and write to). |
-| `getDefaults` | `function() -> table` | Returns the defaults table (same shape as the profile; used to derive default values for each control). |
 | `varPrefix` | `string` | Short prefix used to generate unique variable names for [`Settings.RegisterProxySetting`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua). A path `"general.enabled"` with prefix `"ECM"` becomes variable `"ECM_general_enabled"`. |
 | `onChanged` | `function(spec, value)` | Called after every setter. Use this to trigger layout refreshes, event broadcasts, etc. |
 
@@ -77,11 +107,37 @@ Creates a new builder instance.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `getNestedValue` | `function(tbl, path) -> any` | Built-in dot-path with `tonumber` | Reads a dot-delimited path from a table (e.g. `"general.enabled"` → `tbl.general.enabled`). The built-in default handles numeric path segments (e.g. `"colors.0"` → `tbl.colors[0]`). |
-| `setNestedValue` | `function(tbl, path, value)` | Built-in dot-path with `tonumber` | Writes a value at a dot-delimited path. Creates intermediate tables as needed. |
+| `pathAdapter` | `PathAdapter` | `nil` | A `PathAdapter` instance for path-mode binding. Required when using path-based specs. See `lib.PathAdapter()` below. |
 | `compositeDefaults` | `table` | `nil` | Table keyed by composite function name (`"ModuleEnabledCheckbox"`, `"FontOverrideGroup"`, `"PositioningGroup"`). Values are default spec tables merged (lowest priority) into the composite's spec. Eliminates monkey-patching for addon-wide defaults. |
 
 Returns the `SB` table containing all API functions documented below.
+
+---
+
+## PathAdapter: `lib.PathAdapter(config)`
+
+Creates an adapter that resolves dot-delimited paths into getter/setter/default bindings over a nested table (e.g. AceDB profiles).
+
+### Required Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `getStore` | `function() -> table` | Returns the live storage table (e.g. `db.profile`). |
+| `getDefaults` | `function() -> table` | Returns the defaults table (same shape as the store). |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `getNestedValue` | `function(tbl, path) -> any` | Built-in dot-path with `tonumber` | Reads a dot-delimited path from a table (e.g. `"general.enabled"` → `tbl.general.enabled`). The built-in default handles numeric path segments (e.g. `"colors.0"` → `tbl.colors[0]`). |
+| `setNestedValue` | `function(tbl, path, value)` | Built-in dot-path with `tonumber` | Writes a value at a dot-delimited path. Creates intermediate tables as needed. |
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `adapter:resolve(path)` | Returns `{ get, set, default }` — a binding for the given path. |
+| `adapter:read(path)` | Returns the current value at the path (shorthand for `getNestedValue(getStore(), path)`). |
 
 ---
 
@@ -115,15 +171,21 @@ Returns `category:GetID()` for the root category. Use with [`Settings.OpenToCate
 
 ---
 
-## Path-Based Proxy Controls
+## Proxy Controls
 
-All path-based controls share a common **spec** table. Each call:
+All controls support two binding modes:
 
-1. Derives a unique variable name from `varPrefix` + `spec.path`.
-2. Creates getter/setter functions that read/write via `getNestedValue`/`setNestedValue` on the profile.
-3. Reads the default value from the defaults table.
-4. Calls [`Settings.RegisterProxySetting`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua) and the appropriate `Settings.Create*` factory.
-5. Applies modifiers (parent, disabled, hidden) — reactive predicates re-evaluate on every setting change.
+- **Path mode:** Provide `spec.path` — the builder resolves get/set/default via the `pathAdapter`.
+- **Handler mode:** Provide `spec.get`, `spec.set`, `spec.key`, and optionally `spec.default` — no adapter required.
+
+A spec cannot have both `path` and `get`/`set`.
+
+Each call:
+
+1. Derives a unique variable name from `varPrefix` + (`spec.key` or `spec.path`).
+2. Creates getter/setter functions from the resolved binding.
+3. Calls [`Settings.RegisterProxySetting`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua) and the appropriate `Settings.Create*` factory.
+4. Applies modifiers (parent, disabled, hidden) — reactive predicates re-evaluate on every setting change.
 
 All controls return `initializer, setting`.
 
@@ -131,7 +193,11 @@ All controls return `initializer, setting`.
 
 | Field | Type | Description |
 |---|---|---|
-| `path` | `string` | **Required.** Dot-delimited path into the profile table (e.g. `"powerBar.height"`). |
+| `path` | `string` | Dot-delimited path into the profile table (e.g. `"powerBar.height"`). **Required in path mode.** |
+| `get` | `function() -> any` | Getter for the current value. **Required in handler mode.** |
+| `set` | `function(value)` | Setter for the value. **Required in handler mode.** |
+| `key` | `string` | Unique key for variable name generation. **Required in handler mode.** |
+| `default` | `any` | Default value. In path mode, auto-derived from the defaults table if not specified. |
 | `name` | `string` | **Required.** Display name shown in the settings panel. |
 | `tooltip` | `string` | Tooltip text for the control. |
 | `category` | `category` | Override the target category. Defaults to the current subcategory or root. |
@@ -143,19 +209,19 @@ All controls return `initializer, setting`.
 | `disabled` | `function() -> bool` | When returns `true`, the control is greyed out (via `AddModifyPredicate`). **Reactive** — re-evaluated whenever any setting changes. |
 | `hidden` | `function() -> bool` | When returns `true`, the control is hidden (via `AddShownPredicate`). **Reactive** — re-evaluated whenever any setting changes. |
 
-### `SB.PathCheckbox(spec)`
+### `SB.Checkbox(spec)`
 
 Creates a boolean checkbox. Wraps `Settings.RegisterProxySetting` with `Settings.VarType.Boolean` + [`Settings.CreateCheckbox`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua).
 
 ```lua
-SB.PathCheckbox({
+SB.Checkbox({
     path    = "powerBar.enabled",
     name    = "Enable power bar",
     tooltip = "Show the power bar beneath the player frame.",
 })
 ```
 
-### `SB.PathSlider(spec)`
+### `SB.Slider(spec)`
 
 Creates a numeric slider. Wraps `Settings.RegisterProxySetting` with `Settings.VarType.Number` + [`Settings.CreateSlider`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua).
 
@@ -169,7 +235,7 @@ All sliders get an editable value label — clicking the value text opens an edi
 | `formatter` | `function(value) -> string` | Integer or 1-decimal | Custom label formatter passed to `SetLabelFormatter`. |
 
 ```lua
-SB.PathSlider({
+SB.Slider({
     path = "powerBar.height",
     name = "Height",
     min  = 5, max = 40, step = 1,
@@ -177,7 +243,7 @@ SB.PathSlider({
 })
 ```
 
-### `SB.PathDropdown(spec)`
+### `SB.Dropdown(spec)`
 
 Creates a dropdown selector. Wraps `Settings.RegisterProxySetting` + [`Settings.CreateDropdown`](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua). The var type is inferred from the default (`Settings.VarType.Number` if default is a number, otherwise `Settings.VarType.String`).
 
@@ -187,14 +253,14 @@ Creates a dropdown selector. Wraps `Settings.RegisterProxySetting` + [`Settings.
 | `scrollHeight` | `number` | When present, uses a scroll-enabled dropdown template with `SetScrollMode(scrollHeight)`. Ideal for long lists (fonts, sounds, etc.). |
 
 ```lua
-SB.PathDropdown({
+SB.Dropdown({
     path   = "powerBar.anchorMode",
     name   = "Position Mode",
     values = { attached = "Attached", free = "Free" },
 })
 
 -- Scroll-enabled dropdown for long lists
-SB.PathDropdown({
+SB.Dropdown({
     path         = "powerBar.font",
     name         = "Font",
     values       = GetFontValues,
@@ -202,20 +268,20 @@ SB.PathDropdown({
 })
 ```
 
-### `SB.PathColor(spec)`
+### `SB.Color(spec)`
 
 Creates a color swatch. Stores/reads `{r, g, b, a}` tables in the profile and converts to/from hex strings (AARRGGBB) for the proxy setting. Wraps `Settings.CreateColorSwatch`.
 
 > **Note:** Blizzard's `Settings.CreateColorSwatch` does not support a `hasAlpha` parameter. Alpha channel selection is not available through the Settings API.
 
 ```lua
-SB.PathColor({
+SB.Color({
     path = "powerBar.border.color",
     name = "Border color",
 })
 ```
 
-### `SB.PathCustom(spec)`
+### `SB.Custom(spec)`
 
 Creates a proxy setting backed by a custom XML frame template. The template's `Init` receives `initializer:GetData()` containing `{setting, name, tooltip}`.
 
@@ -225,25 +291,25 @@ Creates a proxy setting backed by a custom XML frame template. The template's `I
 | `varType` | `Settings.VarType` | Override the setting variable type. Defaults to `Settings.VarType.String`. Use `Settings.VarType.Number` or `Settings.VarType.Boolean` for non-string custom controls. |
 
 ```lua
-SB.PathCustom({
+SB.Custom({
     path     = "powerBar.texture",
     name     = "Texture",
     template = "MyAddon_TexturePickerTemplate",
 })
 ```
 
-### `SB.PathControl(spec)`
+### `SB.Control(spec)`
 
 Unified dispatcher. Reads `spec.type` and forwards to the matching factory:
 
-- `"checkbox"` → `PathCheckbox`
-- `"slider"` → `PathSlider`
-- `"dropdown"` → `PathDropdown`
-- `"color"` → `PathColor`
-- `"custom"` → `PathCustom`
+- `"checkbox"` → `Checkbox`
+- `"slider"` → `Slider`
+- `"dropdown"` → `Dropdown`
+- `"color"` → `Color`
+- `"custom"` → `Custom`
 
 ```lua
-SB.PathControl({
+SB.Control({
     type    = "checkbox",
     path    = "resourceBar.showText",
     name    = "Show text",
@@ -274,7 +340,7 @@ Creates a group of controls for per-module font overrides:
 | `fontValues` | `function() -> table` | Choices for the font dropdown. |
 | `fontFallback` | `function() -> string` | Fallback font name when no override is set. |
 | `fontSizeFallback` | `function() -> number` | Fallback size when no override is set. |
-| `fontTemplate` | `string` | Custom template name; when provided, uses `PathCustom` instead of `PathDropdown`. |
+| `fontTemplate` | `string` | Custom template name; when provided, uses `Custom` instead of `Dropdown`. |
 | `enabledName` | `string` | Override label for the checkbox (default: `"Override font"`). |
 | `fontName` / `sizeName` | `string` | Override labels for the font/size controls. |
 | `sizeMin` / `sizeMax` / `sizeStep` | `number` | Slider bounds (defaults: 6–32, step 1). |
@@ -437,16 +503,18 @@ LibSettingsBuilder hooks `SettingsSliderControlMixin:Init` globally (once per li
 
 ## Full Example
 
-### Imperative API
+### Imperative API (path mode)
 
 ```lua
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
 local SB = LSB:New({
-    getProfile  = function() return MyAddonDB.profile end,
-    getDefaults = function() return MyAddonDefaults.profile end,
-    varPrefix   = "MYADDON",
-    onChanged   = function() MyAddon:Refresh() end,
+    pathAdapter = LSB.PathAdapter({
+        getStore    = function() return MyAddonDB.profile end,
+        getDefaults = function() return MyAddonDefaults.profile end,
+    }),
+    varPrefix = "MYADDON",
+    onChanged = function() MyAddon:Refresh() end,
     compositeDefaults = {
         PositioningGroup = {
             positionModes    = { attached = "Attached", free = "Free" },
@@ -459,7 +527,7 @@ SB.CreateRootCategory("My Addon")
 
 -- Root page
 SB._currentSubcategory = SB._rootCategory
-SB.PathCheckbox({ path = "general.welcomeMessage", name = "Show welcome message" })
+SB.Checkbox({ path = "general.welcomeMessage", name = "Show welcome message" })
 
 -- Power Bar subcategory
 SB.CreateSubcategory("Power Bar")
@@ -467,7 +535,7 @@ SB.CreateSubcategory("Power Bar")
 SB.HeightOverrideSlider("powerBar")
 
 SB.Header("Display")
-SB.PathSlider({
+SB.Slider({
     path = "powerBar.opacity",
     name = "Opacity",
     min = 0, max = 100, step = 1,
@@ -536,11 +604,11 @@ Standard types (AceConfig aliases are supported):
 
 | Type | Alias | Maps to |
 |---|---|---|
-| `checkbox` | `toggle` | `PathCheckbox` |
-| `slider` | `range` | `PathSlider` |
-| `dropdown` | `select` | `PathDropdown` |
-| `color` | — | `PathColor` |
-| `custom` | — | `PathCustom` |
+| `checkbox` | `toggle` | `Checkbox` |
+| `slider` | `range` | `Slider` |
+| `dropdown` | `select` | `Dropdown` |
+| `color` | — | `Color` |
+| `custom` | — | `Custom` |
 | `button` | `execute` | `Button` |
 | `header` | — | `Header` |
 | `label` | `description` | `Subheader` |

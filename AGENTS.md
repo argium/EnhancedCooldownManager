@@ -1,4 +1,5 @@
 Be concise with your responses.
+Be professional but honest.
 Use mermaid diagrams and tables to explain complex concepts and architecture.
 
 # Coding

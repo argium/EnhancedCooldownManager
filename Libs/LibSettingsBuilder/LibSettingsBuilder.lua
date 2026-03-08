@@ -409,26 +409,96 @@ if not lib._sliderHookInstalled then
 end
 
 --------------------------------------------------------------------------------
+-- Path accessors: built-in dot-path resolution with numeric key support
+--------------------------------------------------------------------------------
+
+local function defaultGetNestedValue(tbl, path)
+    local current = tbl
+    for segment in path:gmatch("[^.]+") do
+        if type(current) ~= "table" then
+            return nil
+        end
+        local val = current[segment]
+        if val == nil then
+            local num = tonumber(segment)
+            if num then
+                val = current[num]
+            end
+        end
+        current = val
+    end
+    return current
+end
+
+local function defaultSetNestedValue(tbl, path, value)
+    local current, lastKey = tbl, nil
+    for segment in path:gmatch("[^.]+") do
+        if lastKey then
+            local resolved = lastKey
+            if current[lastKey] == nil then
+                local num = tonumber(lastKey)
+                if num and current[num] ~= nil then
+                    resolved = num
+                end
+            end
+            if current[resolved] == nil then
+                current[resolved] = {}
+            end
+            current = current[resolved]
+        end
+        lastKey = segment
+    end
+    local resolved = lastKey
+    if current[lastKey] == nil then
+        local num = tonumber(lastKey)
+        if num then
+            resolved = num
+        end
+    end
+    current[resolved] = value
+end
+
+--- Creates a path adapter for resolving dot-delimited paths to get/set/default
+--- bindings. Built-in accessors handle numeric path segments (e.g. "colors.0").
+---@param config table
+---   Required: getStore (function() -> table), getDefaults (function() -> table)
+---   Optional: getNestedValue, setNestedValue (custom path accessors)
+---@return table adapter with :resolve(path) and :read(path) methods
+function lib.PathAdapter(config)
+    assert(config.getStore, "PathAdapter: getStore is required")
+    assert(config.getDefaults, "PathAdapter: getDefaults is required")
+
+    local getNested = config.getNestedValue or defaultGetNestedValue
+    local setNested = config.setNestedValue or defaultSetNestedValue
+
+    return {
+        resolve = function(self, path)
+            return {
+                get = function() return getNested(config.getStore(), path) end,
+                set = function(value) setNested(config.getStore(), path, value) end,
+                default = getNested(config.getDefaults(), path),
+            }
+        end,
+        read = function(self, path)
+            return getNested(config.getStore(), path)
+        end,
+    }
+end
+
+--------------------------------------------------------------------------------
 -- Factory
 --------------------------------------------------------------------------------
 
 --- Create a new SettingsBuilder instance.
 ---@param config table
 ---   Required fields:
----     getProfile     function() -> table
----     getDefaults    function() -> table
----     getNestedValue function(tbl, path) -> any
----     setNestedValue function(tbl, path, value)
 ---     varPrefix      string            e.g. "ECM"
 ---     onChanged      function(spec, value) called after each setter
 ---   Optional fields:
+---     pathAdapter    table  PathAdapter instance for path-based controls
 ---     compositeDefaults table keyed by composite function name
 ---@return table builder instance with the full SB API
 function lib:New(config)
-    assert(config.getProfile, "LibSettingsBuilder: getProfile is required")
-    assert(config.getDefaults, "LibSettingsBuilder: getDefaults is required")
-    assert(config.getNestedValue, "LibSettingsBuilder: getNestedValue is required")
-    assert(config.setNestedValue, "LibSettingsBuilder: setNestedValue is required")
     assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
     assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
 
@@ -454,13 +524,11 @@ function lib:New(config)
         return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
     end
 
-    local getProfile = config.getProfile
-    local getDefaults = config.getDefaults
-    local getNestedValue = config.getNestedValue
-    local setNestedValue = config.setNestedValue
+    local adapter = config.pathAdapter
 
-    local function makeVarName(path)
-        return config.varPrefix .. "_" .. path:gsub("%.", "_")
+    local function makeVarName(spec)
+        local id = spec.key or spec.path
+        return config.varPrefix .. "_" .. id:gsub("%.", "_")
     end
 
     local function resolveCategory(spec)
@@ -477,15 +545,43 @@ function lib:New(config)
         reevaluateReactiveControls()
     end
 
+    --- Resolves a spec into a binding with get/set/default.
+    --- Handler mode: spec provides explicit get, set, key, and default.
+    --- Path mode: spec provides a path string; the pathAdapter generates get/set/default.
+    local function resolveBinding(spec)
+        local hasPath = spec.path ~= nil
+        local hasHandler = spec.get ~= nil or spec.set ~= nil
+
+        assert(not (hasPath and hasHandler), "spec cannot have both path and get/set")
+
+        if hasHandler then
+            assert(spec.get, "handler mode requires get")
+            assert(spec.set, "handler mode requires set")
+            assert(spec.key, "handler mode requires key")
+            return { get = spec.get, set = spec.set, default = spec.default }
+        end
+
+        assert(hasPath, "spec must have either path or get/set")
+        assert(adapter, "path mode requires a pathAdapter on the builder")
+
+        local binding = adapter:resolve(spec.path)
+        if spec.default ~= nil then
+            binding.default = spec.default
+        end
+        return binding
+    end
+
     --- Consolidates the getter/setter/default/transform/register boilerplate
-    --- shared by PathCheckbox, PathSlider, PathDropdown, and PathCustom.
-    local function makeProxySetting(spec, varType, defaultFallback)
-        local variable = makeVarName(spec.path)
+    --- shared by Checkbox, Slider, Dropdown, and Custom.
+    local function makeProxySetting(spec, varType, defaultFallback, binding)
+        local variable = makeVarName(spec)
         local cat = resolveCategory(spec)
         local setting
 
+        binding = binding or resolveBinding(spec)
+
         local function getter()
-            local val = getNestedValue(getProfile(), spec.path)
+            local val = binding.get()
             if spec.getTransform then
                 val = spec.getTransform(val)
             end
@@ -496,7 +592,7 @@ function lib:New(config)
             if spec.setTransform then
                 value = spec.setTransform(value)
             end
-            setNestedValue(getProfile(), spec.path, value)
+            binding.set(value)
             return value
         end
 
@@ -511,7 +607,7 @@ function lib:New(config)
             reevaluateReactiveControls()
         end
 
-        local default = getNestedValue(getDefaults(), spec.path)
+        local default = binding.default
         if spec.getTransform then
             default = spec.getTransform(default)
         end
@@ -579,6 +675,10 @@ function lib:New(config)
         layout = true,
         type = true,
         desc = true,
+        get = true,
+        set = true,
+        key = true,
+        default = true,
     }
 
     local EXTRA_FIELDS_BY_TYPE = {
@@ -823,10 +923,10 @@ function lib:New(config)
     end
 
     ----------------------------------------------------------------------------
-    -- Path-based proxy controls
+    -- Proxy controls
     ----------------------------------------------------------------------------
 
-    function SB.PathCheckbox(spec)
+    function SB.Checkbox(spec)
         validateSpecFields("checkbox", spec)
         local setting, cat = makeProxySetting(spec, Settings.VarType.Boolean, false)
         local initializer = Settings.CreateCheckbox(cat, setting, spec.tooltip)
@@ -834,7 +934,7 @@ function lib:New(config)
         return initializer, setting
     end
 
-    function SB.PathSlider(spec)
+    function SB.Slider(spec)
         validateSpecFields("slider", spec)
         local setting, cat = makeProxySetting(spec, Settings.VarType.Number, 0)
 
@@ -847,20 +947,21 @@ function lib:New(config)
         return initializer, setting
     end
 
-    function SB.PathDropdown(spec)
+    function SB.Dropdown(spec)
         validateSpecFields("dropdown", spec)
+        local binding = resolveBinding(spec)
         local cat = resolveCategory(spec)
-        local default = getNestedValue(getDefaults(), spec.path)
+
+        local default = binding.default
         if spec.getTransform then
             default = spec.getTransform(default)
         end
 
         local varType = type(default) == "number" and Settings.VarType.Number or Settings.VarType.String
 
-        local setting = makeProxySetting(spec, varType, "")
+        local setting = makeProxySetting(spec, varType, "", binding)
 
         if spec.scrollHeight then
-            -- Scroll-enabled dropdown using the built-in scroll template
             local initializer = Settings.CreateElementInitializer(
                 lib.SCROLL_DROPDOWN_TEMPLATE,
                 {
@@ -896,13 +997,14 @@ function lib:New(config)
         return initializer, setting
     end
 
-    function SB.PathColor(spec)
+    function SB.Color(spec)
         validateSpecFields("color", spec)
-        local variable = makeVarName(spec.path)
+        local variable = makeVarName(spec)
         local cat = resolveCategory(spec)
+        local binding = resolveBinding(spec)
 
         local function getter()
-            local tbl = getNestedValue(getProfile(), spec.path)
+            local tbl = binding.get()
             return colorTableToHex(tbl)
         end
 
@@ -911,19 +1013,17 @@ function lib:New(config)
         local function setter(hexValue)
             local color = CreateColorFromHexString(hexValue)
             local tbl = { r = color.r, g = color.g, b = color.b, a = color.a }
-            setNestedValue(getProfile(), spec.path, tbl)
+            binding.set(tbl)
             postSet(spec, tbl, settingRef)
         end
 
-        local defaultTbl = getNestedValue(getDefaults(), spec.path) or {}
+        local defaultTbl = binding.default or {}
         local defaultHex = colorTableToHex(defaultTbl)
 
         local setting =
             Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, spec.name, defaultHex, getter, setter)
         settingRef = setting
 
-        -- Note: Settings.CreateColorSwatch does not support a hasAlpha parameter.
-        -- Alpha channel selection is not available through the Blizzard Settings API.
         local initializer = Settings.CreateColorSwatch(cat, setting, spec.tooltip)
         applyModifiers(initializer, spec)
 
@@ -932,9 +1032,9 @@ function lib:New(config)
 
     --- Creates a proxy setting backed by a custom frame template.
     --- The template's Init receives initializer data containing {setting, name, tooltip}.
-    function SB.PathCustom(spec)
+    function SB.Custom(spec)
         validateSpecFields("custom", spec)
-        assert(spec.template, "PathCustom: spec.template is required")
+        assert(spec.template, "Custom: spec.template is required")
         local setting, cat = makeProxySetting(spec, spec.varType or Settings.VarType.String, "")
 
         local initializer =
@@ -949,18 +1049,18 @@ function lib:New(config)
         return initializer, setting
     end
 
-    --- Unified path-based proxy control dispatch table.
-    local PATH_DISPATCH = {
-        checkbox = "PathCheckbox",
-        slider = "PathSlider",
-        dropdown = "PathDropdown",
-        color = "PathColor",
-        custom = "PathCustom",
+    --- Unified proxy control dispatch table.
+    local DISPATCH = {
+        checkbox = "Checkbox",
+        slider = "Slider",
+        dropdown = "Dropdown",
+        color = "Color",
+        custom = "Custom",
     }
 
-    function SB.PathControl(spec)
-        local fn = SB[PATH_DISPATCH[spec.type]]
-        assert(fn, "PathControl: unknown type '" .. tostring(spec.type) .. "'")
+    function SB.Control(spec)
+        local fn = SB[DISPATCH[spec.type]]
+        assert(fn, "Control: unknown type '" .. tostring(spec.type) .. "'")
         return fn(spec)
     end
 
@@ -985,7 +1085,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(childSpec, spec)
-        return SB.PathSlider(childSpec)
+        return SB.Slider(childSpec)
     end
 
     --- Font override group.
@@ -1007,7 +1107,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(enabledSpec, spec)
-        local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
+        local enabledInit, enabledSetting = SB.Checkbox(enabledSpec)
 
         -- Children stay visible but disabled when override is off.
         -- The font picker's SetEnabled hides the preview automatically.
@@ -1040,9 +1140,9 @@ function lib:New(config)
         local fontInit
         if spec.fontTemplate then
             fontSpec.template = spec.fontTemplate
-            fontInit = SB.PathCustom(fontSpec)
+            fontInit = SB.Custom(fontSpec)
         else
-            fontInit = SB.PathDropdown(fontSpec)
+            fontInit = SB.Dropdown(fontSpec)
         end
 
         local sizeSpec = {
@@ -1064,7 +1164,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(sizeSpec, spec)
-        local sizeInit = SB.PathSlider(sizeSpec)
+        local sizeInit = SB.Slider(sizeSpec)
 
         return {
             enabledInit = enabledInit,
@@ -1083,7 +1183,7 @@ function lib:New(config)
             tooltip = spec.enabledTooltip,
         }
         propagateModifiers(enabledSpec, spec)
-        local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
+        local enabledInit, enabledSetting = SB.Checkbox(enabledSpec)
 
         local thicknessSpec = {
             path = borderPath .. ".thickness",
@@ -1098,7 +1198,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(thicknessSpec, spec)
-        local thicknessInit = SB.PathSlider(thicknessSpec)
+        local thicknessInit = SB.Slider(thicknessSpec)
 
         local colorSpec = {
             path = borderPath .. ".color",
@@ -1110,7 +1210,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(colorSpec, spec)
-        local colorInit = SB.PathColor(colorSpec)
+        local colorInit = SB.Color(colorSpec)
 
         return {
             enabledInit = enabledInit,
@@ -1131,7 +1231,7 @@ function lib:New(config)
                 tooltip = def.tooltip,
             }
             propagateModifiers(childSpec, spec)
-            local init, setting = SB.PathColor(childSpec)
+            local init, setting = SB.Color(childSpec)
             results[#results + 1] = { key = def.key, initializer = init, setting = setting }
         end
 
@@ -1157,15 +1257,15 @@ function lib:New(config)
             values = spec.positionModes,
             onSet = function(value)
                 if spec.applyPositionMode then
-                    spec.applyPositionMode(getNestedValue(getProfile(), configPath), value)
+                    spec.applyPositionMode(adapter:read(configPath), value)
                 end
             end,
         }
         propagateModifiers(modeSpec, spec)
-        local modeInit, modeSetting = SB.PathDropdown(modeSpec)
+        local modeInit, modeSetting = SB.Dropdown(modeSpec)
 
         local function isFreeMode()
-            return spec.isAnchorModeFree(getNestedValue(getProfile(), configPath))
+            return spec.isAnchorModeFree(adapter:read(configPath))
         end
 
         local defaultBarWidth = spec.defaultBarWidth or 250
@@ -1184,7 +1284,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(widthSpec, spec)
-        local widthInit = SB.PathSlider(widthSpec)
+        local widthInit = SB.Slider(widthSpec)
 
         local offsetXInit
         if spec.includeOffsetX ~= false then
@@ -1205,7 +1305,7 @@ function lib:New(config)
                 end,
             }
             propagateModifiers(offsetXSpec, spec)
-            offsetXInit = SB.PathSlider(offsetXSpec)
+            offsetXInit = SB.Slider(offsetXSpec)
         end
 
         local offsetYSpec = {
@@ -1225,7 +1325,7 @@ function lib:New(config)
             end,
         }
         propagateModifiers(offsetYSpec, spec)
-        local offsetYInit = SB.PathSlider(offsetYSpec)
+        local offsetYInit = SB.Slider(offsetYSpec)
 
         return {
             modeInit = modeInit,
@@ -1460,10 +1560,17 @@ function lib:New(config)
                     end
                 elseif COMPOSITE_DISPATCH[entryType] then
                     init, setting = COMPOSITE_DISPATCH[entryType](resolvePath(entry.path), spec)
-                elseif PATH_DISPATCH[entryType] then
-                    spec.path = resolvePath(entry.path or spec.path)
+                elseif DISPATCH[entryType] then
+                    -- Path mode: resolve path from group prefix
+                    if not spec.get then
+                        spec.path = resolvePath(entry.path or spec.path)
+                    end
+                    -- Handler mode: fall back to entry key as spec.key if not set
+                    if spec.get and not spec.key then
+                        spec.key = entry._key
+                    end
                     spec.type = entryType
-                    init, setting = SB.PathControl(spec)
+                    init, setting = SB.Control(spec)
                 end
 
                 created[entry._key] = { initializer = init, setting = setting }

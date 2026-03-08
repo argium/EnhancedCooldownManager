@@ -216,15 +216,19 @@ ECM.OptionUtil = {
 -- SettingsBuilder instance
 --------------------------------------------------------------------------------
 
-ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
-    getProfile = function()
-        return ns.Addon.db and ns.Addon.db.profile
-    end,
-    getDefaults = function()
-        return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
-    end,
-    getNestedValue = getNestedValue,
-    setNestedValue = setNestedValue,
+local LSB = LibStub("LibSettingsBuilder-1.0")
+
+ECM.SettingsBuilder = LSB:New({
+    pathAdapter = LSB.PathAdapter({
+        getStore = function()
+            return ns.Addon.db and ns.Addon.db.profile
+        end,
+        getDefaults = function()
+            return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+        end,
+        getNestedValue = getNestedValue,
+        setNestedValue = setNestedValue,
+    }),
     varPrefix = "ECM",
     onChanged = function(spec)
         if spec.layout ~= false then
