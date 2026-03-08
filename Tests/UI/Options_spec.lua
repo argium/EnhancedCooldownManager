@@ -122,7 +122,7 @@ describe("OptionUtil", function()
                 ns.Addon.ConfirmReloadUI = function(_, msg) reloadMessage = msg end
 
                 local setting = {
-                    SetValue = function(_, val) revertedValue = val end,
+                    SetValueNoCallback = function(_, val) revertedValue = val end,
                 }
 
                 local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
@@ -132,12 +132,22 @@ describe("OptionUtil", function()
                 assert.are.equal("Reload now?", reloadMessage)
             end)
 
+            it("falls back to profile state when no silent setting API exists", function()
+                ns.Addon.db.profile.buffBars = { enabled = false }
+                ns.Addon.ConfirmReloadUI = function() end
+
+                local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
+                handler(false)
+
+                assert.is_true(ns.Addon.db.profile.buffBars.enabled)
+            end)
+
             it("disables module via reload callback", function()
                 local disabledModule, capturedCallback
                 ns.Addon.DisableModule = function(_, name) disabledModule = name end
                 ns.Addon.ConfirmReloadUI = function(_, _, cb) capturedCallback = cb end
 
-                local setting = { SetValue = function() end }
+                local setting = { SetValueNoCallback = function() end }
 
                 local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
                 handler(false, setting)

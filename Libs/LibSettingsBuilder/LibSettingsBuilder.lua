@@ -482,7 +482,7 @@ function lib:New(config)
     local function makeProxySetting(spec, varType, defaultFallback)
         local variable = makeVarName(spec.path)
         local cat = resolveCategory(spec)
-        local settingRef
+        local setting
 
         local function getter()
             local val = getNestedValue(getProfile(), spec.path)
@@ -492,12 +492,23 @@ function lib:New(config)
             return val
         end
 
-        local function setter(value)
+        local function applyValue(value)
             if spec.setTransform then
                 value = spec.setTransform(value)
             end
             setNestedValue(getProfile(), spec.path, value)
-            postSet(spec, value, settingRef)
+            return value
+        end
+
+        local function setter(value)
+            value = applyValue(value)
+            postSet(spec, value, setting)
+        end
+
+        local function setValueNoCallback(_, value)
+            value = applyValue(value)
+            config.onChanged(spec, value)
+            reevaluateReactiveControls()
         end
 
         local default = getNestedValue(getDefaults(), spec.path)
@@ -505,7 +516,7 @@ function lib:New(config)
             default = spec.getTransform(default)
         end
 
-        local setting = Settings.RegisterProxySetting(
+        setting = Settings.RegisterProxySetting(
             cat,
             variable,
             varType,
@@ -514,7 +525,7 @@ function lib:New(config)
             getter,
             setter
         )
-        settingRef = setting
+        setting.SetValueNoCallback = setValueNoCallback
 
         return setting, cat
     end

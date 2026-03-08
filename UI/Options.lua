@@ -119,6 +119,20 @@ local function getIsDisabledDelegate(configPath)
     end
 end
 
+local function setModuleEnabledValue(moduleName, value, setting)
+    if setting and type(setting.SetValueNoCallback) == "function" then
+        setting:SetValueNoCallback(value)
+        return
+    end
+
+    local profile = ns.Addon and ns.Addon.db and ns.Addon.db.profile
+    local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
+    local moduleConfig = profile and profile[configKey]
+    if moduleConfig then
+        moduleConfig.enabled = value
+    end
+end
+
 --- Creates a standard onSet handler for module enable/disable toggles.
 --- For modules that require a reload to disable, pass requiresReload with a message.
 ---@param moduleName string The module name (e.g., "PowerBar")
@@ -127,23 +141,25 @@ end
 local function createModuleEnabledHandler(moduleName, requiresReload)
     return function(value, setting)
         if value then
-            setting:SetValue(true)
             ns.Addon:EnableModule(moduleName)
             return
-        elseif requiresReload then
+        end
+
+        if requiresReload then
             -- Some modules require a reload to disable them. In those cases, the user can click accept or cancel. Cancelling will switch the module back on.
+            setModuleEnabledValue(moduleName, true, setting)
             ns.Addon:ConfirmReloadUI(requiresReload, function()
                 -- On accept, disable the module and set the toggle to false
-                setting:SetValue(false)
+                setModuleEnabledValue(moduleName, false, setting)
                 ns.Addon:DisableModule(moduleName)
             end, function()
                 -- On cancel, revert the toggle back to enabled
-                setting:SetValue(true)
+                setModuleEnabledValue(moduleName, true, setting)
             end)
-        else
-            setting:SetValue(false)
-            ns.Addon:DisableModule(moduleName)
+            return
         end
+
+        ns.Addon:DisableModule(moduleName)
     end
 end
 

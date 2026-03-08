@@ -154,7 +154,11 @@ function TestHelpers.SetupSettingsStubs()
         end,
 
         RegisterCanvasLayoutSubcategory = function(parent, frame, name)
-            return { _name = name, _parent = parent, _frame = frame }
+            local layout = makeLayout()
+            return {
+                _name = name, _parent = parent, _frame = frame,
+                GetLayout = function() return layout end,
+            }, layout
         end,
 
         RegisterAddOnCategory = function() end,
@@ -671,6 +675,9 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
             ANCHORMODE_FREE = "free",
             GROW_DIRECTION_DOWN = "down",
             GROW_DIRECTION_UP = "up",
+            SPELL_COLORS_SUBCAT = "Spell Colors",
+            SPELL_COLORS_DESC_TEXT = "Configure per-spell aura bar colors.",
+            SCROLL_ROW_HEIGHT_COMPACT = 20,
             DEFAULT_BAR_WIDTH = 250,
             DEFAULT_BAR_HEIGHT = 20,
             DEFAULT_BORDER_THICKNESS = 4,

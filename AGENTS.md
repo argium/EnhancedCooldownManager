@@ -1,3 +1,6 @@
+Be concise with your responses.
+Use mermaid diagrams and tables to explain complex concepts and architecture.
+
 # Coding
 
 - MANDATORY: **ALL constants** are to be stored in Constants.lua.

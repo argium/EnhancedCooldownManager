@@ -126,7 +126,10 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     if resourceType then
         local max = UnitPowerMax("player", resourceType)
         local current = UnitPower("player", resourceType)
-        local safeMax = issecretvalue(max) and nil or max
+        local safeMax = max
+        if issecretvalue(max) then
+            safeMax = nil
+        end
         return max, current, safeMax
     end
 end
