@@ -49,7 +49,7 @@ local constants = {
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
     RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
     RESOURCEBAR_ICICLES_SPELLID = 205473,
-    SPELLID_VOID_FRAGMENTS = 1225789,  -- tracks progress towards void meta form (35 fragments)
+    SPELLID_VOID_FRAGMENTS = 1225789, -- tracks progress towards void meta form (35 fragments)
     SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
     RESOURCEBAR_DEVOURER_NORMAL_MAX = 30,
@@ -156,7 +156,9 @@ local constants = {
     DIALOG_BACKDROP = {
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 },
     },
 }
@@ -171,17 +173,17 @@ local BLIZZARD_FRAMES = {
 local CLASS_COLORS = {
     DEATHKNIGHT = "C41F3B",
     DEMONHUNTER = "A330C9",
-    DRUID       = "FF7D0A",
-    EVOKER      = "33937F",
-    HUNTER      = "ABD473",
-    MAGE        = "69CCF0",
-    MONK        = "00FF96",
-    PALADIN     = "F58CBA",
-    PRIEST      = "FFFFFF",
-    ROGUE       = "FFF569",
-    SHAMAN      = "0070DE",
-    WARLOCK     = "9482C9",
-    WARRIOR     = "C79C6E",
+    DRUID = "FF7D0A",
+    EVOKER = "33937F",
+    HUNTER = "ABD473",
+    MAGE = "69CCF0",
+    MONK = "00FF96",
+    PALADIN = "F58CBA",
+    PRIEST = "FFFFFF",
+    ROGUE = "FFF569",
+    SHAMAN = "0070DE",
+    WARLOCK = "9482C9",
+    WARRIOR = "C79C6E",
 }
 
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }

@@ -286,11 +286,15 @@ end
 local function getUtilityViewerLayout()
     local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
-        return ECM.Constants.DEFAULT_ITEM_ICON_SIZE, ECM.Constants.DEFAULT_ITEM_ICON_SPACING, 1.0, false, {
-            reason = "viewer_hidden_or_missing",
-            measuredSpacing = nil,
-            childScale = nil,
-        }
+        return ECM.Constants.DEFAULT_ITEM_ICON_SIZE,
+            ECM.Constants.DEFAULT_ITEM_ICON_SPACING,
+            1.0,
+            false,
+            {
+                reason = "viewer_hidden_or_missing",
+                measuredSpacing = nil,
+                childScale = nil,
+            }
     end
 
     local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
@@ -435,7 +439,10 @@ function ItemIcons:UpdateLayout(why)
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
-        icon.Border:SetSize(iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE, iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE)
+        icon.Border:SetSize(
+            iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE,
+            iconSize * ECM.Constants.ITEM_ICON_BORDER_SCALE
+        )
         icon.slotId = iconData.slotId
         icon.itemId = iconData.itemId
 
@@ -475,7 +482,10 @@ function ItemIcons:UpdateLayout(why)
     -- Retry layout measurement when the viewer hasn't stabilized yet.
     if layoutStable then
         self._layoutRetryCount = 0
-    elseif not self._layoutRetryPending and (self._layoutRetryCount or 0) < ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS then
+    elseif
+        not self._layoutRetryPending
+        and (self._layoutRetryCount or 0) < ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS
+    then
         self._layoutRetryPending = true
         self._layoutRetryCount = (self._layoutRetryCount or 0) + 1
         C_Timer.After(ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()

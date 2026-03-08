@@ -22,16 +22,27 @@ local RESOURCE_COLOR_DEFS = {
 local ResourceBarOptions = {}
 
 local function isDisabled()
-    return ECM.ClassUtil.IsDeathKnight() or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
+    return ECM.ClassUtil.IsDeathKnight()
+        or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
 end
 
 function ResourceBarOptions.RegisterSettings(SB)
     local args = ECM.OptionUtil.CreateBarArgs(isDisabled)
     args.enabled = {
-        type = "toggle", path = "enabled", name = "Enable resource bar",
-        order = 0, onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+        type = "toggle",
+        path = "enabled",
+        name = "Enable resource bar",
+        order = 0,
+        onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
     }
-    args.colors = { type = "colorList", defs = RESOURCE_COLOR_DEFS, label = "Colors", path = "colors", disabled = isDisabled, order = 30 }
+    args.colors = {
+        type = "colorList",
+        defs = RESOURCE_COLOR_DEFS,
+        label = "Colors",
+        path = "colors",
+        disabled = isDisabled,
+        order = 30,
+    }
 
     SB.RegisterFromTable({
         name = "Resource Bar",

@@ -32,6 +32,7 @@ local function deepCopyExcluding(source, excludePaths, currentPath, seen)
         local message = "Circular reference detected at path: " .. path
         ECM.Log("ImportExport", message)
         error(message)
+        return nil
     end
     seen[source] = true
 
@@ -94,7 +95,7 @@ function ImportExport.EncodeData(data)
         return nil, "Serialization failed"
     end
 
-    local compressed = LibDeflate:CompressDeflate(serialized, {level = 9})
+    local compressed = LibDeflate:CompressDeflate(serialized, { level = 9 })
     if not compressed then
         return nil, "Compression failed"
     end
@@ -130,7 +131,12 @@ function ImportExport.DecodeData(importString)
 
     local version = tonumber(versionStr)
     if not version or version > C.EXPORT_VERSION then
-        return nil, "Incompatible import string version (expected " .. C.EXPORT_VERSION .. ", got " .. tostring(versionStr) .. ")"
+        return nil,
+            "Incompatible import string version (expected "
+                .. C.EXPORT_VERSION
+                .. ", got "
+                .. tostring(versionStr)
+                .. ")"
     end
 
     -- Decode
@@ -165,7 +171,7 @@ local function prepareProfileForExport(profile)
     assert(profile, "profile is nil")
 
     -- Exclude runtime cache data
-    local excludePaths = {"buffBars.colors.cache"}
+    local excludePaths = { "buffBars.colors.cache" }
     local cleanedProfile = deepCopyExcluding(profile, excludePaths)
 
     return {
@@ -222,9 +228,7 @@ function ImportExport.ApplyImportData(data)
     end
 
     -- Preserve the cache if it exists (deep copy to avoid shared references)
-    local existingCache = db.profile.buffBars
-        and db.profile.buffBars.colors
-        and db.profile.buffBars.colors.cache
+    local existingCache = db.profile.buffBars and db.profile.buffBars.colors and db.profile.buffBars.colors.cache
     if existingCache then
         existingCache = deepCopyExcluding(existingCache)
     end

@@ -24,7 +24,9 @@ function AdvancedOptions.RegisterSettings(SB)
                 path = "updateFrequency",
                 name = "Update Frequency",
                 desc = "How often (in seconds) to refresh bar displays. Lower values are smoother but use more CPU.",
-                min = 0.04, max = 0.5, step = 0.04,  -- TODO: this step doesn't work correctly with the slider widget.
+                min = 0.04,
+                max = 0.5,
+                step = 0.04, -- TODO: this step doesn't work correctly with the slider widget.
                 order = 21,
             },
         },

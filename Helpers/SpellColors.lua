@@ -179,10 +179,14 @@ end
 local function buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
     local keyType = preferredType
     local primaryKey
-    if keyType == "spellName" then primaryKey = spellName
-    elseif keyType == "spellID" then primaryKey = spellID
-    elseif keyType == "cooldownID" then primaryKey = cooldownID
-    elseif keyType == "textureFileID" then primaryKey = textureFileID
+    if keyType == "spellName" then
+        primaryKey = spellName
+    elseif keyType == "spellID" then
+        primaryKey = spellID
+    elseif keyType == "cooldownID" then
+        primaryKey = cooldownID
+    elseif keyType == "textureFileID" then
+        primaryKey = textureFileID
     end
     if not primaryKey then
         primaryKey, keyType = selectPrimaryKey(spellName, spellID, cooldownID, textureFileID)
@@ -293,7 +297,8 @@ local function sanitizeColorValue(color)
     return { r = color.r, g = color.g, b = color.b, a = color.a or 1 }
 end
 
-local LEGACY_METADATA_FIELDS = { "keyType", "primaryKey", "spellName", "spellID", "cooldownID", "textureId", "textureFileID" }
+local LEGACY_METADATA_FIELDS =
+    { "keyType", "primaryKey", "spellName", "spellID", "cooldownID", "textureId", "textureFileID" }
 
 ---@param value table|nil
 ---@return boolean changed
@@ -343,9 +348,8 @@ local function buildKeyFromEntry(entry, tierKeyType, rawKey)
     local spellName = validateKey((meta and meta.spellName) or value.spellName)
     local spellID = validateKey((meta and meta.spellID) or value.spellID)
     local cooldownID = validateKey((meta and meta.cooldownID) or value.cooldownID)
-    local textureFileID = validateKey(
-        (meta and (meta.textureFileID or meta.textureId)) or value.textureFileID or value.textureId
-    )
+    local textureFileID =
+        validateKey((meta and (meta.textureFileID or meta.textureId)) or value.textureFileID or value.textureId)
     local preferredType = ((meta and meta.keyType) or value.keyType or tierKeyType)
     if not KEY_TYPES[preferredType] then
         preferredType = tierKeyType
@@ -376,7 +380,8 @@ local function normalizeEntryMetadata(entry, normalized)
     local changed = scrubLegacyColorMetadata(entry.value)
     local desired = buildEntryMeta(normalized)
     local current = type(entry.meta) == "table" and entry.meta or nil
-    if not current
+    if
+        not current
         or current.keyType ~= desired.keyType
         or current.primaryKey ~= desired.primaryKey
         or current.spellName ~= desired.spellName
@@ -443,15 +448,13 @@ local function getMap()
         return nil
     end
 
-    _map = ECM.PriorityKeyMap.New(
-        KEY_DEFS,
-        function()
-            local cfg = config()
-            if not cfg then return nil end
-            return getCurrentClassSpecStores(cfg)
-        end,
-        validateKey
-    )
+    _map = ECM.PriorityKeyMap.New(KEY_DEFS, function()
+        local cfg = config()
+        if not cfg then
+            return nil
+        end
+        return getCurrentClassSpecStores(cfg)
+    end, validateKey)
     return _map
 end
 
@@ -476,7 +479,11 @@ local function repairCurrentSpecStoreMetadata()
                 local normalized = buildKeyFromEntry(entry, tierKeyType, rawKey)
                 if normalized and normalizeEntryMetadata(entry, normalized) then
                     changed = changed + 1
-                elseif type(entry) == "table" and type(entry.value) == "table" and scrubLegacyColorMetadata(entry.value) then
+                elseif
+                    type(entry) == "table"
+                    and type(entry.value) == "table"
+                    and scrubLegacyColorMetadata(entry.value)
+                then
                     changed = changed + 1
                 end
             end
@@ -497,7 +504,13 @@ end
 ---@param textureFileID number|nil
 ---@return ECM_SpellColorKey|nil
 function SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
-    return buildKey(validateKey(spellName), validateKey(spellID), validateKey(cooldownID), validateKey(textureFileID), nil)
+    return buildKey(
+        validateKey(spellName),
+        validateKey(spellID),
+        validateKey(cooldownID),
+        validateKey(textureFileID),
+        nil
+    )
 end
 
 --- Normalizes a key payload into an opaque spell-color key object.

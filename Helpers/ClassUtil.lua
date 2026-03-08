@@ -109,7 +109,9 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
             return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0, C.RESOURCEBAR_DEVOURER_META_MAX
         end
 
-        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX, voidFragments and voidFragments.applications or 0, C.RESOURCEBAR_DEVOURER_NORMAL_MAX
+        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX,
+            voidFragments and voidFragments.applications or 0,
+            C.RESOURCEBAR_DEVOURER_NORMAL_MAX
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then

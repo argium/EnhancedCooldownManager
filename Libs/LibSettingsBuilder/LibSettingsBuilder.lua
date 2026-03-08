@@ -4,7 +4,9 @@
 
 local MAJOR, MINOR = "LibSettingsBuilder-1.0", 1
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
-if not lib then return end
+if not lib then
+    return
+end
 
 lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
 lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
@@ -37,7 +39,9 @@ local CANVAS_SWATCH_CENTER_X = -73
 local CanvasLayout = {}
 lib.CanvasLayout = CanvasLayout
 
-function CanvasLayout:_Advance(h) self.yPos = self.yPos - h end
+function CanvasLayout:_Advance(h)
+    self.yPos = self.yPos - h
+end
 
 function CanvasLayout:_CreateRow(h)
     h = h or CANVAS_ELEMENT_HEIGHT
@@ -195,7 +199,9 @@ function LibSettingsBuilder_EmbedCanvasMixin:Init(initializer)
     SettingsListElementMixin.Init(self, initializer)
 
     local canvas = initializer:GetData().canvas
-    if not canvas then return end
+    if not canvas then
+        return
+    end
 
     canvas:SetParent(self)
     canvas:ClearAllPoints()
@@ -219,7 +225,9 @@ function LibSettingsBuilder_ScrollDropdownMixin:OnLoad()
 end
 
 function LibSettingsBuilder_ScrollDropdownMixin:Init(initializer)
-    if not initializer or not initializer.GetData then return end
+    if not initializer or not initializer.GetData then
+        return
+    end
     self.initializer = initializer
     self.lsbData = initializer:GetData() or {}
     SettingsDropdownControlMixin.Init(self, initializer)
@@ -234,7 +242,9 @@ end
 
 function LibSettingsBuilder_ScrollDropdownMixin:RefreshDropdownText(value)
     local dropdown = self.Control and self.Control.Dropdown
-    if not dropdown then return end
+    if not dropdown then
+        return
+    end
 
     local setting = self:GetSetting()
     local currentValue = value
@@ -243,7 +253,9 @@ function LibSettingsBuilder_ScrollDropdownMixin:RefreshDropdownText(value)
     end
 
     local values = self.lsbData and self.lsbData.values
-    if type(values) == "function" then values = values() end
+    if type(values) == "function" then
+        values = values()
+    end
     local text = values and values[currentValue] or tostring(currentValue or "")
 
     if dropdown.OverrideText then
@@ -264,14 +276,20 @@ function LibSettingsBuilder_ScrollDropdownMixin:InitDropdown()
     local scrollHeight = data.scrollHeight or 200
 
     local dropdown = self.Control and self.Control.Dropdown
-    if not dropdown or not setting then return end
+    if not dropdown or not setting then
+        return
+    end
 
     dropdown:SetupMenu(function(_, rootDescription)
         rootDescription:SetScrollMode(scrollHeight)
 
         local values = data.values
-        if type(values) == "function" then values = values() end
-        if not values then return end
+        if type(values) == "function" then
+            values = values()
+        end
+        if not values then
+            return
+        end
 
         for optValue, label in pairs(values) do
             rootDescription:CreateRadio(label, function()
@@ -292,12 +310,20 @@ end
 
 if not lib._sliderHookInstalled then
     local function setupSliderEditableValue()
-        if not SettingsSliderControlMixin then return end
+        if not SettingsSliderControlMixin then
+            return
+        end
 
         local function findValueLabel(sliderWithSteppers)
-            if sliderWithSteppers._label then return sliderWithSteppers._label end
-            if sliderWithSteppers.RightText then return sliderWithSteppers.RightText end
-            if sliderWithSteppers.Label then return sliderWithSteppers.Label end
+            if sliderWithSteppers._label then
+                return sliderWithSteppers._label
+            end
+            if sliderWithSteppers.RightText then
+                return sliderWithSteppers.RightText
+            end
+            if sliderWithSteppers.Label then
+                return sliderWithSteppers.Label
+            end
             for i = 1, select("#", sliderWithSteppers:GetRegions()) do
                 local region = select(i, sliderWithSteppers:GetRegions())
                 if region and region:IsObjectType("FontString") then
@@ -309,10 +335,14 @@ if not lib._sliderHookInstalled then
 
         hooksecurefunc(SettingsSliderControlMixin, "Init", function(self, initializer)
             local sliderWithSteppers = self.SliderWithSteppers
-            if not sliderWithSteppers then return end
+            if not sliderWithSteppers then
+                return
+            end
 
             local valueLabel = findValueLabel(sliderWithSteppers)
-            if not valueLabel then return end
+            if not valueLabel then
+                return
+            end
 
             if not self._lsbValueButton then
                 local btn = CreateFrame("Button", nil, sliderWithSteppers)
@@ -357,7 +387,9 @@ if not lib._sliderHookInstalled then
 
                 btn:SetScript("OnClick", function()
                     local setting = self._lsbCurrentSetting
-                    if not setting then return end
+                    if not setting then
+                        return
+                    end
                     editBox:SetText(tostring(setting:GetValue()))
                     valueLabel:Hide()
                     editBox:Show()
@@ -454,21 +486,34 @@ function lib:New(config)
 
         local function getter()
             local val = getNestedValue(getProfile(), spec.path)
-            if spec.getTransform then val = spec.getTransform(val) end
+            if spec.getTransform then
+                val = spec.getTransform(val)
+            end
             return val
         end
 
         local function setter(value)
-            if spec.setTransform then value = spec.setTransform(value) end
+            if spec.setTransform then
+                value = spec.setTransform(value)
+            end
             setNestedValue(getProfile(), spec.path, value)
             postSet(spec, value, settingRef)
         end
 
         local default = getNestedValue(getDefaults(), spec.path)
-        if spec.getTransform then default = spec.getTransform(default) end
+        if spec.getTransform then
+            default = spec.getTransform(default)
+        end
 
-        local setting = Settings.RegisterProxySetting(cat, variable,
-            varType, spec.name, default ~= nil and default or defaultFallback, getter, setter)
+        local setting = Settings.RegisterProxySetting(
+            cat,
+            variable,
+            varType,
+            spec.name,
+            default ~= nil and default or defaultFallback,
+            getter,
+            setter
+        )
         settingRef = setting
 
         return setting, cat
@@ -479,7 +524,9 @@ function lib:New(config)
     local MODIFIER_KEYS = { "category", "parent", "parentCheck", "disabled", "hidden", "layout" }
     local function propagateModifiers(target, source)
         for _, key in ipairs(MODIFIER_KEYS) do
-            if target[key] == nil then target[key] = source[key] end
+            if target[key] == nil then
+                target[key] = source[key]
+            end
         end
     end
 
@@ -487,10 +534,18 @@ function lib:New(config)
     --- Spec values win over defaults.
     local function mergeCompositeDefaults(functionName, spec)
         local defaults = config.compositeDefaults and config.compositeDefaults[functionName]
-        if not defaults then return spec or {} end
+        if not defaults then
+            return spec or {}
+        end
         local merged = {}
-        for k, v in pairs(defaults) do merged[k] = v end
-        if spec then for k, v in pairs(spec) do merged[k] = v end end
+        for k, v in pairs(defaults) do
+            merged[k] = v
+        end
+        if spec then
+            for k, v in pairs(spec) do
+                merged[k] = v
+            end
+        end
         return merged
     end
 
@@ -499,10 +554,20 @@ function lib:New(config)
     ----------------------------------------------------------------------------
 
     local COMMON_SPEC_FIELDS = {
-        path = true, name = true, tooltip = true, category = true,
-        onSet = true, getTransform = true, setTransform = true,
-        parent = true, parentCheck = true, disabled = true, hidden = true,
-        layout = true, type = true, desc = true,
+        path = true,
+        name = true,
+        tooltip = true,
+        category = true,
+        onSet = true,
+        getTransform = true,
+        setTransform = true,
+        parent = true,
+        parentCheck = true,
+        disabled = true,
+        hidden = true,
+        layout = true,
+        type = true,
+        desc = true,
     }
 
     local EXTRA_FIELDS_BY_TYPE = {
@@ -514,14 +579,24 @@ function lib:New(config)
     }
 
     local function validateSpecFields(controlType, spec)
-        if not LSB_DEBUG then return end
+        if not LSB_DEBUG then
+            return
+        end
         local allowed = EXTRA_FIELDS_BY_TYPE[controlType]
-        if not allowed then return end
+        if not allowed then
+            return
+        end
         for key in pairs(spec) do
             if not COMMON_SPEC_FIELDS[key] and not allowed[key] then
-                print("|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
-                    .. tostring(key) .. "' on " .. controlType
-                    .. " control '" .. tostring(spec.name or spec.path) .. "'")
+                print(
+                    "|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
+                        .. tostring(key)
+                        .. "' on "
+                        .. controlType
+                        .. " control '"
+                        .. tostring(spec.name or spec.path)
+                        .. "'"
+                )
             end
         end
     end
@@ -549,19 +624,27 @@ function lib:New(config)
             return spec.parentCheck()
         end
 
-        if not spec.parent.GetSetting then return true end
+        if not spec.parent.GetSetting then
+            return true
+        end
         local setting = spec.parent:GetSetting()
-        if not setting then return true end
+        if not setting then
+            return true
+        end
         return setting:GetValue()
     end
 
     local function isControlEnabled(spec)
-        if spec.disabled and spec.disabled() then return false end
+        if spec.disabled and spec.disabled() then
+            return false
+        end
         return isParentEnabled(spec)
     end
 
     local function applyCanvasState(canvas, enabled)
-        if canvas.SetAlpha then canvas:SetAlpha(enabled and 1 or 0.5) end
+        if canvas.SetAlpha then
+            canvas:SetAlpha(enabled and 1 or 0.5)
+        end
         setCanvasInteractive(canvas, enabled)
     end
 
@@ -590,13 +673,19 @@ function lib:New(config)
 
     local function applyEnabledState(initializer, spec)
         local enabled = isControlEnabled(spec)
-        if initializer.SetEnabled then initializer:SetEnabled(enabled) end
-        if spec.canvas then applyCanvasState(spec.canvas, enabled) end
+        if initializer.SetEnabled then
+            initializer:SetEnabled(enabled)
+        end
+        if spec.canvas then
+            applyCanvasState(spec.canvas, enabled)
+        end
         return enabled
     end
 
     local function applyModifiers(initializer, spec)
-        if not initializer then return end
+        if not initializer then
+            return
+        end
 
         if spec.disabled or spec.canvas or spec.parent then
             initializer:AddModifyPredicate(function()
@@ -624,12 +713,16 @@ function lib:New(config)
     end
 
     local function colorTableToHex(tbl)
-        if not tbl then return "FFFFFFFF" end
-        return string.format("%02X%02X%02X%02X",
+        if not tbl then
+            return "FFFFFFFF"
+        end
+        return string.format(
+            "%02X%02X%02X%02X",
             math.floor((tbl.a or 1) * 255 + 0.5),
             math.floor((tbl.r or 1) * 255 + 0.5),
             math.floor((tbl.g or 1) * 255 + 0.5),
-            math.floor((tbl.b or 1) * 255 + 0.5))
+            math.floor((tbl.b or 1) * 255 + 0.5)
+        )
     end
 
     ----------------------------------------------------------------------------
@@ -747,11 +840,11 @@ function lib:New(config)
         validateSpecFields("dropdown", spec)
         local cat = resolveCategory(spec)
         local default = getNestedValue(getDefaults(), spec.path)
-        if spec.getTransform then default = spec.getTransform(default) end
+        if spec.getTransform then
+            default = spec.getTransform(default)
+        end
 
-        local varType = type(default) == "number"
-            and Settings.VarType.Number
-            or Settings.VarType.String
+        local varType = type(default) == "number" and Settings.VarType.Number or Settings.VarType.String
 
         local setting = makeProxySetting(spec, varType, "")
 
@@ -759,8 +852,14 @@ function lib:New(config)
             -- Scroll-enabled dropdown using the built-in scroll template
             local initializer = Settings.CreateElementInitializer(
                 lib.SCROLL_DROPDOWN_TEMPLATE,
-                { setting = setting, values = spec.values, scrollHeight = spec.scrollHeight,
-                  name = spec.name, tooltip = spec.tooltip })
+                {
+                    setting = setting,
+                    values = spec.values,
+                    scrollHeight = spec.scrollHeight,
+                    name = spec.name,
+                    tooltip = spec.tooltip,
+                }
+            )
             if initializer.SetSetting then
                 initializer:SetSetting(setting)
             end
@@ -808,8 +907,8 @@ function lib:New(config)
         local defaultTbl = getNestedValue(getDefaults(), spec.path) or {}
         local defaultHex = colorTableToHex(defaultTbl)
 
-        local setting = Settings.RegisterProxySetting(cat, variable,
-            Settings.VarType.String, spec.name, defaultHex, getter, setter)
+        local setting =
+            Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, spec.name, defaultHex, getter, setter)
         settingRef = setting
 
         -- Note: Settings.CreateColorSwatch does not support a hasAlpha parameter.
@@ -827,8 +926,8 @@ function lib:New(config)
         assert(spec.template, "PathCustom: spec.template is required")
         local setting, cat = makeProxySetting(spec, spec.varType or Settings.VarType.String, "")
 
-        local initializer = Settings.CreateElementInitializer(spec.template,
-            { name = spec.name, tooltip = spec.tooltip })
+        local initializer =
+            Settings.CreateElementInitializer(spec.template, { name = spec.name, tooltip = spec.tooltip })
         if initializer.SetSetting then
             initializer:SetSetting(setting)
         end
@@ -841,8 +940,11 @@ function lib:New(config)
 
     --- Unified path-based proxy control dispatch table.
     local PATH_DISPATCH = {
-        checkbox = "PathCheckbox", slider = "PathSlider",
-        dropdown = "PathDropdown", color = "PathColor", custom = "PathCustom",
+        checkbox = "PathCheckbox",
+        slider = "PathSlider",
+        dropdown = "PathDropdown",
+        color = "PathColor",
+        custom = "PathCustom",
     }
 
     function SB.PathControl(spec)
@@ -864,8 +966,12 @@ function lib:New(config)
             min = spec.min or 0,
             max = spec.max or 40,
             step = spec.step or 1,
-            getTransform = function(value) return value or 0 end,
-            setTransform = function(value) return value > 0 and value or nil end,
+            getTransform = function(value)
+                return value or 0
+            end,
+            setTransform = function(value)
+                return value > 0 and value or nil
+            end,
         }
         propagateModifiers(childSpec, spec)
         return SB.PathSlider(childSpec)
@@ -885,7 +991,9 @@ function lib:New(config)
             path = overridePath,
             name = spec.enabledName or "Override font",
             tooltip = spec.enabledTooltip or "Override the global font settings for this module.",
-            getTransform = function(value) return value == true end,
+            getTransform = function(value)
+                return value == true
+            end,
         }
         propagateModifiers(enabledSpec, spec)
         local enabledInit, enabledSetting = SB.PathCheckbox(enabledSpec)
@@ -894,7 +1002,9 @@ function lib:New(config)
         -- The font picker's SetEnabled hides the preview automatically.
         local outerDisabled = spec.disabled
         local function isOverrideDisabled()
-            if outerDisabled and outerDisabled() then return true end
+            if outerDisabled and outerDisabled() then
+                return true
+            end
             return not enabledSetting:GetValue()
         end
 
@@ -905,8 +1015,12 @@ function lib:New(config)
             values = spec.fontValues,
             disabled = isOverrideDisabled,
             getTransform = function(value)
-                if value then return value end
-                if spec.fontFallback then return spec.fontFallback() end
+                if value then
+                    return value
+                end
+                if spec.fontFallback then
+                    return spec.fontFallback()
+                end
                 return nil
             end,
         }
@@ -929,8 +1043,12 @@ function lib:New(config)
             step = spec.sizeStep or 1,
             disabled = isOverrideDisabled,
             getTransform = function(value)
-                if value then return value end
-                if spec.fontSizeFallback then return spec.fontSizeFallback() end
+                if value then
+                    return value
+                end
+                if spec.fontSizeFallback then
+                    return spec.fontSizeFallback()
+                end
                 return 11
             end,
         }
@@ -964,7 +1082,9 @@ function lib:New(config)
             max = spec.thicknessMax or 10,
             step = spec.thicknessStep or 1,
             parent = enabledInit,
-            parentCheck = function() return enabledSetting:GetValue() end,
+            parentCheck = function()
+                return enabledSetting:GetValue()
+            end,
         }
         propagateModifiers(thicknessSpec, spec)
         local thicknessInit = SB.PathSlider(thicknessSpec)
@@ -974,7 +1094,9 @@ function lib:New(config)
             name = spec.colorName or "Border color",
             tooltip = spec.colorTooltip,
             parent = enabledInit,
-            parentCheck = function() return enabledSetting:GetValue() end,
+            parentCheck = function()
+                return enabledSetting:GetValue()
+            end,
         }
         propagateModifiers(colorSpec, spec)
         local colorInit = SB.PathColor(colorSpec)
@@ -1024,8 +1146,7 @@ function lib:New(config)
             values = spec.positionModes,
             onSet = function(value)
                 if spec.applyPositionMode then
-                    spec.applyPositionMode(
-                        getNestedValue(getProfile(), configPath), value)
+                    spec.applyPositionMode(getNestedValue(getProfile(), configPath), value)
                 end
             end,
         }
@@ -1033,8 +1154,7 @@ function lib:New(config)
         local modeInit, modeSetting = SB.PathDropdown(modeSpec)
 
         local function isFreeMode()
-            return spec.isAnchorModeFree(
-                getNestedValue(getProfile(), configPath))
+            return spec.isAnchorModeFree(getNestedValue(getProfile(), configPath))
         end
 
         local defaultBarWidth = spec.defaultBarWidth or 250
@@ -1066,8 +1186,12 @@ function lib:New(config)
                 step = 1,
                 parent = modeInit,
                 parentCheck = isFreeMode,
-                getTransform = function(value) return value or 0 end,
-                setTransform = function(value) return value ~= 0 and value or nil end,
+                getTransform = function(value)
+                    return value or 0
+                end,
+                setTransform = function(value)
+                    return value ~= 0 and value or nil
+                end,
             }
             propagateModifiers(offsetXSpec, spec)
             offsetXInit = SB.PathSlider(offsetXSpec)
@@ -1082,8 +1206,12 @@ function lib:New(config)
             step = 1,
             parent = modeInit,
             parentCheck = isFreeMode,
-            getTransform = function(value) return value or 0 end,
-            setTransform = function(value) return value ~= 0 and value or nil end,
+            getTransform = function(value)
+                return value or 0
+            end,
+            setTransform = function(value)
+                return value ~= 0 and value or nil
+            end,
         }
         propagateModifiers(offsetYSpec, spec)
         local offsetYInit = SB.PathSlider(offsetYSpec)
@@ -1107,7 +1235,9 @@ function lib:New(config)
         if not SB._firstHeaderAdded[cat] then
             SB._firstHeaderAdded[cat] = true
             local catName = SB._subcategoryNames[cat] or (cat == SB._rootCategory and SB._rootCategoryName)
-            if catName and text == catName then return nil end
+            if catName and text == catName then
+                return nil
+            end
         end
 
         local layout = SB._layouts[cat]
@@ -1135,10 +1265,11 @@ function lib:New(config)
         end
         modifiers.canvas = canvas
 
-        local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE,
-            { canvas = canvas })
+        local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE, { canvas = canvas })
         local extent = height or canvas:GetHeight()
-        initializer.GetExtent = function() return extent end
+        initializer.GetExtent = function()
+            return extent
+        end
 
         Settings.RegisterInitializer(cat, initializer)
         applyModifiers(initializer, modifiers)
@@ -1168,8 +1299,8 @@ function lib:New(config)
         end
 
         local layout = SB._layouts[cat]
-        local initializer = CreateSettingsButtonInitializer(
-            spec.name, spec.buttonText or spec.name, onClick, spec.tooltip, true)
+        local initializer =
+            CreateSettingsButtonInitializer(spec.name, spec.buttonText or spec.name, onClick, spec.tooltip, true)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
 
@@ -1188,18 +1319,21 @@ function lib:New(config)
         description = "subheader",
     }
 
-    local SPEC_EXCLUDE = { type=true, order=true, _key=true, defs=true, label=true, condition=true }
+    local SPEC_EXCLUDE = { type = true, order = true, _key = true, defs = true, label = true, condition = true }
 
     -- Composite type dispatch: returns init, setting from a composite builder
     local COMPOSITE_DISPATCH = {
         positioning = function(path, spec)
-            local r = SB.PositioningGroup(path, spec); return r.modeInit, r.modeSetting
+            local r = SB.PositioningGroup(path, spec)
+            return r.modeInit, r.modeSetting
         end,
         border = function(path, spec)
-            local r = SB.BorderGroup(path, spec); return r.enabledInit, r.enabledSetting
+            local r = SB.BorderGroup(path, spec)
+            return r.enabledInit, r.enabledSetting
         end,
         fontOverride = function(path, spec)
-            local r = SB.FontOverrideGroup(path, spec); return r.enabledInit, r.enabledSetting
+            local r = SB.FontOverrideGroup(path, spec)
+            return r.enabledInit, r.enabledSetting
         end,
         heightOverride = function(path, spec)
             return SB.HeightOverrideSlider(path, spec)
@@ -1219,12 +1353,18 @@ function lib:New(config)
         local groupPath = tbl.path or ""
 
         local function resolvePath(entryPath)
-            if not entryPath then return groupPath end
-            if entryPath:find("%.") or groupPath == "" then return entryPath end
+            if not entryPath then
+                return groupPath
+            end
+            if entryPath:find("%.") or groupPath == "" then
+                return entryPath
+            end
             return groupPath .. "." .. entryPath
         end
 
-        if not tbl.args then return end
+        if not tbl.args then
+            return
+        end
 
         -- Sort entries by order field
         local sorted = {}
@@ -1250,7 +1390,9 @@ function lib:New(config)
             if shouldProcess then
                 local spec = {}
                 for k, v in pairs(entry) do
-                    if not SPEC_EXCLUDE[k] then spec[k] = v end
+                    if not SPEC_EXCLUDE[k] then
+                        spec[k] = v
+                    end
                 end
 
                 if spec.desc and not spec.tooltip then
@@ -1258,8 +1400,12 @@ function lib:New(config)
                     spec.desc = nil
                 end
 
-                if tbl.disabled and spec.disabled == nil then spec.disabled = tbl.disabled end
-                if tbl.hidden and spec.hidden == nil then spec.hidden = tbl.hidden end
+                if tbl.disabled and spec.disabled == nil then
+                    spec.disabled = tbl.disabled
+                end
+                if tbl.hidden and spec.hidden == nil then
+                    spec.hidden = tbl.hidden
+                end
 
                 -- Resolve parent string references
                 if type(spec.parent) == "string" then
@@ -1268,10 +1414,14 @@ function lib:New(config)
                         spec.parent = ref.initializer
                         if spec.parentCheck == "checked" then
                             local s = ref.setting
-                            spec.parentCheck = function() return s:GetValue() end
+                            spec.parentCheck = function()
+                                return s:GetValue()
+                            end
                         elseif spec.parentCheck == "notChecked" then
                             local s = ref.setting
-                            spec.parentCheck = function() return not s:GetValue() end
+                            spec.parentCheck = function()
+                                return not s:GetValue()
+                            end
                         end
                     end
                 end
@@ -1280,30 +1430,25 @@ function lib:New(config)
 
                 if entryType == "header" then
                     init = SB.Header(spec.name)
-
                 elseif entryType == "subheader" then
                     init = SB.Subheader(spec)
-
                 elseif entryType == "button" then
                     init = SB.Button(spec)
-
                 elseif entryType == "canvas" then
                     init = SB.EmbedCanvas(entry.canvas, entry.height, spec)
-
                 elseif entryType == "colorList" then
                     local defs = entry.defs or {}
                     if entry.label then
-                        local labelInit = SB.Subheader({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
+                        local labelInit =
+                            SB.Subheader({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
                         spec.parent = spec.parent or labelInit
                     end
                     local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
                     if results[1] then
                         init, setting = results[1].initializer, results[1].setting
                     end
-
                 elseif COMPOSITE_DISPATCH[entryType] then
                     init, setting = COMPOSITE_DISPATCH[entryType](resolvePath(entry.path), spec)
-
                 elseif PATH_DISPATCH[entryType] then
                     spec.path = resolvePath(entry.path or spec.path)
                     spec.type = entryType

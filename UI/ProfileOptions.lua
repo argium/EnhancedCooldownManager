@@ -19,13 +19,17 @@ local ProfileOptions = {}
 --- Creates a proxy-backed dropdown for transient profile selection (not stored in SavedVars).
 local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGenerator)
     local selected = nil
-    local setting = Settings.RegisterProxySetting(cat, variable,
-        Settings.VarType.String, name, "",
-        function() return selected or "" end,
-        function(value) selected = value end
-    )
+    local setting = Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, name, "", function()
+        return selected or ""
+    end, function(value)
+        selected = value
+    end)
     Settings.CreateDropdown(cat, setting, valuesGenerator, tooltip)
-    return setting, function() return selected end, function() selected = nil end
+    return setting, function()
+        return selected
+    end, function()
+        selected = nil
+    end
 end
 
 function ProfileOptions.RegisterSettings(SB)
@@ -34,11 +38,18 @@ function ProfileOptions.RegisterSettings(SB)
     -- Switch Profile
     SB.Header("Active Profile")
 
-    local switchSetting = Settings.RegisterProxySetting(cat, "ECM_ProfileSwitch",
-        Settings.VarType.String, "Switch Profile",
+    local switchSetting = Settings.RegisterProxySetting(
+        cat,
+        "ECM_ProfileSwitch",
+        Settings.VarType.String,
+        "Switch Profile",
         ns.Addon.db:GetCurrentProfile(),
-        function() return ns.Addon.db:GetCurrentProfile() end,
-        function(value) ns.Addon.db:SetProfile(value) end
+        function()
+            return ns.Addon.db:GetCurrentProfile()
+        end,
+        function(value)
+            ns.Addon.db:SetProfile(value)
+        end
     )
 
     Settings.CreateDropdown(cat, switchSetting, function()
@@ -65,14 +76,21 @@ function ProfileOptions.RegisterSettings(SB)
         local container = Settings.CreateControlTextContainer()
         local current = ns.Addon.db:GetCurrentProfile()
         for _, name in ipairs(ns.Addon.db:GetProfiles()) do
-            if name ~= current then container:Add(name, name) end
+            if name ~= current then
+                container:Add(name, name)
+            end
         end
         return container:GetData()
     end
 
     local _, getCopyProfile, clearCopyProfile = createProfilePicker(
-        SB, cat, "ECM_ProfileCopy", "Copy From",
-        "Select a profile to copy settings from.", otherProfilesGenerator)
+        SB,
+        cat,
+        "ECM_ProfileCopy",
+        "Copy From",
+        "Select a profile to copy settings from.",
+        otherProfilesGenerator
+    )
 
     SB.Button({
         name = "Apply copy from selected profile",
@@ -80,15 +98,22 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = "Copy all settings from the selected profile into the current one.",
         onClick = function()
             local profile = getCopyProfile()
-            if not profile or profile == "" then return end
+            if not profile or profile == "" then
+                return
+            end
             ns.Addon.db:CopyProfile(profile)
             clearCopyProfile()
         end,
     })
 
     local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
-        SB, cat, "ECM_ProfileDelete", "Delete Profile",
-        "Select a profile to delete.", otherProfilesGenerator)
+        SB,
+        cat,
+        "ECM_ProfileDelete",
+        "Delete Profile",
+        "Select a profile to delete.",
+        otherProfilesGenerator
+    )
 
     SB.Button({
         name = "Delete the selected profile",
@@ -96,7 +121,9 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = "Delete the selected profile. The active profile cannot be deleted.",
         onClick = function()
             local profile = getDeleteProfile()
-            if not profile or profile == "" then return end
+            if not profile or profile == "" then
+                return
+            end
             local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
             dialog.text = string.format("Are you sure you want to delete the profile '%s'?", profile)
             dialog.OnAccept = function()
@@ -115,7 +142,9 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = "Reset Profile",
         tooltip = "Reset the current profile back to default settings. This cannot be undone.",
         confirm = "Are you sure you want to reset the current profile to defaults?",
-        onClick = function() ns.Addon.db:ResetProfile() end,
+        onClick = function()
+            ns.Addon.db:ResetProfile()
+        end,
     })
 
     -- Import / Export

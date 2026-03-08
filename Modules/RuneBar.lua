@@ -53,7 +53,11 @@ local function applyRuneFragmentVisual(frag, isReady, cd, color)
     end
 
     frag:SetValue(cd and cd.frac or 0)
-    frag:SetStatusBarColor(color.r * C.RUNEBAR_CD_DIM_FACTOR, color.g * C.RUNEBAR_CD_DIM_FACTOR, color.b * C.RUNEBAR_CD_DIM_FACTOR)
+    frag:SetStatusBarColor(
+        color.r * C.RUNEBAR_CD_DIM_FACTOR,
+        color.g * C.RUNEBAR_CD_DIM_FACTOR,
+        color.b * C.RUNEBAR_CD_DIM_FACTOR
+    )
 end
 
 --- Creates or returns fragmented sub-bars for runes.
@@ -136,7 +140,9 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
                 table.insert(cdList, { index = i, remaining = cdLookup[i] and cdLookup[i].remaining or math.huge })
             end
         end
-        table.sort(cdList, function(a, b) return a.remaining < b.remaining end)
+        table.sort(cdList, function(a, b)
+            return a.remaining < b.remaining
+        end)
 
         bar._displayOrder = {}
         for _, idx in ipairs(readyList) do

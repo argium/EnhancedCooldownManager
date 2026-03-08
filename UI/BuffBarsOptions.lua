@@ -78,7 +78,9 @@ local function createSpellColorCanvas(SB, subcatName)
     local defaultsBtn = headerRow._defaultsButton
     defaultsBtn:SetText(SETTINGS_DEFAULTS)
     defaultsBtn:SetScript("OnClick", function()
-        if ns.Addon.BuffBars:IsEditLocked() then return end
+        if ns.Addon.BuffBars:IsEditLocked() then
+            return
+        end
         StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"].OnAccept = resetAllSpellColors
         StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
     end)
@@ -102,7 +104,9 @@ local function createSpellColorCanvas(SB, subcatName)
     defaultColorSwatch:ClearAllPoints()
     defaultColorSwatch:SetPoint("LEFT", defaultColorRow, "CENTER", -70, 0)
     defaultColorSwatch:SetScript("OnClick", function()
-        if ns.Addon.BuffBars:IsEditLocked() then return end
+        if ns.Addon.BuffBars:IsEditLocked() then
+            return
+        end
         local c = ECM.SpellColors.GetDefaultColor()
         ECM.OptionUtil.OpenColorPicker(c, false, function(color)
             ECM.SpellColors.SetDefaultColor(color)
@@ -126,16 +130,16 @@ local function createSpellColorCanvas(SB, subcatName)
 
         local colorKey = data.key.primaryKey
         local name = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
-        local label = data.textureFileID
-            and ("|T" .. data.textureFileID .. ":14:14|t  " .. name)
-            or name
+        local label = data.textureFileID and ("|T" .. data.textureFileID .. ":14:14|t  " .. name) or name
         control.Text:SetText(label)
 
         local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
         control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
 
         control.ColorSwatch:SetScript("OnClick", function()
-            if ns.Addon.BuffBars:IsEditLocked() then return end
+            if ns.Addon.BuffBars:IsEditLocked() then
+                return
+            end
             local current = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
             ECM.OptionUtil.OpenColorPicker(current, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
@@ -149,9 +153,7 @@ local function createSpellColorCanvas(SB, subcatName)
     scrollBox:SetDataProvider(dataProvider)
 
     function frame:RefreshSpellList()
-        local rows = buildSpellColorRows(
-            ECM.SpellColors.GetAllColorEntries()
-        )
+        local rows = buildSpellColorRows(ECM.SpellColors.GetAllColorEntries())
 
         dataProvider:Flush()
         for _, row in ipairs(rows) do
@@ -164,10 +166,11 @@ local function createSpellColorCanvas(SB, subcatName)
         if locked and reason == "combat" then
             parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
         elseif locked and reason == "secrets" then
-            parts[#parts + 1] = "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
+            parts[#parts + 1] =
+                "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
         end
         if hasUnlabeledBars(rows) then
-            parts[#parts + 1] = "|cffFFDD3CSome spell names were secret and are displayed as a generic \"Bar\".|r"
+            parts[#parts + 1] = '|cffFFDD3CSome spell names were secret and are displayed as a generic "Bar".|r'
         end
         warningText:SetText(table.concat(parts, "\n"))
 
@@ -209,14 +212,19 @@ function BuffBarsOptions.RegisterSettings(SB)
                 name = "Enable aura bars",
                 desc = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
                 order = 0,
-                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars",
-                    "Disabling aura bars requires a UI reload. Reload now?"),
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler(
+                    "BuffBars",
+                    "Disabling aura bars requires a UI reload. Reload now?"
+                ),
             },
 
             -- Layout
-            layoutHeader      = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning       = {
-                type = "positioning", disabled = isDisabled, includeOffsetX = false, order = 11,
+            layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
+            positioning = {
+                type = "positioning",
+                disabled = isDisabled,
+                includeOffsetX = false,
+                order = 11,
                 positionModes = {
                     [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
                     [C.ANCHORMODE_FREE] = "Manual using Edit Mode",
@@ -232,42 +240,67 @@ function BuffBarsOptions.RegisterSettings(SB)
                     [C.GROW_DIRECTION_UP] = "Up",
                 },
                 disabled = isDisabled,
-                getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
+                getTransform = function(value)
+                    return value or C.GROW_DIRECTION_DOWN
+                end,
                 parent = "positioning",
                 parentCheck = function()
                     return ECM.OptionUtil.IsAnchorModeFree(
-                        ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars"))
+                        ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars")
+                    )
                 end,
                 order = 12,
             },
 
             -- Appearance
-            appearanceHeader  = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },
-            showIcon          = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 21 },
-            showSpellName     = { type = "toggle", path = "showSpellName", name = "Show spell name", disabled = isDisabled, order = 22 },
-            showDuration      = { type = "toggle", path = "showDuration", name = "Show remaining duration", disabled = isDisabled, order = 23 },
-            height            = {
+            appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },
+            showIcon = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 21 },
+            showSpellName = {
+                type = "toggle",
+                path = "showSpellName",
+                name = "Show spell name",
+                disabled = isDisabled,
+                order = 22,
+            },
+            showDuration = {
+                type = "toggle",
+                path = "showDuration",
+                name = "Show remaining duration",
+                disabled = isDisabled,
+                order = 23,
+            },
+            height = {
                 type = "range",
                 path = "height",
                 name = "Height Override",
                 desc = "Override the default bar height. Set to 0 to use the global default.",
-                min = 0, max = 40, step = 1,
+                min = 0,
+                max = 40,
+                step = 1,
                 disabled = isDisabled,
-                getTransform = function(value) return value or 0 end,
-                setTransform = function(value) return value > 0 and value or nil end,
+                getTransform = function(value)
+                    return value or 0
+                end,
+                setTransform = function(value)
+                    return value > 0 and value or nil
+                end,
                 order = 24,
             },
-            verticalSpacing   = {
+            verticalSpacing = {
                 type = "range",
                 path = "verticalSpacing",
                 name = "Vertical Spacing",
                 desc = "Vertical gap between aura bars. Set to 0 for no spacing.",
-                min = 0, max = 20, step = 1,
+                min = 0,
+                max = 20,
+                step = 1,
                 disabled = isDisabled,
-                getTransform = function(value) return value or 0 end,
+                getTransform = function(value)
+                    return value or 0
+                end,
                 order = 25,
             },
-            fontOverride      = { type = "fontOverride", disabled = isDisabled, order = 26 },
+            fontOverride = { type = "fontOverride", disabled = isDisabled, order = 26 },
         },
     })
 

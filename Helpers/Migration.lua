@@ -407,20 +407,32 @@ local function normalizeSpellColorStoresV10(profile)
     end
 
     local function selectPrimary(spellName, spellID, cooldownID, textureFileID)
-        if spellName ~= nil then return spellName, "spellName" end
-        if spellID ~= nil then return spellID, "spellID" end
-        if cooldownID ~= nil then return cooldownID, "cooldownID" end
-        if textureFileID ~= nil then return textureFileID, "textureFileID" end
+        if spellName ~= nil then
+            return spellName, "spellName"
+        end
+        if spellID ~= nil then
+            return spellID, "spellID"
+        end
+        if cooldownID ~= nil then
+            return cooldownID, "cooldownID"
+        end
+        if textureFileID ~= nil then
+            return textureFileID, "textureFileID"
+        end
         return nil, nil
     end
 
     local function buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
         local keyType = validKeyTypes[preferredType] and preferredType or nil
         local primaryKey
-        if keyType == "spellName" then primaryKey = spellName
-        elseif keyType == "spellID" then primaryKey = spellID
-        elseif keyType == "cooldownID" then primaryKey = cooldownID
-        elseif keyType == "textureFileID" then primaryKey = textureFileID
+        if keyType == "spellName" then
+            primaryKey = spellName
+        elseif keyType == "spellID" then
+            primaryKey = spellID
+        elseif keyType == "cooldownID" then
+            primaryKey = cooldownID
+        elseif keyType == "textureFileID" then
+            primaryKey = textureFileID
         end
         if primaryKey == nil then
             primaryKey, keyType = selectPrimary(spellName, spellID, cooldownID, textureFileID)
@@ -442,17 +454,31 @@ local function normalizeSpellColorStoresV10(profile)
         if not (a and b) then
             return false
         end
-        if a.spellName and b.spellName and a.spellName == b.spellName then return true end
-        if a.spellID and b.spellID and a.spellID == b.spellID then return true end
-        if a.cooldownID and b.cooldownID and a.cooldownID == b.cooldownID then return true end
-        if a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then return true end
+        if a.spellName and b.spellName and a.spellName == b.spellName then
+            return true
+        end
+        if a.spellID and b.spellID and a.spellID == b.spellID then
+            return true
+        end
+        if a.cooldownID and b.cooldownID and a.cooldownID == b.cooldownID then
+            return true
+        end
+        if a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
+            return true
+        end
         return false
     end
 
     local function mergeKeys(a, b)
-        if a == nil then return b end
-        if b == nil then return a end
-        if not keysMatch(a, b) then return nil end
+        if a == nil then
+            return b
+        end
+        if b == nil then
+            return a
+        end
+        if not keysMatch(a, b) then
+            return nil
+        end
         return buildKey(
             a.spellName or b.spellName,
             a.spellID or b.spellID,
@@ -492,9 +518,8 @@ local function normalizeSpellColorStoresV10(profile)
         local spellName = validKey((meta and meta.spellName) or value.spellName)
         local spellID = validNumericKey((meta and meta.spellID) or value.spellID)
         local cooldownID = validNumericKey((meta and meta.cooldownID) or value.cooldownID)
-        local textureFileID = validNumericKey(
-            (meta and (meta.textureFileID or meta.textureId)) or value.textureFileID or value.textureId
-        )
+        local textureFileID =
+            validNumericKey((meta and (meta.textureFileID or meta.textureId)) or value.textureFileID or value.textureId)
         local preferredType = (meta and meta.keyType) or value.keyType or tierKeyType
         if not validKeyTypes[preferredType] then
             preferredType = tierKeyType
@@ -792,7 +817,10 @@ function Migration.Run(profile)
                     for _, ticks in pairs(specMap) do
                         for _, tick in ipairs(ticks) do
                             if tick and tick.color then
-                                tick.color = normalizeLegacyColor(tick.color, tickCfg.defaultColor and tickCfg.defaultColor.a or 1)
+                                tick.color = normalizeLegacyColor(
+                                    tick.color,
+                                    tickCfg.defaultColor and tickCfg.defaultColor.a or 1
+                                )
                             end
                         end
                     end
@@ -946,27 +974,39 @@ function Migration.Run(profile)
                 end
             end
 
-            log(string.format(
-                "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
-                v10Stats.classesProcessed,
-                v10Stats.specsProcessed,
-                v10Stats.entriesScanned,
-                v10Stats.validEntries,
-                v10Stats.canonicalEntries,
-                v10Stats.aliasLinksMerged,
-                v10Stats.invalidEntries,
-                v10Stats.invalidRetained,
-                v10Stats.invalidKeyCollisions,
-                v10Stats.entriesMetaNormalized,
-                v10Stats.finalEntries
-            ))
-            log(string.format(
-                "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
-                v10Stats.perTier.byName.scanned, v10Stats.perTier.byName.invalid, v10Stats.perTier.byName.final,
-                v10Stats.perTier.bySpellID.scanned, v10Stats.perTier.bySpellID.invalid, v10Stats.perTier.bySpellID.final,
-                v10Stats.perTier.byCooldownID.scanned, v10Stats.perTier.byCooldownID.invalid, v10Stats.perTier.byCooldownID.final,
-                v10Stats.perTier.byTexture.scanned, v10Stats.perTier.byTexture.invalid, v10Stats.perTier.byTexture.final
-            ))
+            log(
+                string.format(
+                    "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
+                    v10Stats.classesProcessed,
+                    v10Stats.specsProcessed,
+                    v10Stats.entriesScanned,
+                    v10Stats.validEntries,
+                    v10Stats.canonicalEntries,
+                    v10Stats.aliasLinksMerged,
+                    v10Stats.invalidEntries,
+                    v10Stats.invalidRetained,
+                    v10Stats.invalidKeyCollisions,
+                    v10Stats.entriesMetaNormalized,
+                    v10Stats.finalEntries
+                )
+            )
+            log(
+                string.format(
+                    "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
+                    v10Stats.perTier.byName.scanned,
+                    v10Stats.perTier.byName.invalid,
+                    v10Stats.perTier.byName.final,
+                    v10Stats.perTier.bySpellID.scanned,
+                    v10Stats.perTier.bySpellID.invalid,
+                    v10Stats.perTier.bySpellID.final,
+                    v10Stats.perTier.byCooldownID.scanned,
+                    v10Stats.perTier.byCooldownID.invalid,
+                    v10Stats.perTier.byCooldownID.final,
+                    v10Stats.perTier.byTexture.scanned,
+                    v10Stats.perTier.byTexture.invalid,
+                    v10Stats.perTier.byTexture.final
+                )
+            )
             if #createdTiers > 0 then
                 log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
             end

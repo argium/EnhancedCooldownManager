@@ -41,7 +41,9 @@ function GeneralOptions.RegisterSettings(SB)
                 path = "global.outOfCombatFade.opacity",
                 name = "Out of Combat Opacity",
                 desc = "How visible the bars are when faded (0%% = invisible, 100%% = fully visible).",
-                min = 0, max = 100, step = 5,
+                min = 0,
+                max = 100,
+                step = 5,
                 parent = "fade",
                 order = 14,
             },
@@ -89,8 +91,12 @@ function GeneralOptions.RegisterSettings(SB)
                 type = "range",
                 path = "fontSize",
                 name = "Font Size",
-                min = 6, max = 32, step = 1,
-                getTransform = function(value) return value or 11 end,
+                min = 6,
+                max = 32,
+                step = 1,
+                getTransform = function(value)
+                    return value or 11
+                end,
                 order = 23,
             },
             fontOutline = {
@@ -120,7 +126,9 @@ function GeneralOptions.RegisterSettings(SB)
                 path = "barHeight",
                 name = "Bar Height",
                 desc = "Default height for all bars.",
-                min = 10, max = 40, step = 1,
+                min = 10,
+                max = 40,
+                step = 1,
                 order = 31,
             },
             offsetY = {
@@ -128,7 +136,9 @@ function GeneralOptions.RegisterSettings(SB)
                 path = "offsetY",
                 name = "Vertical Offset",
                 desc = "Vertical gap between the main icons and the first bar.",
-                min = 0, max = 20, step = 1,
+                min = 0,
+                max = 20,
+                step = 1,
                 order = 32,
             },
             moduleSpacing = {
@@ -136,8 +146,12 @@ function GeneralOptions.RegisterSettings(SB)
                 path = "moduleSpacing",
                 name = "Vertical Spacing",
                 desc = "Vertical spacing between modules. Spacing between buff bars is controlled separately.",
-                min = 0, max = 20, step = 1,
-                getTransform = function(value) return value or 0 end,
+                min = 0,
+                max = 20,
+                step = 1,
+                getTransform = function(value)
+                    return value or 0
+                end,
                 order = 33,
             },
             growDirection = {
@@ -149,7 +163,9 @@ function GeneralOptions.RegisterSettings(SB)
                     [C.GROW_DIRECTION_DOWN] = "Down",
                     [C.GROW_DIRECTION_UP] = "Up",
                 },
-                getTransform = function(value) return value or C.GROW_DIRECTION_DOWN end,
+                getTransform = function(value)
+                    return value or C.GROW_DIRECTION_DOWN
+                end,
                 order = 34,
             },
         },

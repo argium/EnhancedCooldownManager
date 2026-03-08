@@ -21,11 +21,15 @@ end
 local function getNestedValue(tbl, path)
     local current = tbl
     for segment in path:gmatch("[^.]+") do
-        if type(current) ~= "table" then return nil end
+        if type(current) ~= "table" then
+            return nil
+        end
         local val = current[segment]
         if val == nil then
             local num = tonumber(segment)
-            if num then val = current[num] end
+            if num then
+                val = current[num]
+            end
         end
         current = val
     end
@@ -48,7 +52,9 @@ local function setNestedValue(tbl, path, value)
                     resolved = num
                 end
             end
-            if current[resolved] == nil then current[resolved] = {} end
+            if current[resolved] == nil then
+                current[resolved] = {}
+            end
             current = current[resolved]
         end
         lastKey = segment
@@ -57,7 +63,9 @@ local function setNestedValue(tbl, path, value)
     local resolved = lastKey
     if current[lastKey] == nil then
         local num = tonumber(lastKey)
-        if num then resolved = num end
+        if num then
+            resolved = num
+        end
     end
     current[resolved] = value
 end
@@ -124,17 +132,14 @@ local function createModuleEnabledHandler(moduleName, requiresReload)
             return
         elseif requiresReload then
             -- Some modules require a reload to disable them. In those cases, the user can click accept or cancel. Cancelling will switch the module back on.
-            ns.Addon:ConfirmReloadUI(
-                requiresReload,
-                function()
-                    -- On accept, disable the module and set the toggle to false
-                    setting:SetValue(false)
-                    ns.Addon:DisableModule(moduleName)
-                end,
-                function()
-                    -- On cancel, revert the toggle back to enabled
-                    setting:SetValue(true)
-                end)
+            ns.Addon:ConfirmReloadUI(requiresReload, function()
+                -- On accept, disable the module and set the toggle to false
+                setting:SetValue(false)
+                ns.Addon:DisableModule(moduleName)
+            end, function()
+                -- On cancel, revert the toggle back to enabled
+                setting:SetValue(true)
+            end)
         else
             setting:SetValue(false)
             ns.Addon:DisableModule(moduleName)
@@ -153,11 +158,11 @@ local function createBarArgs(isDisabled, options)
     local appearanceOrder = options.appearanceOrder or 20
 
     local args = {
-        layoutHeader     = { type = "header", name = "Layout", disabled = isDisabled, order = layoutOrder },
-        positioning      = { type = "positioning", disabled = isDisabled, order = layoutOrder + 1 },
+        layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = layoutOrder },
+        positioning = { type = "positioning", disabled = isDisabled, order = layoutOrder + 1 },
         appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = appearanceOrder },
-        heightOverride   = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
-        fontOverride     = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
+        heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
+        fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
     }
 
     if options.showText ~= false then
@@ -196,8 +201,12 @@ ECM.OptionUtil = {
 --------------------------------------------------------------------------------
 
 ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
-    getProfile = function() return ns.Addon.db and ns.Addon.db.profile end,
-    getDefaults = function() return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile end,
+    getProfile = function()
+        return ns.Addon.db and ns.Addon.db.profile
+    end,
+    getDefaults = function()
+        return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    end,
     getNestedValue = getNestedValue,
     setNestedValue = setNestedValue,
     varPrefix = "ECM",
@@ -209,8 +218,12 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
     compositeDefaults = {
         FontOverrideGroup = {
             fontValues = LSMW.GetFontValues,
-            fontFallback = function() return ns.Addon.db.profile.global.font end,
-            fontSizeFallback = function() return ns.Addon.db.profile.global.fontSize end,
+            fontFallback = function()
+                return ns.Addon.db.profile.global.font
+            end,
+            fontSizeFallback = function()
+                return ns.Addon.db.profile.global.fontSize
+            end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },
         PositioningGroup = {
@@ -219,7 +232,9 @@ ECM.SettingsBuilder = LibStub("LibSettingsBuilder-1.0"):New({
                 [C.ANCHORMODE_FREE] = "Manual",
             },
             isAnchorModeFree = isAnchorModeFree,
-            applyPositionMode = function(cfg, mode) cfg.anchorMode = mode end,
+            applyPositionMode = function(cfg, mode)
+                cfg.anchorMode = mode
+            end,
         },
     },
 })
@@ -269,8 +284,7 @@ function Options:OnProfileChanged()
 end
 
 function Options:OpenOptions()
-    local categoryID = ECM.SettingsBuilder.GetSubcategoryID("General")
-        or ECM.SettingsBuilder.GetRootCategoryID()
+    local categoryID = ECM.SettingsBuilder.GetSubcategoryID("General") or ECM.SettingsBuilder.GetRootCategoryID()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end

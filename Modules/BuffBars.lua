@@ -74,9 +74,15 @@ end
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
 local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)
-    if not iconFrame then return end
-    if iconFrame.__ecmSquareStyled then return end
-    if not iconTexture then return end
+    if not iconFrame then
+        return
+    end
+    if iconFrame.__ecmSquareStyled then
+        return
+    end
+    if not iconTexture then
+        return
+    end
 
     iconTexture:SetTexCoord(0, 1, 0, 1)
 
@@ -86,7 +92,9 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
             local mask = iconTexture:GetMaskTexture(i)
             if mask then
                 iconTexture:RemoveMaskTexture(mask)
-                if mask.Hide then mask:Hide() end
+                if mask.Hide then
+                    mask:Hide()
+                end
             end
         end
     elseif iconTexture.SetMask then
@@ -98,7 +106,9 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
         for _, region in ipairs({ iconFrame:GetRegions() }) do
             if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
                 pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                if region.Hide then region:Hide() end
+                if region.Hide then
+                    region:Hide()
+                end
             end
         end
     end
@@ -177,7 +187,9 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
             end)
         end
 
-        local bgColor = (config and config.bgColor) or (globalConfig and globalConfig.barBgColor) or ECM.Constants.COLOR_BLACK
+        local bgColor = (config and config.bgColor)
+            or (globalConfig and globalConfig.barBgColor)
+            or ECM.Constants.COLOR_BLACK
         barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
         barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
         barBG:ClearAllPoints()
@@ -202,15 +214,27 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     -- values may remain secret.  Lock editing only when every key is
     -- unusable.  With four tiers (name, spellID, cooldownID, texture)
     -- the colour lookup is much more resilient to partial secrecy.
-    local allSecret = issecretvalue(spellName) and issecretvalue(spellID)
-        and issecretvalue(cooldownID) and issecretvalue(textureFileID)
+    local allSecret = issecretvalue(spellName)
+        and issecretvalue(spellID)
+        and issecretvalue(cooldownID)
+        and issecretvalue(textureFileID)
     _editLocked = _editLocked or allSecret
 
     -- Purely diagnostics to help track down issues with secrets
     local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
-    local colorLog = (barColor and "|cff"..hex .."#" .. hex .."|r" or "nil")
-    local logPrefix = "GetColorForBar[".. barIndex .."] "
-    local logLine = logPrefix .. "(" .. ECM.ToString(spellName) .. ", " .. ECM.ToString(spellID) .. ", " .. ECM.ToString(cooldownID) .. ", " .. ECM.ToString(textureFileID) .. ") = " .. colorLog
+    local colorLog = (barColor and "|cff" .. hex .. "#" .. hex .. "|r" or "nil")
+    local logPrefix = "GetColorForBar[" .. barIndex .. "] "
+    local logLine = logPrefix
+        .. "("
+        .. ECM.ToString(spellName)
+        .. ", "
+        .. ECM.ToString(spellID)
+        .. ", "
+        .. ECM.ToString(cooldownID)
+        .. ", "
+        .. ECM.ToString(textureFileID)
+        .. ") = "
+        .. colorLog
     ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
 
     if allSecret and not InCombatLockdown() then
@@ -334,7 +358,9 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
     local prev
 
     local function anchorChild(child)
-        if not child:IsShown() then return end
+        if not child:IsShown() then
+            return
+        end
 
         local selfEdge = growsUp and "BOTTOM" or "TOP"
         local relEdge = prev and (growsUp and "TOP" or "BOTTOM") or selfEdge
@@ -427,7 +453,9 @@ function BuffBars:IsReady()
     end
 
     -- Check if the viewer is in a state where we can enumerate children
-    local canGetChildren = pcall(function() viewer:GetChildren() end)
+    local canGetChildren = pcall(function()
+        viewer:GetChildren()
+    end)
     if not canGetChildren then
         return false
     end

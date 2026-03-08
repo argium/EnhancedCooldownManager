@@ -9,15 +9,13 @@ ECM.ModuleMixin = ModuleMixin
 --- Returns the global config section (live from AceDB profile).
 ---@return table|nil
 function ModuleMixin:GetGlobalConfig()
-    return ns.Addon.db and ns.Addon.db.profile
-        and ns.Addon.db.profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
+    return ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
 end
 
 --- Returns this module's config section (live from AceDB profile).
 ---@return table|nil
 function ModuleMixin:GetModuleConfig()
-    return ns.Addon.db and ns.Addon.db.profile
-        and ns.Addon.db.profile[self._configKey]
+    return ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile[self._configKey]
 end
 
 --- Applies common module methods (name, config) to the target.
@@ -37,5 +35,5 @@ function ModuleMixin.AddMixin(target, name)
     end
 
     target.Name = name
-    target._configKey = name:sub(1,1):lower() .. name:sub(2) -- camelCase-ish
+    target._configKey = name:sub(1, 1):lower() .. name:sub(2) -- camelCase-ish
 end

@@ -165,24 +165,24 @@ local defaults = {
             },
         },
         powerBar = {
-            enabled           = true,
-            anchorMode        = ECM.Constants.ANCHORMODE_CHAIN,
-            width             = 300,
-            offsetY           = -275,
-            showText          = true,
-            overrideFont      = false,
-            ticks             = {
+            enabled = true,
+            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            width = 300,
+            offsetY = -275,
+            showText = true,
+            overrideFont = false,
+            ticks = {
                 mappings = powerBarTickMappings, -- [classID][specID] = { { value = 50, color = {r,g,b,a}, width = 1 }, ... }
                 defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
                 defaultWidth = 1,
             },
             showManaAsPercent = true,
-            border            = {
+            border = {
                 enabled = false,
                 thickness = C.DEFAULT_BORDER_THICKNESS,
                 color = C.DEFAULT_BORDER_COLOR,
             },
-            colors            = {
+            colors = {
                 [Enum.PowerType.Mana] = { r = 0.00, g = 0.00, b = 1.00, a = 1 },
                 [Enum.PowerType.Rage] = { r = 1.00, g = 0.00, b = 0.00, a = 1 },
                 [Enum.PowerType.Focus] = { r = 1.00, g = 0.57, b = 0.31, a = 1 },
@@ -195,18 +195,18 @@ local defaults = {
             },
         },
         resourceBar = {
-            enabled    = true,
-            showText   = false,
+            enabled = true,
+            showText = false,
             overrideFont = false,
             anchorMode = C.ANCHORMODE_CHAIN,
-            width      = 300,
-            offsetY    = -300,
-            border     = {
+            width = 300,
+            offsetY = -300,
+            border = {
                 enabled = false,
                 thickness = C.DEFAULT_BORDER_THICKNESS,
                 color = C.DEFAULT_BORDER_COLOR,
             },
-            colors     = {
+            colors = {
                 [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
@@ -221,10 +221,10 @@ local defaults = {
             },
         },
         runeBar = {
-            enabled    = true,
+            enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
-            width      = 300,
-            offsetY    = -325,
+            width = 300,
+            offsetY = -325,
             overrideFont = false,
             useSpecColor = true,
             color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },

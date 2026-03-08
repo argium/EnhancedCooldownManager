@@ -67,7 +67,10 @@ local unpack = unpack or table.unpack
 ---@param validateKey fun(k: any): any|nil  Returns k when valid; nil when the key should be rejected (nil, secret, wrong type).
 ---@return PriorityKeyMap
 function PriorityKeyMap.New(keyDefs, scopeFn, validateKey)
-    ECM.DebugAssert(type(keyDefs) == "table" and #keyDefs >= 2, "PriorityKeyMap.New: keyDefs must be an array with at least 2 entries")
+    ECM.DebugAssert(
+        type(keyDefs) == "table" and #keyDefs >= 2,
+        "PriorityKeyMap.New: keyDefs must be an array with at least 2 entries"
+    )
     ECM.DebugAssert(type(scopeFn) == "function", "PriorityKeyMap.New: scopeFn must be a function")
     ECM.DebugAssert(type(validateKey) == "function", "PriorityKeyMap.New: validateKey must be a function")
 
@@ -153,15 +156,19 @@ function PriorityKeyMap:Reconcile(keys)
             if not existing then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM.Log("PriorityKeyMap",
+                ECM.Log(
+                    "PriorityKeyMap",
                     "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]),
-                    { value = unwrap(winner) })
+                    { value = unwrap(winner) }
+                )
             elseif ts(existing) < winnerTs then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM.Log("PriorityKeyMap",
+                ECM.Log(
+                    "PriorityKeyMap",
                     "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]) .. " to most recent",
-                    { value = unwrap(winner) })
+                    { value = unwrap(winner) }
+                )
             end
         end
     end

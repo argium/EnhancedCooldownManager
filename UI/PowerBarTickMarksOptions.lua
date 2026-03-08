@@ -7,8 +7,12 @@ local C = ECM.Constants
 
 local function getTicksConfig()
     local powerBar = ns.Addon.db.profile.powerBar
-    if powerBar and powerBar.ticks then return powerBar.ticks end
-    if not ns.Addon.db.profile.powerBar then ns.Addon.db.profile.powerBar = {} end
+    if powerBar and powerBar.ticks then
+        return powerBar.ticks
+    end
+    if not ns.Addon.db.profile.powerBar then
+        ns.Addon.db.profile.powerBar = {}
+    end
 
     ns.Addon.db.profile.powerBar.ticks = {
         mappings = {},
@@ -22,7 +26,9 @@ local store = {}
 
 function store.GetCurrentTicks()
     local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
-    if not classID or not specIndex then return {} end
+    if not classID or not specIndex then
+        return {}
+    end
     local ticksCfg = ns.Addon.db.profile.powerBar and ns.Addon.db.profile.powerBar.ticks
     local mappings = ticksCfg and ticksCfg.mappings
     local classMappings = mappings and mappings[classID]
@@ -31,9 +37,13 @@ end
 
 function store.SetCurrentTicks(ticks)
     local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
-    if not classID or not specIndex then return end
+    if not classID or not specIndex then
+        return
+    end
     local ticksCfg = getTicksConfig()
-    if not ticksCfg.mappings[classID] then ticksCfg.mappings[classID] = {} end
+    if not ticksCfg.mappings[classID] then
+        ticksCfg.mappings[classID] = {}
+    end
     ticksCfg.mappings[classID][specIndex] = ticks
 end
 
@@ -50,14 +60,18 @@ end
 
 function store.RemoveTick(index)
     local ticks = store.GetCurrentTicks()
-    if not ticks[index] then return end
+    if not ticks[index] then
+        return
+    end
     table.remove(ticks, index)
     store.SetCurrentTicks(ticks)
 end
 
 function store.UpdateTick(index, field, value)
     local ticks = store.GetCurrentTicks()
-    if not ticks[index] then return end
+    if not ticks[index] then
+        return
+    end
     ticks[index][field] = value
     store.SetCurrentTicks(ticks)
 end
@@ -104,8 +118,12 @@ local function createTickRowWidgets(rowFrame, SB)
     rowFrame._highlight = highlight
 
     rowFrame:EnableMouse(true)
-    rowFrame:SetScript("OnEnter", function(self) self._highlight:Show() end)
-    rowFrame:SetScript("OnLeave", function(self) self._highlight:Hide() end)
+    rowFrame:SetScript("OnEnter", function(self)
+        self._highlight:Show()
+    end)
+    rowFrame:SetScript("OnLeave", function(self)
+        self._highlight:Hide()
+    end)
 
     local label = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("LEFT", 10, 0)
@@ -155,7 +173,9 @@ local function createTickRowWidgets(rowFrame, SB)
         slider:SetScript("OnValueChanged", function(_, val)
             local rounded = roundToStep(val)
             textLabel:SetText(tostring(rounded))
-            if rowFrame._isRefreshing then return end
+            if rowFrame._isRefreshing then
+                return
+            end
             if rounded ~= val then
                 rowFrame._isRefreshing = true
                 slider:SetValue(rounded)

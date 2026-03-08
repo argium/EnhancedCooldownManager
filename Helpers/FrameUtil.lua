@@ -90,7 +90,8 @@ local function liveAnchorsEqual(frame, anchors)
     for i = 1, #anchors do
         local want = anchors[i]
         local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
-        if issecretvalue(point)
+        if
+            issecretvalue(point)
             or issecretvalue(relativeTo)
             or issecretvalue(relativePoint)
             or issecretvalue(x)
@@ -98,7 +99,8 @@ local function liveAnchorsEqual(frame, anchors)
         then
             return nil
         end
-        if point ~= want[1]
+        if
+            point ~= want[1]
             or relativeTo ~= want[2]
             or relativePoint ~= want[3]
             or (x or 0) ~= (want[4] or 0)
@@ -141,12 +143,7 @@ local function anchorsEqual(lhs, rhs)
     for i = 1, #lhs do
         local a = lhs[i]
         local b = rhs[i]
-        if a[1] ~= b[1]
-            or a[2] ~= b[2]
-            or a[3] ~= b[3]
-            or (a[4] or 0) ~= (b[4] or 0)
-            or (a[5] or 0) ~= (b[5] or 0)
-        then
+        if a[1] ~= b[1] or a[2] ~= b[2] or a[3] ~= b[3] or (a[4] or 0) ~= (b[4] or 0) or (a[5] or 0) ~= (b[5] or 0) then
             return false
         end
     end
@@ -327,7 +324,9 @@ end
 ---@return boolean changed
 function FrameUtil.LazySetBorder(frame, borderConfig)
     local border = frame.Border
-    if not border then return false end
+    if not border then
+        return false
+    end
 
     local thickness = borderConfig.thickness or 1
     local liveEnabled = border.IsShown and border:IsShown() or nil
@@ -347,7 +346,11 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     end
 
     if borderConfig.enabled then
-        if liveEnabled == true and liveThickness == thickness and ECM.ColorUtil.AreEqual(borderConfig.color, liveColor) then
+        if
+            liveEnabled == true
+            and liveThickness == thickness
+            and ECM.ColorUtil.AreEqual(borderConfig.color, liveColor)
+        then
             return false
         end
     else
@@ -369,8 +372,10 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
         border:SetPoint("TOPLEFT", -thickness, thickness)
         border:SetPoint("BOTTOMRIGHT", thickness, -thickness)
         border:SetBackdropBorderColor(
-            borderConfig.color.r, borderConfig.color.g,
-            borderConfig.color.b, borderConfig.color.a
+            borderConfig.color.r,
+            borderConfig.color.g,
+            borderConfig.color.b,
+            borderConfig.color.a
         )
     else
         border:Hide()

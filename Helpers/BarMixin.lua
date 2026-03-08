@@ -216,12 +216,19 @@ function BarMixin:Refresh(why, force)
     frame:SetTextVisible(showText)
 
     -- Texture
-    local tex = ECM.GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)) or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
+    local tex = ECM.GetTexture((moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture))
+        or ECM.Constants.DEFAULT_STATUSBAR_TEXTURE
     FrameUtil.LazySetStatusBarTexture(frame.StatusBar, tex)
 
     -- Status bar color
     local statusBarColor = self:GetStatusBarColor()
-    FrameUtil.LazySetStatusBarColor(frame.StatusBar, statusBarColor.r, statusBarColor.g, statusBarColor.b, statusBarColor.a)
+    FrameUtil.LazySetStatusBarColor(
+        frame.StatusBar,
+        statusBarColor.r,
+        statusBarColor.g,
+        statusBarColor.b,
+        statusBarColor.a
+    )
 
     frame:Show()
 

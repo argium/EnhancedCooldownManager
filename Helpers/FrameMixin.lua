@@ -41,7 +41,7 @@ function FrameMixin:GetNextChainAnchor(frameName)
         if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local moduleConfig = barModule:GetModuleConfig()
             if moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN and barModule.InnerFrame then
-                ECM.Log(self.Name, "GetNextChainAnchor ".. barName .." <-- " .. (frameName or "nil"))
+                ECM.Log(self.Name, "GetNextChainAnchor " .. barName .. " <-- " .. (frameName or "nil"))
                 return barModule.InnerFrame, false
             end
         end
@@ -109,8 +109,7 @@ end
 ---@param direction string|nil
 ---@return string
 function FrameMixin.NormalizeGrowDirection(direction)
-    return direction == ECM.Constants.GROW_DIRECTION_UP
-        and ECM.Constants.GROW_DIRECTION_UP
+    return direction == ECM.Constants.GROW_DIRECTION_UP and ECM.Constants.GROW_DIRECTION_UP
         or ECM.Constants.GROW_DIRECTION_DOWN
 end
 
@@ -136,7 +135,8 @@ function FrameMixin:CalculateLayoutParams()
     end
 
     local anchor, isFirst = self:GetNextChainAnchor(self.Name)
-    local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
+    local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
+        == ECM.Constants.GROW_DIRECTION_UP
     local gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0) or (globalConfig.moduleSpacing or 0)
 
     return {
@@ -174,7 +174,13 @@ function FrameMixin:ApplyFramePosition()
         local lr = params.anchorRelativePoint or "BOTTOMLEFT"
         anchors = {
             { lp, params.anchor, lr, params.offsetX, params.offsetY },
-            { self.ChainRightPoint(lp, "TOPRIGHT"), params.anchor, self.ChainRightPoint(lr, "BOTTOMRIGHT"), params.offsetX, params.offsetY },
+            {
+                self.ChainRightPoint(lp, "TOPRIGHT"),
+                params.anchor,
+                self.ChainRightPoint(lr, "BOTTOMRIGHT"),
+                params.offsetX,
+                params.offsetY,
+            },
         }
     else
         assert(params.anchor ~= nil, "anchor required for free anchor mode")
@@ -214,7 +220,10 @@ function FrameMixin:UpdateLayout(why)
         FrameUtil.LazySetBorder(frame, borderConfig)
     end
 
-    ECM.DebugAssert(moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor), "bgColor not defined in config for frame " .. self.Name)
+    ECM.DebugAssert(
+        moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor),
+        "bgColor not defined in config for frame " .. self.Name
+    )
     local bgColor = moduleConfig.bgColor or (globalConfig and globalConfig.barBgColor) or ECM.Constants.DEFAULT_BG_COLOR
     FrameUtil.LazySetBackgroundColor(frame, bgColor)
 
@@ -247,8 +256,10 @@ end
 --- Checks if the module is ready for layout updates.
 --- @return boolean ready True if the module is ready for updates.
 function FrameMixin:IsReady()
-    return self:IsEnabled() and self.InnerFrame ~= nil
-        and self:GetGlobalConfig() ~= nil and self:GetModuleConfig() ~= nil
+    return self:IsEnabled()
+        and self.InnerFrame ~= nil
+        and self:GetGlobalConfig() ~= nil
+        and self:GetModuleConfig() ~= nil
 end
 
 --- Internal: checks readiness and runs the coalesced layout update.

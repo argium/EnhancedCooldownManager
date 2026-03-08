@@ -112,8 +112,11 @@ end
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
     local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
     local useModuleOverride = moduleConfig and moduleConfig.overrideFont
-    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font)) or C.DEFAULT_FONT
-    local fontSize = (useModuleOverride and moduleConfig.fontSize) or (config and config.fontSize) or C.DEFAULT_FONT_SIZE
+    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font))
+        or C.DEFAULT_FONT
+    local fontSize = (useModuleOverride and moduleConfig.fontSize)
+        or (config and config.fontSize)
+        or C.DEFAULT_FONT_SIZE
     local fontOutline = (config and config.fontOutline)
 
     if fontOutline == "NONE" then
@@ -214,7 +217,9 @@ local _cooldownViewerSettingsHooked = false
 local _hookedBlizzardFrames = {}
 
 local _chainSet = {}
-for _, name in ipairs(C.CHAIN_ORDER) do _chainSet[name] = true end
+for _, name in ipairs(C.CHAIN_ORDER) do
+    _chainSet[name] = true
+end
 
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
@@ -277,7 +282,10 @@ end
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
 local function setGloballyHidden(hidden, reason)
     if _globallyHidden ~= hidden then
-        ECM.Log(nil, "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or ""))
+        ECM.Log(
+            nil,
+            "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or "")
+        )
     end
 
     _globallyHidden = hidden
@@ -331,11 +339,21 @@ local function updateFadeAndHiddenStates()
 
             local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
 
-            if not shouldSkipFade and hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target") then
+            if
+                not shouldSkipFade
+                and hasLiveTarget
+                and fadeConfig.exceptIfTargetCanBeAttacked
+                and UnitCanAttack("player", "target")
+            then
                 shouldSkipFade = true
             end
 
-            if not shouldSkipFade and hasLiveTarget and fadeConfig.exceptIfTargetCanBeHelped and UnitCanAssist("player", "target") then
+            if
+                not shouldSkipFade
+                and hasLiveTarget
+                and fadeConfig.exceptIfTargetCanBeHelped
+                and UnitCanAssist("player", "target")
+            then
                 shouldSkipFade = true
             end
 
@@ -489,7 +507,6 @@ local function enableLayoutEvents()
     end)
 end
 
-
 local function registerAddonCompartmentEntry()
     if mod._addonCompartmentRegistered then
         return
@@ -606,9 +623,14 @@ function mod:ShowExportDialog(exportString)
     end
 
     if not exportFrame then
-        exportFrame = createDialogFrame("ECMExportFrame", "Export Profile",
-            "Press Ctrl+C to copy. The dialog will close automatically.")
-        addButton(exportFrame, CLOSE, {"BOTTOMRIGHT", -16, 8}, function() exportFrame:Hide() end)
+        exportFrame = createDialogFrame(
+            "ECMExportFrame",
+            "Export Profile",
+            "Press Ctrl+C to copy. The dialog will close automatically."
+        )
+        addButton(exportFrame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
+            exportFrame:Hide()
+        end)
 
         -- Auto-close after Ctrl+C
         exportFrame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
@@ -633,11 +655,13 @@ local importFrame
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
     if not importFrame then
-        importFrame = createDialogFrame("ECMImportFrame", "Import Profile",
-            "Paste your import string below and click Import.")
+        importFrame =
+            createDialogFrame("ECMImportFrame", "Import Profile", "Paste your import string below and click Import.")
 
-        local cancelBtn = addButton(importFrame, CANCEL, {"BOTTOMRIGHT", -16, 8}, function() importFrame:Hide() end)
-        addButton(importFrame, OKAY, {"RIGHT", cancelBtn, "LEFT", -4, 0}, function()
+        local cancelBtn = addButton(importFrame, CANCEL, { "BOTTOMRIGHT", -16, 8 }, function()
+            importFrame:Hide()
+        end)
+        addButton(importFrame, OKAY, { "RIGHT", cancelBtn, "LEFT", -4, 0 }, function()
             local input = importFrame.Scroll.ScrollBox.EditBox:GetText()
 
             if strtrim(input) == "" then
@@ -767,7 +791,13 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM.Log("Initialize", "Database loaded. Latest schema = " .. C.CURRENT_SCHEMA_VERSION .. ". Profile Schema = " .. (profile and profile.schemaVersion or "nil"))
+    ECM.Log(
+        "Initialize",
+        "Database loaded. Latest schema = "
+            .. C.CURRENT_SCHEMA_VERSION
+            .. ". Profile Schema = "
+            .. (profile and profile.schemaVersion or "nil")
+    )
 
     if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)
@@ -777,8 +807,13 @@ function mod:OnInitialize()
 
     -- Register bundled font with LibSharedMedia if present.
     if LSM then
-        pcall(LSM.Register, LSM, "font", "Expressway",
-            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf")
+        pcall(
+            LSM.Register,
+            LSM,
+            "font",
+            "Expressway",
+            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+        )
     end
 
     self:RegisterChatCommand("enhancedcooldownmanager", "ChatCommand")

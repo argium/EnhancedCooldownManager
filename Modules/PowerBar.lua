@@ -57,7 +57,10 @@ function PowerBar:GetStatusBarValues()
     local cfg = self:GetModuleConfig()
 
     if cfg and cfg.showManaAsPercent and powerType == Enum.PowerType.Mana then
-        return current, max, string.format("%.0f%%", UnitPowerPercent("player", powerType, false, CurveConstants.ScaleTo100)), true
+        return current,
+            max,
+            string.format("%.0f%%", UnitPowerPercent("player", powerType, false, CurveConstants.ScaleTo100)),
+            true
     end
 
     return current, max, current, false
