@@ -17,7 +17,7 @@ StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = {
 local ProfileOptions = {}
 
 --- Creates a proxy-backed dropdown for transient profile selection (not stored in SavedVars).
-local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGenerator)
+local function createProfilePicker(cat, variable, name, tooltip, valuesGenerator)
     local selected = nil
     local setting = Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, name, "", function()
         return selected or ""
@@ -84,7 +84,6 @@ function ProfileOptions.RegisterSettings(SB)
     end
 
     local _, getCopyProfile, clearCopyProfile = createProfilePicker(
-        SB,
         cat,
         "ECM_ProfileCopy",
         "Copy From",
@@ -107,7 +106,6 @@ function ProfileOptions.RegisterSettings(SB)
     })
 
     local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
-        SB,
         cat,
         "ECM_ProfileDelete",
         "Delete Profile",

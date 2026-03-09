@@ -90,3 +90,11 @@ Tests can be run by executing
 ```sh
 busted Tests
 ```
+
+## Linter
+
+luacheck does linting
+
+```sh
+luacheck . -q
+```

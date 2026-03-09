@@ -449,11 +449,11 @@ local function getMap()
     end
 
     _map = ECM.PriorityKeyMap.New(KEY_DEFS, function()
-        local cfg = config()
-        if not cfg then
+        local cfg2 = config()
+        if not cfg2 then
             return nil
         end
-        return getCurrentClassSpecStores(cfg)
+        return getCurrentClassSpecStores(cfg2)
     end, validateKey)
     return _map
 end
