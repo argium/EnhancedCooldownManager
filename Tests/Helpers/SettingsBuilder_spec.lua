@@ -77,6 +77,7 @@ describe("SettingsBuilder", function()
             "UnitClass", "GetSpecialization", "GetSpecializationInfo",
             "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
             "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
+            "LibSettingsBuilder_InfoRowMixin",
             "LibSettingsBuilder_ScrollDropdownMixin",
             "GameFontHighlightSmall", "GameFontNormal",
         })
@@ -392,6 +393,28 @@ describe("SettingsBuilder", function()
         -- Labels have no GetSetting, so isParentEnabled should return true
         local enabledPredicate = childInit._modifyPredicates[1]
         assert.is_true(enabledPredicate())
+    end)
+
+    -- InfoRow
+    it("InfoRow adds element initializer with template and data", function()
+        local init = SB.InfoRow({ name = "Author", value = "TestUser" })
+        assert.are.equal("LibSettingsBuilder_InfoRowTemplate", init._template)
+        assert.are.equal("Author", init.data.name)
+        assert.are.equal("TestUser", init.data.value)
+    end)
+
+    it("InfoRow respects explicit category", function()
+        SB._currentSubcategory = SB._rootCategory
+        local init = SB.InfoRow({ name = "Version", value = "1.0" })
+        assert.are.equal("Version", init.data.name)
+        assert.are.equal("1.0", init.data.value)
+    end)
+
+    it("InfoRow supports hidden modifier", function()
+        local hidden = true
+        local init = SB.InfoRow({ name = "Secret", value = "x", hidden = function() return hidden end })
+        assert.is_not_nil(init._shownPredicates)
+        assert.are.equal(1, #init._shownPredicates)
     end)
 
     -- Button
@@ -937,6 +960,7 @@ describe("SettingsBuilder", function()
                     s = { type = "select", path = "mode", name = "Select", values = { solid = "Solid" }, order = 3 },
                     h = { type = "header", name = "Header", order = 4 },
                     d = { type = "description", name = "Desc", order = 5 },
+                    i = { type = "info", name = "Author", value = "Test", order = 6 },
                 },
             })
         end)

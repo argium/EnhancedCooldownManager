@@ -153,6 +153,8 @@ local constants = {
     -- Dialog frame
     DIALOG_FRAME_WIDTH = 480,
     DIALOG_FRAME_HEIGHT = 360,
+    DIALOG_FRAME_WIDTH_SMALL = 400,
+    DIALOG_FRAME_HEIGHT_SMALL = 160,
     DIALOG_BACKDROP = {
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",

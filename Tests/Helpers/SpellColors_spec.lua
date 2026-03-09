@@ -245,12 +245,12 @@ describe("SpellColors", function()
         assert.is_function(key.Merge)
     end)
 
-    it("KeysMatch compares key identity by non-fallback identifiers", function()
+    it("KeysMatch compares key identity by all identifiers", function()
         local byName = SpellColors.MakeKey("Blade Dance", 188499, nil, 1234)
 
         assert.is_true(SpellColors.KeysMatch(byName, { spellName = "Blade Dance" }))
         assert.is_true(byName:Matches({ spellID = 188499 }))
-        assert.is_false(SpellColors.KeysMatch(byName, { textureFileID = 1234 }))
+        assert.is_true(SpellColors.KeysMatch(byName, { textureFileID = 1234 }))
         assert.is_false(SpellColors.KeysMatch(byName, { spellName = "Other", spellID = 999999 }))
 
         local textureOnlyA = SpellColors.MakeKey(nil, nil, nil, 4321)

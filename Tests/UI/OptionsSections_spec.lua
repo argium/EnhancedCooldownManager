@@ -78,7 +78,7 @@ describe("Options sections and root assembly", function()
 
         local ns = { Addon = mod, OptionsSections = {} }
 
-        for _, key in ipairs({ "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
+        for _, key in ipairs({ "About", "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
             ns.OptionsSections[key] = {
                 RegisterSettings = function()
                     registerSettingsCalls[#registerSettingsCalls + 1] = key
@@ -92,6 +92,7 @@ describe("Options sections and root assembly", function()
         createdModule:OnInitialize()
 
         assert.are.same({
+            "About",
             "General", "PowerBar", "ResourceBar", "RuneBar",
             "BuffBars", "ItemIcons", "Profile", "Advanced Options",
         }, registerSettingsCalls)

@@ -271,7 +271,10 @@ function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
     SB.CreateRootCategory(C.ADDON_NAME)
 
-    -- Register sections in display order
+    -- About section renders on the root category (no subcategory entry)
+    ns.OptionsSections["About"].RegisterSettings(SB)
+
+    -- Register subcategory sections in display order
     local sectionOrder = {
         "General",
         "PowerBar",
@@ -290,7 +293,6 @@ function Options:OnInitialize()
         end
     end
 
-    SB.SetRootRedirect("General") -- TODO: the redirect doesn't work. replace it with the old about section.
     SB.RegisterCategories()
 
     local db = ns.Addon.db
