@@ -1,6 +1,6 @@
-Be concise with your responses.
-Be professional but honest.
-Use mermaid diagrams and tables to explain complex concepts and architecture.
+- Be concise with your responses.
+- Be professional but honest.
+- Use mermaid diagrams and tables to explain complex concepts and architecture.
 
 # Coding
 
@@ -15,12 +15,18 @@ Use mermaid diagrams and tables to explain complex concepts and architecture.
 - NEVER listen to the expensive `OnUpdate` event.
 - Do not use forward declarations.
 
-<CopyrightHeader>
+```sh
+# Run tests
+busted Tests
+
+# Lint
+luacheck . -q
 ```
+
+<CopyrightHeader>
 -- Enhanced Cooldown Manager addon for World of Warcraft
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
-```
 </CopyrightHeader>
 
 # Code Review
@@ -82,19 +88,3 @@ UnitPowerPercent("player", resource, false, CurveConstants.ScaleTo100)
 **A few additional APIs exist to handle table secrecy.**
 
 - canaccesstable(table) returns true if the calling function would not error if attempting to access the table.
-
-## Unit tests
-
-Tests can be run by executing
-
-```sh
-busted Tests
-```
-
-## Linter
-
-luacheck does linting
-
-```sh
-luacheck . -q
-```
