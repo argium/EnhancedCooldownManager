@@ -787,4 +787,44 @@ describe("SpellColors", function()
         -- After reconciliation, the color is accessible by spellName
         assert.are.same(c, SpellColors.GetColorByKey({ spellName = "Eye Beam" }))
     end)
+
+    it("ClearDiscoveredKeys on spec change prevents cross-spec leaking", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Demon Spikes",
+            spellID = 203720,
+        }))
+        assert.are.equal(1, #SpellColors.GetAllColorEntries())
+
+        -- Simulate spec change: BuffBars:UpdateLayout calls ClearDiscoveredKeys
+        currentSpecID = 1
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Fel Rush",
+            spellID = 195072,
+        }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Fel Rush", entries[1].key.spellName)
+    end)
+
+    it("ClearDiscoveredKeys on spec change with no new bars yields empty entries", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Demon Spikes",
+            spellID = 203720,
+        }))
+        assert.are.equal(1, #SpellColors.GetAllColorEntries())
+
+        -- Simulate spec change: BuffBars:UpdateLayout calls ClearDiscoveredKeys
+        currentSpecID = 1
+        SpellColors.ClearDiscoveredKeys()
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(0, #entries)
+    end)
 end)

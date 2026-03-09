@@ -469,6 +469,10 @@ function BuffBars:UpdateLayout(why)
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
 
+    if why == "PLAYER_SPECIALIZATION_CHANGED" then
+        ECM.SpellColors.ClearDiscoveredKeys()
+    end
+
     -- Discover bars regardless of visibility so the spell colours options
     -- panel has the full list even when hidden (e.g. resting).
     local visibleChildren = getChildrenOrdered(viewer)
