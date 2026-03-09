@@ -252,7 +252,7 @@ local function keysMatch(a, b)
 
     local aTextureOnly = (a.spellName == nil and a.spellID == nil and a.cooldownID == nil)
     local bTextureOnly = (b.spellName == nil and b.spellID == nil and b.cooldownID == nil)
-    if aTextureOnly and bTextureOnly and a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
+    if (aTextureOnly or bTextureOnly) and a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
         return true
     end
 
