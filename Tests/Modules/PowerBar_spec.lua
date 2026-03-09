@@ -60,7 +60,7 @@ describe("PowerBar", function()
             _hideAllTicksPoolKey = nil,
         }
 
-        function mod:UpdateTicks(frame, powerType, max)
+        function mod:UpdateTicks(frame, max)
             self._updateTicksCalled = true
             self._updateTicksMax = max
         end
@@ -75,7 +75,7 @@ describe("PowerBar", function()
             local powerType = ECM.ClassUtil.GetCurrentPowerType()
             local max = UnitPowerMax("player", powerType)
             if not issecretvalue(max) then
-                self:UpdateTicks(self.InnerFrame, powerType, max)
+                self:UpdateTicks(self.InnerFrame, max)
             else
                 self:HideAllTicks("tickPool")
             end

@@ -441,6 +441,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "UnitClass", "GetSpecialization", "GetSpecializationInfo",
     "Enum", "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
     "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
+    "LibSettingsBuilder_InfoRowMixin",
     "LibSettingsBuilder_ScrollDropdownMixin",
     "GameFontHighlightSmall", "GameFontNormal",
     "SETTINGS_DEFAULTS", "InCombatLockdown", "UnitName", "date",
@@ -588,6 +589,7 @@ function TestHelpers.SetupOptionsGlobals()
         local f = { scripts = {}, _children = {} }
         local noop = function() end
         f.SetScript = function(self, event, fn) self.scripts[event] = fn end
+        f.GetScript = function(self, event) return self.scripts[event] end
         f.GetHeight = function() return 0 end
         f.SetHeight = noop
         f.SetWidth = noop
@@ -598,6 +600,9 @@ function TestHelpers.SetupOptionsGlobals()
         f.Show = noop
         f.Hide = noop
         f.IsShown = function() return false end
+        f.SetAlpha = noop
+        f.EnableMouse = noop
+        f.GetChildren = function() return end
         f.SetEnabled = noop
         f.SetText = noop
         f.GetText = function() return "" end

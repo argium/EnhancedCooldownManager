@@ -252,7 +252,7 @@ local function keysMatch(a, b)
 
     local aTextureOnly = (a.spellName == nil and a.spellID == nil and a.cooldownID == nil)
     local bTextureOnly = (b.spellName == nil and b.spellID == nil and b.cooldownID == nil)
-    if aTextureOnly and bTextureOnly and a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
+    if (aTextureOnly or bTextureOnly) and a.textureFileID and b.textureFileID and a.textureFileID == b.textureFileID then
         return true
     end
 
@@ -449,11 +449,11 @@ local function getMap()
     end
 
     _map = ECM.PriorityKeyMap.New(KEY_DEFS, function()
-        local cfg = config()
-        if not cfg then
+        local cfg2 = config()
+        if not cfg2 then
             return nil
         end
-        return getCurrentClassSpecStores(cfg)
+        return getCurrentClassSpecStores(cfg2)
     end, validateKey)
     return _map
 end

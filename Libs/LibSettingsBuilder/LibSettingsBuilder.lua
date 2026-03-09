@@ -10,6 +10,7 @@ end
 
 lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
 lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
+lib.INFOROW_TEMPLATE = "LibSettingsBuilder_InfoRowTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
 
 --------------------------------------------------------------------------------
@@ -183,6 +184,19 @@ function LibSettingsBuilder_SubheaderMixin:Init(initializer)
     local name = initializer:GetData().name
     self.Title:SetText(name)
     self.Title:SetFontObject(GameFontNormal)
+end
+
+--------------------------------------------------------------------------------
+-- InfoRow Mixin (global, shared across all instances)
+-- Renders a label + value pair aligned with standard controls.
+--------------------------------------------------------------------------------
+
+LibSettingsBuilder_InfoRowMixin = LibSettingsBuilder_InfoRowMixin or {}
+
+function LibSettingsBuilder_InfoRowMixin:Init(initializer)
+    local data = initializer:GetData()
+    self.Title:SetText(data.name)
+    self.Value:SetText(data.value)
 end
 
 --------------------------------------------------------------------------------
@@ -514,6 +528,7 @@ function lib:New(config)
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
     SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
+    SB.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
     SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
 
     ----------------------------------------------------------------------------
@@ -888,28 +903,9 @@ function lib:New(config)
     --- Static color swatch factory, forwarded from lib for convenience.
     SB.CreateColorSwatch = lib.CreateColorSwatch
 
-    --- Configures the root category to auto-redirect to a named subcategory.
-    --- When the user selects the root addon entry, the settings panel will
-    --- immediately navigate to the specified subcategory instead.
-    function SB.SetRootRedirect(subcategoryName)
-        SB._rootRedirect = subcategoryName
-    end
-
     function SB.RegisterCategories()
         if SB._rootCategory then
             Settings.RegisterAddOnCategory(SB._rootCategory)
-        end
-
-        if SB._rootRedirect and SB._rootCategory then
-            local target = SB._subcategories[SB._rootRedirect]
-            if target and SettingsPanel and SettingsPanel.CategoryList then
-                local categoryID = SB._rootCategory:GetID()
-                hooksecurefunc(SettingsPanel.CategoryList, "SetCurrentCategory", function(_, category)
-                    if category and category:GetID() == categoryID then
-                        Settings.OpenToCategory(target:GetID())
-                    end
-                end)
-            end
         end
     end
 
@@ -1366,6 +1362,15 @@ function lib:New(config)
         return initializer
     end
 
+    function SB.InfoRow(spec)
+        local cat = resolveCategory(spec)
+        local layout = SB._layouts[cat]
+        local initializer = Settings.CreateElementInitializer(lib.INFOROW_TEMPLATE, { name = spec.name, value = spec.value })
+        layout:AddInitializer(initializer)
+        applyModifiers(initializer, spec)
+        return initializer
+    end
+
     function SB.EmbedCanvas(canvas, height, spec)
         spec = spec or {}
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
@@ -1543,6 +1548,8 @@ function lib:New(config)
                     init = SB.Header(spec.name)
                 elseif entryType == "subheader" then
                     init = SB.Subheader(spec)
+                elseif entryType == "info" then
+                    init = SB.InfoRow(spec)
                 elseif entryType == "button" then
                     init = SB.Button(spec)
                 elseif entryType == "canvas" then

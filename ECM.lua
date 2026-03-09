@@ -569,9 +569,15 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
     StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
-local function createDialogFrame(name, titleText, explainText)
+local DIALOG_SIZES = {
+    small = { C.DIALOG_FRAME_WIDTH_SMALL, C.DIALOG_FRAME_HEIGHT_SMALL },
+    large = { C.DIALOG_FRAME_WIDTH, C.DIALOG_FRAME_HEIGHT },
+}
+
+local function createDialogFrame(name, titleText, explainText, size)
+    local dims = type(size) == "table" and size or DIALOG_SIZES[size] or DIALOG_SIZES.large
     local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    f:SetSize(C.DIALOG_FRAME_WIDTH, C.DIALOG_FRAME_HEIGHT)
+    f:SetSize(dims[1], dims[2])
     f:SetPoint("CENTER")
     f:SetFrameStrata("DIALOG")
     f:SetBackdrop(C.DIALOG_BACKDROP)
@@ -584,6 +590,7 @@ local function createDialogFrame(name, titleText, explainText)
     local title = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
     title:SetPoint("TOP", 0, -16)
     title:SetText(titleText)
+    f.title = title
 
     local explain = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     explain:SetPoint("TOP", 0, -40)
@@ -612,6 +619,31 @@ local function addButton(parent, label, anchor, onClick)
     return btn
 end
 
+--- Creates a lazily-initialized copy dialog with Ctrl+C auto-close.
+local function createCopyDialog(name, titleText, explainText, size, onCopied)
+    local frame = createDialogFrame(name, titleText, explainText, size)
+    addButton(frame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
+        frame:Hide()
+    end)
+    frame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
+        if key == "C" and IsControlKeyDown() then
+            C_Timer.After(0.1, function()
+                frame:Hide()
+                if onCopied then onCopied() end
+            end)
+        end
+    end)
+    return frame
+end
+
+local function showCopyDialog(frame, text)
+    frame:Show()
+    local editBox = frame.Scroll.ScrollBox.EditBox
+    editBox:SetText(text)
+    editBox:HighlightText()
+    editBox:SetFocus()
+end
+
 local exportFrame
 
 --- Shows a dialog with the export string for copying.
@@ -623,31 +655,36 @@ function mod:ShowExportDialog(exportString)
     end
 
     if not exportFrame then
-        exportFrame = createDialogFrame(
-            "ECMExportFrame",
-            "Export Profile",
-            "Press Ctrl+C to copy. The dialog will close automatically."
+        exportFrame = createCopyDialog(
+            "ECMExportFrame", "Export Profile",
+            "Press Ctrl+C to copy. The dialog will close automatically.",
+            nil, function() ECM.Print("Import string copied to clipboard.") end
         )
-        addButton(exportFrame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
-            exportFrame:Hide()
-        end)
-
-        -- Auto-close after Ctrl+C
-        exportFrame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
-            if key == "C" and IsControlKeyDown() then
-                C_Timer.After(0.1, function()
-                    exportFrame:Hide()
-                    ECM.Print("Import string copied to clipboard.")
-                end)
-            end
-        end)
     end
 
-    exportFrame:Show()
-    local editBox = exportFrame.Scroll.ScrollBox.EditBox
-    editBox:SetText(exportString)
-    editBox:HighlightText()
-    editBox:SetFocus()
+    showCopyDialog(exportFrame, exportString)
+end
+
+local copyTextFrame
+
+--- Shows a small dialog with text for copying (e.g. a URL).
+---@param text string
+---@param title string|nil
+function mod:ShowCopyTextDialog(text, title)
+    if not text or text == "" then
+        return
+    end
+
+    if not copyTextFrame then
+        copyTextFrame = createCopyDialog(
+            "ECMCopyTextFrame", "",
+            "Press Ctrl+C to copy. The dialog will close automatically.",
+            "small"
+        )
+    end
+
+    copyTextFrame.title:SetText(title or "Copy Link")
+    showCopyDialog(copyTextFrame, text)
 end
 
 local importFrame

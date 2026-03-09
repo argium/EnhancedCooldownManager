@@ -21,6 +21,25 @@
         </Layers>
     </Frame>
 
+    <Frame name="LibSettingsBuilder_InfoRowTemplate" mixin="LibSettingsBuilder_InfoRowMixin" virtual="true">
+        <Size x="30" y="26"/>
+        <Layers>
+            <Layer level="OVERLAY">
+                <FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT">
+                    <Anchors>
+                        <Anchor point="LEFT" x="37" y="0"/>
+                        <Anchor point="RIGHT" relativePoint="CENTER" x="-85" y="0"/>
+                    </Anchors>
+                </FontString>
+                <FontString parentKey="Value" inherits="GameFontHighlight" justifyH="LEFT">
+                    <Anchors>
+                        <Anchor point="LEFT" relativePoint="CENTER" x="-80" y="0"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+    </Frame>
+
     <Button name="LibSettingsBuilder_ScrollDropdownTemplate"
         inherits="SettingsDropdownControlTemplate"
         mixin="LibSettingsBuilder_ScrollDropdownMixin"

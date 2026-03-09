@@ -31,9 +31,8 @@ end
 
 --- Updates tick markers on the power bar based on per-class/spec configuration.
 ---@param frame Frame The inner frame containing StatusBar and TicksFrame
----@param powerType Enum.PowerType Current power type
 ---@param max number Maximum power value
-function PowerBar:UpdateTicks(frame, powerType, max)
+function PowerBar:UpdateTicks(frame, max)
     local ticks = self:GetCurrentTicks()
     if not ticks or #ticks == 0 then
         self:HideAllTicks("tickPool")
@@ -84,7 +83,7 @@ function PowerBar:Refresh(why, force)
     local powerType = ECM.ClassUtil.GetCurrentPowerType()
     local max = UnitPowerMax("player", powerType)
     if not issecretvalue(max) then
-        self:UpdateTicks(frame, powerType, max)
+        self:UpdateTicks(frame, max)
     else
         self:HideAllTicks("tickPool")
     end
