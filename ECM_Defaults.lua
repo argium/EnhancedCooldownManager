@@ -7,7 +7,6 @@
 ---@field g number Green channel (0-1).
 ---@field b number Blue channel (0-1).
 ---@field a number Alpha channel (0-1).
----@field textureId number|nil Texture file ID for icon display.
 
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
@@ -30,14 +29,12 @@
 ---@field ticks ECM_PowerBarTicksConfig Tick mark configuration.
 
 ---@class ECM_ResourceBarConfig : ECM_BarConfigBase Resource bar configuration.
----@field demonHunterSoulsMax number Maximum Demon Hunter souls.
 ---@field colors table<ECM_ResourceType, ECM_Color> Resource colors.
 ---@field maxColors table<ECM_ResourceType, ECM_Color> Colors used when a resource is at its maximum value.
 ---@field maxColorsEnabled table<ECM_ResourceType, boolean> Whether the max-value color override is enabled per type.
 ---@field border ECM_BorderConfig Border configuration.
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase Rune bar configuration.
----@field max number Maximum rune count.
 ---@field useSpecColor boolean Whether to use class/spec colors instead of custom color.
 ---@field color ECM_Color Rune bar color.
 ---@field colorBlood ECM_Color Blood rune color.
@@ -47,6 +44,7 @@
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
 ---@class ECM_GlobalConfig Global configuration.
+---@field debug boolean Whether debug logging is enabled.
 ---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
 ---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
 ---@field updateFrequency number Update frequency in seconds.
@@ -121,7 +119,6 @@
 
 ---@class ECM_Profile Profile settings.
 ---@field schemaVersion number Saved variables schema version.
----@field debug boolean Whether debug logging is enabled.
 ---@field global ECM_GlobalConfig Global appearance settings.
 ---@field powerBar ECM_PowerBarConfig Power bar settings.
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.

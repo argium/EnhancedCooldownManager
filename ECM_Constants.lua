@@ -65,12 +65,6 @@ local constants = {
     RESOURCEBAR_TYPE_ICICLES = "icicles",
     RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
 
-    -- Resource types that support a separate color when at maximum value.
-    -- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
-    RESOURCEBAR_MAX_COLOR_TYPES = {
-        ["icicles"] = true,
-    },
-
     RUNEBAR_MAX_RUNES = 6,
     RUNEBAR_CD_DIM_FACTOR = 0.5,
     BUFFBARS_DEFAULT_COLOR = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
@@ -194,9 +188,16 @@ local CLASS_COLORS = {
     WARRIOR = "C79C6E",
 }
 
+-- Resource types that support a separate color when at maximum value.
+-- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
+local maxColorTypes = {
+    ["icicles"] = true,
+}
+
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS
+constants.RESOURCEBAR_MAX_COLOR_TYPES = maxColorTypes
 
 ECM.Constants = constants
