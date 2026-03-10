@@ -65,6 +65,12 @@ local constants = {
     RESOURCEBAR_TYPE_ICICLES = "icicles",
     RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
 
+    -- Resource types that support a separate color when at maximum value.
+    -- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
+    RESOURCEBAR_MAX_COLOR_TYPES = {
+        ["icicles"] = true,
+    },
+
     RUNEBAR_MAX_RUNES = 6,
     RUNEBAR_CD_DIM_FACTOR = 0.5,
     BUFFBARS_DEFAULT_COLOR = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },

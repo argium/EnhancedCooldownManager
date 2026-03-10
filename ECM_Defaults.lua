@@ -32,6 +32,8 @@
 ---@class ECM_ResourceBarConfig : ECM_BarConfigBase Resource bar configuration.
 ---@field demonHunterSoulsMax number Maximum Demon Hunter souls.
 ---@field colors table<ECM_ResourceType, ECM_Color> Resource colors.
+---@field maxColors table<ECM_ResourceType, ECM_Color> Colors used when a resource is at its maximum value.
+---@field maxColorsEnabled table<ECM_ResourceType, boolean> Whether the max-value color override is enabled per type.
 ---@field border ECM_BorderConfig Border configuration.
 
 ---@class ECM_RuneBarConfig : ECM_BarConfigBase Rune bar configuration.
@@ -218,6 +220,12 @@ local defaults = {
                 [Enum.PowerType.HolyPower] = { r = 0.8863, g = 0.8235, b = 0.2392, a = 1 },
                 [C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
                 [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
+            },
+            maxColorsEnabled = {
+                [C.RESOURCEBAR_TYPE_ICICLES] = true,
+            },
+            maxColors = {
+                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
             },
         },
         runeBar = {

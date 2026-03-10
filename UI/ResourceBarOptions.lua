@@ -35,13 +35,40 @@ function ResourceBarOptions.RegisterSettings(SB)
         order = 0,
         onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
     }
+    local maxColorDefs = {}
+    for _, def in ipairs(RESOURCE_COLOR_DEFS) do
+        if C.RESOURCEBAR_MAX_COLOR_TYPES[def.key] then
+            maxColorDefs[#maxColorDefs + 1] = {
+                key = def.key,
+                name = def.name,
+                tooltip = "Use an alternate color when this resource is at its maximum value.",
+            }
+        end
+    end
+
     args.colors = {
         type = "colorList",
-        defs = RESOURCE_COLOR_DEFS,
-        label = "Colors",
         path = "colors",
+        label = "Colors",
+        defs = RESOURCE_COLOR_DEFS,
         disabled = isDisabled,
         order = 30,
+    }
+    args.maxColorsEnabled = {
+        type = "toggleList",
+        path = "maxColorsEnabled",
+        label = "Use alternate color when capped",
+        defs = maxColorDefs,
+        disabled = isDisabled,
+        order = 31,
+    }
+    args.maxColors = {
+        type = "colorList",
+        path = "maxColors",
+        label = "Alternate Colors",
+        defs = maxColorDefs,
+        disabled = isDisabled,
+        order = 32,
     }
 
     SB.RegisterFromTable({

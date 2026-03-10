@@ -2,23 +2,32 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("Options sections and root assembly", function()
     local originalGlobals
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "ECM_DeepEquals",
-            "Settings", "CreateSettingsListSectionHeaderInitializer",
-            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
-            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
+            "ECM",
+            "ECM_DeepEquals",
+            "Settings",
+            "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer",
+            "MinimalSliderWithSteppersMixin",
+            "CreateColor",
+            "StaticPopupDialogs",
+            "StaticPopup_Show",
+            "YES",
+            "NO",
+            "UnitClass",
+            "GetSpecialization",
+            "GetSpecializationInfo",
             "Enum",
-            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "LibStub",
+            "CreateFromMixins",
+            "SettingsListElementInitializer",
             "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
@@ -32,8 +41,12 @@ describe("Options sections and root assembly", function()
         TestHelpers.SetupSettingsStubs()
         TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        lsmw.GetFontValues = function() return {} end
-        lsmw.GetStatusbarValues = function() return {} end
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
+        end
         lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
         lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
     end
@@ -54,12 +67,22 @@ describe("Options sections and root assembly", function()
             ScheduleLayoutUpdate = function() end,
         }
 
-        _G.ECM_DeepEquals = function(a, b) return a == b end
-        _G.ECM.CloneValue = function(v) return v end
+        _G.ECM_DeepEquals = function(a, b)
+            return a == b
+        end
+        _G.ECM.CloneValue = function(v)
+            return v
+        end
 
-        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
-        _G.GetSpecialization = function() return 1 end
-        _G.GetSpecializationInfo = function() return nil, "Arms" end
+        _G.UnitClass = function()
+            return "Warrior", "WARRIOR", 1
+        end
+        _G.GetSpecialization = function()
+            return 1
+        end
+        _G.GetSpecializationInfo = function()
+            return nil, "Arms"
+        end
 
         local createdModule
         local mod = {
@@ -78,7 +101,17 @@ describe("Options sections and root assembly", function()
 
         local ns = { Addon = mod, OptionsSections = {} }
 
-        for _, key in ipairs({ "About", "General", "PowerBar", "ResourceBar", "RuneBar", "BuffBars", "ItemIcons", "Profile", "Advanced Options" }) do
+        for _, key in ipairs({
+            "About",
+            "General",
+            "PowerBar",
+            "ResourceBar",
+            "RuneBar",
+            "BuffBars",
+            "ItemIcons",
+            "Profile",
+            "Advanced Options",
+        }) do
             ns.OptionsSections[key] = {
                 RegisterSettings = function()
                     registerSettingsCalls[#registerSettingsCalls + 1] = key
@@ -93,8 +126,14 @@ describe("Options sections and root assembly", function()
 
         assert.are.same({
             "About",
-            "General", "PowerBar", "ResourceBar", "RuneBar",
-            "BuffBars", "ItemIcons", "Profile", "Advanced Options",
+            "General",
+            "PowerBar",
+            "ResourceBar",
+            "RuneBar",
+            "BuffBars",
+            "ItemIcons",
+            "Profile",
+            "Advanced Options",
         }, registerSettingsCalls)
         assert.are.equal(3, #dbCallbacks)
         assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
@@ -103,21 +142,36 @@ describe("Options sections and root assembly", function()
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
         setupLibs()
 
-        _G.UnitClass = function() return "Player", "WARRIOR", 1 end
-        _G.GetSpecialization = function() return 1 end
-        _G.GetSpecializationInfo = function() return nil, "Arms" end
+        _G.UnitClass = function()
+            return "Player", "WARRIOR", 1
+        end
+        _G.GetSpecialization = function()
+            return 1
+        end
+        _G.GetSpecializationInfo = function()
+            return nil, "Arms"
+        end
 
         _G.Enum = {
             PowerType = {
-                ArcaneCharges = 1, Chi = 2, ComboPoints = 3,
-                Essence = 4, HolyPower = 5, SoulShards = 6,
+                ArcaneCharges = 1,
+                Chi = 2,
+                ComboPoints = 3,
+                Essence = 4,
+                HolyPower = 5,
+                SoulShards = 6,
             },
         }
 
         _G.ECM = {
             Constants = {
                 CLASS = { DEATHKNIGHT = "DEATHKNIGHT" },
+                RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
+                RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
+                RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
+                RESOURCEBAR_TYPE_ICICLES = "icicles",
                 RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
+                RESOURCEBAR_MAX_COLOR_TYPES = { ["icicles"] = true },
                 ANCHORMODE_CHAIN = 1,
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
@@ -129,7 +183,9 @@ describe("Options sections and root assembly", function()
         local profileData = {
             resourceBar = { enabled = true, anchorMode = 1, border = border },
             runeBar = {
-                enabled = true, useSpecColor = false, anchorMode = 1,
+                enabled = true,
+                useSpecColor = false,
+                anchorMode = 1,
                 border = TestHelpers.deepClone(border),
                 color = { r = 0.77, g = 0.12, b = 0.23, a = 1 },
                 colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
@@ -144,7 +200,9 @@ describe("Options sections and root assembly", function()
                     profile = profileData,
                     defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
-                NewModule = function(_, name) return { moduleName = name } end,
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
             },
             OptionsSections = {},
         }
