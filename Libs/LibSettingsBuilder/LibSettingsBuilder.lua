@@ -488,8 +488,12 @@ function lib.PathAdapter(config)
     return {
         resolve = function(self, path)
             return {
-                get = function() return getNested(config.getStore(), path) end,
-                set = function(value) setNested(config.getStore(), path, value) end,
+                get = function()
+                    return getNested(config.getStore(), path)
+                end,
+                set = function(value)
+                    setNested(config.getStore(), path, value)
+                end,
                 default = getNested(config.getDefaults(), path),
             }
         end,
@@ -958,16 +962,13 @@ function lib:New(config)
         local setting = makeProxySetting(spec, varType, "", binding)
 
         if spec.scrollHeight then
-            local initializer = Settings.CreateElementInitializer(
-                lib.SCROLL_DROPDOWN_TEMPLATE,
-                {
-                    setting = setting,
-                    values = spec.values,
-                    scrollHeight = spec.scrollHeight,
-                    name = spec.name,
-                    tooltip = spec.tooltip,
-                }
-            )
+            local initializer = Settings.CreateElementInitializer(lib.SCROLL_DROPDOWN_TEMPLATE, {
+                setting = setting,
+                values = spec.values,
+                scrollHeight = spec.scrollHeight,
+                name = spec.name,
+                tooltip = spec.tooltip,
+            })
             if initializer.SetSetting then
                 initializer:SetSetting(setting)
             end
@@ -1234,6 +1235,24 @@ function lib:New(config)
         return results
     end
 
+    function SB.CheckboxList(basePath, defs, spec)
+        spec = spec or {}
+        local results = {}
+
+        for _, def in ipairs(defs) do
+            local childSpec = {
+                path = basePath .. "." .. tostring(def.key),
+                name = def.name,
+                tooltip = def.tooltip,
+            }
+            propagateModifiers(childSpec, spec)
+            local init, setting = SB.Checkbox(childSpec)
+            results[#results + 1] = { key = def.key, initializer = init, setting = setting }
+        end
+
+        return results
+    end
+
     --- Positioning group.
     --- Required spec fields:
     ---   positionModes     table         value → label map
@@ -1365,7 +1384,8 @@ function lib:New(config)
     function SB.InfoRow(spec)
         local cat = resolveCategory(spec)
         local layout = SB._layouts[cat]
-        local initializer = Settings.CreateElementInitializer(lib.INFOROW_TEMPLATE, { name = spec.name, value = spec.value })
+        local initializer =
+            Settings.CreateElementInitializer(lib.INFOROW_TEMPLATE, { name = spec.name, value = spec.value })
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer
@@ -1562,6 +1582,17 @@ function lib:New(config)
                         spec.parent = spec.parent or labelInit
                     end
                     local results = SB.ColorPickerList(resolvePath(entry.path), defs, spec)
+                    if results[1] then
+                        init, setting = results[1].initializer, results[1].setting
+                    end
+                elseif entryType == "toggleList" then
+                    local defs = entry.defs or {}
+                    if entry.label then
+                        local labelInit =
+                            SB.Subheader({ name = entry.label, disabled = spec.disabled, hidden = spec.hidden })
+                        spec.parent = spec.parent or labelInit
+                    end
+                    local results = SB.CheckboxList(resolvePath(entry.path), defs, spec)
                     if results[1] then
                         init, setting = results[1].initializer, results[1].setting
                     end

@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
@@ -126,12 +124,23 @@ describe("ResourceBarOptions getters/setters/defaults", function()
     describe("colors", function()
         it("all 11 resource type color settings exist", function()
             local keys = {
-                "souls", "devourerNormal", "devourerMeta", "icicles",
-                "16", "12", "4", "19", "9", "maelstromWeapon", "7",
+                "souls",
+                "devourerNormal",
+                "devourerMeta",
+                "icicles",
+                "16",
+                "12",
+                "4",
+                "19",
+                "9",
+                "maelstromWeapon",
+                "7",
             }
             for _, key in ipairs(keys) do
-                assert.is_not_nil(settings["ECM_resourceBar_colors_" .. key],
-                    "Missing color setting for resource type " .. key)
+                assert.is_not_nil(
+                    settings["ECM_resourceBar_colors_" .. key],
+                    "Missing color setting for resource type " .. key
+                )
             end
         end)
         it("souls color getter returns hex string", function()
@@ -150,6 +159,34 @@ describe("ResourceBarOptions getters/setters/defaults", function()
             assert.is_not_nil(settings["ECM_resourceBar_enabled"])
         end)
     end)
+
+    -- Max-color overrides
+    describe("maxColorsEnabled", function()
+        it("icicles toggle setting exists", function()
+            assert.is_not_nil(settings["ECM_resourceBar_maxColorsEnabled_icicles"])
+        end)
+        it("getter returns profile value", function()
+            assert.is_true(settings["ECM_resourceBar_maxColorsEnabled_icicles"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_resourceBar_maxColorsEnabled_icicles"]:SetValue(false)
+            assert.is_false(profile.resourceBar.maxColorsEnabled.icicles)
+        end)
+    end)
+
+    describe("maxColors", function()
+        it("icicles color setting exists", function()
+            assert.is_not_nil(settings["ECM_resourceBar_maxColors_icicles"])
+        end)
+        it("getter returns hex string", function()
+            local hex = settings["ECM_resourceBar_maxColors_icicles"]:GetValue()
+            assert.is_string(hex)
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_resourceBar_maxColors_icicles"]:SetValue("FF0000FF")
+            assert.is_table(profile.resourceBar.maxColors.icicles)
+        end)
+    end)
 end)
 
 describe("ResourceBarOptions class gating (DK)", function()
@@ -165,7 +202,9 @@ describe("ResourceBarOptions class gating (DK)", function()
 
     it("isDisabled returns true for Death Knights", function()
         TestHelpers.SetupOptionsGlobals()
-        _G.UnitClass = function() return "Death Knight", "DEATHKNIGHT", 6 end
+        _G.UnitClass = function()
+            return "Death Knight", "DEATHKNIGHT", 6
+        end
         local profile, defaults = TestHelpers.MakeOptionsProfile()
         local SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 

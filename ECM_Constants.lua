@@ -188,9 +188,16 @@ local CLASS_COLORS = {
     WARRIOR = "C79C6E",
 }
 
+-- Resource types that support a separate color when at maximum value.
+-- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
+local maxColorTypes = {
+    ["icicles"] = true,
+}
+
 local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = order
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS
+constants.RESOURCEBAR_MAX_COLOR_TYPES = maxColorTypes
 
 ECM.Constants = constants

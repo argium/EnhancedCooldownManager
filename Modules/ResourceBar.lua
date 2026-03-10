@@ -23,10 +23,21 @@ function ResourceBar:GetStatusBarValues()
 end
 
 --- Gets the color for the resource bar based on resource type.
+--- Returns a max-value color override when the type supports it, the user has
+--- enabled it, and the resource is currently at its maximum.
 ---@return ECM_Color
 function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local resourceType = ClassUtil.GetPlayerResourceType()
+
+    if ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
+        and cfg.maxColorsEnabled and cfg.maxColorsEnabled[resourceType] then
+        local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
+        if safeMax and current == safeMax then
+            return cfg.maxColors and cfg.maxColors[resourceType] or ECM.Constants.COLOR_WHITE
+        end
+    end
+
     local color = cfg.colors and cfg.colors[resourceType]
     return color or ECM.Constants.COLOR_WHITE
 end
