@@ -358,8 +358,8 @@ local function updateFadeAndHiddenStates()
             end
 
             if not shouldSkipFade then
-                local opacity = fadeConfig.opacity or C.OPACITY_MAX_PERCENT
-                alpha = math.max(0, math.min(1, opacity / C.OPACITY_MAX_PERCENT))
+                local opacity = fadeConfig.opacity or 100
+                alpha = math.max(0, math.min(1, opacity / 100))
             end
         end
     end

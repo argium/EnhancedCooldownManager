@@ -130,9 +130,6 @@ local constants = {
     LAYOUT_COMBAT_END_DELAY = 0.1,
     LAYOUT_ZONE_CHANGE_DELAY = 0.1,
 
-    -- Opacity
-    OPACITY_MAX_PERCENT = 100,
-
     -- Popup dialog
     POPUP_PREFERRED_INDEX = 3,
 
