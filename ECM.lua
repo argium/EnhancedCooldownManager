@@ -318,7 +318,7 @@ local function updateFadeAndHiddenStates()
     local hidden, reason = false, nil
     if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
         hidden, reason = true, "cvar"
-    elseif globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player")) then
+    elseif globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")) then
         hidden, reason = true, "mounted"
     elseif not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting() then
         hidden, reason = true, "rest"
@@ -629,7 +629,9 @@ local function createCopyDialog(name, titleText, explainText, size, onCopied)
         if key == "C" and IsControlKeyDown() then
             C_Timer.After(0.1, function()
                 frame:Hide()
-                if onCopied then onCopied() end
+                if onCopied then
+                    onCopied()
+                end
             end)
         end
     end)
@@ -656,9 +658,13 @@ function mod:ShowExportDialog(exportString)
 
     if not exportFrame then
         exportFrame = createCopyDialog(
-            "ECMExportFrame", "Export Profile",
+            "ECMExportFrame",
+            "Export Profile",
             "Press Ctrl+C to copy. The dialog will close automatically.",
-            nil, function() ECM.Print("Import string copied to clipboard.") end
+            nil,
+            function()
+                ECM.Print("Import string copied to clipboard.")
+            end
         )
     end
 
@@ -677,7 +683,8 @@ function mod:ShowCopyTextDialog(text, title)
 
     if not copyTextFrame then
         copyTextFrame = createCopyDialog(
-            "ECMCopyTextFrame", "",
+            "ECMCopyTextFrame",
+            "",
             "Press Ctrl+C to copy. The dialog will close automatically.",
             "small"
         )

@@ -127,9 +127,12 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     local color = getColor(moduleConfig)
     local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
     local statesChanged = (bar._lastReadySet == nil) or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
+    local dimensionsChanged = (bar._lastBarWidth ~= barWidth) or (bar._lastBarHeight ~= barHeight)
 
-    if statesChanged then
+    if statesChanged or dimensionsChanged then
         bar._lastReadySet = readySet
+        bar._lastBarWidth = barWidth
+        bar._lastBarHeight = barHeight
 
         local readyList = {}
         local cdList = {}

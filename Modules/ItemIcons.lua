@@ -286,7 +286,7 @@ local function getUtilityViewerLayout()
     local viewer = _G["UtilityCooldownViewer"]
     if not viewer or not viewer:IsShown() then
         return ECM.Constants.DEFAULT_ITEM_ICON_SIZE,
-            ECM.Constants.DEFAULT_ITEM_ICON_SPACING,
+            0,
             1.0,
             false,
             {
@@ -298,7 +298,7 @@ local function getUtilityViewerLayout()
 
     local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
     local iconScale = 1.0
-    local spacing = ECM.Constants.DEFAULT_ITEM_ICON_SPACING
+    local spacing = 0
     local isStable = false
     local debugInfo = {
         reason = "no_pair",
@@ -306,13 +306,13 @@ local function getUtilityViewerLayout()
         childScale = nil,
     }
 
-    -- Read Edit Mode settings directly from the viewer frame.
-    -- Blizzard's EditModeCooldownViewerSystemMixin stores these on the frame
-    -- when processing settings (iconPadding, iconScale).
-    if viewer.iconPadding ~= nil then
-        spacing = viewer.iconPadding
+    -- Blizzard's managed layout uses childXPadding for actual icon positioning.
+    -- This differs from the Edit Mode iconPadding setting by a constant offset of -4
+    -- (childXPadding = iconPadding - 4), accounting for transparent padding in icon atlases.
+    if viewer.childXPadding ~= nil then
+        spacing = viewer.childXPadding
         isStable = true
-        debugInfo.reason = "viewer_iconPadding"
+        debugInfo.reason = "viewer_childXPadding"
         debugInfo.measuredSpacing = spacing
     end
 
@@ -477,23 +477,6 @@ function ItemIcons:UpdateLayout(why)
         totalWidth = totalWidth,
         layoutDebug = layoutDebug,
     })
-
-    -- Retry layout measurement when the viewer hasn't stabilized yet.
-    if layoutStable then
-        self._layoutRetryCount = 0
-    elseif
-        not self._layoutRetryPending
-        and (self._layoutRetryCount or 0) < ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS
-    then
-        self._layoutRetryPending = true
-        self._layoutRetryCount = (self._layoutRetryCount or 0) + 1
-        C_Timer.After(ECM.Constants.ITEM_ICON_LAYOUT_REMEASURE_DELAY, function()
-            self._layoutRetryPending = nil
-            if self:IsEnabled() then
-                self:ThrottledUpdateLayout("UpdateLayout")
-            end
-        end)
-    end
 
     self:ThrottledRefresh("UpdateLayout")
 

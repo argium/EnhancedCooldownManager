@@ -109,10 +109,7 @@ local constants = {
 
     -- Item icon defaults
     DEFAULT_ITEM_ICON_SIZE = 32,
-    DEFAULT_ITEM_ICON_SPACING = 2,
     ITEM_ICON_BORDER_SCALE = 1.35,
-    ITEM_ICON_LAYOUT_REMEASURE_DELAY = 0.1,
-    ITEM_ICON_LAYOUT_REMEASURE_ATTEMPTS = 2,
 
     -- Schema migration
     CURRENT_SCHEMA_VERSION = 10,
