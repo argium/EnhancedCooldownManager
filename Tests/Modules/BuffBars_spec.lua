@@ -308,7 +308,7 @@ describe("BuffBars", function()
     describe("child hook _layoutRunning guard", function()
         --- Simulates hookChildFrame's hook pattern: installs SetPoint, OnShow,
         --- and OnHide hooks on a child frame that check module._layoutRunning.
-        --- SetPoint and OnShow synchronously call styleChild before deferring;
+        --- SetPoint restores cached anchors and re-styles; OnShow re-styles;
         --- OnHide only defers.
         ---@param styleChild fun(child: table)|nil Optional callback simulating styleChildFrame
         local function installChildHooks(child, module, styleChild)
@@ -319,6 +319,13 @@ describe("BuffBars", function()
                     return
                 end
                 module._layoutRunning = true
+                local cached = child.__ecmAnchorCache
+                if cached then
+                    child:ClearAllPoints()
+                    for _, a in ipairs(cached) do
+                        child:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
+                    end
+                end
                 if styleChild then
                     styleChild(child)
                 end
@@ -551,6 +558,49 @@ describe("BuffBars", function()
             assert.is_true(nestedHookFired)
             -- Only one deferred call (not two)
             assert.are.equal(1, #outerCalls)
+        end)
+
+        it("SetPoint hook restores cached anchors from __ecmAnchorCache", function()
+            local mod = loadBuffBarsModule()
+            function mod:ThrottledUpdateLayout() end
+
+            local child = makeFrame({ name = "bar1" })
+            -- Simulate a prior layoutBars pass having cached the correct anchors
+            local anchor = child -- use child itself as relative-to frame for simplicity
+            child.__ecmAnchorCache = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 0, -2 },
+                { "TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -2 },
+            }
+            installChildHooks(child, mod)
+
+            -- Blizzard repositions the child to a wrong location
+            child:SetPoint("CENTER", nil, "CENTER", 99, 99)
+
+            -- The hook should have restored from cache
+            local anchors = child.__anchors
+            assert.are.equal(2, #anchors)
+            assert.are.equal("TOPLEFT", anchors[1][1])
+            assert.are.equal("BOTTOMLEFT", anchors[1][3])
+            assert.are.equal(-2, anchors[1][5])
+            assert.are.equal("TOPRIGHT", anchors[2][1])
+            assert.are.equal("BOTTOMRIGHT", anchors[2][3])
+        end)
+
+        it("SetPoint hook skips anchor restoration when cache is absent", function()
+            local mod = loadBuffBarsModule()
+            function mod:ThrottledUpdateLayout() end
+
+            local child = makeFrame({ name = "bar1" })
+            -- No __ecmAnchorCache set
+            installChildHooks(child, mod)
+
+            child:SetPoint("TOPLEFT", nil, "TOPLEFT", 5, 5)
+
+            -- Should keep the point that was set (no cache to restore from)
+            local anchors = child.__anchors
+            assert.are.equal(1, #anchors)
+            assert.are.equal("TOPLEFT", anchors[1][1])
+            assert.are.equal(5, anchors[1][4])
         end)
     end)
 end)

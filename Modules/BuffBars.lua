@@ -326,13 +326,21 @@ local function hookChildFrame(child, module)
 
     -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
     -- Each hook guards against _layoutRunning to prevent recursion from our lazy setters.
-    -- SetPoint and OnShow synchronously re-style the affected child to eliminate visual glitching when Blizzard
-    -- modifies the frames after our customisations have been applied.
     hooksecurefunc(child, "SetPoint", function()
         if module._layoutRunning then
             return
         end
         module._layoutRunning = true
+        -- Restore the child's cached anchors to undo Blizzard's repositioning
+        -- before the next render frame. LazySetAnchors populates __ecmAnchorCache
+        -- during layoutBars, so after the first layout pass this is always available.
+        local cached = child.__ecmAnchorCache
+        if cached then
+            child:ClearAllPoints()
+            for _, a in ipairs(cached) do
+                child:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
+            end
+        end
         styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
