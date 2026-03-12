@@ -45,27 +45,6 @@ local function getChildrenOrdered(viewer)
     return result
 end
 
-local function hookChildFrame(child, module)
-    if child.__ecmHooked then
-        return
-    end
-
-    -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
-    hooksecurefunc(child, "SetPoint", function()
-        module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
-    end)
-
-    child:HookScript("OnShow", function()
-        module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
-    end)
-
-    child:HookScript("OnHide", function()
-        module:ThrottledUpdateLayout("OnHide:child", { secondPass = true })
-    end)
-
-    child.__ecmHooked = true
-end
-
 --- Strips circular masks and hides overlay/border to produce a square icon.
 --- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
 --- frame via `__ecmSquareStyled` so it only runs once per icon frame.
@@ -338,6 +317,45 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     end
 
     ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "styled")
+end
+
+local function hookChildFrame(child, module)
+    if child.__ecmHooked then
+        return
+    end
+
+    -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
+    -- Each hook guards against _layoutRunning to prevent recursion from our lazy setters.
+    -- SetPoint and OnShow synchronously re-style the affected child to eliminate visual glitching when Blizzard
+    -- modifies the frames after our customisations have been applied.
+    hooksecurefunc(child, "SetPoint", function()
+        if module._layoutRunning then
+            return
+        end
+        module._layoutRunning = true
+        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        module._layoutRunning = nil
+        module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
+    end)
+
+    child:HookScript("OnShow", function()
+        if module._layoutRunning then
+            return
+        end
+        module._layoutRunning = true
+        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        module._layoutRunning = nil
+        module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
+    end)
+
+    child:HookScript("OnHide", function()
+        if module._layoutRunning then
+            return
+        end
+        module:ThrottledUpdateLayout("OnHide:child", { secondPass = true })
+    end)
+
+    child.__ecmHooked = true
 end
 
 local function getLayoutState(params, cfg)
