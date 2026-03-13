@@ -53,7 +53,7 @@ read_globals = {
     "SETTINGS_DEFAULTS",
     "StaticPopup_Show",
     "UIParent",
-    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitInVehicle", "UnitIsDead", "UnitName",
+    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName",
     "UnitPower", "UnitPowerMax", "UnitPowerPercent", "UnitPowerType",
     "YES",
 }
