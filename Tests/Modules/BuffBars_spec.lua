@@ -321,10 +321,7 @@ describe("BuffBars", function()
                 module._layoutRunning = true
                 local cached = child.__ecmAnchorCache
                 if cached then
-                    child:ClearAllPoints()
-                    for _, a in ipairs(cached) do
-                        child:SetPoint(a[1], a[2], a[3], a[4] or 0, a[5] or 0)
-                    end
+                    ECM.FrameUtil.LazySetAnchors(child, cached)
                 end
                 if styleChild then
                     styleChild(child)
@@ -381,6 +378,9 @@ describe("BuffBars", function()
             end
 
             local child = makeFrame({ name = "bar1" })
+            child.__ecmAnchorCache = {
+                { "TOPLEFT", child, "BOTTOMLEFT", 0, -2 },
+            }
             installChildHooks(child, mod)
 
             child:SetPoint("TOPLEFT", nil, "TOPLEFT", 0, 0)
@@ -472,6 +472,9 @@ describe("BuffBars", function()
             mod._layoutRunning = nil
 
             -- After layout: dispatched
+            child.__ecmAnchorCache = {
+                { "TOPLEFT", child, "BOTTOMLEFT", 10, 10 },
+            }
             child:SetPoint("TOPLEFT", nil, "TOPLEFT", 10, 10)
             assert.are.equal(1, #calls)
             assert.are.equal("SetPoint:hook", calls[1])
@@ -485,6 +488,9 @@ describe("BuffBars", function()
             end
 
             local child = makeFrame({ name = "bar1" })
+            child.__ecmAnchorCache = {
+                { "TOPLEFT", child, "BOTTOMLEFT", 0, -2 },
+            }
             installChildHooks(child, mod, function(c)
                 sequence[#sequence + 1] = "styled:" .. c:GetName()
             end)
@@ -544,19 +550,25 @@ describe("BuffBars", function()
 
             local child = makeFrame({ name = "bar1" })
             local nestedHookFired = false
+            child.__ecmAnchorCache = {
+                { "TOPLEFT", child, "BOTTOMLEFT", 0, -2 },
+            }
+
+            local baseSetPoint = child.SetPoint
+            child.SetPoint = function(self, ...)
+                baseSetPoint(self, ...)
+                if mod._layoutRunning then
+                    nestedHookFired = true
+                end
+            end
 
             installChildHooks(child, mod, function()
-                -- Simulate styleChildFrame calling SetPoint on a sub-frame
-                -- that somehow triggers the child's SetPoint again.
-                -- The _layoutRunning guard should prevent re-entry.
                 nestedHookFired = mod._layoutRunning == true
             end)
 
-            child:SetPoint("TOPLEFT", nil, "TOPLEFT", 0, 0)
+            child:SetPoint("CENTER", nil, "CENTER", 0, 0)
 
-            -- styleChild ran while _layoutRunning was true
             assert.is_true(nestedHookFired)
-            -- Only one deferred call (not two)
             assert.are.equal(1, #outerCalls)
         end)
 

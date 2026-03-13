@@ -797,15 +797,6 @@ function mod:ChatCommand(input)
     end
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
-        if InCombatLockdown() then
-            ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
-            if not self._openOptionsAfterCombat then
-                self._openOptionsAfterCombat = true
-                self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
-            end
-            return
-        end
-
         local optionsModule = self:GetModule("Options", true)
         if optionsModule then
             optionsModule:OpenOptions()
@@ -833,20 +824,6 @@ function mod:ChatCommand(input)
         profile.global.debug = newVal
         ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
         return
-    end
-end
-
-function mod:HandleOpenOptionsAfterCombat()
-    if not self._openOptionsAfterCombat then
-        return
-    end
-
-    self._openOptionsAfterCombat = nil
-    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-
-    local optionsModule = self:GetModule("Options", true)
-    if optionsModule then
-        optionsModule:OpenOptions()
     end
 end
 

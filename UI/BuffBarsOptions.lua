@@ -49,6 +49,23 @@ local function hasUnlabeledBars(rows)
     return false
 end
 
+--- Returns whether the player is in an environment where secret-name recovery should stay disabled.
+---@return boolean
+local function isSpellColorsReloadRestricted()
+    return InCombatLockdown() or IsInInstance()
+end
+
+--- Returns the footer state for the secret-name recovery controls.
+---@param rows { key: ECM_SpellColorKey }[]
+---@return { show: boolean, enabled: boolean }
+local function getSecretNameFooterState(rows)
+    local show = hasUnlabeledBars(rows)
+    return {
+        show = show,
+        enabled = show and not isSpellColorsReloadRestricted(),
+    }
+end
+
 --------------------------------------------------------------------------------
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
@@ -116,7 +133,48 @@ local function createSpellColorCanvas(SB, subcatName)
     end)
 
     -- Scroll list using Blizzard's SettingsColorSwatchControlTemplate per element
-    local scrollBox, _, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_COMPACT)
+    local scrollTopY = layout.yPos
+    local scrollBox, scrollBar, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_COMPACT)
+
+    scrollBox:ClearAllPoints()
+    scrollBox:SetPoint("TOPLEFT", 37, scrollTopY)
+    scrollBox:SetPoint("BOTTOMRIGHT", -30, C.SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES)
+    scrollBar:ClearAllPoints()
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+
+    local secretNameDescRow = layout:_CreateRow(C.SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT)
+    local secretNameDescText = secretNameDescRow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    secretNameDescText:SetPoint("TOPLEFT", 37, 0)
+    secretNameDescText:SetPoint("TOPRIGHT", secretNameDescRow, "TOPRIGHT", -10, 0)
+    secretNameDescText:SetJustifyH("LEFT")
+    secretNameDescText:SetWordWrap(true)
+    secretNameDescText:SetText(C.SPELL_COLORS_SECRET_NAMES_DESC_TEXT)
+    secretNameDescRow._text = secretNameDescText
+    secretNameDescRow:ClearAllPoints()
+    secretNameDescRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
+    secretNameDescRow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
+    secretNameDescRow:Hide()
+
+    local secretNameButtonRow, secretNameReloadButton = layout:AddButton("", C.SPELL_COLORS_RELOAD_BUTTON_TEXT)
+    secretNameButtonRow._label:SetText("")
+    secretNameButtonRow:ClearAllPoints()
+    secretNameButtonRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET)
+    secretNameButtonRow:SetPoint(
+        "BOTTOMRIGHT",
+        frame,
+        "BOTTOMRIGHT",
+        0,
+        C.SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET
+    )
+    secretNameButtonRow:Hide()
+    secretNameReloadButton:SetScript("OnClick", function()
+        ns.Addon:ConfirmReloadUI(C.SPELL_COLORS_SECRET_NAMES_DESC_TEXT)
+    end)
+
+    frame._secretNameDescRow = secretNameDescRow
+    frame._secretNameReloadButtonRow = secretNameButtonRow
+    frame._secretNameReloadButton = secretNameReloadButton
 
     view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
         -- Position label (matches SettingsListElementMixin:Init positioning)
@@ -154,6 +212,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
     function frame:RefreshSpellList()
         local rows = buildSpellColorRows(ECM.SpellColors.GetAllColorEntries())
+        local secretNameFooterState = getSecretNameFooterState(rows)
 
         dataProvider:Flush()
         for _, row in ipairs(rows) do
@@ -169,10 +228,16 @@ local function createSpellColorCanvas(SB, subcatName)
             parts[#parts + 1] =
                 "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
         end
-        if hasUnlabeledBars(rows) then
-            parts[#parts + 1] = '|cffFFDD3CSome spell names were secret and are displayed as a generic "Bar".|r'
-        end
         warningText:SetText(table.concat(parts, "\n"))
+
+        if secretNameFooterState.show then
+            secretNameDescRow:Show()
+            secretNameButtonRow:Show()
+        else
+            secretNameDescRow:Hide()
+            secretNameButtonRow:Hide()
+        end
+        secretNameReloadButton:SetEnabled(secretNameFooterState.enabled)
 
         local dc = ECM.SpellColors.GetDefaultColor()
         defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
@@ -198,6 +263,8 @@ local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
 BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
+BuffBarsOptions._IsSpellColorsReloadRestricted = isSpellColorsReloadRestricted
+BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
 
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 

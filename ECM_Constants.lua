@@ -139,6 +139,12 @@ local constants = {
 
     -- UI Options
     SPELL_COLORS_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization.",
+    SPELL_COLORS_SECRET_NAMES_DESC_TEXT = "One or more spell names have become secret. This can be cleared by reloading the UI outside of restricted area, typically dungeons, raids, delves, and PVP.",
+    SPELL_COLORS_RELOAD_BUTTON_TEXT = "Reload UI",
+    SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT = 40,
+    SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET = 42,
+    SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET = 8,
+    SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES = 80,
     SPELL_COLORS_SUBCAT = "Spell Colors",
     SCROLL_ROW_HEIGHT_COMPACT = 26,
     TICK_MARKS_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization.",

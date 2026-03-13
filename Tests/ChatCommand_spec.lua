@@ -12,6 +12,7 @@ describe("ChatCommand migration", function()
     local confirmReloadCalls
     local printInfoCalled
     local printLogCalled
+    local openOptionsCalls
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -36,6 +37,7 @@ describe("ChatCommand migration", function()
         confirmReloadCalls = {}
         printInfoCalled = false
         printLogCalled = false
+        openOptionsCalls = 0
 
         _G.strtrim = function(s)
             return tostring(s):match("^%s*(.-)%s*$")
@@ -99,7 +101,14 @@ describe("ChatCommand migration", function()
         addonMethods.RegisterChatCommand = function() end
         addonMethods.RegisterEvent = function() end
         addonMethods.UnregisterEvent = function() end
-        addonMethods.GetModule = function()
+        addonMethods.GetModule = function(_, name)
+            if name == "Options" then
+                return {
+                    OpenOptions = function()
+                        openOptionsCalls = openOptionsCalls + 1
+                    end,
+                }
+            end
             return nil
         end
         addonMethods.ConfirmReloadUI = function(_, text, onAccept)
@@ -326,5 +335,16 @@ describe("ChatCommand migration", function()
         for _, msg in ipairs(printedMessages) do
             assert.is_nil(string.find(msg, "migrationlog", 1, true), "Help should not mention migrationlog")
         end
+    end)
+
+    it("/ecm settings opens options during combat", function()
+        _G.InCombatLockdown = function()
+            return true
+        end
+
+        mod:ChatCommand("settings")
+
+        assert.are.equal(1, openOptionsCalls)
+        assert.are.equal(0, #printedMessages)
     end)
 end)

@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("BuffBarsOptions", function()
     local originalGlobals
@@ -14,14 +12,30 @@ describe("BuffBarsOptions", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "ECM_DeepEquals",
-            "Settings", "CreateSettingsListSectionHeaderInitializer",
-            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
-            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
-            "issecretvalue", "issecrettable", "canaccessvalue", "canaccesstable",
+            "ECM",
+            "ECM_DeepEquals",
+            "Settings",
+            "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer",
+            "MinimalSliderWithSteppersMixin",
+            "CreateColor",
+            "StaticPopupDialogs",
+            "StaticPopup_Show",
+            "YES",
+            "NO",
+            "UnitClass",
+            "GetSpecialization",
+            "GetSpecializationInfo",
+            "issecretvalue",
+            "issecrettable",
+            "canaccessvalue",
+            "canaccesstable",
             "time",
-            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
+            "InCombatLockdown",
+            "IsInInstance",
+            "LibStub",
+            "CreateFromMixins",
+            "SettingsListElementInitializer",
             "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
@@ -34,45 +48,85 @@ describe("BuffBarsOptions", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
 
-        _G.UnitClass = function() return "Demon Hunter", "DEMONHUNTER", 12 end
-        _G.GetSpecialization = function() return 2 end
-        _G.GetSpecializationInfo = function() return nil, "Havoc" end
+        _G.UnitClass = function()
+            return "Demon Hunter", "DEMONHUNTER", 12
+        end
+        _G.GetSpecialization = function()
+            return 2
+        end
+        _G.GetSpecializationInfo = function()
+            return nil, "Havoc"
+        end
 
-        _G.issecretvalue = function() return false end
-        _G.issecrettable = function() return false end
-        _G.canaccessvalue = function() return true end
-        _G.canaccesstable = function() return true end
-        _G.time = function() return 1000 end
+        _G.issecretvalue = function()
+            return false
+        end
+        _G.issecrettable = function()
+            return false
+        end
+        _G.canaccessvalue = function()
+            return true
+        end
+        _G.canaccesstable = function()
+            return true
+        end
+        _G.time = function()
+            return 1000
+        end
+        _G.InCombatLockdown = function()
+            return false
+        end
+        _G.IsInInstance = function()
+            return false
+        end
 
         _G.ECM = {
             Constants = {},
-            FrameUtil = { GetIconTextureFileID = function() return nil end },
+            FrameUtil = {
+                GetIconTextureFileID = function()
+                    return nil
+                end,
+            },
             ScheduleLayoutUpdate = function() end,
-            ToString = function(v) return tostring(v) end,
+            ToString = function(v)
+                return tostring(v)
+            end,
             OptionUtil = {
-                GetCurrentClassSpec = function() return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER" end,
+                GetCurrentClassSpec = function()
+                    return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER"
+                end,
                 GetNestedValue = function(tbl, path)
                     local current = tbl
                     for key in path:gmatch("[^.]+") do
-                        if type(current) ~= "table" then return nil end
+                        if type(current) ~= "table" then
+                            return nil
+                        end
                         current = current[key]
                     end
                     return current
                 end,
                 SetNestedValue = function(tbl, path, value)
                     local parts = {}
-                    for key in path:gmatch("[^.]+") do parts[#parts + 1] = key end
+                    for key in path:gmatch("[^.]+") do
+                        parts[#parts + 1] = key
+                    end
                     local current = tbl
                     for i = 1, #parts - 1 do
-                        if current[parts[i]] == nil then current[parts[i]] = {} end
+                        if current[parts[i]] == nil then
+                            current[parts[i]] = {}
+                        end
                         current = current[parts[i]]
                     end
                     current[parts[#parts]] = value
                 end,
-                IsAnchorModeFree = function() return false end,
+                IsAnchorModeFree = function()
+                    return false
+                end,
                 POSITION_MODE_TEXT = {},
                 ApplyPositionModeToBar = function() end,
-                IsValueChanged = function() return false end,
+                IsValueChanged = function()
+                    return false
+                end,
             },
 
             DebugAssert = function() end,
@@ -84,8 +138,12 @@ describe("BuffBarsOptions", function()
 
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
         if lsmw then
-            lsmw.GetFontValues = function() return {} end
-            lsmw.GetStatusbarValues = function() return {} end
+            lsmw.GetFontValues = function()
+                return {}
+            end
+            lsmw.GetStatusbarValues = function()
+                return {}
+            end
             lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
             lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
         end
@@ -104,10 +162,16 @@ describe("BuffBarsOptions", function()
                     defaults = { profile = { buffBars = {} } },
                 },
                 BuffBars = {
-                    IsEditLocked = function() return false, nil end,
-                    GetActiveSpellData = function() return {} end,
+                    IsEditLocked = function()
+                        return false, nil
+                    end,
+                    GetActiveSpellData = function()
+                        return {}
+                    end,
                 },
-                NewModule = function(_, name) return { moduleName = name } end,
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
             },
         }
 
@@ -200,5 +264,52 @@ describe("BuffBarsOptions", function()
     it("section registers with key BuffBars", function()
         -- BuffBarsOptions should have registered itself
         assert.is_function(BuffBarsOptions.RegisterSettings)
+    end)
+
+    it("_GetSecretNameFooterState hides the footer when all bar names are available", function()
+        local state = BuffBarsOptions._GetSecretNameFooterState({
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
+        })
+
+        assert.is_false(state.show)
+        assert.is_false(state.enabled)
+    end)
+
+    it("_GetSecretNameFooterState shows an enabled footer for unlabeled bars outside restricted areas", function()
+        local state = BuffBarsOptions._GetSecretNameFooterState({
+            { key = { primaryKey = "" } },
+        })
+
+        assert.is_true(state.show)
+        assert.is_true(state.enabled)
+    end)
+
+    it("_GetSecretNameFooterState disables reload in instances", function()
+        _G.IsInInstance = function()
+            return true, "party"
+        end
+
+        local state = BuffBarsOptions._GetSecretNameFooterState({
+            { key = { primaryKey = "" } },
+        })
+
+        assert.is_true(state.show)
+        assert.is_false(state.enabled)
+    end)
+
+    it("_GetSecretNameFooterState disables reload during combat", function()
+        _G.InCombatLockdown = function()
+            return true
+        end
+        _G.issecretvalue = function(value)
+            return value == "Secret Spell"
+        end
+
+        local state = BuffBarsOptions._GetSecretNameFooterState({
+            { key = { primaryKey = "Secret Spell" } },
+        })
+
+        assert.is_true(state.show)
+        assert.is_false(state.enabled)
     end)
 end)
