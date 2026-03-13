@@ -248,6 +248,7 @@ jobs:
 
           gh release create "$VERSION" \
             "${ADDON_NAME}-${VERSION}.zip" \
+            --title "$VERSION" \
             --notes-file changelog.txt \
             "${PRERELEASE_FLAG[@]}"
         env:

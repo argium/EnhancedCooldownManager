@@ -746,12 +746,12 @@ end
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
-    if cmd == "help" or (cmd == "migration" and arg ~= "" and arg ~= "log") then
+    if cmd == "help" then
         ECM.Print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
         ECM.Print("/ecm help - show this message")
+        ECM.Print("/ecm migration - show migration info and commands")
         ECM.Print("/ecm options|config|settings|o - open the options menu")
         ECM.Print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
-        ECM.Print("/ecm migrationlog - show the settings migration log")
         return
     end
 
@@ -762,7 +762,37 @@ function mod:ChatCommand(input)
     end
 
     if cmd == "migration" then
-        ECM.Migration.PrintLog()
+        local subcmd, subarg = arg:match("^(%S*)%s*(.-)%s*$")
+        if subcmd == "log" then
+            ECM.Migration.PrintLog()
+            return
+        end
+
+        if subcmd == "rollback" then
+            local n = tonumber(subarg)
+            if not n then
+                ECM.Print("Usage: /ecm migration rollback <version>")
+                return
+            end
+            if n == 0 then
+                ECM.Print("Version 0 is not valid.")
+                return
+            end
+            if n == -1 then
+                n = ECM.Constants.CURRENT_SCHEMA_VERSION - 1
+            end
+            local ok, message = ECM.Migration.ValidateRollback(n)
+            if not ok then
+                ECM.Print(message)
+                return
+            end
+            self:ConfirmReloadUI(message, function()
+                ECM.Migration.Rollback(n)
+            end)
+            return
+        end
+
+        ECM.Migration.PrintInfo()
         return
     end
 
@@ -835,14 +865,6 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    ECM.Log(
-        "Initialize",
-        "Database loaded. Latest schema = "
-            .. C.CURRENT_SCHEMA_VERSION
-            .. ". Profile Schema = "
-            .. (profile and profile.schemaVersion or "nil")
-    )
-
     if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)
     end

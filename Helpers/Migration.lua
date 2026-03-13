@@ -46,6 +46,23 @@ local function deepCopy(value, seen)
     return copy
 end
 
+--- Aligns copied profile schemaVersion values with the slot they came from.
+--- The versioned slot key is the source of truth during reseeding; older slots
+--- may contain profiles that were previously migrated forward in-place.
+---@param slot table|nil
+---@param schemaVersion number
+local function alignSlotProfileSchemas(slot, schemaVersion)
+    if type(slot) ~= "table" or type(slot.profiles) ~= "table" then
+        return
+    end
+
+    for _, profile in pairs(slot.profiles) do
+        if type(profile) == "table" then
+            profile.schemaVersion = schemaVersion
+        end
+    end
+end
+
 local function normalizeLegacyColor(color, defaultAlpha)
     if color == nil then
         return nil
@@ -1077,6 +1094,7 @@ function Migration.PrepareDatabase()
         if priorVersion and versions[priorVersion] then
             log("Copying from schema V" .. priorVersion .. " to V" .. version)
             versions[version] = deepCopy(versions[priorVersion])
+            alignSlotProfileSchemas(versions[version], priorVersion)
         elseif sv.profiles then
             -- Seed from legacy top-level AceDB data (pre-versioning addon builds)
             local hasProfiles = false
@@ -1146,6 +1164,37 @@ function Migration.PrintLog()
     for _, entry in ipairs(slot._migrationLog) do
         print("- " .. entry)
     end
+end
+
+function Migration.PrintInfo()
+    ECM.Print("Current schema version: V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
+
+    local sv = _G[ECM.Constants.SV_NAME]
+    local versions = sv and sv._versions
+    local keys = {}
+    if versions then
+        for k in pairs(versions) do
+            if type(k) == "number" then
+                keys[#keys + 1] = k
+            end
+        end
+        table.sort(keys)
+    end
+
+    if #keys == 0 then
+        ECM.Print("No versioned settings found.")
+    else
+        local labels = {}
+        for i, k in ipairs(keys) do
+            labels[i] = "V" .. k
+        end
+        ECM.Print("Available versions: " .. table.concat(labels, ", "))
+    end
+
+    ECM.Print("Commands:")
+    ECM.Print("  /ecm migration - show migration info")
+    ECM.Print("  /ecm migration log - show the settings migration log")
+    ECM.Print("  /ecm migration rollback <n> - rollback to version n (-1 = delete current only)")
 end
 
 --- Validates whether a rollback to the given target version is possible.

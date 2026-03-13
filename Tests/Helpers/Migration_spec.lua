@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("Migration", function()
     local originalGlobals
@@ -16,7 +14,9 @@ describe("Migration", function()
         local matches, firstIndex = {}, nil
         for i, message in ipairs(logMessages) do
             if string.find(message, needle, 1, true) then
-                if not firstIndex then firstIndex = i end
+                if not firstIndex then
+                    firstIndex = i
+                end
                 matches[#matches + 1] = message
             end
         end
@@ -42,7 +42,9 @@ describe("Migration", function()
 
     local function countKeys(tbl)
         local n = 0
-        for _ in pairs(tbl) do n = n + 1 end
+        for _ in pairs(tbl) do
+            n = n + 1
+        end
         return n
     end
 
@@ -164,7 +166,8 @@ describe("Migration", function()
     end)
 
     it("collapses existing fallback-tier duplicates into a single wrapper", function()
-        local byNameEntry = { value = { r = 0.1, g = 0.2, b = 0.3, a = 1, spellID = 1001, cooldownID = 1002, textureId = 1003 } }
+        local byNameEntry =
+            { value = { r = 0.1, g = 0.2, b = 0.3, a = 1, spellID = 1001, cooldownID = 1002, textureId = 1003 } }
         local existingSpellID = { value = { r = 0.8, g = 0.8, b = 0.8, a = 1 } }
         local existingCooldownID = { value = { r = 0.7, g = 0.7, b = 0.7, a = 1 } }
         local existingTexture = { value = { r = 0.6, g = 0.6, b = 0.6, a = 1 } }
@@ -269,7 +272,8 @@ describe("Migration", function()
 
         local summaryIndex = assert(select(3, searchLogMessages("V10 spell color normalization summary:")))
         local tierIndex = assert(select(3, searchLogMessages("V10 tier breakdown:")))
-        local createdIndex = assert(select(3, searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture")))
+        local createdIndex =
+            assert(select(3, searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture")))
         local anomalyIndex = assert(select(3, searchLogMessages("V10 anomaly: class=12 spec=2")))
         local migratedIndex = assert(select(3, searchLogMessages("Migrated to V10")))
 
@@ -340,7 +344,10 @@ describe("Migration", function()
             parseMetric(summary, "invalid"),
             tiers.byName.invalid + tiers.bySpellID.invalid + tiers.byCooldownID.invalid + tiers.byTexture.invalid
         )
-        assert.are.equal(parseMetric(summary, "valid"), parseMetric(summary, "scanned") - parseMetric(summary, "invalid"))
+        assert.are.equal(
+            parseMetric(summary, "valid"),
+            parseMetric(summary, "scanned") - parseMetric(summary, "invalid")
+        )
     end)
 
     it("logs V10 skip diagnostics when spell-color stores are unavailable", function()
@@ -420,7 +427,8 @@ describe("Migration", function()
     end)
 
     it("initializes invalid tier tables and creates class/spec buckets during backfill", function()
-        local entry = { value = { r = 0.5, g = 0.5, b = 0.5, a = 1, spellID = 7001, cooldownID = 7002, textureId = 7003 } }
+        local entry =
+            { value = { r = 0.5, g = 0.5, b = 0.5, a = 1, spellID = 7001, cooldownID = 7002, textureId = 7003 } }
         local profile = {
             schemaVersion = 8,
             buffBars = {
@@ -452,8 +460,10 @@ describe("Migration", function()
     it("moves legacy metadata to wrapper meta and normalizes color payloads", function()
         local byNameEntry = { value = { r = 0.1, g = 0.2, b = 0.3, a = 1, keyType = "customName" } }
         local bySpellIDEntry = { value = { r = 0.2, g = 0.3, b = 0.4, a = 1, keyType = "customSpell", spellID = 999 } }
-        local byCooldownEntry = { value = { r = 0.3, g = 0.4, b = 0.5, a = 1, keyType = "customCooldown", cooldownID = 888 } }
-        local byTextureEntry = { value = { r = 0.4, g = 0.5, b = 0.6, a = 1, keyType = "customTexture", textureId = 777 } }
+        local byCooldownEntry =
+            { value = { r = 0.3, g = 0.4, b = 0.5, a = 1, keyType = "customCooldown", cooldownID = 888 } }
+        local byTextureEntry =
+            { value = { r = 0.4, g = 0.5, b = 0.6, a = 1, keyType = "customTexture", textureId = 777 } }
 
         local profile = {
             schemaVersion = 8,
@@ -493,7 +503,15 @@ describe("Migration", function()
                         [12] = {
                             [2] = {
                                 ["Bad IDs"] = {
-                                    value = { r = 0.1, g = 0.2, b = 0.3, a = 1, spellID = "7001", cooldownID = false, textureId = "7003" },
+                                    value = {
+                                        r = 0.1,
+                                        g = 0.2,
+                                        b = 0.3,
+                                        a = 1,
+                                        spellID = "7001",
+                                        cooldownID = false,
+                                        textureId = "7003",
+                                    },
                                 },
                                 ["Invalid Entry"] = true,
                                 ["Invalid Value"] = { value = "not-a-table" },
@@ -522,7 +540,7 @@ describe("Migration", function()
 
     it("migrates schema version 9 to 10 and normalizes wrapper metadata", function()
         local byNameEntry = {
-            value = { r = 0.4, g = 0.4, b = 0.4, a = 1, spellID = 9001, cooldownID = 9002, textureId = 9003 }
+            value = { r = 0.4, g = 0.4, b = 0.4, a = 1, spellID = 9001, cooldownID = 9002, textureId = 9003 },
         }
         local spellIDEntry = { value = { r = 0.3, g = 0.3, b = 0.3, a = 1 } }
 
@@ -622,6 +640,58 @@ describe("Migration", function()
         assert.are.equal("Target version must be a whole number.", message)
     end)
 
+    it("PrepareDatabase reseeds from the prior slot version even when copied profiles drifted forward", function()
+        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local prior = current - 1
+
+        _G[ECM.Constants.SV_NAME] = {
+            _versions = {
+                [prior] = {
+                    profiles = {
+                        Default = {
+                            schemaVersion = current,
+                            global = { debug = false },
+                        },
+                    },
+                    profileKeys = {
+                        Player = "Default",
+                    },
+                },
+            },
+        }
+
+        Migration.PrepareDatabase()
+
+        local active = _G[ECM.Constants.ACTIVE_SV_KEY]
+        assert.is_not_nil(active)
+        assert.are.equal(prior, active.profiles.Default.schemaVersion)
+        assert.are.equal(current, _G[ECM.Constants.SV_NAME]._versions[prior].profiles.Default.schemaVersion)
+    end)
+
+    it("PrepareDatabase preserves non-profile slot data while aligning copied profile schema versions", function()
+        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local prior = current - 1
+
+        _G[ECM.Constants.SV_NAME] = {
+            _versions = {
+                [prior] = {
+                    profiles = {
+                        Default = {
+                            schemaVersion = current,
+                        },
+                    },
+                    _migrationLog = { "old entry" },
+                },
+            },
+        }
+
+        Migration.PrepareDatabase()
+
+        local active = _G[ECM.Constants.ACTIVE_SV_KEY]
+        assert.are.same({ "old entry" }, active._migrationLog)
+        assert.are.equal(prior, active.profiles.Default.schemaVersion)
+    end)
+
     it("ValidateRollback accepts integer targets and reports deleted versions", function()
         local current = ECM.Constants.CURRENT_SCHEMA_VERSION
         local floor = current - 2
@@ -641,6 +711,90 @@ describe("Migration", function()
         for v = floor + 1, current do
             deleted[#deleted + 1] = "V" .. v
         end
-        assert.are.equal("Will delete " .. table.concat(deleted, ", ") .. " and re-migrate from V" .. floor .. ".", message)
+        assert.are.equal(
+            "Will delete " .. table.concat(deleted, ", ") .. " and re-migrate from V" .. floor .. ".",
+            message
+        )
+    end)
+
+    describe("PrintInfo", function()
+        local printedMessages
+
+        before_each(function()
+            printedMessages = {}
+            ECM.Print = function(...)
+                local args = { ... }
+                for i = 1, #args do
+                    args[i] = tostring(args[i])
+                end
+                printedMessages[#printedMessages + 1] = table.concat(args, " ")
+            end
+        end)
+
+        it("prints current schema version", function()
+            _G[ECM.Constants.SV_NAME] = { _versions = { [10] = {} } }
+
+            Migration.PrintInfo()
+
+            assert.are.equal("Current schema version: V" .. ECM.Constants.CURRENT_SCHEMA_VERSION, printedMessages[1])
+        end)
+
+        it("lists available version slots sorted", function()
+            _G[ECM.Constants.SV_NAME] = {
+                _versions = {
+                    [7] = {},
+                    [10] = {},
+                    [8] = {},
+                    nonNumeric = {},
+                },
+            }
+
+            Migration.PrintInfo()
+
+            assert.is_not_nil(string.find(printedMessages[2], "V7, V8, V10", 1, true))
+        end)
+
+        it("prints no versioned settings when versions table is nil", function()
+            _G[ECM.Constants.SV_NAME] = {}
+
+            Migration.PrintInfo()
+
+            assert.are.equal("No versioned settings found.", printedMessages[2])
+        end)
+
+        it("prints no versioned settings when versions table has no numeric keys", function()
+            _G[ECM.Constants.SV_NAME] = { _versions = { foo = {} } }
+
+            Migration.PrintInfo()
+
+            assert.are.equal("No versioned settings found.", printedMessages[2])
+        end)
+
+        it("prints subcommand help lines", function()
+            _G[ECM.Constants.SV_NAME] = { _versions = { [10] = {} } }
+
+            Migration.PrintInfo()
+
+            local hasLogCmd = false
+            local hasRollbackCmd = false
+            for _, msg in ipairs(printedMessages) do
+                if string.find(msg, "/ecm migration log", 1, true) then
+                    hasLogCmd = true
+                end
+                if string.find(msg, "/ecm migration rollback", 1, true) then
+                    hasRollbackCmd = true
+                end
+            end
+            assert.is_true(hasLogCmd, "Expected log command in help output")
+            assert.is_true(hasRollbackCmd, "Expected rollback command in help output")
+        end)
+
+        it("prints no versioned settings when SV_NAME global is nil", function()
+            _G[ECM.Constants.SV_NAME] = nil
+
+            Migration.PrintInfo()
+
+            assert.are.equal("No versioned settings found.", printedMessages[2])
+        end)
     end)
 end)
