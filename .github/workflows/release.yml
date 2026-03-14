@@ -21,12 +21,10 @@ jobs:
         permissions:
             contents: write
             checks: write
-        env:
-            FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
@@ -149,7 +147,7 @@ jobs:
 
             ## Publish to partner sites
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}
                   path: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}.zip

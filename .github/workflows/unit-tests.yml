@@ -18,12 +18,10 @@ jobs:
             contents: read
             checks: write
             pull-requests: write
-        env:
-            FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Install Lua 5.1 and LuaRocks
               run: |
