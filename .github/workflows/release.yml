@@ -10,7 +10,6 @@ concurrency:
     cancel-in-progress: false
 
 env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     ADDON_NAME: EnhancedCooldownManager
     CF_PROJECT_ID: 1427906
     WOWI_ADDON_ID: 27051
@@ -22,6 +21,8 @@ jobs:
         permissions:
             contents: write
             checks: write
+        env:
+            FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
         steps:
             - name: Checkout repository
