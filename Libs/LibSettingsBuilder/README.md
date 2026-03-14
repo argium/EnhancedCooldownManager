@@ -113,6 +113,143 @@ SB.RegisterCategories()
 
 ---
 
+## Migrating from AceConfig / AceGUI
+
+If you're coming from AceConfig-3.0 + AceGUI-3.0 + AceConfigDialog-3.0, here's what changes and what stays the same.
+
+### What you're replacing
+
+| AceConfig stack | LibSettingsBuilder |
+|---|---|
+| AceConfigDialog renders into a standalone AceGUI frame or Blizzard's old InterfaceOptions panel. | Renders directly into Blizzard's **Settings API** panel (the one players already use for game settings). |
+| AceDB-3.0 for saved variables + profiles. | **Keep AceDB.** LSB reads/writes your existing AceDB profile through a `PathAdapter`. Nothing changes about how your data is stored. |
+| `LibStub("AceConfig-3.0"):RegisterOptionsTable(name, optionsTable)` | `SB.RegisterFromTable(tbl)` — similar table structure, different field names. |
+| `LibStub("AceConfigDialog-3.0"):AddToBlizOptions(name)` | `SB.RegisterCategories()` |
+
+### Your SavedVariables don't change
+
+LSB doesn't manage saved variables. It reads and writes through getter/setter functions you provide. If you're using AceDB, point the `PathAdapter` at your existing `db.profile` and `db.defaults.profile` — your saved variables file, your profile switching, and your defaults table all stay exactly as they are.
+
+```lua
+-- Your existing AceDB setup — no changes needed
+self.db = LibStub("AceDB-3.0"):New("MyAddonDB", defaults, true)
+
+-- Point LSB at the same tables AceConfig was reading
+local SB = LSB:New({
+    pathAdapter = LSB.PathAdapter({
+        getStore    = function() return self.db.profile end,
+        getDefaults = function() return self.db.defaults.profile end,
+    }),
+    varPrefix = "MYADDON",
+    onChanged = function() self:ApplySettings() end,
+})
+```
+
+### Field name mapping
+
+LSB's `RegisterFromTable` accepts AceConfig-style type aliases so you don't have to relearn everything:
+
+| AceConfig field | LSB equivalent | Notes |
+|---|---|---|
+| `type = "toggle"` | `type = "toggle"` | Alias for `"checkbox"`. Works as-is. |
+| `type = "range"` | `type = "range"` | Alias for `"slider"`. Works as-is. |
+| `type = "select"` | `type = "select"` | Alias for `"dropdown"`. Works as-is. |
+| `type = "execute"` | `type = "execute"` | Alias for `"button"`. Works as-is. |
+| `type = "description"` | `type = "description"` | Alias for `"subheader"`. Works as-is. |
+| `type = "color"` | `type = "color"` | Same name. |
+| `type = "header"` | `type = "header"` | Same name. |
+| `type = "group"` | No equivalent | Use separate `RegisterFromTable` calls or `CreateSubcategory`. |
+| `type = "input"` | No equivalent | Use `type = "custom"` with your own template. |
+| `type = "multiselect"` | No equivalent | Use `type = "toggleList"` with a `defs` array. |
+| `desc` | `desc` | Alias for `tooltip`. Works as-is. |
+| `order` | `order` | Same behavior. |
+| `disabled` | `disabled` | Same behavior (function returning bool). |
+| `hidden` | `hidden` | Same behavior (function returning bool). |
+| `get` / `set` | `get` / `set` | Same concept — handler mode. Also need `key` for variable name generation. |
+| `values` | `values` | Same — table or function returning `value -> label` map. |
+| `min` / `max` / `step` | `min` / `max` / `step` | Same. |
+
+### Side-by-side example
+
+**AceConfig:**
+
+```lua
+local options = {
+    name = "My Addon",
+    type = "group",
+    args = {
+        enabled = {
+            type = "toggle",
+            name = "Enable",
+            desc = "Enable the addon.",
+            order = 1,
+            get = function() return db.profile.enabled end,
+            set = function(_, v) db.profile.enabled = v end,
+        },
+        opacity = {
+            type = "range",
+            name = "Opacity",
+            min = 0, max = 100, step = 1,
+            order = 2,
+            get = function() return db.profile.opacity end,
+            set = function(_, v) db.profile.opacity = v end,
+        },
+    },
+}
+LibStub("AceConfig-3.0"):RegisterOptionsTable("MyAddon", options)
+LibStub("AceConfigDialog-3.0"):AddToBlizOptions("MyAddon")
+```
+
+**LibSettingsBuilder (path mode — no per-field get/set needed):**
+
+```lua
+local SB = LSB:New({
+    pathAdapter = LSB.PathAdapter({
+        getStore    = function() return db.profile end,
+        getDefaults = function() return db.defaults.profile end,
+    }),
+    varPrefix = "MYADDON",
+    onChanged = function() MyAddon:Refresh() end,
+})
+
+SB.CreateRootCategory("My Addon")
+
+SB.RegisterFromTable({
+    name = "My Addon",
+    rootCategory = true,
+    args = {
+        enabled = {
+            type  = "toggle",
+            path  = "enabled",
+            name  = "Enable",
+            desc  = "Enable the addon.",
+            order = 1,
+        },
+        opacity = {
+            type = "range",
+            path = "opacity",
+            name = "Opacity",
+            min  = 0, max = 100, step = 1,
+            order = 2,
+        },
+    },
+})
+
+SB.RegisterCategories()
+```
+
+The key difference: in path mode, you declare the path once and LSB generates the get/set for you from the `PathAdapter`. No more writing `function(info) return db.profile.X end` / `function(info, v) db.profile.X = v end` on every field.
+
+### What LSB adds that AceConfig doesn't have
+
+- **Composite builders** — `FontOverrideGroup`, `BorderGroup`, `PositioningGroup` create 3–5 related controls in one line.
+- **Canvas layout pages** — `CreateCanvasLayout` for scroll lists, custom widgets, and anything that doesn't fit a vertical list.
+- **Reactive modifiers** — `disabled` and `hidden` predicates re-evaluate automatically on every setting change. No manual refresh needed.
+- **Editable slider values** — all sliders let users click the value label to type an exact number.
+- **Native Settings panel** — your addon's settings appear in the same panel as Blizzard's game settings, not in a separate AceGUI window.
+
+---
+
 ## Glossary
 
 | Term | Meaning |
