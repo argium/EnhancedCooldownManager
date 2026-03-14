@@ -1,55 +1,50 @@
 name: Unit Tests
 
 on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
+    workflow_dispatch:
+    pull_request:
+    push:
+        branches:
+            - main
+
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
-  group: unit-tests-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: unit-tests-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  busted:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    busted:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            checks: write
+            pull-requests: write
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Install Lua 5.1 and LuaRocks
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
+            - name: Install Lua 5.1 and LuaRocks
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
 
-      - name: Install test dependencies
-        run: |
-          luarocks --lua-version=5.1 install --local moonscript
-          luarocks --lua-version=5.1 install --local busted
+            - name: Install test dependencies
+              run: |
+                  luarocks --lua-version=5.1 install --local moonscript
+                  luarocks --lua-version=5.1 install --local busted
 
-      - name: Run Busted tests (JUnit output)
-        run: |
-          eval "$(luarocks --lua-version=5.1 path --local)"
-          mkdir -p test-results
-          busted Tests --output=junit > test-results/busted-junit.xml
+            - name: Run Busted tests (JUnit output)
+              run: |
+                  eval "$(luarocks --lua-version=5.1 path --local)"
+                  mkdir -p test-results
+                  busted Tests --output=junit > test-results/busted-junit.xml
 
-      - name: Add test report summary
-        if: always()
-        run: |
-          if [ -f test-results/busted-junit.xml ]; then
-            echo "Busted JUnit report generated: \`test-results/busted-junit.xml\`" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Busted JUnit report was not generated." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload test report artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: busted-junit-report
-          path: test-results/busted-junit.xml
-          if-no-files-found: ignore
+            - name: Publish Test Results
+              uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+              with:
+                  action_fail: true
+                  action_fail_on_inconclusive: true
+                  files: test-results/busted-junit.xml

@@ -1,255 +1,284 @@
 name: Package Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+    push:
+        tags:
+            - "v*"
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
 
 env:
-  ADDON_NAME: EnhancedCooldownManager
-  CF_PROJECT_ID: 1427906
-  WOWI_ADDON_ID: 27051
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    ADDON_NAME: EnhancedCooldownManager
+    CF_PROJECT_ID: 1427906
+    WOWI_ADDON_ID: 27051
 
 jobs:
-  package:
-    runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      contents: write
+    package:
+        runs-on: ubuntu-latest
+        environment: release
+        permissions:
+            contents: write
+            checks: write
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-      - name: Prepare release metadata
-        id: meta
-        run: |
-          set -euo pipefail
+            ## Run tests
+            - name: Install Lua 5.1 and LuaRocks
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
 
-          VERSION="${{ github.ref_name }}"
-          TOC_VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
-          TOC_INTERFACES=$(grep -oP '## Interface: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
+            - name: Install test dependencies
+              run: |
+                  luarocks --lua-version=5.1 install --local moonscript
+                  luarocks --lua-version=5.1 install --local busted
 
-          echo "Tag version: $VERSION"
-          echo "TOC version: $TOC_VERSION"
-          echo "TOC Interface versions: $TOC_INTERFACES"
+            - name: Run Busted tests (JUnit output)
+              run: |
+                  eval "$(luarocks --lua-version=5.1 path --local)"
+                  mkdir -p test-results
+                  busted Tests --output=junit > test-results/busted-junit.xml
 
-          if [ "$VERSION" != "$TOC_VERSION" ]; then
-            echo "::error::Version mismatch! Tag is '$VERSION' but TOC file has '$TOC_VERSION'. Please update the TOC file version before releasing."
-            exit 1
-          fi
+            - name: Publish Test Results
+              uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+              with:
+                  action_fail: true
+                  action_fail_on_inconclusive: true
+                  comment_mode: off
+                  files: test-results/busted-junit.xml
 
-          if [[ "$VERSION" == *"-alpha"* ]]; then
-            RELEASE_TYPE="alpha"
-            PRERELEASE="true"
-          elif [[ "$VERSION" == *"-beta"* ]]; then
-            RELEASE_TYPE="beta"
-            PRERELEASE="true"
-          else
-            RELEASE_TYPE="release"
-            PRERELEASE="false"
-          fi
+            ##  Packaging
+            - name: Prepare release metadata
+              id: meta
+              run: |
+                  set -euo pipefail
 
-          echo "Packaging version: $VERSION"
-          echo "Release type: $RELEASE_TYPE"
+                  VERSION="${{ github.ref_name }}"
+                  TOC_VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
+                  TOC_INTERFACES=$(grep -oP '## Interface: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
 
-          # Prefer the annotated tag message for release notes/changelog.
-          TAG_OBJECT_TYPE=$(git cat-file -t "$VERSION" 2>/dev/null || echo "")
-          if [ "$TAG_OBJECT_TYPE" = "tag" ]; then
-            CHANGELOG=$(git for-each-ref "refs/tags/$VERSION" --format='%(contents)')
-          else
-            CHANGELOG=""
-          fi
+                  echo "Tag version: $VERSION"
+                  echo "TOC version: $TOC_VERSION"
+                  echo "TOC Interface versions: $TOC_INTERFACES"
 
-          # Fallback: generate changelog from commits since previous tag.
-          if [ -z "$CHANGELOG" ]; then
-            PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
+                  if [ "$VERSION" != "$TOC_VERSION" ]; then
+                    echo "::error::Version mismatch! Tag is '$VERSION' but TOC file has '$TOC_VERSION'. Please update the TOC file version before releasing."
+                    exit 1
+                  fi
 
-            if [ -n "$PREVIOUS_TAG" ]; then
-              echo "No annotated tag message found. Generating changelog from $PREVIOUS_TAG to $VERSION"
-              CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${VERSION}" 2>/dev/null || echo "")
-            else
-              echo "No annotated tag message or previous tag found. Using all commits up to $VERSION"
-              CHANGELOG=$(git log --pretty=format:"- %s" "${VERSION}" 2>/dev/null || echo "")
-            fi
-          else
-            echo "Using annotated tag message for changelog"
-          fi
+                  if [[ "$VERSION" == *"-alpha"* ]]; then
+                    RELEASE_TYPE="alpha"
+                    PRERELEASE="true"
+                  elif [[ "$VERSION" == *"-beta"* ]]; then
+                    RELEASE_TYPE="beta"
+                    PRERELEASE="true"
+                  else
+                    RELEASE_TYPE="release"
+                    PRERELEASE="false"
+                  fi
 
-          if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="- Release ${VERSION}"
-          fi
+                  echo "Packaging version: $VERSION"
+                  echo "Release type: $RELEASE_TYPE"
 
-          echo "$CHANGELOG" > changelog.txt
-          echo "Changelog:"
-          cat changelog.txt
+                  # Prefer the annotated tag message for release notes/changelog.
+                  TAG_OBJECT_TYPE=$(git cat-file -t "$VERSION" 2>/dev/null || echo "")
+                  if [ "$TAG_OBJECT_TYPE" = "tag" ]; then
+                    CHANGELOG=$(git for-each-ref "refs/tags/$VERSION" --format='%(contents)')
+                  else
+                    CHANGELOG=""
+                  fi
 
-          {
-            echo "version=$VERSION"
-            echo "toc_interfaces=$TOC_INTERFACES"
-            echo "release_type=$RELEASE_TYPE"
-            echo "prerelease=$PRERELEASE"
-          } >> "$GITHUB_OUTPUT"
+                  # Fallback: generate changelog from commits since previous tag.
+                  if [ -z "$CHANGELOG" ]; then
+                    PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
 
-      - name: Package addon
-        run: |
-          set -euo pipefail
-          mkdir -p "package/${ADDON_NAME}"
-          rsync -av . "package/${ADDON_NAME}/" \
-            --exclude '.*' \
-            --exclude 'TODO.md' \
-            --exclude 'CLAUDE.md' \
-            --exclude 'AGENTS.md' \
-            --exclude 'CONTRIBUTING.md' \
-            --exclude 'docs' \
-            --exclude '*.code-workspace' \
-            --exclude '.vscode' \
-            --exclude 'Tests' \
-            --exclude '*.rockspec' \
-            --exclude 'package'
-          (
-            cd package
-            zip -r "../${ADDON_NAME}-${{ steps.meta.outputs.version }}.zip" "${ADDON_NAME}"
-          )
+                    if [ -n "$PREVIOUS_TAG" ]; then
+                      echo "No annotated tag message found. Generating changelog from $PREVIOUS_TAG to $VERSION"
+                      CHANGELOG=$(git log --pretty=format:"- %s" "${PREVIOUS_TAG}..${VERSION}" 2>/dev/null || echo "")
+                    else
+                      echo "No annotated tag message or previous tag found. Using all commits up to $VERSION"
+                      CHANGELOG=$(git log --pretty=format:"- %s" "${VERSION}" 2>/dev/null || echo "")
+                    fi
+                  else
+                    echo "Using annotated tag message for changelog"
+                  fi
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}
-          path: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}.zip
+                  if [ -z "$CHANGELOG" ]; then
+                    CHANGELOG="- Release ${VERSION}"
+                  fi
 
-      - name: Upload to CurseForge
-        env:
-          CF_TOKEN: ${{ secrets.CF_TOKEN }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.meta.outputs.version }}"
-          RELEASE_TYPE="${{ steps.meta.outputs.release_type }}"
-          TOC_INTERFACES="${{ steps.meta.outputs.toc_interfaces }}"
+                  echo "$CHANGELOG" > changelog.txt
+                  echo "Changelog:"
+                  cat changelog.txt
 
-          # Fetch game versions from CurseForge API (requires auth)
-          CF_VERSIONS=$(curl -s -H "X-Api-Token: ${CF_TOKEN}" "https://wow.curseforge.com/api/game/versions")
+                  {
+                    echo "version=$VERSION"
+                    echo "toc_interfaces=$TOC_INTERFACES"
+                    echo "release_type=$RELEASE_TYPE"
+                    echo "prerelease=$PRERELEASE"
+                  } >> "$GITHUB_OUTPUT"
 
-          # Match by apiVersion and verify all TOC versions are mapped
-          # Filter to only objects that have apiVersion field
-          RESULT=$(echo "$CF_VERSIONS" | jq -c --arg interfaces "$TOC_INTERFACES" '
-            # Split the comma-separated interface versions into an array (keep as strings)
-            ($interfaces | split(",")) as $toc_versions |
-            # Get matched versions (only from entries that have apiVersion)
-            ([.[] | select(type == "object" and .apiVersion != null) | select(.apiVersion as $api | $toc_versions | index($api))]) as $matched |
-            # Get the apiVersions that were matched
-            ([$matched[].apiVersion]) as $matched_apis |
-            # Find unmatched TOC versions
-            ([$toc_versions[] | select(. as $v | $matched_apis | index($v) | not)]) as $unmatched |
-            {
-              gameVersions: [$matched[].id],
-              unmatchedInterfaces: $unmatched
-            }
-          ')
+            - name: Package addon
+              run: |
+                  set -euo pipefail
+                  mkdir -p "package/${ADDON_NAME}"
+                  rsync -av . "package/${ADDON_NAME}/" \
+                    --exclude '.*' \
+                    --exclude 'TODO.md' \
+                    --exclude 'CLAUDE.md' \
+                    --exclude 'AGENTS.md' \
+                    --exclude 'CONTRIBUTING.md' \
+                    --exclude 'docs' \
+                    --exclude '*.code-workspace' \
+                    --exclude '.vscode' \
+                    --exclude 'Tests' \
+                    --exclude '*.rockspec' \
+                    --exclude 'package'
+                  (
+                    cd package
+                    zip -r "../${ADDON_NAME}-${{ steps.meta.outputs.version }}.zip" "${ADDON_NAME}"
+                  )
 
-          GAME_VERSIONS=$(echo "$RESULT" | jq -c '.gameVersions')
-          UNMATCHED=$(echo "$RESULT" | jq -c '.unmatchedInterfaces')
+            ## Publish to partner sites
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}
+                  path: ${{ env.ADDON_NAME }}-${{ steps.meta.outputs.version }}.zip
 
-          echo "Matched CurseForge game version IDs: $GAME_VERSIONS"
+            - name: Upload to CurseForge
+              env:
+                  CF_TOKEN: ${{ secrets.CF_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  VERSION="${{ steps.meta.outputs.version }}"
+                  RELEASE_TYPE="${{ steps.meta.outputs.release_type }}"
+                  TOC_INTERFACES="${{ steps.meta.outputs.toc_interfaces }}"
 
-          # Fail if any TOC interface versions weren't mapped
-          if [ "$UNMATCHED" != "[]" ]; then
-            echo "::error::The following TOC interface versions have no matching CurseForge game version: $UNMATCHED"
-            exit 1
-          fi
+                  # Fetch game versions from CurseForge API (requires auth)
+                  CF_VERSIONS=$(curl -s -H "X-Api-Token: ${CF_TOKEN}" "https://wow.curseforge.com/api/game/versions")
 
-          # Fail if no versions matched at all
-          if [ "$GAME_VERSIONS" == "[]" ] || [ -z "$GAME_VERSIONS" ]; then
-            echo "::error::No game versions matched from TOC interfaces: $TOC_INTERFACES"
-            exit 1
-          fi
+                  # Match by apiVersion and verify all TOC versions are mapped
+                  # Filter to only objects that have apiVersion field
+                  RESULT=$(echo "$CF_VERSIONS" | jq -c --arg interfaces "$TOC_INTERFACES" '
+                    # Split the comma-separated interface versions into an array (keep as strings)
+                    ($interfaces | split(",")) as $toc_versions |
+                    # Get matched versions (only from entries that have apiVersion)
+                    ([.[] | select(type == "object" and .apiVersion != null) | select(.apiVersion as $api | $toc_versions | index($api))]) as $matched |
+                    # Get the apiVersions that were matched
+                    ([$matched[].apiVersion]) as $matched_apis |
+                    # Find unmatched TOC versions
+                    ([$toc_versions[] | select(. as $v | $matched_apis | index($v) | not)]) as $unmatched |
+                    {
+                      gameVersions: [$matched[].id],
+                      unmatchedInterfaces: $unmatched
+                    }
+                  ')
 
-          # Read changelog from file
-          CHANGELOG=$(cat changelog.txt)
+                  GAME_VERSIONS=$(echo "$RESULT" | jq -c '.gameVersions')
+                  UNMATCHED=$(echo "$RESULT" | jq -c '.unmatchedInterfaces')
 
-          # Create metadata JSON - escape the changelog for JSON
-          CHANGELOG_JSON=$(echo "$CHANGELOG" | jq -Rs .)
-          METADATA=$(jq -n \
-            --argjson changelog "$CHANGELOG_JSON" \
-            --arg displayName "${ADDON_NAME} ${VERSION}" \
-            --argjson gameVersions "$GAME_VERSIONS" \
-            --arg releaseType "$RELEASE_TYPE" \
-            '{
-              changelog: $changelog,
-              changelogType: "markdown",
-              displayName: $displayName,
-              gameVersions: $gameVersions,
-              releaseType: $releaseType
-            }'
-          )
+                  echo "Matched CurseForge game version IDs: $GAME_VERSIONS"
 
-          # Upload to CurseForge
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            -H "X-Api-Token: ${CF_TOKEN}" \
-            -F "metadata=${METADATA}" \
-            -F "file=@${ADDON_NAME}-${VERSION}.zip" \
-            "https://wow.curseforge.com/api/projects/${{ env.CF_PROJECT_ID }}/upload-file")
+                  # Fail if any TOC interface versions weren't mapped
+                  if [ "$UNMATCHED" != "[]" ]; then
+                    echo "::error::The following TOC interface versions have no matching CurseForge game version: $UNMATCHED"
+                    exit 1
+                  fi
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+                  # Fail if no versions matched at all
+                  if [ "$GAME_VERSIONS" == "[]" ] || [ -z "$GAME_VERSIONS" ]; then
+                    echo "::error::No game versions matched from TOC interfaces: $TOC_INTERFACES"
+                    exit 1
+                  fi
 
-          echo "CurseForge response: $BODY"
+                  # Read changelog from file
+                  CHANGELOG=$(cat changelog.txt)
 
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "::error::CurseForge upload failed with HTTP $HTTP_CODE: $BODY"
-            exit 1
-          fi
+                  # Create metadata JSON - escape the changelog for JSON
+                  CHANGELOG_JSON=$(echo "$CHANGELOG" | jq -Rs .)
+                  METADATA=$(jq -n \
+                    --argjson changelog "$CHANGELOG_JSON" \
+                    --arg displayName "${ADDON_NAME} ${VERSION}" \
+                    --argjson gameVersions "$GAME_VERSIONS" \
+                    --arg releaseType "$RELEASE_TYPE" \
+                    '{
+                      changelog: $changelog,
+                      changelogType: "markdown",
+                      displayName: $displayName,
+                      gameVersions: $gameVersions,
+                      releaseType: $releaseType
+                    }'
+                  )
 
-          echo "Successfully uploaded to CurseForge (HTTP $HTTP_CODE)"
+                  # Upload to CurseForge
+                  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                    -H "X-Api-Token: ${CF_TOKEN}" \
+                    -F "metadata=${METADATA}" \
+                    -F "file=@${ADDON_NAME}-${VERSION}.zip" \
+                    "https://wow.curseforge.com/api/projects/${{ env.CF_PROJECT_ID }}/upload-file")
 
-      - name: Upload to WoWInterface
-        env:
-          WOWI_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.meta.outputs.version }}"
-          COMPATIBLE="${{ steps.meta.outputs.toc_interfaces }}"
-          echo "WoWInterface compatible versions: $COMPATIBLE"
+                  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+                  BODY=$(echo "$RESPONSE" | sed '$d')
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            -H "x-api-token: ${WOWI_TOKEN}" \
-            -F "id=${{ env.WOWI_ADDON_ID }}" \
-            -F "version=${VERSION}" \
-            -F "compatible=${COMPATIBLE}" \
-            -F "updatefile=@${ADDON_NAME}-${VERSION}.zip" \
-            "https://api.wowinterface.com/addons/update")
+                  echo "CurseForge response: $BODY"
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+                  if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+                    echo "::error::CurseForge upload failed with HTTP $HTTP_CODE: $BODY"
+                    exit 1
+                  fi
 
-          echo "WoWInterface response: $BODY"
+                  echo "Successfully uploaded to CurseForge (HTTP $HTTP_CODE)"
 
-          if [ "$HTTP_CODE" -ne 202 ]; then
-            echo "::error::WoWInterface upload failed with HTTP $HTTP_CODE: $BODY"
-            exit 1
-          fi
+            - name: Upload to WoWInterface
+              env:
+                  WOWI_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  VERSION="${{ steps.meta.outputs.version }}"
+                  COMPATIBLE="${{ steps.meta.outputs.toc_interfaces }}"
+                  echo "WoWInterface compatible versions: $COMPATIBLE"
 
-          echo "Successfully uploaded to WoWInterface (HTTP $HTTP_CODE)"
+                  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                    -H "x-api-token: ${WOWI_TOKEN}" \
+                    -F "id=${{ env.WOWI_ADDON_ID }}" \
+                    -F "version=${VERSION}" \
+                    -F "compatible=${COMPATIBLE}" \
+                    -F "updatefile=@${ADDON_NAME}-${VERSION}.zip" \
+                    "https://api.wowinterface.com/addons/update")
 
-      - name: Create GitHub Release
-        run: |
-          set -euo pipefail
-          VERSION="${{ steps.meta.outputs.version }}"
-          PRERELEASE_FLAG=()
-          if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
-            PRERELEASE_FLAG+=(--prerelease)
-          fi
+                  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+                  BODY=$(echo "$RESPONSE" | sed '$d')
 
-          gh release create "$VERSION" \
-            "${ADDON_NAME}-${VERSION}.zip" \
-            --title "$VERSION" \
-            --notes-file changelog.txt \
-            "${PRERELEASE_FLAG[@]}"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  echo "WoWInterface response: $BODY"
+
+                  if [ "$HTTP_CODE" -ne 202 ]; then
+                    echo "::error::WoWInterface upload failed with HTTP $HTTP_CODE: $BODY"
+                    exit 1
+                  fi
+
+                  echo "Successfully uploaded to WoWInterface (HTTP $HTTP_CODE)"
+
+            - name: Create GitHub Release
+              run: |
+                  set -euo pipefail
+                  VERSION="${{ steps.meta.outputs.version }}"
+                  PRERELEASE_FLAG=()
+                  if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
+                    PRERELEASE_FLAG+=(--prerelease)
+                  fi
+
+                  gh release create "$VERSION" \
+                    "${ADDON_NAME}-${VERSION}.zip" \
+                    --title "$VERSION" \
+                    --notes-file changelog.txt \
+                    "${PRERELEASE_FLAG[@]}"
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
