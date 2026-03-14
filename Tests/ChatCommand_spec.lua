@@ -13,6 +13,8 @@ describe("ChatCommand migration", function()
     local printInfoCalled
     local printLogCalled
     local openOptionsCalls
+    local registeredEvents
+    local unregisteredEvents
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -38,6 +40,8 @@ describe("ChatCommand migration", function()
         printInfoCalled = false
         printLogCalled = false
         openOptionsCalls = 0
+        registeredEvents = {}
+        unregisteredEvents = {}
 
         _G.strtrim = function(s)
             return tostring(s):match("^%s*(.-)%s*$")
@@ -99,8 +103,12 @@ describe("ChatCommand migration", function()
             }
         end
         addonMethods.RegisterChatCommand = function() end
-        addonMethods.RegisterEvent = function() end
-        addonMethods.UnregisterEvent = function() end
+        addonMethods.RegisterEvent = function(_, eventName, handlerName)
+            registeredEvents[#registeredEvents + 1] = { eventName = eventName, handlerName = handlerName }
+        end
+        addonMethods.UnregisterEvent = function(_, eventName)
+            unregisteredEvents[#unregisteredEvents + 1] = eventName
+        end
         addonMethods.GetModule = function(_, name)
             if name == "Options" then
                 return {
@@ -176,6 +184,15 @@ describe("ChatCommand migration", function()
             end
 
             if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
+                if InCombatLockdown() then
+                    ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
+                    if not self._openOptionsAfterCombat then
+                        self._openOptionsAfterCombat = true
+                        self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
+                    end
+                    return
+                end
+
                 local optionsModule = self:GetModule("Options", true)
                 if optionsModule then
                     optionsModule:OpenOptions()
@@ -203,6 +220,20 @@ describe("ChatCommand migration", function()
                 profile.global.debug = newVal
                 ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
                 return
+            end
+        end
+
+        function mod:HandleOpenOptionsAfterCombat()
+            if not self._openOptionsAfterCombat then
+                return
+            end
+
+            self._openOptionsAfterCombat = nil
+            self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+
+            local optionsModule = self:GetModule("Options", true)
+            if optionsModule then
+                optionsModule:OpenOptions()
             end
         end
     end)
@@ -337,14 +368,31 @@ describe("ChatCommand migration", function()
         end
     end)
 
-    it("/ecm settings opens options during combat", function()
+    it("/ecm settings defers opening options during combat", function()
         _G.InCombatLockdown = function()
             return true
         end
 
         mod:ChatCommand("settings")
 
+        assert.are.equal(0, openOptionsCalls)
+        assert.are.equal(1, #printedMessages)
+        assert.are.equal("Options cannot be opened during combat. They will open when combat ends.", printedMessages[1])
+        assert.are.equal(1, #registeredEvents)
+        assert.are.same(
+            { eventName = "PLAYER_REGEN_ENABLED", handlerName = "HandleOpenOptionsAfterCombat" },
+            registeredEvents[1]
+        )
+        assert.is_true(mod._openOptionsAfterCombat)
+    end)
+
+    it("queued options open after combat ends", function()
+        mod._openOptionsAfterCombat = true
+
+        mod:HandleOpenOptionsAfterCombat()
+
         assert.are.equal(1, openOptionsCalls)
-        assert.are.equal(0, #printedMessages)
+        assert.are.same({ "PLAYER_REGEN_ENABLED" }, unregisteredEvents)
+        assert.is_nil(mod._openOptionsAfterCombat)
     end)
 end)
