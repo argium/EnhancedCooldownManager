@@ -7,6 +7,7 @@
 ## OptionalDeps: Ace3, LibSharedMedia-3.0
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
+## X-Wago-ID: qGZOwbNd
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
