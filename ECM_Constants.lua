@@ -8,6 +8,9 @@ local constants = {
     ADDON_NAME = "Enhanced Cooldown Manager",
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_ABRV = "ECM",
+    ADDON_METADATA_VERSION_KEY = "Version",
+    VERSION_TAG_BETA = "beta",
+    BETA_LOGIN_MESSAGE = "You are using a pre-release version of this addon. Some features may not work as expected and you will encounter bugs. Your settings may have been migrated. If you encounter oddidies, you can restore your settings from the last stable version. Type /ecm migration for details.",
 
     DEBUG_COLOR = "F17934",
 

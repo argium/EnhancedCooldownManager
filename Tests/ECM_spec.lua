@@ -11,6 +11,9 @@ describe("ECM layout system", function()
     local isMounted
     local inCombat
     local cvarEnabled
+    local addonVersion
+    local printedMessages
+    local fakeAddon
 
     --- Lightweight frame stub for ECM integration tests (no call tracking needed)
     local function makeFrame(opts)
@@ -196,6 +199,7 @@ describe("ECM layout system", function()
         "ECM",
         "LibStub",
         "C_Timer",
+        "C_AddOns",
         "C_CVar",
         "GetTime",
         "UIParent",
@@ -242,6 +246,8 @@ describe("ECM layout system", function()
         isMounted = false
         inCombat = false
         cvarEnabled = true
+        addonVersion = "v0.6.1"
+        printedMessages = {}
 
         _G.GetTime = function()
             return fakeTime
@@ -286,7 +292,9 @@ describe("ECM layout system", function()
         _G.strtrim = function(s)
             return (s:gsub("^%s+", ""):gsub("%s+$", ""))
         end
-        _G.print = function() end
+        _G.print = function(message)
+            printedMessages[#printedMessages + 1] = message
+        end
         _G.StaticPopupDialogs = {}
         _G.StaticPopup_Show = function() end
         _G.YES = "Yes"
@@ -305,6 +313,13 @@ describe("ECM layout system", function()
             end,
             SetCVar = function() end,
         }
+        _G.C_AddOns = {
+            GetAddOnMetadata = function(_, key)
+                if key == "Version" then
+                    return addonVersion
+                end
+            end,
+        }
         _G.C_Timer = {
             After = function(_, callback)
                 callback()
@@ -316,8 +331,13 @@ describe("ECM layout system", function()
             return makeFrame()
         end
 
-        local fakeAddon =
-            { RegisterChatCommand = function() end, RegisterEvent = function() end, UnregisterEvent = function() end }
+        fakeAddon = {
+            RegisterChatCommand = function() end,
+            RegisterEvent = function() end,
+            UnregisterEvent = function() end,
+            EnableModule = function() end,
+            DisableModule = function() end,
+        }
         _G.LibStub = setmetatable({}, {
             __call = function(_, name, silent)
                 if name == "AceAddon-3.0" then
@@ -442,6 +462,27 @@ describe("ECM layout system", function()
             fakeTime = fakeTime + 1
             ECM.ScheduleLayoutUpdate(0, "re-enforce")
             assert.is_false(mod.InnerFrame:IsShown())
+        end)
+    end)
+
+    describe("beta login warning", function()
+        it("prints the pre-release warning on beta versions", function()
+            addonVersion = "v0.6.1-beta"
+
+            fakeAddon:OnEnable()
+
+            assert.is_truthy(printedMessages[#printedMessages])
+            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+        end)
+
+        it("does not print the pre-release warning on stable versions", function()
+            addonVersion = "v0.6.1"
+
+            fakeAddon:OnEnable()
+
+            for _, message in ipairs(printedMessages) do
+                assert.is_nil(message:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+            end
         end)
     end)
 end)

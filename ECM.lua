@@ -76,6 +76,16 @@ local function getLsmMedia(mediaType, key)
     end
 end
 
+local function getAddonVersion()
+    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
+    end
+end
+
+local function isBetaVersion(version)
+    return type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil
+end
+
 function ECM.ToString(v)
     if type(v) == "table" then
         return safeTableTostring(v, 0, {})
@@ -912,4 +922,8 @@ function mod:OnEnable()
     end
 
     enableLayoutEvents()
+
+    if isBetaVersion(getAddonVersion()) then
+        ECM.Print(C.BETA_LOGIN_MESSAGE)
+    end
 end
