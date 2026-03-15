@@ -4,3 +4,6 @@ PLAN-*.md
 CHAT-*.json
 /Annotations
 /wt
+luacov-html/
+luacov.report.out
+luacov.stats.out

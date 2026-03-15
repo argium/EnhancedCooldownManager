@@ -1,4 +1,10 @@
 return {
+    _all = {
+        sort = true,
+    },
+    coverage = {
+        coverage = true,
+    },
     libsettingsbuilder = {
         pattern = "LibSettingsBuilder_spec%.lua$",
     },

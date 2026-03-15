@@ -1,0 +1,18 @@
+return {
+    statsfile = "luacov.stats.out",
+    reportfile = "luacov.report.out",
+    includeuntestedfiles = true,
+    include = {
+        "^ECM%.lua$",
+        "^ECM_Constants%.lua$",
+        "^ECM_Defaults%.lua$",
+        "^Helpers/",
+        "^Modules/",
+        "^UI/",
+        "^Libs/LibSettingsBuilder/",
+        "^Libs/LibLSMSettingsWidgets/",
+    },
+    exclude = {
+        "^Tests/",
+    },
+}

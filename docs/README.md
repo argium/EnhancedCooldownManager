@@ -5,7 +5,7 @@
 ```sh
 # Install lua and luarocks, then:
 
-luarocks install --local moonscript busted luacheck
+luarocks install moonscript busted luacheck
 
 # Run all tests
 busted Tests
@@ -16,3 +16,5 @@ busted -r ecm Tests
 # Run LibSettingsBuilder tests only
 busted -r libsettingsbuilder Tests
 ```
+
+Coverage reports are generated in GitHub Actions, including an HTML artifact (`luacov-html-report`).
