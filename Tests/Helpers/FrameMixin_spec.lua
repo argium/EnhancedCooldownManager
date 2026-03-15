@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("FrameMixin", function()
     local originalGlobals
@@ -19,7 +17,11 @@ describe("FrameMixin", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "C_Timer", "GetTime", "UIParent", "issecretvalue",
+            "ECM",
+            "C_Timer",
+            "GetTime",
+            "UIParent",
+            "issecretvalue",
         })
     end)
 
@@ -31,18 +33,34 @@ describe("FrameMixin", function()
         fakeTime = 0
 
         _G.ECM = {}
-        _G.ECM.ColorUtil = { AreEqual = function(a, b)
-            if a == nil and b == nil then return true end
-            if a == nil or b == nil then return false end
-            return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
-        end }
+        _G.ECM.ColorUtil = {
+            AreEqual = function(a, b)
+                if a == nil and b == nil then
+                    return true
+                end
+                if a == nil or b == nil then
+                    return false
+                end
+                return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
+            end,
+        }
         _G.ECM.DebugAssert = function(condition, message)
-            if not condition then error(message or "ECM.DebugAssert failed") end
+            if not condition then
+                error(message or "ECM.DebugAssert failed")
+            end
         end
-        _G.C_Timer = { After = function(_, callback) callback() end }
-        _G.GetTime = function() return fakeTime end
+        _G.C_Timer = {
+            After = function(_, callback)
+                callback()
+            end,
+        }
+        _G.GetTime = function()
+            return fakeTime
+        end
         _G.UIParent = makeFrame({ name = "UIParent" })
-        _G.issecretvalue = function() return false end
+        _G.issecretvalue = function()
+            return false
+        end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
@@ -59,39 +77,59 @@ describe("FrameMixin", function()
                 Name = opts.name or "TestModule",
                 InnerFrame = innerFrame,
                 _lastUpdate = 0,
-                ShouldShow = function() return opts.shouldShow end,
+                ShouldShow = function()
+                    return opts.shouldShow
+                end,
                 CalculateLayoutParams = function()
                     return {
                         mode = ECM.Constants.ANCHORMODE_CHAIN,
                         anchor = anchor,
                         anchorPoint = "TOPLEFT",
                         anchorRelativePoint = "BOTTOMLEFT",
-                        offsetX = 0, offsetY = 0,
+                        offsetX = 0,
+                        offsetY = 0,
                         height = opts.height or 20,
                     }
                 end,
-                GetGlobalConfig = function() return { barBgColor = color(0, 0, 0, 0.5), updateFrequency = 0 } end,
-                GetModuleConfig = function() return { bgColor = color(0, 0, 0, 0.5) } end,
+                GetGlobalConfig = function()
+                    return { barBgColor = color(0, 0, 0, 0.5), updateFrequency = 0 }
+                end,
+                GetModuleConfig = function()
+                    return { bgColor = color(0, 0, 0, 0.5) }
+                end,
                 Refresh = function() end,
             }
 
             function selfObj:UpdateLayout(why)
-                if not self:ShouldShow() then self.InnerFrame:Hide(); return false end
-                if not self.InnerFrame:IsShown() then self.InnerFrame:Show() end
+                if not self:ShouldShow() then
+                    self.InnerFrame:Hide()
+                    return false
+                end
+                if not self.InnerFrame:IsShown() then
+                    self.InnerFrame:Show()
+                end
                 local params = self:CalculateLayoutParams()
-                if params.height then FrameUtil.LazySetHeight(self.InnerFrame, params.height) end
-                if params.width then FrameUtil.LazySetWidth(self.InnerFrame, params.width) end
+                if params.height then
+                    FrameUtil.LazySetHeight(self.InnerFrame, params.height)
+                end
+                if params.width then
+                    FrameUtil.LazySetWidth(self.InnerFrame, params.width)
+                end
                 local mc = self:GetModuleConfig()
                 local gc = self:GetGlobalConfig()
                 local bgColor = (mc and mc.bgColor) or (gc and gc.barBgColor)
-                if bgColor then FrameUtil.LazySetBackgroundColor(self.InnerFrame, bgColor) end
+                if bgColor then
+                    FrameUtil.LazySetBackgroundColor(self.InnerFrame, bgColor)
+                end
                 self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
                 return true
             end
             function selfObj:ThrottledRefresh(why)
                 local gc = self:GetGlobalConfig()
                 local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
-                if GetTime() - (self._lastUpdate or 0) < freq then return false end
+                if GetTime() - (self._lastUpdate or 0) < freq then
+                    return false
+                end
                 self:Refresh(why)
                 self._lastUpdate = GetTime()
                 return true
@@ -130,7 +168,9 @@ describe("FrameMixin", function()
             mod:UpdateLayout("hide")
             assert.is_false(mod.InnerFrame:IsShown())
 
-            mod.ShouldShow = function() return true end
+            mod.ShouldShow = function()
+                return true
+            end
             mod:UpdateLayout("show")
             assert.is_true(mod.InnerFrame:IsShown())
         end)
