@@ -309,6 +309,9 @@ describe("ResourceBar real source", function()
     local ns
     local currentResourceType
     local currentValues
+    local addMixinCalls
+    local registerFrameCalls
+    local unregisterFrameCalls
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
@@ -321,6 +324,9 @@ describe("ResourceBar real source", function()
     before_each(function()
         currentResourceType = "icicles"
         currentValues = { 5, 2, 5 }
+        addMixinCalls = 0
+        registerFrameCalls = 0
+        unregisterFrameCalls = 0
 
         _G.ECM = {
             FrameMixin = {
@@ -332,6 +338,9 @@ describe("ResourceBar real source", function()
                 Refresh = function()
                     return true
                 end,
+                AddMixin = function()
+                    addMixinCalls = addMixinCalls + 1
+                end,
             },
             ClassUtil = {
                 GetPlayerResourceType = function()
@@ -341,6 +350,12 @@ describe("ResourceBar real source", function()
                     return currentValues[1], currentValues[2], currentValues[3]
                 end,
             },
+            RegisterFrame = function()
+                registerFrameCalls = registerFrameCalls + 1
+            end,
+            UnregisterFrame = function()
+                unregisterFrameCalls = unregisterFrameCalls + 1
+            end,
             Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
@@ -404,5 +419,48 @@ describe("ResourceBar real source", function()
 
         assert.is_true(ResourceBar:Refresh("test"))
         assert.are.equal("tickPool", hidePoolKey)
+    end)
+
+    it("Refresh hides ticks when safeMax is nil or too small", function()
+        local hidePoolKey
+        currentValues = { 1, 1, nil }
+        ResourceBar.InnerFrame = { TicksFrame = {} }
+        function ResourceBar:EnsureTicks()
+            error("EnsureTicks should not be called when safeMax is nil")
+        end
+        function ResourceBar:LayoutResourceTicks()
+            error("LayoutResourceTicks should not be called when safeMax is nil")
+        end
+        function ResourceBar:HideAllTicks(poolKey)
+            hidePoolKey = poolKey
+        end
+
+        assert.is_true(ResourceBar:Refresh("test"))
+        assert.are.equal("tickPool", hidePoolKey)
+    end)
+
+    it("only updates for player UNIT_AURA events and always updates for other events", function()
+        local reasons = {}
+        function ResourceBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        ResourceBar:OnEventUpdate("UNIT_AURA", "target")
+        ResourceBar:OnEventUpdate("UNIT_AURA", "player")
+        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE")
+
+        assert.same({ "UNIT_AURA", "UNIT_POWER_UPDATE" }, reasons)
+    end)
+
+    it("registers and unregisters with the frame system", function()
+        function ResourceBar:RegisterEvent() end
+        function ResourceBar:UnregisterAllEvents() end
+
+        ResourceBar:OnEnable()
+        ResourceBar:OnDisable()
+
+        assert.are.equal(1, addMixinCalls)
+        assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(1, unregisterFrameCalls)
     end)
 end)

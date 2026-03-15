@@ -167,6 +167,9 @@ describe("ItemIcons real source", function()
     local ItemIcons
     local ns
     local createdCooldowns
+    local registerFrameCalls
+    local addMixinCalls
+    local timerCallbacks
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -175,6 +178,7 @@ describe("ItemIcons real source", function()
             "UtilityCooldownViewer",
             "UIParent",
             "CreateFrame",
+            "C_Timer",
         })
     end)
 
@@ -200,19 +204,33 @@ describe("ItemIcons real source", function()
 
     before_each(function()
         createdCooldowns = {}
+        registerFrameCalls = 0
+        addMixinCalls = 0
+        timerCallbacks = {}
         _G.ECM = {
             Log = function() end,
-            UnregisterFrame = function() end,
             FrameMixin = {
                 ShouldShow = function()
                     return true
                 end,
+                AddMixin = function()
+                    addMixinCalls = addMixinCalls + 1
+                end,
             },
+            RegisterFrame = function()
+                registerFrameCalls = registerFrameCalls + 1
+            end,
+            UnregisterFrame = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         _G.EditModeManagerFrame = makeHookableFrame(false)
         _G.UtilityCooldownViewer = makeHookableFrame(true)
+        _G.C_Timer = {
+            After = function(_, callback)
+                timerCallbacks[#timerCallbacks + 1] = callback
+            end,
+        }
         _G.CreateFrame = function(frameType)
             local frame = TestHelpers.makeFrame({ shown = true })
             frame.SetFrameStrata = function() end
@@ -366,5 +384,58 @@ describe("ItemIcons real source", function()
 
         assert.is_false(ItemIcons.InnerFrame:IsShown())
         assert.same({ "OnShow", "OnHide", "OnSizeChanged" }, reasons)
+    end)
+
+    it("returns false from UpdateLayout when the frame is missing or config is unavailable", function()
+        ItemIcons.InnerFrame = nil
+        assert.is_false(ItemIcons:UpdateLayout("test"))
+
+        ItemIcons.InnerFrame = TestHelpers.makeFrame({ shown = true })
+        ItemIcons.GetModuleConfig = function()
+            return nil
+        end
+        assert.is_false(ItemIcons:UpdateLayout("test"))
+    end)
+
+    it("returns false from UpdateLayout during edit mode", function()
+        ItemIcons.InnerFrame = TestHelpers.makeFrame({ shown = true })
+        ItemIcons.GetModuleConfig = function()
+            return { enabled = true }
+        end
+        ItemIcons._isEditModeActive = true
+
+        assert.is_false(ItemIcons:UpdateLayout("test"))
+        assert.is_false(ItemIcons.InnerFrame:IsShown())
+    end)
+
+    it("defers layout for delayed bag and world events", function()
+        local reasons = {}
+        function ItemIcons:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        ItemIcons:OnBagUpdateDelayed()
+        ItemIcons:OnPlayerEnteringWorld()
+
+        assert.same({ "OnBagUpdateDelayed", "OnPlayerEnteringWorld" }, reasons)
+    end)
+
+    it("registers with the frame system and schedules initial hooks on enable", function()
+        local reasons = {}
+        function ItemIcons:RegisterEvent() end
+        function ItemIcons:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        ItemIcons:OnEnable()
+        assert.are.equal(1, addMixinCalls)
+        assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(1, #timerCallbacks)
+
+        timerCallbacks[1]()
+
+        assert.same({ "OnEnable" }, reasons)
+        assert.is_true(ItemIcons._editModeHooked)
+        assert.is_true(ItemIcons._viewerHooked)
     end)
 end)

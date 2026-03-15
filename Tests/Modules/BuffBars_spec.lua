@@ -623,6 +623,10 @@ describe("BuffBars real source", function()
     local ns
     local makeFrame = TestHelpers.makeFrame
     local secureHooks
+    local registerFrameCalls
+    local unregisterFrameCalls
+    local addMixinCalls
+    local timerCallbacks
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -633,6 +637,7 @@ describe("BuffBars real source", function()
             "EditModeManagerFrame",
             "InCombatLockdown",
             "issecretvalue",
+            "C_Timer",
         })
     end)
 
@@ -658,6 +663,10 @@ describe("BuffBars real source", function()
 
     before_each(function()
         secureHooks = {}
+        registerFrameCalls = 0
+        unregisterFrameCalls = 0
+        addMixinCalls = 0
+        timerCallbacks = {}
         _G.ECM = {
             Log = function() end,
             Constants = nil,
@@ -685,7 +694,9 @@ describe("BuffBars real source", function()
                 IsReady = function()
                     return true
                 end,
-                AddMixin = function() end,
+                AddMixin = function()
+                    addMixinCalls = addMixinCalls + 1
+                end,
             },
             SpellColors = {
                 MakeKey = function(name, spellID, cooldownID, textureFileID)
@@ -699,7 +710,16 @@ describe("BuffBars real source", function()
                         textureFileID = textureFileID,
                     }
                 end,
+                SetConfigAccessor = function() end,
+                ClearDiscoveredKeys = function() end,
+                DiscoverBar = function() end,
             },
+            RegisterFrame = function()
+                registerFrameCalls = registerFrameCalls + 1
+            end,
+            UnregisterFrame = function()
+                unregisterFrameCalls = unregisterFrameCalls + 1
+            end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
 
@@ -707,6 +727,11 @@ describe("BuffBars real source", function()
         _G.hooksecurefunc = function(target, scriptName, callback)
             secureHooks[#secureHooks + 1] = { target = target, scriptName = scriptName, callback = callback }
         end
+        _G.C_Timer = {
+            After = function(_, callback)
+                timerCallbacks[#timerCallbacks + 1] = callback
+            end,
+        }
         _G.EditModeManagerFrame = makeHookableFrame({ name = "EditModeManagerFrame", shown = false })
         _G.InCombatLockdown = function()
             return false
@@ -845,5 +870,180 @@ describe("BuffBars real source", function()
 
         assert.is_false(result)
         assert.is_false(BuffBarCooldownViewer:IsShown())
+    end)
+
+    it("returns false from IsReady when the viewer is missing or cannot enumerate children", function()
+        _G.BuffBarCooldownViewer = nil
+        assert.is_false(BuffBars:IsReady())
+
+        _G.BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        function BuffBarCooldownViewer:GetChildren()
+            error("forbidden")
+        end
+        assert.is_false(BuffBars:IsReady())
+    end)
+
+    it("returns free-mode layout params from module config", function()
+        BuffBars.GetModuleConfig = function()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOP",
+                relativePoint = "BOTTOM",
+                offsetX = 10,
+                offsetY = 20,
+                width = 345,
+            }
+        end
+
+        local params = BuffBars:CalculateLayoutParams()
+
+        assert.are.equal(ECM.Constants.ANCHORMODE_FREE, params.mode)
+        assert.are.equal("TOP", params.anchorPoint)
+        assert.are.equal("BOTTOM", params.anchorRelativePoint)
+        assert.are.equal(10, params.offsetX)
+        assert.are.equal(20, params.offsetY)
+        assert.are.equal(345, params.width)
+    end)
+
+    it("viewer hooks defer layout and respect the layout-running guard", function()
+        local reasons = {}
+        function BuffBars:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        BuffBars:HookViewer()
+        BuffBarCooldownViewer._hooks.OnShow[1]()
+        BuffBars._layoutRunning = true
+        BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
+        BuffBars._layoutRunning = nil
+        BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
+
+        assert.same({ "viewer:OnShow", "viewer:OnSizeChanged" }, reasons)
+    end)
+
+    it("edit mode hooks defer layout on enter and exit", function()
+        local reasons = {}
+        function BuffBars:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        BuffBars:HookEditMode()
+        secureHooks[2].callback()
+        secureHooks[1].callback()
+
+        assert.same({ "EditModeEnter", "EditModeExit" }, reasons)
+    end)
+
+    it("reports edit lock reasons for combat and secret values", function()
+        _G.InCombatLockdown = function()
+            return true
+        end
+        assert.same({ true, "combat" }, { BuffBars:IsEditLocked() })
+
+        _G.InCombatLockdown = function()
+            return false
+        end
+        local secretColorRequested = false
+        ECM.SpellColors.GetColorForBar = function()
+            secretColorRequested = true
+            return nil
+        end
+        ECM.SpellColors.GetDefaultColor = function()
+            return { r = 1, g = 1, b = 1, a = 1 }
+        end
+        ECM.ColorUtil = {
+            ColorToHex = function()
+                return "ffffff"
+            end,
+        }
+        ECM.ToString = tostring
+        ECM.GetTexture = function()
+            return "Solid"
+        end
+        ECM.ApplyFont = function() end
+        ECM.DebugAssert = function() end
+        ECM.FrameUtil.GetBarBackground = function()
+            return nil
+        end
+        ECM.FrameUtil.GetIconTexture = function()
+            return nil
+        end
+        ECM.FrameUtil.GetIconOverlay = function()
+            return nil
+        end
+        ECM.FrameUtil.LazySetHeight = function() end
+        ECM.FrameUtil.LazySetWidth = function() end
+        ECM.FrameUtil.LazySetStatusBarTexture = function() end
+        ECM.FrameUtil.LazySetStatusBarColor = function() end
+        ECM.FrameUtil.LazySetAnchors = function() end
+        ECM.FrameUtil.LazySetAlpha = function() end
+        _G.issecretvalue = function()
+            return true
+        end
+
+        local frame = makeFrame({ shown = true })
+        frame.__ecmHooked = true
+        frame.Bar = {
+            Name = {
+                GetText = function()
+                    return "Spell"
+                end,
+                SetShown = function() end,
+            },
+            Duration = { SetShown = function() end },
+            Pip = { Hide = function() end, SetTexture = function() end },
+            SetShown = function() end,
+        }
+        frame.Icon = makeFrame({ shown = false })
+        frame.Icon.SetShown = function() end
+        frame.Icon.Applications = { SetShown = function() end }
+        function BuffBars:GetModuleConfig()
+            return { showIcon = false, showSpellName = true, showDuration = true }
+        end
+        function BuffBars:GetGlobalConfig()
+            return { barHeight = 20, texture = "Solid" }
+        end
+        function BuffBars:ShouldShow()
+            return true
+        end
+        function BuffBarCooldownViewer:GetChildren()
+            return frame
+        end
+
+        BuffBars:UpdateLayout("test")
+
+        assert.is_true(secretColorRequested)
+        assert.same({ true, "secrets" }, { BuffBars:IsEditLocked() })
+    end)
+
+    it("registers immediately and schedules initial hooks on enable", function()
+        local reasons = {}
+        function BuffBars:RegisterEvent() end
+        function BuffBars:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+        function BuffBars:GetModuleConfig()
+            return { enabled = true }
+        end
+
+        BuffBars:OnEnable()
+
+        assert.are.equal(1, addMixinCalls)
+        assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(1, #timerCallbacks)
+
+        timerCallbacks[1]()
+
+        assert.same({ "ModuleInit" }, reasons)
+        assert.is_true(BuffBars._viewerHooked)
+        assert.is_true(BuffBars._editModeHooked)
+    end)
+
+    it("unregisters on disable", function()
+        function BuffBars:UnregisterAllEvents() end
+
+        BuffBars:OnDisable()
+
+        assert.are.equal(1, unregisterFrameCalls)
     end)
 end)

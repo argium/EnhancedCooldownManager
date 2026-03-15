@@ -280,9 +280,11 @@ describe("RuneBar real source", function()
     local tickerCount
     local unregisterFrameCalls
     local makeFrame = TestHelpers.makeFrame
+    local createFrameCalls
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({ "ECM", "C_Timer" })
+        originalGlobals =
+            TestHelpers.CaptureGlobals({ "ECM", "C_Timer", "CreateFrame", "GetSpecialization", "UIParent" })
     end)
 
     teardown(function()
@@ -295,6 +297,7 @@ describe("RuneBar real source", function()
         registerFrameCalls = 0
         tickerCount = 0
         unregisterFrameCalls = 0
+        createFrameCalls = 0
 
         _G.ECM = {
             FrameMixin = {
@@ -303,6 +306,14 @@ describe("RuneBar real source", function()
                 end,
                 Refresh = function()
                     return true
+                end,
+                CreateFrame = function(self)
+                    local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
+                    frame.GetFrameLevel = function()
+                        return 1
+                    end
+                    frame.SetFrameLevel = function() end
+                    return frame
                 end,
             },
             BarMixin = {
@@ -335,6 +346,27 @@ describe("RuneBar real source", function()
                 }
             end,
         }
+        _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.GetSpecialization = function()
+            return 1
+        end
+        _G.CreateFrame = function(frameType, name, parent)
+            createFrameCalls = createFrameCalls + 1
+            local frame = makeFrame({ name = name, shown = true, width = 300, height = 20 })
+            frame.SetFrameLevel = function() end
+            frame.GetFrameLevel = function()
+                return 1
+            end
+            frame.SetStatusBarTexture = function() end
+            frame.SetMinMaxValues = function() end
+            frame.SetValue = function() end
+            frame.SetStatusBarColor = function() end
+            frame.SetSize = function(self, width, height)
+                self:SetWidth(width)
+                self:SetHeight(height)
+            end
+            return frame
+        end
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
 
         ns = {
@@ -414,5 +446,72 @@ describe("RuneBar real source", function()
         RuneBar:OnDisable()
 
         assert.are.equal(0, unregisterFrameCalls)
+    end)
+
+    it("creates a frame with status and tick containers", function()
+        local frame = RuneBar:CreateFrame()
+
+        assert.is_not_nil(frame.StatusBar)
+        assert.is_not_nil(frame.TicksFrame)
+        assert.same({}, frame.FragmentedBars)
+        assert.are.equal(2, createFrameCalls)
+    end)
+
+    it("Refresh initializes fragmented bars and lays out ticks", function()
+        local ensureTicksCount
+        local layoutTicksMax
+        local updateArgs
+        local frame = {
+            StatusBar = {
+                SetMinMaxValues = function() end,
+                GetWidth = function()
+                    return 300
+                end,
+                GetHeight = function()
+                    return 20
+                end,
+            },
+            TicksFrame = {},
+            FragmentedBars = {},
+            GetWidth = function()
+                return 300
+            end,
+            GetHeight = function()
+                return 20
+            end,
+            GetFrameLevel = function()
+                return 1
+            end,
+            Show = function(self)
+                self.__shown = true
+            end,
+        }
+        RuneBar.InnerFrame = frame
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 1, g = 0, b = 0 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { texture = "Solid", updateFrequency = 0.04 }
+        end
+        RuneBar.EnsureTicks = function(_, count)
+            ensureTicksCount = count
+        end
+        RuneBar.LayoutResourceTicks = function(_, maxRunes)
+            layoutTicksMax = maxRunes
+        end
+        ECM.GetTexture = function()
+            return "Interface\\TargetingFrame\\UI-StatusBar"
+        end
+        ECM.PixelSnap = function(v)
+            return math.floor(v + 0.5)
+        end
+        _G.GetRuneCooldown = function(index)
+            return 0, 0, true
+        end
+
+        assert.is_true(RuneBar:Refresh("test"))
+        assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES - 1, ensureTicksCount)
+        assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES, layoutTicksMax)
+        assert.is_true(frame.__shown == true)
     end)
 end)

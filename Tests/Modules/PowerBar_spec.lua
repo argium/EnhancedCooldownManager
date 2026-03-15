@@ -170,6 +170,12 @@ describe("PowerBar real source", function()
     local originalGlobals
     local PowerBar
     local ns
+    local registerFrameCalls
+    local unregisterFrameCalls
+    local addMixinCalls
+    local unitPowerValue
+    local unitPowerMaxValue
+    local unitPowerPercentValue
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -178,6 +184,11 @@ describe("PowerBar real source", function()
             "UnitClass",
             "GetSpecialization",
             "GetSpecializationRole",
+            "UnitPower",
+            "UnitPowerMax",
+            "UnitPowerPercent",
+            "CurveConstants",
+            "issecretvalue",
         })
     end)
 
@@ -186,10 +197,22 @@ describe("PowerBar real source", function()
     end)
 
     before_each(function()
+        registerFrameCalls = 0
+        unregisterFrameCalls = 0
+        addMixinCalls = 0
+        unitPowerValue = 37
+        unitPowerMaxValue = 100
+        unitPowerPercentValue = 37
+
         _G.ECM = {
             FrameMixin = {
                 ShouldShow = function()
                     return true
+                end,
+            },
+            BarMixin = {
+                AddMixin = function()
+                    addMixinCalls = addMixinCalls + 1
                 end,
             },
             ClassUtil = {
@@ -197,6 +220,13 @@ describe("PowerBar real source", function()
                     return Enum.PowerType.Mana
                 end,
             },
+            RegisterFrame = function()
+                registerFrameCalls = registerFrameCalls + 1
+            end,
+            UnregisterFrame = function()
+                unregisterFrameCalls = unregisterFrameCalls + 1
+            end,
+            Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadStub("Enums.lua")
@@ -209,6 +239,19 @@ describe("PowerBar real source", function()
         end
         _G.GetSpecializationRole = function()
             return "DAMAGER"
+        end
+        _G.UnitPower = function()
+            return unitPowerValue
+        end
+        _G.UnitPowerMax = function()
+            return unitPowerMaxValue
+        end
+        _G.UnitPowerPercent = function()
+            return unitPowerPercentValue
+        end
+        _G.CurveConstants = { ScaleTo100 = 1 }
+        _G.issecretvalue = function()
+            return false
         end
 
         ns = {
@@ -252,5 +295,92 @@ describe("PowerBar real source", function()
             return "TANK"
         end
         assert.is_false(PowerBar:ShouldShow())
+    end)
+
+    it("shows mana bars for configured mana classes and hides them for others", function()
+        _G.GetSpecializationRole = function()
+            return "DAMAGER"
+        end
+
+        _G.UnitClass = function()
+            return "Mage", "MAGE", 8
+        end
+        assert.is_true(PowerBar:ShouldShow())
+
+        _G.UnitClass = function()
+            return "Paladin", "PALADIN", 2
+        end
+        assert.is_false(PowerBar:ShouldShow())
+    end)
+
+    it("returns mana percentage text when configured", function()
+        unitPowerValue = 40
+        unitPowerMaxValue = 100
+        unitPowerPercentValue = 40
+        PowerBar.GetModuleConfig = function()
+            return { showManaAsPercent = true }
+        end
+
+        local current, max, display, isFraction = PowerBar:GetStatusBarValues()
+
+        assert.are.equal(40, current)
+        assert.are.equal(100, max)
+        assert.are.equal("40%", display)
+        assert.is_true(isFraction)
+    end)
+
+    it("returns raw values when mana percentage is disabled", function()
+        unitPowerValue = 55
+        unitPowerMaxValue = 120
+        PowerBar.GetModuleConfig = function()
+            return { showManaAsPercent = false }
+        end
+
+        local current, max, display, isFraction = PowerBar:GetStatusBarValues()
+
+        assert.are.equal(55, current)
+        assert.are.equal(120, max)
+        assert.are.equal(55, display)
+        assert.is_false(isFraction)
+    end)
+
+    it("returns configured status bar colors and falls back to white", function()
+        PowerBar.GetModuleConfig = function()
+            return {
+                colors = {
+                    [Enum.PowerType.Mana] = { r = 0.1, g = 0.2, b = 0.3, a = 1 },
+                },
+            }
+        end
+        assert.same({ r = 0.1, g = 0.2, b = 0.3, a = 1 }, PowerBar:GetStatusBarColor())
+
+        PowerBar.GetModuleConfig = function()
+            return { colors = {} }
+        end
+        assert.are.equal(ECM.Constants.COLOR_WHITE, PowerBar:GetStatusBarColor())
+    end)
+
+    it("only responds to UNIT_POWER_UPDATE for the player", function()
+        local reasons = {}
+        function PowerBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        PowerBar:OnUnitPowerUpdate("UNIT_POWER_UPDATE", "target")
+        PowerBar:OnUnitPowerUpdate("UNIT_POWER_UPDATE", "player")
+
+        assert.same({ "UNIT_POWER_UPDATE" }, reasons)
+    end)
+
+    it("registers and unregisters with the frame system", function()
+        function PowerBar:RegisterEvent() end
+        function PowerBar:UnregisterAllEvents() end
+
+        PowerBar:OnEnable()
+        PowerBar:OnDisable()
+
+        assert.are.equal(1, addMixinCalls)
+        assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(1, unregisterFrameCalls)
     end)
 end)
