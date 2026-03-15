@@ -176,6 +176,8 @@ describe("PowerBar real source", function()
     local unitPowerValue
     local unitPowerMaxValue
     local unitPowerPercentValue
+    local isSecretValue
+    local barRefreshResult
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -203,6 +205,8 @@ describe("PowerBar real source", function()
         unitPowerValue = 37
         unitPowerMaxValue = 100
         unitPowerPercentValue = 37
+        isSecretValue = false
+        barRefreshResult = true
 
         _G.ECM = {
             FrameMixin = {
@@ -213,6 +217,9 @@ describe("PowerBar real source", function()
             BarMixin = {
                 AddMixin = function()
                     addMixinCalls = addMixinCalls + 1
+                end,
+                Refresh = function()
+                    return barRefreshResult
                 end,
             },
             ClassUtil = {
@@ -251,7 +258,7 @@ describe("PowerBar real source", function()
         end
         _G.CurveConstants = { ScaleTo100 = 1 }
         _G.issecretvalue = function()
-            return false
+            return isSecretValue
         end
 
         ns = {
@@ -382,5 +389,145 @@ describe("PowerBar real source", function()
         assert.are.equal(1, addMixinCalls)
         assert.are.equal(1, registerFrameCalls)
         assert.are.equal(1, unregisterFrameCalls)
+    end)
+
+    it("returns nil tick mappings when config, class, or spec data is missing", function()
+        PowerBar.GetModuleConfig = function()
+            return nil
+        end
+        assert.is_nil(PowerBar:GetCurrentTicks())
+
+        PowerBar.GetModuleConfig = function()
+            return { ticks = { mappings = {} } }
+        end
+        _G.UnitClass = function()
+            return "Mage", "MAGE", nil
+        end
+        assert.is_nil(PowerBar:GetCurrentTicks())
+
+        _G.UnitClass = function()
+            return "Mage", "MAGE", 8
+        end
+        _G.GetSpecialization = function()
+            return nil
+        end
+        assert.is_nil(PowerBar:GetCurrentTicks())
+    end)
+
+    it("UpdateTicks hides ticks when no mappings are configured", function()
+        local hiddenPoolKey
+        PowerBar.GetCurrentTicks = function()
+            return nil
+        end
+        function PowerBar:HideAllTicks(poolKey)
+            hiddenPoolKey = poolKey
+        end
+
+        PowerBar:UpdateTicks({ TicksFrame = {}, StatusBar = {} }, 100)
+
+        assert.are.equal("tickPool", hiddenPoolKey)
+    end)
+
+    it("UpdateTicks ensures and lays out ticks using configured defaults", function()
+        local ensured
+        local layoutArgs
+        local ticks = {
+            { value = 25 },
+            { value = 75, color = { r = 1, g = 0, b = 0, a = 1 }, width = 2 },
+        }
+        PowerBar.GetCurrentTicks = function()
+            return ticks
+        end
+        PowerBar.GetModuleConfig = function()
+            return {
+                ticks = {
+                    defaultColor = { r = 0.3, g = 0.4, b = 0.5, a = 0.6 },
+                    defaultWidth = 3,
+                },
+            }
+        end
+        function PowerBar:EnsureTicks(count, parent, poolKey)
+            ensured = { count = count, parent = parent, poolKey = poolKey }
+        end
+        function PowerBar:LayoutValueTicks(statusBar, mappedTicks, max, defaultColor, defaultWidth, poolKey)
+            layoutArgs = {
+                statusBar = statusBar,
+                mappedTicks = mappedTicks,
+                max = max,
+                defaultColor = defaultColor,
+                defaultWidth = defaultWidth,
+                poolKey = poolKey,
+            }
+        end
+
+        local frame = { TicksFrame = {}, StatusBar = {} }
+        PowerBar:UpdateTicks(frame, 125)
+
+        assert.same({ count = 2, parent = frame.TicksFrame, poolKey = "tickPool" }, ensured)
+        assert.are.equal(frame.StatusBar, layoutArgs.statusBar)
+        assert.are.equal(ticks, layoutArgs.mappedTicks)
+        assert.are.equal(125, layoutArgs.max)
+        assert.same({ r = 0.3, g = 0.4, b = 0.5, a = 0.6 }, layoutArgs.defaultColor)
+        assert.are.equal(3, layoutArgs.defaultWidth)
+        assert.are.equal("tickPool", layoutArgs.poolKey)
+    end)
+
+    it("returns false from Refresh when the base bar mixin stops the update", function()
+        barRefreshResult = false
+        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
+
+        assert.is_false(PowerBar:Refresh("test"))
+    end)
+
+    it("Refresh updates ticks when max power is visible", function()
+        local updatedMax
+        local hiddenPoolKey
+        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
+        function PowerBar:UpdateTicks(_, max)
+            updatedMax = max
+        end
+        function PowerBar:HideAllTicks(poolKey)
+            hiddenPoolKey = poolKey
+        end
+
+        assert.is_true(PowerBar:Refresh("test"))
+        assert.are.equal(unitPowerMaxValue, updatedMax)
+        assert.is_nil(hiddenPoolKey)
+    end)
+
+    it("Refresh hides ticks when max power is secret", function()
+        local updatedMax
+        local hiddenPoolKey
+        isSecretValue = true
+        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
+        function PowerBar:UpdateTicks(_, max)
+            updatedMax = max
+        end
+        function PowerBar:HideAllTicks(poolKey)
+            hiddenPoolKey = poolKey
+        end
+
+        assert.is_true(PowerBar:Refresh("test"))
+        assert.is_nil(updatedMax)
+        assert.are.equal("tickPool", hiddenPoolKey)
+    end)
+
+    it("shows non-mana power bars and respects the outer frame visibility guard", function()
+        ECM.FrameMixin.ShouldShow = function()
+            return false
+        end
+        assert.is_false(PowerBar:ShouldShow())
+
+        ECM.FrameMixin.ShouldShow = function()
+            return true
+        end
+        ECM.ClassUtil.GetCurrentPowerType = function()
+            return Enum.PowerType.Energy
+        end
+        _G.GetSpecializationRole = function()
+            return "TANK"
+        end
+
+        assert.is_true(PowerBar:ShouldShow())
     end)
 end)

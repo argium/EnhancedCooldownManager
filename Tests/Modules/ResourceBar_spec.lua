@@ -312,6 +312,7 @@ describe("ResourceBar real source", function()
     local addMixinCalls
     local registerFrameCalls
     local unregisterFrameCalls
+    local barRefreshResult
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
@@ -327,6 +328,7 @@ describe("ResourceBar real source", function()
         addMixinCalls = 0
         registerFrameCalls = 0
         unregisterFrameCalls = 0
+        barRefreshResult = true
 
         _G.ECM = {
             FrameMixin = {
@@ -336,7 +338,7 @@ describe("ResourceBar real source", function()
             },
             BarMixin = {
                 Refresh = function()
-                    return true
+                    return barRefreshResult
                 end,
                 AddMixin = function()
                     addMixinCalls = addMixinCalls + 1
@@ -462,5 +464,50 @@ describe("ResourceBar real source", function()
         assert.are.equal(1, addMixinCalls)
         assert.are.equal(1, registerFrameCalls)
         assert.are.equal(1, unregisterFrameCalls)
+    end)
+
+    it("returns real status values and fallback values through the module API", function()
+        currentValues = { 5, 3, 5 }
+        local current, max, display, isFraction = ResourceBar:GetStatusBarValues()
+        assert.are.equal(3, current)
+        assert.are.equal(5, max)
+        assert.are.equal(3, display)
+        assert.is_false(isFraction)
+
+        currentValues = { nil, nil, nil }
+        current, max, display, isFraction = ResourceBar:GetStatusBarValues()
+        assert.are.equal(0, current)
+        assert.are.equal(1, max)
+        assert.are.equal(0, display)
+        assert.is_false(isFraction)
+    end)
+
+    it("returns max colors and normal colors through the real module API", function()
+        currentResourceType = ECM.Constants.RESOURCEBAR_TYPE_ICICLES
+        currentValues = { 5, 5, 5 }
+        function ResourceBar:GetModuleConfig()
+            return {
+                colors = {
+                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 0.2, g = 0.3, b = 0.4, a = 1 },
+                },
+                maxColorsEnabled = {
+                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = true,
+                },
+                maxColors = {
+                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
+                },
+            }
+        end
+        assert.same({ r = 1, g = 1, b = 1, a = 1 }, ResourceBar:GetStatusBarColor())
+
+        currentValues = { 5, 3, 5 }
+        assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
+    end)
+
+    it("returns false from Refresh when the base bar refresh stops the update", function()
+        barRefreshResult = false
+        ResourceBar.InnerFrame = { TicksFrame = {} }
+
+        assert.is_false(ResourceBar:Refresh("test"))
     end)
 end)

@@ -1046,4 +1046,130 @@ describe("BuffBars real source", function()
 
         assert.are.equal(1, unregisterFrameCalls)
     end)
+
+    it("runs the main UpdateLayout hot path, discovers bars, and clears colors on spec changes", function()
+        local discovered = {}
+        local cleared = 0
+        local appliedTextures = {}
+        local appliedColors = {}
+        ECM.SpellColors.ClearDiscoveredKeys = function()
+            cleared = cleared + 1
+        end
+        ECM.SpellColors.DiscoverBar = function(frame)
+            discovered[#discovered + 1] = frame
+        end
+        ECM.SpellColors.GetColorForBar = function()
+            return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
+        end
+        ECM.SpellColors.GetDefaultColor = function()
+            return { r = 1, g = 1, b = 1, a = 1 }
+        end
+        ECM.ColorUtil = {
+            ColorToHex = function()
+                return "abcdef"
+            end,
+        }
+        ECM.ToString = tostring
+        ECM.GetTexture = function()
+            return "Interface\\TargetingFrame\\UI-StatusBar"
+        end
+        ECM.ApplyFont = function() end
+        ECM.DebugAssert = function(condition)
+            assert.is_true(condition)
+        end
+        ECM.FrameUtil.GetBarBackground = function()
+            return nil
+        end
+        ECM.FrameUtil.GetIconTexture = function()
+            return nil
+        end
+        ECM.FrameUtil.GetIconOverlay = function()
+            return nil
+        end
+        ECM.FrameUtil.LazySetHeight = function(frame, value)
+            frame.__height = value
+        end
+        ECM.FrameUtil.LazySetWidth = function(frame, value)
+            frame.__width = value
+        end
+        ECM.FrameUtil.LazySetStatusBarTexture = function(bar, texture)
+            appliedTextures[#appliedTextures + 1] = { bar = bar, texture = texture }
+        end
+        ECM.FrameUtil.LazySetStatusBarColor = function(bar, r, g, b, a)
+            appliedColors[#appliedColors + 1] = { bar = bar, color = { r, g, b, a } }
+        end
+        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            frame.__ecmAnchorCache = anchors
+            frame.__anchors = anchors
+        end
+        ECM.FrameUtil.LazySetAlpha = function(frame, value)
+            frame.__alpha = value
+        end
+
+        local function makeChild(name, shown, layoutIndex)
+            local child = makeHookableFrame({ name = name, shown = shown, width = 200, height = 20 })
+            child.layoutIndex = layoutIndex
+            child.Bar = {
+                Name = {
+                    GetText = function()
+                        return name
+                    end,
+                    SetShown = function(self, value)
+                        self.__shown = value
+                    end,
+                },
+                Duration = {
+                    SetShown = function(self, value)
+                        self.__shown = value
+                    end,
+                },
+                Pip = {
+                    Hide = function() end,
+                    SetTexture = function() end,
+                },
+            }
+            child.Icon = makeHookableFrame({ shown = false, width = 20, height = 20 })
+            child.Icon.SetShown = function(self, value)
+                self.__shown = value
+            end
+            child.Icon.Applications = {}
+            child.cooldownInfo = { spellID = layoutIndex }
+            child.cooldownID = 1000 + layoutIndex
+            child.iconTextureFileID = 2000 + layoutIndex
+            return child
+        end
+
+        local first = makeChild("First", true, 2)
+        local second = makeChild("Second", false, 1)
+        local ignored = makeChild("Ignored", true, 99)
+        ignored.ignoreInLayout = true
+        function BuffBarCooldownViewer:GetChildren()
+            return first, ignored, second
+        end
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid", barHeight = 18, barWidth = 250 }
+        end
+        function BuffBars:GetModuleConfig()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                showIcon = false,
+                showSpellName = true,
+                showDuration = true,
+            }
+        end
+        function BuffBars:ShouldShow()
+            return true
+        end
+
+        local result = BuffBars:UpdateLayout("PLAYER_SPECIALIZATION_CHANGED")
+
+        assert.is_true(result)
+        assert.are.equal(1, cleared)
+        assert.same({ second, first }, discovered)
+        assert.is_true(first.__ecmHooked)
+        assert.is_true(second.__ecmHooked)
+        assert.are.equal(2, #appliedTextures)
+        assert.are.equal(2, #appliedColors)
+        assert.is_true(BuffBarCooldownViewer:IsShown())
+    end)
 end)

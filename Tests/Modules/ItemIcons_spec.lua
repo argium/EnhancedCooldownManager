@@ -4,6 +4,7 @@
 
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
+local unpack_fn = table.unpack or unpack
 
 describe("ItemIcons", function()
     local originalGlobals
@@ -170,6 +171,13 @@ describe("ItemIcons real source", function()
     local registerFrameCalls
     local addMixinCalls
     local timerCallbacks
+    local inventoryItemBySlot
+    local inventorySpellByItem
+    local inventoryTextureBySlot
+    local inventoryCooldownBySlot
+    local itemCounts
+    local itemIconsByID
+    local itemCooldownByID
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -179,6 +187,10 @@ describe("ItemIcons real source", function()
             "UIParent",
             "CreateFrame",
             "C_Timer",
+            "GetInventoryItemID",
+            "GetInventoryItemTexture",
+            "GetInventoryItemCooldown",
+            "C_Item",
         })
     end)
 
@@ -189,6 +201,7 @@ describe("ItemIcons real source", function()
     local function makeHookableFrame(shown)
         local frame = TestHelpers.makeFrame({ shown = shown })
         frame._hooks = {}
+        frame._children = {}
 
         function frame:HookScript(scriptName, callback)
             self._hooks[scriptName] = self._hooks[scriptName] or {}
@@ -199,6 +212,15 @@ describe("ItemIcons real source", function()
             return self._hooks[scriptName] and #self._hooks[scriptName] or 0
         end
 
+        function frame:GetChildren()
+            return unpack_fn(self._children)
+        end
+
+        local baseGetPoint = frame.GetPoint
+        function frame:GetPoint(index)
+            return baseGetPoint(self, index or 1)
+        end
+
         return frame
     end
 
@@ -207,10 +229,20 @@ describe("ItemIcons real source", function()
         registerFrameCalls = 0
         addMixinCalls = 0
         timerCallbacks = {}
+        inventoryItemBySlot = {}
+        inventorySpellByItem = {}
+        inventoryTextureBySlot = {}
+        inventoryCooldownBySlot = {}
+        itemCounts = {}
+        itemIconsByID = {}
+        itemCooldownByID = {}
         _G.ECM = {
             Log = function() end,
             FrameMixin = {
                 ShouldShow = function()
+                    return true
+                end,
+                Refresh = function()
                     return true
                 end,
                 AddMixin = function()
@@ -231,12 +263,43 @@ describe("ItemIcons real source", function()
                 timerCallbacks[#timerCallbacks + 1] = callback
             end,
         }
+        _G.GetInventoryItemID = function(_, slotId)
+            return inventoryItemBySlot[slotId]
+        end
+        _G.GetInventoryItemTexture = function(_, slotId)
+            return inventoryTextureBySlot[slotId]
+        end
+        _G.GetInventoryItemCooldown = function(_, slotId)
+            local cooldown = inventoryCooldownBySlot[slotId] or { 0, 0, 0 }
+            return cooldown[1], cooldown[2], cooldown[3]
+        end
+        _G.C_Item = {
+            GetItemSpell = function(itemId)
+                return nil, inventorySpellByItem[itemId]
+            end,
+            GetItemCount = function(itemId)
+                return itemCounts[itemId] or 0
+            end,
+            GetItemIconByID = function(itemId)
+                return itemIconsByID[itemId]
+            end,
+            GetItemCooldown = function(itemId)
+                local cooldown = itemCooldownByID[itemId] or { 0, 0, false }
+                return cooldown[1], cooldown[2], cooldown[3]
+            end,
+        }
         _G.CreateFrame = function(frameType)
             local frame = TestHelpers.makeFrame({ shown = true })
             frame.SetFrameStrata = function() end
             frame.SetSize = function(self, width, height)
                 self:SetWidth(width)
                 self:SetHeight(height)
+            end
+            frame.SetScale = function(self, scale)
+                self.__scale = scale
+            end
+            frame.GetScale = function(self)
+                return self.__scale or 1
             end
             frame.CreateTexture = function()
                 local texture = TestHelpers.makeTexture()
@@ -268,7 +331,17 @@ describe("ItemIcons real source", function()
             frame.SetCooldown = function(self, start, duration)
                 self.__cooldown = { start, duration }
             end
-            frame.GetRegions = function()
+            frame.__fontRegion = TestHelpers.makeRegion("FontString")
+            frame.__fontRegion.SetFont = function(self, path, size, flags)
+                self.__font = { path, size, flags }
+            end
+            frame.__fontRegion.GetFont = function(self)
+                return unpack(self.__font or {})
+            end
+            frame.GetRegions = function(self)
+                if frameType == "Cooldown" then
+                    return self.__fontRegion
+                end
                 return
             end
             if frameType == "Cooldown" then
@@ -292,6 +365,7 @@ describe("ItemIcons real source", function()
         function ItemIcons:IsEnabled()
             return true
         end
+        function ItemIcons:ThrottledRefresh() end
     end)
 
     it("requires the utility viewer to be visible in ShouldShow", function()
@@ -437,5 +511,145 @@ describe("ItemIcons real source", function()
         assert.same({ "OnEnable" }, reasons)
         assert.is_true(ItemIcons._editModeHooked)
         assert.is_true(ItemIcons._viewerHooked)
+    end)
+
+    it("lays out display items using utility viewer sizing and copies cooldown fonts", function()
+        local utilityFontRegion = TestHelpers.makeRegion("FontString")
+        utilityFontRegion.GetFont = function()
+            return "Fonts\\FRIZQT__.TTF", 17, "OUTLINE"
+        end
+        local utilityCooldown = {
+            GetRegions = function()
+                return utilityFontRegion
+            end,
+        }
+        local utilityFontChild = {
+            Cooldown = utilityCooldown,
+            IsShown = function()
+                return false
+            end,
+        }
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function()
+            return 12345
+        end
+        UtilityCooldownViewer.childXPadding = 6
+        UtilityCooldownViewer.iconScale = 1.25
+        UtilityCooldownViewer._children = { utilityFontChild, utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 50)
+
+        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_1] = 101
+        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_1] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_2] = 102
+        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_2] = "trinket-2"
+        inventorySpellByItem[102] = 9002
+        itemCounts[ECM.Constants.COMBAT_POTIONS[1].itemID] = 3
+        itemIconsByID[ECM.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
+        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return {
+                showTrinket1 = true,
+                showTrinket2 = true,
+                showCombatPotion = true,
+                showHealthPotion = false,
+                showHealthstone = true,
+            }
+        end
+
+        assert.is_true(ItemIcons:UpdateLayout("test"))
+        assert.is_true(ItemIcons.InnerFrame:IsShown())
+        assert.are.equal(1.25, ItemIcons.InnerFrame.__scale)
+        assert.are.equal((4 * 18) + (3 * 6), ItemIcons.InnerFrame:GetWidth())
+        assert.are.equal(18, ItemIcons.InnerFrame:GetHeight())
+        assert.are.equal(101, ItemIcons.InnerFrame._iconPool[1].itemId)
+        assert.are.equal(ECM.Constants.TRINKET_SLOT_1, ItemIcons.InnerFrame._iconPool[1].slotId)
+        assert.are.equal(102, ItemIcons.InnerFrame._iconPool[2].itemId)
+        assert.are.equal(ECM.Constants.TRINKET_SLOT_2, ItemIcons.InnerFrame._iconPool[2].slotId)
+        assert.are.equal(ECM.Constants.COMBAT_POTIONS[1].itemID, ItemIcons.InnerFrame._iconPool[3].itemId)
+        assert.are.equal(ECM.Constants.HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[4].itemId)
+        assert.same(
+            { "Fonts\\FRIZQT__.TTF", 17, "OUTLINE" },
+            ItemIcons.InnerFrame._iconPool[1].Cooldown.__fontRegion.__font
+        )
+
+        local point, relativeTo, relativePoint, x, y = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal("CENTER", point)
+        assert.are.equal(UIParent, relativeTo)
+        assert.are.equal("CENTER", relativePoint)
+        assert.are.equal(40.75, x)
+        assert.are.equal(50, y)
+    end)
+
+    it("restores the utility viewer and hides the frame when no items are available", function()
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 50)
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return {
+                showTrinket1 = true,
+                showTrinket2 = true,
+                showCombatPotion = true,
+                showHealthPotion = true,
+                showHealthstone = true,
+            }
+        end
+        ItemIcons._viewerOriginalPoint = { "CENTER", UIParent, "CENTER", 10, 20 }
+
+        assert.is_false(ItemIcons:UpdateLayout("test"))
+        assert.is_false(ItemIcons.InnerFrame:IsShown())
+
+        local point, relativeTo, relativePoint, x, y = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal("CENTER", point)
+        assert.are.equal(UIParent, relativeTo)
+        assert.are.equal("CENTER", relativePoint)
+        assert.are.equal(10, x)
+        assert.are.equal(20, y)
+    end)
+
+    it("refreshes cooldowns for visible trinket and bag icons", function()
+        local frame = ItemIcons:CreateFrame()
+        frame._iconPool[1]:Show()
+        frame._iconPool[1].slotId = ECM.Constants.TRINKET_SLOT_1
+        frame._iconPool[2]:Show()
+        frame._iconPool[2].itemId = 5001
+        frame._iconPool[3]:Show()
+        frame._iconPool[3].itemId = 5002
+        ItemIcons.InnerFrame = frame
+
+        inventoryCooldownBySlot[ECM.Constants.TRINKET_SLOT_1] = { 10, 30, 1 }
+        itemCooldownByID[5001] = { 20, 40, true }
+        itemCooldownByID[5002] = { 0, 0, false }
+
+        assert.is_true(ItemIcons:Refresh("test"))
+        assert.same({ 10, 30 }, frame._iconPool[1].Cooldown.__cooldown)
+        assert.same({ 20, 40 }, frame._iconPool[2].Cooldown.__cooldown)
+        assert.is_true(frame._iconPool[3].Cooldown.__cleared)
+    end)
+
+    it("cleans up real module state on disable", function()
+        local updateReasons = {}
+        ItemIcons._viewerOriginalPoint = { "TOP", UIParent, "TOP", 0, 0 }
+        ItemIcons._isEditModeActive = true
+        ItemIcons._layoutRetryPending = true
+        ItemIcons._layoutRetryCount = 4
+        function ItemIcons:UnregisterAllEvents()
+            self._eventsUnregistered = true
+        end
+        function ItemIcons:UpdateLayout(reason)
+            updateReasons[#updateReasons + 1] = reason
+            return false
+        end
+
+        ItemIcons:OnDisable()
+
+        assert.is_true(ItemIcons._eventsUnregistered)
+        assert.same({ "OnDisable" }, updateReasons)
+        assert.is_nil(ItemIcons._viewerOriginalPoint)
+        assert.is_nil(ItemIcons._isEditModeActive)
+        assert.is_nil(ItemIcons._layoutRetryPending)
+        assert.are.equal(0, ItemIcons._layoutRetryCount)
     end)
 end)

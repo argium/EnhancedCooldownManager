@@ -281,10 +281,20 @@ describe("RuneBar real source", function()
     local unregisterFrameCalls
     local makeFrame = TestHelpers.makeFrame
     local createFrameCalls
+    local frameRefreshResult
+    local now
 
     setup(function()
         originalGlobals =
-            TestHelpers.CaptureGlobals({ "ECM", "C_Timer", "CreateFrame", "GetSpecialization", "UIParent" })
+            TestHelpers.CaptureGlobals({
+                "ECM",
+                "C_Timer",
+                "CreateFrame",
+                "GetSpecialization",
+                "UIParent",
+                "GetRuneCooldown",
+                "GetTime",
+            })
     end)
 
     teardown(function()
@@ -298,6 +308,8 @@ describe("RuneBar real source", function()
         tickerCount = 0
         unregisterFrameCalls = 0
         createFrameCalls = 0
+        frameRefreshResult = true
+        now = 100
 
         _G.ECM = {
             FrameMixin = {
@@ -305,7 +317,7 @@ describe("RuneBar real source", function()
                     return true
                 end,
                 Refresh = function()
-                    return true
+                    return frameRefreshResult
                 end,
                 CreateFrame = function(self)
                     local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
@@ -349,6 +361,12 @@ describe("RuneBar real source", function()
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.GetSpecialization = function()
             return 1
+        end
+        _G.GetTime = function()
+            return now
+        end
+        _G.GetRuneCooldown = function()
+            return 0, 0, true
         end
         _G.CreateFrame = function(frameType, name, parent)
             createFrameCalls = createFrameCalls + 1
@@ -513,5 +531,88 @@ describe("RuneBar real source", function()
         assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES - 1, ensureTicksCount)
         assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES, layoutTicksMax)
         assert.is_true(frame.__shown == true)
+    end)
+
+    it("returns false from Refresh when the base frame refresh stops the update", function()
+        frameRefreshResult = false
+        RuneBar.InnerFrame = makeFrame({ shown = true })
+
+        assert.is_false(RuneBar:Refresh("test"))
+    end)
+
+    it("ticker hot path updates fragment values without relayout when rune states are unchanged", function()
+        local frags = {}
+        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            frags[i] = {
+                SetValue = function(self, value)
+                    self.__value = value
+                end,
+                SetStatusBarColor = function(self, r, g, b)
+                    self.__color = { r, g, b }
+                end,
+            }
+        end
+        RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+        RuneBar.InnerFrame.FragmentedBars = frags
+        RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.InnerFrame._lastReadySet = {}
+        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            RuneBar.InnerFrame._lastReadySet[i] = true
+        end
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 0.8, g = 0.1, b = 0.2 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        _G.GetRuneCooldown = function()
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnEnable()
+        RuneBar._valueTicker.callback()
+
+        assert.are.equal(1, frags[1].__value)
+        assert.same({ 0.8, 0.1, 0.2 }, frags[1].__color)
+    end)
+
+    it("ticker hot path requests relayout when rune ready states change", function()
+        local reasons = {}
+        local frags = {}
+        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            frags[i] = {
+                SetValue = function() end,
+                SetStatusBarColor = function() end,
+            }
+        end
+        RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+        RuneBar.InnerFrame.FragmentedBars = frags
+        RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.InnerFrame._lastReadySet = {}
+        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            RuneBar.InnerFrame._lastReadySet[i] = true
+        end
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 0.8, g = 0.1, b = 0.2 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        function RuneBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+        _G.GetRuneCooldown = function(index)
+            if index == 1 then
+                return 90, 10, false
+            end
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnEnable()
+        RuneBar._valueTicker.callback()
+
+        assert.same({ "RuneStateChange" }, reasons)
     end)
 end)

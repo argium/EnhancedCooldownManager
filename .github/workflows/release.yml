@@ -87,10 +87,31 @@ jobs:
                     exit 1
                   fi
 
+            - name: Prepare packager release notes
+              run: |
+                  set -euo pipefail
+
+                  TAG_NAME="${{ github.ref_name }}"
+                  TAG_MESSAGE=$(git for-each-ref --format='%(contents)' "refs/tags/$TAG_NAME")
+
+                  if [ -n "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
+                    printf '%s\n' "$TAG_MESSAGE" > .github/release-notes.md
+                    printf '%s\n' \
+                      'manual-changelog:' \
+                      '  filename: .github/release-notes.md' \
+                      '  markup-type: markdown' \
+                      > .github/release.pkgmeta
+                    echo "PACKAGER_ARGS=-m .github/release.pkgmeta -p 1427906 -w 27051" >> "$GITHUB_ENV"
+                    echo "Using annotated tag message for release notes."
+                  else
+                    echo "PACKAGER_ARGS=-p 1427906 -w 27051" >> "$GITHUB_ENV"
+                    echo "No annotated tag message found; using generated changelog."
+                  fi
+
             - name: Package and release
               uses: BigWigsMods/packager@v2
               with:
-                  args: -p 1427906 -w 27051
+                  args: ${{ env.PACKAGER_ARGS }}
               env:
                   CF_API_KEY: ${{ secrets.CF_TOKEN }}
                   WOWI_API_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
