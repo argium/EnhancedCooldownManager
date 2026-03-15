@@ -1,6 +1,6 @@
 return {
     statsfile = "luacov.stats.out",
-    reportfile = "luacov.report.out",
+    reportfile = "luacov.report.html",
     includeuntestedfiles = true,
     include = {
         "^ECM%.lua$",
@@ -16,8 +16,4 @@ return {
         "^Tests/",
     },
     reporter = "html",
-    html = {
-        outputDirectory = "luacov-html",
-        projectName = "EnhancedCooldownManager",
-    },
 }

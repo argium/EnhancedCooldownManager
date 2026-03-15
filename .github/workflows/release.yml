@@ -36,33 +36,32 @@ jobs:
                   luarocks --lua-version=5.1 install --local moonscript
                   luarocks --lua-version=5.1 install --local busted
                   luarocks --lua-version=5.1 install --local luacov
-                  luarocks --lua-version=5.1 install --local luacov-html
 
             - name: Run Busted tests with LuaCov (JUnit output)
               run: |
                   eval "$(luarocks --lua-version=5.1 path --local)"
                   mkdir -p test-results
-                  rm -f luacov.stats.out luacov.report.out
-                  rm -rf luacov-html
+                  rm -f luacov.stats.out luacov.report.out luacov.report.html
                   busted -r coverage Tests --output=junit > test-results/busted-junit.xml
                   luacov
                   luacov --config .luacov-html
                   mv luacov.report.out test-results/luacov.report.out
+                  mv luacov.report.html test-results/luacov.report.html
 
             - name: Show coverage report
               run: cat test-results/luacov.report.out
 
             - name: Upload coverage report
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: luacov-report
                   path: test-results/luacov.report.out
 
             - name: Upload HTML coverage report
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v6
               with:
                   name: luacov-html-report
-                  path: luacov-html
+                  path: test-results/luacov.report.html
 
             - name: Publish Test Results
               uses: EnricoMi/publish-unit-test-result-action@v2.23.0
