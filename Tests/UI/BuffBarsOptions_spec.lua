@@ -36,7 +36,6 @@ describe("BuffBarsOptions", function()
             "LibStub",
             "CreateFromMixins",
             "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
 

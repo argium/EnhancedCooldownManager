@@ -8,7 +8,7 @@ local C = ECM.Constants
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
 local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
 
-local BUTTON_X = 37 -- matches InfoRow template Title anchor (x=37 in LibSettingsBuilder_InfoRowTemplate)
+local BUTTON_X = 37 -- matches the settings info-row title anchor
 local BUTTON_HEIGHT = 26
 local BUTTON_WIDTH = 200
 

@@ -259,6 +259,25 @@ function TestHelpers.SetupSettingsStubs()
             return opts
         end,
 
+        CreateCallbackHandleContainer = function()
+            return {
+                _handles = {},
+                IsEmpty = function(self)
+                    return #self._handles == 0
+                end,
+                AddHandle = function(self, handle)
+                    self._handles[#self._handles + 1] = handle
+                end,
+                SetOnValueChangedCallback = function(self, variable, callback, owner)
+                    self:AddHandle({ variable = variable, callback = callback, owner = owner })
+                end,
+                Unregister = function(self)
+                    self._handles = {}
+                    self._unregistered = true
+                end,
+            }
+        end,
+
         CreateControlTextContainer = function()
             local data = {}
             return {
@@ -608,10 +627,6 @@ TestHelpers.OPTIONS_GLOBALS = {
     "LibStub",
     "CreateFromMixins",
     "SettingsListElementInitializer",
-    "LibSettingsBuilder_EmbedCanvasMixin",
-    "LibSettingsBuilder_SubheaderMixin",
-    "LibSettingsBuilder_InfoRowMixin",
-    "LibSettingsBuilder_ScrollDropdownMixin",
     "GameFontHighlightSmall",
     "GameFontNormal",
     "SETTINGS_DEFAULTS",

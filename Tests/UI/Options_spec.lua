@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("OptionUtil", function()
     local originalGlobals
@@ -13,13 +11,23 @@ describe("OptionUtil", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "ECM_DeepEquals",
-            "Settings", "CreateSettingsListSectionHeaderInitializer",
-            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-            "CreateColor", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
-            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
-            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin",
+            "ECM",
+            "ECM_DeepEquals",
+            "Settings",
+            "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer",
+            "MinimalSliderWithSteppersMixin",
+            "CreateColor",
+            "StaticPopupDialogs",
+            "StaticPopup_Show",
+            "YES",
+            "NO",
+            "UnitClass",
+            "GetSpecialization",
+            "GetSpecializationInfo",
+            "LibStub",
+            "CreateFromMixins",
+            "SettingsListElementInitializer",
         })
     end)
 
@@ -31,9 +39,15 @@ describe("OptionUtil", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
 
-        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
-        _G.GetSpecialization = function() return 1 end
-        _G.GetSpecializationInfo = function() return nil, "Arms" end
+        _G.UnitClass = function()
+            return "Warrior", "WARRIOR", 1
+        end
+        _G.GetSpecialization = function()
+            return 1
+        end
+        _G.GetSpecializationInfo = function()
+            return nil, "Arms"
+        end
 
         _G.ECM = {
             Constants = {
@@ -46,7 +60,9 @@ describe("OptionUtil", function()
         TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        lsmw.GetFontValues = function() return {} end
+        lsmw.GetFontValues = function()
+            return {}
+        end
         lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
 
         ns = {
@@ -55,7 +71,9 @@ describe("OptionUtil", function()
                     profile = {},
                     defaults = { profile = {} },
                 },
-                NewModule = function(_, name) return { moduleName = name } end,
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
                 EnableModule = function() end,
                 DisableModule = function() end,
                 ConfirmReloadUI = function() end,
@@ -78,7 +96,9 @@ describe("OptionUtil", function()
 
         it("calls EnableModule when value is true", function()
             local enabledModule
-            ns.Addon.EnableModule = function(_, name) enabledModule = name end
+            ns.Addon.EnableModule = function(_, name)
+                enabledModule = name
+            end
 
             local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(true)
@@ -88,7 +108,9 @@ describe("OptionUtil", function()
 
         it("calls DisableModule when value is false (no reload)", function()
             local disabledModule
-            ns.Addon.DisableModule = function(_, name) disabledModule = name end
+            ns.Addon.DisableModule = function(_, name)
+                disabledModule = name
+            end
 
             local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(false)
@@ -98,7 +120,9 @@ describe("OptionUtil", function()
 
         it("does not call ConfirmReloadUI for simple modules", function()
             local reloadCalled = false
-            ns.Addon.ConfirmReloadUI = function() reloadCalled = true end
+            ns.Addon.ConfirmReloadUI = function()
+                reloadCalled = true
+            end
 
             local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(false)
@@ -109,7 +133,9 @@ describe("OptionUtil", function()
         describe("with requiresReload", function()
             it("calls EnableModule when value is true", function()
                 local enabledModule
-                ns.Addon.EnableModule = function(_, name) enabledModule = name end
+                ns.Addon.EnableModule = function(_, name)
+                    enabledModule = name
+                end
 
                 local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload?")
                 handler(true)
@@ -119,10 +145,14 @@ describe("OptionUtil", function()
 
             it("reverts setting and shows reload confirmation when value is false", function()
                 local reloadMessage, revertedValue
-                ns.Addon.ConfirmReloadUI = function(_, msg) reloadMessage = msg end
+                ns.Addon.ConfirmReloadUI = function(_, msg)
+                    reloadMessage = msg
+                end
 
                 local setting = {
-                    SetValueNoCallback = function(_, val) revertedValue = val end,
+                    SetValueNoCallback = function(_, val)
+                        revertedValue = val
+                    end,
                 }
 
                 local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
@@ -144,8 +174,12 @@ describe("OptionUtil", function()
 
             it("disables module via reload callback", function()
                 local disabledModule, capturedCallback
-                ns.Addon.DisableModule = function(_, name) disabledModule = name end
-                ns.Addon.ConfirmReloadUI = function(_, _, cb) capturedCallback = cb end
+                ns.Addon.DisableModule = function(_, name)
+                    disabledModule = name
+                end
+                ns.Addon.ConfirmReloadUI = function(_, _, cb)
+                    capturedCallback = cb
+                end
 
                 local setting = { SetValueNoCallback = function() end }
 
@@ -165,7 +199,9 @@ describe("OptionUtil", function()
         end)
 
         it("returns layout and appearance args with defaults", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
             assert.is_table(args.layoutHeader)
@@ -184,7 +220,9 @@ describe("OptionUtil", function()
         end)
 
         it("includes showText and border by default", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
             assert.is_table(args.showText)
@@ -197,7 +235,9 @@ describe("OptionUtil", function()
         end)
 
         it("shifts height and font after showText when present", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
             assert.are.equal(21, args.showText.order)
@@ -207,7 +247,9 @@ describe("OptionUtil", function()
         end)
 
         it("omits showText when showText=false", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled, { showText = false })
 
             assert.is_nil(args.showText)
@@ -216,14 +258,18 @@ describe("OptionUtil", function()
         end)
 
         it("omits border when border=false", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled, { border = false })
 
             assert.is_nil(args.border)
         end)
 
         it("omits both showText and border", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled, { showText = false, border = false })
 
             assert.is_nil(args.showText)
@@ -233,7 +279,9 @@ describe("OptionUtil", function()
         end)
 
         it("respects custom layoutOrder and appearanceOrder", function()
-            local disabled = function() return false end
+            local disabled = function()
+                return false
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
 
             assert.are.equal(1, args.layoutHeader.order)
@@ -246,7 +294,9 @@ describe("OptionUtil", function()
         end)
 
         it("passes isDisabled to all args", function()
-            local disabled = function() return true end
+            local disabled = function()
+                return true
+            end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
             assert.are.equal(disabled, args.layoutHeader.disabled)

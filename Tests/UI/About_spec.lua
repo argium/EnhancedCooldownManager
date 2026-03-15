@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("About section", function()
     local originalGlobals
@@ -13,7 +11,9 @@ describe("About section", function()
 
     setup(function()
         local globals = {}
-        for _, v in ipairs(TestHelpers.OPTIONS_GLOBALS) do globals[#globals + 1] = v end
+        for _, v in ipairs(TestHelpers.OPTIONS_GLOBALS) do
+            globals[#globals + 1] = v
+        end
         globals[#globals + 1] = "C_AddOns"
         originalGlobals = TestHelpers.CaptureGlobals(globals)
     end)
@@ -29,12 +29,16 @@ describe("About section", function()
 
         _G.C_AddOns = {
             GetAddOnMetadata = function(_, key)
-                if key == "Version" then return "v1.2.3-test" end
+                if key == "Version" then
+                    return "v1.2.3-test"
+                end
             end,
         }
 
         ECM.ColorUtil = {
-            Sparkle = function(text) return "<<sparkle:" .. text .. ">>" end,
+            Sparkle = function(text)
+                return "<<sparkle:" .. text .. ">>"
+            end,
         }
 
         TestHelpers.LoadChunk("UI/About.lua", "Unable to load UI/About.lua")(nil, ns)
@@ -42,13 +46,15 @@ describe("About section", function()
 
     local function findInitializer(layout, predicate)
         for _, init in ipairs(layout._initializers) do
-            if predicate(init) then return init end
+            if predicate(init) then
+                return init
+            end
         end
     end
 
     local function findInfoRow(layout, name)
         return findInitializer(layout, function(init)
-            return init._template == "LibSettingsBuilder_InfoRowTemplate" and init.data.name == name
+            return init._template == SB.INFOROW_TEMPLATE and init.data.name == name
         end)
     end
 
@@ -89,7 +95,7 @@ describe("About section", function()
 
         it("includes Links subheader", function()
             local init = findInitializer(rootLayout, function(i)
-                return i._template == "LibSettingsBuilder_SubheaderTemplate" and i.data.name == "Links"
+                return i._template == SB.SUBHEADER_TEMPLATE and i.data.name == "Links"
             end)
             assert.is_not_nil(init, "expected Links subheader")
         end)
@@ -143,7 +149,9 @@ describe("About section", function()
     describe("version fallback", function()
         it("uses 'Unknown' when GetAddOnMetadata returns nil", function()
             _G.C_AddOns = {
-                GetAddOnMetadata = function() return nil end,
+                GetAddOnMetadata = function()
+                    return nil
+                end,
             }
 
             SB._layouts[SB._rootCategory]._initializers = {}

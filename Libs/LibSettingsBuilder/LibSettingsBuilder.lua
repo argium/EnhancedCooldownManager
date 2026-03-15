@@ -1,3 +1,7 @@
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
+
 -- LibSettingsBuilder: A standalone path-based settings builder for the
 -- World of Warcraft Settings API.  Provides proxy controls, composite groups
 -- and utility helpers.
@@ -8,216 +12,142 @@ if not lib then
     return
 end
 
-lib.EMBED_CANVAS_TEMPLATE = "LibSettingsBuilder_EmbedCanvasTemplate"
-lib.SUBHEADER_TEMPLATE = "LibSettingsBuilder_SubheaderTemplate"
-lib.INFOROW_TEMPLATE = "LibSettingsBuilder_InfoRowTemplate"
-lib.SCROLL_DROPDOWN_TEMPLATE = "LibSettingsBuilder_ScrollDropdownTemplate"
+lib.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
+lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
+lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
+lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
---------------------------------------------------------------------------------
--- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
--- Replicates Blizzard's Settings panel positioning so canvas pages are
--- visually indistinguishable from vertical-layout pages.
---
--- Measurements from Blizzard_SettingControls.xml/.lua:
---   Element height:      26   (all control types)
---   Section header:      45   (GameFontHighlightLarge at TOPLEFT 7, -16)
---   Label left offset:   indent + 37
---   Label right bound:   CENTER - 85
---   Control anchor:      CENTER - 80  (checkbox, slider, color swatch)
---   Button anchor:       CENTER - 40  (width 200)
---   Indent per level:    15
---------------------------------------------------------------------------------
+local confirmDialogName = MAJOR .. "_SettingsConfirm"
+local listElementKeysToHide = { "_lsbSubheaderTitle", "_lsbInfoTitle", "_lsbInfoValue", "_lsbCanvas" }
 
-local CANVAS_ELEMENT_HEIGHT = 26
-local CANVAS_HEADER_HEIGHT = 50
-local CANVAS_LABEL_X = 37
-local CANVAS_CONTROL_CENTER_X = -80
-local CANVAS_BUTTON_CENTER_X = -40
-local CANVAS_BUTTON_WIDTH = 200
-local CANVAS_SLIDER_WIDTH = 250
-local CANVAS_SWATCH_CENTER_X = -73
-
-local CanvasLayout = {}
-lib.CanvasLayout = CanvasLayout
-
-function CanvasLayout:_Advance(h)
-    self.yPos = self.yPos - h
+local function copyMixin(target, source)
+    for key, value in pairs(source) do
+        target[key] = value
+    end
+    return target
 end
 
-function CanvasLayout:_CreateRow(h)
-    h = h or CANVAS_ELEMENT_HEIGHT
-    local row = CreateFrame("Frame", nil, self.frame)
-    row:SetPoint("TOPLEFT", 0, self.yPos)
-    row:SetPoint("RIGHT")
-    row:SetHeight(h)
-    self.elements[#self.elements + 1] = row
-    self:_Advance(h)
-    return row
+local function setInitializerExtent(initializer, extent)
+    if initializer.SetExtent then
+        initializer:SetExtent(extent)
+        return
+    end
+
+    initializer.GetExtent = function()
+        return extent
+    end
 end
 
-function CanvasLayout:_AddLabel(row, text, fontObject)
-    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
-    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
-    label:SetPoint("RIGHT", row, "CENTER", -85, 0)
-    label:SetJustifyH("LEFT")
-    label:SetWordWrap(false)
-    label:SetText(text)
-    row._label = label
-    return label
+local function getInitializerData(initializer)
+    if initializer and initializer.GetData then
+        return initializer:GetData()
+    end
 end
 
---- Add a page header using Blizzard's SettingsListTemplate.Header.
---- Provides Title, Options_HorizontalDivider, and DefaultsButton.
----@return Frame row  (row._title, row._defaultsButton exposed)
-function CanvasLayout:AddHeader(text)
-    local row = self:_CreateRow(CANVAS_HEADER_HEIGHT)
-    local settingsList = CreateFrame("Frame", nil, row, "SettingsListTemplate")
-    settingsList:SetAllPoints(row)
-    settingsList.ScrollBox:Hide()
-    settingsList.ScrollBar:Hide()
-    settingsList.Header.Title:SetText(text)
-    row._title = settingsList.Header.Title
-    row._defaultsButton = settingsList.Header.DefaultsButton
-    return row
+local function makeStableSortKey(value)
+    local valueType = type(value)
+    if valueType == "number" then
+        return "1:" .. string.format("%020.10f", value)
+    end
+    if valueType == "boolean" then
+        return value and "2:true" or "2:false"
+    end
+    return valueType .. ":" .. tostring(value):lower()
 end
 
---- Add vertical spacing.
-function CanvasLayout:AddSpacer(height)
-    self:_Advance(height)
+local function getOrderedValueEntries(values)
+    local entries = {}
+    if not values then
+        return entries
+    end
+
+    for value, label in pairs(values) do
+        entries[#entries + 1] = {
+            value = value,
+            label = label,
+            labelSortKey = tostring(label):lower(),
+            valueSortKey = makeStableSortKey(value),
+        }
+    end
+
+    table.sort(entries, function(left, right)
+        if left.labelSortKey == right.labelSortKey then
+            return left.valueSortKey < right.valueSortKey
+        end
+        return left.labelSortKey < right.labelSortKey
+    end)
+
+    return entries
 end
 
---- Add a description / informational text row.
-function CanvasLayout:AddDescription(text, fontObject)
-    local row = self:_CreateRow()
-    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
-    label:SetPoint("LEFT", CANVAS_LABEL_X, 0)
-    label:SetPoint("RIGHT", row, "RIGHT", -10, 0)
-    label:SetJustifyH("LEFT")
-    label:SetText(text)
-    row._text = label
-    return row
+local function resetListElement(frame)
+    for _, key in ipairs(listElementKeysToHide) do
+        local region = frame[key]
+        if region then
+            region:Hide()
+        end
+    end
 end
 
---- Add a color swatch row (label + clickable swatch).
----@return Frame row, Button swatch
-function CanvasLayout:AddColorSwatch(labelText)
-    local row = self:_CreateRow()
-    self:_AddLabel(row, labelText)
-    local swatch = lib.CreateColorSwatch(row)
-    swatch:SetPoint("LEFT", row, "CENTER", CANVAS_SWATCH_CENTER_X, 0)
-    row._swatch = swatch
-    return row, swatch
+local function ensureSubheaderTitle(frame)
+    if frame._lsbSubheaderTitle then
+        return frame._lsbSubheaderTitle
+    end
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("TOPLEFT", 35, -12)
+    title:SetJustifyH("LEFT")
+    title:SetJustifyV("TOP")
+    frame._lsbSubheaderTitle = title
+    frame.Title = title
+    return title
 end
 
---- Add a slider row (label + MinimalSliderWithSteppers).
----@return Frame row, Slider slider, FontString valueText
-function CanvasLayout:AddSlider(labelText, min, max, step)
-    local row = self:_CreateRow()
-    self:_AddLabel(row, labelText)
-    local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
-    slider:SetWidth(CANVAS_SLIDER_WIDTH)
-    slider:SetPoint("LEFT", row, "CENTER", CANVAS_CONTROL_CENTER_X, 3)
-    slider:SetMinMaxValues(min, max)
-    slider:SetValueStep(step or 1)
-    slider:SetObeyStepOnDrag(true)
-    local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    valueText:SetPoint("LEFT", slider, "RIGHT", 8, 0)
-    valueText:SetWidth(40)
-    valueText:SetJustifyH("LEFT")
-    row._slider = slider
-    row._valueText = valueText
-    return row, slider, valueText
+local function ensureInfoRowWidgets(frame)
+    if frame._lsbInfoTitle and frame._lsbInfoValue then
+        return frame._lsbInfoTitle, frame._lsbInfoValue
+    end
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("LEFT", 37, 0)
+    title:SetPoint("RIGHT", frame, "CENTER", -85, 0)
+    title:SetJustifyH("LEFT")
+
+    local value = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    value:SetPoint("LEFT", frame, "CENTER", -80, 0)
+    value:SetJustifyH("LEFT")
+
+    frame._lsbInfoTitle = title
+    frame._lsbInfoValue = value
+    frame.Title = title
+    frame.Value = value
+
+    return title, value
 end
 
---- Add a button row (label + UIPanelButton).
----@return Frame row, Button button
-function CanvasLayout:AddButton(labelText, buttonText)
-    local row = self:_CreateRow()
-    self:_AddLabel(row, labelText)
-    local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    button:SetSize(CANVAS_BUTTON_WIDTH, 26)
-    button:SetPoint("LEFT", row, "CENTER", CANVAS_BUTTON_CENTER_X, 0)
-    button:SetText(buttonText)
-    row._button = button
-    return row, button
+local function applySubheaderFrame(frame, data)
+    local title = ensureSubheaderTitle(frame)
+    title:SetFontObject(GameFontNormal)
+    title:SetText(data.name)
+    title:Show()
 end
 
---- Add a scroll list that fills the remaining vertical space.
----@return Frame scrollBox, EventFrame scrollBar, table view
-function CanvasLayout:AddScrollList(elementExtent)
-    local scrollBox = CreateFrame("Frame", nil, self.frame, "WowScrollBoxList")
-    scrollBox:SetPoint("TOPLEFT", CANVAS_LABEL_X, self.yPos)
-    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
-    local scrollBar = CreateFrame("EventFrame", nil, self.frame, "MinimalScrollBar")
-    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
-    local view = CreateScrollBoxListLinearView()
-    view:SetElementExtent(elementExtent)
-    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
-    return scrollBox, scrollBar, view
+local function applyInfoRowFrame(frame, data)
+    local title, value = ensureInfoRowWidgets(frame)
+    title:SetText(data.name)
+    value:SetText(data.value)
+    title:Show()
+    value:Show()
 end
 
---------------------------------------------------------------------------------
--- Static utilities (shared across all instances)
---------------------------------------------------------------------------------
-
---- Create a color swatch button using Blizzard's SettingsColorSwatchTemplate.
---- Inherits ColorSwatchTemplate (SwatchBg/InnerBorder/Color layers) and
---- SettingsColorSwatchMixin (hover effects, color picker integration).
----@param parent Frame
----@return Button swatch  (swatch._tex points to swatch.Color for backward compat)
-function lib.CreateColorSwatch(parent)
-    local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
-    swatch._tex = swatch.Color
-    return swatch
-end
-
---------------------------------------------------------------------------------
--- Subheader Mixin (global, shared across all instances)
--- Renders as a normal control label (GameFontNormal) with no control widget.
--- Used exclusively as a parent for sub-settings.
---------------------------------------------------------------------------------
-
-LibSettingsBuilder_SubheaderMixin = LibSettingsBuilder_SubheaderMixin or {}
-
-function LibSettingsBuilder_SubheaderMixin:Init(initializer)
-    local name = initializer:GetData().name
-    self.Title:SetText(name)
-    self.Title:SetFontObject(GameFontNormal)
-end
-
---------------------------------------------------------------------------------
--- InfoRow Mixin (global, shared across all instances)
--- Renders a label + value pair aligned with standard controls.
---------------------------------------------------------------------------------
-
-LibSettingsBuilder_InfoRowMixin = LibSettingsBuilder_InfoRowMixin or {}
-
-function LibSettingsBuilder_InfoRowMixin:Init(initializer)
-    local data = initializer:GetData()
-    self.Title:SetText(data.name)
-    self.Value:SetText(data.value)
-end
-
---------------------------------------------------------------------------------
--- EmbedCanvas Mixin (global, shared across all instances)
---------------------------------------------------------------------------------
-
-LibSettingsBuilder_EmbedCanvasMixin = LibSettingsBuilder_EmbedCanvasMixin or {}
-
-function LibSettingsBuilder_EmbedCanvasMixin:OnLoad()
-    SettingsListElementMixin.OnLoad(self)
-end
-
-function LibSettingsBuilder_EmbedCanvasMixin:Init(initializer)
-    SettingsListElementMixin.Init(self, initializer)
-
-    local canvas = initializer:GetData().canvas
+local function applyEmbedCanvasFrame(frame, data, initializer)
+    local canvas = data.canvas
     if not canvas then
         return
     end
 
-    canvas:SetParent(self)
+    frame._lsbCanvas = canvas
+    canvas:SetParent(frame)
     canvas:ClearAllPoints()
     canvas:SetPoint("TOPLEFT", 0, 0)
     canvas:SetPoint("TOPRIGHT", 0, 0)
@@ -225,36 +155,93 @@ function LibSettingsBuilder_EmbedCanvasMixin:Init(initializer)
     canvas:Show()
 end
 
---------------------------------------------------------------------------------
--- ScrollDropdown Mixin (global, shared across all instances)
--- Minimal scroll-enabled dropdown: SetScrollMode + CreateRadio per option.
--- Unlike LibEQOL's 264-line version, this handles only simple value→label
--- pairs without option normalization, grid modes, or custom generators.
---------------------------------------------------------------------------------
-
-LibSettingsBuilder_ScrollDropdownMixin = CreateFromMixins(SettingsDropdownControlMixin)
-
-function LibSettingsBuilder_ScrollDropdownMixin:OnLoad()
-    SettingsDropdownControlMixin.OnLoad(self)
-end
-
-function LibSettingsBuilder_ScrollDropdownMixin:Init(initializer)
-    if not initializer or not initializer.GetData then
+local function ensureListElementCallbackHandles(frame)
+    if frame.cbrHandles or not (Settings and Settings.CreateCallbackHandleContainer) then
         return
     end
-    self.initializer = initializer
-    self.lsbData = initializer:GetData() or {}
-    SettingsDropdownControlMixin.Init(self, initializer)
+
+    frame.cbrHandles = Settings.CreateCallbackHandleContainer()
 end
 
-function LibSettingsBuilder_ScrollDropdownMixin:GetSetting()
+local function initializerShouldShow(initializer)
+    if initializer and initializer.ShouldShow then
+        return initializer:ShouldShow()
+    end
+
+    if initializer and initializer._shownPredicates then
+        for _, predicate in ipairs(initializer._shownPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
+local function createCustomListRowInitializer(template, data, extent, initFrame)
+    local initializer = Settings.CreateElementInitializer(template, data)
+    setInitializerExtent(initializer, extent)
+
+    initializer.InitFrame = function(self, frame)
+        ensureListElementCallbackHandles(frame)
+
+        frame.data = self.data
+        if frame.Text then
+            frame.Text:SetText("")
+        end
+        if frame.NewFeature then
+            frame.NewFeature:Hide()
+        end
+
+        resetListElement(frame)
+        initFrame(frame, self.data, self)
+
+        if not frame._lsbHasCustomEvaluateState then
+            frame.EvaluateState = function(control)
+                local currentInitializer = control.GetElementData and control:GetElementData()
+                    or control._lsbInitializer
+                control:SetShown(initializerShouldShow(currentInitializer))
+            end
+            frame._lsbHasCustomEvaluateState = true
+        end
+
+        frame._lsbInitializer = self
+        frame:EvaluateState()
+    end
+
+    initializer.Resetter = function(self, frame)
+        if frame.cbrHandles and frame.cbrHandles.Unregister then
+            frame.cbrHandles:Unregister()
+        end
+        if frame.Text then
+            frame.Text:SetText("")
+        end
+        if frame.NewFeature then
+            frame.NewFeature:Hide()
+        end
+        if frame._lsbCanvas then
+            frame._lsbCanvas:Hide()
+        end
+
+        resetListElement(frame)
+        frame.data = nil
+        frame._lsbInitializer = nil
+    end
+
+    return initializer
+end
+
+local ScrollDropdownMethods = {}
+
+function ScrollDropdownMethods:GetSetting()
     if self.initializer and self.initializer.GetSetting then
         return self.initializer:GetSetting()
     end
     return self.lsbData and self.lsbData.setting or nil
 end
 
-function LibSettingsBuilder_ScrollDropdownMixin:RefreshDropdownText(value)
+function ScrollDropdownMethods:RefreshDropdownText(value)
     local dropdown = self.Control and self.Control.Dropdown
     if not dropdown then
         return
@@ -279,12 +266,11 @@ function LibSettingsBuilder_ScrollDropdownMixin:RefreshDropdownText(value)
     end
 end
 
--- Avoid regenerating the dropdown menu on value changes when using scroll mode.
-function LibSettingsBuilder_ScrollDropdownMixin:SetValue(value)
+function ScrollDropdownMethods:SetValue(value)
     self:RefreshDropdownText(value)
 end
 
-function LibSettingsBuilder_ScrollDropdownMixin:InitDropdown()
+function ScrollDropdownMethods:InitDropdown()
     local setting = self:GetSetting()
     local data = self.lsbData or {}
     local scrollHeight = data.scrollHeight or 200
@@ -305,17 +291,221 @@ function LibSettingsBuilder_ScrollDropdownMixin:InitDropdown()
             return
         end
 
-        for optValue, label in pairs(values) do
-            rootDescription:CreateRadio(label, function()
-                return setting:GetValue() == optValue
+        for _, entry in ipairs(getOrderedValueEntries(values)) do
+            rootDescription:CreateRadio(entry.label, function()
+                return setting:GetValue() == entry.value
             end, function()
-                setting:SetValue(optValue)
-                self:RefreshDropdownText(optValue)
-            end, optValue)
+                setting:SetValue(entry.value)
+                self:RefreshDropdownText(entry.value)
+            end, entry.value)
         end
     end)
 
     self:RefreshDropdownText()
+end
+
+local function configureScrollDropdownFrame(frame, initializer)
+    if not frame._lsbOriginalSetValue then
+        frame._lsbOriginalSetValue = frame.SetValue
+    end
+
+    copyMixin(frame, ScrollDropdownMethods)
+    frame.initializer = initializer
+    frame.lsbData = initializer:GetData() or {}
+    frame:InitDropdown()
+end
+
+if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownControlMixin then
+    hooksecurefunc(SettingsDropdownControlMixin, "Init", function(frame, initializer)
+        local data = getInitializerData(initializer)
+        if not data or data._lsbKind ~= "scrollDropdown" then
+            if frame._lsbOriginalSetValue then
+                frame.SetValue = frame._lsbOriginalSetValue
+            end
+            frame.initializer = initializer
+            frame.lsbData = nil
+            return
+        end
+
+        configureScrollDropdownFrame(frame, initializer)
+    end)
+
+    lib._scrollDropdownHookInstalled = true
+end
+
+--------------------------------------------------------------------------------
+-- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
+-- Replicates Blizzard's Settings panel positioning so canvas pages are
+-- visually indistinguishable from vertical-layout pages.
+--
+-- Measurements from Blizzard_SettingControls.xml/.lua:
+--   Element height:      26   (all control types)
+--   Section header:      45   (GameFontHighlightLarge at TOPLEFT 7, -16)
+--   Label left offset:   indent + 37
+--   Label right bound:   CENTER - 85
+--   Control anchor:      CENTER - 80  (checkbox, slider, color swatch)
+--   Button anchor:       CENTER - 40  (width 200)
+--   Indent per level:    15
+--------------------------------------------------------------------------------
+
+lib.CanvasLayoutDefaults = lib.CanvasLayoutDefaults
+    or {
+        elementHeight = 26,
+        headerHeight = 50,
+        labelX = 37,
+        controlCenterX = -80,
+        buttonCenterX = -40,
+        buttonWidth = 200,
+        sliderWidth = 250,
+        swatchCenterX = -73,
+        verifiedPatch = "Retail 12.0/12.1",
+    }
+
+local CanvasLayout = {}
+lib.CanvasLayout = CanvasLayout
+
+local function getCanvasLayoutMetrics(layout)
+    return layout._metrics or lib.CanvasLayoutDefaults
+end
+
+function CanvasLayout:_Advance(h)
+    self.yPos = self.yPos - h
+end
+
+function CanvasLayout:_CreateRow(h)
+    local metrics = getCanvasLayoutMetrics(self)
+    h = h or metrics.elementHeight
+    local row = CreateFrame("Frame", nil, self.frame)
+    row:SetPoint("TOPLEFT", 0, self.yPos)
+    row:SetPoint("RIGHT")
+    row:SetHeight(h)
+    self.elements[#self.elements + 1] = row
+    self:_Advance(h)
+    return row
+end
+
+function CanvasLayout:_AddLabel(row, text, fontObject)
+    local metrics = getCanvasLayoutMetrics(self)
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", metrics.labelX, 0)
+    label:SetPoint("RIGHT", row, "CENTER", -85, 0)
+    label:SetJustifyH("LEFT")
+    label:SetWordWrap(false)
+    label:SetText(text)
+    row._label = label
+    return label
+end
+
+--- Add a page header using Blizzard's SettingsListTemplate.Header.
+--- Provides Title, Options_HorizontalDivider, and DefaultsButton.
+---@return Frame row  (row._title, row._defaultsButton exposed)
+function CanvasLayout:AddHeader(text)
+    local metrics = getCanvasLayoutMetrics(self)
+    local row = self:_CreateRow(metrics.headerHeight)
+    local settingsList = CreateFrame("Frame", nil, row, "SettingsListTemplate")
+    settingsList:SetAllPoints(row)
+    settingsList.ScrollBox:Hide()
+    settingsList.ScrollBar:Hide()
+    settingsList.Header.Title:SetText(text)
+    row._title = settingsList.Header.Title
+    row._defaultsButton = settingsList.Header.DefaultsButton
+    return row
+end
+
+--- Add vertical spacing.
+function CanvasLayout:AddSpacer(height)
+    self:_Advance(height)
+end
+
+--- Add a description / informational text row.
+function CanvasLayout:AddDescription(text, fontObject)
+    local metrics = getCanvasLayoutMetrics(self)
+    local row = self:_CreateRow()
+    local label = row:CreateFontString(nil, "OVERLAY", fontObject or "GameFontNormal")
+    label:SetPoint("LEFT", metrics.labelX, 0)
+    label:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    label:SetJustifyH("LEFT")
+    label:SetText(text)
+    row._text = label
+    return row
+end
+
+--- Add a color swatch row (label + clickable swatch).
+---@return Frame row, Button swatch
+function CanvasLayout:AddColorSwatch(labelText)
+    local metrics = getCanvasLayoutMetrics(self)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local swatch = lib.CreateColorSwatch(row)
+    swatch:SetPoint("LEFT", row, "CENTER", metrics.swatchCenterX, 0)
+    row._swatch = swatch
+    return row, swatch
+end
+
+--- Add a slider row (label + MinimalSliderWithSteppers).
+---@return Frame row, Slider slider, FontString valueText
+function CanvasLayout:AddSlider(labelText, min, max, step)
+    local metrics = getCanvasLayoutMetrics(self)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
+    slider:SetWidth(metrics.sliderWidth)
+    slider:SetPoint("LEFT", row, "CENTER", metrics.controlCenterX, 3)
+    slider:SetMinMaxValues(min, max)
+    slider:SetValueStep(step or 1)
+    slider:SetObeyStepOnDrag(true)
+    local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetPoint("LEFT", slider, "RIGHT", 8, 0)
+    valueText:SetWidth(40)
+    valueText:SetJustifyH("LEFT")
+    row._slider = slider
+    row._valueText = valueText
+    return row, slider, valueText
+end
+
+--- Add a button row (label + UIPanelButton).
+---@return Frame row, Button button
+function CanvasLayout:AddButton(labelText, buttonText)
+    local metrics = getCanvasLayoutMetrics(self)
+    local row = self:_CreateRow()
+    self:_AddLabel(row, labelText)
+    local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    button:SetSize(metrics.buttonWidth, 26)
+    button:SetPoint("LEFT", row, "CENTER", metrics.buttonCenterX, 0)
+    button:SetText(buttonText)
+    row._button = button
+    return row, button
+end
+
+--- Add a scroll list that fills the remaining vertical space.
+---@return Frame scrollBox, EventFrame scrollBar, table view
+function CanvasLayout:AddScrollList(elementExtent)
+    local metrics = getCanvasLayoutMetrics(self)
+    local scrollBox = CreateFrame("Frame", nil, self.frame, "WowScrollBoxList")
+    scrollBox:SetPoint("TOPLEFT", metrics.labelX, self.yPos)
+    scrollBox:SetPoint("BOTTOMRIGHT", -30, 10)
+    local scrollBar = CreateFrame("EventFrame", nil, self.frame, "MinimalScrollBar")
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(elementExtent)
+    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+    return scrollBox, scrollBar, view
+end
+
+--------------------------------------------------------------------------------
+-- Static utilities (shared across all instances)
+--------------------------------------------------------------------------------
+
+--- Create a color swatch button using Blizzard's SettingsColorSwatchTemplate.
+--- Inherits ColorSwatchTemplate (SwatchBg/InnerBorder/Color layers) and
+--- SettingsColorSwatchMixin (hover effects, color picker integration).
+---@param parent Frame
+---@return Button swatch  (swatch._tex points to swatch.Color for backward compat)
+function lib.CreateColorSwatch(parent)
+    local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
+    swatch._tex = swatch.Color
+    return swatch
 end
 
 --------------------------------------------------------------------------------
@@ -347,6 +537,62 @@ if not lib._sliderHookInstalled then
             return nil
         end
 
+        local function getSliderValueText(self)
+            local setting = self and self._lsbCurrentSetting
+            if not setting or not setting.GetValue then
+                return ""
+            end
+            return tostring(setting:GetValue())
+        end
+
+        local function hideSliderEditBox(self)
+            local editBox = self and self._lsbEditBox
+            local valueLabel = self and self._lsbValueLabel
+            if not editBox or not valueLabel then
+                return
+            end
+            editBox:ClearFocus()
+            editBox:Hide()
+            valueLabel:Show()
+        end
+
+        local function applySliderEditValue(self)
+            local editBox = self and self._lsbEditBox
+            local setting = self and self._lsbCurrentSetting
+            local sliderWithSteppers = self and self.SliderWithSteppers
+            if not editBox or not setting or not sliderWithSteppers or not sliderWithSteppers.Slider then
+                hideSliderEditBox(self)
+                return
+            end
+
+            local num = tonumber(editBox:GetText())
+            if num then
+                local slider = sliderWithSteppers.Slider
+                local min, max = slider:GetMinMaxValues()
+                num = math.max(min, math.min(max, num))
+                local step = slider:GetValueStep()
+                if step and step > 0 then
+                    num = math.floor(num / step + 0.5) * step
+                end
+                setting:SetValue(num)
+            end
+
+            hideSliderEditBox(self)
+        end
+
+        local function anchorSliderValueButton(self)
+            local valueLabel = self and self._lsbValueLabel
+            local valueButton = self and self._lsbValueButton
+            if not valueLabel or not valueButton then
+                return
+            end
+
+            if valueButton.ClearAllPoints then
+                valueButton:ClearAllPoints()
+            end
+            valueButton:SetAllPoints(valueLabel)
+        end
+
         hooksecurefunc(SettingsSliderControlMixin, "Init", function(self, initializer)
             local sliderWithSteppers = self.SliderWithSteppers
             if not sliderWithSteppers then
@@ -358,9 +604,11 @@ if not lib._sliderHookInstalled then
                 return
             end
 
+            self._lsbCurrentSetting = initializer:GetSetting()
+            self._lsbValueLabel = valueLabel
+
             if not self._lsbValueButton then
                 local btn = CreateFrame("Button", nil, sliderWithSteppers)
-                btn:SetAllPoints(valueLabel)
                 btn:RegisterForClicks("LeftButtonDown")
                 self._lsbValueButton = btn
 
@@ -373,47 +621,38 @@ if not lib._sliderHookInstalled then
                 editBox:Hide()
                 self._lsbEditBox = editBox
 
-                local function hideEditBox()
-                    editBox:ClearFocus()
-                    editBox:Hide()
-                    valueLabel:Show()
-                end
-
-                local function applyValue()
-                    local text = editBox:GetText()
-                    local num = tonumber(text)
-                    if num and self._lsbCurrentSetting then
-                        local slider = sliderWithSteppers.Slider
-                        local min, max = slider:GetMinMaxValues()
-                        num = math.max(min, math.min(max, num))
-                        local step = slider:GetValueStep()
-                        if step and step > 0 then
-                            num = math.floor(num / step + 0.5) * step
-                        end
-                        self._lsbCurrentSetting:SetValue(num)
-                    end
-                    hideEditBox()
-                end
-
-                editBox:SetScript("OnEnterPressed", applyValue)
-                editBox:SetScript("OnEscapePressed", hideEditBox)
-                editBox:SetScript("OnEditFocusLost", hideEditBox)
+                editBox:SetScript("OnEnterPressed", function()
+                    applySliderEditValue(self)
+                end)
+                editBox:SetScript("OnEscapePressed", function()
+                    hideSliderEditBox(self)
+                end)
+                editBox:SetScript("OnEditFocusLost", function()
+                    hideSliderEditBox(self)
+                end)
 
                 btn:SetScript("OnClick", function()
                     local setting = self._lsbCurrentSetting
-                    if not setting then
+                    local currentValueLabel = self._lsbValueLabel
+                    if not setting or not currentValueLabel then
                         return
                     end
-                    editBox:SetText(tostring(setting:GetValue()))
-                    valueLabel:Hide()
+
+                    anchorSliderValueButton(self)
+                    editBox:SetText(getSliderValueText(self))
+                    currentValueLabel:Hide()
                     editBox:Show()
                     editBox:SetFocus()
                     editBox:HighlightText()
                 end)
             end
 
-            self._lsbCurrentSetting = initializer:GetSetting()
-            self._lsbEditBox:Hide()
+            anchorSliderValueButton(self)
+
+            if self._lsbEditBox and self._lsbEditBox.ClearFocus then
+                self._lsbEditBox:ClearFocus()
+                self._lsbEditBox:Hide()
+            end
             valueLabel:Show()
         end)
     end
@@ -896,12 +1135,36 @@ function lib:New(config)
     function SB.CreateCanvasLayout(name, parentCategory)
         local frame = CreateFrame("Frame", nil)
         SB.CreateCanvasSubcategory(frame, name, parentCategory)
+        local metrics = copyMixin({}, lib.CanvasLayoutDefaults)
         local layout = setmetatable({
             frame = frame,
             yPos = 0,
             elements = {},
+            _metrics = metrics,
         }, { __index = lib.CanvasLayout })
         return layout
+    end
+
+    function SB.SetCanvasLayoutDefaults(overrides)
+        if not overrides then
+            return lib.CanvasLayoutDefaults
+        end
+
+        for key, value in pairs(overrides) do
+            lib.CanvasLayoutDefaults[key] = value
+        end
+
+        return lib.CanvasLayoutDefaults
+    end
+
+    function SB.ConfigureCanvasLayout(layout, overrides)
+        assert(layout, "ConfigureCanvasLayout: layout is required")
+        if not overrides then
+            return getCanvasLayoutMetrics(layout)
+        end
+
+        layout._metrics = copyMixin(copyMixin({}, lib.CanvasLayoutDefaults), overrides)
+        return layout._metrics
     end
 
     --- Static color swatch factory, forwarded from lib for convenience.
@@ -963,6 +1226,7 @@ function lib:New(config)
 
         if spec.scrollHeight then
             local initializer = Settings.CreateElementInitializer(lib.SCROLL_DROPDOWN_TEMPLATE, {
+                _lsbKind = "scrollDropdown",
                 setting = setting,
                 values = spec.values,
                 scrollHeight = spec.scrollHeight,
@@ -981,8 +1245,8 @@ function lib:New(config)
             local container = Settings.CreateControlTextContainer()
             local values = type(spec.values) == "function" and spec.values() or spec.values
             if values then
-                for value, label in pairs(values) do
-                    container:Add(value, label)
+                for _, entry in ipairs(getOrderedValueEntries(values)) do
+                    container:Add(entry.value, entry.label)
                 end
             end
             return container:GetData()
@@ -1375,7 +1639,10 @@ function lib:New(config)
     function SB.Subheader(spec)
         local cat = resolveCategory(spec)
         local layout = SB._layouts[cat]
-        local initializer = Settings.CreateElementInitializer(lib.SUBHEADER_TEMPLATE, { name = spec.name })
+        local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
+            _lsbKind = "subheader",
+            name = spec.name,
+        }, 35, applySubheaderFrame)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer
@@ -1384,8 +1651,11 @@ function lib:New(config)
     function SB.InfoRow(spec)
         local cat = resolveCategory(spec)
         local layout = SB._layouts[cat]
-        local initializer =
-            Settings.CreateElementInitializer(lib.INFOROW_TEMPLATE, { name = spec.name, value = spec.value })
+        local initializer = createCustomListRowInitializer(lib.INFOROW_TEMPLATE, {
+            _lsbKind = "infoRow",
+            name = spec.name,
+            value = spec.value,
+        }, 26, applyInfoRowFrame)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer
@@ -1401,11 +1671,10 @@ function lib:New(config)
         end
         modifiers.canvas = canvas
 
-        local initializer = Settings.CreateElementInitializer(lib.EMBED_CANVAS_TEMPLATE, { canvas = canvas })
-        local extent = height or canvas:GetHeight()
-        initializer.GetExtent = function()
-            return extent
-        end
+        local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, {
+            _lsbKind = "embedCanvas",
+            canvas = canvas,
+        }, height or canvas:GetHeight(), applyEmbedCanvasFrame)
 
         Settings.RegisterInitializer(cat, initializer)
         applyModifiers(initializer, modifiers)
@@ -1420,8 +1689,10 @@ function lib:New(config)
         if spec.confirm then
             local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
             local originalClick = onClick
+            lib._nextConfirmDialogId = (lib._nextConfirmDialogId or 0) + 1
+            local dialogName = confirmDialogName .. "_" .. lib._nextConfirmDialogId
             onClick = function()
-                StaticPopupDialogs["LSB_SETTINGS_CONFIRM"] = {
+                StaticPopupDialogs[dialogName] = {
                     text = confirmText,
                     button1 = YES,
                     button2 = NO,
@@ -1430,7 +1701,7 @@ function lib:New(config)
                     whileDead = true,
                     hideOnEscape = true,
                 }
-                StaticPopup_Show("LSB_SETTINGS_CONFIRM")
+                StaticPopup_Show(dialogName)
             end
         end
 

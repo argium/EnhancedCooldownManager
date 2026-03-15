@@ -28,7 +28,6 @@ describe("Options sections and root assembly", function()
             "LibStub",
             "CreateFromMixins",
             "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin",
         })
     end)
 

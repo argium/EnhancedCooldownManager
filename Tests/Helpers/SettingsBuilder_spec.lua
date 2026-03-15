@@ -2,10 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local TestHelpers = assert(
-    loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"),
-    "Unable to load Tests/TestHelpers.lua"
-)()
+local TestHelpers =
+    assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
 describe("SettingsBuilder", function()
     local originalGlobals
@@ -16,11 +14,15 @@ describe("SettingsBuilder", function()
     local function getNestedValue(tbl, path)
         local current = tbl
         for segment in path:gmatch("[^.]+") do
-            if type(current) ~= "table" then return nil end
+            if type(current) ~= "table" then
+                return nil
+            end
             local val = current[segment]
             if val == nil then
                 local num = tonumber(segment)
-                if num then val = current[num] end
+                if num then
+                    val = current[num]
+                end
             end
             current = val
         end
@@ -31,7 +33,9 @@ describe("SettingsBuilder", function()
         local current, lastKey = tbl, nil
         for segment in path:gmatch("[^.]+") do
             if lastKey then
-                if current[lastKey] == nil then current[lastKey] = {} end
+                if current[lastKey] == nil then
+                    current[lastKey] = {}
+                end
                 current = current[lastKey]
             end
             lastKey = segment
@@ -43,8 +47,12 @@ describe("SettingsBuilder", function()
         local LSB2 = LibStub("LibSettingsBuilder-1.0")
         local SB2 = LSB2:New({
             pathAdapter = LSB2.PathAdapter({
-                getStore = function() return addonNS.Addon.db.profile end,
-                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                getStore = function()
+                    return addonNS.Addon.db.profile
+                end,
+                getDefaults = function()
+                    return addonNS.Addon.db.defaults.profile
+                end,
                 getNestedValue = getNestedValue,
                 setNestedValue = setNestedValue,
             }),
@@ -58,28 +66,116 @@ describe("SettingsBuilder", function()
     local function createSettingsPanelMock()
         local frames = {}
         _G.SettingsPanel = {
-            IsShown = function() return true end,
+            IsShown = function()
+                return true
+            end,
             GetSettingsList = function()
-                return { ScrollBox = { ForEachFrame = function(_, fn)
-                    for _, f in ipairs(frames) do fn(f) end
-                end } }
+                return {
+                    ScrollBox = {
+                        ForEachFrame = function(_, fn)
+                            for _, f in ipairs(frames) do
+                                fn(f)
+                            end
+                        end,
+                    },
+                }
             end,
         }
         return frames
     end
 
+    local function createScriptableFrame()
+        local frame = TestHelpers.makeFrame()
+        frame._scripts = {}
+        frame._text = ""
+        frame._focused = false
+        frame.RegisterForClicks = function(self, ...)
+            self._registeredClicks = { ... }
+        end
+        frame.SetScript = function(self, event, fn)
+            self._scripts[event] = fn
+        end
+        frame.GetScript = function(self, event)
+            return self._scripts[event]
+        end
+        frame.SetAutoFocus = function() end
+        frame.SetNumeric = function() end
+        frame.SetJustifyH = function() end
+        frame.SetSize = function(self, width, height)
+            self:SetWidth(width)
+            self:SetHeight(height)
+        end
+        frame.SetText = function(self, text)
+            self._text = text
+        end
+        frame.GetText = function(self)
+            return self._text
+        end
+        frame.SetFocus = function(self)
+            self._focused = true
+        end
+        frame.ClearFocus = function(self)
+            self._focused = false
+        end
+        frame.HighlightText = function(self)
+            self._highlighted = true
+        end
+        return frame
+    end
+
+    local function loadLibraryWithHookStubs()
+        local hooks = {}
+
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+
+        _G.hooksecurefunc = function(target, method, fn)
+            hooks[target] = hooks[target] or {}
+            hooks[target][method] = fn
+        end
+
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function(_, _, _, template)
+            local frame = createScriptableFrame()
+            frame._template = template
+            return frame
+        end
+
+        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+
+        return hooks, LibStub("LibSettingsBuilder-1.0")
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM", "ECM_DeepEquals",
-            "Settings", "SettingsPanel", "CreateSettingsListSectionHeaderInitializer",
-            "CreateSettingsButtonInitializer", "MinimalSliderWithSteppersMixin",
-            "CreateColor", "CreateColorFromHexString", "StaticPopupDialogs", "StaticPopup_Show", "YES", "NO",
-            "UnitClass", "GetSpecialization", "GetSpecializationInfo",
-            "LibStub", "CreateFromMixins", "SettingsListElementInitializer",
-            "LibSettingsBuilder_EmbedCanvasMixin", "LibSettingsBuilder_SubheaderMixin",
-            "LibSettingsBuilder_InfoRowMixin",
-            "LibSettingsBuilder_ScrollDropdownMixin",
-            "GameFontHighlightSmall", "GameFontNormal",
+            "ECM",
+            "ECM_DeepEquals",
+            "Settings",
+            "SettingsPanel",
+            "CreateSettingsListSectionHeaderInitializer",
+            "CreateSettingsButtonInitializer",
+            "MinimalSliderWithSteppersMixin",
+            "CreateColor",
+            "CreateColorFromHexString",
+            "CreateFrame",
+            "hooksecurefunc",
+            "StaticPopupDialogs",
+            "StaticPopup_Show",
+            "YES",
+            "NO",
+            "UnitClass",
+            "GetSpecialization",
+            "GetSpecializationInfo",
+            "LibStub",
+            "CreateFromMixins",
+            "SettingsListElementInitializer",
+            "SettingsListElementMixin",
+            "SettingsDropdownControlMixin",
+            "SettingsSliderControlMixin",
+            "GameFontHighlightSmall",
+            "GameFontNormal",
         })
     end)
 
@@ -97,17 +193,27 @@ describe("SettingsBuilder", function()
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
         _G.GameFontNormal = "GameFontNormal"
 
-        _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
-        _G.GetSpecialization = function() return 1 end
-        _G.GetSpecializationInfo = function() return nil, "Arms" end
+        _G.UnitClass = function()
+            return "Warrior", "WARRIOR", 1
+        end
+        _G.GetSpecialization = function()
+            return 1
+        end
+        _G.GetSpecializationInfo = function()
+            return nil, "Arms"
+        end
 
         -- Load the library
         TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
         -- Register LSMW stub
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        lsmw.GetFontValues = function() return { Expressway = "Expressway" } end
-        lsmw.GetStatusbarValues = function() return { Blizzard = "Blizzard" } end
+        lsmw.GetFontValues = function()
+            return { Expressway = "Expressway" }
+        end
+        lsmw.GetStatusbarValues = function()
+            return { Blizzard = "Blizzard" }
+        end
         lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
         lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
 
@@ -153,7 +259,9 @@ describe("SettingsBuilder", function()
                     profile = profileData,
                     defaults = { profile = TestHelpers.deepClone(profileData) },
                 },
-                NewModule = function(_, name) return { moduleName = name } end,
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
             },
         }
 
@@ -172,7 +280,9 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterCategories does not error", function()
-        assert.has_no.errors(function() SB.RegisterCategories() end)
+        assert.has_no.errors(function()
+            SB.RegisterCategories()
+        end)
     end)
 
     it("Setting current subcategory to root allows adding headers there", function()
@@ -201,7 +311,9 @@ describe("SettingsBuilder", function()
         local _, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
-            onSet = function(v) onSetValue = v end,
+            onSet = function(v)
+                onSetValue = v
+            end,
         })
 
         setting:SetValue(false)
@@ -216,8 +328,12 @@ describe("SettingsBuilder", function()
             min = 0,
             max = 40,
             step = 1,
-            getTransform = function(v) return v or 0 end,
-            setTransform = function(v) return v > 0 and v or nil end,
+            getTransform = function(v)
+                return v or 0
+            end,
+            setTransform = function(v)
+                return v > 0 and v or nil
+            end,
         })
 
         assert.are.equal(10, setting:GetValue())
@@ -260,7 +376,9 @@ describe("SettingsBuilder", function()
             return origCreate(cat, setting, options, tooltip)
         end
 
-        local customFormatter = function(value) return value .. "%%" end
+        local customFormatter = function(value)
+            return value .. "%%"
+        end
         SB.Slider({
             path = "global.value",
             name = "Value",
@@ -320,7 +438,9 @@ describe("SettingsBuilder", function()
             type = "slider",
             path = "global.value",
             name = "Value",
-            min = 0, max = 10, step = 1,
+            min = 0,
+            max = 10,
+            step = 1,
         })
         assert.are.equal(5, setting:GetValue())
     end)
@@ -373,7 +493,7 @@ describe("SettingsBuilder", function()
     -- Subheader
     it("Subheader adds element initializer with normal font template", function()
         local init = SB.Subheader({ name = "Item Quality" })
-        assert.are.equal("LibSettingsBuilder_SubheaderTemplate", init._template)
+        assert.are.equal(SB.SUBHEADER_TEMPLATE, init._template)
         assert.are.equal("Item Quality", init.data.name)
     end)
 
@@ -398,9 +518,24 @@ describe("SettingsBuilder", function()
     -- InfoRow
     it("InfoRow adds element initializer with template and data", function()
         local init = SB.InfoRow({ name = "Author", value = "TestUser" })
-        assert.are.equal("LibSettingsBuilder_InfoRowTemplate", init._template)
+        assert.are.equal(SB.INFOROW_TEMPLATE, init._template)
         assert.are.equal("Author", init.data.name)
         assert.are.equal("TestUser", init.data.value)
+    end)
+
+    it("InfoRow falls back to GetExtent when SetExtent is unavailable", function()
+        local originalCreateElementInitializer = Settings.CreateElementInitializer
+        Settings.CreateElementInitializer = function(frameTemplate, data)
+            local init = originalCreateElementInitializer(frameTemplate, data)
+            init.SetExtent = nil
+            return init
+        end
+
+        local init = SB.InfoRow({ name = "Author", value = "TestUser" })
+
+        Settings.CreateElementInitializer = originalCreateElementInitializer
+
+        assert.are.equal(26, init:GetExtent())
     end)
 
     it("InfoRow respects explicit category", function()
@@ -412,9 +547,62 @@ describe("SettingsBuilder", function()
 
     it("InfoRow supports hidden modifier", function()
         local hidden = true
-        local init = SB.InfoRow({ name = "Secret", value = "x", hidden = function() return hidden end })
+        local init = SB.InfoRow({
+            name = "Secret",
+            value = "x",
+            hidden = function()
+                return hidden
+            end,
+        })
         assert.is_not_nil(init._shownPredicates)
         assert.are.equal(1, #init._shownPredicates)
+    end)
+
+    it("custom list rows initialize safely without preexisting cbrHandles", function()
+        local function makeListElementFrame()
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                return fontString
+            end
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+            return frame
+        end
+
+        local subheader = SB.Subheader({ name = "Item Quality" })
+        local subheaderFrame = makeListElementFrame()
+
+        assert.has_no.errors(function()
+            subheader:InitFrame(subheaderFrame)
+        end)
+        assert.is_not_nil(subheaderFrame.cbrHandles)
+        assert.are.equal("Item Quality", subheaderFrame._lsbSubheaderTitle:GetText())
+
+        subheader:Resetter(subheaderFrame)
+        assert.is_true(subheaderFrame.cbrHandles._unregistered)
+
+        local canvas = createScriptableFrame()
+        canvas.SetParent = function(self, parent)
+            self._parent = parent
+        end
+        canvas.GetParent = function(self)
+            return self._parent
+        end
+        local embed = SB.EmbedCanvas(canvas, 120)
+        local embedFrame = makeListElementFrame()
+
+        assert.has_no.errors(function()
+            embed:InitFrame(embedFrame)
+        end)
+        assert.are.equal(embedFrame, canvas:GetParent())
+        assert.are.equal(120, canvas:GetHeight())
     end)
 
     -- Button
@@ -423,7 +611,9 @@ describe("SettingsBuilder", function()
         local init = SB.Button({
             name = "Do it",
             buttonText = "Click",
-            onClick = function() clicked = true end,
+            onClick = function()
+                clicked = true
+            end,
         })
         assert.are.equal("button", init._type)
         init._onClick()
@@ -436,11 +626,48 @@ describe("SettingsBuilder", function()
             name = "Danger",
             buttonText = "Reset",
             confirm = "Are you sure?",
-            onClick = function() clicked = true end,
+            onClick = function()
+                clicked = true
+            end,
         })
 
         init._onClick()
         assert.is_true(clicked)
+    end)
+
+    it("Button confirm uses isolated dialog registrations per button", function()
+        local shownNames = {}
+        _G.StaticPopup_Show = function(name)
+            shownNames[#shownNames + 1] = name
+        end
+
+        local clicked = {}
+        local resetButton = SB.Button({
+            name = "Reset",
+            confirm = "Reset everything?",
+            onClick = function()
+                clicked[#clicked + 1] = "reset"
+            end,
+        })
+        local deleteButton = SB.Button({
+            name = "Delete",
+            confirm = "Delete profile?",
+            onClick = function()
+                clicked[#clicked + 1] = "delete"
+            end,
+        })
+
+        resetButton._onClick()
+        deleteButton._onClick()
+
+        assert.are.equal(2, #shownNames)
+        assert.is_not_equal(shownNames[1], shownNames[2])
+        assert.are.equal("Reset everything?", StaticPopupDialogs[shownNames[1]].text)
+        assert.are.equal("Delete profile?", StaticPopupDialogs[shownNames[2]].text)
+
+        StaticPopupDialogs[shownNames[1]].OnAccept()
+        StaticPopupDialogs[shownNames[2]].OnAccept()
+        assert.are.same({ "reset", "delete" }, clicked)
     end)
 
     -- ApplyModifiers
@@ -453,9 +680,15 @@ describe("SettingsBuilder", function()
             path = "global.hideWhenMounted",
             name = "Child",
             parent = parentInit,
-            parentCheck = function() return true end,
-            disabled = function() return true end,
-            hidden = function() return false end,
+            parentCheck = function()
+                return true
+            end,
+            disabled = function()
+                return true
+            end,
+            hidden = function()
+                return false
+            end,
         })
 
         assert.are.equal(parentInit, childInit._parentInit)
@@ -474,7 +707,9 @@ describe("SettingsBuilder", function()
             name = "Child",
             values = { solid = "Solid", flat = "Flat" },
             parent = parentInit,
-            parentCheck = function() return parentSetting:GetValue() end,
+            parentCheck = function()
+                return parentSetting:GetValue()
+            end,
         })
 
         local enabledPredicate = childInit._modifyPredicates[1]
@@ -505,7 +740,9 @@ describe("SettingsBuilder", function()
             name = "Custom picker",
             template = "TestTexturePickerTemplate",
             parent = parentInit,
-            parentCheck = function() return parentSetting:GetValue() end,
+            parentCheck = function()
+                return parentSetting:GetValue()
+            end,
         })
 
         Settings.CreateElementInitializer = originalCreateElementInitializer
@@ -540,14 +777,18 @@ describe("SettingsBuilder", function()
         SB.Checkbox({
             path = "powerBar.showText",
             name = "Show text",
-            disabled = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
+            disabled = function()
+                return not addonNS.Addon.db.profile.powerBar.enabled
+            end,
         })
 
         Settings.CreateCheckbox = origCreateCheckbox
 
         -- Simulate a rendered frame for the child control
         frames[1] = {
-            GetElementData = function() return childInit end,
+            GetElementData = function()
+                return childInit
+            end,
             IsEnabled = function(self)
                 return self:GetElementData():EvaluateModifyPredicates()
             end,
@@ -589,7 +830,9 @@ describe("SettingsBuilder", function()
         SB.Checkbox({
             path = "powerBar.showText",
             name = "Show text",
-            hidden = function() return not addonNS.Addon.db.profile.powerBar.enabled end,
+            hidden = function()
+                return not addonNS.Addon.db.profile.powerBar.enabled
+            end,
         })
 
         Settings.CreateCheckbox = origCreateCheckbox
@@ -604,7 +847,9 @@ describe("SettingsBuilder", function()
             return not childInit._shownPredicates[1] or childInit._shownPredicates[1]()
         end
         frames[1] = {
-            GetElementData = function() return childInit end,
+            GetElementData = function()
+                return childInit
+            end,
             EvaluateState = function(self)
                 frameShown = self:GetElementData():ShouldShow()
             end,
@@ -862,7 +1107,7 @@ describe("SettingsBuilder", function()
 
         Settings.CreateElementInitializer = origCreateElementInitializer
 
-        assert.are.equal("LibSettingsBuilder_ScrollDropdownTemplate", capturedTemplate)
+        assert.are.equal(SB.SCROLL_DROPDOWN_TEMPLATE, capturedTemplate)
         assert.are.equal("solid", setting:GetValue())
 
         setting:SetValue("flat")
@@ -887,7 +1132,97 @@ describe("SettingsBuilder", function()
 
         -- Standard path uses Settings.CreateDropdown, not CreateElementInitializer
         -- with the scroll template
-        assert.is_not_equal("LibSettingsBuilder_ScrollDropdownTemplate", capturedTemplate)
+        assert.is_not_equal(SB.SCROLL_DROPDOWN_TEMPLATE, capturedTemplate)
+    end)
+
+    it("Dropdown options are added in deterministic label order", function()
+        local init = SB.Dropdown({
+            path = "global.mode",
+            name = "Standard Mode",
+            values = {
+                gamma = "Gamma",
+                alpha = "Alpha",
+                beta = "Beta",
+            },
+        })
+
+        local options = init._optionsGen()
+        assert.are.same({ "Alpha", "Beta", "Gamma" }, {
+            options[1].label,
+            options[2].label,
+            options[3].label,
+        })
+        assert.are.same({ "alpha", "beta", "gamma" }, {
+            options[1].value,
+            options[2].value,
+            options[3].value,
+        })
+    end)
+
+    it("scroll dropdown menu options are added in deterministic label order", function()
+        local hooks = select(1, loadLibraryWithHookStubs())
+        local initHook = hooks[_G.SettingsDropdownControlMixin].Init
+
+        local currentValue = "beta"
+        local setting = {
+            GetValue = function()
+                return currentValue
+            end,
+            SetValue = function(_, value)
+                currentValue = value
+            end,
+        }
+
+        local dropdown = {
+            SetupMenu = function(self, builder)
+                self._builder = builder
+            end,
+            OverrideText = function(self, text)
+                self._text = text
+            end,
+        }
+        local frame = {
+            Control = { Dropdown = dropdown },
+            SetValue = function() end,
+        }
+        local initializer = {
+            GetData = function()
+                return {
+                    _lsbKind = "scrollDropdown",
+                    setting = setting,
+                    values = {
+                        gamma = "Gamma",
+                        alpha = "Alpha",
+                        beta = "Beta",
+                    },
+                    scrollHeight = 240,
+                }
+            end,
+            GetSetting = function()
+                return setting
+            end,
+        }
+
+        initHook(frame, initializer)
+
+        local orderedLabels = {}
+        local rootDescription = {
+            SetScrollMode = function(_, value)
+                orderedLabels.scrollHeight = value
+            end,
+            CreateRadio = function(_, label)
+                orderedLabels[#orderedLabels + 1] = label
+            end,
+        }
+        dropdown._builder(nil, rootDescription)
+
+        assert.are.equal("Beta", dropdown._text)
+        assert.are.equal(240, orderedLabels.scrollHeight)
+        assert.are.same({ "Alpha", "Beta", "Gamma" }, {
+            orderedLabels[1],
+            orderedLabels[2],
+            orderedLabels[3],
+        })
     end)
 
     -- RegisterFromTable
@@ -911,7 +1246,9 @@ describe("SettingsBuilder", function()
     end)
 
     it("RegisterFromTable inherits disabled from group", function()
-        local disabledFn = function() return true end
+        local disabledFn = function()
+            return true
+        end
         local capturedSpecs = {}
         local SB2 = createSB2("TBL2", "InheritTest")
 
@@ -938,9 +1275,17 @@ describe("SettingsBuilder", function()
                 path = "global",
                 args = {
                     parentCtrl = { type = "toggle", path = "hideWhenMounted", name = "Parent", order = 1 },
-                    childCtrl = { type = "range", path = "value", name = "Child",
-                        min = 0, max = 10, step = 1,
-                        parent = "parentCtrl", parentCheck = "checked", order = 2 },
+                    childCtrl = {
+                        type = "range",
+                        path = "value",
+                        name = "Child",
+                        min = 0,
+                        max = 10,
+                        step = 1,
+                        parent = "parentCtrl",
+                        parentCheck = "checked",
+                        order = 2,
+                    },
                 },
             })
         end)
@@ -980,8 +1325,13 @@ describe("SettingsBuilder", function()
             name = "Desc Section",
             path = "global",
             args = {
-                mounted = { type = "toggle", path = "hideWhenMounted", name = "Hide",
-                    desc = "Hide when on a mount.", order = 1 },
+                mounted = {
+                    type = "toggle",
+                    path = "hideWhenMounted",
+                    name = "Hide",
+                    desc = "Hide when on a mount.",
+                    order = 1,
+                },
             },
         })
 
@@ -1009,7 +1359,9 @@ describe("SettingsBuilder", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
-            if text == "Should Not Appear" then headerCreated = true end
+            if text == "Should Not Appear" then
+                headerCreated = true
+            end
             return origHeader(text)
         end
 
@@ -1019,7 +1371,14 @@ describe("SettingsBuilder", function()
             name = "Cond Section",
             path = "global",
             args = {
-                skipped = { type = "header", name = "Should Not Appear", condition = function() return false end, order = 1 },
+                skipped = {
+                    type = "header",
+                    name = "Should Not Appear",
+                    condition = function()
+                        return false
+                    end,
+                    order = 1,
+                },
                 shown = { type = "header", name = "Should Appear", order = 2 },
             },
         })
@@ -1032,7 +1391,9 @@ describe("SettingsBuilder", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
-            if text == "Conditional Header" then headerCreated = true end
+            if text == "Conditional Header" then
+                headerCreated = true
+            end
             return origHeader(text)
         end
 
@@ -1042,7 +1403,14 @@ describe("SettingsBuilder", function()
             name = "Cond Section 2",
             path = "global",
             args = {
-                shown = { type = "header", name = "Conditional Header", condition = function() return true end, order = 1 },
+                shown = {
+                    type = "header",
+                    name = "Conditional Header",
+                    condition = function()
+                        return true
+                    end,
+                    order = 1,
+                },
             },
         })
 
@@ -1069,7 +1437,11 @@ describe("SettingsBuilder", function()
     it("RegisterFromTable canvas type embeds a canvas frame", function()
         local SB2 = createSB2("CANVAS1", "CanvasTest")
 
-        local canvasFrame = { GetHeight = function() return 200 end }
+        local canvasFrame = {
+            GetHeight = function()
+                return 200
+            end,
+        }
 
         local embeddedCanvas, embeddedHeight
         local origEmbed = SB2.EmbedCanvas
@@ -1089,6 +1461,58 @@ describe("SettingsBuilder", function()
 
         assert.are.equal(canvasFrame, embeddedCanvas)
         assert.are.equal(400, embeddedHeight)
+    end)
+
+    it("CanvasLayout supports configurable defaults and per-layout overrides", function()
+        local originalCreateFrame = _G.CreateFrame
+        _G.CreateFrame = function(_, _, _, template)
+            local frame = TestHelpers.makeFrame({ height = 0, width = 0 })
+            frame._template = template
+            frame.SetSize = function(self, width, height)
+                self:SetWidth(width)
+                self:SetHeight(height)
+            end
+            frame.SetText = function(self, text)
+                self._text = text
+            end
+            frame.CreateFontString = function()
+                local fontString = TestHelpers.makeFrame()
+                fontString.SetText = function(self, text)
+                    self._text = text
+                end
+                fontString.SetFontObject = function() end
+                fontString.SetWordWrap = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                return fontString
+            end
+            return frame
+        end
+
+        local originalDefaults = TestHelpers.deepClone(SB.SetCanvasLayoutDefaults())
+        SB.SetCanvasLayoutDefaults({ elementHeight = 30 })
+
+        local defaultLayout = SB.CreateCanvasLayout("Canvas Defaults")
+        local defaultRow = defaultLayout:AddDescription("Uses updated defaults")
+        assert.are.equal(30, defaultRow:GetHeight())
+
+        local customLayout = SB.CreateCanvasLayout("Canvas Custom")
+        SB.ConfigureCanvasLayout(customLayout, {
+            elementHeight = 42,
+            labelX = 20,
+            buttonCenterX = -10,
+            buttonWidth = 180,
+        })
+
+        local row, button = customLayout:AddButton("Action", "Run")
+
+        assert.are.equal(42, row:GetHeight())
+        TestHelpers.assertAnchor(row._label, 1, "LEFT", 20, 0, 0, 0)
+        TestHelpers.assertAnchor(button, 1, "LEFT", row, "CENTER", -10, 0)
+        assert.are.equal(180, button:GetWidth())
+
+        SB.SetCanvasLayoutDefaults(originalDefaults)
+        _G.CreateFrame = originalCreateFrame
     end)
 
     it("onSet receives setting as second parameter", function()
@@ -1115,8 +1539,12 @@ describe("SettingsBuilder", function()
         it("resolve returns get/set/default for nested path", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local pa = LSB.PathAdapter({
-                getStore = function() return addonNS.Addon.db.profile end,
-                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                getStore = function()
+                    return addonNS.Addon.db.profile
+                end,
+                getDefaults = function()
+                    return addonNS.Addon.db.defaults.profile
+                end,
             })
 
             local binding = pa:resolve("global.hideWhenMounted")
@@ -1132,8 +1560,12 @@ describe("SettingsBuilder", function()
         it("read returns nested value", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local pa = LSB.PathAdapter({
-                getStore = function() return addonNS.Addon.db.profile end,
-                getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                getStore = function()
+                    return addonNS.Addon.db.profile
+                end,
+                getDefaults = function()
+                    return addonNS.Addon.db.defaults.profile
+                end,
             })
 
             assert.are.equal(5, pa:read("global.value"))
@@ -1142,8 +1574,12 @@ describe("SettingsBuilder", function()
         it("falls back to nil when defaults table missing", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local pa = LSB.PathAdapter({
-                getStore = function() return addonNS.Addon.db.profile end,
-                getDefaults = function() return nil end,
+                getStore = function()
+                    return addonNS.Addon.db.profile
+                end,
+                getDefaults = function()
+                    return nil
+                end,
             })
 
             local binding = pa:resolve("global.hideWhenMounted")
@@ -1164,8 +1600,12 @@ describe("SettingsBuilder", function()
 
             local store = { myVal = true }
             local _, setting = SBH.Checkbox({
-                get = function() return store.myVal end,
-                set = function(v) store.myVal = v end,
+                get = function()
+                    return store.myVal
+                end,
+                set = function(v)
+                    store.myVal = v
+                end,
                 key = "myVal",
                 default = true,
                 name = "Handler Checkbox",
@@ -1187,14 +1627,24 @@ describe("SettingsBuilder", function()
 
             local store = { scale = 0.75 }
             local _, setting = SBH.Slider({
-                get = function() return store.scale end,
-                set = function(v) store.scale = v end,
+                get = function()
+                    return store.scale
+                end,
+                set = function(v)
+                    store.scale = v
+                end,
                 key = "scale",
                 default = 1.0,
                 name = "Handler Slider",
-                min = 0, max = 2, step = 0.01,
-                getTransform = function(v) return v * 100 end,
-                setTransform = function(v) return v / 100 end,
+                min = 0,
+                max = 2,
+                step = 0.01,
+                getTransform = function(v)
+                    return v * 100
+                end,
+                setTransform = function(v)
+                    return v / 100
+                end,
             })
 
             assert.are.equal(75, setting:GetValue())
@@ -1206,7 +1656,9 @@ describe("SettingsBuilder", function()
             assert.has.errors(function()
                 SB.Checkbox({
                     path = "global.hideWhenMounted",
-                    get = function() return true end,
+                    get = function()
+                        return true
+                    end,
                     set = function() end,
                     key = "x",
                     name = "Bad Spec",
@@ -1222,7 +1674,9 @@ describe("SettingsBuilder", function()
 
             assert.has.errors(function()
                 SBH.Checkbox({
-                    get = function() return true end,
+                    get = function()
+                        return true
+                    end,
                     key = "x",
                     name = "Missing Set",
                 })
@@ -1237,7 +1691,9 @@ describe("SettingsBuilder", function()
 
             assert.has.errors(function()
                 SBH.Checkbox({
-                    get = function() return true end,
+                    get = function()
+                        return true
+                    end,
                     set = function() end,
                     name = "Missing Key",
                 })
@@ -1267,8 +1723,12 @@ describe("SettingsBuilder", function()
             local store = { flag = false }
             local _, setting = SBH.Control({
                 type = "checkbox",
-                get = function() return store.flag end,
-                set = function(v) store.flag = v end,
+                get = function()
+                    return store.flag
+                end,
+                set = function(v)
+                    store.flag = v
+                end,
                 key = "flag",
                 default = false,
                 name = "Dispatched Handler",
@@ -1280,4 +1740,87 @@ describe("SettingsBuilder", function()
         end)
     end)
 
+    describe("slider inline edit hook", function()
+        it("rebinds the edit box to the current slider setting when frames are reused", function()
+            local hooks = select(1, loadLibraryWithHookStubs())
+            local initHook = hooks[_G.SettingsSliderControlMixin].Init
+
+            local firstValue = 12
+            local secondValue = 33
+            local firstSetting = {
+                GetValue = function()
+                    return firstValue
+                end,
+                SetValue = function(_, value)
+                    firstValue = value
+                end,
+            }
+            local secondSetting = {
+                GetValue = function()
+                    return secondValue
+                end,
+                SetValue = function(_, value)
+                    secondValue = value
+                end,
+            }
+
+            local firstLabel = createScriptableFrame()
+            firstLabel.IsObjectType = function(_, objectType)
+                return objectType == "FontString"
+            end
+
+            local sliderWithSteppers = createScriptableFrame()
+            sliderWithSteppers.Slider = {
+                GetMinMaxValues = function()
+                    return 0, 100
+                end,
+                GetValueStep = function()
+                    return 5
+                end,
+            }
+            sliderWithSteppers.RightText = firstLabel
+            sliderWithSteppers.GetRegions = function()
+                return firstLabel
+            end
+
+            local control = {
+                SliderWithSteppers = sliderWithSteppers,
+            }
+
+            initHook(control, {
+                GetSetting = function()
+                    return firstSetting
+                end,
+            })
+
+            control._lsbValueButton:GetScript("OnClick")()
+            assert.are.equal("12", control._lsbEditBox:GetText())
+
+            local secondLabel = createScriptableFrame()
+            secondLabel.IsObjectType = function(_, objectType)
+                return objectType == "FontString"
+            end
+            sliderWithSteppers.RightText = secondLabel
+            sliderWithSteppers.GetRegions = function()
+                return secondLabel
+            end
+
+            initHook(control, {
+                GetSetting = function()
+                    return secondSetting
+                end,
+            })
+
+            control._lsbValueButton:GetScript("OnClick")()
+            assert.are.equal("33", control._lsbEditBox:GetText())
+
+            control._lsbEditBox:SetText("27")
+            control._lsbEditBox:GetScript("OnEnterPressed")()
+
+            assert.are.equal(25, secondValue)
+            assert.are.equal(12, firstValue)
+            assert.is_true(secondLabel:IsShown())
+            assert.is_false(control._lsbEditBox._focused)
+        end)
+    end)
 end)
