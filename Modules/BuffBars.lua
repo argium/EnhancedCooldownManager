@@ -17,27 +17,34 @@ local _editLocked = false
 ---@field Bar StatusBar
 ---@field DebuffBorder any
 ---@field Icon Frame
+---@field ignoreInLayout boolean|nil
+---@field layoutIndex number|nil
 ---@field cooldownID number|nil
 ---@field cooldownInfo { spellID: number|nil }|nil
 
 local function getChildrenOrdered(viewer)
     local result = {}
     for insertOrder, child in ipairs({ viewer:GetChildren() }) do
-        -- There are other children that are present but don't appear to be valid. I'm not sure what they are
-        -- so this check is a bit of a guess (that only valid bars have a cooldownID).
-        if child and child.Bar and child.cooldownID then
-            local top = child.GetTop and child:GetTop()
-            result[#result + 1] = { frame = child, top = top, order = insertOrder }
+        if child and not child.ignoreInLayout then
+            result[#result + 1] = {
+                frame = child,
+                layoutIndex = child.layoutIndex,
+                order = insertOrder,
+            }
         end
     end
 
-    -- Sort top-to-bottom (highest Y first). Use insertion order as tiebreaker
-    -- when Y positions are equal or nil (bars not yet positioned by Blizzard).
     table.sort(result, function(a, b)
-        local aTop = a.top or 0
-        local bTop = b.top or 0
-        if aTop ~= bTop then
-            return aTop > bTop
+        local aLayoutIndex = a.layoutIndex
+        local bLayoutIndex = b.layoutIndex
+        if aLayoutIndex ~= bLayoutIndex then
+            if aLayoutIndex == nil then
+                return false
+            end
+            if bLayoutIndex == nil then
+                return true
+            end
+            return aLayoutIndex < bLayoutIndex
         end
         return a.order < b.order
     end)

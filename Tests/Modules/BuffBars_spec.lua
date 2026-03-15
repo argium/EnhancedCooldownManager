@@ -738,55 +738,65 @@ describe("BuffBars real source", function()
         assert.are.equal(BuffBarCooldownViewer, BuffBars:CreateFrame())
     end)
 
-    it("orders active spell data top-to-bottom and skips hidden bars", function()
-        local topBar = makeFrame({ shown = true })
-        topBar.Bar = { Name = {
-            GetText = function()
-                return "Top"
-            end,
-        } }
-        topBar.cooldownInfo = { spellID = 17 }
-        topBar.cooldownID = 1700
-        topBar.iconTextureFileID = 170
-        topBar.GetTop = function()
-            return 100
-        end
-
-        local lowerBar = makeFrame({ shown = true })
-        lowerBar.Bar = { Name = {
-            GetText = function()
-                return "Lower"
-            end,
-        } }
-        lowerBar.cooldownInfo = { spellID = 18 }
-        lowerBar.cooldownID = 1800
-        lowerBar.iconTextureFileID = 180
-        lowerBar.GetTop = function()
+    it("orders active spell data by layoutIndex and skips hidden bars", function()
+        local firstBar = makeFrame({ shown = true })
+        firstBar.Bar = {
+            Name = {
+                GetText = function()
+                    return "First"
+                end,
+            },
+        }
+        firstBar.cooldownInfo = { spellID = 17 }
+        firstBar.iconTextureFileID = 170
+        firstBar.layoutIndex = 2
+        firstBar.GetTop = function()
             return 50
         end
 
-        local hiddenBar = makeFrame({ shown = false })
-        hiddenBar.Bar = { Name = {
-            GetText = function()
-                return "Hidden"
-            end,
-        } }
-        hiddenBar.cooldownInfo = { spellID = 19 }
-        hiddenBar.cooldownID = 1900
-        hiddenBar.iconTextureFileID = 190
-        hiddenBar.GetTop = function()
+        local secondBar = makeFrame({ shown = true })
+        secondBar.Bar = {
+            Name = {
+                GetText = function()
+                    return "Second"
+                end,
+            },
+        }
+        secondBar.cooldownInfo = { spellID = 18 }
+        secondBar.iconTextureFileID = 180
+        secondBar.layoutIndex = 1
+        secondBar.GetTop = function()
             return 200
         end
 
+        local hiddenBar = makeFrame({ shown = false })
+        hiddenBar.Bar = {
+            Name = {
+                GetText = function()
+                    return "Hidden"
+                end,
+            },
+        }
+        hiddenBar.cooldownInfo = { spellID = 19 }
+        hiddenBar.iconTextureFileID = 190
+        hiddenBar.layoutIndex = 0
+        hiddenBar.GetTop = function()
+            return 300
+        end
+
+        local ignoredChild = makeFrame({ shown = true })
+        ignoredChild.ignoreInLayout = true
+        ignoredChild.layoutIndex = -1
+
         function BuffBarCooldownViewer:GetChildren()
-            return lowerBar, hiddenBar, topBar
+            return firstBar, hiddenBar, ignoredChild, secondBar
         end
 
         local active = BuffBars:GetActiveSpellData()
 
         assert.are.equal(2, #active)
-        assert.are.equal("Top", active[1].name)
-        assert.are.equal("Lower", active[2].name)
+        assert.are.equal("Second", active[1].name)
+        assert.are.equal("First", active[2].name)
     end)
 
     it("hooks the viewer only once", function()
