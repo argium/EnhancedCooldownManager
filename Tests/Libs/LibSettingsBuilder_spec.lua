@@ -5,7 +5,7 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
-describe("SettingsBuilder", function()
+describe("LibSettingsBuilder", function()
     local originalGlobals
     local addonNS
     local layoutUpdateCalls
