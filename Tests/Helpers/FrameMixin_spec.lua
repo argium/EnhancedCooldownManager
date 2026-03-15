@@ -136,3 +136,163 @@ describe("FrameMixin", function()
         end)
     end)
 end)
+
+describe("FrameMixin real source", function()
+    local originalGlobals
+    local FrameMixin
+    local ns
+    local timerQueue
+    local makeFrame = TestHelpers.makeFrame
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({
+            "ECM",
+            "C_Timer",
+            "GetTime",
+            "UIParent",
+            "EssentialCooldownViewer",
+        })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        timerQueue = {}
+
+        _G.ECM = {
+            Log = function() end,
+            DebugAssert = function(condition, message)
+                if not condition then
+                    error(message or "ECM.DebugAssert failed")
+                end
+            end,
+            ColorUtil = {
+                AreEqual = function(a, b)
+                    if a == nil and b == nil then
+                        return true
+                    end
+                    if a == nil or b == nil then
+                        return false
+                    end
+                    return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
+                end,
+            },
+        }
+        _G.C_Timer = {
+            After = function(delay, callback)
+                timerQueue[#timerQueue + 1] = { delay = delay, callback = callback }
+            end,
+        }
+        _G.GetTime = function()
+            return 0
+        end
+        _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
+
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        ns = { Addon = {} }
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, ns)
+        FrameMixin = assert(ECM.FrameMixin, "FrameMixin did not initialize")
+    end)
+
+    it("GetNextChainAnchor returns the nearest earlier chain module", function()
+        local order = ECM.Constants.CHAIN_ORDER
+        local previousFrame = makeFrame({ name = order[2] })
+        local modules = {
+            [order[2]] = {
+                IsEnabled = function()
+                    return true
+                end,
+                ShouldShow = function()
+                    return true
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+                end,
+                InnerFrame = previousFrame,
+            },
+        }
+        ns.Addon.GetECMModule = function(_, name)
+            return modules[name]
+        end
+
+        local anchor, isFirst = FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, order[3])
+
+        assert.are.equal(previousFrame, anchor)
+        assert.is_false(isFirst)
+    end)
+
+    it("GetNextChainAnchor falls back to the viewer when no prior module is valid", function()
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local anchor, isFirst = FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, ECM.Constants.CHAIN_ORDER[1])
+
+        assert.are.equal(EssentialCooldownViewer, anchor)
+        assert.is_true(isFirst)
+    end)
+
+    it("SetHidden hides immediately and defers showing", function()
+        local layoutCalls = {}
+        local innerFrame = makeFrame({ shown = true })
+        local mod = {
+            InnerFrame = innerFrame,
+            ThrottledUpdateLayout = function(_, reason)
+                layoutCalls[#layoutCalls + 1] = reason
+            end,
+        }
+
+        FrameMixin.SetHidden(mod, true)
+        assert.is_true(mod.IsHidden)
+        assert.is_false(innerFrame:IsShown())
+        assert.are.equal(0, #layoutCalls)
+
+        FrameMixin.SetHidden(mod, false)
+        assert.is_false(mod.IsHidden)
+        assert.same({ "SetHidden" }, layoutCalls)
+    end)
+
+    it("ThrottledUpdateLayout coalesces queued work and schedules second pass", function()
+        local updateReasons = {}
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            IsReady = function()
+                return true
+            end,
+            GetGlobalConfig = function()
+                return {}
+            end,
+            GetModuleConfig = function()
+                return {}
+            end,
+            UpdateLayout = function(_, why)
+                updateReasons[#updateReasons + 1] = why
+            end,
+        }
+        mod.ThrottledUpdateLayout = FrameMixin.ThrottledUpdateLayout
+
+        FrameMixin.ThrottledUpdateLayout(mod, "First", { secondPass = true })
+        FrameMixin.ThrottledUpdateLayout(mod, "Second", { secondPass = true })
+
+        assert.are.equal(1, #timerQueue)
+
+        timerQueue[1].callback()
+        assert.same({ "First" }, updateReasons)
+        assert.are.equal(2, #timerQueue)
+
+        timerQueue[2].callback()
+        assert.are.equal(3, #timerQueue)
+
+        timerQueue[3].callback()
+        assert.same({ "First", "SecondPass" }, updateReasons)
+    end)
+end)

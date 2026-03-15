@@ -269,3 +269,150 @@ describe("RuneBar", function()
         end)
     end)
 end)
+
+describe("RuneBar real source", function()
+    local originalGlobals
+    local RuneBar
+    local ns
+    local isDeathKnight
+    local addMixinCalls
+    local registerFrameCalls
+    local tickerCount
+    local unregisterFrameCalls
+    local makeFrame = TestHelpers.makeFrame
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({ "ECM", "C_Timer" })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        isDeathKnight = false
+        addMixinCalls = 0
+        registerFrameCalls = 0
+        tickerCount = 0
+        unregisterFrameCalls = 0
+
+        _G.ECM = {
+            FrameMixin = {
+                ShouldShow = function()
+                    return true
+                end,
+                Refresh = function()
+                    return true
+                end,
+            },
+            BarMixin = {
+                AddMixin = function()
+                    addMixinCalls = addMixinCalls + 1
+                end,
+            },
+            ClassUtil = {
+                IsDeathKnight = function()
+                    return isDeathKnight
+                end,
+            },
+            RegisterFrame = function()
+                registerFrameCalls = registerFrameCalls + 1
+            end,
+            UnregisterFrame = function()
+                unregisterFrameCalls = unregisterFrameCalls + 1
+            end,
+            Log = function() end,
+        }
+        _G.C_Timer = {
+            NewTicker = function(_, callback)
+                tickerCount = tickerCount + 1
+                return {
+                    callback = callback,
+                    cancelled = false,
+                    Cancel = function(self)
+                        self.cancelled = true
+                    end,
+                }
+            end,
+        }
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+
+        ns = {
+            Addon = {
+                NewModule = function(self, name)
+                    local module = { Name = name }
+                    self[name] = module
+                    return module
+                end,
+            },
+        }
+
+        TestHelpers.LoadChunk("Modules/RuneBar.lua", "Unable to load Modules/RuneBar.lua")(nil, ns)
+        RuneBar = assert(ns.Addon.RuneBar, "RuneBar module did not initialize")
+        function RuneBar:IsEnabled()
+            return true
+        end
+        function RuneBar:RegisterEvent() end
+        function RuneBar:UnregisterAllEvents() end
+    end)
+
+    it("only returns true from ShouldShow for death knights", function()
+        assert.is_false(RuneBar:ShouldShow())
+
+        isDeathKnight = true
+        assert.is_true(RuneBar:ShouldShow())
+    end)
+
+    it("returns early from OnEnable for non-death-knights", function()
+        RuneBar:OnEnable()
+
+        assert.are.equal(0, addMixinCalls)
+        assert.are.equal(0, registerFrameCalls)
+        assert.are.equal(0, tickerCount)
+    end)
+
+    it("creates a ticker and registers the frame for death knights", function()
+        isDeathKnight = true
+
+        RuneBar:OnEnable()
+
+        assert.are.equal(1, addMixinCalls)
+        assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(1, tickerCount)
+        assert.is_not_nil(RuneBar._valueTicker)
+    end)
+
+    it("defers a layout refresh on rune power updates", function()
+        local reasons = {}
+        function RuneBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        RuneBar:OnRunePowerUpdate()
+
+        assert.same({ "RUNE_POWER_UPDATE" }, reasons)
+    end)
+
+    it("unregisters the frame and cancels the ticker on disable when needed", function()
+        local ticker = {
+            cancelled = false,
+            Cancel = function(self)
+                self.cancelled = true
+            end,
+        }
+        RuneBar.InnerFrame = makeFrame({ shown = true })
+        RuneBar._valueTicker = ticker
+
+        RuneBar:OnDisable()
+
+        assert.are.equal(1, unregisterFrameCalls)
+        assert.is_true(ticker.cancelled)
+        assert.is_nil(RuneBar._valueTicker)
+    end)
+
+    it("skips unregistering on disable when no frame exists", function()
+        RuneBar:OnDisable()
+
+        assert.are.equal(0, unregisterFrameCalls)
+    end)
+end)

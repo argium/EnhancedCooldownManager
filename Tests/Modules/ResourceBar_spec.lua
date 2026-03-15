@@ -302,3 +302,107 @@ describe("ResourceBar", function()
         end)
     end)
 end)
+
+describe("ResourceBar real source", function()
+    local originalGlobals
+    local ResourceBar
+    local ns
+    local currentResourceType
+    local currentValues
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    before_each(function()
+        currentResourceType = "icicles"
+        currentValues = { 5, 2, 5 }
+
+        _G.ECM = {
+            FrameMixin = {
+                ShouldShow = function()
+                    return true
+                end,
+            },
+            BarMixin = {
+                Refresh = function()
+                    return true
+                end,
+            },
+            ClassUtil = {
+                GetPlayerResourceType = function()
+                    return currentResourceType
+                end,
+                GetCurrentMaxResourceValues = function()
+                    return currentValues[1], currentValues[2], currentValues[3]
+                end,
+            },
+            Log = function() end,
+        }
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+
+        ns = {
+            Addon = {
+                NewModule = function(self, name)
+                    local module = { Name = name }
+                    self[name] = module
+                    return module
+                end,
+            },
+        }
+
+        TestHelpers.LoadChunk("Modules/ResourceBar.lua", "Unable to load Modules/ResourceBar.lua")(nil, ns)
+        ResourceBar = assert(ns.Addon.ResourceBar, "ResourceBar module did not initialize")
+    end)
+
+    it("ShouldShow requires a current resource type", function()
+        assert.is_true(ResourceBar:ShouldShow())
+
+        currentResourceType = nil
+        assert.is_false(ResourceBar:ShouldShow())
+    end)
+
+    it("Refresh lays out ticks for safe discrete resources", function()
+        local ensureCount
+        local layoutCount
+        local hidePoolKey
+        ResourceBar.InnerFrame = { TicksFrame = {} }
+        function ResourceBar:EnsureTicks(count)
+            ensureCount = count
+        end
+        function ResourceBar:LayoutResourceTicks(maxResources)
+            layoutCount = maxResources
+        end
+        function ResourceBar:HideAllTicks(poolKey)
+            hidePoolKey = poolKey
+        end
+
+        assert.is_true(ResourceBar:Refresh("test"))
+        assert.are.equal(4, ensureCount)
+        assert.are.equal(5, layoutCount)
+        assert.is_nil(hidePoolKey)
+    end)
+
+    it("Refresh hides ticks for devourer resources", function()
+        local hidePoolKey
+        currentResourceType = ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
+        currentValues = { 30, 4, 30 }
+        ResourceBar.InnerFrame = { TicksFrame = {} }
+        function ResourceBar:EnsureTicks()
+            error("EnsureTicks should not be called for devourer resources")
+        end
+        function ResourceBar:LayoutResourceTicks()
+            error("LayoutResourceTicks should not be called for devourer resources")
+        end
+        function ResourceBar:HideAllTicks(poolKey)
+            hidePoolKey = poolKey
+        end
+
+        assert.is_true(ResourceBar:Refresh("test"))
+        assert.are.equal("tickPool", hidePoolKey)
+    end)
+end)

@@ -616,3 +616,224 @@ describe("BuffBars", function()
         end)
     end)
 end)
+
+describe("BuffBars real source", function()
+    local originalGlobals
+    local BuffBars
+    local ns
+    local makeFrame = TestHelpers.makeFrame
+    local secureHooks
+
+    setup(function()
+        originalGlobals = TestHelpers.CaptureGlobals({
+            "ECM",
+            "UIParent",
+            "BuffBarCooldownViewer",
+            "hooksecurefunc",
+            "EditModeManagerFrame",
+            "InCombatLockdown",
+            "issecretvalue",
+        })
+    end)
+
+    teardown(function()
+        TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    local function makeHookableFrame(opts)
+        local frame = makeFrame(opts)
+        frame._hooks = {}
+
+        function frame:HookScript(scriptName, callback)
+            self._hooks[scriptName] = self._hooks[scriptName] or {}
+            self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
+        end
+
+        function frame:GetHookCount(scriptName)
+            return self._hooks[scriptName] and #self._hooks[scriptName] or 0
+        end
+
+        return frame
+    end
+
+    before_each(function()
+        secureHooks = {}
+        _G.ECM = {
+            Log = function() end,
+            Constants = nil,
+            FrameUtil = {
+                GetIconTextureFileID = function(frame)
+                    return frame.iconTextureFileID
+                end,
+            },
+            FrameMixin = {
+                ChainRightPoint = function(point, fallback)
+                    if point == "TOPLEFT" then
+                        return "TOPRIGHT"
+                    end
+                    if point == "BOTTOMLEFT" then
+                        return "BOTTOMRIGHT"
+                    end
+                    return fallback
+                end,
+                NormalizeGrowDirection = function(direction)
+                    return direction
+                end,
+                CalculateLayoutParams = function()
+                    return {}
+                end,
+                IsReady = function()
+                    return true
+                end,
+                AddMixin = function() end,
+            },
+            SpellColors = {
+                MakeKey = function(name, spellID, cooldownID, textureFileID)
+                    if not name and not spellID and not cooldownID and not textureFileID then
+                        return nil
+                    end
+                    return {
+                        name = name,
+                        spellID = spellID,
+                        cooldownID = cooldownID,
+                        textureFileID = textureFileID,
+                    }
+                end,
+            },
+        }
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+
+        _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.hooksecurefunc = function(target, scriptName, callback)
+            secureHooks[#secureHooks + 1] = { target = target, scriptName = scriptName, callback = callback }
+        end
+        _G.EditModeManagerFrame = makeHookableFrame({ name = "EditModeManagerFrame", shown = false })
+        _G.InCombatLockdown = function()
+            return false
+        end
+        _G.issecretvalue = function()
+            return false
+        end
+
+        ns = {
+            Addon = {
+                NewModule = function(self, name)
+                    local module = { Name = name }
+                    self[name] = module
+                    return module
+                end,
+            },
+        }
+
+        _G.BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        function BuffBarCooldownViewer:GetChildren()
+            return
+        end
+
+        TestHelpers.LoadChunk("Modules/BuffBars.lua", "Unable to load Modules/BuffBars.lua")(nil, ns)
+        BuffBars = assert(ns.Addon.BuffBars, "BuffBars module did not initialize")
+    end)
+
+    it("returns the Blizzard buff bar viewer from CreateFrame", function()
+        assert.are.equal(BuffBarCooldownViewer, BuffBars:CreateFrame())
+    end)
+
+    it("orders active spell data top-to-bottom and skips hidden bars", function()
+        local topBar = makeFrame({ shown = true })
+        topBar.Bar = { Name = {
+            GetText = function()
+                return "Top"
+            end,
+        } }
+        topBar.cooldownInfo = { spellID = 17 }
+        topBar.cooldownID = 1700
+        topBar.iconTextureFileID = 170
+        topBar.GetTop = function()
+            return 100
+        end
+
+        local lowerBar = makeFrame({ shown = true })
+        lowerBar.Bar = { Name = {
+            GetText = function()
+                return "Lower"
+            end,
+        } }
+        lowerBar.cooldownInfo = { spellID = 18 }
+        lowerBar.cooldownID = 1800
+        lowerBar.iconTextureFileID = 180
+        lowerBar.GetTop = function()
+            return 50
+        end
+
+        local hiddenBar = makeFrame({ shown = false })
+        hiddenBar.Bar = { Name = {
+            GetText = function()
+                return "Hidden"
+            end,
+        } }
+        hiddenBar.cooldownInfo = { spellID = 19 }
+        hiddenBar.cooldownID = 1900
+        hiddenBar.iconTextureFileID = 190
+        hiddenBar.GetTop = function()
+            return 200
+        end
+
+        function BuffBarCooldownViewer:GetChildren()
+            return lowerBar, hiddenBar, topBar
+        end
+
+        local active = BuffBars:GetActiveSpellData()
+
+        assert.are.equal(2, #active)
+        assert.are.equal("Top", active[1].name)
+        assert.are.equal("Lower", active[2].name)
+    end)
+
+    it("hooks the viewer only once", function()
+        BuffBars:HookViewer()
+        BuffBars:HookViewer()
+
+        assert.is_true(BuffBars._viewerHooked)
+        assert.are.equal(1, BuffBarCooldownViewer:GetHookCount("OnShow"))
+        assert.are.equal(1, BuffBarCooldownViewer:GetHookCount("OnSizeChanged"))
+    end)
+
+    it("hooks edit mode only once", function()
+        BuffBars:HookEditMode()
+        BuffBars:HookEditMode()
+
+        assert.is_true(BuffBars._editModeHooked)
+        assert.are.equal(2, #secureHooks)
+        assert.are.equal("ExitEditMode", secureHooks[1].scriptName)
+        assert.are.equal("EnterEditMode", secureHooks[2].scriptName)
+    end)
+
+    it("only relayouts for player auras", function()
+        local reasons = {}
+        function BuffBars:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        BuffBars:OnUnitAura(nil, "target")
+        BuffBars:OnUnitAura(nil, "player")
+
+        assert.same({ "OnUnitAura" }, reasons)
+    end)
+
+    it("hides the viewer when UpdateLayout decides not to show", function()
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid" }
+        end
+        function BuffBars:GetModuleConfig()
+            return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+        end
+        function BuffBars:ShouldShow()
+            return false
+        end
+
+        local result = BuffBars:UpdateLayout("test")
+
+        assert.is_false(result)
+        assert.is_false(BuffBarCooldownViewer:IsShown())
+    end)
+end)
