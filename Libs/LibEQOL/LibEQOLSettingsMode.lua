@@ -1,4 +1,4 @@
-local MODULE_MAJOR, MINOR = "LibEQOLSettingsMode-1.0", 18010001
+local MODULE_MAJOR, MINOR = "LibEQOLSettingsMode-1.0", 20000001
 local LibStub = _G.LibStub
 assert(LibStub, MODULE_MAJOR .. " requires LibStub")
 
