@@ -62,16 +62,6 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    describe("width", function()
-        it("getter returns profile value", function()
-            assert.are.equal(300, settings["ECM_resourceBar_width"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_resourceBar_width"]:SetValue(500)
-            assert.are.equal(500, profile.resourceBar.width)
-        end)
-    end)
-
     -- Height override composite
     describe("height", function()
         it("getter applies transform for nil", function()

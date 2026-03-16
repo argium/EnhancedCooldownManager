@@ -8,10 +8,14 @@
 ---@field b number Blue channel (0-1).
 ---@field a number Alpha channel (0-1).
 
+---@class ECM_EditModePosition Saved position for one Edit Mode layout.
+---@field point string Anchor point (e.g. "CENTER", "TOPLEFT").
+---@field x number X offset from anchor.
+---@field y number Y offset from anchor.
+
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
----@field offsetX number|nil Horizontal offset when free anchor.
----@field offsetY number|nil Vertical offset when free anchor.
+---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
 ---@field width number|nil Bar width override.
 ---@field height number|nil Bar height override.
 ---@field texture string|nil Bar texture override.
@@ -80,8 +84,6 @@
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
 ---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
----@field width number|nil Buff bar width when free anchor.
----@field offsetY number|nil Vertical offset when free anchor.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
 ---@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
@@ -167,7 +169,7 @@ local defaults = {
             enabled = true,
             anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -275,
+            editModePositions = {},
             showText = true,
             overrideFont = false,
             ticks = {
@@ -199,7 +201,7 @@ local defaults = {
             overrideFont = false,
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -300,
+            editModePositions = {},
             border = {
                 enabled = false,
                 thickness = C.DEFAULT_BORDER_THICKNESS,
@@ -229,7 +231,7 @@ local defaults = {
             enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -325,
+            editModePositions = {},
             overrideFont = false,
             useSpecColor = true,
             color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
@@ -240,8 +242,7 @@ local defaults = {
         buffBars = {
             enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
-            width = 300,
-            offsetY = -350,
+            editModePositions = {},
             verticalSpacing = 0,
             freeGrowDirection = C.GROW_DIRECTION_DOWN,
             showIcon = false,

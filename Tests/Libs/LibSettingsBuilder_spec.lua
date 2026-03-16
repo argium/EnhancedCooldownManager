@@ -941,25 +941,6 @@ describe("LibSettingsBuilder", function()
         assert.is_not_nil(results[2].setting)
     end)
 
-    -- PositioningGroup
-    it("PositioningGroup creates mode, width, offsetX, offsetY controls", function()
-        ECM.OptionUtil.POSITION_MODE_TEXT = {
-            [1] = "Automatic",
-            [2] = "Free",
-        }
-        ECM.OptionUtil.ApplyPositionModeToBar = function() end
-        ECM.OptionUtil.IsAnchorModeFree = function(cfg)
-            return cfg and cfg.anchorMode == 2
-        end
-
-        local result = SB.PositioningGroup("powerBar")
-        assert.is_not_nil(result.modeInit)
-        assert.is_not_nil(result.modeSetting)
-        assert.is_not_nil(result.widthInit)
-        assert.is_not_nil(result.offsetXInit)
-        assert.is_not_nil(result.offsetYInit)
-    end)
-
     -- RegisterSection
     it("RegisterSection stores section in namespace", function()
         local ns = {}

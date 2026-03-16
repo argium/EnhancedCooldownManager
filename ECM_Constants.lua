@@ -35,7 +35,6 @@ local constants = {
     WATCHDOG_INTERVAL = 0.5,
     DEFAULT_BAR_HEIGHT = 20,
     DEFAULT_BAR_WIDTH = 250,
-    DEFAULT_FREE_ANCHOR_OFFSET_Y = -300,
     DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
     DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
     DEFAULT_BORDER_THICKNESS = 4,
@@ -115,7 +114,7 @@ local constants = {
     ITEM_ICON_BORDER_SCALE = 1.35,
 
     -- Schema migration
-    CURRENT_SCHEMA_VERSION = 10,
+    CURRENT_SCHEMA_VERSION = 11,
     SV_NAME = "EnhancedCooldownManagerDB",
     ACTIVE_SV_KEY = "_ECM_DB",
 

@@ -20,6 +20,7 @@ describe("BarMixin", function()
             "UIParent",
             "CreateFrame",
             "issecretvalue",
+            "LibStub",
         })
     end)
 
@@ -90,6 +91,9 @@ describe("BarMixin", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        _G.ECM.ScheduleLayoutUpdate = function() end
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEQOLEditModeStub()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()

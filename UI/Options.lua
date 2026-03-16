@@ -175,7 +175,18 @@ local function createBarArgs(isDisabled, options)
 
     local args = {
         layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = layoutOrder },
-        positioning = { type = "positioning", disabled = isDisabled, order = layoutOrder + 1 },
+        positioning = {
+            type = "select",
+            path = "anchorMode",
+            name = "Position Mode",
+            desc = "How this bar is positioned.",
+            values = {
+                [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
+                [C.ANCHORMODE_FREE] = "Free (drag in Edit Mode)",
+            },
+            disabled = isDisabled,
+            order = layoutOrder + 1,
+        },
         appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = appearanceOrder },
         heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
         fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
@@ -246,16 +257,7 @@ ECM.SettingsBuilder = LSB:New({
             end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },
-        PositioningGroup = {
-            positionModes = {
-                [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
-                [C.ANCHORMODE_FREE] = "Manual",
-            },
-            isAnchorModeFree = isAnchorModeFree,
-            applyPositionMode = function(cfg, mode)
-                cfg.anchorMode = mode
-            end,
-        },
+
     },
 })
 

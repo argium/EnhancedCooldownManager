@@ -118,7 +118,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_nil(persistedColor.keyType)
         assert.is_nil(persistedColor.spellID)
         assert.is_nil(persistedColor.cooldownID)
@@ -152,7 +152,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellID", spellIDEntry.meta.keyType)
         assert.are.equal(2468, spellIDEntry.meta.spellID)
         assert.are.equal("cooldownID", cooldownEntry.meta.keyType)
@@ -186,7 +186,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.same(byNameEntry, profile.buffBars.colors.byName[12][2]["Do Not Replace"])
         assert.are.same(byNameEntry, profile.buffBars.colors.bySpellID[12][2][1001])
         assert.are.same(byNameEntry, profile.buffBars.colors.byCooldownID[12][2][1002])
@@ -200,7 +200,7 @@ describe("Migration", function()
             schemaVersion = 8,
         }
         Migration.Run(noBuffBars)
-        assert.are.equal(10, noBuffBars.schemaVersion)
+        assert.are.equal(11, noBuffBars.schemaVersion)
 
         local invalidColors = {
             schemaVersion = 8,
@@ -209,7 +209,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidColors)
-        assert.are.equal(10, invalidColors.schemaVersion)
+        assert.are.equal(11, invalidColors.schemaVersion)
         assert.are.equal("invalid", invalidColors.buffBars.colors)
 
         local invalidByName = {
@@ -224,7 +224,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidByName)
-        assert.are.equal(10, invalidByName.schemaVersion)
+        assert.are.equal(11, invalidByName.schemaVersion)
         assert.is_table(invalidByName.buffBars.colors.byName)
     end)
 
@@ -264,7 +264,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local created = assert(searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture"))
@@ -354,7 +354,7 @@ describe("Migration", function()
         local noBuffBars = { schemaVersion = 9 }
         Migration.Run(noBuffBars)
 
-        assert.are.equal(10, noBuffBars.schemaVersion)
+        assert.are.equal(11, noBuffBars.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -367,7 +367,7 @@ describe("Migration", function()
         }
         Migration.Run(invalidColors)
 
-        assert.are.equal(10, invalidColors.schemaVersion)
+        assert.are.equal(11, invalidColors.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -396,7 +396,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local specAnomalies = select(2, searchLogMessages("V10 anomaly: class=12 spec="))
@@ -443,7 +443,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID)
         assert.is_table(profile.buffBars.colors.byCooldownID)
         assert.is_table(profile.buffBars.colors.byTexture)
@@ -479,7 +479,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal("KeepNameMetadata", byNameEntry.meta.spellName)
         assert.are.equal("spellID", bySpellIDEntry.meta.keyType)
@@ -527,7 +527,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID[12][2])
         assert.is_table(profile.buffBars.colors.byCooldownID[12][2])
         assert.is_table(profile.buffBars.colors.byTexture[12][2])
@@ -558,7 +558,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal(9001, byNameEntry.meta.spellID)
         assert.are.equal(9002, byNameEntry.meta.cooldownID)
@@ -610,7 +610,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         local winner = profile.buffBars.colors.bySpellID[12][2][203720]
         assert.are.same(bySpellEntry, winner)
         assert.are.same(winner, profile.buffBars.colors.byName[12][2]["Demon Spikes"])
@@ -624,6 +624,110 @@ describe("Migration", function()
         assert.is_nil(winner.value.spellID)
         assert.is_nil(winner.value.cooldownID)
         assert.is_nil(winner.value.textureId)
+    end)
+
+    -- V11: offsetX/offsetY → editModePositions migration
+
+    it("V11 migrates offsetX/offsetY to editModePositions for all bar modules", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { offsetX = 5, offsetY = -275 },
+            resourceBar = { offsetY = -300 },
+            runeBar = { offsetX = 0, offsetY = -325 },
+            buffBars = { anchorPoint = "TOP", relativePoint = "BOTTOM", offsetX = 10, offsetY = -350 },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+
+        -- powerBar: both offsets migrated, cleared
+        assert.is_nil(profile.powerBar.offsetX)
+        assert.is_nil(profile.powerBar.offsetY)
+        local pb = profile.powerBar.editModePositions["__migrated"]
+        assert.is_not_nil(pb)
+        assert.are.equal("CENTER", pb.point) -- no anchorPoint field → defaults to CENTER
+        assert.are.equal(5, pb.x)
+        assert.are.equal(-275, pb.y)
+
+        -- resourceBar: only offsetY was set
+        assert.is_nil(profile.resourceBar.offsetX)
+        assert.is_nil(profile.resourceBar.offsetY)
+        local rb = profile.resourceBar.editModePositions["__migrated"]
+        assert.is_not_nil(rb)
+        assert.are.equal("CENTER", rb.point)
+        assert.are.equal(0, rb.x) -- offsetX was nil → 0
+        assert.are.equal(-300, rb.y)
+
+        -- runeBar
+        local rune = profile.runeBar.editModePositions["__migrated"]
+        assert.is_not_nil(rune)
+        assert.are.equal(0, rune.x)
+        assert.are.equal(-325, rune.y)
+
+        -- buffBars: had anchorPoint, so that is used in the migrated position
+        local bb = profile.buffBars.editModePositions["__migrated"]
+        assert.is_not_nil(bb)
+        assert.are.equal("TOP", bb.point) -- came from cfg.anchorPoint
+        assert.are.equal(10, bb.x)
+        assert.are.equal(-350, bb.y)
+        -- anchorPoint/relativePoint cleared
+        assert.is_nil(profile.buffBars.anchorPoint)
+        assert.is_nil(profile.buffBars.relativePoint)
+    end)
+
+    it("V11 skips sections with no offsetX or offsetY (chain mode defaults)", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = "chain" },
+            resourceBar = { anchorMode = "chain" },
+            runeBar = { anchorMode = "chain" },
+            buffBars = { anchorMode = "chain" },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        assert.is_nil(profile.powerBar.editModePositions)
+        assert.is_nil(profile.resourceBar.editModePositions)
+        assert.is_nil(profile.runeBar.editModePositions)
+        assert.is_nil(profile.buffBars.editModePositions)
+    end)
+
+    it("V11 clears anchorPoint and relativePoint even when no offsets exist", function()
+        local profile = {
+            schemaVersion = 10,
+            buffBars = { anchorPoint = "CENTER", relativePoint = "CENTER" },
+            powerBar = {},
+            resourceBar = {},
+            runeBar = {},
+        }
+
+        Migration.Run(profile)
+
+        assert.is_nil(profile.buffBars.anchorPoint)
+        assert.is_nil(profile.buffBars.relativePoint)
+    end)
+
+    it("V11 preserves existing editModePositions when present", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = {
+                offsetY = -275,
+                editModePositions = { Modern = { point = "TOPLEFT", x = 50, y = 50 } },
+            },
+            resourceBar = {},
+            runeBar = {},
+            buffBars = {},
+        }
+
+        Migration.Run(profile)
+
+        -- Migrated entry added alongside existing one
+        assert.is_not_nil(profile.powerBar.editModePositions["__migrated"])
+        assert.are.equal(-275, profile.powerBar.editModePositions["__migrated"].y)
+        -- Existing entry preserved
+        assert.are.equal(50, profile.powerBar.editModePositions.Modern.x)
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

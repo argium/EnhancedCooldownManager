@@ -4,8 +4,21 @@
 
 local _, ns = ...
 local FrameUtil = ECM.FrameUtil
+local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
 local FrameMixin = {}
 ECM.FrameMixin = FrameMixin
+
+-- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
+-- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
+LibEQOLEditMode:RegisterCallback("enter", function()
+    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeEnter") end)
+end)
+LibEQOLEditMode:RegisterCallback("exit", function()
+    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeExit") end)
+end)
+LibEQOLEditMode:RegisterCallback("layout", function()
+    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeLayout") end)
+end)
 
 ---@alias AnchorPoint string
 
@@ -70,6 +83,13 @@ function FrameMixin:ShouldShow()
     return not self.IsHidden and (config == nil or config.enabled ~= false)
 end
 
+--- Determines whether this module should register its frame with ECM Edit Mode.
+--- Modules backed by Blizzard-owned system frames can override this to opt out.
+---@return boolean
+function FrameMixin:ShouldRegisterEditMode()
+    return true
+end
+
 function FrameMixin:CreateFrame()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
@@ -121,14 +141,15 @@ function FrameMixin:CalculateLayoutParams()
     local moduleConfig = self:GetModuleConfig()
 
     if moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_FREE then
+        local pos = self:GetEditModePosition()
         return {
             mode = ECM.Constants.ANCHORMODE_FREE,
             anchor = UIParent,
             isFirst = false,
-            anchorPoint = "CENTER",
-            anchorRelativePoint = "CENTER",
-            offsetX = moduleConfig.offsetX or 0,
-            offsetY = moduleConfig.offsetY or ECM.Constants.DEFAULT_FREE_ANCHOR_OFFSET_Y,
+            anchorPoint = pos.point,
+            anchorRelativePoint = pos.point,
+            offsetX = pos.x,
+            offsetY = pos.y,
             height = moduleConfig.height or globalConfig.barHeight,
             width = moduleConfig.width or globalConfig.barWidth,
         }
@@ -314,6 +335,88 @@ function FrameMixin:ThrottledUpdateLayout(reason, opts)
     end
 end
 
+--- Gets the saved Edit Mode position for the current layout.
+--- Falls back to the migrated position, then CENTER (0, 0).
+---@return ECM_EditModePosition
+function FrameMixin:GetEditModePosition()
+    local cfg = self:GetModuleConfig()
+    local positions = cfg and cfg.editModePositions
+    if positions then
+        local layoutName = LibEQOLEditMode:GetActiveLayoutName()
+        if layoutName and positions[layoutName] then
+            return positions[layoutName]
+        end
+        if positions["__migrated"] then
+            return positions["__migrated"]
+        end
+    end
+    return { point = "CENTER", x = 0, y = 0 }
+end
+
+--- Saves an Edit Mode position for the given layout.
+---@param layoutName string Edit Mode layout name.
+---@param point string Anchor point (e.g. "CENTER").
+---@param x number X offset.
+---@param y number Y offset.
+function FrameMixin:_SaveEditModePosition(layoutName, point, x, y)
+    local cfg = self:GetModuleConfig()
+    if not cfg then
+        return
+    end
+    if type(cfg.editModePositions) ~= "table" then
+        cfg.editModePositions = {}
+    end
+    cfg.editModePositions[layoutName] = { point = point, x = x, y = y }
+end
+
+--- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
+--- Called once during AddMixin after InnerFrame is created.
+--- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
+function FrameMixin:_RegisterEditMode()
+    local frame = self.InnerFrame
+    if not frame then
+        return
+    end
+
+    frame.editModeName = "ECM: " .. self.Name
+
+    local module = self
+    LibEQOLEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
+        module:_SaveEditModePosition(layoutName, point, x, y)
+        module:ThrottledUpdateLayout("EditModeDrag")
+    end, {
+        allowDrag = function()
+            local cfg = module:GetModuleConfig()
+            return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
+        end,
+        showReset = true,
+        enableOverlayToggle = true,
+    })
+
+    LibEQOLEditMode:AddFrameSettings(frame, {
+        {
+            kind = LibEQOLEditMode.SettingType.Slider,
+            name = "Width",
+            get = function()
+                local cfg = module:GetModuleConfig()
+                return (cfg and cfg.width) or ECM.Constants.DEFAULT_BAR_WIDTH
+            end,
+            set = function(_, value)
+                local cfg = module:GetModuleConfig()
+                if cfg then
+                    cfg.width = value
+                    module:ThrottledUpdateLayout("EditModeWidth")
+                end
+            end,
+            default = ECM.Constants.DEFAULT_BAR_WIDTH,
+            minValue = 100,
+            maxValue = 600,
+            valueStep = 1,
+            allowInput = true,
+        },
+    })
+end
+
 function FrameMixin.AssertValid(target)
     assert(target and type(target) == "table", "target is not a table")
     assert(target.Name, "target is missing a Name")
@@ -337,4 +440,7 @@ function FrameMixin.AddMixin(target, name)
     end
 
     target.IsHidden = false
+    if target.ShouldRegisterEditMode == nil or target:ShouldRegisterEditMode() then
+        target:_RegisterEditMode()
+    end
 end

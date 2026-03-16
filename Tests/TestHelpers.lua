@@ -137,6 +137,22 @@ function TestHelpers.SetupLibStub()
     return LibStub
 end
 
+--- Registers a minimal LibEQOLEditMode-1.0 stub in an existing LibStub.
+--- Must be called after LibStub is available.
+function TestHelpers.SetupLibEQOLEditModeStub()
+    assert(_G.LibStub, "LibStub must be set up before calling SetupLibEQOLEditModeStub")
+    local lib = _G.LibStub:NewLibrary("LibEQOLEditMode-1.0", 1) or _G.LibStub("LibEQOLEditMode-1.0")
+    lib.AddFrame = lib.AddFrame or function() end
+    lib.AddFrameSettings = lib.AddFrameSettings or function() end
+    lib.RegisterCallback = lib.RegisterCallback or function() end
+    lib.GetActiveLayoutName = lib.GetActiveLayoutName or function() return "Modern" end
+    lib.GetActiveLayoutIndex = lib.GetActiveLayoutIndex or function() return 1 end
+    lib.IsInEditMode = lib.IsInEditMode or function() return false end
+    lib.SetFrameDragEnabled = lib.SetFrameDragEnabled or function() end
+    lib.SettingType = lib.SettingType or { Slider = 0 }
+    return lib
+end
+
 --- Install all Settings API stubs into _G. Returns the list of global names
 --- that were set, so they can be captured/restored.
 function TestHelpers.SetupSettingsStubs()
@@ -645,7 +661,7 @@ TestHelpers.OPTIONS_GLOBALS = {
 function TestHelpers.MakeOptionsProfile()
     local border = { enabled = false, thickness = 4, color = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 } }
     local profile = {
-        schemaVersion = 10,
+        schemaVersion = 11,
         global = {
             debug = false,
             hideWhenMounted = true,
@@ -673,7 +689,7 @@ function TestHelpers.MakeOptionsProfile()
             enabled = true,
             anchorMode = "chain",
             width = 300,
-            offsetY = -275,
+            editModePositions = {},
             showText = true,
             overrideFont = false,
             showManaAsPercent = true,
@@ -697,7 +713,7 @@ function TestHelpers.MakeOptionsProfile()
             overrideFont = false,
             anchorMode = "chain",
             width = 300,
-            offsetY = -300,
+            editModePositions = {},
             border = deepClone(border),
             colors = {
                 souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
@@ -723,7 +739,7 @@ function TestHelpers.MakeOptionsProfile()
             enabled = true,
             anchorMode = "chain",
             width = 300,
-            offsetY = -325,
+            editModePositions = {},
             overrideFont = false,
             useSpecColor = true,
             color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
@@ -734,8 +750,7 @@ function TestHelpers.MakeOptionsProfile()
         buffBars = {
             enabled = true,
             anchorMode = "chain",
-            width = 300,
-            offsetY = -350,
+            editModePositions = {},
             verticalSpacing = 0,
             freeGrowDirection = "down",
             showIcon = false,

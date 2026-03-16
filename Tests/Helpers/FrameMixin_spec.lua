@@ -191,6 +191,7 @@ describe("FrameMixin real source", function()
             "GetTime",
             "UIParent",
             "EssentialCooldownViewer",
+            "LibStub",
         })
     end)
 
@@ -232,6 +233,9 @@ describe("FrameMixin real source", function()
         _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        _G.ECM.ScheduleLayoutUpdate = function() end
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEQOLEditModeStub()
         ns = { Addon = {} }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
@@ -334,5 +338,32 @@ describe("FrameMixin real source", function()
 
         timerQueue[3].callback()
         assert.same({ "First", "SecondPass" }, updateReasons)
+    end)
+
+    it("AddMixin skips Edit Mode registration when the module opts out", function()
+        local registerCalls = 0
+        local mod = {
+            Name = "ExternalFrameModule",
+            CreateFrame = function()
+                return makeFrame({ name = "ExternalFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+            _RegisterEditMode = function()
+                registerCalls = registerCalls + 1
+            end,
+            GetGlobalConfig = function()
+                return {}
+            end,
+            GetModuleConfig = function()
+                return {}
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "ExternalFrameModule")
+
+        assert.are.equal(0, registerCalls)
+        assert.are.equal("ExternalFrame", mod.InnerFrame:GetName())
     end)
 end)

@@ -1039,6 +1039,52 @@ function Migration.Run(profile)
         profile.schemaVersion = 10
     end
 
+    if profile.schemaVersion < 11 then
+        -- Migration: move offsetX/offsetY into editModePositions and remove
+        -- legacy BuffBars anchorPoint/relativePoint fields.
+        for _, section in ipairs({ "powerBar", "resourceBar", "runeBar", "buffBars" }) do
+            local cfg = profile[section]
+            if type(cfg) == "table" then
+                local ox = cfg.offsetX
+                local oy = cfg.offsetY
+                local ap = cfg.anchorPoint
+                local rp = cfg.relativePoint
+                log(section .. ": pre-migrate state"
+                    .. " anchorMode=" .. tostring(cfg.anchorMode)
+                    .. " anchorPoint=" .. tostring(ap)
+                    .. " relativePoint=" .. tostring(rp)
+                    .. " offsetX=" .. tostring(ox)
+                    .. " offsetY=" .. tostring(oy))
+                if ox or oy then
+                    if type(cfg.editModePositions) ~= "table" then
+                        cfg.editModePositions = {}
+                    end
+                    local migrated = {
+                        point = ap or "CENTER",
+                        x = ox or 0,
+                        y = oy or 0,
+                    }
+                    cfg.editModePositions["__migrated"] = migrated
+                    cfg.offsetX = nil
+                    cfg.offsetY = nil
+                    log(section .. ": migrated to editModePositions.__migrated"
+                        .. " point=" .. migrated.point
+                        .. " x=" .. migrated.x
+                        .. " y=" .. migrated.y)
+                else
+                    log(section .. ": no offsetX/offsetY found, skipping")
+                end
+                cfg.anchorPoint = nil
+                cfg.relativePoint = nil
+            else
+                log(section .. ": section missing or not a table")
+            end
+        end
+
+        log("Migrated to V11")
+        profile.schemaVersion = 11
+    end
+
     log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
 end
 

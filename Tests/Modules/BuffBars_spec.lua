@@ -22,7 +22,7 @@ describe("BuffBars", function()
         "issecretvalue",
         "InCombatLockdown",
         "hooksecurefunc",
-        "EditModeManagerFrame",
+        "LibStub",
     }
 
     setup(function()
@@ -52,7 +52,6 @@ describe("BuffBars", function()
             return false
         end
         _G.hooksecurefunc = function() end
-        _G.EditModeManagerFrame = nil
 
         -- Capture timer callbacks without executing them
         _G.C_Timer = {
@@ -75,6 +74,9 @@ describe("BuffBars", function()
             end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        _G.ECM.ScheduleLayoutUpdate = function() end
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEQOLEditModeStub()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
@@ -103,7 +105,6 @@ describe("BuffBars", function()
         local mod = {
             _events = {},
             _viewerHooked = false,
-            _editModeHooked = false,
             _registered = false,
         }
         function mod:RegisterEvent(event, handler)
@@ -622,7 +623,6 @@ describe("BuffBars real source", function()
     local BuffBars
     local ns
     local makeFrame = TestHelpers.makeFrame
-    local secureHooks
     local registerFrameCalls
     local unregisterFrameCalls
     local addMixinCalls
@@ -634,7 +634,6 @@ describe("BuffBars real source", function()
             "UIParent",
             "BuffBarCooldownViewer",
             "hooksecurefunc",
-            "EditModeManagerFrame",
             "InCombatLockdown",
             "issecretvalue",
             "C_Timer",
@@ -662,7 +661,6 @@ describe("BuffBars real source", function()
     end
 
     before_each(function()
-        secureHooks = {}
         registerFrameCalls = 0
         unregisterFrameCalls = 0
         addMixinCalls = 0
@@ -724,15 +722,12 @@ describe("BuffBars real source", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
 
         _G.UIParent = makeFrame({ name = "UIParent" })
-        _G.hooksecurefunc = function(target, scriptName, callback)
-            secureHooks[#secureHooks + 1] = { target = target, scriptName = scriptName, callback = callback }
-        end
+        _G.hooksecurefunc = function() end
         _G.C_Timer = {
             After = function(_, callback)
                 timerCallbacks[#timerCallbacks + 1] = callback
             end,
         }
-        _G.EditModeManagerFrame = makeHookableFrame({ name = "EditModeManagerFrame", shown = false })
         _G.InCombatLockdown = function()
             return false
         end
@@ -761,6 +756,10 @@ describe("BuffBars real source", function()
 
     it("returns the Blizzard buff bar viewer from CreateFrame", function()
         assert.are.equal(BuffBarCooldownViewer, BuffBars:CreateFrame())
+    end)
+
+    it("opts out of generic Edit Mode registration", function()
+        assert.is_false(BuffBars:ShouldRegisterEditMode())
     end)
 
     it("orders active spell data by layoutIndex and skips hidden bars", function()
@@ -833,16 +832,6 @@ describe("BuffBars real source", function()
         assert.are.equal(1, BuffBarCooldownViewer:GetHookCount("OnSizeChanged"))
     end)
 
-    it("hooks edit mode only once", function()
-        BuffBars:HookEditMode()
-        BuffBars:HookEditMode()
-
-        assert.is_true(BuffBars._editModeHooked)
-        assert.are.equal(2, #secureHooks)
-        assert.are.equal("ExitEditMode", secureHooks[1].scriptName)
-        assert.are.equal("EnterEditMode", secureHooks[2].scriptName)
-    end)
-
     it("only relayouts for player auras", function()
         local reasons = {}
         function BuffBars:ThrottledUpdateLayout(reason)
@@ -883,26 +872,69 @@ describe("BuffBars real source", function()
         assert.is_false(BuffBars:IsReady())
     end)
 
-    it("returns free-mode layout params from module config", function()
+    it("returns free-mode layout params from Edit Mode positions", function()
         BuffBars.GetModuleConfig = function()
             return {
                 anchorMode = ECM.Constants.ANCHORMODE_FREE,
-                anchorPoint = "TOP",
-                relativePoint = "BOTTOM",
-                offsetX = 10,
-                offsetY = 20,
-                width = 345,
+                editModePositions = {
+                    ["__migrated"] = { point = "TOP", x = 10, y = 20 },
+                },
             }
+        end
+        BuffBars.GetEditModePosition = function()
+            return { point = "TOP", x = 10, y = 20 }
         end
 
         local params = BuffBars:CalculateLayoutParams()
 
         assert.are.equal(ECM.Constants.ANCHORMODE_FREE, params.mode)
         assert.are.equal("TOP", params.anchorPoint)
-        assert.are.equal("BOTTOM", params.anchorRelativePoint)
+        assert.are.equal("TOP", params.anchorRelativePoint)
         assert.are.equal(10, params.offsetX)
         assert.are.equal(20, params.offsetY)
-        assert.are.equal(345, params.width)
+        assert.is_nil(params.width)
+    end)
+
+    it("applies free-mode width from baseBarWidth and barWidthScale", function()
+        local appliedWidths = {}
+        ECM.FrameUtil.LazySetWidth = function(frame, value)
+            appliedWidths[#appliedWidths + 1] = { frame = frame, value = value }
+        end
+        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            frame.__ecmAnchorCache = anchors
+            frame.__anchors = anchors
+        end
+
+        BuffBarCooldownViewer.baseBarWidth = 180
+        BuffBarCooldownViewer.barWidthScale = 1.25
+
+        function BuffBarCooldownViewer:GetChildren()
+            return
+        end
+        function BuffBars:GetModuleConfig()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                editModePositions = {
+                    ["__migrated"] = { point = "CENTER", x = 12, y = -34 },
+                },
+            }
+        end
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid", barHeight = 18, barWidth = 250 }
+        end
+        function BuffBars:GetEditModePosition()
+            return { point = "CENTER", x = 12, y = -34 }
+        end
+        function BuffBars:ShouldShow()
+            return true
+        end
+
+        local result = BuffBars:UpdateLayout("test")
+
+        assert.is_true(result)
+        assert.are.equal(1, #appliedWidths)
+        assert.are.equal(BuffBarCooldownViewer, appliedWidths[1].frame)
+        assert.are.equal(225, appliedWidths[1].value)
     end)
 
     it("viewer hooks defer layout and respect the layout-running guard", function()
@@ -919,19 +951,6 @@ describe("BuffBars real source", function()
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
 
         assert.same({ "viewer:OnShow", "viewer:OnSizeChanged" }, reasons)
-    end)
-
-    it("edit mode hooks defer layout on enter and exit", function()
-        local reasons = {}
-        function BuffBars:ThrottledUpdateLayout(reason)
-            reasons[#reasons + 1] = reason
-        end
-
-        BuffBars:HookEditMode()
-        secureHooks[2].callback()
-        secureHooks[1].callback()
-
-        assert.same({ "EditModeEnter", "EditModeExit" }, reasons)
     end)
 
     it("reports edit lock reasons for combat and secret values", function()
@@ -1036,7 +1055,6 @@ describe("BuffBars real source", function()
 
         assert.same({ "ModuleInit" }, reasons)
         assert.is_true(BuffBars._viewerHooked)
-        assert.is_true(BuffBars._editModeHooked)
     end)
 
     it("unregisters on disable", function()

@@ -210,7 +210,7 @@ describe("OptionUtil", function()
             assert.are.equal(10, args.layoutHeader.order)
 
             assert.is_table(args.positioning)
-            assert.are.equal("positioning", args.positioning.type)
+            assert.are.equal("select", args.positioning.type)
             assert.are.equal(11, args.positioning.order)
 
             assert.is_table(args.appearanceHeader)

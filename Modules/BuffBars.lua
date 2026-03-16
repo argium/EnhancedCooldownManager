@@ -415,7 +415,7 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
     end
 end
 
-local function applyViewerPosition(viewer, params, cfg, globalConfig)
+local function applyViewerPosition(viewer, params)
     if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
         local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
         local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
@@ -428,25 +428,22 @@ local function applyViewerPosition(viewer, params, cfg, globalConfig)
         return
     end
 
-    -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
-    -- override explicit width. If stale chain anchors remain,
-    -- collapse to the first anchor point so SetWidth can work.
-    -- Blizzard's edit mode manages positioning from here on.
-    if viewer:GetNumPoints() > 1 then
-        local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
-        viewer:ClearAllPoints()
-        if point and relativeTo then
-            viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
-        end
-    end
+    -- Free mode: use a single-point anchor only.
+    -- FrameUtil.LazySetAnchors(viewer, {
+    --     { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
+    -- })
 
-    local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
-    if width and width > 0 then
-        FrameUtil.LazySetWidth(viewer, width)
+    local baseBarWidth = viewer.baseBarWidth
+    local barWidthScale = viewer.barWidthScale
+    if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
+        local width = baseBarWidth * barWidthScale
+        if width > 0 then
+            FrameUtil.LazySetWidth(viewer, width)
+        end
     end
 end
 
---- Override to support custom anchor points in free mode.
+--- Override to support Edit Mode positions in free mode.
 ---@return table params Layout parameters
 function BuffBars:CalculateLayoutParams()
     local cfg = self:GetModuleConfig()
@@ -456,16 +453,24 @@ function BuffBars:CalculateLayoutParams()
         return FrameMixin.CalculateLayoutParams(self)
     end
 
+    local pos = self:GetEditModePosition()
     return {
         mode = mode,
         anchor = UIParent,
         isFirst = false,
-        anchorPoint = cfg.anchorPoint or "CENTER",
-        anchorRelativePoint = cfg.relativePoint or "CENTER",
-        offsetX = cfg.offsetX or 0,
-        offsetY = cfg.offsetY or 0,
-        width = cfg.width,
+        anchorPoint = pos.point,
+        anchorRelativePoint = pos.point,
+        offsetX = pos.x,
+        offsetY = pos.y,
     }
+end
+
+--- Buff bars are backed by Blizzard's BuffBarCooldownViewer system frame.
+--- Registering that frame with the addon Edit Mode wrapper taints Blizzard's
+--- own Edit Mode selection handling, so BuffBars must opt out.
+---@return boolean
+function BuffBars:ShouldRegisterEditMode()
+    return false
 end
 
 function BuffBars:CreateFrame()
@@ -517,7 +522,7 @@ function BuffBars:UpdateLayout(why)
 
     local params = self:CalculateLayoutParams()
     local growsUp, verticalSpacing = getLayoutState(params, cfg)
-    applyViewerPosition(viewer, params, cfg, globalConfig)
+    applyViewerPosition(viewer, params)
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
     -- while we are actively styling and positioning bars.
@@ -538,7 +543,6 @@ function BuffBars:UpdateLayout(why)
     ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = params.mode,
         childCount = #visibleChildren,
-        viewerWidth = params.width or -1,
         anchor = params.anchor and params.anchor:GetName() or "nil",
         anchorPoint = params.anchorPoint,
         anchorRelativePoint = params.anchorRelativePoint,
@@ -665,7 +669,6 @@ function BuffBars:OnEnable()
 
     C_Timer.After(0.1, function()
         self:HookViewer()
-        self:HookEditMode()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
 end

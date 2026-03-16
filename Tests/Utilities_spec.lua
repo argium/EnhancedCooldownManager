@@ -75,32 +75,26 @@ describe("Utilities", function()
             },
         }
 
-        _G.LibStub = function(name)
-            if name == "AceAddon-3.0" then
-                return {
-                    NewAddon = function()
-                        return addonNS.Addon
-                    end,
-                }
-            end
-            if name == "LibSharedMedia-3.0" then
-                return {
-                    Fetch = function(_, mediaType, key)
-                        if mediaType == "font" and type(key) == "string" then
-                            return "FONT:" .. key
-                        end
-                        return nil
-                    end,
-                }
+        TestHelpers.SetupLibStub()
+        local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
+        aceAddon.NewAddon = function()
+            return addonNS.Addon
+        end
+        local sharedMedia = _G.LibStub:NewLibrary("LibSharedMedia-3.0", 1)
+        sharedMedia.Fetch = function(_, mediaType, key)
+            if mediaType == "font" and type(key) == "string" then
+                return "FONT:" .. key
             end
             return nil
         end
+        TestHelpers.SetupLibEQOLEditModeStub()
         _G.ECM.ColorUtil = {
             Sparkle = function(text)
                 return text
             end,
         }
         _G.ECM.DebugAssert = function() end
+        _G.ECM.ScheduleLayoutUpdate = function() end
         _G.issecretvalue = function() return false end
         _G.issecrettable = function() return false end
         _G.InCombatLockdown = function() return false end

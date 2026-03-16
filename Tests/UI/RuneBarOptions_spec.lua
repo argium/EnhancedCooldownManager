@@ -108,16 +108,6 @@ describe("RuneBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    describe("width", function()
-        it("getter returns profile value", function()
-            assert.are.equal(300, settings["ECM_runeBar_width"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_runeBar_width"]:SetValue(400)
-            assert.are.equal(400, profile.runeBar.width)
-        end)
-    end)
-
     -- Height override composite
     describe("height", function()
         it("getter applies transform for nil", function()

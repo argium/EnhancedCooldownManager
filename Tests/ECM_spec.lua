@@ -338,22 +338,13 @@ describe("ECM layout system", function()
             EnableModule = function() end,
             DisableModule = function() end,
         }
-        _G.LibStub = setmetatable({}, {
-            __call = function(_, name, silent)
-                if name == "AceAddon-3.0" then
-                    return {
-                        NewAddon = function(_, n)
-                            fakeAddon.name = n
-                            return fakeAddon
-                        end,
-                    }
-                end
-                if silent then
-                    return nil
-                end
-                return {}
-            end,
-        })
+        TestHelpers.SetupLibStub()
+        local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
+        aceAddon.NewAddon = function(_, n)
+            fakeAddon.name = n
+            return fakeAddon
+        end
+        TestHelpers.SetupLibEQOLEditModeStub()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
         _G.ECM = {}
@@ -379,6 +370,7 @@ describe("ECM layout system", function()
             FlushLog = function() end,
             PrintLog = function() end,
         }
+        _G.ECM.ScheduleLayoutUpdate = function() end
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(
             nil,
