@@ -11,21 +11,13 @@ ECM.FrameMixin = FrameMixin
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
 LibEQOLEditMode:RegisterCallback("enter", function()
-    C_Timer.After(0, function()
-        ECM.ScheduleLayoutUpdate(0, "EditModeEnter")
-        -- Hide selection overlays for chain/detached modules whose position
-        -- is controlled by their respective anchors, not individual dragging.
-        FrameMixin._UpdateNonFreeOverlays()
-    end)
+    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeEnter") end)
 end)
 LibEQOLEditMode:RegisterCallback("exit", function()
     C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeExit") end)
 end)
 LibEQOLEditMode:RegisterCallback("layout", function()
-    C_Timer.After(0, function()
-        ECM.ScheduleLayoutUpdate(0, "EditModeLayout")
-        FrameMixin._UpdateNonFreeOverlays()
-    end)
+    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeLayout") end)
 end)
 
 ---@alias AnchorPoint string
@@ -406,30 +398,6 @@ function FrameMixin:_SaveEditModePosition(layoutName, point, x, y)
     cfg.editModePositions[layoutName] = { point = point, x = x, y = y }
 end
 
---- Hides LibEQOL selection overlays for chain and detached modules.
---- Only free-mode bars need their own overlay; chain bars move with the
---- main anchor and detached bars move with the detached anchor.
-function FrameMixin._UpdateNonFreeOverlays()
-    if not LibEQOLEditMode:IsInEditMode() then
-        return
-    end
-    local addon = ns.Addon
-    if not addon then return end
-    local C = ECM.Constants
-    for _, moduleName in ipairs(C.CHAIN_ORDER) do
-        local barModule = addon:GetECMModule(moduleName, true)
-        if barModule and barModule.InnerFrame then
-            local mc = barModule:GetModuleConfig()
-            if mc and mc.anchorMode ~= C.ANCHORMODE_FREE then
-                local selection = LibEQOLEditMode.selectionRegistry[barModule.InnerFrame]
-                if selection then
-                    selection:Hide()
-                end
-            end
-        end
-    end
-end
-
 --- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
 --- Called once during AddMixin after InnerFrame is created.
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
@@ -453,6 +421,20 @@ function FrameMixin:_RegisterEditMode()
         showReset = true,
         enableOverlayToggle = true,
     })
+
+    -- Hook the selection overlay so it stays hidden for chain/detached modules.
+    -- LibEQOL's resetSelectionIndicators calls ShowHighlighted (→ Show) on every
+    -- selection during edit mode; this OnShow hook re-hides it immediately when
+    -- the module isn't in free mode, making the suppression durable.
+    local selection = LibEQOLEditMode.selectionRegistry[frame]
+    if selection then
+        selection:HookScript("OnShow", function(sel)
+            local cfg = module:GetModuleConfig()
+            if cfg and cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
+                sel:Hide()
+            end
+        end)
+    end
 
     LibEQOLEditMode:AddFrameSettings(frame, {
         {

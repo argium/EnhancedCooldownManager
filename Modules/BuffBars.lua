@@ -430,11 +430,6 @@ local function applyViewerPosition(viewer, params)
         return
     end
 
-    -- Free mode: use a single-point anchor only.
-    -- FrameUtil.LazySetAnchors(viewer, {
-    --     { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
-    -- })
-
     local baseBarWidth = viewer.baseBarWidth
     local barWidthScale = viewer.barWidthScale
     if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
@@ -608,34 +603,6 @@ function BuffBars:HookViewer()
     end)
 
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
-end
-
---- Hooks EditModeManagerFrame to re-apply layout on exit.
-function BuffBars:HookEditMode()
-    if self._editModeHooked then
-        return
-    end
-
-    if not EditModeManagerFrame then
-        return
-    end
-
-    self._editModeHooked = true
-
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
-        -- Edit mode exit is infrequent, so perform an immediate restyle pass.
-        local viewer = _G["BuffBarCooldownViewer"]
-        if viewer and viewer:IsShown() then
-            self:ThrottledUpdateLayout("EditModeExit")
-        end
-    end)
-
-    hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
-        -- Re-apply style during edit mode so bars look correct while editing
-        self:ThrottledUpdateLayout("EditModeEnter")
-    end)
-
-    ECM.Log(self.Name, "Hooked EditModeManagerFrame")
 end
 
 function BuffBars:OnUnitAura(_, unit)
