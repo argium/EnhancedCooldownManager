@@ -231,6 +231,9 @@ for _, name in ipairs(C.CHAIN_ORDER) do
     _chainSet[name] = true
 end
 
+local _detachedAnchor = nil
+local _detachedAnchorLayout = nil
+
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
@@ -324,6 +327,15 @@ local function updateFadeAndHiddenStates()
         return
     end
 
+    -- Force-show everything during edit mode so the user can see and position all modules.
+    local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+    if LibEQOLEditMode:IsInEditMode() then
+        setGloballyHidden(false)
+        setAlpha(1)
+        enforceBlizzardFrameState()
+        return
+    end
+
     -- Determine hidden state
     local hidden, reason = false, nil
     if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
@@ -380,6 +392,205 @@ local function updateFadeAndHiddenStates()
     enforceBlizzardFrameState()
 end
 
+--- Returns true if any enabled module in CHAIN_ORDER uses detached mode.
+---@return boolean
+function ECM.HasDetachedModules()
+    local addon = ns.Addon
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+        local barModule = addon and addon:GetECMModule(moduleName, true)
+        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
+            local mc = barModule:GetModuleConfig()
+            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+--- Gets the saved detached anchor position for the current layout.
+---@return ECM_EditModePosition
+local function getDetachedAnchorPosition()
+    local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+    local positions = gc and gc.detachedAnchorPositions
+    if positions then
+        local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+        local layoutName = LibEQOLEditMode:GetActiveLayoutName()
+        if layoutName and positions[layoutName] then
+            return positions[layoutName]
+        end
+    end
+    return { point = "CENTER", x = 0, y = 0 }
+end
+
+--- Saves the detached anchor position for the given layout.
+---@param layoutName string
+---@param point string
+---@param x number
+---@param y number
+local function saveDetachedAnchorPosition(layoutName, point, x, y)
+    local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+    if not gc then
+        return
+    end
+    if type(gc.detachedAnchorPositions) ~= "table" then
+        gc.detachedAnchorPositions = {}
+    end
+    gc.detachedAnchorPositions[layoutName] = { point = point, x = x, y = y }
+end
+
+--- Creates and registers the detached anchor frame with LibEQOL.
+local function ensureDetachedAnchor()
+    if _detachedAnchor then
+        return _detachedAnchor
+    end
+
+    local frame = CreateFrame("Frame", "ECMDetachedAnchor", UIParent)
+    frame:SetFrameStrata("MEDIUM")
+    frame:SetSize(C.DEFAULT_BAR_WIDTH, 1)
+    frame:Hide()
+    _detachedAnchor = frame
+    ECM.DetachedAnchor = frame
+
+    local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+    frame.editModeName = "ECM: Detached Anchor"
+
+    LibEQOLEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
+        saveDetachedAnchorPosition(layoutName, point, x, y)
+        ECM.ScheduleLayoutUpdate(0, "DetachedAnchorDrag")
+    end, {
+        allowDrag = true,
+        showReset = true,
+        enableOverlayToggle = true,
+    })
+
+    LibEQOLEditMode:AddFrameSettings(frame, {
+        {
+            kind = LibEQOLEditMode.SettingType.Slider,
+            name = "Width",
+            get = function()
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                return (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+            end,
+            set = function(_, value)
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                if gc then
+                    gc.detachedBarWidth = value
+                    ECM.ScheduleLayoutUpdate(0, "DetachedAnchorWidth")
+                end
+            end,
+            default = C.DEFAULT_BAR_WIDTH,
+            minValue = 100,
+            maxValue = 600,
+            valueStep = 1,
+            allowInput = true,
+        },
+        {
+            kind = LibEQOLEditMode.SettingType.Slider,
+            name = "Spacing",
+            get = function()
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                return (gc and gc.detachedModuleSpacing) or 0
+            end,
+            set = function(_, value)
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                if gc then
+                    gc.detachedModuleSpacing = value
+                    ECM.ScheduleLayoutUpdate(0, "DetachedAnchorSpacing")
+                end
+            end,
+            default = 0,
+            minValue = 0,
+            maxValue = 20,
+            valueStep = 1,
+            allowInput = true,
+        },
+        {
+            kind = LibEQOLEditMode.SettingType.Dropdown,
+            name = "Grow Direction",
+            get = function()
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                return (gc and gc.detachedGrowDirection) or C.GROW_DIRECTION_DOWN
+            end,
+            set = function(_, value)
+                local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+                if gc then
+                    gc.detachedGrowDirection = value
+                    ECM.ScheduleLayoutUpdate(0, "DetachedAnchorGrowDirection")
+                end
+            end,
+            values = {
+                { label = "Down", value = C.GROW_DIRECTION_DOWN },
+                { label = "Up", value = C.GROW_DIRECTION_UP },
+            },
+        },
+    })
+
+    ECM.Log(nil, "Detached anchor created and registered with edit mode")
+    return frame
+end
+
+--- Updates the detached anchor frame's size and visibility.
+--- Shows the anchor when any module uses detached mode, hides otherwise.
+local function updateDetachedAnchorSize()
+    local hasDetached = ECM.HasDetachedModules()
+
+    if not hasDetached then
+        if _detachedAnchor and _detachedAnchor:IsShown() then
+            _detachedAnchor:Hide()
+        end
+        _detachedAnchorLayout = nil
+        return
+    end
+
+    local anchor = ensureDetachedAnchor()
+    local gc = mod.db and mod.db.profile and mod.db.profile[C.CONFIG_SECTION_GLOBAL]
+    local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+    local spacing = (gc and gc.detachedModuleSpacing) or 0
+
+    -- Sum heights of all visible detached modules
+    local totalHeight = 0
+    local count = 0
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+        local barModule = ns.Addon:GetECMModule(moduleName, true)
+        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
+            local mc = barModule:GetModuleConfig()
+            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED and barModule.InnerFrame then
+                local h = barModule.InnerFrame:GetHeight()
+                if h and h > 0 then
+                    totalHeight = totalHeight + h
+                    count = count + 1
+                end
+            end
+        end
+    end
+
+    if count > 1 then
+        totalHeight = totalHeight + (spacing * (count - 1))
+    end
+
+    ECM.FrameUtil.LazySetWidth(anchor, barWidth)
+    ECM.FrameUtil.LazySetHeight(anchor, math.max(totalHeight, 1))
+
+    -- Apply saved position only when first showing or after a layout switch;
+    -- continuous re-application fights with LibEQOL drag state and can reset
+    -- the anchor to the default position when the layout name is momentarily
+    -- unavailable during edit mode transitions.
+    local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+    local layoutName = LibEQOLEditMode:GetActiveLayoutName()
+    if not anchor:IsShown() or layoutName ~= _detachedAnchorLayout then
+        local pos = getDetachedAnchorPosition()
+        ECM.FrameUtil.LazySetAnchors(anchor, {
+            { pos.point, UIParent, pos.point, pos.x, pos.y },
+        })
+        _detachedAnchorLayout = layoutName
+    end
+
+    if not anchor:IsShown() then
+        anchor:Show()
+    end
+end
+
 local function updateAllLayouts(reason)
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
@@ -395,6 +606,8 @@ local function updateAllLayouts(reason)
             module:ThrottledUpdateLayout(reason)
         end
     end
+
+    updateDetachedAnchorSize()
 end
 
 --- Hooks CooldownViewerSettings hide to force alpha/layout reapplication.

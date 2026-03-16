@@ -293,7 +293,8 @@ function BuffBarsOptions.RegisterSettings(SB)
                 name = "Position Mode",
                 desc = "How this bar is positioned.",
                 values = {
-                    [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
+                    [C.ANCHORMODE_CHAIN] = "Attached to Cooldown Manager",
+                    [C.ANCHORMODE_DETACHED] = "Detached (shared anchor)",
                     [C.ANCHORMODE_FREE] = "Free (drag in Edit Mode)",
                 },
                 disabled = isDisabled,
@@ -314,9 +315,8 @@ function BuffBarsOptions.RegisterSettings(SB)
                 end,
                 parent = "positioning",
                 parentCheck = function()
-                    return ECM.OptionUtil.IsAnchorModeFree(
-                        ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars")
-                    )
+                    local cfg = ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars")
+                    return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
                 end,
                 order = 12,
             },

@@ -75,6 +75,10 @@ describe("PowerBarOptions getters/setters/defaults", function()
             settings["ECM_powerBar_anchorMode"]:SetValue("free")
             assert.are.equal("free", profile.powerBar.anchorMode)
         end)
+        it("setter accepts detached value", function()
+            settings["ECM_powerBar_anchorMode"]:SetValue("detached")
+            assert.are.equal("detached", profile.powerBar.anchorMode)
+        end)
     end)
 
     -- Height override composite

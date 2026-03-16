@@ -52,6 +52,7 @@ describe("OptionUtil", function()
         _G.ECM = {
             Constants = {
                 ANCHORMODE_CHAIN = 1,
+                ANCHORMODE_DETACHED = 3,
                 ANCHORMODE_FREE = 2,
             },
             ScheduleLayoutUpdate = function() end,

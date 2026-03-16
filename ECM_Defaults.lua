@@ -24,7 +24,7 @@
 ---@field fontSize number|nil Font size override for bar text.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase Power bar configuration.
 ---@field showManaAsPercent boolean Whether to show mana as a percent.
@@ -63,6 +63,10 @@
 ---@field fontOutline "NONE"|"OUTLINE"|"THICKOUTLINE"|"MONOCHROME" Font outline style.
 ---@field fontShadow boolean Whether font shadow is enabled.
 ---@field outOfCombatFade ECM_CombatFadeConfig Out of combat fade configuration.
+---@field detachedAnchorPositions table<string, ECM_EditModePosition>|nil Per-layout positions for the detached anchor frame.
+---@field detachedBarWidth number|nil Shared width for all detached bars.
+---@field detachedModuleSpacing number|nil Vertical gap between detached modules.
+---@field detachedGrowDirection "down"|"up"|nil Vertical grow direction for detached modules.
 
 ---@class ECM_BorderConfig Border configuration.
 ---@field enabled boolean Whether border is enabled.
@@ -83,7 +87,7 @@
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
 ---@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
@@ -164,6 +168,10 @@ local defaults = {
                 exceptIfTargetCanBeHelped = false,
                 exceptInInstance = true,
             },
+            detachedAnchorPositions = {},
+            detachedBarWidth = 300,
+            detachedModuleSpacing = 0,
+            detachedGrowDirection = C.GROW_DIRECTION_DOWN,
         },
         powerBar = {
             enabled = true,

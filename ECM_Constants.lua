@@ -25,6 +25,7 @@ local constants = {
     -- Configuration
     CONFIG_SECTION_GLOBAL = "global",
     ANCHORMODE_CHAIN = "chain",
+    ANCHORMODE_DETACHED = "detached",
     ANCHORMODE_FREE = "free",
     GROW_DIRECTION_DOWN = "down",
     GROW_DIRECTION_UP = "up",

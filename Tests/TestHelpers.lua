@@ -951,6 +951,7 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
         Constants = {
             ADDON_NAME = "Enhanced Cooldown Manager",
             ANCHORMODE_CHAIN = "chain",
+            ANCHORMODE_DETACHED = "detached",
             ANCHORMODE_FREE = "free",
             GROW_DIRECTION_DOWN = "down",
             GROW_DIRECTION_UP = "up",

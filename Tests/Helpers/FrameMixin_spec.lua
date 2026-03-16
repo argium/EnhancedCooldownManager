@@ -281,6 +281,66 @@ describe("FrameMixin real source", function()
         assert.is_true(isFirst)
     end)
 
+    it("GetNextChainAnchor with detached mode finds nearest prior detached module", function()
+        local order = ECM.Constants.CHAIN_ORDER
+        local detachedFrame = makeFrame({ name = order[2] })
+        local modules = {
+            [order[1]] = {
+                IsEnabled = function()
+                    return true
+                end,
+                ShouldShow = function()
+                    return true
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+                end,
+                InnerFrame = makeFrame({ name = order[1] }),
+            },
+            [order[2]] = {
+                IsEnabled = function()
+                    return true
+                end,
+                ShouldShow = function()
+                    return true
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_DETACHED }
+                end,
+                InnerFrame = detachedFrame,
+            },
+        }
+        ns.Addon.GetECMModule = function(_, name)
+            return modules[name]
+        end
+
+        local anchor, isFirst =
+            FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, order[3], ECM.Constants.ANCHORMODE_DETACHED)
+
+        assert.are.equal(detachedFrame, anchor)
+        assert.is_false(isFirst)
+    end)
+
+    it("GetNextChainAnchor with detached mode falls back to DetachedAnchor", function()
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local detachedAnchor = makeFrame({ name = "ECMDetachedAnchor" })
+        ECM.DetachedAnchor = detachedAnchor
+
+        local anchor, isFirst = FrameMixin.GetNextChainAnchor(
+            { Name = "TestModule" },
+            ECM.Constants.CHAIN_ORDER[1],
+            ECM.Constants.ANCHORMODE_DETACHED
+        )
+
+        assert.are.equal(detachedAnchor, anchor)
+        assert.is_true(isFirst)
+
+        ECM.DetachedAnchor = nil
+    end)
+
     it("SetHidden hides immediately and defers showing", function()
         local layoutCalls = {}
         local innerFrame = makeFrame({ shown = true })

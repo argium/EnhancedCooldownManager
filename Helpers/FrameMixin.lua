@@ -11,13 +11,21 @@ ECM.FrameMixin = FrameMixin
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
 LibEQOLEditMode:RegisterCallback("enter", function()
-    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeEnter") end)
+    C_Timer.After(0, function()
+        ECM.ScheduleLayoutUpdate(0, "EditModeEnter")
+        -- Hide selection overlays for chain/detached modules whose position
+        -- is controlled by their respective anchors, not individual dragging.
+        FrameMixin._UpdateNonFreeOverlays()
+    end)
 end)
 LibEQOLEditMode:RegisterCallback("exit", function()
     C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeExit") end)
 end)
 LibEQOLEditMode:RegisterCallback("layout", function()
-    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeLayout") end)
+    C_Timer.After(0, function()
+        ECM.ScheduleLayoutUpdate(0, "EditModeLayout")
+        FrameMixin._UpdateNonFreeOverlays()
+    end)
 end)
 
 ---@alias AnchorPoint string
@@ -30,9 +38,12 @@ end)
 
 --- Determine the correct anchor for this specific frame in the fixed order.
 --- @param frameName string|nil The name of the current frame, or nil if first in chain.
+--- @param anchorMode string|nil The anchor mode to filter by (defaults to ANCHORMODE_CHAIN).
 --- @return Frame The frame to anchor to.
 --- @return boolean isFirst True if this is the first frame in the chain.
-function FrameMixin:GetNextChainAnchor(frameName)
+function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
+    anchorMode = anchorMode or ECM.Constants.ANCHORMODE_CHAIN
+
     -- Find the ideal position
     local stopIndex = #ECM.Constants.CHAIN_ORDER + 1
     if frameName then
@@ -53,11 +64,17 @@ function FrameMixin:GetNextChainAnchor(frameName)
         local barModule = addon and addon:GetECMModule(barName, true)
         if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local moduleConfig = barModule:GetModuleConfig()
-            if moduleConfig and moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_CHAIN and barModule.InnerFrame then
+            if moduleConfig and moduleConfig.anchorMode == anchorMode and barModule.InnerFrame then
                 ECM.Log(self.Name, "GetNextChainAnchor " .. barName .. " <-- " .. (frameName or "nil"))
                 return barModule.InnerFrame, false
             end
         end
+    end
+
+    -- Root anchor depends on the mode being resolved.
+    if anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
+        ECM.Log(self.Name, "GetNextChainAnchor DetachedAnchor <-- " .. (frameName or "nil"))
+        return ECM.DetachedAnchor or UIParent, true
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
@@ -133,7 +150,7 @@ function FrameMixin.NormalizeGrowDirection(direction)
         or ECM.Constants.GROW_DIRECTION_DOWN
 end
 
---- Default layout parameter calculation for chain/free anchor modes.
+--- Default layout parameter calculation for chain/detached/free anchor modes.
 --- Modules with custom positioning (e.g. BuffBars) override this.
 ---@return table params Layout parameters: mode, anchor, isFirst, anchorPoint, anchorRelativePoint, offsetX, offsetY, width, height
 function FrameMixin:CalculateLayoutParams()
@@ -152,6 +169,25 @@ function FrameMixin:CalculateLayoutParams()
             offsetY = pos.y,
             height = moduleConfig.height or globalConfig.barHeight,
             width = moduleConfig.width or globalConfig.barWidth,
+        }
+    end
+
+    if moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
+        local anchor, isFirst = self:GetNextChainAnchor(self.Name, ECM.Constants.ANCHORMODE_DETACHED)
+        local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.detachedGrowDirection)
+            == ECM.Constants.GROW_DIRECTION_UP
+        local gap = isFirst and 0 or (globalConfig.detachedModuleSpacing or 0)
+        local anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
+
+        return {
+            mode = ECM.Constants.ANCHORMODE_DETACHED,
+            anchor = anchor,
+            isFirst = isFirst,
+            anchorPoint = anchorPoint,
+            anchorRelativePoint = isFirst and anchorPoint or (growsUp and "TOPLEFT" or "BOTTOMLEFT"),
+            offsetX = 0,
+            offsetY = growsUp and gap or -gap,
+            height = moduleConfig.height or globalConfig.barHeight,
         }
     end
 
@@ -190,7 +226,13 @@ function FrameMixin:ApplyFramePosition()
 
     local params = self:CalculateLayoutParams()
     local anchors
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+    if params.mode == ECM.Constants.ANCHORMODE_FREE then
+        assert(params.anchor ~= nil, "anchor required for free anchor mode")
+        anchors = {
+            { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
+        }
+    else
+        -- Chain and detached both use 2-point anchoring
         local lp = params.anchorPoint or "TOPLEFT"
         local lr = params.anchorRelativePoint or "BOTTOMLEFT"
         anchors = {
@@ -202,11 +244,6 @@ function FrameMixin:ApplyFramePosition()
                 params.offsetX,
                 params.offsetY,
             },
-        }
-    else
-        assert(params.anchor ~= nil, "anchor required for free anchor mode")
-        anchors = {
-            { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
         }
     end
 
@@ -369,6 +406,30 @@ function FrameMixin:_SaveEditModePosition(layoutName, point, x, y)
     cfg.editModePositions[layoutName] = { point = point, x = x, y = y }
 end
 
+--- Hides LibEQOL selection overlays for chain and detached modules.
+--- Only free-mode bars need their own overlay; chain bars move with the
+--- main anchor and detached bars move with the detached anchor.
+function FrameMixin._UpdateNonFreeOverlays()
+    if not LibEQOLEditMode:IsInEditMode() then
+        return
+    end
+    local addon = ns.Addon
+    if not addon then return end
+    local C = ECM.Constants
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+        local barModule = addon:GetECMModule(moduleName, true)
+        if barModule and barModule.InnerFrame then
+            local mc = barModule:GetModuleConfig()
+            if mc and mc.anchorMode ~= C.ANCHORMODE_FREE then
+                local selection = LibEQOLEditMode.selectionRegistry[barModule.InnerFrame]
+                if selection then
+                    selection:Hide()
+                end
+            end
+        end
+    end
+end
+
 --- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
 --- Called once during AddMixin after InnerFrame is created.
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
@@ -413,6 +474,10 @@ function FrameMixin:_RegisterEditMode()
             maxValue = 600,
             valueStep = 1,
             allowInput = true,
+            hidden = function()
+                local cfg = module:GetModuleConfig()
+                return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_DETACHED
+            end,
         },
     })
 end

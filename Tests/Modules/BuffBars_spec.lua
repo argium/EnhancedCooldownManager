@@ -895,6 +895,54 @@ describe("BuffBars real source", function()
         assert.is_nil(params.width)
     end)
 
+    it("delegates detached-mode layout params to FrameMixin", function()
+        local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
+        ECM.DetachedAnchor = detachedAnchor
+
+        -- Override the stub so FrameMixin.CalculateLayoutParams returns
+        -- detached-mode params (the real implementation requires GetNextChainAnchor
+        -- which isn't available in this test environment).
+        ECM.FrameMixin.CalculateLayoutParams = function(self)
+            local gc = self:GetGlobalConfig()
+            return {
+                mode = ECM.Constants.ANCHORMODE_DETACHED,
+                anchor = ECM.DetachedAnchor,
+                isFirst = true,
+                anchorPoint = "TOPLEFT",
+                anchorRelativePoint = "BOTTOMLEFT",
+                offsetX = 0,
+                offsetY = 0,
+                height = (gc and gc.barHeight) or 22,
+            }
+        end
+
+        BuffBars.GetModuleConfig = function()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_DETACHED,
+            }
+        end
+        BuffBars.GetGlobalConfig = function()
+            return {
+                barHeight = 22,
+                detachedGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN,
+                detachedModuleSpacing = 2,
+            }
+        end
+
+        local params = BuffBars:CalculateLayoutParams()
+
+        assert.are.equal(ECM.Constants.ANCHORMODE_DETACHED, params.mode)
+        assert.are.equal(detachedAnchor, params.anchor)
+        assert.is_true(params.isFirst)
+        assert.are.equal("TOPLEFT", params.anchorPoint)
+
+        ECM.DetachedAnchor = nil
+        -- Restore the default stub
+        ECM.FrameMixin.CalculateLayoutParams = function()
+            return {}
+        end
+    end)
+
     it("applies free-mode width from baseBarWidth and barWidthScale", function()
         local appliedWidths = {}
         ECM.FrameUtil.LazySetWidth = function(frame, value)

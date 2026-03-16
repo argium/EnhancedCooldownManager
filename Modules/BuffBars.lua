@@ -374,6 +374,8 @@ local function getLayoutState(params, cfg)
     local growsUp
     if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
         growsUp = params.anchorPoint == "BOTTOMLEFT"
+    elseif params.mode == ECM.Constants.ANCHORMODE_DETACHED then
+        growsUp = params.anchorPoint == "BOTTOMLEFT"
     else
         growsUp = NormalizeGrowDirection(cfg and cfg.freeGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
     end
@@ -416,7 +418,7 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
 end
 
 local function applyViewerPosition(viewer, params)
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
+    if params.mode ~= ECM.Constants.ANCHORMODE_FREE then
         local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
         local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
         local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
@@ -449,7 +451,7 @@ function BuffBars:CalculateLayoutParams()
     local cfg = self:GetModuleConfig()
     local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
-    if mode == ECM.Constants.ANCHORMODE_CHAIN then
+    if mode ~= ECM.Constants.ANCHORMODE_FREE then
         return FrameMixin.CalculateLayoutParams(self)
     end
 

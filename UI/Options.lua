@@ -181,7 +181,8 @@ local function createBarArgs(isDisabled, options)
             name = "Position Mode",
             desc = "How this bar is positioned.",
             values = {
-                [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
+                [C.ANCHORMODE_CHAIN] = "Attached to Cooldown Manager",
+                [C.ANCHORMODE_DETACHED] = "Detached (shared anchor)",
                 [C.ANCHORMODE_FREE] = "Free (drag in Edit Mode)",
             },
             disabled = isDisabled,
