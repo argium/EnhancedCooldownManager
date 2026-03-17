@@ -370,14 +370,39 @@ local function hookChildFrame(child, module)
     child.__ecmHooked = true
 end
 
-local function getLayoutState(params, cfg)
+local function getViewerPosition(module)
+    local cfg = module:GetModuleConfig()
+    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
+
+    if mode ~= ECM.Constants.ANCHORMODE_FREE then
+        local params = FrameMixin.CalculateLayoutParams(module)
+        return {
+            mode = params.mode,
+            anchor = params.anchor,
+            point = params.anchorPoint,
+            relativePoint = params.anchorRelativePoint,
+            x = params.offsetX,
+            y = params.offsetY,
+        }
+    end
+
+    local pos = module:GetEditModePosition()
+    return {
+        mode = mode,
+        anchor = UIParent,
+        point = pos.point,
+        relativePoint = pos.point,
+        x = pos.x,
+        y = pos.y,
+    }
+end
+
+local function getLayoutState(position, cfg)
     local growsUp
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
-        growsUp = params.anchorPoint == "BOTTOMLEFT"
-    elseif params.mode == ECM.Constants.ANCHORMODE_DETACHED then
-        growsUp = params.anchorPoint == "BOTTOMLEFT"
-    else
+    if position.mode == ECM.Constants.ANCHORMODE_FREE then
         growsUp = NormalizeGrowDirection(cfg and cfg.freeGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
+    else
+        growsUp = position.point == "BOTTOMLEFT"
     end
 
     local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
@@ -417,15 +442,15 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
     end
 end
 
-local function applyViewerPosition(viewer, params)
-    if params.mode ~= ECM.Constants.ANCHORMODE_FREE then
-        local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
-        local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
+local function applyViewerPosition(viewer, position)
+    if position.mode ~= ECM.Constants.ANCHORMODE_FREE then
+        local leftAnchorPoint = position.point or "TOPLEFT"
+        local leftRelativePoint = position.relativePoint or "BOTTOMLEFT"
         local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
         local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
         FrameUtil.LazySetAnchors(viewer, {
-            { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
-            { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
+            { leftAnchorPoint, position.anchor, leftRelativePoint, position.x, position.y },
+            { rightAnchorPoint, position.anchor, rightRelativePoint, position.x, position.y },
         })
         return
     end
@@ -438,28 +463,6 @@ local function applyViewerPosition(viewer, params)
             FrameUtil.LazySetWidth(viewer, width)
         end
     end
-end
-
---- Override to support Edit Mode positions in free mode.
----@return table params Layout parameters
-function BuffBars:CalculateLayoutParams()
-    local cfg = self:GetModuleConfig()
-    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
-
-    if mode ~= ECM.Constants.ANCHORMODE_FREE then
-        return FrameMixin.CalculateLayoutParams(self)
-    end
-
-    local pos = self:GetEditModePosition()
-    return {
-        mode = mode,
-        anchor = UIParent,
-        isFirst = false,
-        anchorPoint = pos.point,
-        anchorRelativePoint = pos.point,
-        offsetX = pos.x,
-        offsetY = pos.y,
-    }
 end
 
 --- Buff bars are backed by Blizzard's BuffBarCooldownViewer system frame.
@@ -517,9 +520,9 @@ function BuffBars:UpdateLayout(why)
         return false
     end
 
-    local params = self:CalculateLayoutParams()
-    local growsUp, verticalSpacing = getLayoutState(params, cfg)
-    applyViewerPosition(viewer, params)
+    local position = getViewerPosition(self)
+    local growsUp, verticalSpacing = getLayoutState(position, cfg)
+    applyViewerPosition(viewer, position)
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
     -- while we are actively styling and positioning bars.
@@ -538,13 +541,13 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = nil
     viewer:Show()
     ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
-        mode = params.mode,
+        mode = position.mode,
         childCount = #visibleChildren,
-        anchor = params.anchor and params.anchor:GetName() or "nil",
-        anchorPoint = params.anchorPoint,
-        anchorRelativePoint = params.anchorRelativePoint,
-        offsetX = params.offsetX,
-        offsetY = params.offsetY,
+        anchor = position.anchor and position.anchor:GetName() or "nil",
+        anchorPoint = position.point,
+        anchorRelativePoint = position.relativePoint,
+        offsetX = position.x,
+        offsetY = position.y,
     })
     return true
 end

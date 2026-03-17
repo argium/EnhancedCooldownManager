@@ -644,7 +644,7 @@ describe("Migration", function()
         -- powerBar: both offsets migrated, cleared
         assert.is_nil(profile.powerBar.offsetX)
         assert.is_nil(profile.powerBar.offsetY)
-        local pb = profile.powerBar.editModePositions["__migrated"]
+        local pb = profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
         assert.is_not_nil(pb)
         assert.are.equal("CENTER", pb.point) -- no anchorPoint field → defaults to CENTER
         assert.are.equal(5, pb.x)
@@ -653,20 +653,20 @@ describe("Migration", function()
         -- resourceBar: only offsetY was set
         assert.is_nil(profile.resourceBar.offsetX)
         assert.is_nil(profile.resourceBar.offsetY)
-        local rb = profile.resourceBar.editModePositions["__migrated"]
+        local rb = profile.resourceBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
         assert.is_not_nil(rb)
         assert.are.equal("CENTER", rb.point)
         assert.are.equal(0, rb.x) -- offsetX was nil → 0
         assert.are.equal(-300, rb.y)
 
         -- runeBar
-        local rune = profile.runeBar.editModePositions["__migrated"]
+        local rune = profile.runeBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
         assert.is_not_nil(rune)
         assert.are.equal(0, rune.x)
         assert.are.equal(-325, rune.y)
 
         -- buffBars: had anchorPoint, so that is used in the migrated position
-        local bb = profile.buffBars.editModePositions["__migrated"]
+        local bb = profile.buffBars.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
         assert.is_not_nil(bb)
         assert.are.equal("TOP", bb.point) -- came from cfg.anchorPoint
         assert.are.equal(10, bb.x)
@@ -724,8 +724,8 @@ describe("Migration", function()
         Migration.Run(profile)
 
         -- Migrated entry added alongside existing one
-        assert.is_not_nil(profile.powerBar.editModePositions["__migrated"])
-        assert.are.equal(-275, profile.powerBar.editModePositions["__migrated"].y)
+        assert.is_not_nil(profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY])
+        assert.are.equal(-275, profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY].y)
         -- Existing entry preserved
         assert.are.equal(50, profile.powerBar.editModePositions.Modern.x)
     end)

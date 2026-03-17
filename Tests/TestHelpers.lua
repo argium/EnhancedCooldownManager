@@ -150,7 +150,7 @@ function TestHelpers.SetupLibEQOLEditModeStub()
     lib.IsInEditMode = lib.IsInEditMode or function() return false end
     lib.SetFrameDragEnabled = lib.SetFrameDragEnabled or function() end
     lib.selectionRegistry = lib.selectionRegistry or {}
-    lib.SettingType = lib.SettingType or { Slider = 0 }
+    lib.SettingType = lib.SettingType or { Slider = 0, Dropdown = 1 }
     return lib
 end
 

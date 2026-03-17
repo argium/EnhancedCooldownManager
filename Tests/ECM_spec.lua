@@ -53,6 +53,13 @@ describe("ECM layout system", function()
         function frame:GetWidth()
             return self.__width
         end
+        function frame:SetSize(w, h)
+            self.__width = w
+            self.__height = h
+        end
+        function frame:SetFrameStrata(strata)
+            self.__frameStrata = strata
+        end
         function frame:SetPoint() end
         function frame:GetPoint() end
         function frame:GetNumPoints()
@@ -454,6 +461,51 @@ describe("ECM layout system", function()
             fakeTime = fakeTime + 1
             ECM.ScheduleLayoutUpdate(0, "re-enforce")
             assert.is_false(mod.InnerFrame:IsShown())
+        end)
+    end)
+
+    describe("detached anchor layout handling", function()
+        it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local lib = LibStub("LibEQOLEditMode-1.0")
+            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.global.detachedAnchorPositions = {
+                Modern = { point = "TOPLEFT", x = 10, y = 20 },
+                Raid = { point = "TOPRIGHT", x = 30, y = 40 },
+            }
+            mod.InnerFrame:SetHeight(24)
+            fakeAddon.GetECMModule = function(_, name)
+                return name == mod.Name and mod or nil
+            end
+
+            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+                frame.__ecmAnchorCache = anchors
+                frame.__anchors = anchors
+            end
+
+            lib.GetActiveLayoutName = function()
+                return "Modern"
+            end
+            ECM.ScheduleLayoutUpdate(0, "detached-initial")
+
+            local anchor = ECM.DetachedAnchor
+            assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
+
+            lib.GetActiveLayoutName = function()
+                return nil
+            end
+            ECM.ScheduleLayoutUpdate(0, "detached-transition")
+            assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
+
+            lib.GetActiveLayoutName = function()
+                return "Raid"
+            end
+            ECM.ScheduleLayoutUpdate(0, "detached-layout-switch")
+            assert.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 30, 40 }, anchor.__anchors[1])
+
+            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
     end)
 

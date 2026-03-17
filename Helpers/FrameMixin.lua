@@ -3,10 +3,94 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
+local C = ECM.Constants
 local FrameUtil = ECM.FrameUtil
 local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+local EditMode = ECM.EditMode or {}
+EditMode.Lib = LibEQOLEditMode
+ECM.EditMode = EditMode
 local FrameMixin = {}
 ECM.FrameMixin = FrameMixin
+
+function EditMode.GetActiveLayoutName()
+    return LibEQOLEditMode:GetActiveLayoutName()
+end
+
+---@param positions table<string, ECM_EditModePosition>|nil
+---@param fallbackKey string|nil
+---@param layoutName string|nil
+---@return ECM_EditModePosition
+---@return string|nil
+function EditMode.GetPosition(positions, fallbackKey, layoutName)
+    local activeLayoutName = layoutName
+    if activeLayoutName == nil then
+        activeLayoutName = EditMode.GetActiveLayoutName()
+    end
+
+    if type(positions) == "table" then
+        local position = activeLayoutName and positions[activeLayoutName]
+        if position then
+            return position, activeLayoutName
+        end
+
+        if fallbackKey and positions[fallbackKey] then
+            return positions[fallbackKey], activeLayoutName
+        end
+    end
+
+    return { point = C.EDIT_MODE_DEFAULT_POINT, x = 0, y = 0 }, activeLayoutName
+end
+
+---@param container table|nil
+---@param fieldName string
+---@param layoutName string
+---@param point string
+---@param x number
+---@param y number
+function EditMode.SavePosition(container, fieldName, layoutName, point, x, y)
+    if not container then
+        return
+    end
+
+    if type(container[fieldName]) ~= "table" then
+        container[fieldName] = {}
+    end
+
+    container[fieldName][layoutName] = { point = point, x = x, y = y }
+end
+
+---@param frame Frame|nil
+---@param options table
+function EditMode.RegisterFrame(frame, options)
+    if not frame then
+        return
+    end
+
+    frame.editModeName = options.name
+
+    LibEQOLEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
+        options.onPositionChanged(layoutName, point, x, y)
+    end, {
+        allowDrag = options.allowDrag,
+        showReset = options.showReset ~= false,
+        enableOverlayToggle = options.enableOverlayToggle ~= false,
+    })
+
+    if options.hideSelection then
+        local selection = LibEQOLEditMode.selectionRegistry[frame]
+        if selection then
+            selection:HookScript("OnShow", function(sel)
+                if options.hideSelection() then
+                    sel:Hide()
+                end
+            end)
+        end
+    end
+
+    if options.settings then
+        LibEQOLEditMode:AddFrameSettings(frame, options.settings)
+    end
+end
 
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
@@ -138,8 +222,49 @@ end
 ---@param direction string|nil
 ---@return string
 function FrameMixin.NormalizeGrowDirection(direction)
-    return direction == ECM.Constants.GROW_DIRECTION_UP and ECM.Constants.GROW_DIRECTION_UP
-        or ECM.Constants.GROW_DIRECTION_DOWN
+    return direction == C.GROW_DIRECTION_UP and C.GROW_DIRECTION_UP or C.GROW_DIRECTION_DOWN
+end
+
+---@param self FrameMixin
+---@param globalConfig table
+---@param moduleConfig table
+---@param mode string
+---@return table
+local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
+    local anchor
+    local isFirst
+    local growsUp
+    local gap
+
+    if mode == C.ANCHORMODE_DETACHED then
+        anchor, isFirst = self:GetNextChainAnchor(self.Name, mode)
+        growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.detachedGrowDirection) == C.GROW_DIRECTION_UP
+        gap = isFirst and 0 or ((globalConfig and globalConfig.detachedModuleSpacing) or 0)
+    else
+        mode = C.ANCHORMODE_CHAIN
+        anchor, isFirst = self:GetNextChainAnchor(self.Name)
+        growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection) == C.GROW_DIRECTION_UP
+        gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0) or ((globalConfig and globalConfig.moduleSpacing) or 0)
+    end
+
+    local anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
+    local anchorRelativePoint
+    if mode == C.ANCHORMODE_DETACHED then
+        anchorRelativePoint = isFirst and anchorPoint or (growsUp and "TOPLEFT" or "BOTTOMLEFT")
+    else
+        anchorRelativePoint = growsUp and "TOPLEFT" or "BOTTOMLEFT"
+    end
+
+    return {
+        mode = mode,
+        anchor = anchor,
+        isFirst = isFirst,
+        anchorPoint = anchorPoint,
+        anchorRelativePoint = anchorRelativePoint,
+        offsetX = 0,
+        offsetY = growsUp and gap or -gap,
+        height = moduleConfig.height or globalConfig.barHeight,
+    }
 end
 
 --- Default layout parameter calculation for chain/detached/free anchor modes.
@@ -148,11 +273,12 @@ end
 function FrameMixin:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
+    local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
 
-    if moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_FREE then
+    if mode == C.ANCHORMODE_FREE then
         local pos = self:GetEditModePosition()
         return {
-            mode = ECM.Constants.ANCHORMODE_FREE,
+            mode = C.ANCHORMODE_FREE,
             anchor = UIParent,
             isFirst = false,
             anchorPoint = pos.point,
@@ -164,40 +290,7 @@ function FrameMixin:CalculateLayoutParams()
         }
     end
 
-    if moduleConfig.anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
-        local anchor, isFirst = self:GetNextChainAnchor(self.Name, ECM.Constants.ANCHORMODE_DETACHED)
-        local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.detachedGrowDirection)
-            == ECM.Constants.GROW_DIRECTION_UP
-        local gap = isFirst and 0 or (globalConfig.detachedModuleSpacing or 0)
-        local anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
-
-        return {
-            mode = ECM.Constants.ANCHORMODE_DETACHED,
-            anchor = anchor,
-            isFirst = isFirst,
-            anchorPoint = anchorPoint,
-            anchorRelativePoint = isFirst and anchorPoint or (growsUp and "TOPLEFT" or "BOTTOMLEFT"),
-            offsetX = 0,
-            offsetY = growsUp and gap or -gap,
-            height = moduleConfig.height or globalConfig.barHeight,
-        }
-    end
-
-    local anchor, isFirst = self:GetNextChainAnchor(self.Name)
-    local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection)
-        == ECM.Constants.GROW_DIRECTION_UP
-    local gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0) or (globalConfig.moduleSpacing or 0)
-
-    return {
-        mode = ECM.Constants.ANCHORMODE_CHAIN,
-        anchor = anchor,
-        isFirst = isFirst,
-        anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT",
-        anchorRelativePoint = growsUp and "TOPLEFT" or "BOTTOMLEFT",
-        offsetX = 0,
-        offsetY = growsUp and gap or -gap,
-        height = moduleConfig.height or globalConfig.barHeight,
-    }
+    return getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
 end
 
 --- Applies positioning to a frame based on layout parameters.
@@ -369,17 +462,7 @@ end
 ---@return ECM_EditModePosition
 function FrameMixin:GetEditModePosition()
     local cfg = self:GetModuleConfig()
-    local positions = cfg and cfg.editModePositions
-    if positions then
-        local layoutName = LibEQOLEditMode:GetActiveLayoutName()
-        if layoutName and positions[layoutName] then
-            return positions[layoutName]
-        end
-        if positions["__migrated"] then
-            return positions["__migrated"]
-        end
-    end
-    return { point = "CENTER", x = 0, y = 0 }
+    return EditMode.GetPosition(cfg and cfg.editModePositions, C.EDIT_MODE_MIGRATED_KEY)
 end
 
 --- Saves an Edit Mode position for the given layout.
@@ -389,13 +472,7 @@ end
 ---@param y number Y offset.
 function FrameMixin:_SaveEditModePosition(layoutName, point, x, y)
     local cfg = self:GetModuleConfig()
-    if not cfg then
-        return
-    end
-    if type(cfg.editModePositions) ~= "table" then
-        cfg.editModePositions = {}
-    end
-    cfg.editModePositions[layoutName] = { point = point, x = x, y = y }
+    EditMode.SavePosition(cfg, "editModePositions", layoutName, point, x, y)
 end
 
 --- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
@@ -403,63 +480,46 @@ end
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
 function FrameMixin:_RegisterEditMode()
     local frame = self.InnerFrame
-    if not frame then
-        return
-    end
-
-    frame.editModeName = "ECM: " .. self.Name
-
     local module = self
-    LibEQOLEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
-        module:_SaveEditModePosition(layoutName, point, x, y)
-        module:ThrottledUpdateLayout("EditModeDrag")
-    end, {
+    EditMode.RegisterFrame(frame, {
+        name = "ECM: " .. self.Name,
+        onPositionChanged = function(layoutName, point, x, y)
+            module:_SaveEditModePosition(layoutName, point, x, y)
+            module:ThrottledUpdateLayout("EditModeDrag")
+        end,
         allowDrag = function()
             local cfg = module:GetModuleConfig()
-            return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
+            return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
         end,
-        showReset = true,
-        enableOverlayToggle = true,
-    })
-
-    -- Hook the selection overlay so it stays hidden for chain/detached modules.
-    -- LibEQOL's resetSelectionIndicators calls ShowHighlighted (→ Show) on every
-    -- selection during edit mode; this OnShow hook re-hides it immediately when
-    -- the module isn't in free mode, making the suppression durable.
-    local selection = LibEQOLEditMode.selectionRegistry[frame]
-    if selection then
-        selection:HookScript("OnShow", function(sel)
+        hideSelection = function()
             local cfg = module:GetModuleConfig()
-            if cfg and cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
-                sel:Hide()
-            end
-        end)
-    end
-
-    LibEQOLEditMode:AddFrameSettings(frame, {
-        {
-            kind = LibEQOLEditMode.SettingType.Slider,
-            name = "Width",
-            get = function()
-                local cfg = module:GetModuleConfig()
-                return (cfg and cfg.width) or ECM.Constants.DEFAULT_BAR_WIDTH
-            end,
-            set = function(_, value)
-                local cfg = module:GetModuleConfig()
-                if cfg then
-                    cfg.width = value
-                    module:ThrottledUpdateLayout("EditModeWidth")
-                end
-            end,
-            default = ECM.Constants.DEFAULT_BAR_WIDTH,
-            minValue = 100,
-            maxValue = 600,
-            valueStep = 1,
-            allowInput = true,
-            hidden = function()
-                local cfg = module:GetModuleConfig()
-                return cfg and cfg.anchorMode == ECM.Constants.ANCHORMODE_DETACHED
-            end,
+            return cfg and cfg.anchorMode ~= C.ANCHORMODE_FREE
+        end,
+        settings = {
+            {
+                kind = LibEQOLEditMode.SettingType.Slider,
+                name = "Width",
+                get = function()
+                    local cfg = module:GetModuleConfig()
+                    return (cfg and cfg.width) or C.DEFAULT_BAR_WIDTH
+                end,
+                set = function(_, value)
+                    local cfg = module:GetModuleConfig()
+                    if cfg then
+                        cfg.width = value
+                        module:ThrottledUpdateLayout("EditModeWidth")
+                    end
+                end,
+                default = C.DEFAULT_BAR_WIDTH,
+                minValue = 100,
+                maxValue = 600,
+                valueStep = 1,
+                allowInput = true,
+                hidden = function()
+                    local cfg = module:GetModuleConfig()
+                    return cfg and cfg.anchorMode == C.ANCHORMODE_DETACHED
+                end,
+            },
         },
     })
 end
@@ -487,7 +547,7 @@ function FrameMixin.AddMixin(target, name)
     end
 
     target.IsHidden = false
-    if target.ShouldRegisterEditMode == nil or target:ShouldRegisterEditMode() then
+    if target:ShouldRegisterEditMode() then
         target:_RegisterEditMode()
     end
 end

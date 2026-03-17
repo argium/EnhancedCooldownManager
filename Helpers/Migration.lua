@@ -1064,10 +1064,10 @@ function Migration.Run(profile)
                         x = ox or 0,
                         y = oy or 0,
                     }
-                    cfg.editModePositions["__migrated"] = migrated
+                    cfg.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY] = migrated
                     cfg.offsetX = nil
                     cfg.offsetY = nil
-                    log(section .. ": migrated to editModePositions.__migrated"
+                    log(section .. ": migrated to editModePositions." .. ECM.Constants.EDIT_MODE_MIGRATED_KEY
                         .. " point=" .. migrated.point
                         .. " x=" .. migrated.x
                         .. " y=" .. migrated.y)

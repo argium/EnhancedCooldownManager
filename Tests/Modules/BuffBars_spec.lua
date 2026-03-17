@@ -872,48 +872,27 @@ describe("BuffBars real source", function()
         assert.is_false(BuffBars:IsReady())
     end)
 
-    it("returns free-mode layout params from Edit Mode positions", function()
-        BuffBars.GetModuleConfig = function()
-            return {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
-                editModePositions = {
-                    ["__migrated"] = { point = "TOP", x = 10, y = 20 },
-                },
-            }
-        end
-        BuffBars.GetEditModePosition = function()
-            return { point = "TOP", x = 10, y = 20 }
-        end
-
-        local params = BuffBars:CalculateLayoutParams()
-
-        assert.are.equal(ECM.Constants.ANCHORMODE_FREE, params.mode)
-        assert.are.equal("TOP", params.anchorPoint)
-        assert.are.equal("TOP", params.anchorRelativePoint)
-        assert.are.equal(10, params.offsetX)
-        assert.are.equal(20, params.offsetY)
-        assert.is_nil(params.width)
-    end)
-
-    it("delegates detached-mode layout params to FrameMixin", function()
+    it("uses FrameMixin positioning for detached mode", function()
         local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
         ECM.DetachedAnchor = detachedAnchor
+        local originalCalculateLayoutParams = ECM.FrameMixin.CalculateLayoutParams
+        local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
-        -- Override the stub so FrameMixin.CalculateLayoutParams returns
-        -- detached-mode params (the real implementation requires GetNextChainAnchor
-        -- which isn't available in this test environment).
         ECM.FrameMixin.CalculateLayoutParams = function(self)
             local gc = self:GetGlobalConfig()
             return {
                 mode = ECM.Constants.ANCHORMODE_DETACHED,
                 anchor = ECM.DetachedAnchor,
-                isFirst = true,
                 anchorPoint = "TOPLEFT",
                 anchorRelativePoint = "BOTTOMLEFT",
                 offsetX = 0,
-                offsetY = 0,
+                offsetY = -2,
                 height = (gc and gc.barHeight) or 22,
             }
+        end
+        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            frame.__ecmAnchorCache = anchors
+            frame.__anchors = anchors
         end
 
         BuffBars.GetModuleConfig = function()
@@ -928,19 +907,24 @@ describe("BuffBars real source", function()
                 detachedModuleSpacing = 2,
             }
         end
+        function BuffBarCooldownViewer:GetChildren()
+            return
+        end
+        function BuffBars:ShouldShow()
+            return true
+        end
 
-        local params = BuffBars:CalculateLayoutParams()
+        local result = BuffBars:UpdateLayout("test")
 
-        assert.are.equal(ECM.Constants.ANCHORMODE_DETACHED, params.mode)
-        assert.are.equal(detachedAnchor, params.anchor)
-        assert.is_true(params.isFirst)
-        assert.are.equal("TOPLEFT", params.anchorPoint)
+        assert.is_true(result)
+        assert.are.equal("TOPLEFT", BuffBarCooldownViewer.__anchors[1][1])
+        assert.are.equal(detachedAnchor, BuffBarCooldownViewer.__anchors[1][2])
+        assert.are.equal("BOTTOMLEFT", BuffBarCooldownViewer.__anchors[1][3])
+        assert.are.equal(-2, BuffBarCooldownViewer.__anchors[1][5])
 
         ECM.DetachedAnchor = nil
-        -- Restore the default stub
-        ECM.FrameMixin.CalculateLayoutParams = function()
-            return {}
-        end
+        ECM.FrameMixin.CalculateLayoutParams = originalCalculateLayoutParams
+        ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 
     it("applies free-mode width from baseBarWidth and barWidthScale", function()
@@ -963,7 +947,7 @@ describe("BuffBars real source", function()
             return {
                 anchorMode = ECM.Constants.ANCHORMODE_FREE,
                 editModePositions = {
-                    ["__migrated"] = { point = "CENTER", x = 12, y = -34 },
+                    [ECM.Constants.EDIT_MODE_MIGRATED_KEY] = { point = "CENTER", x = 12, y = -34 },
                 },
             }
         end

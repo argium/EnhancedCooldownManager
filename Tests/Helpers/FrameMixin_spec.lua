@@ -281,6 +281,37 @@ describe("FrameMixin real source", function()
         assert.is_true(isFirst)
     end)
 
+    it("CalculateLayoutParams keeps the first chained module anchored below the viewer", function()
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local mod = {
+            Name = ECM.Constants.CHAIN_ORDER[1],
+            GetGlobalConfig = function()
+                return {
+                    moduleGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN,
+                    offsetY = 4,
+                    barHeight = 20,
+                }
+            end,
+            GetModuleConfig = function()
+                return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+            end,
+            GetNextChainAnchor = FrameMixin.GetNextChainAnchor,
+            NormalizeGrowDirection = FrameMixin.NormalizeGrowDirection,
+        }
+
+        local params = FrameMixin.CalculateLayoutParams(mod)
+
+        assert.are.equal(ECM.Constants.ANCHORMODE_CHAIN, params.mode)
+        assert.are.equal(EssentialCooldownViewer, params.anchor)
+        assert.is_true(params.isFirst)
+        assert.are.equal("TOPLEFT", params.anchorPoint)
+        assert.are.equal("BOTTOMLEFT", params.anchorRelativePoint)
+        assert.are.equal(-4, params.offsetY)
+    end)
+
     it("GetNextChainAnchor with detached mode finds nearest prior detached module", function()
         local order = ECM.Constants.CHAIN_ORDER
         local detachedFrame = makeFrame({ name = order[2] })
@@ -398,6 +429,24 @@ describe("FrameMixin real source", function()
 
         timerQueue[3].callback()
         assert.same({ "First", "SecondPass" }, updateReasons)
+    end)
+
+    it("GetEditModePosition falls back to the migrated layout entry", function()
+        local mod = {
+            GetModuleConfig = function()
+                return {
+                    editModePositions = {
+                        [ECM.Constants.EDIT_MODE_MIGRATED_KEY] = { point = "TOP", x = 12, y = -34 },
+                    },
+                }
+            end,
+        }
+
+        local position = FrameMixin.GetEditModePosition(mod)
+
+        assert.are.equal("TOP", position.point)
+        assert.are.equal(12, position.x)
+        assert.are.equal(-34, position.y)
     end)
 
     it("AddMixin skips Edit Mode registration when the module opts out", function()

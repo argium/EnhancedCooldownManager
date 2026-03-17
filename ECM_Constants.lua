@@ -29,6 +29,8 @@ local constants = {
     ANCHORMODE_FREE = "free",
     GROW_DIRECTION_DOWN = "down",
     GROW_DIRECTION_UP = "up",
+    EDIT_MODE_DEFAULT_POINT = "CENTER",
+    EDIT_MODE_MIGRATED_KEY = "__migrated",
 
     -- Default or fallback values for configuration
     DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
