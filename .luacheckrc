@@ -1,7 +1,15 @@
 std = "lua51"
 max_line_length = false
 exclude_files = {
-    "libs/",
+    "Libs/AceAddon-3.0/",
+    "Libs/AceDB-3.0/",
+    "Libs/AceEvent-3.0/",
+    "Libs/CallbackHandler-1.0/",
+    "Libs/LibDeflate/",
+    "Libs/LibEQOL/",
+    "Libs/LibSerialize/",
+    "Libs/LibSharedMedia-3.0/",
+    "Libs/LibStub/",
     "Tests/",
     ".luacheckrc"
 }
