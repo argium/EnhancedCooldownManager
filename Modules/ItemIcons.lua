@@ -4,7 +4,7 @@
 
 local _, ns = ...
 local FrameMixin = ECM.FrameMixin
-local ItemIcons = ns.Addon:NewModule("ItemIcons", "AceEvent-3.0")
+local ItemIcons = ns.Addon:NewModule("ItemIcons")
 ns.Addon.ItemIcons = ItemIcons
 
 ---@class ECM_ItemIconsModule : ModuleMixin

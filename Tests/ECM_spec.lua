@@ -14,6 +14,7 @@ describe("ECM layout system", function()
     local addonVersion
     local printedMessages
     local fakeAddon
+    local defaultModuleLibraries
 
     --- Lightweight frame stub for ECM integration tests (no call tracking needed)
     local function makeFrame(opts)
@@ -238,6 +239,8 @@ describe("ECM layout system", function()
         "CANCEL",
         "OKAY",
         "CooldownViewerSettings",
+        "SlashCmdList",
+        "hash_SlashCmdList",
     }
 
     setup(function()
@@ -255,6 +258,7 @@ describe("ECM layout system", function()
         cvarEnabled = true
         addonVersion = "v0.6.1"
         printedMessages = {}
+        defaultModuleLibraries = {}
 
         _G.GetTime = function()
             return fakeTime
@@ -341,17 +345,24 @@ describe("ECM layout system", function()
         fakeAddon = {
             RegisterChatCommand = function() end,
             RegisterEvent = function() end,
+            SetDefaultModuleLibraries = function() end,
             UnregisterEvent = function() end,
             EnableModule = function() end,
             DisableModule = function() end,
         }
+        fakeAddon.SetDefaultModuleLibraries = function(_, ...)
+            defaultModuleLibraries = { ... }
+        end
         TestHelpers.SetupLibStub()
+        _G.SlashCmdList = {}
+        _G.hash_SlashCmdList = {}
         local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
         aceAddon.NewAddon = function(_, n)
             fakeAddon.name = n
             return fakeAddon
         end
         TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
         _G.ECM = {}
@@ -527,6 +538,36 @@ describe("ECM layout system", function()
             for _, message in ipairs(printedMessages) do
                 assert.is_nil(message:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
             end
+        end)
+    end)
+
+    describe("initialization wiring", function()
+        it("sets LibEvent as the default module library on addon creation", function()
+            assert.same({ "LibEvent-1.0" }, defaultModuleLibraries)
+        end)
+
+        it("registers both slash commands through LibConsole during OnInitialize", function()
+            local chatInputs = {}
+            local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
+            aceDB.New = function()
+                return { profile = TestHelpers.deepClone(ECM.defaults.profile) }
+            end
+
+            function fakeAddon:ChatCommand(input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            fakeAddon:OnInitialize()
+
+            assert.is_function(SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER)
+            assert.is_function(SlashCmdList.LIBCONSOLE_ECM)
+            assert.are.equal("/enhancedcooldownmanager", _G.SLASH_LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER1)
+            assert.are.equal("/ecm", _G.SLASH_LIBCONSOLE_ECM1)
+
+            SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER("from-long")
+            SlashCmdList.LIBCONSOLE_ECM("from-short")
+
+            assert.same({ "from-long", "from-short" }, chatInputs)
         end)
     end)
 end)

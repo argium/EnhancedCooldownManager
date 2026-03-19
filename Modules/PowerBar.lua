@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local PowerBar = ns.Addon:NewModule("PowerBar", "AceEvent-3.0")
+local PowerBar = ns.Addon:NewModule("PowerBar")
 ns.Addon.PowerBar = PowerBar
 
 --- Returns the tick marks configured for the current class and spec.

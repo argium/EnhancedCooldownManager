@@ -154,7 +154,7 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = "Paste a previously exported profile string to import settings.",
         onClick = function()
             if InCombatLockdown() then
-                ns.Addon:Print("Cannot import during combat (reload blocked)")
+                ECM.Print("Cannot import during combat (reload blocked)")
                 return
             end
             ns.Addon:ShowImportDialog()
@@ -168,7 +168,7 @@ function ProfileOptions.RegisterSettings(SB)
         onClick = function()
             local exportString, err = ECM.ImportExport.ExportCurrentProfile()
             if not exportString then
-                ns.Addon:Print("Export failed: " .. (err or "Unknown error"))
+                ECM.Print("Export failed: " .. (err or "Unknown error"))
                 return
             end
             ns.Addon:ShowExportDialog(exportString)

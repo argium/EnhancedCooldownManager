@@ -194,7 +194,7 @@ function BarMixin:Refresh(why, force)
 
     -- Values: apply min/max before value so startup/transient states do not
     -- render full when current is zero.
-    local current, max, displayValue, isFraction = self:GetStatusBarValues()
+    local current, max, displayValue = self:GetStatusBarValues()
     if max == nil then
         max = 1
     end
@@ -259,12 +259,12 @@ function BarMixin:CreateFrame()
     frame.TextValue:SetJustifyH("CENTER")
     frame.TextValue:SetJustifyV("MIDDLE")
 
-    function frame:SetText(text)
-        self.TextValue:SetText(text)
+    function frame.SetText(_, text)
+        frame.TextValue:SetText(text)
     end
 
-    function frame:SetTextVisible(shown)
-        self.TextFrame:SetShown(shown)
+    function frame.SetTextVisible(_, shown)
+        frame.TextFrame:SetShown(shown)
     end
 
     ECM.Log(self.Name, "Frame created.")

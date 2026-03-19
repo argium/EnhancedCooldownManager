@@ -13,8 +13,8 @@ Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 
 Libs\AceAddon-3.0\AceAddon-3.0.xml
-Libs\AceEvent-3.0\AceEvent-3.0.xml
-Libs\AceConsole-3.0\AceConsole-3.0.xml
+Libs\LibEvent\LibEvent.lua
+Libs\LibConsole\LibConsole.lua
 Libs\AceDB-3.0\AceDB-3.0.xml
 Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml

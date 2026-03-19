@@ -5,7 +5,7 @@ A World of Warcraft retail addon that creates a clean combat HUD around Blizzard
 
 ## Tech Stack
 - **Language**: Lua 5.1 (WoW embedded runtime)
-- **Libraries**: AceAddon-3.0, AceEvent-3.0, AceConsole-3.0, AceDB-3.0, LibSharedMedia-3.0, LibSerialize, LibDeflate, LibEQOL, LibSettingsBuilder
+- **Libraries**: AceAddon-3.0, LibEvent-1.0, AceConsole-3.0, AceDB-3.0, LibSharedMedia-3.0, LibSerialize, LibDeflate, LibEQOL, LibSettingsBuilder
 - **Testing**: Busted (Lua test framework)
 - **Linting**: luacheck
 - **License**: GNU GPLv3, Author: Argium

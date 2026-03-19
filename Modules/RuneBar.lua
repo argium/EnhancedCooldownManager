@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local RuneBar = ns.Addon:NewModule("RuneBar", "AceEvent-3.0")
+local RuneBar = ns.Addon:NewModule("RuneBar")
 local ClassUtil = ECM.ClassUtil
 local C, FrameMixin = ECM.Constants, ECM.FrameMixin
 ns.Addon.RuneBar = RuneBar

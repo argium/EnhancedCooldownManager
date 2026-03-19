@@ -3,7 +3,8 @@
 -- Licensed under the GNU General Public License v3.0
 
 local ADDON_NAME, ns = ...
-local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
+local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "LibEvent-1.0")
+mod:SetDefaultModuleLibraries("LibEvent-1.0")
 ns.Addon = mod
 ECM = ECM or {}
 assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
@@ -12,6 +13,7 @@ assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 assert(ECM.FrameMixin, "FrameMixin.lua must be loaded before ECM.lua")
 assert(ECM.EditMode, "FrameMixin.lua must initialize ECM.EditMode before ECM.lua")
 
+local LibConsole = LibStub("LibConsole-1.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local C = ECM.Constants
@@ -175,15 +177,9 @@ function ECM.CloneValue(value)
     return copy
 end
 
-function ECM.Print(...)
-    local prefix = ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
-    local args = { ... }
-    for i = 1, #args do
-        args[i] = tostring(args[i])
-    end
-    local message = table.concat(args, " ")
-    print(prefix .. " " .. message)
-end
+ECM.Print = LibConsole:NewPrinter(function(message)
+    print(ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":") .. " " .. message)
+end)
 
 function ECM.Log(module, message, data)
     if not isDebugEnabled() then
@@ -935,13 +931,13 @@ function mod:ShowImportDialog()
             local input = importFrame.Scroll.ScrollBox.EditBox:GetText()
 
             if strtrim(input) == "" then
-                mod:Print("Import cancelled: no string provided")
+                ECM.Print("Import cancelled: no string provided")
                 return
             end
 
             local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
             if not data then
-                mod:Print("Import failed: " .. (errorMsg or "unknown error"))
+                ECM.Print("Import failed: " .. (errorMsg or "unknown error"))
                 return
             end
 
@@ -956,7 +952,7 @@ function mod:ShowImportDialog()
             mod:ConfirmReloadUI(confirmText, function()
                 local success, applyErr = ECM.ImportExport.ApplyImportData(data)
                 if not success then
-                    mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                    ECM.Print("Import apply failed: " .. (applyErr or "unknown error"))
                 end
             end, nil)
         end)
@@ -1108,8 +1104,8 @@ function mod:OnInitialize()
         )
     end
 
-    self:RegisterChatCommand("enhancedcooldownmanager", "ChatCommand")
-    self:RegisterChatCommand("ecm", "ChatCommand")
+    LibConsole:RegisterCommand("enhancedcooldownmanager", function(input) mod:ChatCommand(input) end)
+    LibConsole:RegisterCommand("ecm", function(input) mod:ChatCommand(input) end)
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.

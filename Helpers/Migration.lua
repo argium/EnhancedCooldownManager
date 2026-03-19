@@ -203,13 +203,13 @@ local function migrateToPerSpellColors(profile)
 
     local perSpell = cfg.colors.perSpell
 
-    local function doSpellMigration(perBar, perSpell, cache)
-        for i, v in ipairs(cache) do
+    local function doSpellMigration(perBarStore, perSpellStore, cacheStore)
+        for i, v in ipairs(cacheStore) do
             if not v.color and v.spellName then
-                local bc = perBar[i]
+                local bc = perBarStore[i]
                 if bc then
-                    perSpell[v.spellName] = bc
-                    cache[i] = {
+                    perSpellStore[v.spellName] = bc
+                    cacheStore[i] = {
                         lastSeen = v.lastSeen,
                         spellName = v.spellName,
                     }
@@ -219,7 +219,7 @@ local function migrateToPerSpellColors(profile)
     end
 
     for classID, spec in pairs(perBar) do
-        for specID, colors in pairs(spec) do
+        for specID in pairs(spec) do
             if not perSpell[classID] then
                 perSpell[classID] = {}
             end
@@ -1143,11 +1143,7 @@ function Migration.PrepareDatabase()
             alignSlotProfileSchemas(versions[version], priorVersion)
         elseif sv.profiles then
             -- Seed from legacy top-level AceDB data (pre-versioning addon builds)
-            local hasProfiles = false
-            for _ in pairs(sv.profiles) do
-                hasProfiles = true
-                break
-            end
+            local hasProfiles = next(sv.profiles) ~= nil
 
             if hasProfiles then
                 log("Copying legacy profiles to versioned store V" .. version)

@@ -45,6 +45,8 @@ describe("Utilities", function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
             "LibStub",
+            "SlashCmdList",
+            "hash_SlashCmdList",
             "issecretvalue",
             "issecrettable",
             "InCombatLockdown",
@@ -62,6 +64,7 @@ describe("Utilities", function()
         }
         addonNS = {
             Addon = {
+                SetDefaultModuleLibraries = function() end,
                 db = {
                     profile = {
                         global = {
@@ -76,6 +79,8 @@ describe("Utilities", function()
         }
 
         TestHelpers.SetupLibStub()
+        _G.SlashCmdList = {}
+        _G.hash_SlashCmdList = {}
         local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
         aceAddon.NewAddon = function()
             return addonNS.Addon
@@ -99,6 +104,7 @@ describe("Utilities", function()
         _G.issecrettable = function() return false end
         _G.InCombatLockdown = function() return false end
 
+        TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, addonNS)

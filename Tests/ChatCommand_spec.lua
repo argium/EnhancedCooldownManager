@@ -8,6 +8,7 @@ local TestHelpers =
 describe("ChatCommand migration", function()
     local originalGlobals
     local mod
+    local fakeAddon
     local printedMessages
     local confirmReloadCalls
     local printInfoCalled
@@ -15,6 +16,8 @@ describe("ChatCommand migration", function()
     local openOptionsCalls
     local registeredEvents
     local unregisteredEvents
+    local scheduleLayoutCalls
+    local defaultModuleLibraries
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -27,6 +30,33 @@ describe("ChatCommand migration", function()
             "NO",
             "ReloadUI",
             "strtrim",
+            "issecretvalue",
+            "issecrettable",
+            "C_Timer",
+            "C_AddOns",
+            "C_CVar",
+            "GetTime",
+            "UIParent",
+            "CreateFrame",
+            "IsMounted",
+            "UnitInVehicle",
+            "UnitOnTaxi",
+            "IsResting",
+            "UnitExists",
+            "UnitIsDead",
+            "UnitCanAttack",
+            "UnitCanAssist",
+            "IsInInstance",
+            "Enum",
+            "print",
+            "DevTool",
+            "AddonCompartmentFrame",
+            "CLOSE",
+            "CANCEL",
+            "OKAY",
+            "CooldownViewerSettings",
+            "SlashCmdList",
+            "hash_SlashCmdList",
         })
     end)
 
@@ -42,6 +72,8 @@ describe("ChatCommand migration", function()
         openOptionsCalls = 0
         registeredEvents = {}
         unregisteredEvents = {}
+        scheduleLayoutCalls = {}
+        defaultModuleLibraries = {}
 
         _G.strtrim = function(s)
             return tostring(s):match("^%s*(.-)%s*$")
@@ -49,31 +81,124 @@ describe("ChatCommand migration", function()
         _G.InCombatLockdown = function()
             return false
         end
+        _G.IsMounted = function()
+            return false
+        end
+        _G.UnitInVehicle = function()
+            return false
+        end
+        _G.UnitOnTaxi = function()
+            return false
+        end
+        _G.IsResting = function()
+            return false
+        end
+        _G.UnitExists = function()
+            return false
+        end
+        _G.UnitIsDead = function()
+            return false
+        end
+        _G.UnitCanAttack = function()
+            return false
+        end
+        _G.UnitCanAssist = function()
+            return false
+        end
+        _G.IsInInstance = function()
+            return false
+        end
+        _G.issecretvalue = function()
+            return false
+        end
+        _G.issecrettable = function()
+            return false
+        end
         _G.StaticPopupDialogs = {}
         _G.StaticPopup_Show = function() end
         _G.YES = "Yes"
         _G.NO = "No"
         _G.ReloadUI = function() end
+        _G.GetTime = function()
+            return 0
+        end
+        _G.C_Timer = {
+            After = function(_, callback)
+                callback()
+            end,
+            NewTicker = function() end,
+        }
+        _G.C_AddOns = {
+            GetAddOnMetadata = function()
+                return "v0.0.0"
+            end,
+        }
+        _G.C_CVar = {
+            GetCVarBool = function()
+                return true
+            end,
+            SetCVar = function() end,
+        }
+        _G.Enum = {}
+        _G.DevTool = nil
+        _G.AddonCompartmentFrame = nil
+        _G.CLOSE = "Close"
+        _G.CANCEL = "Cancel"
+        _G.OKAY = "Okay"
+        _G.CooldownViewerSettings = nil
+        _G.SlashCmdList = {}
+        _G.hash_SlashCmdList = {}
+        _G.print = function(...) end
+        _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
+        _G.CreateFrame = function(_, name)
+            local frame = TestHelpers.makeFrame({ name = name })
+            frame.SetFrameStrata = function() end
+            frame.SetBackdrop = function() end
+            frame.SetBackdropColor = function() end
+            frame.SetBackdropBorderColor = function() end
+            frame.EnableMouse = function() end
+            frame.CreateFontString = function()
+                local fontString = TestHelpers.makeRegion("FontString")
+                fontString.SetPoint = function() end
+                fontString.SetText = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                return fontString
+            end
+            frame.SetSize = function() end
+            frame.SetPoint = function() end
+            frame.Hide = function(self)
+                self.__shown = false
+            end
+            frame.Show = function(self)
+                self.__shown = true
+            end
+            frame.IsShown = function(self)
+                return self.__shown ~= false
+            end
+            frame.HookScript = function() end
+            return frame
+        end
 
         _G.ECM = {}
         _G.ECM.Log = function() end
-        _G.ECM.Print = function(...)
-            local args = { ... }
-            for i = 1, #args do
-                args[i] = tostring(args[i])
-            end
-            printedMessages[#printedMessages + 1] = table.concat(args, " ")
-        end
         _G.ECM.ColorUtil = {
             Sparkle = function(s)
                 return s
             end,
         }
-        _G.ECM.ScheduleLayoutUpdate = function() end
+        _G.ECM.ScheduleLayoutUpdate = function(delay, reason)
+            scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
+        end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+    TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
+        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
 
         _G.ECM.Migration = {
+            PrepareDatabase = function() end,
+            Run = function() end,
+            FlushLog = function() end,
             PrintInfo = function()
                 printInfoCalled = true
             end,
@@ -85,31 +210,44 @@ describe("ChatCommand migration", function()
             end,
             Rollback = function() end,
         }
+        _G.ECM.EditMode = {
+            Lib = {
+                IsInEditMode = function()
+                    return false
+                end,
+                RegisterFrame = function() end,
+                GetActiveLayoutName = function()
+                    return "Modern"
+                end,
+            },
+            GetPosition = function()
+                return { point = "CENTER", x = 0, y = 0 }
+            end,
+            SavePosition = function() end,
+            RegisterFrame = function() end,
+            GetActiveLayoutName = function()
+                return "Modern"
+            end,
+        }
+
+        TestHelpers.SetupLibStub()
+    TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
+        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
+        TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         -- Minimal AceAddon mock
-        local addonMethods = {}
-        _G.LibStub = function()
-            return {
-                NewAddon = function(_, name, ...)
-                    addonMethods._name = name
-                    return addonMethods
-                end,
-                New = function()
-                    return { profile = { global = { debug = false } } }
-                end,
-                GetLib = function()
-                    return nil
-                end,
-            }
-        end
-        addonMethods.RegisterChatCommand = function() end
-        addonMethods.RegisterEvent = function(_, eventName, handlerName)
+        fakeAddon = {
+            db = { profile = { global = { debug = false } } },
+        }
+        fakeAddon.RegisterEvent = function(_, eventName, handlerName)
             registeredEvents[#registeredEvents + 1] = { eventName = eventName, handlerName = handlerName }
         end
-        addonMethods.UnregisterEvent = function(_, eventName)
+        fakeAddon.UnregisterEvent = function(_, eventName)
             unregisteredEvents[#unregisteredEvents + 1] = eventName
         end
-        addonMethods.GetModule = function(_, name)
+        fakeAddon.GetModule = function(_, name)
             if name == "Options" then
                 return {
                     OpenOptions = function()
@@ -119,123 +257,38 @@ describe("ChatCommand migration", function()
             end
             return nil
         end
-        addonMethods.ConfirmReloadUI = function(_, text, onAccept)
+        fakeAddon.ConfirmReloadUI = function(_, text, onAccept)
             confirmReloadCalls[#confirmReloadCalls + 1] = { text = text, onAccept = onAccept }
         end
-        addonMethods.db = { profile = { global = { debug = false } } }
-
-        -- Load just enough of ECM.lua to get ChatCommand
-        -- We need to extract the ChatCommand method, but ECM.lua has many dependencies.
-        -- Instead, we'll directly test through the mock addon object.
-        mod = addonMethods
-
-        -- Manually define ChatCommand matching the production code structure
-        function mod:ChatCommand(input)
-            local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
-
-            if cmd == "help" then
-                ECM.Print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
-                ECM.Print("/ecm help - show this message")
-                ECM.Print("/ecm migration - show migration info and commands")
-                ECM.Print("/ecm options|config|settings|o - open the options menu")
-                ECM.Print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
-                return
-            end
-
-            if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
-                ECM.ScheduleLayoutUpdate(0, "ChatCommand")
-                ECM.Print("Refreshing all modules.")
-                return
-            end
-
-            if cmd == "migration" then
-                local subcmd, subarg = arg:match("^(%S*)%s*(.-)%s*$")
-                if subcmd == "log" then
-                    ECM.Migration.PrintLog()
-                    return
-                end
-
-                if subcmd == "rollback" then
-                    local n = tonumber(subarg)
-                    if not n then
-                        ECM.Print("Usage: /ecm migration rollback <version>")
-                        return
-                    end
-                    if n == 0 then
-                        ECM.Print("Version 0 is not valid.")
-                        return
-                    end
-                    if n == -1 then
-                        n = ECM.Constants.CURRENT_SCHEMA_VERSION - 1
-                    end
-                    local ok, message = ECM.Migration.ValidateRollback(n)
-                    if not ok then
-                        ECM.Print(message)
-                        return
-                    end
-                    self:ConfirmReloadUI(message, function()
-                        ECM.Migration.Rollback(n)
-                    end)
-                    return
-                end
-
-                ECM.Migration.PrintInfo()
-                return
-            end
-
-            if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
-                if InCombatLockdown() then
-                    ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
-                    if not self._openOptionsAfterCombat then
-                        self._openOptionsAfterCombat = true
-                        self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
-                    end
-                    return
-                end
-
-                local optionsModule = self:GetModule("Options", true)
-                if optionsModule then
-                    optionsModule:OpenOptions()
-                end
-                return
-            end
-
-            local profile = self.db and self.db.profile
-            if not profile then
-                return
-            end
-
-            if cmd == "debug" then
-                local newVal
-                if arg == "" or arg == "toggle" then
-                    newVal = not profile.global.debug
-                elseif arg == "on" then
-                    newVal = true
-                elseif arg == "off" then
-                    newVal = false
-                else
-                    ECM.Print("Usage: expected on|off|toggle")
-                    return
-                end
-                profile.global.debug = newVal
-                ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
-                return
-            end
+        fakeAddon.SetDefaultModuleLibraries = function(_, ...)
+            defaultModuleLibraries = { ... }
         end
 
-        function mod:HandleOpenOptionsAfterCombat()
-            if not self._openOptionsAfterCombat then
-                return
-            end
-
-            self._openOptionsAfterCombat = nil
-            self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-
-            local optionsModule = self:GetModule("Options", true)
-            if optionsModule then
-                optionsModule:OpenOptions()
-            end
+        local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
+        aceAddon.NewAddon = function(_, name)
+            fakeAddon._name = name
+            return fakeAddon
         end
+
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
+
+        fakeAddon.ConfirmReloadUI = function(_, text, onAccept)
+            confirmReloadCalls[#confirmReloadCalls + 1] = { text = text, onAccept = onAccept }
+        end
+        _G.ECM.ScheduleLayoutUpdate = function(delay, reason)
+            scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
+        end
+
+        local originalPrint = _G.ECM.Print
+        _G.ECM.Print = function(...)
+            local args = { ... }
+            for i = 1, #args do
+                args[i] = tostring(args[i])
+            end
+            printedMessages[#printedMessages + 1] = table.concat(args, " ")
+        end
+        mod = fakeAddon
+        mod._testOriginalPrint = originalPrint
     end)
 
     it("/ecm migration calls PrintInfo", function()
@@ -394,5 +447,14 @@ describe("ChatCommand migration", function()
         assert.are.equal(1, openOptionsCalls)
         assert.are.same({ "PLAYER_REGEN_ENABLED" }, unregisteredEvents)
         assert.is_nil(mod._openOptionsAfterCombat)
+    end)
+
+    it("/ecm rl schedules a layout update through the real addon implementation", function()
+        mod:ChatCommand("rl")
+
+        assert.are.equal(1, #scheduleLayoutCalls)
+        assert.are.equal(0, scheduleLayoutCalls[1].delay)
+        assert.are.equal("ChatCommand", scheduleLayoutCalls[1].reason)
+        assert.are.equal("Refreshing all modules.", printedMessages[1])
     end)
 end)

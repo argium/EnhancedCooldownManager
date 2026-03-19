@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local ResourceBar = ns.Addon:NewModule("ResourceBar", "AceEvent-3.0")
+local ResourceBar = ns.Addon:NewModule("ResourceBar")
 local ClassUtil = ECM.ClassUtil
 ns.Addon.ResourceBar = ResourceBar
 
