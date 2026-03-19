@@ -1,0 +1,11 @@
+ignore:
+  - AGENTS.md
+  - CLAUDE.md
+  - README.md
+  - Tests
+  - TODO.md
+  - docs
+  - '*.code-workspace'
+  - '*.rockspec'
+  - package
+  - scripts
