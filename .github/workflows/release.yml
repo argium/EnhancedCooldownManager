@@ -94,17 +94,25 @@ jobs:
                   TAG_NAME="${{ github.ref_name }}"
                   TAG_MESSAGE=$(git for-each-ref --format='%(contents)' "refs/tags/$TAG_NAME")
 
+                  if [ -f .pkgmeta ]; then
+                    cp .pkgmeta .github/release.pkgmeta
+                  else
+                    : > .github/release.pkgmeta
+                  fi
+
                   if [ -n "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
                     printf '%s\n' "$TAG_MESSAGE" > .github/release-notes.md
+                    printf '\n%s\n' 'manual-changelog:' >> .github/release.pkgmeta
                     printf '%s\n' \
-                      'manual-changelog:' \
                       '  filename: .github/release-notes.md' \
                       '  markup-type: markdown' \
-                      > .github/release.pkgmeta
-                    echo "PACKAGER_ARGS=-m .github/release.pkgmeta -p 1427906 -w 27051" >> "$GITHUB_ENV"
+                      >> .github/release.pkgmeta
                     echo "Using annotated tag message for release notes."
-                  else
-                    echo "PACKAGER_ARGS=-p 1427906 -w 27051" >> "$GITHUB_ENV"
+                  fi
+
+                  echo "PACKAGER_ARGS=-m .github/release.pkgmeta -p 1427906 -w 27051" >> "$GITHUB_ENV"
+
+                  if [ -z "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
                     echo "No annotated tag message found; using generated changelog."
                   fi
 
