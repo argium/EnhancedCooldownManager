@@ -10,7 +10,6 @@ exclude_files = {
     "Libs/LibSerialize/",
     "Libs/LibSharedMedia-3.0/",
     "Libs/LibStub/",
-    "Tests/",
     ".luacheckrc"
 }
 
