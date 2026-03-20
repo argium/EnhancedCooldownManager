@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("PowerBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -25,6 +25,12 @@ describe("PowerBarOptions getters/setters/defaults", function()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         ECM.PowerBarTickMarksOptions = { RegisterSettings = function() end }
+
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/PowerBarOptions.lua", "PowerBarOptions")(nil, ns)
@@ -66,18 +72,14 @@ describe("PowerBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    -- Positioning composite
-    describe("anchorMode", function()
-        it("getter returns profile value", function()
-            assert.are.equal("chain", settings["ECM_powerBar_anchorMode"]:GetValue())
+    describe("layout breadcrumb", function()
+        it("removes anchorMode from the module page", function()
+            assert.is_nil(settings["ECM_powerBar_anchorMode"])
         end)
-        it("setter writes to profile", function()
-            settings["ECM_powerBar_anchorMode"]:SetValue("free")
-            assert.are.equal("free", profile.powerBar.anchorMode)
-        end)
-        it("setter accepts detached value", function()
-            settings["ECM_powerBar_anchorMode"]:SetValue("detached")
-            assert.are.equal("detached", profile.powerBar.anchorMode)
+        it("adds a breadcrumb to the Layout page", function()
+            assert.is_nil(capturedTable.args.layoutMovedInfo)
+            assert.are.equal(ECM.Constants.LAYOUT_PAGE_MOVED_INFO_VALUE, capturedTable.args.layoutMovedButton.name)
+            assert.are.equal(ECM.Constants.LAYOUT_PAGE_MOVED_BUTTON_TEXT, capturedTable.args.layoutMovedButton.buttonText)
         end)
     end)
 

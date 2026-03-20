@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local GeneralOptions = {}
@@ -119,8 +118,8 @@ function GeneralOptions.RegisterSettings(SB)
                 order = 25,
             },
 
-            -- Layout
-            layoutHeader = { type = "header", name = "Layout", order = 30 },
+            -- Sizing
+            layoutHeader = { type = "header", name = "Sizing", order = 30 },
             barHeight = {
                 type = "range",
                 path = "barHeight",
@@ -130,43 +129,6 @@ function GeneralOptions.RegisterSettings(SB)
                 max = 40,
                 step = 1,
                 order = 31,
-            },
-            offsetY = {
-                type = "range",
-                path = "offsetY",
-                name = "Vertical Offset",
-                desc = "Vertical gap between the main icons and the first bar.",
-                min = 0,
-                max = 20,
-                step = 1,
-                order = 32,
-            },
-            moduleSpacing = {
-                type = "range",
-                path = "moduleSpacing",
-                name = "Vertical Spacing",
-                desc = "Vertical spacing between modules. Spacing between buff bars is controlled separately.",
-                min = 0,
-                max = 20,
-                step = 1,
-                getTransform = function(value)
-                    return value or 0
-                end,
-                order = 33,
-            },
-            growDirection = {
-                type = "select",
-                path = "moduleGrowDirection",
-                name = "Grow Direction",
-                desc = "Display bars above or below the cooldown viewer.",
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                order = 34,
             },
         },
     })

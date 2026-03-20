@@ -452,6 +452,40 @@ describe("BuffBars real source", function()
         assert.are.equal(1, #appliedWidths)
         assert.are.equal(BuffBarCooldownViewer, appliedWidths[1].frame)
         assert.are.equal(225, appliedWidths[1].value)
+        assert.same({ "CENTER", UIParent, "CENTER", 12, -34 }, BuffBarCooldownViewer.__anchors[1])
+    end)
+
+    it("ignores removed free grow direction config in free mode", function()
+        stubChildLayoutEnvironment()
+
+        local first = makeStyledChild("First", true, 1)
+        local second = makeStyledChild("Second", true, 2)
+
+        function BuffBarCooldownViewer:GetChildren()
+            return first, second
+        end
+        function BuffBars:GetModuleConfig()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                freeGrowDirection = ECM.Constants.GROW_DIRECTION_UP,
+                showIcon = false,
+                showSpellName = true,
+                showDuration = true,
+            }
+        end
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid", barHeight = 18, barWidth = 250 }
+        end
+        function BuffBars:GetEditModePosition()
+            return { point = "CENTER", x = 12, y = -34 }
+        end
+        function BuffBars:ShouldShow()
+            return true
+        end
+
+        assert.is_true(BuffBars:UpdateLayout("test"))
+        assert.same({ "TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0 }, first.__anchors[1])
+        assert.same({ "TOPLEFT", first, "BOTTOMLEFT", 0, 0 }, second.__anchors[1])
     end)
 
     it("viewer hooks defer layout and respect the layout-running guard", function()

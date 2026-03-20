@@ -7,7 +7,7 @@ local TestHelpers =
 
 describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -21,6 +21,12 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         TestHelpers.SetupOptionsGlobals()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
@@ -51,14 +57,13 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    -- Positioning composite
-    describe("anchorMode", function()
-        it("getter returns profile value", function()
-            assert.are.equal("chain", settings["ECM_resourceBar_anchorMode"]:GetValue())
+    describe("layout breadcrumb", function()
+        it("removes anchorMode from the module page", function()
+            assert.is_nil(settings["ECM_resourceBar_anchorMode"])
         end)
-        it("setter writes to profile", function()
-            settings["ECM_resourceBar_anchorMode"]:SetValue("free")
-            assert.are.equal("free", profile.resourceBar.anchorMode)
+        it("adds a breadcrumb to the Layout page", function()
+            assert.is_nil(capturedTable.args.layoutMovedInfo)
+            assert.are.equal(ECM.Constants.LAYOUT_PAGE_MOVED_INFO_VALUE, capturedTable.args.layoutMovedButton.name)
         end)
     end)
 
@@ -196,7 +201,7 @@ describe("ResourceBarOptions class gating (DK)", function()
             return "Death Knight", "DEATHKNIGHT", 6
         end
         local profile, defaults = TestHelpers.MakeOptionsProfile()
-        local SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+        local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
         assert.is_not_nil(ns.OptionsSections.ResourceBar)

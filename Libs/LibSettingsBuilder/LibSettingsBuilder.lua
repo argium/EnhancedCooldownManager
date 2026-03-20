@@ -17,6 +17,73 @@ lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
 lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
+lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
+lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
+
+--- Installs one-time hooks on SettingsPanel to fire page-level onShow/onHide
+--- callbacks registered via RegisterFromTable.  Defers automatically if
+--- SettingsPanel has not been created yet (Blizzard_Settings loads on demand).
+local function installPageLifecycleHooks()
+    if lib._pageLifecycleHooked then
+        return
+    end
+
+    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
+        -- SettingsPanel not yet loaded; listen for ADDON_LOADED to retry.
+        if lib._pageLifecycleDeferred or type(CreateFrame) ~= "function" then
+            return
+        end
+        lib._pageLifecycleDeferred = true
+        local f = CreateFrame("Frame")
+        f:RegisterEvent("ADDON_LOADED")
+        f:SetScript("OnEvent", function(self)
+            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
+                self:UnregisterAllEvents()
+                installPageLifecycleHooks()
+            end
+        end)
+        return
+    end
+
+    lib._pageLifecycleHooked = true
+
+    -- DisplayCategory fires for both sidebar clicks and OpenToCategory.
+    -- Retrieve the active category via GetCurrentCategory inside the hook.
+    hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
+        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        local old = lib._activeLifecycleCategory
+        if old == category then
+            return
+        end
+
+        if old then
+            local cbs = lib._pageLifecycleCallbacks[old]
+            if cbs and cbs.onHide then
+                cbs.onHide()
+            end
+        end
+
+        lib._activeLifecycleCategory = category
+        if category then
+            local cbs = lib._pageLifecycleCallbacks[category]
+            if cbs and cbs.onShow then
+                cbs.onShow()
+            end
+        end
+    end)
+
+    SettingsPanel:HookScript("OnHide", function()
+        local active = lib._activeLifecycleCategory
+        if active then
+            local cbs = lib._pageLifecycleCallbacks[active]
+            if cbs and cbs.onHide then
+                cbs.onHide()
+            end
+        end
+        lib._activeLifecycleCategory = nil
+    end)
+end
+
 local confirmDialogName = MAJOR .. "_SettingsConfirm"
 local listElementKeysToHide = { "_lsbSubheaderTitle", "_lsbInfoTitle", "_lsbInfoValue", "_lsbCanvas" }
 
@@ -1647,6 +1714,8 @@ function lib:New(config)
     }
 
     --- Walks an AceConfig-inspired option table and calls the imperative API.
+    --- Top-level `onShow`/`onHide` callbacks fire when the page is selected or
+    --- navigated away from (via SettingsPanel.SelectCategory hook).
     function SB.RegisterFromTable(tbl)
         assert(tbl.name, "RegisterFromTable: tbl.name is required")
 
@@ -1654,6 +1723,14 @@ function lib:New(config)
             SB._currentSubcategory = SB._rootCategory
         else
             SB.CreateSubcategory(tbl.name)
+        end
+
+        if tbl.onShow or tbl.onHide then
+            lib._pageLifecycleCallbacks[SB._currentSubcategory] = {
+                onShow = tbl.onShow,
+                onHide = tbl.onHide,
+            }
+            installPageLifecycleHooks()
         end
 
         local groupPath = tbl.path or ""

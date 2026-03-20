@@ -88,7 +88,7 @@ describe("Options sections and root assembly", function()
             db = {
                 profile = {},
                 defaults = { profile = {} },
-                RegisterCallback = function(_, owner, eventName, methodName)
+                RegisterCallback = function(_, _, eventName, methodName)
                     dbCallbacks[#dbCallbacks + 1] = { eventName = eventName, methodName = methodName }
                 end,
             },
@@ -103,6 +103,7 @@ describe("Options sections and root assembly", function()
         for _, key in ipairs({
             "About",
             "General",
+            "Layout",
             "PowerBar",
             "ResourceBar",
             "RuneBar",
@@ -126,6 +127,7 @@ describe("Options sections and root assembly", function()
         assert.are.same({
             "About",
             "General",
+            "Layout",
             "PowerBar",
             "ResourceBar",
             "RuneBar",
@@ -162,21 +164,12 @@ describe("Options sections and root assembly", function()
             },
         }
 
-        _G.ECM = {
-            Constants = {
-                CLASS = { DEATHKNIGHT = "DEATHKNIGHT" },
-                RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
-                RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
-                RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
-                RESOURCEBAR_TYPE_ICICLES = "icicles",
-                RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
-                RESOURCEBAR_MAX_COLOR_TYPES = { ["icicles"] = true },
-                ANCHORMODE_CHAIN = 1,
-                ANCHORMODE_FREE = 2,
-                DEFAULT_BAR_WIDTH = 300,
-            },
-            ScheduleLayoutUpdate = function() end,
-        }
+        TestHelpers.LoadLiveConstants()
+        -- Test-specific sentinel values
+        ECM.Constants.ANCHORMODE_CHAIN = 1
+        ECM.Constants.ANCHORMODE_FREE = 2
+        ECM.Constants.DEFAULT_BAR_WIDTH = 300
+        ECM.ScheduleLayoutUpdate = function() end
 
         local border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }
         local profileData = {

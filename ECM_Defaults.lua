@@ -89,7 +89,6 @@
 ---@field enabled boolean Whether buff bars are enabled.
 ---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
----@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
@@ -252,7 +251,6 @@ local defaults = {
             anchorMode = C.ANCHORMODE_CHAIN,
             editModePositions = {},
             verticalSpacing = 0,
-            freeGrowDirection = C.GROW_DIRECTION_DOWN,
             showIcon = false,
             showSpellName = true,
             showDuration = true,

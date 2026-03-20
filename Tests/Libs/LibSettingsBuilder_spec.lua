@@ -65,6 +65,8 @@ describe("LibSettingsBuilder", function()
 
     local function createSettingsPanelMock()
         local frames = {}
+        local hookScripts = {}
+        local currentCategory = nil
         _G.SettingsPanel = {
             IsShown = function()
                 return true
@@ -80,6 +82,25 @@ describe("LibSettingsBuilder", function()
                     },
                 }
             end,
+            SelectCategory = function() end,
+            DisplayCategory = function(self, cat)
+                currentCategory = cat or currentCategory
+            end,
+            GetCurrentCategory = function()
+                return currentCategory
+            end,
+            SetCurrentCategory = function(_, cat)
+                currentCategory = cat
+            end,
+            HookScript = function(_, event, fn)
+                hookScripts[event] = hookScripts[event] or {}
+                hookScripts[event][#hookScripts[event] + 1] = fn
+            end,
+            _fireScript = function(event)
+                for _, fn in ipairs(hookScripts[event] or {}) do
+                    fn(_G.SettingsPanel)
+                end
+            end,
         }
         return frames
     end
@@ -89,6 +110,8 @@ describe("LibSettingsBuilder", function()
         frame._scripts = {}
         frame._text = ""
         frame._focused = false
+        frame.RegisterEvent = function() end
+        frame.UnregisterAllEvents = function() end
         frame.RegisterForClicks = function(self, ...)
             self._registeredClicks = { ... }
         end
@@ -1802,6 +1825,230 @@ describe("LibSettingsBuilder", function()
             assert.are.equal(12, firstValue)
             assert.is_true(secondLabel:IsShown())
             assert.is_false(control._lsbEditBox._focused)
+        end)
+    end)
+
+    describe("page lifecycle onShow/onHide", function()
+        local LSB
+
+        before_each(function()
+            createSettingsPanelMock()
+
+            TestHelpers.SetupLibStub()
+            TestHelpers.SetupSettingsStubs()
+
+            _G.hooksecurefunc = function(tbl, method, hook)
+                if type(tbl) == "table" and type(method) == "string" and type(hook) == "function" then
+                    local orig = tbl[method]
+                    if type(orig) == "function" then
+                        tbl[method] = function(...)
+                            orig(...)
+                            hook(...)
+                        end
+                    end
+                end
+            end
+
+            _G.SettingsListElementMixin = {}
+            _G.SettingsDropdownControlMixin = {}
+            _G.SettingsSliderControlMixin = {}
+            _G.CreateFrame = function()
+                return createScriptableFrame()
+            end
+
+            TestHelpers.LoadChunk(
+                "Libs/LibSettingsBuilder/LibSettingsBuilder.lua",
+                "Unable to load LibSettingsBuilder.lua"
+            )()
+            LSB = LibStub("LibSettingsBuilder-1.0")
+        end)
+
+        local function makeSB(prefix)
+            return LSB:New({
+                pathAdapter = LSB.PathAdapter({
+                    getStore = function() return addonNS.Addon.db.profile end,
+                    getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                    getNestedValue = getNestedValue,
+                    setNestedValue = setNestedValue,
+                }),
+                varPrefix = prefix or "T",
+                onChanged = function() end,
+            })
+        end
+
+        it("stores onShow/onHide callbacks when provided in RegisterFromTable", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            sb.RegisterFromTable({
+                name = "Page1",
+                onShow = function() end,
+                onHide = function() end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            assert.is_table(LSB._pageLifecycleCallbacks[cat])
+            assert.is_function(LSB._pageLifecycleCallbacks[cat].onShow)
+            assert.is_function(LSB._pageLifecycleCallbacks[cat].onHide)
+        end)
+
+        --- Simulates WoW's sidebar navigation: SetCurrentCategory then DisplayCategory.
+        local function navigateTo(cat)
+            SettingsPanel:SetCurrentCategory(cat)
+            SettingsPanel:DisplayCategory(cat)
+        end
+
+        it("fires onShow when DisplayCategory is called with a tracked category", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            local showCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onShow = function() showCount = showCount + 1 end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            navigateTo(cat)
+            assert.are.equal(1, showCount)
+        end)
+
+        it("fires onHide when switching away from a tracked category", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            local hideCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onHide = function() hideCount = hideCount + 1 end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            local other = { _name = "Other" }
+            navigateTo(cat)
+            navigateTo(other)
+            assert.are.equal(1, hideCount)
+        end)
+
+        it("fires onHide when SettingsPanel is hidden", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            local hideCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onHide = function() hideCount = hideCount + 1 end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            navigateTo(cat)
+            SettingsPanel._fireScript("OnHide")
+            assert.are.equal(1, hideCount)
+        end)
+
+        it("does not fire duplicate onShow when same category re-selected", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            local showCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onShow = function() showCount = showCount + 1 end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            navigateTo(cat)
+            navigateTo(cat)
+            assert.are.equal(1, showCount)
+        end)
+
+        it("does not fire callbacks for categories without lifecycle hooks", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            sb.RegisterFromTable({ name = "Plain", args = {} })
+            local untracked = sb._subcategories["Plain"]
+            -- Should not error
+            navigateTo(untracked)
+        end)
+
+        it("clears active category on panel hide so next open fires onShow", function()
+            local sb = makeSB()
+            sb.CreateRootCategory("Lifecycle")
+            local showCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onShow = function() showCount = showCount + 1 end,
+                args = {},
+            })
+            local cat = sb._subcategories["Page1"]
+            navigateTo(cat)
+            SettingsPanel._fireScript("OnHide")
+            navigateTo(cat)
+            assert.are.equal(2, showCount)
+        end)
+
+        it("defers hook installation when SettingsPanel is not yet available", function()
+            -- Remove SettingsPanel before loading library
+            _G.SettingsPanel = nil
+
+            TestHelpers.SetupLibStub()
+            TestHelpers.SetupSettingsStubs()
+            _G.hooksecurefunc = function(tbl, method, hook)
+                if type(tbl) == "table" and type(method) == "string" and type(hook) == "function" then
+                    local orig = tbl[method]
+                    if type(orig) == "function" then
+                        tbl[method] = function(...)
+                            orig(...)
+                            hook(...)
+                        end
+                    end
+                end
+            end
+            _G.SettingsListElementMixin = {}
+            _G.SettingsDropdownControlMixin = {}
+            _G.SettingsSliderControlMixin = {}
+
+            local deferFrame
+            _G.CreateFrame = function()
+                deferFrame = createScriptableFrame()
+                return deferFrame
+            end
+
+            TestHelpers.LoadChunk(
+                "Libs/LibSettingsBuilder/LibSettingsBuilder.lua",
+                "Unable to load LibSettingsBuilder.lua"
+            )()
+            local lsb = LibStub("LibSettingsBuilder-1.0")
+
+            local sb = lsb:New({
+                pathAdapter = lsb.PathAdapter({
+                    getStore = function() return addonNS.Addon.db.profile end,
+                    getDefaults = function() return addonNS.Addon.db.defaults.profile end,
+                    getNestedValue = getNestedValue,
+                    setNestedValue = setNestedValue,
+                }),
+                varPrefix = "D",
+                onChanged = function() end,
+            })
+            sb.CreateRootCategory("Deferred")
+
+            local showCount = 0
+            sb.RegisterFromTable({
+                name = "Page1",
+                onShow = function() showCount = showCount + 1 end,
+                args = {},
+            })
+
+            -- Hooks not yet installed — deferred frame should exist
+            assert.is_table(deferFrame)
+            assert.is_false(lsb._pageLifecycleHooked)
+
+            -- Simulate Blizzard_Settings loading
+            createSettingsPanelMock()
+            deferFrame:GetScript("OnEvent")(deferFrame, "ADDON_LOADED", "Blizzard_Settings")
+
+            assert.is_true(lsb._pageLifecycleHooked)
+
+            -- Hooks should now work
+            local cat = sb._subcategories["Page1"]
+            SettingsPanel:SetCurrentCategory(cat)
+            SettingsPanel:DisplayCategory(cat)
+            assert.are.equal(1, showCount)
         end)
     end)
 end)

@@ -14,6 +14,135 @@ local function isAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
 end
 
+local function createPreviewBlock(parent, width, height, point, relativeTo, relativePoint, x, y, color)
+    local block = parent:CreateTexture(nil, "ARTWORK")
+    if type(block.SetColorTexture) == "function" then
+        block:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    end
+    block:SetSize(width, height)
+    block:SetPoint(point, relativeTo, relativePoint, x, y)
+    return block
+end
+
+local function createPreviewBars(parent, positions)
+    for _, pos in ipairs(positions) do
+        createPreviewBlock(parent, pos.width, pos.height, "TOPLEFT", parent, "TOPLEFT", pos.x, pos.y, pos.color)
+    end
+end
+
+local function createPositioningExamplesCanvas()
+    if type(CreateFrame) ~= "function" then
+        return {}
+    end
+
+    local frame = CreateFrame("Frame")
+    frame:SetHeight(C.POSITION_MODE_EXPLAINER_HEIGHT)
+
+    local columns = {
+        {
+            title = C.POSITION_MODE_EXPLAINER_TITLE_ATTACHED,
+            caption = C.POSITION_MODE_EXPLAINER_CAPTION_ATTACHED,
+            build = function(preview)
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 18, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 36, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 54, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBars(preview, {
+                    { x = 12, y = -38, width = 72, height = 10, color = { 0.22, 0.74, 0.98, 1 } },
+                    { x = 12, y = -52, width = 72, height = 10, color = { 0.65, 0.41, 0.96, 1 } },
+                    { x = 12, y = -66, width = 72, height = 10, color = { 0.30, 0.82, 0.52, 1 } },
+                })
+            end,
+        },
+        {
+            title = C.POSITION_MODE_EXPLAINER_TITLE_DETACHED,
+            caption = C.POSITION_MODE_EXPLAINER_CAPTION_DETACHED,
+            build = function(preview)
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 10, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 28, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 46, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 2, 26, "TOPLEFT", preview, "TOPLEFT", 78, -34, { 0.95, 0.95, 0.95, 0.65 })
+                createPreviewBlock(preview, 26, 2, "TOPLEFT", preview, "TOPLEFT", 66, -22, { 0.95, 0.95, 0.95, 0.65 })
+                createPreviewBars(preview, {
+                    { x = 92, y = -16, width = 60, height = 10, color = { 0.22, 0.74, 0.98, 1 } },
+                    { x = 92, y = -30, width = 60, height = 10, color = { 0.65, 0.41, 0.96, 1 } },
+                    { x = 92, y = -44, width = 60, height = 10, color = { 0.30, 0.82, 0.52, 1 } },
+                })
+            end,
+        },
+        {
+            title = C.POSITION_MODE_EXPLAINER_TITLE_FREE,
+            caption = C.POSITION_MODE_EXPLAINER_CAPTION_FREE,
+            build = function(preview)
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 14, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 32, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 50, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBars(preview, {
+                    { x = 6, y = -42, width = 52, height = 10, color = { 0.22, 0.74, 0.98, 1 } },
+                    { x = 76, y = -26, width = 54, height = 10, color = { 0.65, 0.41, 0.96, 1 } },
+                    { x = 56, y = -64, width = 58, height = 10, color = { 0.30, 0.82, 0.52, 1 } },
+                })
+            end,
+        },
+    }
+
+    local columnWidth = 170
+    local previewWidth = 156
+    local previewHeight = 82
+    local leftInset = 8
+
+    for index, column in ipairs(columns) do
+        local columnFrame = CreateFrame("Frame", nil, frame)
+        columnFrame:SetSize(columnWidth, C.POSITION_MODE_EXPLAINER_HEIGHT)
+        columnFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", leftInset + ((index - 1) * columnWidth), 0)
+
+        local title = columnFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        title:SetPoint("TOP", columnFrame, "TOP", 0, 0)
+        title:SetText(column.title)
+
+        local preview = CreateFrame("Frame", nil, columnFrame)
+        preview:SetSize(previewWidth, previewHeight)
+        preview:SetPoint("TOP", title, "BOTTOM", 0, -6)
+
+        local previewBg = preview:CreateTexture(nil, "BACKGROUND")
+        previewBg:SetAllPoints(preview)
+        if type(previewBg.SetColorTexture) == "function" then
+            previewBg:SetColorTexture(0.08, 0.08, 0.08, 0.65)
+        end
+
+        column.build(preview)
+
+        local caption = columnFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        caption:SetPoint("TOP", preview, "BOTTOM", 0, -6)
+        caption:SetPoint("LEFT", columnFrame, "LEFT", 8, 0)
+        caption:SetPoint("RIGHT", columnFrame, "RIGHT", -8, 0)
+        caption:SetJustifyH("LEFT")
+        caption:SetWordWrap(true)
+        caption:SetText(column.caption)
+    end
+
+    return frame
+end
+
+local function openLayoutPage()
+    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(C.LAYOUT_SUBCATEGORY)
+    if categoryID then
+        Settings.OpenToCategory(categoryID)
+    end
+end
+
+local function createLayoutBreadcrumbArgs(order)
+    order = order or 10
+    return {
+        layoutMovedButton = {
+            type = "button",
+            name = C.LAYOUT_PAGE_MOVED_INFO_VALUE,
+            buttonText = C.LAYOUT_PAGE_MOVED_BUTTON_TEXT,
+            onClick = openLayoutPage,
+            order = order,
+        },
+    }
+end
+
 --- Gets the nested value from table using dot-separated path
 ---@param tbl table The table to get the value from
 ---@param path string The dot-separated path to the value
@@ -172,22 +301,10 @@ local function createBarArgs(isDisabled, options)
     options = options or {}
     local layoutOrder = options.layoutOrder or 10
     local appearanceOrder = options.appearanceOrder or 20
+    local breadcrumbArgs = createLayoutBreadcrumbArgs(layoutOrder)
 
     local args = {
-        layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = layoutOrder },
-        positioning = {
-            type = "select",
-            path = "anchorMode",
-            name = "Position Mode",
-            desc = "How this bar is positioned.",
-            values = {
-                [C.ANCHORMODE_CHAIN] = "Attached to Cooldown Manager",
-                [C.ANCHORMODE_DETACHED] = "Detached (shared anchor)",
-                [C.ANCHORMODE_FREE] = "Free (drag in Edit Mode)",
-            },
-            disabled = isDisabled,
-            order = layoutOrder + 1,
-        },
+        layoutMovedButton = breadcrumbArgs.layoutMovedButton,
         appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = appearanceOrder },
         heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
         fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
@@ -221,6 +338,9 @@ ECM.OptionUtil = {
     OpenColorPicker = openColorPicker,
     GetIsDisabledDelegate = getIsDisabledDelegate,
     CreateModuleEnabledHandler = createModuleEnabledHandler,
+    OpenLayoutPage = openLayoutPage,
+    CreateLayoutBreadcrumbArgs = createLayoutBreadcrumbArgs,
+    CreatePositioningExamplesCanvas = createPositioningExamplesCanvas,
     CreateBarArgs = createBarArgs,
 }
 
@@ -280,6 +400,7 @@ function Options:OnInitialize()
     -- Register subcategory sections in display order
     local sectionOrder = {
         "General",
+        "Layout",
         "PowerBar",
         "ResourceBar",
         "RuneBar",

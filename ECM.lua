@@ -228,6 +228,7 @@ local _desiredAlpha = 1
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
 local _cooldownViewerSettingsHooked = false
+local _layoutPreviewActive = false
 local _hookedBlizzardFrames = {}
 
 local _chainSet = {}
@@ -333,6 +334,15 @@ local function updateFadeAndHiddenStates()
 
     -- Force-show everything during edit mode so the user can see and position all modules.
     if LibEQOLEditMode:IsInEditMode() then
+        setGloballyHidden(false)
+        setAlpha(1)
+        enforceBlizzardFrameState()
+        return
+    end
+
+    -- Force-show while the Layout options page is open so the user can preview
+    -- positioning changes without hide/fade interfering.
+    if _layoutPreviewActive then
         setGloballyHidden(false)
         setAlpha(1)
         enforceBlizzardFrameState()
@@ -464,7 +474,7 @@ local function ensureDetachedAnchor()
         settings = {
             {
                 kind = LibEQOLEditMode.SettingType.Slider,
-                name = "Width",
+                name = C.WIDTH_SETTING_NAME,
                 get = function()
                     return getDetachedAnchorConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
                 end,
@@ -479,7 +489,7 @@ local function ensureDetachedAnchor()
             },
             {
                 kind = LibEQOLEditMode.SettingType.Slider,
-                name = "Spacing",
+                name = C.SPACING_SETTING_NAME,
                 get = function()
                     return getDetachedAnchorConfigValue("detachedModuleSpacing", 0)
                 end,
@@ -494,7 +504,7 @@ local function ensureDetachedAnchor()
             },
             {
                 kind = LibEQOLEditMode.SettingType.Dropdown,
-                name = "Grow Direction",
+                name = C.GROW_DIRECTION_SETTING_NAME,
                 get = function()
                     return getDetachedAnchorConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN)
                 end,
@@ -627,6 +637,20 @@ local function hookCooldownViewerSettings()
 
     _cooldownViewerSettingsHooked = true
     ECM.Log(nil, "Hooked CooldownViewerSettings OnHide")
+end
+
+--- Sets or clears the layout preview override.
+--- When active, hide-when-mounted, hide-in-rest, and out-of-combat fade are bypassed.
+---@param active boolean
+function ECM.SetLayoutPreview(active)
+    active = active == true
+    if _layoutPreviewActive == active then
+        return
+    end
+    _layoutPreviewActive = active
+    ECM.Log(nil, "Layout preview " .. (active and "ON" or "OFF"))
+    updateFadeAndHiddenStates()
+    ECM.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
 end
 
 --- Schedules a layout update after a delay (debounced).

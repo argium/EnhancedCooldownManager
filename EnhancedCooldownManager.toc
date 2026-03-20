@@ -50,6 +50,7 @@ UI\About.lua
 UI\Options.lua
 UI\PowerBarTickMarksOptions.lua
 UI\GeneralOptions.lua
+UI\LayoutOptions.lua
 UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua

@@ -1,6 +1,5 @@
 ignore:
   - AGENTS.md
-  - CLAUDE.md
   - README.md
   - Tests
   - TODO.md
@@ -9,3 +8,4 @@ ignore:
   - '*.rockspec'
   - package
   - scripts
+  - media/icon-full.tga

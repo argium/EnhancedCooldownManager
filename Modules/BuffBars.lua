@@ -6,7 +6,6 @@ local _, ns = ...
 local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
 local ChainRightPoint = FrameMixin.ChainRightPoint
-local NormalizeGrowDirection = FrameMixin.NormalizeGrowDirection
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
 local _warned = false
@@ -398,13 +397,9 @@ local function getViewerPosition(module)
 end
 
 local function getLayoutState(position, cfg)
-    local growsUp
-    if position.mode == ECM.Constants.ANCHORMODE_FREE then
-        growsUp = NormalizeGrowDirection(cfg and cfg.freeGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
-    else
-        growsUp = position.point == "BOTTOMLEFT"
-    end
-
+    -- Free-positioned buff bars no longer have a separate grow-direction setting,
+    -- so only bottom-left anchored placements stack upward; everything else stacks downward.
+    local growsUp = position.point == "BOTTOMLEFT"
     local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
     return growsUp, verticalSpacing
 end
@@ -454,6 +449,10 @@ local function applyViewerPosition(viewer, position)
         })
         return
     end
+
+    FrameUtil.LazySetAnchors(viewer, {
+        { position.point, position.anchor, position.relativePoint, position.x, position.y },
+    })
 
     local baseBarWidth = viewer.baseBarWidth
     local barWidthScale = viewer.barWidthScale

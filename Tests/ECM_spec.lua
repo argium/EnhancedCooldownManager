@@ -473,6 +473,19 @@ describe("ECM layout system", function()
             ECM.ScheduleLayoutUpdate(0, "re-enforce")
             assert.is_false(mod.InnerFrame:IsShown())
         end)
+
+        it("forces a layout pass when layout preview is toggled on", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            ECM.SetLayoutPreview(true)
+
+            assert.same({ "LayoutPreviewOn" }, reasons)
+        end)
     end)
 
     describe("detached anchor layout handling", function()

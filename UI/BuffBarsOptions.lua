@@ -285,41 +285,7 @@ function BuffBarsOptions.RegisterSettings(SB)
                 ),
             },
 
-            -- Layout
-            layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning = {
-                type = "select",
-                path = "anchorMode",
-                name = "Position Mode",
-                desc = "How this bar is positioned.",
-                values = {
-                    [C.ANCHORMODE_CHAIN] = "Attached to Cooldown Manager",
-                    [C.ANCHORMODE_DETACHED] = "Detached (shared anchor)",
-                    [C.ANCHORMODE_FREE] = "Free (drag in Edit Mode)",
-                },
-                disabled = isDisabled,
-                order = 11,
-            },
-            freeGrowDirection = {
-                type = "select",
-                path = "freeGrowDirection",
-                name = "Free Grow Direction",
-                desc = "Choose whether aura bars stack downward or upward in free positioning mode.",
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                disabled = isDisabled,
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                parent = "positioning",
-                parentCheck = function()
-                    local cfg = ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars")
-                    return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
-                end,
-                order = 12,
-            },
+            layoutMovedButton = ECM.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
 
             -- Appearance
             appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },

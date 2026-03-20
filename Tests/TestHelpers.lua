@@ -656,127 +656,28 @@ TestHelpers.OPTIONS_GLOBALS = {
     "hooksecurefunc",
     "CreateScrollBoxListLinearView",
     "ScrollUtil",
+    "SettingsPanel",
 }
 
---- Create a full default profile for option tests.
+--- Load the live ECM_Constants.lua to populate ECM.Constants.
+function TestHelpers.LoadLiveConstants()
+    _G.ECM = _G.ECM or {}
+    if not ECM.Constants then
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+    end
+end
+
+--- Load the live ECM_Defaults.lua to populate ECM.defaults.
+--- Requires ECM.Constants and Enum to be set up first.
+function TestHelpers.LoadLiveDefaults()
+    TestHelpers.LoadLiveConstants()
+    TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
+end
+
+--- Create a full default profile for option tests using the live defaults file.
 function TestHelpers.MakeOptionsProfile()
-    local border = { enabled = false, thickness = 4, color = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 } }
-    local profile = {
-        schemaVersion = 11,
-        global = {
-            debug = false,
-            hideWhenMounted = true,
-            hideOutOfCombatInRestAreas = false,
-            updateFrequency = 0.04,
-            barHeight = 22,
-            barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
-            offsetY = 4,
-            moduleSpacing = 0,
-            moduleGrowDirection = "down",
-            texture = "Solid",
-            font = "Expressway",
-            fontSize = 11,
-            fontOutline = "OUTLINE",
-            fontShadow = false,
-            outOfCombatFade = {
-                enabled = false,
-                opacity = 60,
-                exceptIfTargetCanBeAttacked = true,
-                exceptIfTargetCanBeHelped = false,
-                exceptInInstance = true,
-            },
-        },
-        powerBar = {
-            enabled = true,
-            anchorMode = "chain",
-            width = 300,
-            editModePositions = {},
-            showText = true,
-            overrideFont = false,
-            showManaAsPercent = true,
-            border = deepClone(border),
-            ticks = { mappings = {}, defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }, defaultWidth = 1 },
-            colors = {
-                [0] = { r = 0, g = 0, b = 1, a = 1 },
-                [1] = { r = 1, g = 0, b = 0, a = 1 },
-                [2] = { r = 1, g = 0.57, b = 0.31, a = 1 },
-                [3] = { r = 0.85, g = 0.65, b = 0.13, a = 1 },
-                [6] = { r = 0, g = 0.82, b = 1, a = 1 },
-                [8] = { r = 0.3, g = 0.52, b = 0.9, a = 1 },
-                [11] = { r = 0, g = 0.439, b = 0.871, a = 1 },
-                [13] = { r = 0.4, g = 0, b = 0.8, a = 1 },
-                [17] = { r = 0.788, g = 0.259, b = 0.992, a = 1 },
-            },
-        },
-        resourceBar = {
-            enabled = true,
-            showText = false,
-            overrideFont = false,
-            anchorMode = "chain",
-            width = 300,
-            editModePositions = {},
-            border = deepClone(border),
-            colors = {
-                souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
-                devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                devourerMeta = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
-                icicles = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
-                [16] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
-                [12] = { r = 0, g = 1, b = 0.59, a = 1 },
-                [4] = { r = 1, g = 0.96, b = 0.41, a = 1 },
-                [19] = { r = 0.2, g = 0.58, b = 0.5, a = 1 },
-                [9] = { r = 0.886, g = 0.824, b = 0.239, a = 1 },
-                maelstromWeapon = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
-                [7] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
-            },
-            maxColorsEnabled = {
-                icicles = true,
-            },
-            maxColors = {
-                icicles = { r = 1, g = 1, b = 1, a = 1 },
-            },
-        },
-        runeBar = {
-            enabled = true,
-            anchorMode = "chain",
-            width = 300,
-            editModePositions = {},
-            overrideFont = false,
-            useSpecColor = true,
-            color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
-            colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
-            colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
-            colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 },
-        },
-        buffBars = {
-            enabled = true,
-            anchorMode = "chain",
-            editModePositions = {},
-            verticalSpacing = 0,
-            freeGrowDirection = "down",
-            showIcon = false,
-            showSpellName = true,
-            showDuration = true,
-            overrideFont = false,
-            colors = {
-                byName = {},
-                bySpellID = {},
-                byCooldownID = {},
-                byTexture = {},
-                cache = {},
-                defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
-            },
-        },
-        itemIcons = {
-            enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
-        },
-    }
-    return profile, deepClone(profile)
+    TestHelpers.LoadLiveDefaults()
+    return deepClone(ECM.defaults.profile), deepClone(ECM.defaults.profile)
 end
 
 --- Install common WoW globals for option tests.
@@ -897,7 +798,37 @@ function TestHelpers.SetupOptionsGlobals()
         }
     end
 
-    _G.hooksecurefunc = function() end
+    _G.hooksecurefunc = function(tbl, method, hook)
+        if type(tbl) == "table" and type(method) == "string" and type(hook) == "function" then
+            local orig = tbl[method]
+            if type(orig) == "function" then
+                tbl[method] = function(...)
+                    orig(...)
+                    hook(...)
+                end
+            end
+        end
+    end
+
+    local settingsPanelScripts = {}
+    local settingsPanelCurrentCategory = nil
+    _G.SettingsPanel = {
+        SelectCategory = function() end,
+        DisplayCategory = function() end,
+        GetCurrentCategory = function() return settingsPanelCurrentCategory end,
+        SetCurrentCategory = function(_, cat) settingsPanelCurrentCategory = cat end,
+        IsShown = function() return false end,
+        GetSettingsList = function() return nil end,
+        HookScript = function(_, event, fn)
+            settingsPanelScripts[event] = settingsPanelScripts[event] or {}
+            settingsPanelScripts[event][#settingsPanelScripts[event] + 1] = fn
+        end,
+        _fireScript = function(event)
+            for _, fn in ipairs(settingsPanelScripts[event] or {}) do
+                fn(_G.SettingsPanel)
+            end
+        end,
+    }
 
     _G.CreateScrollBoxListLinearView = function()
         local view = {}
@@ -948,41 +879,13 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
     lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
 
-    _G.ECM = {
-        Constants = {
-            ADDON_NAME = "Enhanced Cooldown Manager",
-            ANCHORMODE_CHAIN = "chain",
-            ANCHORMODE_DETACHED = "detached",
-            ANCHORMODE_FREE = "free",
-            GROW_DIRECTION_DOWN = "down",
-            GROW_DIRECTION_UP = "up",
-            SPELL_COLORS_SUBCAT = "Spell Colors",
-            SPELL_COLORS_DESC_TEXT = "Configure per-spell aura bar colors.",
-            SCROLL_ROW_HEIGHT_COMPACT = 20,
-            DEFAULT_BAR_WIDTH = 250,
-            DEFAULT_BAR_HEIGHT = 20,
-            DEFAULT_BORDER_THICKNESS = 4,
-            DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
-            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
-            RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
-            RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
-            RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
-            RESOURCEBAR_TYPE_ICICLES = "icicles",
-            RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
-            RESOURCEBAR_MAX_COLOR_TYPES = {
-                ["icicles"] = true,
-            },
-            DEMONHUNTER_CLASS_ID = 12,
-            DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
-            CURRENT_SCHEMA_VERSION = 10,
-        },
-        CloneValue = deepClone,
-        ScheduleLayoutUpdate = function() end,
-        ClassUtil = {
-            IsDeathKnight = function()
-                return false
-            end,
-        },
+    TestHelpers.LoadLiveConstants()
+    ECM.CloneValue = deepClone
+    ECM.ScheduleLayoutUpdate = function() end
+    ECM.ClassUtil = {
+        IsDeathKnight = function()
+            return false
+        end,
     }
 
     local mod = {
