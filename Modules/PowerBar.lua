@@ -124,11 +124,11 @@ end
 
 function PowerBar:OnEnable()
     ECM.BarMixin.AddMixin(self, "PowerBar")
-    ECM.RegisterFrame(self)
+    ECM.Runtime.RegisterFrame(self)
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
 end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

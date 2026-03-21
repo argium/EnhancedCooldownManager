@@ -184,7 +184,7 @@ local function createTickRowWidgets(rowFrame, SB)
                 return
             end
             store.UpdateTick(rowFrame._rowIndex, storeField, rounded)
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end
 
@@ -199,7 +199,7 @@ local function createTickMarksCanvas(SB, subcatName)
     local function clearAllTicks()
         store.SetCurrentTicks({})
         frame:RefreshTicks()
-        ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
     local headerRow = layout:AddHeader(subcatName)
@@ -271,14 +271,14 @@ local function createTickMarksCanvas(SB, subcatName)
             ECM.OptionUtil.OpenColorPicker(current, true, function(color)
                 store.UpdateTick(rowFrame._rowIndex, "color", color)
                 rowFrame._swatch:SetColorRGB(color.r, color.g, color.b)
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
         end)
 
         rowFrame._removeBtn:SetScript("OnClick", function()
             store.RemoveTick(rowFrame._rowIndex)
             frame:RefreshTicks()
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 

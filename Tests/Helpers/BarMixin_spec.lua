@@ -92,7 +92,7 @@ describe("BarMixin", function()
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        _G.ECM.ScheduleLayoutUpdate = function() end
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEQOLEditModeStub()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()

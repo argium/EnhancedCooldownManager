@@ -54,12 +54,14 @@ describe("ResourceBar real source", function()
                     return currentValues[1], currentValues[2], currentValues[3]
                 end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function()
-                unregisterFrameCalls = unregisterFrameCalls + 1
-            end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function()
+                    unregisterFrameCalls = unregisterFrameCalls + 1
+                end,
+            },
             Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()

@@ -233,7 +233,7 @@ describe("FrameMixin real source", function()
         _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        _G.ECM.ScheduleLayoutUpdate = function() end
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEQOLEditModeStub()
         ns = { Addon = {} }
@@ -358,7 +358,7 @@ describe("FrameMixin real source", function()
         end
 
         local detachedAnchor = makeFrame({ name = "ECMDetachedAnchor" })
-        ECM.DetachedAnchor = detachedAnchor
+        ECM.Runtime.DetachedAnchor = detachedAnchor
 
         local anchor, isFirst = FrameMixin.GetNextChainAnchor(
             { Name = "TestModule" },
@@ -369,7 +369,7 @@ describe("FrameMixin real source", function()
         assert.are.equal(detachedAnchor, anchor)
         assert.is_true(isFirst)
 
-        ECM.DetachedAnchor = nil
+        ECM.Runtime.DetachedAnchor = nil
     end)
 
     it("SetHidden hides immediately and defers showing", function()

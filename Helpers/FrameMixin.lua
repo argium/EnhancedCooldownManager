@@ -96,13 +96,13 @@ end
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
 LibEQOLEditMode:RegisterCallback("enter", function()
-    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeEnter") end)
+    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter") end)
 end)
 LibEQOLEditMode:RegisterCallback("exit", function()
-    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeExit") end)
+    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit") end)
 end)
 LibEQOLEditMode:RegisterCallback("layout", function()
-    C_Timer.After(0, function() ECM.ScheduleLayoutUpdate(0, "EditModeLayout") end)
+    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout") end)
 end)
 
 ---@alias AnchorPoint string
@@ -151,7 +151,7 @@ function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
     -- Root anchor depends on the mode being resolved.
     if anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
         ECM.Log(self.Name, "GetNextChainAnchor DetachedAnchor <-- " .. (frameName or "nil"))
-        return ECM.DetachedAnchor or UIParent, true
+        return ECM.Runtime.DetachedAnchor or UIParent, true
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.

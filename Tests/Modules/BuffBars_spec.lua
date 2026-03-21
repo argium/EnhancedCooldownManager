@@ -189,12 +189,14 @@ describe("BuffBars real source", function()
                 ClearDiscoveredKeys = function() end,
                 DiscoverBar = function() end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function()
-                unregisterFrameCalls = unregisterFrameCalls + 1
-            end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function()
+                    unregisterFrameCalls = unregisterFrameCalls + 1
+                end,
+            },
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
@@ -360,7 +362,7 @@ describe("BuffBars real source", function()
 
     it("uses FrameMixin positioning for detached mode", function()
         local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
-        ECM.DetachedAnchor = detachedAnchor
+        ECM.Runtime.DetachedAnchor = detachedAnchor
         local originalCalculateLayoutParams = ECM.FrameMixin.CalculateLayoutParams
         local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
@@ -368,7 +370,7 @@ describe("BuffBars real source", function()
             local gc = self:GetGlobalConfig()
             return {
                 mode = ECM.Constants.ANCHORMODE_DETACHED,
-                anchor = ECM.DetachedAnchor,
+                anchor = ECM.Runtime.DetachedAnchor,
                 anchorPoint = "TOPLEFT",
                 anchorRelativePoint = "BOTTOMLEFT",
                 offsetX = 0,
@@ -408,7 +410,7 @@ describe("BuffBars real source", function()
         assert.are.equal("BOTTOMLEFT", BuffBarCooldownViewer.__anchors[1][3])
         assert.are.equal(-2, BuffBarCooldownViewer.__anchors[1][5])
 
-        ECM.DetachedAnchor = nil
+        ECM.Runtime.DetachedAnchor = nil
         ECM.FrameMixin.CalculateLayoutParams = originalCalculateLayoutParams
         ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)

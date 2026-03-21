@@ -116,7 +116,7 @@ describe("ItemIcons", function()
             self:UnregisterAllEvents()
             self:UpdateLayout("OnDisable")
 
-            ECM.UnregisterFrame(self)
+            ECM.Runtime.UnregisterFrame(self)
 
             self._viewerOriginalPoint = nil
             self._isEditModeActive = nil
@@ -129,7 +129,9 @@ describe("ItemIcons", function()
 
     before_each(function()
         _G.ECM = {
-            UnregisterFrame = function() end,
+            Runtime = {
+                UnregisterFrame = function() end,
+            },
         }
         _G.EditModeManagerFrame = makeHookableFrame(false)
         _G.UtilityCooldownViewer = makeHookableFrame(true)
@@ -249,10 +251,12 @@ describe("ItemIcons real source", function()
                     addMixinCalls = addMixinCalls + 1
                 end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function() end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function() end,
+            },
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()

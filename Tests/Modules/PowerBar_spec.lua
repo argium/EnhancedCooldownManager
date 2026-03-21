@@ -66,12 +66,14 @@ describe("PowerBar real source", function()
                     return Enum.PowerType.Mana
                 end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function()
-                unregisterFrameCalls = unregisterFrameCalls + 1
-            end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function()
+                    unregisterFrameCalls = unregisterFrameCalls + 1
+                end,
+            },
             Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()

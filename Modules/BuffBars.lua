@@ -631,7 +631,7 @@ function BuffBars:OnEnable()
     end)
 
     ECM.FrameMixin.AddMixin(self, "BuffBars")
-    ECM.RegisterFrame(self)
+    ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
     self:RegisterEvent("ZONE_CHANGED", "OnZoneChanged")
@@ -647,5 +647,5 @@ end
 function BuffBars:OnDisable()
     ECM.SpellColors.SetConfigAccessor(nil)
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

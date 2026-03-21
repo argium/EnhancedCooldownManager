@@ -94,5 +94,5 @@ end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

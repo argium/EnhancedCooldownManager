@@ -54,7 +54,8 @@ describe("OptionUtil", function()
         ECM.Constants.ANCHORMODE_CHAIN = 1
         ECM.Constants.ANCHORMODE_DETACHED = 3
         ECM.Constants.ANCHORMODE_FREE = 2
-        ECM.ScheduleLayoutUpdate = function() end
+        ECM.Runtime = ECM.Runtime or {}
+        ECM.Runtime.ScheduleLayoutUpdate = function() end
 
         TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 

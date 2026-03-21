@@ -886,7 +886,8 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
 
     TestHelpers.LoadLiveConstants()
     ECM.CloneValue = deepClone
-    ECM.ScheduleLayoutUpdate = function() end
+    ECM.Runtime = ECM.Runtime or {}
+    ECM.Runtime.ScheduleLayoutUpdate = function() end
     ECM.ClassUtil = {
         IsDeathKnight = function()
             return false

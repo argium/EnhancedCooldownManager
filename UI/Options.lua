@@ -478,7 +478,7 @@ ECM.SettingsBuilder = LSB:New({
     varPrefix = "ECM",
     onChanged = function(spec)
         if spec.layout ~= false then
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
     end,
     compositeDefaults = {
@@ -540,7 +540,7 @@ function Options:OnInitialize()
 end
 
 function Options:OnProfileChanged()
-    ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+    ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
 end
 
 function Options:OpenOptions()

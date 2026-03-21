@@ -100,7 +100,7 @@ describe("Utilities", function()
             end,
         }
         _G.ECM.DebugAssert = function() end
-        _G.ECM.ScheduleLayoutUpdate = function() end
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
         _G.CreateFrame = function()
             return {
                 SetScript = function() end,

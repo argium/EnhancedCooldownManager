@@ -169,7 +169,8 @@ describe("Options sections and root assembly", function()
         ECM.Constants.ANCHORMODE_CHAIN = 1
         ECM.Constants.ANCHORMODE_FREE = 2
         ECM.Constants.DEFAULT_BAR_WIDTH = 300
-        ECM.ScheduleLayoutUpdate = function() end
+        ECM.Runtime = ECM.Runtime or {}
+        ECM.Runtime.ScheduleLayoutUpdate = function() end
 
         local border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }
         local profileData = {

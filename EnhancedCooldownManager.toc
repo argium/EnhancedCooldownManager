@@ -40,6 +40,7 @@ Helpers\FrameMixin.lua
 Helpers\BarMixin.lua
 
 ECM.lua
+ECM_Runtime.lua
 
 Modules\BuffBars.lua
 Modules\PowerBar.lua

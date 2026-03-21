@@ -587,7 +587,7 @@ end
 
 function ItemIcons:OnEnable()
     ECM.FrameMixin.AddMixin(self, "ItemIcons")
-    ECM.RegisterFrame(self)
+    ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items
     self:RegisterEvent("BAG_UPDATE_DELAYED", "OnBagUpdateDelayed")
@@ -606,7 +606,7 @@ function ItemIcons:OnDisable()
     self:UnregisterAllEvents()
     self:UpdateLayout("OnDisable")
 
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 
     self._viewerOriginalPoint = nil
     self._isEditModeActive = nil

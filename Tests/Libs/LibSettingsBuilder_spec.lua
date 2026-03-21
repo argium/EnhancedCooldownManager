@@ -247,9 +247,11 @@ describe("LibSettingsBuilder", function()
                 DEFAULT_BAR_WIDTH = 300,
             },
             CloneValue = TestHelpers.deepClone,
-            ScheduleLayoutUpdate = function()
-                layoutUpdateCalls = layoutUpdateCalls + 1
-            end,
+            Runtime = {
+                ScheduleLayoutUpdate = function()
+                    layoutUpdateCalls = layoutUpdateCalls + 1
+                end,
+            },
         }
 
         local profileData = {

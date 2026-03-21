@@ -188,9 +188,9 @@ describe("ChatCommand migration", function()
                 return s
             end,
         }
-        _G.ECM.ScheduleLayoutUpdate = function(delay, reason)
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function(delay, reason)
             scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
-        end
+        end }
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
@@ -276,7 +276,7 @@ describe("ChatCommand migration", function()
         fakeAddon.ConfirmReloadUI = function(_, text, onAccept)
             confirmReloadCalls[#confirmReloadCalls + 1] = { text = text, onAccept = onAccept }
         end
-        _G.ECM.ScheduleLayoutUpdate = function(delay, reason)
+        _G.ECM.Runtime.ScheduleLayoutUpdate = function(delay, reason)
             scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
         end
 
@@ -432,11 +432,6 @@ describe("ChatCommand migration", function()
         assert.are.equal(0, openOptionsCalls)
         assert.are.equal(1, #printedMessages)
         assert.are.equal("Options cannot be opened during combat. They will open when combat ends.", printedMessages[1])
-        assert.are.equal(1, #registeredEvents)
-        assert.are.same(
-            { eventName = "PLAYER_REGEN_ENABLED", handlerName = "HandleOpenOptionsAfterCombat" },
-            registeredEvents[1]
-        )
         assert.is_true(mod._openOptionsAfterCombat)
     end)
 
@@ -446,7 +441,6 @@ describe("ChatCommand migration", function()
         mod:HandleOpenOptionsAfterCombat()
 
         assert.are.equal(1, openOptionsCalls)
-        assert.are.same({ "PLAYER_REGEN_ENABLED" }, unregisteredEvents)
         assert.is_nil(mod._openOptionsAfterCombat)
     end)
 

@@ -78,6 +78,14 @@ local function getMaelstromWeaponMax()
     return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
+-- Gets the max value towards demon hunter void meta form based ond talents
+local function getDemonHunterVoidMetaMax()
+    if C_SpellBook.IsSpellKnown(C.SPELLID_SOUL_GLUTTEN) then
+        return C.RESOURCEBAR_DEVOURER_META_MAX - 15
+    end
+    return C.RESOURCEBAR_DEVOURER_META_MAX
+end
+
 --- Returns max, current, and a safe discrete count for the given resource type.
 --- The 3rd return (safeMax) is always a non-secret number suitable for comparison
 --- and arithmetic (e.g., tick layout). For special resource types, max and safeMax
@@ -109,9 +117,10 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
             return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0, C.RESOURCEBAR_DEVOURER_META_MAX
         end
 
-        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX,
-            voidFragments and voidFragments.applications or 0,
-            C.RESOURCEBAR_DEVOURER_NORMAL_MAX
+        local max = getDemonHunterVoidMetaMax() / 5
+        return max,
+            voidFragments and voidFragments.applications / 5 or 0,
+            max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then

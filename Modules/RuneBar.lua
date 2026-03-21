@@ -293,7 +293,7 @@ function RuneBar:OnEnable()
     end
 
     ECM.BarMixin.AddMixin(self, "RuneBar")
-    ECM.RegisterFrame(self)
+    ECM.Runtime.RegisterFrame(self)
 
     if self._valueTicker then
         self._valueTicker:Cancel()
@@ -314,7 +314,7 @@ function RuneBar:OnDisable()
     self:UnregisterAllEvents()
 
     if self.InnerFrame then
-        ECM.UnregisterFrame(self)
+        ECM.Runtime.UnregisterFrame(self)
     end
 
     if self._valueTicker then

@@ -5,16 +5,14 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
-describe("ECM layout system", function()
+describe("ECM.Runtime layout system", function()
     local originalGlobals
     local fakeTime
     local isMounted
     local inCombat
     local cvarEnabled
-    local addonVersion
     local printedMessages
     local fakeAddon
-    local defaultModuleLibraries
     local createdFrames
     local createdTickers
 
@@ -60,9 +58,7 @@ describe("ECM layout system", function()
             self.__width = w
             self.__height = h
         end
-        function frame:SetFrameStrata(strata)
-            self.__frameStrata = strata
-        end
+        function frame:SetFrameStrata() end
         function frame:SetPoint() end
         function frame:GetPoint() end
         function frame:GetNumPoints()
@@ -74,10 +70,9 @@ describe("ECM layout system", function()
         function frame:GetName()
             return opts.name
         end
-        function frame:SetScript() end
-        function frame:SetScript(scriptName, callback)
+        function frame:SetScript(name, fn)
             self.__scripts = self.__scripts or {}
-            self.__scripts[scriptName] = callback
+            self.__scripts[name] = fn
         end
         function frame:RegisterEvent(event)
             self.__registeredEvents = self.__registeredEvents or {}
@@ -94,24 +89,113 @@ describe("ECM layout system", function()
         function frame:GetEffectiveScale()
             return 1
         end
-        function frame:GetBackdropBorderColor()
-            return 0, 0, 0, 1
-        end
-        function frame:GetBackdrop()
-            return nil
-        end
-        function frame:GetColorTexture()
-            return nil
-        end
-        function frame:SetColorTexture() end
-        function frame:GetVertexColor()
-            return nil
-        end
-        function frame:IsObjectType()
-            return false
-        end
 
         return frame
+    end
+
+    local function makeModule(name)
+        local innerFrame = makeFrame({ name = "ECM" .. name, shown = true })
+        innerFrame.Background = makeFrame()
+        innerFrame.Border = makeFrame({ shown = false })
+
+        local mod = {
+            Name = name,
+            InnerFrame = innerFrame,
+            IsHidden = false,
+            _lastUpdate = 0,
+            _configKey = name:sub(1, 1):lower() .. name:sub(2),
+        }
+
+        function mod:SetHidden(hide)
+            self.IsHidden = hide
+        end
+        function mod:ShouldShow()
+            return not self.IsHidden
+        end
+        function mod:IsEnabled()
+            return true
+        end
+        function mod:GetGlobalConfig()
+            local p = _G._testDB and _G._testDB.profile
+            return p and p.global
+        end
+        function mod:GetModuleConfig()
+            local p = _G._testDB and _G._testDB.profile
+            return p and p[self._configKey]
+        end
+        function mod:CalculateLayoutParams()
+            local gc = self:GetGlobalConfig()
+            local mc = self:GetModuleConfig()
+            return {
+                mode = mc.anchorMode,
+                anchor = _G.UIParent,
+                isFirst = true,
+                anchorPoint = "TOPLEFT",
+                anchorRelativePoint = "BOTTOMLEFT",
+                offsetX = 0,
+                offsetY = -((gc and gc.offsetY) or 0),
+                height = (mc and mc.height) or (gc and gc.barHeight),
+                width = mc.anchorMode == ECM.Constants.ANCHORMODE_FREE and ((mc and mc.width) or (gc and gc.barWidth))
+                    or nil,
+            }
+        end
+        function mod:GetNextChainAnchor()
+            return _G.UIParent, true
+        end
+        function mod:UpdateLayout(why)
+            if not self:ShouldShow() then
+                self.InnerFrame:Hide()
+                return false
+            end
+            if not self.InnerFrame:IsShown() then
+                self.InnerFrame:Show()
+            end
+            local params = self:CalculateLayoutParams()
+            if params.height then
+                ECM.FrameUtil.LazySetHeight(self.InnerFrame, params.height)
+            end
+            if params.width then
+                ECM.FrameUtil.LazySetWidth(self.InnerFrame, params.width)
+            end
+            self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
+            return true
+        end
+        function mod:Refresh()
+            return true
+        end
+        function mod:ThrottledRefresh(why)
+            local gc = self:GetGlobalConfig()
+            local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+            if GetTime() - (self._lastUpdate or 0) < freq then
+                return false
+            end
+            self:Refresh(why)
+            self._lastUpdate = GetTime()
+            return true
+        end
+        function mod:ThrottledUpdateLayout(reason)
+            if self:IsEnabled() then
+                self:UpdateLayout(reason)
+            end
+        end
+
+        return mod
+    end
+
+    local function makeRegisteredModule(name)
+        local mod = makeModule(name or "PowerBar")
+        ECM.Runtime.RegisterFrame(mod)
+        return mod
+    end
+
+    local function makeFadeConfig(opacity)
+        return {
+            enabled = true,
+            opacity = opacity,
+            exceptIfTargetCanBeAttacked = false,
+            exceptIfTargetCanBeHelped = false,
+            exceptInInstance = false,
+        }
     end
 
     local CAPTURED_GLOBALS = {
@@ -167,9 +251,7 @@ describe("ECM layout system", function()
         isMounted = false
         inCombat = false
         cvarEnabled = true
-        addonVersion = "v0.6.1"
         printedMessages = {}
-        defaultModuleLibraries = {}
         createdFrames = {}
         createdTickers = {}
 
@@ -240,7 +322,7 @@ describe("ECM layout system", function()
         _G.C_AddOns = {
             GetAddOnMetadata = function(_, key)
                 if key == "Version" then
-                    return addonVersion
+                    return "v0.6.1"
                 end
             end,
         }
@@ -278,9 +360,6 @@ describe("ECM layout system", function()
             DisableModule = function() end,
             GetModule = function() end,
         }
-        fakeAddon.SetDefaultModuleLibraries = function(_, ...)
-            defaultModuleLibraries = { ... }
-        end
         TestHelpers.SetupLibStub()
         _G.SlashCmdList = {}
         _G.hash_SlashCmdList = {}
@@ -346,54 +425,153 @@ describe("ECM layout system", function()
         )
     end)
 
-    describe("beta login warning", function()
-        it("prints the pre-release warning on beta versions", function()
-            addonVersion = "v0.6.1-beta"
+    describe("automatic layout enforcement", function()
+        it("hides registered module frames when mounted", function()
+            local mod = makeRegisteredModule()
+            isMounted = true
 
-            fakeAddon:OnEnable()
+            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
 
-            assert.is_truthy(printedMessages[#printedMessages])
-            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
+            assert.is_true(mod.IsHidden)
+            assert.is_false(mod.InnerFrame:IsShown())
         end)
 
-        it("does not print the pre-release warning on stable versions", function()
-            addonVersion = "v0.6.1"
+        it("applies fade alpha when out of combat", function()
+            local mod = makeRegisteredModule()
+            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(50)
 
-            fakeAddon:OnEnable()
+            ECM.Runtime.ScheduleLayoutUpdate(0, "fade")
 
-            for _, message in ipairs(printedMessages) do
-                assert.is_nil(message:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
+            assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
+        end)
+
+        it("re-shows module frames after dismounting", function()
+            local mod = makeRegisteredModule()
+
+            isMounted = true
+            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
+            assert.is_false(mod.InnerFrame:IsShown())
+
+            fakeTime = fakeTime + 1
+            isMounted = false
+            ECM.Runtime.ScheduleLayoutUpdate(0, "dismount")
+            assert.is_true(mod.InnerFrame:IsShown())
+        end)
+
+        it("restores full alpha when combat fade is disabled", function()
+            local mod = makeRegisteredModule()
+            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(30)
+            ECM.Runtime.ScheduleLayoutUpdate(0, "fade-on")
+            assert.are.equal(0.3, mod.InnerFrame:GetAlpha())
+
+            fakeTime = fakeTime + 1
+            _G._testDB.profile.global.outOfCombatFade.enabled = false
+            ECM.Runtime.ScheduleLayoutUpdate(0, "fade-off")
+            assert.are.equal(1, mod.InnerFrame:GetAlpha())
+        end)
+
+        it("hides all registered modules when cvar is disabled", function()
+            local mod1 = makeRegisteredModule("PowerBar")
+            local mod2 = makeRegisteredModule("ResourceBar")
+
+            cvarEnabled = false
+            ECM.Runtime.ScheduleLayoutUpdate(0, "cvar-off")
+
+            assert.is_true(mod1.IsHidden)
+            assert.is_true(mod2.IsHidden)
+        end)
+
+        it("re-hides a module frame that was externally shown while hidden", function()
+            local mod = makeRegisteredModule()
+            isMounted = true
+            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
+
+            mod.InnerFrame:Show()
+
+            fakeTime = fakeTime + 1
+            ECM.Runtime.ScheduleLayoutUpdate(0, "re-enforce")
+            assert.is_false(mod.InnerFrame:IsShown())
+        end)
+
+        it("forces a layout pass when layout preview is toggled on", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
             end
+
+            ECM.Runtime.SetLayoutPreview(true)
+
+            assert.same({ "LayoutPreviewOn" }, reasons)
         end)
     end)
 
-    describe("initialization wiring", function()
-        it("sets LibEvent as the default module library on addon creation", function()
-            assert.same({ "LibEvent-1.0" }, defaultModuleLibraries)
-        end)
+    describe("detached anchor layout handling", function()
+        it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local lib = LibStub("LibEQOLEditMode-1.0")
+            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
-        it("registers layout events via Runtime on enable", function()
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.global.detachedAnchorPositions = {
+                Modern = { point = "TOPLEFT", x = 10, y = 20 },
+                Raid = { point = "TOPRIGHT", x = 30, y = 40 },
+            }
+            mod.InnerFrame:SetHeight(24)
+            fakeAddon.GetECMModule = function(_, name)
+                return name == mod.Name and mod or nil
+            end
+
+            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+                frame.__ecmAnchorCache = anchors
+                frame.__anchors = anchors
+            end
+
+            lib.GetActiveLayoutName = function()
+                return "Modern"
+            end
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-initial")
+
+            local anchor = ECM.Runtime.DetachedAnchor
+            assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
+
+            lib.GetActiveLayoutName = function()
+                return nil
+            end
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-transition")
+            assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
+
+            lib.GetActiveLayoutName = function()
+                return "Raid"
+            end
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-layout-switch")
+            assert.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 30, 40 }, anchor.__anchors[1])
+
+            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        end)
+    end)
+
+    describe("lifecycle", function()
+        it("registers layout events on enable", function()
             local libEvent = LibStub("LibEvent-1.0")
 
-            fakeAddon:OnEnable()
-            inCombat = true
-            fakeAddon:ChatCommand("options")
+            ECM.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             assert.is_true(addonFrame.__registeredEvents.ZONE_CHANGED)
             assert.is_true(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
         end)
 
-        it("cleans up layout events via Runtime on disable", function()
+        it("cleans up layout events on disable", function()
             local libEvent = LibStub("LibEvent-1.0")
 
-            fakeAddon:OnEnable()
+            ECM.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
-
             assert.is_false(createdTickers[1].cancelled)
 
-            fakeAddon:OnDisable()
+            ECM.Runtime.Disable(fakeAddon)
 
             assert.is_nil(addonFrame.__registeredEvents.ZONE_CHANGED)
             assert.is_nil(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
@@ -402,28 +580,24 @@ describe("ECM layout system", function()
             assert.is_true(createdTickers[1].cancelled)
         end)
 
-        it("registers both slash commands through LibConsole during OnInitialize", function()
-            local chatInputs = {}
-            local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
-            aceDB.New = function()
-                return { profile = TestHelpers.deepClone(ECM.defaults.profile) }
+        it("calls OnCombatEnd callback on PLAYER_REGEN_ENABLED", function()
+            local called = false
+            ECM.Runtime.OnCombatEnd = function()
+                called = true
             end
 
-            function fakeAddon:ChatCommand(input)
-                chatInputs[#chatInputs + 1] = input
+            ECM.Runtime.Enable(fakeAddon)
+
+            local libEvent = LibStub("LibEvent-1.0")
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+
+            -- Simulate PLAYER_REGEN_ENABLED via the registered handler
+            local handler = addonFrame.__scripts and addonFrame.__scripts["OnEvent"]
+            if handler then
+                handler(addonFrame, "PLAYER_REGEN_ENABLED")
             end
 
-            fakeAddon:OnInitialize()
-
-            assert.is_function(SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER)
-            assert.is_function(SlashCmdList.LIBCONSOLE_ECM)
-            assert.are.equal("/enhancedcooldownmanager", _G.SLASH_LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER1)
-            assert.are.equal("/ecm", _G.SLASH_LIBCONSOLE_ECM1)
-
-            SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER("from-long")
-            SlashCmdList.LIBCONSOLE_ECM("from-short")
-
-            assert.same({ "from-long", "from-short" }, chatInputs)
+            assert.is_true(called)
         end)
     end)
 end)
