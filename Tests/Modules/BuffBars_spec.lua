@@ -144,6 +144,7 @@ describe("BuffBars real source", function()
         timerCallbacks = {}
         _G.ECM = {
             Log = function() end,
+            IsDebugEnabled = function() return false end,
             Constants = nil,
             FrameUtil = {
                 GetIconTextureFileID = function(frame)
@@ -320,17 +321,6 @@ describe("BuffBars real source", function()
         assert.are.equal(1, BuffBarCooldownViewer:GetHookCount("OnSizeChanged"))
     end)
 
-    it("only relayouts for player auras", function()
-        local reasons = {}
-        function BuffBars:ThrottledUpdateLayout(reason)
-            reasons[#reasons + 1] = reason
-        end
-
-        BuffBars:OnUnitAura(nil, "target")
-        BuffBars:OnUnitAura(nil, "player")
-
-        assert.same({ "OnUnitAura" }, reasons)
-    end)
 
     it("hides the viewer when UpdateLayout decides not to show", function()
         function BuffBars:GetGlobalConfig()

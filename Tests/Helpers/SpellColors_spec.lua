@@ -105,6 +105,7 @@ describe("SpellColors", function()
         currentSpecID = 2
 
         _G.ECM = {
+            IsDebugEnabled = function() return false end,
             FrameUtil = {
                 GetIconTextureFileID = function(frame)
                     return frame and frame.__textureFileID or nil

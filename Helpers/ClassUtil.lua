@@ -158,7 +158,7 @@ function ClassUtil.GetCurrentPowerType()
     local specIndex = GetSpecialization()
 
     if class == "SHAMAN" and specIndex then
-        if specIndex == ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX then
+        if specIndex == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
             return Enum.PowerType.Maelstrom
         end
 

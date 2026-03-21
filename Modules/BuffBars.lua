@@ -8,8 +8,6 @@ local FrameUtil = ECM.FrameUtil
 local ChainRightPoint = FrameMixin.ChainRightPoint
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
-local _warned = false
-local _editLocked = false
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
@@ -116,7 +114,7 @@ end
 ---@param globalConfig table Global config
 ---@param barIndex number Index of the bar (for logging)
 ---@param retryCount number|nil Number of times this function has been retried
-local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount)
+local function styleChildFrame(module, frame, config, globalConfig, barIndex, retryCount)
     if not (frame and frame.__ecmHooked) then
         ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
         return
@@ -203,40 +201,42 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         and issecretvalue(spellID)
         and issecretvalue(cooldownID)
         and issecretvalue(textureFileID)
-    _editLocked = _editLocked or allSecret
+    module._editLocked = module._editLocked or allSecret
 
-    -- Purely diagnostics to help track down issues with secrets
-    local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
-    local colorLog = (barColor and "|cff" .. hex .. "#" .. hex .. "|r" or "nil")
-    local logPrefix = "GetColorForBar[" .. barIndex .. "] "
-    local logLine = logPrefix
-        .. "("
-        .. ECM.ToString(spellName)
-        .. ", "
-        .. ECM.ToString(spellID)
-        .. ", "
-        .. ECM.ToString(cooldownID)
-        .. ", "
-        .. ECM.ToString(textureFileID)
-        .. ") = "
-        .. colorLog
-    ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+    if ECM.IsDebugEnabled() then
+        local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
+        local colorLog = (barColor and "|cff" .. hex .. "#" .. hex .. "|r" or "nil")
+        local logLine = "GetColorForBar[" .. barIndex .. "] "
+            .. "("
+            .. ECM.ToString(spellName)
+            .. ", "
+            .. ECM.ToString(spellID)
+            .. ", "
+            .. ECM.ToString(cooldownID)
+            .. ", "
+            .. ECM.ToString(textureFileID)
+            .. ") = "
+            .. colorLog
+        ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+
+        if retryCount > 0 and not allSecret then
+            ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
+        end
+    end
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
-                styleChildFrame(frame, config, globalConfig, barIndex, retryCount + 1)
+                styleChildFrame(module, frame, config, globalConfig, barIndex, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
             barColor = nil
-        elseif not _warned then
+        elseif ECM.IsDebugEnabled() and not module._warned then
             ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
-            _warned = true
+            module._warned = true
         end
-    elseif retryCount > 0 then
-        ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
     if barColor == nil and not allSecret then
@@ -322,7 +322,9 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         })
     end
 
-    ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "styled")
+    if ECM.IsDebugEnabled() then
+        ECM.Log(ECM.Constants.BUFFBARS, "GetColorForBar[" .. barIndex .. "] styled")
+    end
 end
 
 local function hookChildFrame(child, module)
@@ -344,7 +346,7 @@ local function hookChildFrame(child, module)
         if cached then
             FrameUtil.LazySetAnchors(child, cached)
         end
-        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
@@ -354,7 +356,7 @@ local function hookChildFrame(child, module)
             return
         end
         module._layoutRunning = true
-        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
@@ -528,11 +530,11 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
-    _warned = false
-    _editLocked = false
+    self._warned = false
+    self._editLocked = false
     for barIndex, entry in ipairs(visibleChildren) do
         hookChildFrame(entry.frame, self)
-        styleChildFrame(entry.frame, cfg, globalConfig, barIndex)
+        styleChildFrame(self, entry.frame, cfg, globalConfig, barIndex)
     end
 
     layoutBars(viewer, growsUp, verticalSpacing)
@@ -607,12 +609,6 @@ function BuffBars:HookViewer()
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
 
-function BuffBars:OnUnitAura(_, unit)
-    if unit == "player" then
-        self:ThrottledUpdateLayout("OnUnitAura")
-    end
-end
-
 function BuffBars:OnZoneChanged()
     self:ThrottledUpdateLayout("OnZoneChanged")
 end
@@ -621,7 +617,7 @@ end
 --- @return boolean isEditLocked Whether editing is locked due to combat or secrets
 --- @return string reason Reason editing is locked ("combat", "secrets", or nil)
 function BuffBars:IsEditLocked()
-    local reason = InCombatLockdown() and "combat" or (_editLocked and "secrets") or nil
+    local reason = InCombatLockdown() and "combat" or (self._editLocked and "secrets") or nil
     return reason ~= nil, reason
 end
 

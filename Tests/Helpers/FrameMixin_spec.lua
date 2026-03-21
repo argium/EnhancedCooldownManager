@@ -33,6 +33,7 @@ describe("FrameMixin", function()
         fakeTime = 0
 
         _G.ECM = {}
+        _G.ECM.IsDebugEnabled = function() return false end
         _G.ECM.ColorUtil = {
             AreEqual = function(a, b)
                 if a == nil and b == nil then
@@ -203,6 +204,7 @@ describe("FrameMixin real source", function()
         timerQueue = {}
 
         _G.ECM = {
+            IsDebugEnabled = function() return false end,
             Log = function() end,
             DebugAssert = function(condition, message)
                 if not condition then

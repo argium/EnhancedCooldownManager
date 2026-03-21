@@ -34,6 +34,13 @@ describe("ModuleMixin", function()
             },
         }
 
+        -- ECM.GetGlobalConfig is defined in ECM.lua; stub it here since we only load ModuleMixin.lua
+        ECM.GetGlobalConfig = function()
+            local db = ns.Addon and ns.Addon.db
+            local profile = db and db.profile
+            return profile and profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
+        end
+
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
         ModuleMixin = assert(ECM.ModuleMixin, "ModuleMixin did not initialize")
     end)

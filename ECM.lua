@@ -2,6 +2,11 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@class ECM_Addon : AceAddon Core addon object (AceAddon instance).
+---@field db AceDBObject-3.0 AceDB database handle.
+---@field _addonCompartmentRegistered boolean Whether the addon compartment entry has been registered.
+---@field _openOptionsAfterCombat boolean Whether to open options after leaving combat.
+
 local ADDON_NAME, ns = ...
 local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "LibEvent-1.0")
 mod:SetDefaultModuleLibraries("LibEvent-1.0")
@@ -15,12 +20,21 @@ assert(ECM.EditMode, "ECM.EditMode must be initialized before ECM.lua")
 
 local LibConsole = LibStub("LibConsole-1.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
-local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local C = ECM.Constants
 local L = ECM.L
 
-local function isDebugEnabled()
-    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
+--- Returns the global config section. Standalone accessor for non-module callers.
+---@return table|nil
+function ECM.GetGlobalConfig()
+    local db = ns.Addon and ns.Addon.db
+    local profile = db and db.profile
+    return profile and profile[C.CONFIG_SECTION_GLOBAL]
+end
+
+--- Returns whether debug mode is enabled.
+function ECM.IsDebugEnabled()
+    local gc = ECM.GetGlobalConfig()
+    return gc and gc.debug
 end
 
 local function safeStrTostring(x)
@@ -113,7 +127,7 @@ function ECM.GetTexture(texture)
 end
 
 function ECM.DebugAssert(condition, message, data)
-    if not isDebugEnabled() then
+    if not ECM.IsDebugEnabled() then
         return
     end
 
@@ -124,7 +138,7 @@ function ECM.DebugAssert(condition, message, data)
 end
 
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
-    local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
+    local config = globalConfig or ECM.GetGlobalConfig()
     local useModuleOverride = moduleConfig and moduleConfig.overrideFont
     local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font))
         or C.DEFAULT_FONT
@@ -176,7 +190,7 @@ ECM.Print = LibConsole:NewPrinter(function(message)
 end)
 
 function ECM.Log(module, message, data)
-    if not isDebugEnabled() then
+    if not ECM.IsDebugEnabled() then
         return
     end
 
@@ -230,8 +244,8 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
         return
     end
 
-    if not StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] then
-        StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] = {
+    if not StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] then
+        StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] = {
             text = L["RELOAD_UI_PROMPT"],
             button1 = YES or "Yes",
             button2 = NO or "No",
@@ -253,8 +267,8 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
         }
     end
 
-    StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or L["RELOAD_UI_PROMPT"]
-    StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+    StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI].text = text or L["RELOAD_UI_PROMPT"]
+    StaticPopup_Show(C.POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
 local DIALOG_SIZES = {
@@ -495,15 +509,15 @@ function mod:ChatCommand(input)
         return
     end
 
-    local profile = self.db and self.db.profile
-    if not profile then
+    local gc = ECM.GetGlobalConfig()
+    if not gc then
         return
     end
 
     if cmd == "debug" then
         local newVal
         if arg == "" or arg == "toggle" then
-            newVal = not profile.global.debug
+            newVal = not gc.debug
         elseif arg == "on" then
             newVal = true
         elseif arg == "off" then
@@ -512,8 +526,8 @@ function mod:ChatCommand(input)
             ECM.Print(L["DEBUG_USAGE"])
             return
         end
-        profile.global.debug = newVal
-        ECM.Print(L["DEBUG_STATUS"] .. " " .. (profile.global.debug and L["DEBUG_ON"] or L["DEBUG_OFF"]))
+        gc.debug = newVal
+        ECM.Print(L["DEBUG_STATUS"] .. " " .. (gc.debug and L["DEBUG_ON"] or L["DEBUG_OFF"]))
         return
     end
 end

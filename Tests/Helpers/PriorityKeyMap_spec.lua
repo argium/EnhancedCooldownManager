@@ -31,6 +31,7 @@ describe("PriorityKeyMap", function()
             return now
         end
         _G.ECM = {
+            IsDebugEnabled = function() return false end,
             DebugAssert = function(condition, message)
                 if not condition then
                     error(message or "ECM.DebugAssert failed")

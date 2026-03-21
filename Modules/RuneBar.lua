@@ -184,9 +184,22 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     end
 end
 
+--- Returns true if any rune is currently on cooldown.
+local function anyRuneOnCooldown(maxRunes)
+    local now = GetTime()
+    for i = 1, maxRunes do
+        local isReady = getRuneCooldownState(i, now)
+        if not isReady then
+            return true
+        end
+    end
+    return false
+end
+
 --- Lightweight per-frame rune value updater.
 --- Only updates fill values and colors on existing fragment bars.
 --- Triggers a full layout refresh when rune ready/CD states change.
+--- Self-stops the animation ticker when all runes are ready.
 ---@param self RuneBar
 ---@param frame Frame
 local function updateRuneValues(self, frame)
@@ -226,6 +239,11 @@ local function updateRuneValues(self, frame)
         if frag then
             applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
+    end
+
+    -- Stop the animation ticker when all runes are ready
+    if not anyRuneOnCooldown(maxRunes) then
+        self:_StopAnimationTicker()
     end
 end
 
@@ -282,9 +300,34 @@ function RuneBar:Refresh(why, force)
     updateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
     self:LayoutResourceTicks(maxRunes, C.COLOR_BLACK, 1, "tickPool")
 
+    -- Start animation ticker if any rune is on cooldown
+    if anyRuneOnCooldown(maxRunes) then
+        self:_StartAnimationTicker()
+    end
+
     frame:Show()
     ECM.Log(self.Name, "Refresh complete.")
     return true
+end
+
+--- Starts the cooldown animation ticker if not already running.
+function RuneBar:_StartAnimationTicker()
+    if self._valueTicker then
+        return
+    end
+    self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
+        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
+            updateRuneValues(self, self.InnerFrame)
+        end
+    end)
+end
+
+--- Stops the cooldown animation ticker.
+function RuneBar:_StopAnimationTicker()
+    if self._valueTicker then
+        self._valueTicker:Cancel()
+        self._valueTicker = nil
+    end
 end
 
 function RuneBar:OnEnable()
@@ -295,18 +338,11 @@ function RuneBar:OnEnable()
     ECM.BarMixin.AddMixin(self, "RuneBar")
     ECM.Runtime.RegisterFrame(self)
 
-    if self._valueTicker then
-        self._valueTicker:Cancel()
-    end
-    self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
-        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
-            updateRuneValues(self, self.InnerFrame)
-        end
-    end)
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
 end
 
 function RuneBar:OnRunePowerUpdate()
+    self:_StartAnimationTicker()
     self:ThrottledUpdateLayout("RUNE_POWER_UPDATE")
 end
 
@@ -317,8 +353,5 @@ function RuneBar:OnDisable()
         ECM.Runtime.UnregisterFrame(self)
     end
 
-    if self._valueTicker then
-        self._valueTicker:Cancel()
-        self._valueTicker = nil
-    end
+    self:_StopAnimationTicker()
 end

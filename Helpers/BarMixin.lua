@@ -232,7 +232,9 @@ function BarMixin:Refresh(why, force)
 
     frame:Show()
 
-    ECM.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
+    if ECM.IsDebugEnabled() then
+        ECM.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
+    end
     return true
 end
 

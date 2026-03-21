@@ -159,13 +159,24 @@ describe("RuneBar real source", function()
         assert.are.equal(0, tickerCount)
     end)
 
-    it("creates a ticker and registers the frame for death knights", function()
+    it("registers the frame for death knights without starting a ticker", function()
         isDeathKnight = true
 
         RuneBar:OnEnable()
 
         assert.are.equal(1, addMixinCalls)
         assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(0, tickerCount)
+        assert.is_nil(RuneBar._valueTicker)
+    end)
+
+    it("starts the animation ticker on rune power update", function()
+        isDeathKnight = true
+        RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+
+        RuneBar:OnRunePowerUpdate()
+
         assert.are.equal(1, tickerCount)
         assert.is_not_nil(RuneBar._valueTicker)
     end)
@@ -308,10 +319,14 @@ describe("RuneBar real source", function()
         isDeathKnight = true
 
         RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+        RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
         assert.are.equal(1, frags[1].__value)
         assert.same({ 0.8, 0.1, 0.2 }, frags[1].__color)
+        -- Ticker should self-stop since all runes are ready
+        assert.is_nil(RuneBar._valueTicker)
     end)
 
     it("ticker hot path requests relayout when rune ready states change", function()
@@ -348,8 +363,9 @@ describe("RuneBar real source", function()
         isDeathKnight = true
 
         RuneBar:OnEnable()
+        RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
-        assert.same({ "RuneStateChange" }, reasons)
+        assert.same({ "RUNE_POWER_UPDATE", "RuneStateChange" }, reasons)
     end)
 end)

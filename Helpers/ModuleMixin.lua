@@ -6,12 +6,6 @@ local _, ns = ...
 local ModuleMixin = {}
 ECM.ModuleMixin = ModuleMixin
 
---- Returns the global config section (live from AceDB profile).
----@return table|nil
-function ModuleMixin:GetGlobalConfig()
-    return ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
-end
-
 --- Returns this module's config section (live from AceDB profile).
 ---@return table|nil
 function ModuleMixin:GetModuleConfig()
@@ -36,4 +30,7 @@ function ModuleMixin.AddMixin(target, name)
 
     target.Name = name
     target._configKey = name:sub(1, 1):lower() .. name:sub(2) -- camelCase-ish
+    if not target.GetGlobalConfig then
+        target.GetGlobalConfig = ECM.GetGlobalConfig
+    end
 end

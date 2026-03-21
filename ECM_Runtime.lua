@@ -16,13 +16,6 @@ local LibEQOLEditMode = EditMode.Lib
 local Runtime = {}
 ECM.Runtime = Runtime
 
-local function getGlobalConfig()
-    local addon = ns.Addon
-    local db = addon and addon.db
-    local profile = db and db.profile
-    return profile and profile[C.CONFIG_SECTION_GLOBAL]
-end
-
 --------------------------------------------------------------------------------
 -- Layout — global visibility, fade, Blizzard frame enforcement, event dispatch
 --------------------------------------------------------------------------------
@@ -151,7 +144,7 @@ end
 
 --- Checks all fade and hide conditions and updates global state.
 local function updateFadeAndHiddenStates()
-    local globalConfig = getGlobalConfig()
+    local globalConfig = ECM.GetGlobalConfig()
     if not globalConfig then
         return
     end
@@ -225,7 +218,7 @@ end
 ---@param layoutName string|nil
 ---@return ECM_EditModePosition
 local function getDetachedAnchorPosition(layoutName)
-    local gc = getGlobalConfig()
+    local gc = ECM.GetGlobalConfig()
     return EditMode.GetPosition(gc and gc.detachedAnchorPositions, nil, layoutName)
 end
 
@@ -235,7 +228,7 @@ end
 ---@param x number
 ---@param y number
 local function saveDetachedAnchorPosition(layoutName, point, x, y)
-    local gc = getGlobalConfig()
+    local gc = ECM.GetGlobalConfig()
     EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, point, x, y)
 end
 
@@ -267,11 +260,11 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     return (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
                 end,
                 set = function(_, value)
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedBarWidth = value
                         Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorWidth")
@@ -287,11 +280,11 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Slider,
                 name = L["SPACING"],
                 get = function()
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     return (gc and gc.detachedModuleSpacing) or 0
                 end,
                 set = function(_, value)
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedModuleSpacing = value
                         Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorSpacing")
@@ -307,11 +300,11 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Dropdown,
                 name = L["GROW_DIRECTION"],
                 get = function()
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     return (gc and gc.detachedGrowDirection) or C.GROW_DIRECTION_DOWN
                 end,
                 set = function(_, value)
-                    local gc = getGlobalConfig()
+                    local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedGrowDirection = value
                         Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorGrowDirection")
@@ -381,7 +374,7 @@ local function updateDetachedAnchorSize()
     end
 
     local anchor = ensureDetachedAnchor()
-    local gc = getGlobalConfig()
+    local gc = ECM.GetGlobalConfig()
     local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
     local spacing = (gc and gc.detachedModuleSpacing) or 0
 

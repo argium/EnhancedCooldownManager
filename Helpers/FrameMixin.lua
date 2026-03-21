@@ -142,7 +142,9 @@ function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
         if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local moduleConfig = barModule:GetModuleConfig()
             if moduleConfig and moduleConfig.anchorMode == anchorMode and barModule.InnerFrame then
-                ECM.Log(self.Name, "GetNextChainAnchor " .. barName .. " <-- " .. (frameName or "nil"))
+                if ECM.IsDebugEnabled() then
+                    ECM.Log(self.Name, "GetNextChainAnchor " .. barName .. " <-- " .. (frameName or "nil"))
+                end
                 return barModule.InnerFrame, false
             end
         end
@@ -150,12 +152,16 @@ function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
 
     -- Root anchor depends on the mode being resolved.
     if anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
-        ECM.Log(self.Name, "GetNextChainAnchor DetachedAnchor <-- " .. (frameName or "nil"))
+        if ECM.IsDebugEnabled() then
+            ECM.Log(self.Name, "GetNextChainAnchor DetachedAnchor <-- " .. (frameName or "nil"))
+        end
         return ECM.Runtime.DetachedAnchor or UIParent, true
     end
 
     -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
-    ECM.Log(self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
+    if ECM.IsDebugEnabled() then
+        ECM.Log(self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
+    end
     return _G["EssentialCooldownViewer"] or UIParent, true
 end
 

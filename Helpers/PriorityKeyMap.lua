@@ -58,7 +58,7 @@ end
 ---@field _validateKey fun(k: any): any|nil
 local PriorityKeyMap = {}
 PriorityKeyMap.__index = PriorityKeyMap
--- Compatibility shim: Lua 5.1 exposes unpack as a global, while Lua 5.2+ uses table.unpack.
+-- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
 local unpack = unpack or table.unpack
 
 --- Creates a new PriorityKeyMap.
@@ -156,19 +156,23 @@ function PriorityKeyMap:Reconcile(keys)
             if not existing then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM.Log(
-                    "PriorityKeyMap",
-                    "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]),
-                    { value = unwrap(winner) }
-                )
+                if ECM.IsDebugEnabled() then
+                    ECM.Log(
+                        "PriorityKeyMap",
+                        "Reconcile - copied to " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]),
+                        { value = unwrap(winner) }
+                    )
+                end
             elseif ts(existing) < winnerTs then
                 tables[i][vkeys[i]] = winner
                 changed = true
-                ECM.Log(
-                    "PriorityKeyMap",
-                    "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]) .. " to most recent",
-                    { value = unwrap(winner) }
-                )
+                if ECM.IsDebugEnabled() then
+                    ECM.Log(
+                        "PriorityKeyMap",
+                        "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]) .. " to most recent",
+                        { value = unwrap(winner) }
+                    )
+                end
             end
         end
     end
@@ -280,11 +284,13 @@ function PriorityKeyMap:Set(keys, value, meta)
         end
     end
 
-    local parts = {}
-    for i = 1, #self._keyDefs do
-        parts[i] = ECM.ToString(keys[i])
+    if ECM.IsDebugEnabled() then
+        local parts = {}
+        for i = 1, #self._keyDefs do
+            parts[i] = ECM.ToString(keys[i])
+        end
+        ECM.Log("PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM.ToString(value))
     end
-    ECM.Log("PriorityKeyMap", "Set (" .. table.concat(parts, ",") .. ") = " .. ECM.ToString(value))
 end
 
 ---------------------------------------------------------------------------

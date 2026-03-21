@@ -638,8 +638,6 @@ describe("ItemIcons real source", function()
         local updateReasons = {}
         ItemIcons._viewerOriginalPoint = { "TOP", UIParent, "TOP", 0, 0 }
         ItemIcons._isEditModeActive = true
-        ItemIcons._layoutRetryPending = true
-        ItemIcons._layoutRetryCount = 4
         function ItemIcons:UnregisterAllEvents()
             self._eventsUnregistered = true
         end
@@ -654,7 +652,5 @@ describe("ItemIcons real source", function()
         assert.same({ "OnDisable" }, updateReasons)
         assert.is_nil(ItemIcons._viewerOriginalPoint)
         assert.is_nil(ItemIcons._isEditModeActive)
-        assert.is_nil(ItemIcons._layoutRetryPending)
-        assert.are.equal(0, ItemIcons._layoutRetryCount)
     end)
 end)
