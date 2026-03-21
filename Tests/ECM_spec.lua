@@ -336,7 +336,7 @@ describe("ECM layout system", function()
         )
 
         local profile = TestHelpers.deepClone(ECM.defaults.profile)
-        _G._testDB = { profile = profile }
+        _G._testDB = { profile = profile, RegisterCallback = function() end }
         fakeAddon.db = _G._testDB
 
         TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
@@ -364,6 +364,51 @@ describe("ECM layout system", function()
             for _, message in ipairs(printedMessages) do
                 assert.is_nil(message:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
             end
+        end)
+    end)
+
+    describe("profile change handling", function()
+        it("registers AceDB profile callbacks on enable", function()
+            local registeredEvents = {}
+            _G._testDB.RegisterCallback = function(_target, event, _handler)
+                registeredEvents[#registeredEvents + 1] = event
+            end
+
+            fakeAddon:OnEnable()
+
+            table.sort(registeredEvents)
+            assert.same({ "OnProfileChanged", "OnProfileCopied", "OnProfileReset" }, registeredEvents)
+        end)
+
+        it("OnProfileChangedHandler re-evaluates module states and schedules layout", function()
+            local enableCalls = {}
+            local layoutReasons = {}
+            fakeAddon.EnableModule = function(_, name) enableCalls[#enableCalls + 1] = { "enable", name } end
+            fakeAddon.DisableModule = function(_, name) enableCalls[#enableCalls + 1] = { "disable", name } end
+
+            local origSchedule = ECM.Runtime.ScheduleLayoutUpdate
+            ECM.Runtime.ScheduleLayoutUpdate = function(_, reason)
+                layoutReasons[#layoutReasons + 1] = reason
+            end
+
+            fakeAddon:OnEnable()
+            enableCalls = {}
+
+            -- Disable PowerBar in the profile and trigger handler
+            _G._testDB.profile.powerBar.enabled = false
+            fakeAddon:OnProfileChangedHandler()
+
+            -- Should have re-evaluated: PowerBar disabled, others enabled
+            local disabledPowerBar = false
+            for _, call in ipairs(enableCalls) do
+                if call[1] == "disable" and call[2] == "PowerBar" then
+                    disabledPowerBar = true
+                end
+            end
+            assert.is_true(disabledPowerBar)
+            assert.is_truthy(layoutReasons[#layoutReasons] == "ProfileChanged")
+
+            ECM.Runtime.ScheduleLayoutUpdate = origSchedule
         end)
     end)
 

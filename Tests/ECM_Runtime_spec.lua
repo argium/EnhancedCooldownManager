@@ -415,7 +415,7 @@ describe("ECM.Runtime layout system", function()
         )
 
         local profile = TestHelpers.deepClone(ECM.defaults.profile)
-        _G._testDB = { profile = profile }
+        _G._testDB = { profile = profile, RegisterCallback = function() end }
         fakeAddon.db = _G._testDB
 
         TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
@@ -504,6 +504,47 @@ describe("ECM.Runtime layout system", function()
             ECM.Runtime.SetLayoutPreview(true)
 
             assert.same({ "LayoutPreviewOn" }, reasons)
+        end)
+    end)
+
+    describe("synchronous layout", function()
+        it("UpdateLayoutImmediately runs layout without C_Timer", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            local timerCalled = false
+            local origAfter = _G.C_Timer.After
+            _G.C_Timer.After = function(_, cb)
+                timerCalled = true
+                cb()
+            end
+
+            ECM.Runtime.UpdateLayoutImmediately("SyncTest")
+
+            assert.same({ "SyncTest" }, reasons)
+            assert.is_false(timerCalled)
+            _G.C_Timer.After = origAfter
+        end)
+
+        it("UpdateLayoutImmediately clears pending flag so ScheduleLayoutUpdate is not blocked", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            -- Schedule a deferred update (fires immediately in test due to stub)
+            ECM.Runtime.ScheduleLayoutUpdate(0, "Deferred")
+            -- Now do synchronous
+            ECM.Runtime.UpdateLayoutImmediately("Sync")
+            -- Schedule again — should not be blocked
+            fakeTime = fakeTime + 1
+            ECM.Runtime.ScheduleLayoutUpdate(0, "AfterSync")
+
+            assert.same({ "Deferred", "Sync", "AfterSync" }, reasons)
         end)
     end)
 

@@ -532,15 +532,6 @@ function Options:OnInitialize()
     end
 
     SB.RegisterCategories()
-
-    local db = ns.Addon.db
-    db.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
-    db.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
-    db.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")
-end
-
-function Options:OnProfileChanged()
-    ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
 end
 
 function Options:OpenOptions()

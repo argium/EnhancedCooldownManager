@@ -252,7 +252,7 @@ local function ensureDetachedAnchor()
         name = "ECM: Detached Anchor",
         onPositionChanged = function(layoutName, point, x, y)
             saveDetachedAnchorPosition(layoutName, point, x, y)
-            Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorDrag")
+            Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
         allowDrag = true,
         settings = {
@@ -267,7 +267,7 @@ local function ensureDetachedAnchor()
                     local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedBarWidth = value
-                        Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorWidth")
+                        Runtime.UpdateLayoutImmediately("DetachedAnchorWidth")
                     end
                 end,
                 default = C.DEFAULT_BAR_WIDTH,
@@ -287,7 +287,7 @@ local function ensureDetachedAnchor()
                     local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedModuleSpacing = value
-                        Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorSpacing")
+                        Runtime.UpdateLayoutImmediately("DetachedAnchorSpacing")
                     end
                 end,
                 default = 0,
@@ -307,7 +307,7 @@ local function ensureDetachedAnchor()
                     local gc = ECM.GetGlobalConfig()
                     if gc then
                         gc.detachedGrowDirection = value
-                        Runtime.ScheduleLayoutUpdate(0, "DetachedAnchorGrowDirection")
+                        Runtime.UpdateLayoutImmediately("DetachedAnchorGrowDirection")
                     end
                 end,
                 values = {
@@ -454,6 +454,16 @@ function Runtime.SetLayoutPreview(active)
     ECM.Log(nil, "Layout preview " .. (active and "ON" or "OFF"))
     updateFadeAndHiddenStates()
     Runtime.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
+end
+
+--- Runs a layout update synchronously (no timer batching).
+--- Use for Edit Mode drag where 1-frame latency is noticeable.
+--- @param reason string|nil The lifecycle reason.
+function Runtime.UpdateLayoutImmediately(reason)
+    _layoutPending = false
+    hookCooldownViewerSettings()
+    updateFadeAndHiddenStates()
+    updateAllLayouts(reason)
 end
 
 --- Schedules a layout update after a delay (debounced).
@@ -603,15 +613,7 @@ end
 function Runtime.Enable(addon)
     local profile = addon.db and addon.db.profile
 
-    local moduleOrder = {
-        C.POWERBAR,
-        C.RESOURCEBAR,
-        C.RUNEBAR,
-        C.BUFFBARS,
-        C.ITEMICONS,
-    }
-
-    for _, moduleName in ipairs(moduleOrder) do
+    for _, moduleName in ipairs(C.MODULE_ORDER) do
         local configKey = C.MODULE_CONFIG_KEYS[moduleName]
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)

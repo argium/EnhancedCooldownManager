@@ -433,6 +433,77 @@ describe("FrameMixin real source", function()
         assert.same({ "First", "SecondPass" }, updateReasons)
     end)
 
+    it("UpdateLayoutImmediately runs layout synchronously without C_Timer", function()
+        local updateReasons = {}
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function(_, why)
+                updateReasons[#updateReasons + 1] = why
+            end,
+        }
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        local timersBefore = #timerQueue
+        FrameMixin.UpdateLayoutImmediately(mod, "ImmediateTest")
+
+        assert.same({ "ImmediateTest" }, updateReasons)
+        assert.are.equal(timersBefore, #timerQueue)
+    end)
+
+    it("UpdateLayoutImmediately skips layout when module is disabled", function()
+        local called = false
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return false
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function()
+                called = true
+            end,
+        }
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        FrameMixin.UpdateLayoutImmediately(mod, "DisabledTest")
+        assert.is_false(called)
+    end)
+
+    it("UpdateLayoutImmediately clears pending deferred state", function()
+        local updateReasons = {}
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function(_, why)
+                updateReasons[#updateReasons + 1] = why
+            end,
+            _updateLayoutPending = true,
+            _pendingWhy = "OldReason",
+        }
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        FrameMixin.UpdateLayoutImmediately(mod, "Immediate")
+
+        assert.same({ "Immediate" }, updateReasons)
+        assert.is_false(mod._updateLayoutPending)
+        assert.is_nil(mod._pendingWhy)
+    end)
+
     it("GetEditModePosition falls back to the migrated layout entry", function()
         local mod = {
             GetModuleConfig = function()

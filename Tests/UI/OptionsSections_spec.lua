@@ -136,7 +136,7 @@ describe("Options sections and root assembly", function()
             "Profile",
             "Advanced Options",
         }, registerSettingsCalls)
-        assert.are.equal(3, #dbCallbacks)
+        assert.are.equal(0, #dbCallbacks)
         assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
     end)
 

@@ -592,9 +592,20 @@ function mod:OnEnable()
 
     ECM.Runtime.Enable(self)
 
+    -- Re-evaluate module enable/disable states on profile switch.
+    self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChangedHandler")
+    self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChangedHandler")
+    self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChangedHandler")
+
     if isBetaVersion(getAddonVersion()) then
         ECM.Print(L["BETA_LOGIN_MESSAGE"])
     end
+end
+
+--- Re-evaluates module enable/disable states after a profile change and refreshes layout.
+function mod:OnProfileChangedHandler()
+    ECM.Runtime.Enable(self)
+    ECM.Runtime.ScheduleLayoutUpdate(0, "ProfileChanged")
 end
 
 function mod:OnDisable()

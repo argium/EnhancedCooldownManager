@@ -449,6 +449,21 @@ local function updateLayoutDeferred(self)
     end
 end
 
+--- Runs a layout update synchronously, bypassing the C_Timer batch.
+--- Use for Edit Mode drag where 1-frame latency is noticeable.
+--- @param reason string Debug trace string identifying the caller.
+function FrameMixinProto:UpdateLayoutImmediately(reason)
+    if self.IsEnabled and not self:IsEnabled() then
+        return
+    end
+    if not self:IsReady() then
+        return
+    end
+    self._updateLayoutPending = false
+    self._pendingWhy = nil
+    self:UpdateLayout(reason)
+end
+
 --- Requests a layout update for this module.
 --- @param reason string Debug trace string identifying the caller.
 --- @param opts table|nil Optional parameters: { secondPass = boolean }
@@ -504,7 +519,7 @@ function FrameMixinProto:_RegisterEditMode()
         name = "ECM: " .. self.Name,
         onPositionChanged = function(layoutName, point, x, y)
             module:_SaveEditModePosition(layoutName, point, x, y)
-            module:ThrottledUpdateLayout("EditModeDrag")
+            module:UpdateLayoutImmediately("EditModeDrag")
         end,
         allowDrag = function()
             local cfg = module:GetModuleConfig()
@@ -526,7 +541,7 @@ function FrameMixinProto:_RegisterEditMode()
                     local cfg = module:GetModuleConfig()
                     if cfg then
                         cfg.width = value
-                        module:ThrottledUpdateLayout("EditModeWidth")
+                        module:UpdateLayoutImmediately("EditModeWidth")
                     end
                 end,
                 default = C.DEFAULT_BAR_WIDTH,
