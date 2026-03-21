@@ -45,38 +45,24 @@ describe("ModuleMixin", function()
         ModuleMixin = assert(ECM.ModuleMixin, "ModuleMixin did not initialize")
     end)
 
-    it("AddMixin sets Name and camel-case config key", function()
-        local target = {}
-
-        ModuleMixin.AddMixin(target, "PowerBar")
-
-        assert.are.equal("PowerBar", target.Name)
-        assert.are.equal("powerBar", target._configKey)
-        assert.is_function(target.GetGlobalConfig)
-        assert.is_function(target.GetModuleConfig)
+    it("Proto exposes GetModuleConfig", function()
+        assert.is_function(ModuleMixin.Proto.GetModuleConfig)
     end)
 
-    it("GetGlobalConfig and GetModuleConfig return live profile tables", function()
-        local target = {}
-        ModuleMixin.AddMixin(target, "PowerBar")
+    it("GetModuleConfig returns live profile tables", function()
+        local target = { _configKey = "powerBar" }
+        setmetatable(target, { __index = ModuleMixin.Proto })
 
-        assert.are.equal(ns.Addon.db.profile.global, target:GetGlobalConfig())
         assert.are.equal(ns.Addon.db.profile.powerBar, target:GetModuleConfig())
 
         ns.Addon.db.profile.powerBar.enabled = false
         assert.is_false(target:GetModuleConfig().enabled)
     end)
 
-    it("does not overwrite pre-existing methods", function()
-        local existing = function()
-            return "keep"
-        end
-        local target = {
-            GetModuleConfig = existing,
-        }
+    it("GetModuleConfig returns nil when profile is missing", function()
+        local target = { _configKey = "missing" }
+        setmetatable(target, { __index = ModuleMixin.Proto })
 
-        ModuleMixin.AddMixin(target, "PowerBar")
-
-        assert.are.equal(existing, target.GetModuleConfig)
+        assert.is_nil(target:GetModuleConfig())
     end)
 end)

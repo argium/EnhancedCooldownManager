@@ -621,12 +621,16 @@ function BuffBars:IsEditLocked()
     return reason ~= nil, reason
 end
 
+function BuffBars:OnInitialize()
+    ECM.FrameMixin.AddMixin(self, "BuffBars")
+end
+
 function BuffBars:OnEnable()
     ECM.SpellColors.SetConfigAccessor(function()
         return self:GetModuleConfig()
     end)
 
-    ECM.FrameMixin.AddMixin(self, "BuffBars")
+    self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")

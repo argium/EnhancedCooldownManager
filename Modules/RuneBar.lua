@@ -330,12 +330,16 @@ function RuneBar:_StopAnimationTicker()
     end
 end
 
+function RuneBar:OnInitialize()
+    ECM.BarMixin.AddMixin(self, "RuneBar")
+end
+
 function RuneBar:OnEnable()
     if not ClassUtil.IsDeathKnight() then
         return
     end
 
-    ECM.BarMixin.AddMixin(self, "RuneBar")
+    self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")

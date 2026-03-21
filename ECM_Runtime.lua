@@ -612,7 +612,7 @@ function Runtime.Enable(addon)
     }
 
     for _, moduleName in ipairs(moduleOrder) do
-        local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
+        local configKey = C.MODULE_CONFIG_KEYS[moduleName]
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
         if shouldEnable then

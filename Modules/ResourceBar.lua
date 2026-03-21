@@ -76,8 +76,12 @@ function ResourceBar:OnEventUpdate(event, ...)
     self:ThrottledUpdateLayout(event or "OnEventUpdate")
 end
 
-function ResourceBar:OnEnable()
+function ResourceBar:OnInitialize()
     ECM.BarMixin.AddMixin(self, "ResourceBar")
+end
+
+function ResourceBar:OnEnable()
+    self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("UNIT_AURA", "OnEventUpdate")

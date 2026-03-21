@@ -223,7 +223,7 @@ describe("LibEvent", function()
         assert.is_nil(LibEvent.embeds[target]._events.TEST_EVENT)
     end)
 
-    it("updates an existing registration callback without re-registering the target frame event", function()
+    it("fires multiple callbacks registered for the same event", function()
         local firstCalls = 0
         local secondCalls = 0
         local target = {
@@ -241,7 +241,109 @@ describe("LibEvent", function()
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.registeredEvents)
+        assert.are.equal(1, firstCalls)
+        assert.are.equal(1, secondCalls)
+    end)
+
+    it("is idempotent when the same callback is registered twice", function()
+        local calls = 0
+        local target = {
+            Handler = function()
+                calls = calls + 1
+            end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT", "Handler")
+        target:RegisterEvent("TEST_EVENT", "Handler")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
+        assert.are.equal(1, calls)
+    end)
+
+    it("removes only a specific callback when UnregisterEvent is given a callback", function()
+        local firstCalls = 0
+        local secondCalls = 0
+        local target = {
+            First = function()
+                firstCalls = firstCalls + 1
+            end,
+            Second = function()
+                secondCalls = secondCalls + 1
+            end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT", "First")
+        target:RegisterEvent("TEST_EVENT", "Second")
+        target:UnregisterEvent("TEST_EVENT", "First")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
         assert.are.equal(0, firstCalls)
         assert.are.equal(1, secondCalls)
+        assert.same({}, LibEvent.embeds[target].frame.unregisteredEvents)
+    end)
+
+    it("unregisters the frame event when the last specific callback is removed", function()
+        local target = {
+            Handler = function() end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT", "Handler")
+        target:UnregisterEvent("TEST_EVENT", "Handler")
+
+        assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.unregisteredEvents)
+        assert.is_nil(LibEvent.embeds[target]._events.TEST_EVENT)
+    end)
+
+    it("removes all callbacks when UnregisterEvent is called without a callback", function()
+        local firstCalls = 0
+        local secondCalls = 0
+        local target = {
+            First = function()
+                firstCalls = firstCalls + 1
+            end,
+            Second = function()
+                secondCalls = secondCalls + 1
+            end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT", "First")
+        target:RegisterEvent("TEST_EVENT", "Second")
+        target:UnregisterEvent("TEST_EVENT")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
+        assert.are.equal(0, firstCalls)
+        assert.are.equal(0, secondCalls)
+        assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.unregisteredEvents)
+    end)
+
+    it("handles a callback unregistering itself during dispatch", function()
+        local calls = {}
+        local target = {}
+        LibEvent:Embed(target)
+
+        local selfRemovingCb
+        selfRemovingCb = function(self, event)
+            calls[#calls + 1] = "self-removing"
+            self:UnregisterEvent(event, selfRemovingCb)
+        end
+
+        local stableCb = function(_, _)
+            calls[#calls + 1] = "stable"
+        end
+
+        target:RegisterEvent("TEST_EVENT", selfRemovingCb)
+        target:RegisterEvent("TEST_EVENT", stableCb)
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
+        assert.same({ "self-removing", "stable" }, calls)
+
+        -- Second dispatch: only stable callback remains
+        calls = {}
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+        assert.same({ "stable" }, calls)
     end)
 end)

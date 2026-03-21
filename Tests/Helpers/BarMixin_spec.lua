@@ -124,7 +124,7 @@ describe("BarMixin", function()
             return mod
         end
 
-        it("copies BarMixin methods to the target module", function()
+        it("resolves BarMixin methods on the target module via metatable", function()
             local mod = makeModule()
             BarMixin.AddMixin(mod, "TestBar")
 
@@ -166,9 +166,36 @@ describe("BarMixin", function()
         it("creates InnerFrame with StatusBar for modules without custom CreateFrame", function()
             local mod = makeModule()
             BarMixin.AddMixin(mod, "TestBar")
+            mod:EnsureFrame()
 
             assert.is_not_nil(mod.InnerFrame, "InnerFrame should exist")
             assert.is_not_nil(mod.InnerFrame.StatusBar, "InnerFrame.StatusBar should exist")
+        end)
+
+        it("preserves existing metatable chain (AceAddon compatibility)", function()
+            local aceEnabled = function() return true end
+            local aceMt = { __index = { IsEnabled = aceEnabled } }
+            local mod = setmetatable(makeModule({ IsEnabled = nil }), aceMt)
+            mod.IsEnabled = nil
+
+            BarMixin.AddMixin(mod, "TestBar")
+
+            assert.are.equal(aceEnabled, mod.IsEnabled)
+            assert.is_function(mod.EnsureTicks)
+            assert.is_function(mod.GetModuleConfig)
+            assert.is_function(mod.EnsureFrame)
+        end)
+
+        it("is idempotent — second call is a no-op", function()
+            local mod = makeModule()
+            BarMixin.AddMixin(mod, "TestBar")
+            local mt1 = getmetatable(mod)
+
+            BarMixin.AddMixin(mod, "TestBar")
+            local mt2 = getmetatable(mod)
+
+            assert.are.equal(mt1, mt2)
+            assert.is_true(mod._mixinApplied)
         end)
     end)
 

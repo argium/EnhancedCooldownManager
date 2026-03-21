@@ -583,7 +583,7 @@ end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
 function mod:OnEnable()
-    pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
+    C_CVar.SetCVar("cooldownViewerEnabled", "1")
     registerAddonCompartmentEntry()
 
     ECM.Runtime.OnCombatEnd = function()

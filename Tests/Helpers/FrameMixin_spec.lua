@@ -473,8 +473,63 @@ describe("FrameMixin real source", function()
         }
 
         FrameMixin.AddMixin(mod, "ExternalFrameModule")
+        mod:EnsureFrame()
 
         assert.are.equal(0, registerCalls)
         assert.are.equal("ExternalFrame", mod.InnerFrame:GetName())
+    end)
+
+    it("resolves mixin methods via metatable __index", function()
+        local mod = {
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        assert.is_nil(rawget(mod, "UpdateLayout"))
+        assert.is_function(mod.UpdateLayout)
+        assert.is_nil(rawget(mod, "GetModuleConfig"))
+        assert.is_function(mod.GetModuleConfig)
+        assert.is_function(mod.EnsureFrame)
+    end)
+
+    it("preserves existing metatable chain (AceAddon compatibility)", function()
+        local aceEnabled = function() return true end
+        local aceMt = { __index = { IsEnabled = aceEnabled } }
+        local mod = setmetatable({
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+        }, aceMt)
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        assert.are.equal(aceEnabled, mod.IsEnabled)
+        assert.is_function(mod.UpdateLayout)
+        assert.is_function(mod.GetModuleConfig)
+        assert.is_function(mod.EnsureFrame)
+    end)
+
+    it("AddMixin is idempotent — second call is a no-op", function()
+        local mod = {
+            ShouldRegisterEditMode = function() return false end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+        local mt1 = getmetatable(mod)
+
+        FrameMixin.AddMixin(mod, "TestModule")
+        local mt2 = getmetatable(mod)
+
+        assert.are.equal(mt1, mt2)
+        assert.is_true(mod._mixinApplied)
     end)
 end)

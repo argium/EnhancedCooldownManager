@@ -585,8 +585,12 @@ function ItemIcons:HookUtilityViewer()
     ECM.Log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
-function ItemIcons:OnEnable()
+function ItemIcons:OnInitialize()
     ECM.FrameMixin.AddMixin(self, "ItemIcons")
+end
+
+function ItemIcons:OnEnable()
+    self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items

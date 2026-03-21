@@ -64,8 +64,9 @@ describe("RuneBar real source", function()
                 end,
             },
             BarMixin = {
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             ClassUtil = {
@@ -152,9 +153,10 @@ describe("RuneBar real source", function()
     end)
 
     it("returns early from OnEnable for non-death-knights", function()
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
 
-        assert.are.equal(0, addMixinCalls)
+        assert.are.equal(1, addMixinCalls)
         assert.are.equal(0, registerFrameCalls)
         assert.are.equal(0, tickerCount)
     end)
@@ -162,6 +164,7 @@ describe("RuneBar real source", function()
     it("registers the frame for death knights without starting a ticker", function()
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
 
         assert.are.equal(1, addMixinCalls)
@@ -172,6 +175,7 @@ describe("RuneBar real source", function()
 
     it("starts the animation ticker on rune power update", function()
         isDeathKnight = true
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
         function RuneBar:ThrottledUpdateLayout() end
 
@@ -318,6 +322,7 @@ describe("RuneBar real source", function()
         end
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
         function RuneBar:ThrottledUpdateLayout() end
         RuneBar:OnRunePowerUpdate()
@@ -362,6 +367,7 @@ describe("RuneBar real source", function()
         end
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
         RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()

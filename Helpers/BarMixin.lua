@@ -7,6 +7,11 @@ local FrameMixin = ECM.FrameMixin
 local BarMixin = {}
 ECM.BarMixin = BarMixin
 
+local BarMixinProto = {}
+for k, v in pairs(ECM.FrameMixin.Proto) do
+    BarMixinProto[k] = v
+end
+
 --------------------------------------------------------------------------------
 -- Tick Helpers
 --------------------------------------------------------------------------------
@@ -17,7 +22,7 @@ ECM.BarMixin = BarMixin
 ---@param count number Number of ticks needed
 ---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
 ---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
-function BarMixin:EnsureTicks(count, parentFrame, poolKey)
+function BarMixinProto:EnsureTicks(count, parentFrame, poolKey)
     assert(parentFrame, "parentFrame required for tick creation")
 
     poolKey = poolKey or "tickPool"
@@ -46,7 +51,7 @@ end
 --- Hides all ticks in the pool.
 ---@param self BarMixin
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarMixin:HideAllTicks(poolKey)
+function BarMixinProto:HideAllTicks(poolKey)
     local pool = self[poolKey or "tickPool"]
     if not pool then
         return
@@ -64,7 +69,7 @@ end
 ---@param color ECM_Color|table|nil RGBA color (default black)
 ---@param tickWidth number|nil Width of each tick (default 1)
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarMixin:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
+function BarMixinProto:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
     maxResources = tonumber(maxResources) or 0
     if maxResources <= 1 then
         self:HideAllTicks(poolKey)
@@ -110,7 +115,7 @@ end
 ---@param defaultColor ECM_Color Default RGBA color
 ---@param defaultWidth number Default tick width
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
-function BarMixin:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
+function BarMixinProto:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey)
     if not statusBar then
         return
     end
@@ -164,14 +169,14 @@ end
 ---@return number|nil max
 ---@return number|nil displayValue
 ---@return boolean isFraction valueType
-function BarMixin:GetStatusBarValues()
+function BarMixinProto:GetStatusBarValues()
     ECM.DebugAssert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
 end
 
 --- Gets the color for the status bar. Override for custom color logic.
 ---@return ECM_Color Color table with r, g, b, a fields
-function BarMixin:GetStatusBarColor()
+function BarMixinProto:GetStatusBarColor()
     local powerType = UnitPowerType("player")
     local moduleConfig = self:GetModuleConfig()
     local color = moduleConfig and moduleConfig.colors and moduleConfig.colors[powerType]
@@ -182,7 +187,7 @@ end
 --- @param why string|nil Reason for refresh (for logging/debugging).
 --- @param force boolean|nil If true, forces a refresh even if not needed.
 --- @return boolean continue True if refresh completed, false if skipped
-function BarMixin:Refresh(why, force)
+function BarMixinProto:Refresh(why, force)
     -- call the frame mixin to check pre-conditions
     if not FrameMixin.Refresh(self, why, force) then
         return false
@@ -238,7 +243,7 @@ function BarMixin:Refresh(why, force)
     return true
 end
 
-function BarMixin:CreateFrame()
+function BarMixinProto:CreateFrame()
     local frame = ECM.FrameMixin.CreateFrame(self)
 
     -- StatusBar for value display
@@ -273,15 +278,35 @@ function BarMixin:CreateFrame()
     return frame
 end
 
-function BarMixin.AddMixin(module, name)
-    -- Copy BarMixin methods first so CreateFrame is available when
-    -- FrameMixin.AddMixin creates the InnerFrame.
-    for k, v in pairs(BarMixin) do
-        if type(v) == "function" and module[k] == nil then
-            module[k] = v
-        end
-    end
+BarMixin.Proto = BarMixinProto
+setmetatable(BarMixin, { __index = BarMixinProto })
 
-    ECM.FrameMixin.AddMixin(module, name)
+--- Applies bar, frame, and common module mixins to the target via metatable.
+--- Idempotent — safe to call more than once (no-op after first application).
+function BarMixin.AddMixin(module, name)
+    assert(module, "module required")
+    assert(name, "name required")
+    if module._mixinApplied then return end
+
+    local existingMt = getmetatable(module)
+    local existingIndex = existingMt and existingMt.__index
+
+    setmetatable(module, {
+        __index = function(_, k)
+            local v = BarMixinProto[k]
+            if v ~= nil then return v end
+            if type(existingIndex) == "function" then return existingIndex(module, k) end
+            if type(existingIndex) == "table" then return existingIndex[k] end
+        end
+    })
+
+    local C = ECM.Constants
+    module.Name = name
+    module._configKey = C.ConfigKeyForModule(name)
+    if not module.GetGlobalConfig then
+        module.GetGlobalConfig = ECM.GetGlobalConfig
+    end
+    module.IsHidden = false
     module._lastUpdate = GetTime()
+    module._mixinApplied = true
 end

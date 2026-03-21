@@ -42,8 +42,9 @@ describe("ResourceBar real source", function()
                 Refresh = function()
                     return barRefreshResult
                 end,
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             ClassUtil = {
@@ -165,6 +166,7 @@ describe("ResourceBar real source", function()
         function ResourceBar:RegisterEvent() end
         function ResourceBar:UnregisterAllEvents() end
 
+        ResourceBar:OnInitialize()
         ResourceBar:OnEnable()
         ResourceBar:OnDisable()
 

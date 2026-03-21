@@ -122,8 +122,12 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
     self:ThrottledUpdateLayout(event or "OnUnitPowerUpdate")
 end
 
-function PowerBar:OnEnable()
+function PowerBar:OnInitialize()
     ECM.BarMixin.AddMixin(self, "PowerBar")
+end
+
+function PowerBar:OnEnable()
+    self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
 end

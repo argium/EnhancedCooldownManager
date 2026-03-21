@@ -247,8 +247,9 @@ describe("ItemIcons real source", function()
                 Refresh = function()
                     return true
                 end,
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             Runtime = {
@@ -506,6 +507,7 @@ describe("ItemIcons real source", function()
             reasons[#reasons + 1] = reason
         end
 
+        ItemIcons:OnInitialize()
         ItemIcons:OnEnable()
         assert.are.equal(1, addMixinCalls)
         assert.are.equal(1, registerFrameCalls)

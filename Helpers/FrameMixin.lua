@@ -13,6 +13,11 @@ ECM.EditMode = EditMode
 local FrameMixin = {}
 ECM.FrameMixin = FrameMixin
 
+local FrameMixinProto = {}
+for k, v in pairs(ECM.ModuleMixin.Proto) do
+    FrameMixinProto[k] = v
+end
+
 function EditMode.GetActiveLayoutName()
     return LibEQOLEditMode:GetActiveLayoutName()
 end
@@ -118,7 +123,7 @@ end)
 --- @param anchorMode string|nil The anchor mode to filter by (defaults to ANCHORMODE_CHAIN).
 --- @return Frame The frame to anchor to.
 --- @return boolean isFirst True if this is the first frame in the chain.
-function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
+function FrameMixinProto:GetNextChainAnchor(frameName, anchorMode)
     anchorMode = anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
     -- Find the ideal position
@@ -165,7 +170,7 @@ function FrameMixin:GetNextChainAnchor(frameName, anchorMode)
     return _G["EssentialCooldownViewer"] or UIParent, true
 end
 
-function FrameMixin:SetHidden(hide)
+function FrameMixinProto:SetHidden(hide)
     self.IsHidden = hide
     if self.InnerFrame then
         -- Hide immediately, but defer showing until the next layout pass to ensure proper anchoring.
@@ -178,7 +183,7 @@ function FrameMixin:SetHidden(hide)
 end
 
 --- Determines whether this frame should be shown at this particular moment. Can be overridden.
-function FrameMixin:ShouldShow()
+function FrameMixinProto:ShouldShow()
     local config = self:GetModuleConfig()
     return not self.IsHidden and (config == nil or config.enabled ~= false)
 end
@@ -186,11 +191,11 @@ end
 --- Determines whether this module should register its frame with ECM Edit Mode.
 --- Modules backed by Blizzard-owned system frames can override this to opt out.
 ---@return boolean
-function FrameMixin:ShouldRegisterEditMode()
+function FrameMixinProto:ShouldRegisterEditMode()
     return true
 end
 
-function FrameMixin:CreateFrame()
+function FrameMixinProto:CreateFrame()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local name = "ECM" .. self.Name
@@ -213,10 +218,21 @@ function FrameMixin:CreateFrame()
     return frame
 end
 
+--- Creates the InnerFrame (if not already present) and registers Edit Mode.
+--- Call this in OnEnable after AddMixin to separate object construction from frame creation.
+function FrameMixinProto:EnsureFrame()
+    if not self.InnerFrame then
+        self.InnerFrame = self:CreateFrame()
+    end
+    if self:ShouldRegisterEditMode() then
+        self:_RegisterEditMode()
+    end
+end
+
 ---@param point string|nil
 ---@param fallback string
 ---@return string
-function FrameMixin.ChainRightPoint(point, fallback)
+function FrameMixinProto.ChainRightPoint(point, fallback)
     if point == "TOPLEFT" then
         return "TOPRIGHT"
     end
@@ -228,7 +244,7 @@ end
 
 ---@param direction string|nil
 ---@return string
-function FrameMixin.NormalizeGrowDirection(direction)
+function FrameMixinProto.NormalizeGrowDirection(direction)
     return direction == C.GROW_DIRECTION_UP and C.GROW_DIRECTION_UP or C.GROW_DIRECTION_DOWN
 end
 
@@ -273,7 +289,7 @@ end
 --- Default layout parameter calculation for chain/detached/free anchor modes.
 --- Modules with custom positioning (e.g. BuffBars) override this.
 ---@return table params Layout parameters: mode, anchor, isFirst, anchorPoint, anchorRelativePoint, offsetX, offsetY, width, height
-function FrameMixin:CalculateLayoutParams()
+function FrameMixinProto:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
@@ -299,7 +315,7 @@ end
 --- Applies positioning to a frame based on layout parameters.
 --- Handles ShouldShow check, layout calculation, and anchor positioning.
 ---@return table|nil params Layout params if shown, nil if hidden
-function FrameMixin:ApplyFramePosition()
+function FrameMixinProto:ApplyFramePosition()
     local frame = self.InnerFrame
     if not self:ShouldShow() then
         frame:Hide()
@@ -343,7 +359,7 @@ end
 --- Calls self:ThrottledRefresh at the end to update values.
 ---@param why string|nil
 ---@return boolean
-function FrameMixin:UpdateLayout(why)
+function FrameMixinProto:UpdateLayout(why)
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local frame = self.InnerFrame
@@ -381,14 +397,14 @@ end
 --- @param why string|nil Optional debug string for why the refresh was triggered.
 --- @param force boolean|nil Whether to force a refresh, even if the bar is hidden.
 --- @return boolean continue True if the frame should continue refreshing, false to skip.
-function FrameMixin:Refresh(why, force)
+function FrameMixinProto:Refresh(why, force)
     return force or self:ShouldShow()
 end
 
 --- Rate-limited refresh. Skips if called within updateFrequency window.
 --- @param why string|nil Optional debug string for why the refresh was triggered.
 --- @return boolean refreshed True if Refresh() was called
-function FrameMixin:ThrottledRefresh(why)
+function FrameMixinProto:ThrottledRefresh(why)
     local globalConfig = self:GetGlobalConfig()
     local freq = (globalConfig and globalConfig.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
     if GetTime() - (self._lastUpdate or 0) < freq then
@@ -401,7 +417,7 @@ end
 
 --- Checks if the module is ready for layout updates.
 --- @return boolean ready True if the module is ready for updates.
-function FrameMixin:IsReady()
+function FrameMixinProto:IsReady()
     return self:IsEnabled()
         and self.InnerFrame ~= nil
         and self:GetGlobalConfig() ~= nil
@@ -436,7 +452,7 @@ end
 --- Requests a layout update for this module.
 --- @param reason string Debug trace string identifying the caller.
 --- @param opts table|nil Optional parameters: { secondPass = boolean }
-function FrameMixin:ThrottledUpdateLayout(reason, opts)
+function FrameMixinProto:ThrottledUpdateLayout(reason, opts)
     ECM.DebugAssert(reason, "ThrottledUpdateLayout: reason is required")
 
     -- Bail immediately if the module is disabled.
@@ -463,7 +479,7 @@ end
 --- Gets the saved Edit Mode position for the current layout.
 --- Falls back to the migrated position, then CENTER (0, 0).
 ---@return ECM_EditModePosition
-function FrameMixin:GetEditModePosition()
+function FrameMixinProto:GetEditModePosition()
     local cfg = self:GetModuleConfig()
     return EditMode.GetPosition(cfg and cfg.editModePositions, C.EDIT_MODE_MIGRATED_KEY)
 end
@@ -473,7 +489,7 @@ end
 ---@param point string Anchor point (e.g. "CENTER").
 ---@param x number X offset.
 ---@param y number Y offset.
-function FrameMixin:_SaveEditModePosition(layoutName, point, x, y)
+function FrameMixinProto:_SaveEditModePosition(layoutName, point, x, y)
     local cfg = self:GetModuleConfig()
     EditMode.SavePosition(cfg, "editModePositions", layoutName, point, x, y)
 end
@@ -481,7 +497,7 @@ end
 --- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
 --- Called once during AddMixin after InnerFrame is created.
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
-function FrameMixin:_RegisterEditMode()
+function FrameMixinProto:_RegisterEditMode()
     local frame = self.InnerFrame
     local module = self
     EditMode.RegisterFrame(frame, {
@@ -527,30 +543,41 @@ function FrameMixin:_RegisterEditMode()
     })
 end
 
+FrameMixin.Proto = FrameMixinProto
+setmetatable(FrameMixin, { __index = FrameMixinProto })
+
 function FrameMixin.AssertValid(target)
     assert(target and type(target) == "table", "target is not a table")
     assert(target.Name, "target is missing a Name")
     assert(target.InnerFrame, "target '" .. target.Name .. "' is missing an InnerFrame")
 end
 
---- Applies the frame and common module mixins to the target.
+--- Applies the frame and common module mixins to the target via metatable.
+--- Idempotent — safe to call more than once (no-op after first application).
 --- @param target table table to apply the mixin to.
 --- @param name string the module name. must be unique.
 function FrameMixin.AddMixin(target, name)
-    ECM.ModuleMixin.AddMixin(target, name)
+    assert(target, "target required")
+    assert(name, "name required")
+    if target._mixinApplied then return end
 
-    for k, v in pairs(FrameMixin) do
-        if type(v) == "function" and target[k] == nil then
-            target[k] = v
+    local existingMt = getmetatable(target)
+    local existingIndex = existingMt and existingMt.__index
+
+    setmetatable(target, {
+        __index = function(_, k)
+            local v = FrameMixinProto[k]
+            if v ~= nil then return v end
+            if type(existingIndex) == "function" then return existingIndex(target, k) end
+            if type(existingIndex) == "table" then return existingIndex[k] end
         end
-    end
+    })
 
-    if not target.InnerFrame then
-        target.InnerFrame = target:CreateFrame()
+    target.Name = name
+    target._configKey = C.ConfigKeyForModule(name)
+    if not target.GetGlobalConfig then
+        target.GetGlobalConfig = ECM.GetGlobalConfig
     end
-
     target.IsHidden = false
-    if target:ShouldRegisterEditMode() then
-        target:_RegisterEditMode()
-    end
+    target._mixinApplied = true
 end

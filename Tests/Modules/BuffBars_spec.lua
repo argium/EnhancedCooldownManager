@@ -170,8 +170,9 @@ describe("BuffBars real source", function()
                 IsReady = function()
                     return true
                 end,
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             SpellColors = {
@@ -671,6 +672,7 @@ describe("BuffBars real source", function()
             return { enabled = true }
         end
 
+        BuffBars:OnInitialize()
         BuffBars:OnEnable()
 
         assert.are.equal(1, addMixinCalls)

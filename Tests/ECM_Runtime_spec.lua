@@ -103,7 +103,7 @@ describe("ECM.Runtime layout system", function()
             InnerFrame = innerFrame,
             IsHidden = false,
             _lastUpdate = 0,
-            _configKey = name:sub(1, 1):lower() .. name:sub(2),
+            _configKey = ECM.Constants.ConfigKeyForModule(name),
         }
 
         function mod:SetHidden(hide)

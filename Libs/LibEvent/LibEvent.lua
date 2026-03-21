@@ -3,9 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 ---@class LibEvent
----@field embeds table<table, { frame: Frame, _events: table<string, function> }> Stores embedded event instances by target table.
+---@field embeds table<table, { frame: Frame, _events: table<string, function[]> }> Stores embedded event instances by target table.
 
-local MAJOR, MINOR = "LibEvent-1.0", 1
+local MAJOR, MINOR = "LibEvent-1.0", 2
 local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibEvent then
@@ -37,6 +37,7 @@ local function getInstance(target)
 end
 
 ---Registers a callback for a WoW event on the embedded target.
+---If the same callback is already registered for this event, the call is a no-op.
 ---@param event string The event name to register.
 ---@param callback? string|fun(target: table, event: string, ...: any) The callback function or method name to invoke.
 function LibEvent:RegisterEvent(event, callback)
@@ -46,23 +47,53 @@ function LibEvent:RegisterEvent(event, callback)
     callback = resolveCallback(self, event, callback)
     assert(type(callback) == "function", "Callback must resolve to a function")
 
-    if not instance._events[event] then
+    local callbacks = instance._events[event]
+    if not callbacks then
+        callbacks = {}
+        instance._events[event] = callbacks
         instance.frame:RegisterEvent(event)
     end
 
-    instance._events[event] = callback
+    for i = 1, #callbacks do
+        if callbacks[i] == callback then
+            return
+        end
+    end
+
+    callbacks[#callbacks + 1] = callback
 end
 
----Unregisters a previously registered WoW event from the embedded target.
+---Unregisters a previously registered WoW event callback from the embedded target.
 ---@param event string The event name to unregister.
-function LibEvent:UnregisterEvent(event)
+---@param callback? string|fun(target: table, event: string, ...: any) Specific callback to remove. If omitted, removes all callbacks for the event.
+function LibEvent:UnregisterEvent(event, callback)
     local instance = getInstance(self)
-    if not instance._events[event] then
+    local callbacks = instance._events[event]
+    if not callbacks then
         return
     end
 
-    instance._events[event] = nil
-    instance.frame:UnregisterEvent(event)
+    if callback == nil then
+        instance._events[event] = nil
+        instance.frame:UnregisterEvent(event)
+        return
+    end
+
+    if type(callback) == "string" then
+        callback = self[callback]
+    end
+
+    for i = #callbacks, 1, -1 do
+        if callbacks[i] == callback then
+            table.remove(callbacks, i)
+            break
+        end
+    end
+
+    if #callbacks == 0 then
+        instance._events[event] = nil
+        instance.frame:UnregisterEvent(event)
+    end
 end
 
 ---Unregisters all WoW events currently registered on the embedded target.
@@ -84,9 +115,16 @@ local function createInstance(target)
     instance._events = instance._events or {}
 
     instance.frame:SetScript("OnEvent", function(_, event, ...)
-        local callback = instance._events[event]
-        if callback then
-            callback(target, event, ...)
+        local callbacks = instance._events[event]
+        if not callbacks then
+            return
+        end
+        local snapshot = {}
+        for i = 1, #callbacks do
+            snapshot[i] = callbacks[i]
+        end
+        for i = 1, #snapshot do
+            snapshot[i](target, event, ...)
         end
     end)
 

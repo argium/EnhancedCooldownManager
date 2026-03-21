@@ -195,8 +195,24 @@ local resourceBarMaxColorTypes = {
     [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
 }
 
+--- Authoritative mapping from module name to its profile config key.
+local moduleConfigKeys = {
+    [constants.POWERBAR] = "powerBar",
+    [constants.RESOURCEBAR] = "resourceBar",
+    [constants.RUNEBAR] = "runeBar",
+    [constants.BUFFBARS] = "buffBars",
+    [constants.ITEMICONS] = "itemIcons",
+}
+
+--- Returns the profile config key for a module name.
+--- Uses the authoritative lookup; falls back to lowercasing the first character.
+function constants.ConfigKeyForModule(name)
+    return moduleConfigKeys[name] or (name:sub(1, 1):lower() .. name:sub(2))
+end
+
 local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = chainOrder
+constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes

@@ -54,8 +54,9 @@ describe("PowerBar real source", function()
                 end,
             },
             BarMixin = {
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
                 Refresh = function()
                     return barRefreshResult
@@ -224,6 +225,7 @@ describe("PowerBar real source", function()
         function PowerBar:RegisterEvent() end
         function PowerBar:UnregisterAllEvents() end
 
+        PowerBar:OnInitialize()
         PowerBar:OnEnable()
         PowerBar:OnDisable()
 
