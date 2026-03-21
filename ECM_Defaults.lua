@@ -230,13 +230,11 @@ local defaults = {
             -- Remember to enable the resource type in Constants too.
             maxColorsEnabled = {
                 [C.RESOURCEBAR_TYPE_ICICLES] = true,
-                [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = true,
                 [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
                 [C.RESOURCEBAR_TYPE_DEVOURER_META] = true,
             },
             maxColors = {
                 [C.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
-                [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 1, g = 1, b = 1, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 1, g = 1, b = 1, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 1, g = 1, b = 1, a = 1 },
             },
