@@ -15,6 +15,8 @@ describe("ECM layout system", function()
     local printedMessages
     local fakeAddon
     local defaultModuleLibraries
+    local createdFrames
+    local createdTickers
 
     --- Lightweight frame stub for ECM integration tests (no call tracking needed)
     local function makeFrame(opts)
@@ -73,7 +75,21 @@ describe("ECM layout system", function()
             return opts.name
         end
         function frame:SetScript() end
-        function frame:RegisterEvent() end
+        function frame:SetScript(scriptName, callback)
+            self.__scripts = self.__scripts or {}
+            self.__scripts[scriptName] = callback
+        end
+        function frame:RegisterEvent(event)
+            self.__registeredEvents = self.__registeredEvents or {}
+            self.__registeredEvents[event] = true
+        end
+        function frame:UnregisterEvent(event)
+            self.__unregisteredEvents = self.__unregisteredEvents or {}
+            self.__unregisteredEvents[event] = true
+            if self.__registeredEvents then
+                self.__registeredEvents[event] = nil
+            end
+        end
         function frame:HookScript() end
         function frame:GetEffectiveScale()
             return 1
@@ -259,6 +275,8 @@ describe("ECM layout system", function()
         addonVersion = "v0.6.1"
         printedMessages = {}
         defaultModuleLibraries = {}
+        createdFrames = {}
+        createdTickers = {}
 
         _G.GetTime = function()
             return fakeTime
@@ -335,11 +353,25 @@ describe("ECM layout system", function()
             After = function(_, callback)
                 callback()
             end,
-            NewTicker = function() end,
+            NewTicker = function(_, callback)
+                local ticker = {
+                    cancelled = false,
+                    callback = callback,
+                }
+
+                function ticker:Cancel()
+                    self.cancelled = true
+                end
+
+                createdTickers[#createdTickers + 1] = ticker
+                return ticker
+            end,
         }
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.CreateFrame = function()
-            return makeFrame()
+            local frame = makeFrame()
+            createdFrames[#createdFrames + 1] = frame
+            return frame
         end
 
         fakeAddon = {
@@ -349,6 +381,7 @@ describe("ECM layout system", function()
             UnregisterEvent = function() end,
             EnableModule = function() end,
             DisableModule = function() end,
+            GetModule = function() end,
         }
         fakeAddon.SetDefaultModuleLibraries = function(_, ...)
             defaultModuleLibraries = { ... }
@@ -356,9 +389,16 @@ describe("ECM layout system", function()
         TestHelpers.SetupLibStub()
         _G.SlashCmdList = {}
         _G.hash_SlashCmdList = {}
+        TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
         local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
-        aceAddon.NewAddon = function(_, n)
+        aceAddon.NewAddon = function(_, n, ...)
             fakeAddon.name = n
+            for _, libraryName in ipairs({ ... }) do
+                local library = _G.LibStub(libraryName)
+                if library and library.Embed then
+                    library:Embed(fakeAddon)
+                end
+            end
             return fakeAddon
         end
         TestHelpers.SetupLibEQOLEditModeStub()
@@ -381,6 +421,7 @@ describe("ECM layout system", function()
             end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
         _G.ECM.Migration = {
             PrepareDatabase = function() end,
@@ -540,7 +581,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             assert.is_truthy(printedMessages[#printedMessages])
-            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
         end)
 
         it("does not print the pre-release warning on stable versions", function()
@@ -549,7 +590,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             for _, message in ipairs(printedMessages) do
-                assert.is_nil(message:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+                assert.is_nil(message:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
             end
         end)
     end)
@@ -557,6 +598,36 @@ describe("ECM layout system", function()
     describe("initialization wiring", function()
         it("sets LibEvent as the default module library on addon creation", function()
             assert.same({ "LibEvent-1.0" }, defaultModuleLibraries)
+        end)
+
+        it("registers layout events on ECM itself", function()
+            local libEvent = LibStub("LibEvent-1.0")
+
+            fakeAddon:OnEnable()
+            inCombat = true
+            fakeAddon:ChatCommand("options")
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            assert.is_true(addonFrame.__registeredEvents.ZONE_CHANGED)
+            assert.is_true(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
+        end)
+
+        it("cleans up ECM layout events on disable", function()
+            local libEvent = LibStub("LibEvent-1.0")
+
+            fakeAddon:OnEnable()
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+
+            assert.is_false(createdTickers[1].cancelled)
+
+            fakeAddon:OnDisable()
+
+            assert.is_nil(addonFrame.__registeredEvents.ZONE_CHANGED)
+            assert.is_nil(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
+            assert.is_true(addonFrame.__unregisteredEvents.ZONE_CHANGED)
+            assert.is_true(addonFrame.__unregisteredEvents.PLAYER_REGEN_ENABLED)
+            assert.is_true(createdTickers[1].cancelled)
         end)
 
         it("registers both slash commands through LibConsole during OnInitialize", function()

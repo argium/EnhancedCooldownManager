@@ -149,6 +149,7 @@ describe("SpellColors", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
 
         buffBarsConfig = {}

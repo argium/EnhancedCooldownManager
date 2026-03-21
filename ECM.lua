@@ -11,12 +11,13 @@ assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 assert(ECM.FrameMixin, "FrameMixin.lua must be loaded before ECM.lua")
-assert(ECM.EditMode, "FrameMixin.lua must initialize ECM.EditMode before ECM.lua")
+assert(ECM.EditMode, "ECM.EditMode must be initialized before ECM.lua")
 
 local LibConsole = LibStub("LibConsole-1.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
 local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local C = ECM.Constants
+local L = ECM.L
 local EditMode = ECM.EditMode
 local LibEQOLEditMode = EditMode.Lib
 
@@ -178,7 +179,7 @@ function ECM.CloneValue(value)
 end
 
 ECM.Print = LibConsole:NewPrinter(function(message)
-    print(ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":") .. " " .. message)
+    print(ECM.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
 function ECM.Log(module, message, data)
@@ -186,7 +187,7 @@ function ECM.Log(module, message, data)
         return
     end
 
-    local prefix = "[" .. C.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
+    local prefix = "[" .. L["ADDON_ABRV"] .. (module and (" " .. module) or "") .. "]"
 
     if DevTool and DevTool.AddData then
         local payload = {
@@ -227,6 +228,8 @@ local _globallyHidden = false
 local _desiredAlpha = 1
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
+local _layoutEventsEnabled = false
+local _layoutWatchdogTicker = nil
 local _cooldownViewerSettingsHooked = false
 local _layoutPreviewActive = false
 local _hookedBlizzardFrames = {}
@@ -332,17 +335,9 @@ local function updateFadeAndHiddenStates()
         return
     end
 
-    -- Force-show everything during edit mode so the user can see and position all modules.
-    if LibEQOLEditMode:IsInEditMode() then
-        setGloballyHidden(false)
-        setAlpha(1)
-        enforceBlizzardFrameState()
-        return
-    end
-
-    -- Force-show while the Layout options page is open so the user can preview
-    -- positioning changes without hide/fade interfering.
-    if _layoutPreviewActive then
+    -- Force-show while edit mode or the Layout options preview is active so the
+    -- user can see and position modules without hide/fade interference.
+    if LibEQOLEditMode:IsInEditMode() or _layoutPreviewActive then
         setGloballyHidden(false)
         setAlpha(1)
         enforceBlizzardFrameState()
@@ -423,31 +418,6 @@ local function saveDetachedAnchorPosition(layoutName, point, x, y)
     EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, point, x, y)
 end
 
----@param fieldName string
----@param defaultValue any
----@return any
-local function getDetachedAnchorConfigValue(fieldName, defaultValue)
-    local gc = getGlobalConfig()
-    local value = gc and gc[fieldName]
-    if value == nil then
-        return defaultValue
-    end
-    return value
-end
-
----@param fieldName string
----@param value any
----@param reason string
-local function setDetachedAnchorConfigValue(fieldName, value, reason)
-    local gc = getGlobalConfig()
-    if not gc then
-        return
-    end
-
-    gc[fieldName] = value
-    ECM.ScheduleLayoutUpdate(0, reason)
-end
-
 --- Creates and registers the detached anchor frame with LibEQOL.
 local function ensureDetachedAnchor()
     if _detachedAnchor then
@@ -474,12 +444,17 @@ local function ensureDetachedAnchor()
         settings = {
             {
                 kind = LibEQOLEditMode.SettingType.Slider,
-                name = C.WIDTH_SETTING_NAME,
+                name = L["WIDTH"],
                 get = function()
-                    return getDetachedAnchorConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
+                    local gc = getGlobalConfig()
+                    return (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
                 end,
                 set = function(_, value)
-                    setDetachedAnchorConfigValue("detachedBarWidth", value, "DetachedAnchorWidth")
+                    local gc = getGlobalConfig()
+                    if gc then
+                        gc.detachedBarWidth = value
+                        ECM.ScheduleLayoutUpdate(0, "DetachedAnchorWidth")
+                    end
                 end,
                 default = C.DEFAULT_BAR_WIDTH,
                 minValue = 100,
@@ -489,12 +464,17 @@ local function ensureDetachedAnchor()
             },
             {
                 kind = LibEQOLEditMode.SettingType.Slider,
-                name = C.SPACING_SETTING_NAME,
+                name = L["SPACING"],
                 get = function()
-                    return getDetachedAnchorConfigValue("detachedModuleSpacing", 0)
+                    local gc = getGlobalConfig()
+                    return (gc and gc.detachedModuleSpacing) or 0
                 end,
                 set = function(_, value)
-                    setDetachedAnchorConfigValue("detachedModuleSpacing", value, "DetachedAnchorSpacing")
+                    local gc = getGlobalConfig()
+                    if gc then
+                        gc.detachedModuleSpacing = value
+                        ECM.ScheduleLayoutUpdate(0, "DetachedAnchorSpacing")
+                    end
                 end,
                 default = 0,
                 minValue = 0,
@@ -504,16 +484,21 @@ local function ensureDetachedAnchor()
             },
             {
                 kind = LibEQOLEditMode.SettingType.Dropdown,
-                name = C.GROW_DIRECTION_SETTING_NAME,
+                name = L["GROW_DIRECTION"],
                 get = function()
-                    return getDetachedAnchorConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN)
+                    local gc = getGlobalConfig()
+                    return (gc and gc.detachedGrowDirection) or C.GROW_DIRECTION_DOWN
                 end,
                 set = function(_, value)
-                    setDetachedAnchorConfigValue("detachedGrowDirection", value, "DetachedAnchorGrowDirection")
+                    local gc = getGlobalConfig()
+                    if gc then
+                        gc.detachedGrowDirection = value
+                        ECM.ScheduleLayoutUpdate(0, "DetachedAnchorGrowDirection")
+                    end
                 end,
                 values = {
-                    { label = "Down", value = C.GROW_DIRECTION_DOWN },
-                    { label = "Up", value = C.GROW_DIRECTION_UP },
+                    { label = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
+                    { label = L["UP"], value = C.GROW_DIRECTION_UP },
                 },
             },
         },
@@ -576,8 +561,9 @@ local function updateDetachedAnchorSize()
     end
 
     local anchor = ensureDetachedAnchor()
-    local barWidth = getDetachedAnchorConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
-    local spacing = getDetachedAnchorConfigValue("detachedModuleSpacing", 0)
+    local gc = getGlobalConfig()
+    local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+    local spacing = (gc and gc.detachedModuleSpacing) or 0
 
     if count > 1 then
         totalHeight = totalHeight + (spacing * (count - 1))
@@ -695,51 +681,64 @@ function ECM.UnregisterFrame(frame)
 end
 
 --- Registers layout events and starts event-driven state updates.
-local function enableLayoutEvents()
-    local eventFrame = CreateFrame("Frame")
+function mod:HandleLayoutEvent(event, arg1)
+    hookCooldownViewerSettings()
 
-    for eventName in pairs(LAYOUT_EVENTS) do
-        eventFrame:RegisterEvent(eventName)
+    if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
+        return
     end
-    eventFrame:RegisterEvent("CVAR_UPDATE")
 
-    eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
-        hookCooldownViewerSettings()
+    if event == "PLAYER_REGEN_ENABLED" then
+        self:HandleOpenOptionsAfterCombat()
+    end
 
-        if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
-            return
+    if event == "CVAR_UPDATE" then
+        if arg1 == "cooldownViewerEnabled" then
+            ECM.ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
         end
+        return
+    end
 
-        if event == "CVAR_UPDATE" then
-            if arg1 == "cooldownViewerEnabled" then
-                ECM.ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
-            end
-            return
-        end
+    local config = LAYOUT_EVENTS[event]
+    if not config then
+        return
+    end
 
-        local config = LAYOUT_EVENTS[event]
-        if not config then
-            return
-        end
+    if config.combatChange then
+        _inCombat = (event == "PLAYER_REGEN_DISABLED")
+    end
 
-        if config.combatChange then
-            _inCombat = (event == "PLAYER_REGEN_DISABLED")
-        end
-
-        if config.delay and config.delay > 0 then
-            C_Timer.After(config.delay, function()
-                updateFadeAndHiddenStates()
-                updateAllLayouts(event)
-            end)
-        else
+    if config.delay and config.delay > 0 then
+        C_Timer.After(config.delay, function()
             updateFadeAndHiddenStates()
             updateAllLayouts(event)
-        end
-    end)
+        end)
+        return
+    end
+
+    updateFadeAndHiddenStates()
+    updateAllLayouts(event)
+end
+
+local function enableLayoutEvents()
+    if _layoutEventsEnabled then
+        return
+    end
+
+    _layoutEventsEnabled = true
+
+    if _layoutWatchdogTicker and type(_layoutWatchdogTicker.Cancel) == "function" then
+        _layoutWatchdogTicker:Cancel()
+    end
+
+    for eventName in pairs(LAYOUT_EVENTS) do
+        mod:RegisterEvent(eventName, "HandleLayoutEvent")
+    end
+    mod:RegisterEvent("CVAR_UPDATE", "HandleLayoutEvent")
 
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
-    C_Timer.NewTicker(C.WATCHDOG_INTERVAL, function()
+    _layoutWatchdogTicker = C_Timer.NewTicker(C.WATCHDOG_INTERVAL, function()
         hookBlizzardFrames()
         hookCooldownViewerSettings()
         enforceBlizzardFrameState()
@@ -753,6 +752,24 @@ local function enableLayoutEvents()
     end)
 end
 
+local function disableLayoutEvents()
+    if not _layoutEventsEnabled then
+        return
+    end
+
+    _layoutEventsEnabled = false
+
+    for eventName in pairs(LAYOUT_EVENTS) do
+        mod:UnregisterEvent(eventName)
+    end
+    mod:UnregisterEvent("CVAR_UPDATE")
+
+    if _layoutWatchdogTicker and type(_layoutWatchdogTicker.Cancel) == "function" then
+        _layoutWatchdogTicker:Cancel()
+    end
+    _layoutWatchdogTicker = nil
+end
+
 local function registerAddonCompartmentEntry()
     if mod._addonCompartmentRegistered then
         return
@@ -762,7 +779,7 @@ local function registerAddonCompartmentEntry()
         return
     end
 
-    local text = ECM.ColorUtil.Sparkle(C.ADDON_NAME)
+    local text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"])
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
         text = text,
         icon = C.ADDON_ICON_TEXTURE,
@@ -784,13 +801,13 @@ end
 ---@param onCancel fun()|nil
 function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        ECM.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        ECM.Print(L["RELOAD_BLOCKED_COMBAT"])
         return
     end
 
     if not StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] then
         StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] = {
-            text = "Reload the UI?",
+            text = L["RELOAD_UI_PROMPT"],
             button1 = YES or "Yes",
             button2 = NO or "No",
             OnAccept = function(_, data)
@@ -811,7 +828,7 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
         }
     end
 
-    StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or "Reload the UI?"
+    StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or L["RELOAD_UI_PROMPT"]
     StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
@@ -898,18 +915,18 @@ local exportFrame
 ---@param exportString string
 function mod:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        ECM.Print("Invalid export string provided")
+        ECM.Print(L["INVALID_EXPORT_STRING"])
         return
     end
 
     if not exportFrame then
         exportFrame = createCopyDialog(
             "ECMExportFrame",
-            "Export Profile",
-            "Press Ctrl+C to copy. The dialog will close automatically.",
+            L["EXPORT_PROFILE_TITLE"],
+            L["COPY_CTRL_C"],
             nil,
             function()
-                ECM.Print("Import string copied to clipboard.")
+                ECM.Print(L["IMPORT_COPIED"])
             end
         )
     end
@@ -931,12 +948,12 @@ function mod:ShowCopyTextDialog(text, title)
         copyTextFrame = createCopyDialog(
             "ECMCopyTextFrame",
             "",
-            "Press Ctrl+C to copy. The dialog will close automatically.",
+            L["COPY_CTRL_C"],
             "small"
         )
     end
 
-    copyTextFrame.title:SetText(title or "Copy Link")
+    copyTextFrame.title:SetText(title or L["COPY_LINK"])
     showCopyDialog(copyTextFrame, text)
 end
 
@@ -946,7 +963,7 @@ local importFrame
 function mod:ShowImportDialog()
     if not importFrame then
         importFrame =
-            createDialogFrame("ECMImportFrame", "Import Profile", "Paste your import string below and click Import.")
+            createDialogFrame("ECMImportFrame", L["IMPORT_PROFILE_TITLE"], L["IMPORT_PASTE_PROMPT"])
 
         local cancelBtn = addButton(importFrame, CANCEL, { "BOTTOMRIGHT", -16, 8 }, function()
             importFrame:Hide()
@@ -955,28 +972,25 @@ function mod:ShowImportDialog()
             local input = importFrame.Scroll.ScrollBox.EditBox:GetText()
 
             if strtrim(input) == "" then
-                ECM.Print("Import cancelled: no string provided")
+                ECM.Print(L["IMPORT_CANCELLED"])
                 return
             end
 
             local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
             if not data then
-                ECM.Print("Import failed: " .. (errorMsg or "unknown error"))
+                ECM.Print(string.format(L["IMPORT_FAILED"], errorMsg or "unknown error"))
                 return
             end
 
             importFrame:Hide()
 
             local versionStr = data.metadata and data.metadata.addonVersion or "unknown"
-            local confirmText = string.format(
-                "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI.",
-                versionStr
-            )
+            local confirmText = string.format(L["IMPORT_CONFIRM"], versionStr)
 
             mod:ConfirmReloadUI(confirmText, function()
                 local success, applyErr = ECM.ImportExport.ApplyImportData(data)
                 if not success then
-                    ECM.Print("Import apply failed: " .. (applyErr or "unknown error"))
+                    ECM.Print(string.format(L["IMPORT_APPLY_FAILED"], applyErr or "unknown error"))
                 end
             end, nil)
         end)
@@ -993,17 +1007,17 @@ function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        ECM.Print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
-        ECM.Print("/ecm help - show this message")
-        ECM.Print("/ecm migration - show migration info and commands")
-        ECM.Print("/ecm options|config|settings|o - open the options menu")
-        ECM.Print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
+        ECM.Print(L["CMD_HELP_DEBUG"])
+        ECM.Print(L["CMD_HELP_HELP"])
+        ECM.Print(L["CMD_HELP_MIGRATION"])
+        ECM.Print(L["CMD_HELP_OPTIONS"])
+        ECM.Print(L["CMD_HELP_REFRESH"])
         return
     end
 
     if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
         ECM.ScheduleLayoutUpdate(0, "ChatCommand")
-        ECM.Print("Refreshing all modules.")
+        ECM.Print(L["REFRESHING_ALL_MODULES"])
         return
     end
 
@@ -1017,11 +1031,11 @@ function mod:ChatCommand(input)
         if subcmd == "rollback" then
             local n = tonumber(subarg)
             if not n then
-                ECM.Print("Usage: /ecm migration rollback <version>")
+                ECM.Print(L["MIGRATION_ROLLBACK_USAGE"])
                 return
             end
             if n == 0 then
-                ECM.Print("Version 0 is not valid.")
+                ECM.Print(L["VERSION_ZERO_INVALID"])
                 return
             end
             if n == -1 then
@@ -1044,11 +1058,8 @@ function mod:ChatCommand(input)
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
-            ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
-            if not self._openOptionsAfterCombat then
-                self._openOptionsAfterCombat = true
-                self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
-            end
+            ECM.Print(L["OPTIONS_BLOCKED_COMBAT"])
+            self._openOptionsAfterCombat = true
             return
         end
 
@@ -1073,11 +1084,11 @@ function mod:ChatCommand(input)
         elseif arg == "off" then
             newVal = false
         else
-            ECM.Print("Usage: expected on|off|toggle")
+            ECM.Print(L["DEBUG_USAGE"])
             return
         end
         profile.global.debug = newVal
-        ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
+        ECM.Print(L["DEBUG_STATUS"] .. " " .. (profile.global.debug and L["DEBUG_ON"] or L["DEBUG_OFF"]))
         return
     end
 end
@@ -1088,7 +1099,6 @@ function mod:HandleOpenOptionsAfterCombat()
     end
 
     self._openOptionsAfterCombat = nil
-    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 
     local optionsModule = self:GetModule("Options", true)
     if optionsModule then
@@ -1099,7 +1109,7 @@ end
 function mod:GetECMModule(moduleName, silent)
     local module = self[moduleName] or ECM[moduleName]
     if not module and not silent then
-        ECM.Print("Module not found:", moduleName)
+        ECM.Print(L["MODULE_NOT_FOUND"] .. " " .. moduleName)
     end
     return module
 end
@@ -1160,6 +1170,10 @@ function mod:OnEnable()
     enableLayoutEvents()
 
     if isBetaVersion(getAddonVersion()) then
-        ECM.Print(C.BETA_LOGIN_MESSAGE)
+        ECM.Print(L["BETA_LOGIN_MESSAGE"])
     end
+end
+
+function mod:OnDisable()
+    disableLayoutEvents()
 end

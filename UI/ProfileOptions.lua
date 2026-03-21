@@ -3,6 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
+local L = ECM.L
 
 StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = {
     text = "",
@@ -33,16 +34,16 @@ local function createProfilePicker(cat, variable, name, tooltip, valuesGenerator
 end
 
 function ProfileOptions.RegisterSettings(SB)
-    local cat = SB.CreateSubcategory("Profiles")
+    local cat = SB.CreateSubcategory(L["PROFILES"])
 
     -- Switch Profile
-    SB.Header("Active Profile")
+    SB.Header(L["ACTIVE_PROFILE"])
 
     local switchSetting = Settings.RegisterProxySetting(
         cat,
         "ECM_ProfileSwitch",
         Settings.VarType.String,
-        "Switch Profile",
+        L["SWITCH_PROFILE"],
         ns.Addon.db:GetCurrentProfile(),
         function()
             return ns.Addon.db:GetCurrentProfile()
@@ -61,16 +62,16 @@ function ProfileOptions.RegisterSettings(SB)
     end, "Select a profile to switch to.")
 
     SB.Button({
-        name = "Create a new profile",
-        buttonText = "New Profile",
-        tooltip = "Create a new profile using your current character name.",
+        name = L["CREATE_NEW_PROFILE"],
+        buttonText = L["NEW_PROFILE"],
+        tooltip = L["NEW_PROFILE_DESC"],
         onClick = function()
             switchSetting:SetValue(UnitName("player") .. " - " .. date("%H%M%S"))
         end,
     })
 
     -- Copy / Delete
-    SB.Header("Profile Actions")
+    SB.Header(L["PROFILE_ACTIONS"])
 
     local function otherProfilesGenerator()
         local container = Settings.CreateControlTextContainer()
@@ -86,15 +87,15 @@ function ProfileOptions.RegisterSettings(SB)
     local _, getCopyProfile, clearCopyProfile = createProfilePicker(
         cat,
         "ECM_ProfileCopy",
-        "Copy From",
-        "Select a profile to copy settings from.",
+        L["COPY_FROM"],
+        L["COPY_FROM_DESC"],
         otherProfilesGenerator
     )
 
     SB.Button({
-        name = "Apply copy from selected profile",
-        buttonText = "Copy",
-        tooltip = "Copy all settings from the selected profile into the current one.",
+        name = L["APPLY_COPY"],
+        buttonText = L["COPY"],
+        tooltip = L["COPY_DESC"],
         onClick = function()
             local profile = getCopyProfile()
             if not profile or profile == "" then
@@ -108,22 +109,22 @@ function ProfileOptions.RegisterSettings(SB)
     local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
         cat,
         "ECM_ProfileDelete",
-        "Delete Profile",
-        "Select a profile to delete.",
+        L["DELETE_PROFILE"],
+        L["DELETE_PROFILE_SELECT_DESC"],
         otherProfilesGenerator
     )
 
     SB.Button({
-        name = "Delete the selected profile",
-        buttonText = "Delete",
-        tooltip = "Delete the selected profile. The active profile cannot be deleted.",
+        name = L["DELETE"],
+        buttonText = L["DELETE"],
+        tooltip = L["DELETE_DESC"],
         onClick = function()
             local profile = getDeleteProfile()
             if not profile or profile == "" then
                 return
             end
             local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
-            dialog.text = string.format("Are you sure you want to delete the profile '%s'?", profile)
+            dialog.text = string.format(L["DELETE_PROFILE_CONFIRM"], profile)
             dialog.OnAccept = function()
                 ns.Addon.db:DeleteProfile(profile)
                 clearDeleteProfile()
@@ -133,28 +134,28 @@ function ProfileOptions.RegisterSettings(SB)
     })
 
     -- Reset
-    SB.Header("Reset")
+    SB.Header(L["RESET"])
 
     SB.Button({
-        name = "Reset current profile to defaults",
-        buttonText = "Reset Profile",
-        tooltip = "Reset the current profile back to default settings. This cannot be undone.",
-        confirm = "Are you sure you want to reset the current profile to defaults?",
+        name = L["RESET_PROFILE"],
+        buttonText = L["RESET_PROFILE_BUTTON"],
+        tooltip = L["RESET_PROFILE_DESC"],
+        confirm = L["RESET_PROFILE_CONFIRM"],
         onClick = function()
             ns.Addon.db:ResetProfile()
         end,
     })
 
     -- Import / Export
-    SB.Header("Import / Export")
+    SB.Header(L["IMPORT_EXPORT"])
 
     SB.Button({
-        name = "Import profile from clipboard",
-        buttonText = "Import",
-        tooltip = "Paste a previously exported profile string to import settings.",
+        name = L["IMPORT_PROFILE"],
+        buttonText = L["IMPORT"],
+        tooltip = L["IMPORT_DESC"],
         onClick = function()
             if InCombatLockdown() then
-                ECM.Print("Cannot import during combat (reload blocked)")
+                ECM.Print(L["CANNOT_IMPORT_IN_COMBAT"])
                 return
             end
             ns.Addon:ShowImportDialog()
@@ -162,13 +163,13 @@ function ProfileOptions.RegisterSettings(SB)
     })
 
     SB.Button({
-        name = "Export profile to clipboard",
-        buttonText = "Export",
-        tooltip = "Generate a shareable string that can be imported on another character.",
+        name = L["EXPORT_PROFILE"],
+        buttonText = L["EXPORT"],
+        tooltip = L["EXPORT_DESC"],
         onClick = function()
             local exportString, err = ECM.ImportExport.ExportCurrentProfile()
             if not exportString then
-                ECM.Print("Export failed: " .. (err or "Unknown error"))
+                ECM.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
                 return
             end
             ns.Addon:ShowExportDialog(exportString)

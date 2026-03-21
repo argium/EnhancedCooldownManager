@@ -2,6 +2,9 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@class LibEvent
+---@field embeds table<table, { frame: Frame, _events: table<string, function> }> Stores embedded event instances by target table.
+
 local MAJOR, MINOR = "LibEvent-1.0", 1
 local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
 
@@ -33,6 +36,9 @@ local function getInstance(target)
     return instance
 end
 
+---Registers a callback for a WoW event on the embedded target.
+---@param event string The event name to register.
+---@param callback? string|fun(target: table, event: string, ...: any) The callback function or method name to invoke.
 function LibEvent:RegisterEvent(event, callback)
     local instance = getInstance(self)
     assert(type(event) == "string" and event ~= "", "Usage: RegisterEvent(event, [callback])")
@@ -47,6 +53,8 @@ function LibEvent:RegisterEvent(event, callback)
     instance._events[event] = callback
 end
 
+---Unregisters a previously registered WoW event from the embedded target.
+---@param event string The event name to unregister.
 function LibEvent:UnregisterEvent(event)
     local instance = getInstance(self)
     if not instance._events[event] then
@@ -57,6 +65,7 @@ function LibEvent:UnregisterEvent(event)
     instance.frame:UnregisterEvent(event)
 end
 
+---Unregisters all WoW events currently registered on the embedded target.
 function LibEvent:UnregisterAllEvents()
     local instance = getInstance(self)
     for event in pairs(instance._events) do
@@ -91,6 +100,9 @@ local mixins = {
     "UnregisterAllEvents",
 }
 
+---Embeds the LibEvent API into a target table.
+---@param target table The table receiving the LibEvent methods.
+---@return table target The same target table after embedding.
 function LibEvent:Embed(target)
     createInstance(target)
 
@@ -101,6 +113,8 @@ function LibEvent:Embed(target)
     return target
 end
 
+---Disables an embedded target by unregistering all of its events.
+---@param target table The embedded target to disable.
 function LibEvent:OnEmbedDisable(target)
     target:UnregisterAllEvents()
 end

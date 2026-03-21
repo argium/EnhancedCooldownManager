@@ -38,6 +38,7 @@ describe("ImportExport", function()
             Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         ECM.Migration = {
             Run = function(profile)
                 migrationCalls[#migrationCalls + 1] = profile

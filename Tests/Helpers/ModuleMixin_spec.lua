@@ -21,6 +21,7 @@ describe("ModuleMixin", function()
     before_each(function()
         _G.ECM = {}
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
         ns = {
             Addon = {

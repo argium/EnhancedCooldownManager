@@ -64,7 +64,7 @@ describe("BarMixin", function()
         end
 
         -- Minimal CreateFrame stub for FrameMixin:CreateFrame
-        _G.CreateFrame = function(frameType, name, parent, template)
+        _G.CreateFrame = function(_, name, _, _)
             local f = makeFrame({ name = name })
             f.CreateTexture = function()
                 return makeTexture()
@@ -91,6 +91,7 @@ describe("BarMixin", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         _G.ECM.ScheduleLayoutUpdate = function() end
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEQOLEditModeStub()

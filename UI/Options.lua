@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 --------------------------------------------------------------------------------
@@ -40,8 +41,8 @@ local function createPositioningExamplesCanvas()
 
     local columns = {
         {
-            title = C.POSITION_MODE_EXPLAINER_TITLE_ATTACHED,
-            caption = C.POSITION_MODE_EXPLAINER_CAPTION_ATTACHED,
+            title = L["POSITION_MODE_EXPLAINER_TITLE_ATTACHED"],
+            caption = L["POSITION_MODE_EXPLAINER_CAPTION_ATTACHED"],
             build = function(preview)
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 18, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 36, -14, { 0.92, 0.78, 0.23, 1 })
@@ -54,8 +55,8 @@ local function createPositioningExamplesCanvas()
             end,
         },
         {
-            title = C.POSITION_MODE_EXPLAINER_TITLE_DETACHED,
-            caption = C.POSITION_MODE_EXPLAINER_CAPTION_DETACHED,
+            title = L["POSITION_MODE_EXPLAINER_TITLE_DETACHED"],
+            caption = L["POSITION_MODE_EXPLAINER_CAPTION_DETACHED"],
             build = function(preview)
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 10, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 28, -14, { 0.92, 0.78, 0.23, 1 })
@@ -70,8 +71,8 @@ local function createPositioningExamplesCanvas()
             end,
         },
         {
-            title = C.POSITION_MODE_EXPLAINER_TITLE_FREE,
-            caption = C.POSITION_MODE_EXPLAINER_CAPTION_FREE,
+            title = L["POSITION_MODE_EXPLAINER_TITLE_FREE"],
+            caption = L["POSITION_MODE_EXPLAINER_CAPTION_FREE"],
             build = function(preview)
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 14, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 32, -14, { 0.92, 0.78, 0.23, 1 })
@@ -124,7 +125,7 @@ local function createPositioningExamplesCanvas()
 end
 
 local function openLayoutPage()
-    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(C.LAYOUT_SUBCATEGORY)
+    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
@@ -135,8 +136,8 @@ local function createLayoutBreadcrumbArgs(order)
     return {
         layoutMovedButton = {
             type = "button",
-            name = C.LAYOUT_PAGE_MOVED_INFO_VALUE,
-            buttonText = C.LAYOUT_PAGE_MOVED_BUTTON_TEXT,
+            name = L["LAYOUT_SUBCATEGORY"],
+            buttonText = L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"],
             onClick = openLayoutPage,
             order = order,
         },
@@ -305,7 +306,7 @@ local function createBarArgs(isDisabled, options)
 
     local args = {
         layoutMovedButton = breadcrumbArgs.layoutMovedButton,
-        appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = appearanceOrder },
+        appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = appearanceOrder },
         heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
         fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
     }
@@ -314,8 +315,8 @@ local function createBarArgs(isDisabled, options)
         args.showText = {
             type = "toggle",
             path = "showText",
-            name = "Show text",
-            desc = "Display the current value on the bar.",
+            name = L["SHOW_TEXT"],
+            desc = L["SHOW_TEXT_DESC"],
             disabled = isDisabled,
             order = appearanceOrder + 1,
         }
@@ -330,6 +331,117 @@ local function createBarArgs(isDisabled, options)
     return args
 end
 
+local function createDetachedSettingSpecs()
+    return {
+        {
+            key = "detachedBarWidth",
+            name = L["WIDTH"],
+            desc = L["DETACHED_WIDTH_DESC"],
+            default = C.DEFAULT_BAR_WIDTH,
+            min = 100,
+            max = 600,
+            step = 1,
+            updateReason = "DetachedAnchorWidth",
+        },
+        {
+            key = "detachedModuleSpacing",
+            name = L["SPACING"],
+            desc = L["DETACHED_SPACING_DESC"],
+            default = 0,
+            min = 0,
+            max = 20,
+            step = 1,
+            updateReason = "DetachedAnchorSpacing",
+        },
+        {
+            key = "detachedGrowDirection",
+            name = L["GROW_DIRECTION"],
+            desc = L["DETACHED_GROW_DIRECTION_DESC"],
+            default = C.GROW_DIRECTION_DOWN,
+            values = {
+                { label = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
+                { label = L["UP"], value = C.GROW_DIRECTION_UP },
+            },
+            updateReason = "DetachedAnchorGrowDirection",
+        },
+    }
+end
+
+local function createDetachedStackArgs()
+    local args = {
+        detachedHeader = { type = "header", name = L["POSITION_MODE_DETACHED"], order = 30 },
+    }
+
+    local order = 31
+    for _, spec in ipairs(createDetachedSettingSpecs()) do
+        local arg = {
+            path = "global." .. spec.key,
+            name = spec.name,
+            desc = spec.desc,
+            order = order,
+            getTransform = function(value)
+                return value or spec.default
+            end,
+        }
+
+        if spec.values then
+            arg.type = "select"
+            arg.values = {}
+            for _, option in ipairs(spec.values) do
+                arg.values[option.value] = option.label
+            end
+        else
+            arg.type = "range"
+            arg.min = spec.min
+            arg.max = spec.max
+            arg.step = spec.step
+        end
+
+        args[spec.key] = arg
+        order = order + 1
+    end
+
+    return args
+end
+
+local function createDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
+    local settingType = ECM.EditMode.Lib.SettingType
+    local settings = {}
+
+    for _, spec in ipairs(createDetachedSettingSpecs()) do
+        local setting = {
+            name = spec.name,
+            get = function()
+                local gc = getGlobalConfig()
+                return (gc and gc[spec.key]) or spec.default
+            end,
+            set = function(_, value)
+                local gc = getGlobalConfig()
+                if gc then
+                    gc[spec.key] = value
+                    onChanged(spec.updateReason)
+                end
+            end,
+        }
+
+        if spec.values then
+            setting.kind = settingType.Dropdown
+            setting.values = spec.values
+        else
+            setting.kind = settingType.Slider
+            setting.default = spec.default
+            setting.minValue = spec.min
+            setting.maxValue = spec.max
+            setting.valueStep = spec.step
+            setting.allowInput = true
+        end
+
+        settings[#settings + 1] = setting
+    end
+
+    return settings
+end
+
 ECM.OptionUtil = {
     GetNestedValue = getNestedValue,
     SetNestedValue = setNestedValue,
@@ -342,6 +454,8 @@ ECM.OptionUtil = {
     CreateLayoutBreadcrumbArgs = createLayoutBreadcrumbArgs,
     CreatePositioningExamplesCanvas = createPositioningExamplesCanvas,
     CreateBarArgs = createBarArgs,
+    CreateDetachedStackArgs = createDetachedStackArgs,
+    CreateDetachedAnchorEditModeSettings = createDetachedAnchorEditModeSettings,
 }
 
 --------------------------------------------------------------------------------
@@ -392,7 +506,7 @@ local Options = ns.Addon:NewModule("Options")
 
 function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
-    SB.CreateRootCategory(C.ADDON_NAME)
+    SB.CreateRootCategory(L["ADDON_NAME"])
 
     -- About section renders on the root category (no subcategory entry)
     ns.OptionsSections["About"].RegisterSettings(SB)
@@ -430,7 +544,7 @@ function Options:OnProfileChanged()
 end
 
 function Options:OpenOptions()
-    local categoryID = ECM.SettingsBuilder.GetSubcategoryID("General") or ECM.SettingsBuilder.GetRootCategoryID()
+    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(L["GENERAL"]) or ECM.SettingsBuilder.GetRootCategoryID()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end

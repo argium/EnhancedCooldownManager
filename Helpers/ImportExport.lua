@@ -7,6 +7,7 @@ local ImportExport = {}
 ECM.ImportExport = ImportExport
 
 local C = ECM.Constants
+local L = ECM.L
 
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
@@ -87,22 +88,22 @@ end
 ---@return string|nil errorMessage Error message if encoding failed
 function ImportExport.EncodeData(data)
     if not data then
-        return nil, "No data provided for encoding"
+        return nil, L["ENCODE_NO_DATA"]
     end
 
     local serialized = LibSerialize:Serialize(data)
     if not serialized then
-        return nil, "Serialization failed"
+        return nil, L["ENCODE_SERIALIZATION_FAILED"]
     end
 
     local compressed = LibDeflate:CompressDeflate(serialized, { level = 9 })
     if not compressed then
-        return nil, "Compression failed"
+        return nil, L["ENCODE_COMPRESSION_FAILED"]
     end
 
     local encoded = LibDeflate:EncodeForPrint(compressed)
     if not encoded then
-        return nil, "Encoding failed"
+        return nil, L["ENCODE_ENCODING_FAILED"]
     end
 
     return C.EXPORT_PREFIX .. ":" .. C.EXPORT_VERSION .. ":" .. encoded
@@ -114,7 +115,7 @@ end
 ---@return string|nil errorMessage Error message if decoding failed
 function ImportExport.DecodeData(importString)
     if not importString or strtrim(importString) == "" then
-        return nil, "Import string is empty"
+        return nil, L["DECODE_EMPTY"]
     end
 
     -- Parse format: "AddonName:Version:EncodedData"
@@ -122,39 +123,34 @@ function ImportExport.DecodeData(importString)
     local prefix, versionStr, encoded = importString:match("^([^:]+):(%d+):(.+)$")
 
     if not prefix or not versionStr or not encoded or encoded == "" then
-        return nil, "Invalid import string format"
+        return nil, L["DECODE_INVALID_FORMAT"]
     end
 
     if prefix ~= C.EXPORT_PREFIX then
-        return nil, "This import string is not for Enhanced Cooldown Manager (prefix: " .. tostring(prefix) .. ")"
+        return nil, string.format(L["DECODE_WRONG_ADDON"], tostring(prefix))
     end
 
     local version = tonumber(versionStr)
     if not version or version > C.EXPORT_VERSION then
-        return nil,
-            "Incompatible import string version (expected "
-                .. C.EXPORT_VERSION
-                .. ", got "
-                .. tostring(versionStr)
-                .. ")"
+        return nil, string.format(L["DECODE_INCOMPATIBLE_VERSION"], C.EXPORT_VERSION, tostring(versionStr))
     end
 
     -- Decode
     local compressed = LibDeflate:DecodeForPrint(encoded)
     if not compressed then
-        return nil, "Failed to decode string - it may be corrupted or incomplete"
+        return nil, L["DECODE_CORRUPTED"]
     end
 
     -- Decompress
     local serialized = LibDeflate:DecompressDeflate(compressed)
     if not serialized then
-        return nil, "Failed to decompress data - the string may be corrupted"
+        return nil, L["DECODE_DECOMPRESS_FAILED"]
     end
 
     -- Deserialize
     local success, data = LibSerialize:Deserialize(serialized)
     if not success or not data then
-        return nil, "Failed to deserialize data - the string may be corrupted"
+        return nil, L["DECODE_DESERIALIZE_FAILED"]
     end
 
     return data
@@ -186,7 +182,7 @@ end
 function ImportExport.ExportCurrentProfile()
     local db = ns.Addon.db
     if not db or not db.profile then
-        return nil, "No active profile found"
+        return nil, L["IMPORT_NO_PROFILE"]
     end
 
     local exportData = prepareProfileForExport(db.profile)
@@ -206,7 +202,7 @@ function ImportExport.ValidateImportString(importString)
 
     -- Validate structure
     if not data.profile then
-        return nil, "Import string does not contain profile data"
+        return nil, L["IMPORT_NO_PROFILE_DATA"]
     end
 
     return data
@@ -219,12 +215,12 @@ end
 ---@return string|nil errorMessage Error message if apply failed
 function ImportExport.ApplyImportData(data)
     if not data or not data.profile then
-        return false, "Invalid import data"
+        return false, L["IMPORT_INVALID_DATA"]
     end
 
     local db = ns.Addon.db
     if not db or not db.profile then
-        return false, "No active profile to import into"
+        return false, L["IMPORT_NO_ACTIVE_PROFILE"]
     end
 
     -- Preserve the cache if it exists (deep copy to avoid shared references)

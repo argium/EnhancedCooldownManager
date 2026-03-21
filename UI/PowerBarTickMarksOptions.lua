@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 
 local function getTicksConfig()
     local powerBar = ns.Addon.db.profile.powerBar
@@ -95,7 +96,7 @@ end
 ECM.PowerBarTickMarksStore = store
 
 StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = {
-    text = "Are you sure you want to remove all tick marks for this spec?",
+    text = L["TICK_MARKS_CLEAR_CONFIRM"],
     button1 = YES,
     button2 = NO,
     OnAccept = function() end,
@@ -166,7 +167,7 @@ local function createTickRowWidgets(rowFrame, SB)
     local removeBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
     removeBtn:SetSize(70, 22)
     removeBtn:SetPoint("LEFT", swatch, "RIGHT", 8, 0)
-    removeBtn:SetText("Remove")
+    removeBtn:SetText(L["REMOVE"])
     rowFrame._removeBtn = removeBtn
 
     local function bindSlider(slider, textLabel, storeField)
@@ -211,13 +212,13 @@ local function createTickMarksCanvas(SB, subcatName)
 
     layout:AddSpacer(2)
 
-    layout:AddDescription(C.TICK_MARKS_DESC_TEXT, "GameFontHighlight")._text:SetWordWrap(true)
+    layout:AddDescription(L["TICK_MARKS_DESC"], "GameFontHighlight")._text:SetWordWrap(true)
 
     local infoRow = layout:AddDescription("")
     local infoText = infoRow._text
     infoText:SetWordWrap(true)
 
-    local _, defaultColorSwatch = layout:AddColorSwatch("Default color")
+    local _, defaultColorSwatch = layout:AddColorSwatch(L["DEFAULT_COLOR"])
     defaultColorSwatch:SetScript("OnClick", function()
         local c = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
         ECM.OptionUtil.OpenColorPicker(c, true, function(color)
@@ -226,14 +227,14 @@ local function createTickMarksCanvas(SB, subcatName)
         end)
     end)
 
-    local _, defaultWidthSlider, defaultWidthText = layout:AddSlider("Default width", 1, 5, 1)
+    local _, defaultWidthSlider, defaultWidthText = layout:AddSlider(L["DEFAULT_WIDTH"], 1, 5, 1)
     defaultWidthSlider:SetScript("OnValueChanged", function(_, value)
         local rounded = roundToStep(value)
         defaultWidthText:SetText(tostring(rounded))
         store.SetDefaultWidth(rounded)
     end)
 
-    local _, addBtn = layout:AddButton("Add Tick Mark", "Add")
+    local _, addBtn = layout:AddButton(L["ADD_TICK_MARK"], L["ADD"])
     addBtn:SetScript("OnClick", function()
         store.AddTick(50, nil, nil)
         frame:RefreshTicks()
@@ -250,7 +251,7 @@ local function createTickMarksCanvas(SB, subcatName)
         local index = data.index
         rowFrame._rowIndex = index
         rowFrame._highlight:Hide()
-        rowFrame._label:SetText("Tick " .. index)
+        rowFrame._label:SetText(string.format(L["TICK_N"], index))
 
         local tickValue = data.tick.value or 50
         local tickWidth = data.tick.width or store.GetDefaultWidth()
@@ -297,9 +298,9 @@ local function createTickMarksCanvas(SB, subcatName)
         local classSpecLabel = "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
         local count = #ticks
         if count == 0 then
-            infoText:SetText(classSpecLabel .. " - no tick marks configured.")
+            infoText:SetText(string.format(L["NO_TICK_MARKS"], classSpecLabel))
         else
-            infoText:SetText(string.format("%s - %d tick mark(s) configured.", classSpecLabel, count))
+            infoText:SetText(string.format(L["TICK_COUNT"], classSpecLabel, count))
         end
 
         defaultsBtn:SetEnabled(count > 0)

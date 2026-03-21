@@ -5,99 +5,105 @@
 ECM = ECM or {} -- this file is probably loaded before everything else so this initializes the global table.
 
 local constants = {
-    ADDON_NAME = "Enhanced Cooldown Manager",
+    -- Addon metadata
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
-    ADDON_ABRV = "ECM",
     ADDON_METADATA_VERSION_KEY = "Version",
-    VERSION_TAG_BETA = "beta",
-    BETA_LOGIN_MESSAGE = "You are using a pre-release version of this addon. Some features may not work as expected and you will encounter bugs. Your settings may have been migrated. If you encounter oddidies, you can restore your settings from the last stable version. Type /ecm migration for details.",
-
     DEBUG_COLOR = "F17934",
+    VERSION_TAG_BETA = "beta",
 
-    -- Internal module names
+    -- Module identifiers
+    BUFFBARS = "BuffBars",
+    ITEMICONS = "ItemIcons",
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
     RUNEBAR = "RuneBar",
-    BUFFBARS = "BuffBars",
-    ITEMICONS = "ItemIcons",
 
-    -- Module name to config key mapping
-    -- Configuration
-    CONFIG_SECTION_GLOBAL = "global",
+    -- Shared configuration values
     ANCHORMODE_CHAIN = "chain",
     ANCHORMODE_DETACHED = "detached",
     ANCHORMODE_FREE = "free",
-    GROW_DIRECTION_DOWN = "down",
-    GROW_DIRECTION_UP = "up",
+    CONFIG_SECTION_GLOBAL = "global",
     EDIT_MODE_DEFAULT_POINT = "CENTER",
     EDIT_MODE_MIGRATED_KEY = "__migrated",
+    GROW_DIRECTION_DOWN = "down",
+    GROW_DIRECTION_UP = "up",
 
-    -- Default or fallback values for configuration
-    DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
-    DEFAULT_REFRESH_FREQUENCY = 0.066,
-    WATCHDOG_INTERVAL = 0.5,
-    DEFAULT_BAR_HEIGHT = 20,
-    DEFAULT_BAR_WIDTH = 250,
-    DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
-    DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
-    DEFAULT_BORDER_THICKNESS = 4,
-    DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
-    DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
-    FALLBACK_TEXTURE = "Interface\\Buttons\\WHITE8X8",
-
-    -- Color constants
+    -- Shared visuals and defaults
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
     COLOR_WHITE = { r = 1, g = 1, b = 1, a = 1 },
     COLOR_WHITE_HEX = "FFFFFF",
+    DEFAULT_BAR_HEIGHT = 20,
+    DEFAULT_BAR_WIDTH = 250,
+    DEFAULT_BG_COLOR = { r = 0.08, g = 0.08, b = 0.08, a = 0.65 },
+    DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
+    DEFAULT_BORDER_THICKNESS = 4,
+    DEFAULT_FONT = "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf",
+    DEFAULT_FONT_SIZE = 11,
+    DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
+    DEFAULT_REFRESH_FREQUENCY = 0.066,
+    DEFAULT_STATUSBAR_TEXTURE = "Interface\\TARGETINGFRAME\\UI-StatusBar",
+    FALLBACK_TEXTURE = "Interface\\Buttons\\WHITE8X8",
 
-    -- Module-specific constants and configuration
+    -- Power bar
     POWERBAR_SHOW_MANABAR = { MAGE = true, WARLOCK = true, DRUID = true },
-    RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
+
+    -- Resource bar identifiers
+    RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
+    RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
+    RESOURCEBAR_TYPE_ICICLES = "icicles",
+    RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
+    RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
+
+    -- Resource bar spell IDs
     RESOURCEBAR_ICICLES_SPELLID = 205473,
-    SPELLID_VOID_FRAGMENTS = 1225789, -- tracks progress towards void meta form (35 fragments)
-    SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
-    RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
+    RESOURCEBAR_RAGING_MAELSTROM_SPELLID = 384143,
+    RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
+
+    -- Resource bar limits
     RESOURCEBAR_DEVOURER_NORMAL_MAX = 30,
     RESOURCEBAR_DEVOURER_META_MAX = 35,
     RESOURCEBAR_ICICLES_MAX = 5,
-    SPELLID_MAELSTROM_WEAPON = 344179,
-    RESOURCEBAR_RAGING_MAELSTROM_SPELLID = 384143,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE = 5,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED = 10,
-    RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
-    RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
-    RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
-    RESOURCEBAR_TYPE_ICICLES = "icicles",
-    RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
+    RESOURCEBAR_VENGEANCE_SOULS_MAX = 6,
 
-    RUNEBAR_MAX_RUNES = 6,
-    RUNEBAR_CD_DIM_FACTOR = 0.5,
+    -- Resource bar related spell IDs
+    SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
+    SPELLID_MAELSTROM_WEAPON = 344179,
+    SPELLID_VOID_FRAGMENTS = 1225789, -- tracks progress towards void meta form (35 fragments)
+
+    -- Buff bars
     BUFFBARS_DEFAULT_COLOR = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
     BUFFBARS_ICON_TEXTURE_REGION_INDEX = 1,
     BUFFBARS_ICON_OVERLAY_REGION_INDEX = 3,
     BUFFBARS_TEXT_PADDING = 4,
 
-    DEMONHUNTER_CLASS_ID = 12,
-    DEMONHUNTER_VENGEANCE_SPEC_INDEX = 2,
-    DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
-    DEATHKNIGHT_BLOOD_SPEC_INDEX = 1,
+    -- Rune bar
+    RUNEBAR_CD_DIM_FACTOR = 0.5,
+    RUNEBAR_MAX_RUNES = 6,
+
+    -- Class and specialization identifiers
     DEATHKNIGHT_FROST_SPEC_INDEX = 2,
     DEATHKNIGHT_UNHOLY_SPEC_INDEX = 3,
-    SHAMAN_ELEMENTAL_SPEC_INDEX = 1,
-    SHAMAN_ENHANCEMENT_SPEC_INDEX = 2,
-    SHAMAN_RESTORATION_SPEC_INDEX = 3,
+    DEMONHUNTER_CLASS_ID = 12,
+    DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
+    DEMONHUNTER_VENGEANCE_SPEC_INDEX = 2,
+    DRUID_CAT_FORM_INDEX = 2,
+    MAGE_ARCANE_SPEC_INDEX = 1,
+    MAGE_FROST_SPEC_INDEX = 3,
     MONK_BREWMASTER_SPEC_INDEX = 1,
     MONK_MISTWEAVER_SPEC_INDEX = 2,
     MONK_WINDWALKER_SPEC_INDEX = 3,
-    MAGE_ARCANE_SPEC_INDEX = 1,
-    MAGE_FROST_SPEC_INDEX = 3,
-    DRUID_CAT_FORM_INDEX = 2,
+    SHAMAN_ELEMENTAL_SPEC_INDEX = 1,
+    SHAMAN_ENHANCEMENT_SPEC_INDEX = 2,
+    SHAMAN_RESTORATION_SPEC_INDEX = 3,
 
-    -- Trinket slots
-    TRINKET_SLOT_1 = 13,
-    TRINKET_SLOT_2 = 14,
+    -- Item icons
+    DEFAULT_ITEM_ICON_SIZE = 32,
+    ITEM_ICON_BORDER_SCALE = 1.35,
+    ITEM_ICONS_MAX = 5,
 
-    -- Consumable item IDs (priority-ordered: best first)
+    -- Consumables and equipment slots
     COMBAT_POTIONS = {
         { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
         { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
@@ -110,83 +116,28 @@ local constants = {
         { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
     },
     HEALTHSTONE_ITEM_ID = 5512,
-    ITEM_ICONS_MAX = 5,
+    TRINKET_SLOT_1 = 13,
+    TRINKET_SLOT_2 = 14,
 
-    -- Item icon defaults
-    DEFAULT_ITEM_ICON_SIZE = 32,
-    ITEM_ICON_BORDER_SCALE = 1.35,
-
-    -- Schema migration
+    -- Saved variables and migration
+    ACTIVE_SV_KEY = "_ECM_DB",
     CURRENT_SCHEMA_VERSION = 11,
     SV_NAME = "EnhancedCooldownManagerDB",
-    ACTIVE_SV_KEY = "_ECM_DB",
 
-    LIFECYCLE_SECOND_PASS_DELAY = 0.05,
-
-    -- Debug serialization limits
-    TOSTRING_MAX_DEPTH = 3,
-    TOSTRING_MAX_ITEMS = 25,
-
-    -- Font fallback
-    DEFAULT_FONT_SIZE = 11,
-
-    -- Layout event delays
-    LAYOUT_ENTERING_WORLD_DELAY = 0.4,
-    LAYOUT_COMBAT_END_DELAY = 0.1,
-    LAYOUT_ZONE_CHANGE_DELAY = 0.1,
-
-    -- Popup dialog
-    POPUP_PREFERRED_INDEX = 3,
-
-    -- Import/Export
+    -- Import and export
     EXPORT_PREFIX = "EnhancedCooldownManager",
     EXPORT_VERSION = 1,
 
-    -- UI Options
-    POSITION_MODE_NAME = "Position Mode",
-    POSITION_MODE_DESC = "Choose how this module is positioned.\n\n- Automatic: Keeps this module in the main stack next to Blizzard's cooldown icons. Uses the shared spacing and grow direction settings.\n- Detached automatic: Places this module in a separate shared stack. Move the detached stack anchor in Edit Mode. Width, spacing, and grow direction are shared by all detached modules.\n- Free placement: Places this module independently. Drag this module directly in Edit Mode to position it.",
-    POSITION_MODE_AUTOMATIC_LABEL = "Automatic",
-    POSITION_MODE_DETACHED_LABEL = "Automatic (detached)",
-    POSITION_MODE_FREE_LABEL = "Free placement",
-    LAYOUT_SUBCATEGORY = "Layout",
-    LAYOUT_PAGE_MOVED_INFO_VALUE = "Layout",
-    LAYOUT_PAGE_MOVED_BUTTON_NAME = "Open Layout Page",
-    LAYOUT_PAGE_MOVED_BUTTON_TEXT = "Open",
-    LAYOUT_PAGE_DESC = "Configure how modules attach to the main cooldown icons, stack on the shared detached anchor, or move independently in Edit Mode.",
-    LAYOUT_PAGE_EDIT_MODE_HINT = "Use Edit Mode to move the detached stack anchor or any modules using Free placement.",
-    AUTOMATIC_LABEL = "Automatic",
-    DETACHED_AUTOMATIC_HEADER = "Automatic (detached)",
-    MODULE_LAYOUT_HEADER = "Positioning",
-    POSITION_MODE_EXPLAINER_HEIGHT = 150,
-    POSITION_MODE_EXPLAINER_TITLE_ATTACHED = "Attached",
-    POSITION_MODE_EXPLAINER_TITLE_DETACHED = "Detached stack",
-    POSITION_MODE_EXPLAINER_TITLE_FREE = "Free placement",
-    POSITION_MODE_EXPLAINER_CAPTION_ATTACHED = "Bars stay with the main cooldown icons.",
-    POSITION_MODE_EXPLAINER_CAPTION_DETACHED = "Bars stay grouped together, but move as a separate stack.",
-    POSITION_MODE_EXPLAINER_CAPTION_FREE = "Each bar can be positioned independently.",
-    WIDTH_SETTING_NAME = "Width",
-    SPACING_SETTING_NAME = "Spacing",
-    GROW_DIRECTION_SETTING_NAME = "Grow Direction",
-    DETACHED_WIDTH_DESC = "Shared width for all modules using Detached Automatic mode.",
-    DETACHED_SPACING_DESC = "Vertical spacing between modules in the detached stack.",
-    DETACHED_GROW_DIRECTION_DESC = "Whether the detached stack grows upward or downward from its anchor.",
-    SPELL_COLORS_DESC_TEXT = "Customize colors for individual spells. Colors are saved per class and specialization.",
-    SPELL_COLORS_SECRET_NAMES_DESC_TEXT = "One or more spell names have become secret. This can be cleared by reloading the UI outside of restricted area, typically dungeons, raids, delves, and PVP.",
-    SPELL_COLORS_RELOAD_BUTTON_TEXT = "Reload UI",
-    SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT = 40,
-    SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET = 42,
-    SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET = 8,
-    SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES = 80,
-    SPELL_COLORS_SUBCAT = "Spell Colors",
-    SCROLL_ROW_HEIGHT_COMPACT = 26,
-    TICK_MARKS_DESC_TEXT = "Customize tick marks for the power bar. Marks are saved per class and specialization.",
-    SCROLL_ROW_HEIGHT_WITH_CONTROLS = 34,
+    -- Runtime timing and debug limits
+    LAYOUT_COMBAT_END_DELAY = 0.1,
+    LAYOUT_ENTERING_WORLD_DELAY = 0.4,
+    LAYOUT_ZONE_CHANGE_DELAY = 0.1,
+    LIFECYCLE_SECOND_PASS_DELAY = 0.05,
+    TOSTRING_MAX_DEPTH = 3,
+    TOSTRING_MAX_ITEMS = 25,
+    WATCHDOG_INTERVAL = 0.5,
 
-    -- Dialog frame
-    DIALOG_FRAME_WIDTH = 480,
-    DIALOG_FRAME_HEIGHT = 360,
-    DIALOG_FRAME_WIDTH_SMALL = 400,
-    DIALOG_FRAME_HEIGHT_SMALL = 160,
+    -- Dialogs and popups
     DIALOG_BACKDROP = {
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -195,6 +146,20 @@ local constants = {
         edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 },
     },
+    DIALOG_FRAME_HEIGHT = 360,
+    DIALOG_FRAME_HEIGHT_SMALL = 160,
+    DIALOG_FRAME_WIDTH = 480,
+    DIALOG_FRAME_WIDTH_SMALL = 400,
+    POPUP_PREFERRED_INDEX = 3,
+
+    -- UI dimension constants
+    POSITION_MODE_EXPLAINER_HEIGHT = 150,
+    SCROLL_ROW_HEIGHT_COMPACT = 26,
+    SCROLL_ROW_HEIGHT_WITH_CONTROLS = 34,
+    SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES = 80,
+    SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET = 8,
+    SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET = 42,
+    SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT = 40,
 }
 
 local BLIZZARD_FRAMES = {
@@ -222,14 +187,14 @@ local CLASS_COLORS = {
 
 -- Resource types that support a separate color when at maximum value.
 -- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
-local maxColorTypes = {
+local resourceBarMaxColorTypes = {
     ["icicles"] = true,
 }
 
-local order = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
-constants.CHAIN_ORDER = order
+local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
+constants.CHAIN_ORDER = chainOrder
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS
-constants.RESOURCEBAR_MAX_COLOR_TYPES = maxColorTypes
+constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes
 
 ECM.Constants = constants

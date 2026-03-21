@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 local FrameUtil = ECM.FrameUtil
 local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
 local EditMode = ECM.EditMode or {}
@@ -231,29 +232,25 @@ end
 ---@param mode string
 ---@return table
 local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
-    local anchor
-    local isFirst
-    local growsUp
-    local gap
+    local isDetached = mode == C.ANCHORMODE_DETACHED
+    if not isDetached then mode = C.ANCHORMODE_CHAIN end
 
-    if mode == C.ANCHORMODE_DETACHED then
-        anchor, isFirst = self:GetNextChainAnchor(self.Name, mode)
-        growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.detachedGrowDirection) == C.GROW_DIRECTION_UP
+    local anchor, isFirst = self:GetNextChainAnchor(self.Name, mode)
+
+    local directionKey = isDetached and "detachedGrowDirection" or "moduleGrowDirection"
+    local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig[directionKey]) == C.GROW_DIRECTION_UP
+
+    local gap
+    if isDetached then
         gap = isFirst and 0 or ((globalConfig and globalConfig.detachedModuleSpacing) or 0)
     else
-        mode = C.ANCHORMODE_CHAIN
-        anchor, isFirst = self:GetNextChainAnchor(self.Name)
-        growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig.moduleGrowDirection) == C.GROW_DIRECTION_UP
         gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0) or ((globalConfig and globalConfig.moduleSpacing) or 0)
     end
 
     local anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
-    local anchorRelativePoint
-    if mode == C.ANCHORMODE_DETACHED then
-        anchorRelativePoint = isFirst and anchorPoint or (growsUp and "TOPLEFT" or "BOTTOMLEFT")
-    else
-        anchorRelativePoint = growsUp and "TOPLEFT" or "BOTTOMLEFT"
-    end
+    -- Detached first module anchors inside its container; all other cases anchor outside the predecessor.
+    local flippedPoint = growsUp and "TOPLEFT" or "BOTTOMLEFT"
+    local anchorRelativePoint = (isDetached and isFirst) and anchorPoint or flippedPoint
 
     return {
         mode = mode,
@@ -498,7 +495,7 @@ function FrameMixin:_RegisterEditMode()
         settings = {
             {
                 kind = LibEQOLEditMode.SettingType.Slider,
-                name = "Width",
+                name = L["WIDTH"],
                 get = function()
                     local cfg = module:GetModuleConfig()
                     return (cfg and cfg.width) or C.DEFAULT_BAR_WIDTH

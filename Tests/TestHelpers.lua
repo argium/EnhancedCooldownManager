@@ -247,7 +247,7 @@ function TestHelpers.SetupSettingsStubs()
             return init
         end,
 
-        RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
+        RegisterProxySetting = function(_, _, _, _, default, getter, setter)
             return makeSetting(getter, setter, default)
         end,
 
@@ -600,7 +600,9 @@ end
 --- Asserts anchor values match. Uses busted's assert when available, plain assert otherwise.
 function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint, x, y)
     local ap, ar, arp, ax, ay = frame:GetPoint(index)
-    local eq = (type(assert) == "table" and assert.are and assert.are.equal)
+    local bustedAssert = _G.assert
+    local are = type(bustedAssert) == "table" and rawget(bustedAssert, "are") or nil
+    local eq = are and rawget(are, "equal")
     if eq then
         eq(point, ap)
         eq(relativeTo, ar)
@@ -659,11 +661,14 @@ TestHelpers.OPTIONS_GLOBALS = {
     "SettingsPanel",
 }
 
---- Load the live ECM_Constants.lua to populate ECM.Constants.
+--- Load the live ECM_Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
 function TestHelpers.LoadLiveConstants()
     _G.ECM = _G.ECM or {}
     if not ECM.Constants then
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+    end
+    if not ECM.L then
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
     end
 end
 

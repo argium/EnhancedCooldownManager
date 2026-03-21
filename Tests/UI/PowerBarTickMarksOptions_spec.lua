@@ -32,6 +32,7 @@ describe("PowerBarTickMarksOptions", function()
                 CLASS_COLORS = { WARRIOR = "C79C6E" },
                 COLOR_WHITE_HEX = "FFFFFF",
             },
+            L = setmetatable({}, { __index = function(_, k) return k end }),
             CloneValue = TestHelpers.deepClone,
             OptionUtil = {
                 GetCurrentClassSpec = function()

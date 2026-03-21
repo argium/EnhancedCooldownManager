@@ -76,7 +76,7 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         it("uses the updated labels and help text", function()
             local args = capturedTable.args
             assert.is_nil(args.layoutMovedInfo)
-            assert.are.equal(ECM.Constants.LAYOUT_PAGE_MOVED_INFO_VALUE, args.layoutMovedButton.name)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
             assert.is_nil(args.positioning)
         end)
     end)

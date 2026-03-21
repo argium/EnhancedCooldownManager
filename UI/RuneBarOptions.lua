@@ -3,6 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
+local L = ECM.L
 local RuneBarOptions = {}
 
 local function isNotDeathKnight()
@@ -17,23 +18,23 @@ function RuneBarOptions.RegisterSettings(SB)
     local args = ECM.OptionUtil.CreateBarArgs(isDisabled, { showText = false, border = false })
     args.dkWarning = {
         type = "subheader",
-        name = "|cffFF8800These settings are only applicable to Death Knights.|r",
+        name = L["DK_ONLY_WARNING"],
         condition = isNotDeathKnight,
         order = 0,
     }
     args.enabled = {
         type = "toggle",
         path = "enabled",
-        name = "Enable rune bar",
+        name = L["ENABLE_RUNE_BAR"],
         order = 1,
         onSet = ECM.OptionUtil.CreateModuleEnabledHandler("RuneBar"),
     }
-    args.colorLabel = { type = "subheader", name = "Colors", disabled = isDisabled, order = 30 }
+    args.colorLabel = { type = "subheader", name = L["COLORS"], disabled = isDisabled, order = 30 }
     args.useSpecColor = {
         type = "checkbox",
         path = "useSpecColor",
-        name = "Use specialization color",
-        desc = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below.",
+        name = L["USE_SPEC_COLOR"],
+        desc = L["USE_SPEC_COLOR_DESC"],
         parent = "colorLabel",
         disabled = isDisabled,
         order = 31,
@@ -41,7 +42,7 @@ function RuneBarOptions.RegisterSettings(SB)
     args.runeColor = {
         type = "color",
         path = "color",
-        name = "Rune color",
+        name = L["RUNE_COLOR"],
         parent = "useSpecColor",
         parentCheck = "notChecked",
         disabled = isDisabled,
@@ -50,7 +51,7 @@ function RuneBarOptions.RegisterSettings(SB)
     args.bloodColor = {
         type = "color",
         path = "colorBlood",
-        name = "Blood color",
+        name = L["BLOOD_COLOR"],
         parent = "useSpecColor",
         parentCheck = "checked",
         disabled = isDisabled,
@@ -59,7 +60,7 @@ function RuneBarOptions.RegisterSettings(SB)
     args.frostColor = {
         type = "color",
         path = "colorFrost",
-        name = "Frost color",
+        name = L["FROST_COLOR"],
         parent = "useSpecColor",
         parentCheck = "checked",
         disabled = isDisabled,
@@ -68,7 +69,7 @@ function RuneBarOptions.RegisterSettings(SB)
     args.unholyColor = {
         type = "color",
         path = "colorUnholy",
-        name = "Unholy color",
+        name = L["UNHOLY_COLOR"],
         parent = "useSpecColor",
         parentCheck = "checked",
         disabled = isDisabled,
@@ -76,7 +77,7 @@ function RuneBarOptions.RegisterSettings(SB)
     }
 
     SB.RegisterFromTable({
-        name = "Rune Bar",
+        name = L["RUNE_BAR"],
         path = "runeBar",
         disabled = isNotDeathKnight,
         args = args,

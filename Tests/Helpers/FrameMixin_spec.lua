@@ -277,7 +277,7 @@ describe("FrameMixin real source", function()
 
         local anchor, isFirst = FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, ECM.Constants.CHAIN_ORDER[1])
 
-        assert.are.equal(EssentialCooldownViewer, anchor)
+        assert.are.equal(_G.EssentialCooldownViewer, anchor)
         assert.is_true(isFirst)
     end)
 
@@ -305,7 +305,7 @@ describe("FrameMixin real source", function()
         local params = FrameMixin.CalculateLayoutParams(mod)
 
         assert.are.equal(ECM.Constants.ANCHORMODE_CHAIN, params.mode)
-        assert.are.equal(EssentialCooldownViewer, params.anchor)
+        assert.are.equal(_G.EssentialCooldownViewer, params.anchor)
         assert.is_true(params.isFirst)
         assert.are.equal("TOPLEFT", params.anchorPoint)
         assert.are.equal("BOTTOMLEFT", params.anchorRelativePoint)

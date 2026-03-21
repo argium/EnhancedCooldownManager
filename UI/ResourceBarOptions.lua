@@ -4,19 +4,20 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 
 local RESOURCE_COLOR_DEFS = {
-    { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = "Soul Fragments (Demon Hunter)" },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = "Soul Fragments (Devourer)" },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = "Void Fragments (Devourer)" },
-    { key = C.RESOURCEBAR_TYPE_ICICLES, name = "Icicles (Frost Mage)" },
-    { key = Enum.PowerType.ArcaneCharges, name = "Arcane Charges" },
-    { key = Enum.PowerType.Chi, name = "Chi" },
-    { key = Enum.PowerType.ComboPoints, name = "Combo Points" },
-    { key = Enum.PowerType.Essence, name = "Essence" },
-    { key = Enum.PowerType.HolyPower, name = "Holy Power" },
-    { key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON, name = "Maelstrom Weapon (Enhancement)" },
-    { key = Enum.PowerType.SoulShards, name = "Soul Shards" },
+    { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = L["RESOURCE_SOUL_FRAGMENTS_DH"] },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] },
+    { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] },
+    { key = C.RESOURCEBAR_TYPE_ICICLES, name = L["RESOURCE_ICICLES"] },
+    { key = Enum.PowerType.ArcaneCharges, name = L["RESOURCE_ARCANE_CHARGES"] },
+    { key = Enum.PowerType.Chi, name = L["RESOURCE_CHI"] },
+    { key = Enum.PowerType.ComboPoints, name = L["RESOURCE_COMBO_POINTS"] },
+    { key = Enum.PowerType.Essence, name = L["RESOURCE_ESSENCE"] },
+    { key = Enum.PowerType.HolyPower, name = L["RESOURCE_HOLY_POWER"] },
+    { key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON, name = L["RESOURCE_MAELSTROM_WEAPON"] },
+    { key = Enum.PowerType.SoulShards, name = L["RESOURCE_SOUL_SHARDS"] },
 }
 
 local ResourceBarOptions = {}
@@ -31,7 +32,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     args.enabled = {
         type = "toggle",
         path = "enabled",
-        name = "Enable resource bar",
+        name = L["ENABLE_RESOURCE_BAR"],
         order = 0,
         onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
     }
@@ -41,7 +42,7 @@ function ResourceBarOptions.RegisterSettings(SB)
             maxColorDefs[#maxColorDefs + 1] = {
                 key = def.key,
                 name = def.name,
-                tooltip = "Use an alternate color when this resource is at its maximum value.",
+                tooltip = L["ALTERNATE_COLOR_TOOLTIP"],
             }
         end
     end
@@ -49,7 +50,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     args.colors = {
         type = "colorList",
         path = "colors",
-        label = "Colors",
+        label = L["COLORS"],
         defs = RESOURCE_COLOR_DEFS,
         disabled = isDisabled,
         order = 30,
@@ -57,7 +58,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     args.maxColorsEnabled = {
         type = "toggleList",
         path = "maxColorsEnabled",
-        label = "Use alternate color when capped",
+        label = L["USE_ALTERNATE_COLOR_WHEN_CAPPED"],
         defs = maxColorDefs,
         disabled = isDisabled,
         order = 31,
@@ -65,14 +66,14 @@ function ResourceBarOptions.RegisterSettings(SB)
     args.maxColors = {
         type = "colorList",
         path = "maxColors",
-        label = "Alternate Colors",
+        label = L["ALTERNATE_COLORS"],
         defs = maxColorDefs,
         disabled = isDisabled,
         order = 32,
     }
 
     SB.RegisterFromTable({
-        name = "Resource Bar",
+        name = L["RESOURCE_BAR"],
         path = "resourceBar",
         disabled = ECM.ClassUtil.IsDeathKnight,
         args = args,

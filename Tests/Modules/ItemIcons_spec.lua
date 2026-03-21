@@ -255,6 +255,7 @@ describe("ItemIcons real source", function()
             UnregisterFrame = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         _G.EditModeManagerFrame = makeHookableFrame(false)
         _G.UtilityCooldownViewer = makeHookableFrame(true)

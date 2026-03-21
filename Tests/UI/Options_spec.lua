@@ -207,7 +207,7 @@ describe("OptionUtil", function()
 
             assert.is_table(args.layoutMovedButton)
             assert.are.equal("button", args.layoutMovedButton.type)
-            assert.are.equal(ECM.Constants.LAYOUT_PAGE_MOVED_INFO_VALUE, args.layoutMovedButton.name)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
             assert.are.equal("Open", args.layoutMovedButton.buttonText)
             assert.are.equal(10, args.layoutMovedButton.order)
 

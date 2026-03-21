@@ -58,11 +58,11 @@ describe("Options sections and root assembly", function()
 
         _G.ECM = {
             Constants = {
-                ADDON_NAME = "ECM",
                 ANCHORMODE_CHAIN = 1,
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
             },
+            L = setmetatable({}, { __index = function(_, k) return k end }),
             ScheduleLayoutUpdate = function() end,
         }
 

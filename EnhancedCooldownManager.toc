@@ -24,6 +24,7 @@ Libs\LibSettingsBuilder\LibSettingsBuilder.lua
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
 ECM_Constants.lua
+Locales\en.lua
 ECM_Defaults.lua
 
 Helpers\ClassUtil.lua

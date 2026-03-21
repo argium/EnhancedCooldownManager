@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 
 local LayoutOptions = {}
 
@@ -12,11 +13,11 @@ local function createAnchorModeSpec(name, path, order, disabled)
         type = "select",
         path = path,
         name = name,
-        desc = C.POSITION_MODE_DESC,
+        desc = L["POSITION_MODE_DESC"],
         values = {
-            [C.ANCHORMODE_CHAIN] = C.POSITION_MODE_AUTOMATIC_LABEL,
-            [C.ANCHORMODE_DETACHED] = C.POSITION_MODE_DETACHED_LABEL,
-            [C.ANCHORMODE_FREE] = C.POSITION_MODE_FREE_LABEL,
+            [C.ANCHORMODE_CHAIN] = L["POSITION_MODE_AUTOMATIC"],
+            [C.ANCHORMODE_DETACHED] = L["POSITION_MODE_DETACHED"],
+            [C.ANCHORMODE_FREE] = L["POSITION_MODE_FREE"],
         },
         disabled = disabled,
         order = order,
@@ -29,109 +30,70 @@ function LayoutOptions.RegisterSettings(SB)
     local runeBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("runeBar")
     local buffBarsDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
+    local args = {
+        positioningExamples = {
+            type = "canvas",
+            canvas = ECM.OptionUtil.CreatePositioningExamplesCanvas(),
+            height = C.POSITION_MODE_EXPLAINER_HEIGHT,
+            order = 0,
+        },
+
+        moduleHeader = { type = "header", name = L["MODULE_LAYOUT_HEADER"], order = 10 },
+        powerBarMode = createAnchorModeSpec(L["POWER_BAR"], "powerBar.anchorMode", 11, powerBarDisabled),
+        resourceBarMode = createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", 12, resourceBarDisabled),
+        runeBarMode = createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", 13, runeBarDisabled),
+        buffBarsMode = createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", 14, buffBarsDisabled),
+
+        attachedHeader = { type = "header", name = L["POSITION_MODE_AUTOMATIC"], order = 20 },
+        offsetY = {
+            type = "range",
+            path = "global.offsetY",
+            name = L["VERTICAL_OFFSET"],
+            desc = L["VERTICAL_OFFSET_DESC"],
+            min = 0,
+            max = 20,
+            step = 1,
+            order = 21,
+        },
+        moduleSpacing = {
+            type = "range",
+            path = "global.moduleSpacing",
+            name = L["VERTICAL_SPACING"],
+            desc = L["VERTICAL_SPACING_DESC"],
+            min = 0,
+            max = 20,
+            step = 1,
+            getTransform = function(value)
+                return value or 0
+            end,
+            order = 22,
+        },
+        moduleGrowDirection = {
+            type = "select",
+            path = "global.moduleGrowDirection",
+            name = L["GROW_DIRECTION"],
+            desc = L["GROW_DIRECTION_ATTACHED_DESC"],
+            values = {
+                [C.GROW_DIRECTION_DOWN] = L["DOWN"],
+                [C.GROW_DIRECTION_UP] = L["UP"],
+            },
+            getTransform = function(value)
+                return value or C.GROW_DIRECTION_DOWN
+            end,
+            order = 23,
+        },
+    }
+
+    for key, spec in pairs(ECM.OptionUtil.CreateDetachedStackArgs()) do
+        args[key] = spec
+    end
+
     SB.RegisterFromTable({
-        name = C.LAYOUT_SUBCATEGORY,
+        name = L["LAYOUT_SUBCATEGORY"],
         onShow = function() ECM.SetLayoutPreview(true) end,
         onHide = function() ECM.SetLayoutPreview(false) end,
-        args = {
-            positioningExamples = {
-                type = "canvas",
-                canvas = ECM.OptionUtil.CreatePositioningExamplesCanvas(),
-                height = C.POSITION_MODE_EXPLAINER_HEIGHT,
-                order = 0,
-            },
-
-            moduleHeader = { type = "header", name = C.MODULE_LAYOUT_HEADER, order = 10 },
-            powerBarMode = createAnchorModeSpec("Power Bar", "powerBar.anchorMode", 11, powerBarDisabled),
-            resourceBarMode = createAnchorModeSpec("Resource Bar", "resourceBar.anchorMode", 12, resourceBarDisabled),
-            runeBarMode = createAnchorModeSpec("Rune Bar", "runeBar.anchorMode", 13, runeBarDisabled),
-            buffBarsMode = createAnchorModeSpec("Aura Bars", "buffBars.anchorMode", 14, buffBarsDisabled),
-
-            attachedHeader = { type = "header", name = C.AUTOMATIC_LABEL, order = 20 },
-            -- TODO: add description
-            offsetY = {
-                type = "range",
-                path = "global.offsetY",
-                name = "Vertical Offset",
-                desc = "Vertical gap between the main cooldown icons and the first attached bar.",
-                min = 0,
-                max = 20,
-                step = 1,
-                order = 21,
-            },
-            moduleSpacing = {
-                type = "range",
-                path = "global.moduleSpacing",
-                name = "Vertical Spacing",
-                desc = "Vertical spacing between attached modules. Spacing between aura bars is controlled separately.",
-                min = 0,
-                max = 20,
-                step = 1,
-                getTransform = function(value)
-                    return value or 0
-                end,
-                order = 22,
-            },
-            moduleGrowDirection = {
-                type = "select",
-                path = "global.moduleGrowDirection",
-                name = "Grow Direction",
-                desc = "Whether the attached stack grows above or below the main cooldown icons.",
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                order = 23,
-            },
-
-            detachedHeader = { type = "header", name = C.DETACHED_AUTOMATIC_HEADER, order = 30 },
-            -- TODO: add description
-            detachedBarWidth = {
-                type = "range",
-                path = "global.detachedBarWidth",
-                name = C.WIDTH_SETTING_NAME,
-                desc = C.DETACHED_WIDTH_DESC,
-                min = 100,
-                max = 600,
-                step = 1,
-                getTransform = function(value)
-                    return value or C.DEFAULT_BAR_WIDTH
-                end,
-                order = 31,
-            },
-            detachedModuleSpacing = {
-                type = "range",
-                path = "global.detachedModuleSpacing",
-                name = C.SPACING_SETTING_NAME,
-                desc = C.DETACHED_SPACING_DESC,
-                min = 0,
-                max = 20,
-                step = 1,
-                getTransform = function(value)
-                    return value or 0
-                end,
-                order = 32,
-            },
-            detachedGrowDirection = {
-                type = "select",
-                path = "global.detachedGrowDirection",
-                name = C.GROW_DIRECTION_SETTING_NAME,
-                desc = C.DETACHED_GROW_DIRECTION_DESC,
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                order = 33,
-            },
-
-        },
+        args = args,
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, C.LAYOUT_SUBCATEGORY, LayoutOptions)
+ECM.SettingsBuilder.RegisterSection(ns, "Layout", LayoutOptions)

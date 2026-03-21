@@ -17,7 +17,6 @@ describe("ChatCommand migration", function()
     local registeredEvents
     local unregisteredEvents
     local scheduleLayoutCalls
-    local defaultModuleLibraries
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -73,7 +72,6 @@ describe("ChatCommand migration", function()
         registeredEvents = {}
         unregisteredEvents = {}
         scheduleLayoutCalls = {}
-        defaultModuleLibraries = {}
 
         _G.strtrim = function(s)
             return tostring(s):match("^%s*(.-)%s*$")
@@ -152,6 +150,9 @@ describe("ChatCommand migration", function()
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         _G.CreateFrame = function(_, name)
             local frame = TestHelpers.makeFrame({ name = name })
+            frame.SetScript = function() end
+            frame.RegisterEvent = function() end
+            frame.UnregisterEvent = function() end
             frame.SetFrameStrata = function() end
             frame.SetBackdrop = function() end
             frame.SetBackdropColor = function() end
@@ -192,7 +193,8 @@ describe("ChatCommand migration", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-    TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
         TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
 
         _G.ECM.Migration = {
@@ -231,7 +233,8 @@ describe("ChatCommand migration", function()
         }
 
         TestHelpers.SetupLibStub()
-    TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
@@ -260,9 +263,7 @@ describe("ChatCommand migration", function()
         fakeAddon.ConfirmReloadUI = function(_, text, onAccept)
             confirmReloadCalls[#confirmReloadCalls + 1] = { text = text, onAccept = onAccept }
         end
-        fakeAddon.SetDefaultModuleLibraries = function(_, ...)
-            defaultModuleLibraries = { ... }
-        end
+        fakeAddon.SetDefaultModuleLibraries = function() end
 
         local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
         aceAddon.NewAddon = function(_, name)
@@ -370,7 +371,7 @@ describe("ChatCommand migration", function()
 
     it("ConfirmReloadUI onAccept calls Migration.Rollback with correct version", function()
         local rolledBackVersion
-        ECM.Migration.ValidateRollback = function(n)
+        ECM.Migration.ValidateRollback = function(_)
             return true, "Will delete V10."
         end
         ECM.Migration.Rollback = function(n)
@@ -387,7 +388,7 @@ describe("ChatCommand migration", function()
 
     it("ConfirmReloadUI onAccept after -1 calls Rollback with translated version", function()
         local rolledBackVersion
-        ECM.Migration.ValidateRollback = function(n)
+        ECM.Migration.ValidateRollback = function(_)
             return true, "Will delete."
         end
         ECM.Migration.Rollback = function(n)

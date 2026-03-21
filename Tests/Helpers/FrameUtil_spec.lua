@@ -76,6 +76,7 @@ describe("FrameUtil", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
 
         FrameUtil = assert(ECM.FrameUtil, "FrameUtil module did not initialize")
