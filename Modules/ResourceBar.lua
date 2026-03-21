@@ -49,18 +49,10 @@ function ResourceBar:Refresh(why, force)
     end
 
     -- Use the safe discrete count (3rd return) for tick layout to avoid
-    -- secret value comparison/arithmetic. Devourer types have large counts
-    -- (30/35) that should not produce tick dividers.
+    -- secret value comparison/arithmetic.
     local resourceType = ClassUtil.GetPlayerResourceType()
     local _, _, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
-    local isDevourer = (
-        resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
-        or resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
-    )
-
-    if isDevourer then
-        self:HideAllTicks("tickPool")
-    elseif safeMax and safeMax > 1 then
+    if safeMax and safeMax > 1 then
         local frame = self.InnerFrame
         local tickCount = safeMax - 1
         self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
@@ -86,7 +78,7 @@ end
 
 function ResourceBar:OnEnable()
     ECM.BarMixin.AddMixin(self, "ResourceBar")
-    ECM.RegisterFrame(self)
+    ECM.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
     self:RegisterEvent("UNIT_POWER_UPDATE", "OnEventUpdate")

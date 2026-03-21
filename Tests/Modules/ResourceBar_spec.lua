@@ -109,23 +109,25 @@ describe("ResourceBar real source", function()
         assert.is_nil(hidePoolKey)
     end)
 
-    it("Refresh hides ticks for devourer resources", function()
-        local hidePoolKey
+    it("Refresh creates ticks for devourer resources based on safeMax", function()
+        local ensureCount
+        local layoutCount
         currentResourceType = ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
-        currentValues = { 30, 4, 30 }
+        currentValues = { 10, 2, 10 }
         ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks()
-            error("EnsureTicks should not be called for devourer resources")
+        function ResourceBar:EnsureTicks(count)
+            ensureCount = count
         end
-        function ResourceBar:LayoutResourceTicks()
-            error("LayoutResourceTicks should not be called for devourer resources")
+        function ResourceBar:LayoutResourceTicks(maxResources)
+            layoutCount = maxResources
         end
-        function ResourceBar:HideAllTicks(poolKey)
-            hidePoolKey = poolKey
+        function ResourceBar:HideAllTicks()
+            error("HideAllTicks should not be called when safeMax > 1")
         end
 
         assert.is_true(ResourceBar:Refresh("test"))
-        assert.are.equal("tickPool", hidePoolKey)
+        assert.are.equal(9, ensureCount)
+        assert.are.equal(10, layoutCount)
     end)
 
     it("Refresh hides ticks when safeMax is nil or too small", function()

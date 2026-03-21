@@ -139,7 +139,7 @@ L["ALTERNATE_COLORS"] = "Alternate Colors"
 L["ALTERNATE_COLOR_TOOLTIP"] = "Use an alternate color when this resource is at its maximum value."
 
 -- Resource type display names
-L["RESOURCE_SOUL_FRAGMENTS_DH"] = "Soul Fragments (Demon Hunter)"
+L["RESOURCE_SOUL_FRAGMENTS_DH"] = "Soul Fragments (Vengeance)"
 L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] = "Soul Fragments (Devourer)"
 L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] = "Void Fragments (Devourer)"
 L["RESOURCE_ICICLES"] = "Icicles (Frost Mage)"
@@ -182,7 +182,7 @@ L["CONFIGURE_SPELL_COLORS"] = "Configure Spell Colors"
 L["OPEN"] = "Open"
 
 L["SPELL_COLORS_SUBCAT"] = "Spell Colors"
-L["SPELL_COLORS_DESC"] = "Customize colors for individual spells. Colors are saved per class and specialization."
+L["SPELL_COLORS_DESC"] = "Customize colors for individual spells. Spells that are tracked in the cooldown manager as bars will automatically appear here."
 L["SPELL_COLORS_SECRET_NAMES_DESC"] = "One or more spell names have become secret. This can be cleared by reloading the UI outside of restricted area, typically dungeons, raids, delves, and PVP."
 L["SPELL_COLORS_RELOAD_BUTTON"] = "Reload UI"
 L["SPELL_COLORS_RESET_CONFIRM"] = "Are you sure you want to reset all spell colors for this spec?"

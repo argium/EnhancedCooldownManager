@@ -115,9 +115,7 @@ describe("ClassUtil", function()
             )
         end)
 
-        it("returns devourerNormal for devourer demon hunters when void fragments are inactive", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, nil)
-            CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, false)
+        it("returns devourerNormal for devourer demon hunters when void meta aura is absent", function()
             assertResourceType(
                 "DEMONHUNTER",
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
@@ -125,9 +123,8 @@ describe("ClassUtil", function()
             )
         end)
 
-        it("returns devourerMeta for devourer demon hunters when void fragments are active", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 1 })
-            CSpellBookStub.SetSpellKnown(ECM.Constants.SPELLID_VOID_FRAGMENTS, true)
+        it("returns devourerMeta for devourer demon hunters when void meta aura is present", function()
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_META, { applications = 1 })
             assertResourceType(
                 "DEMONHUNTER",
                 ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
@@ -223,18 +220,18 @@ describe("ClassUtil", function()
         end)
 
         it("returns devourer meta values when collapsing star aura is active", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 11 })
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_COLLAPSING_STAR, { applications = 7 })
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META, ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, 7)
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 11 })
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_COLLAPSING_STAR, { applications = 15 })
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META, ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, 3)
         end)
 
-        it("returns devourer normal values from void fragments when meta aura is inactive", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_FRAGMENTS, { applications = 12 })
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 12)
+        it("returns devourer normal values from void fragments divided by 5", function()
+            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 10 })
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 2)
         end)
 
         it("returns devourer normal zero stacks when no aura is present", function()
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, 0)
+            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 0)
         end)
 
         it("returns base maelstrom max when raging maelstrom talent is unknown", function()
@@ -289,7 +286,7 @@ describe("ClassUtil", function()
 
         it("returns devourer normal max as safeMax", function()
             local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_NORMAL_MAX, safeMax)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, safeMax)
         end)
 
         it("returns devourer meta max as safeMax", function()
@@ -299,7 +296,7 @@ describe("ClassUtil", function()
                 end
             end }
             local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_META_MAX, safeMax)
+            assert.are.equal(ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, safeMax)
         end)
 
         it("returns base maelstrom max when talent is unknown", function()

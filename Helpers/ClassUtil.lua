@@ -21,8 +21,8 @@ local discreteResourceTypes = {
 function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
-            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
-            if voidFragments then
+            local voidMeta = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_META)
+            if voidMeta then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
                 return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL
@@ -78,12 +78,12 @@ local function getMaelstromWeaponMax()
     return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
--- Gets the max value towards demon hunter void meta form based ond talents
-local function getDemonHunterVoidMetaMax()
+-- Gets the max devourer soul fragments needed for void meta form based on talents
+local function getDevourerSoulFragmentsMax()
     if C_SpellBook.IsSpellKnown(C.SPELLID_SOUL_GLUTTEN) then
-        return C.RESOURCEBAR_DEVOURER_META_MAX - 15
+        return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX - 15
     end
-    return C.RESOURCEBAR_DEVOURER_META_MAX
+    return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX
 end
 
 --- Returns max, current, and a safe discrete count for the given resource type.
@@ -109,17 +109,19 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0, C.RESOURCEBAR_ICICLES_MAX
     end
 
-    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL or resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
-        -- Devourer is tracked by two spells - one for void meta, and one not.
-        local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
+    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
         local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
-        if collapsingStar then
-            return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0, C.RESOURCEBAR_DEVOURER_META_MAX
-        end
-
-        local max = getDemonHunterVoidMetaMax() / 5
+        local max = C.RESOURCEBAR_COLLAPSING_STAR_MAX / 5
         return max,
-            voidFragments and voidFragments.applications / 5 or 0,
+            collapsingStar and collapsingStar.applications / 5 or 0,
+            max
+    end
+
+    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL then
+        local soulFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
+        local max = getDevourerSoulFragmentsMax() / 5
+        return max,
+            soulFragments and soulFragments.applications / 5 or 0,
             max
     end
 

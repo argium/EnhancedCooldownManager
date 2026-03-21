@@ -217,7 +217,7 @@ local defaults = {
             colors = {
                 [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.494, g = 0.549, b = 1.000, a = 1 },
                 [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
                 [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
                 [Enum.PowerType.Chi] = { r = 0.00, g = 1.00, b = 0.59, a = 1 },
@@ -227,11 +227,18 @@ local defaults = {
                 [C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
                 [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
             },
+            -- Remember to enable the resource type in Constants too.
             maxColorsEnabled = {
                 [C.RESOURCEBAR_TYPE_ICICLES] = true,
+                [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = true,
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = true,
             },
             maxColors = {
                 [C.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
+                [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 1, g = 1, b = 1, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 1, g = 1, b = 1, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 1, g = 1, b = 1, a = 1 },
             },
         },
         runeBar = {

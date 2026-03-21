@@ -60,8 +60,8 @@ local constants = {
     RESOURCEBAR_SPIRIT_BOMB_SPELLID = 247454,
 
     -- Resource bar limits
-    RESOURCEBAR_DEVOURER_NORMAL_MAX = 30,
-    RESOURCEBAR_DEVOURER_META_MAX = 50,
+    RESOURCEBAR_COLLAPSING_STAR_MAX = 30,
+    RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX = 50,
     RESOURCEBAR_ICICLES_MAX = 5,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE = 5,
     RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED = 10,
@@ -70,8 +70,9 @@ local constants = {
     -- Resource bar related spell IDs
     SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     SPELLID_MAELSTROM_WEAPON = 344179,
-    SPELLID_VOID_FRAGMENTS = 1225789, -- tracks progress towards void meta form (50 fragments)
+    SPELLID_DEVOURER_SOUL_FRAGMENTS = 1225789, -- tracks progress towards void meta form (50 soul fragments)
     SPELLID_SOUL_GLUTTEN = 1247534, -- reduces the number of souls needed for void meta by 15
+    SPELLID_VOID_META = 1217607, -- void meta
 
     -- Buff bars
     BUFFBARS_DEFAULT_COLOR = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
@@ -189,7 +190,9 @@ local CLASS_COLORS = {
 -- Resource types that support a separate color when at maximum value.
 -- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
 local resourceBarMaxColorTypes = {
-    ["icicles"] = true,
+    [constants.RESOURCEBAR_TYPE_ICICLES] = true,
+    [constants.RESOURCEBAR_TYPE_DEVOURER_META] = true,
+    [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
 }
 
 local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
