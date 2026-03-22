@@ -110,7 +110,14 @@ jobs:
                     echo "Using annotated tag message for release notes."
                   fi
 
-                  echo "PACKAGER_ARGS=-m .github/release.pkgmeta -p 1427906 -w 27051" >> "$GITHUB_ENV"
+                  RELEASE_TYPE="release"
+                  case "$TAG_NAME" in
+                    *-alpha*) RELEASE_TYPE="alpha" ;;
+                    *-beta*)  RELEASE_TYPE="beta"  ;;
+                  esac
+                  echo "Release type: $RELEASE_TYPE"
+
+                  echo "PACKAGER_ARGS=-m .github/release.pkgmeta -r $RELEASE_TYPE -p 1427906 -w 27051" >> "$GITHUB_ENV"
 
                   if [ -z "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
                     echo "No annotated tag message found; using generated changelog."
