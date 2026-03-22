@@ -62,6 +62,8 @@ describe("Migration", function()
             "ECM",
             "date",
             "strtrim",
+            "UIParent",
+            "LibStub",
             "wipe",
         })
     end)
@@ -73,6 +75,11 @@ describe("Migration", function()
     before_each(function()
         logMessages = {}
         _G.ECM = {}
+        _G.ECM.EditMode = {
+            GetActiveLayoutName = function()
+                return "Modern"
+            end,
+        }
         _G.ECM.Log = function(_, message)
             logMessages[#logMessages + 1] = message
         end
@@ -87,9 +94,18 @@ describe("Migration", function()
                 tbl[k] = nil
             end
         end
+        _G.UIParent = {
+            GetWidth = function()
+                return 1920
+            end,
+            GetHeight = function()
+                return 1080
+            end,
+        }
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")()
 
         Migration = assert(ECM.Migration, "Migration module did not initialize")
@@ -645,7 +661,7 @@ describe("Migration", function()
         -- powerBar: both offsets migrated, cleared
         assert.is_nil(profile.powerBar.offsetX)
         assert.is_nil(profile.powerBar.offsetY)
-        local pb = profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
+        local pb = profile.powerBar.editModePositions.Modern
         assert.is_not_nil(pb)
         assert.are.equal("CENTER", pb.point) -- no anchorPoint field → defaults to CENTER
         assert.are.equal(5, pb.x)
@@ -654,24 +670,24 @@ describe("Migration", function()
         -- resourceBar: only offsetY was set
         assert.is_nil(profile.resourceBar.offsetX)
         assert.is_nil(profile.resourceBar.offsetY)
-        local rb = profile.resourceBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
+        local rb = profile.resourceBar.editModePositions.Modern
         assert.is_not_nil(rb)
         assert.are.equal("CENTER", rb.point)
         assert.are.equal(0, rb.x) -- offsetX was nil → 0
         assert.are.equal(-300, rb.y)
 
         -- runeBar
-        local rune = profile.runeBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
+        local rune = profile.runeBar.editModePositions.Modern
         assert.is_not_nil(rune)
         assert.are.equal(0, rune.x)
         assert.are.equal(-325, rune.y)
 
         -- buffBars: had anchorPoint, so that is used in the migrated position
-        local bb = profile.buffBars.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY]
+        local bb = profile.buffBars.editModePositions.Modern
         assert.is_not_nil(bb)
         assert.are.equal("TOP", bb.point) -- came from cfg.anchorPoint
         assert.are.equal(10, bb.x)
-        assert.are.equal(-350, bb.y)
+        assert.are.equal(-1430, bb.y)
         -- anchorPoint/relativePoint cleared
         assert.is_nil(profile.buffBars.anchorPoint)
         assert.is_nil(profile.buffBars.relativePoint)
@@ -710,6 +726,84 @@ describe("Migration", function()
         assert.is_nil(profile.buffBars.relativePoint)
     end)
 
+    it("V11 seeds legacy free-mode defaults when offsets were never persisted", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            resourceBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            runeBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            buffBars = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+        }
+
+        Migration.Run(profile)
+
+        assert.same(
+            { point = "CENTER", x = 0, y = -275 },
+            profile.powerBar.editModePositions.Modern
+        )
+        assert.same(
+            { point = "CENTER", x = 0, y = -300 },
+            profile.resourceBar.editModePositions.Modern
+        )
+        assert.same(
+            { point = "CENTER", x = 0, y = -325 },
+            profile.runeBar.editModePositions.Modern
+        )
+        assert.same(
+            { point = "CENTER", x = 0, y = -350 },
+            profile.buffBars.editModePositions.Modern
+        )
+    end)
+
+    it("V11 normalizes differing anchorPoint and relativePoint into exact edit-mode coordinates", function()
+        local profile = {
+            schemaVersion = 10,
+            buffBars = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOPLEFT",
+                relativePoint = "BOTTOMLEFT",
+                offsetX = 10,
+                offsetY = -350,
+            },
+            powerBar = {},
+            resourceBar = {},
+            runeBar = {},
+        }
+
+        Migration.Run(profile)
+
+        local migrated = profile.buffBars.editModePositions.Modern
+        assert.are.equal("TOPLEFT", migrated.point)
+        assert.are.equal(10, migrated.x)
+        assert.are.equal(-1430, migrated.y)
+    end)
+
+    it("V11 logs migration source and normalization details", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            resourceBar = {},
+            runeBar = {},
+            buffBars = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOPLEFT",
+                relativePoint = "BOTTOMLEFT",
+                offsetX = 10,
+                offsetY = -350,
+            },
+        }
+
+        Migration.Run(profile)
+
+        local powerLog = assert(searchLogMessages("powerBar: migrated to editModePositions.Modern"))
+        assert.is_not_nil(string.find(powerLog, "source=legacy-free-default", 1, true))
+        assert.is_not_nil(string.find(powerLog, "normalized=false", 1, true))
+
+        local buffLog = assert(searchLogMessages("buffBars: migrated to editModePositions.Modern"))
+        assert.is_not_nil(string.find(buffLog, "source=saved-offsets", 1, true))
+        assert.is_not_nil(string.find(buffLog, "normalized=true", 1, true))
+    end)
+
     it("V11 preserves existing editModePositions when present", function()
         local profile = {
             schemaVersion = 10,
@@ -724,11 +818,65 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        -- Migrated entry added alongside existing one
-        assert.is_not_nil(profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY])
-        assert.are.equal(-275, profile.powerBar.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY].y)
-        -- Existing entry preserved
+        -- Existing active-layout entry is preserved
         assert.are.equal(50, profile.powerBar.editModePositions.Modern.x)
+    end)
+
+    it("V11 uses the shared active layout accessor", function()
+        ECM.EditMode.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            resourceBar = {},
+            runeBar = {},
+            buffBars = {},
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        assert.same({ point = "CENTER", x = 0, y = -275 }, profile.powerBar.editModePositions.Modern)
+    end)
+
+    it("V11 leaves the schema unchanged when the active layout name cannot be resolved", function()
+        ECM.EditMode.GetActiveLayoutName = function()
+            return nil
+        end
+        _G.LibStub = function(name, silent)
+            if name ~= "LibEQOLEditMode-1.0" then
+                if not silent then
+                    error("Library not found: " .. tostring(name))
+                end
+                return nil
+            end
+
+            return {
+                GetActiveLayoutName = function()
+                    return nil
+                end,
+                GetActiveLayoutIndex = function()
+                    return nil
+                end,
+            }
+        end
+
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { offsetY = -275 },
+            resourceBar = {},
+            runeBar = {},
+            buffBars = {},
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(10, profile.schemaVersion)
+        assert.is_nil(profile.powerBar.editModePositions)
+        assert.are.equal(-275, profile.powerBar.offsetY)
+        assert.is_not_nil(searchLogMessages("V11 active layout unavailable; deferring migration"))
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

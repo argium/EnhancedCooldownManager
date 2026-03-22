@@ -410,9 +410,59 @@ describe("ECM layout system", function()
 
             ECM.Runtime.ScheduleLayoutUpdate = origSchedule
         end)
+
+        it("OnInitialize runs migration for older schema profiles", function()
+            local migrationProfiles = {}
+            local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
+            local profile = TestHelpers.deepClone(ECM.defaults.profile)
+            profile.schemaVersion = 10
+            aceDB.New = function()
+                return { profile = profile, RegisterCallback = function() end }
+            end
+
+            local origRun = ECM.Migration.Run
+            ECM.Migration.Run = function(activeProfile)
+                migrationProfiles[#migrationProfiles + 1] = activeProfile
+            end
+
+            fakeAddon:OnInitialize()
+
+            assert.same({ profile }, migrationProfiles)
+
+            ECM.Migration.Run = origRun
+        end)
+
+        it("OnEnable retries migration when initialization left the profile on an older schema", function()
+            local migrationProfiles = {}
+            local origRun = ECM.Migration.Run
+            ECM.Migration.Run = function(profile)
+                migrationProfiles[#migrationProfiles + 1] = profile
+            end
+
+            _G._testDB.profile.schemaVersion = 10
+            fakeAddon:OnEnable()
+
+            assert.same({ _G._testDB.profile }, migrationProfiles)
+
+            ECM.Migration.Run = origRun
+        end)
     end)
 
     describe("initialization wiring", function()
+        it("defines the reload popup constant used by ConfirmReloadUI", function()
+            local shownName
+            _G.StaticPopup_Show = function(name)
+                shownName = name
+            end
+
+            fakeAddon:ConfirmReloadUI("Reload now?")
+
+            assert.are.equal("ECM_CONFIRM_RELOAD_UI", ECM.Constants.POPUP_CONFIRM_RELOAD_UI)
+            assert.are.equal(ECM.Constants.POPUP_CONFIRM_RELOAD_UI, shownName)
+            assert.is_table(StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI])
+            assert.are.equal("Reload now?", StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI].text)
+        end)
+
         it("sets LibEvent as the default module library on addon creation", function()
             assert.same({ "LibEvent-1.0" }, defaultModuleLibraries)
         end)

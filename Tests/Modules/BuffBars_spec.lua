@@ -146,7 +146,24 @@ describe("BuffBars real source", function()
             Log = function() end,
             IsDebugEnabled = function() return false end,
             Constants = nil,
+            EditMode = {
+                Lib = {
+                    IsInEditMode = function()
+                        return false
+                    end,
+                },
+                GetActiveLayoutName = function()
+                    return "Modern"
+                end,
+                SavePosition = function(container, fieldName, layoutName, point, x, y)
+                    container[fieldName] = container[fieldName] or {}
+                    container[fieldName][layoutName] = { point = point, x = x, y = y }
+                end,
+            },
             FrameUtil = {
+                NormalizePosition = function(point, _, x, y)
+                    return point, x, y
+                end,
                 GetIconTextureFileID = function(frame)
                     return frame.iconTextureFileID
                 end,
@@ -426,7 +443,7 @@ describe("BuffBars real source", function()
             return {
                 anchorMode = ECM.Constants.ANCHORMODE_FREE,
                 editModePositions = {
-                    [ECM.Constants.EDIT_MODE_MIGRATED_KEY] = { point = "CENTER", x = 12, y = -34 },
+                    Modern = { point = "CENTER", x = 12, y = -34 },
                 },
             }
         end
@@ -496,6 +513,88 @@ describe("BuffBars real source", function()
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
 
         assert.same({ "viewer:OnShow", "viewer:OnSizeChanged" }, reasons)
+    end)
+
+    it("viewer SetPoint hook persists free-mode positions during Edit Mode", function()
+        local cfg = {
+            anchorMode = ECM.Constants.ANCHORMODE_FREE,
+            editModePositions = {},
+        }
+
+        function BuffBars:GetModuleConfig()
+            return cfg
+        end
+
+        ECM.EditMode.Lib.IsInEditMode = function()
+            return true
+        end
+
+        BuffBars:HookViewer()
+
+        BuffBarCooldownViewer:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 10, -350)
+
+        local saved = cfg.editModePositions.Modern
+        assert.is_not_nil(saved)
+        assert.are.equal("TOPLEFT", saved.point)
+        assert.are.equal(10, saved.x)
+        assert.are.equal(-350, saved.y)
+    end)
+
+    it("viewer SetPoint hook saves the normalized position returned by EditMode", function()
+        local cfg = {
+            anchorMode = ECM.Constants.ANCHORMODE_FREE,
+            editModePositions = {},
+        }
+
+        local normalizeCalls = {}
+
+        function BuffBars:GetModuleConfig()
+            return cfg
+        end
+
+        ECM.EditMode.Lib.IsInEditMode = function()
+            return true
+        end
+        ECM.FrameUtil.NormalizePosition = function(point, relativePoint, x, y)
+            normalizeCalls[#normalizeCalls + 1] = { point, relativePoint, x, y }
+            return "TOPLEFT", 10, -1430
+        end
+
+        BuffBars:HookViewer()
+
+        BuffBarCooldownViewer:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 10, -350)
+
+        assert.same({ { "TOPLEFT", "BOTTOMLEFT", 10, -350 } }, normalizeCalls)
+        local saved = cfg.editModePositions.Modern
+        assert.is_not_nil(saved)
+        assert.are.equal("TOPLEFT", saved.point)
+        assert.are.equal(10, saved.x)
+        assert.are.equal(-1430, saved.y)
+    end)
+
+    it("viewer SetPoint hook ignores non-free modes and internal layout writes", function()
+        local cfg = {
+            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            editModePositions = {},
+        }
+
+        function BuffBars:GetModuleConfig()
+            return cfg
+        end
+
+        ECM.EditMode.Lib.IsInEditMode = function()
+            return true
+        end
+
+        BuffBars:HookViewer()
+        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 12, -34)
+        assert.is_nil(cfg.editModePositions.Modern)
+
+        cfg.anchorMode = ECM.Constants.ANCHORMODE_FREE
+        BuffBars._layoutRunning = true
+        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 50, 60)
+        BuffBars._layoutRunning = nil
+        assert.is_nil(cfg.editModePositions.Modern)
     end)
 
     it("child SetPoint hooks restore cached anchors and respect the layout-running guard", function()

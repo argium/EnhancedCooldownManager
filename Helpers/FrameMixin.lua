@@ -19,29 +19,27 @@ for k, v in pairs(ECM.ModuleMixin.Proto) do
 end
 
 --- Gets the active Edit Mode layout name.
---- If LibEQOL has not populated the name yet, this forces the layout index
---- lookup first so position reads use the correct layout.
+--- Hydrates LibEQOL's active layout cache, then falls back to its layout-name
+--- map if the active name has not been copied onto the library state yet.
 function EditMode.GetActiveLayoutName()
     local layoutName = LibEQOLEditMode:GetActiveLayoutName()
     if layoutName == nil and type(LibEQOLEditMode.GetActiveLayoutIndex) == "function" then
-        -- LibEQOL sometimes has the active layout selected internally before it
-        -- has populated the matching layout name. Touching the index forces the
-        -- library to finish that lookup, which prevents position reads from
-        -- falling back to defaults during early layout passes or transitions.
-        LibEQOLEditMode:GetActiveLayoutIndex()
+        local activeLayoutIndex = LibEQOLEditMode:GetActiveLayoutIndex()
         layoutName = LibEQOLEditMode:GetActiveLayoutName()
+        if layoutName == nil then
+            local layoutNames = LibEQOLEditMode.layoutNames
+            layoutName = type(layoutNames) == "table" and layoutNames[activeLayoutIndex] or nil
+        end
     end
     return layoutName
 end
 
---- Gets a saved Edit Mode position for the active layout, with an optional
---- fallback key when that layout has no saved position yet.
+--- Gets a saved Edit Mode position for the active layout.
 ---@param positions table<string, ECM_EditModePosition>|nil
----@param fallbackKey string|nil
 ---@param layoutName string|nil
 ---@return ECM_EditModePosition
 ---@return string|nil
-function EditMode.GetPosition(positions, fallbackKey, layoutName)
+function EditMode.GetPosition(positions, layoutName)
     local activeLayoutName = layoutName
     if activeLayoutName == nil then
         activeLayoutName = EditMode.GetActiveLayoutName()
@@ -51,10 +49,6 @@ function EditMode.GetPosition(positions, fallbackKey, layoutName)
         local position = activeLayoutName and positions[activeLayoutName]
         if position then
             return position, activeLayoutName
-        end
-
-        if fallbackKey and positions[fallbackKey] then
-            return positions[fallbackKey], activeLayoutName
         end
     end
 
@@ -244,7 +238,7 @@ function FrameMixinProto:EnsureFrame()
     if not self.InnerFrame then
         self.InnerFrame = self:CreateFrame()
     end
-    if self:ShouldRegisterEditMode() then
+    if self:ShouldRegisterEditMode() and self._editModeRegisteredFrame ~= self.InnerFrame then
         self:_RegisterEditMode()
     end
 end
@@ -515,11 +509,11 @@ function FrameMixinProto:ThrottledUpdateLayout(reason, opts)
 end
 
 --- Gets the saved Edit Mode position for the current layout.
---- Falls back to the migrated position, then CENTER (0, 0).
+--- Returns CENTER (0, 0) when the active layout has no saved position.
 ---@return ECM_EditModePosition
 function FrameMixinProto:GetEditModePosition()
     local cfg = self:GetModuleConfig()
-    return EditMode.GetPosition(cfg and cfg.editModePositions, C.EDIT_MODE_MIGRATED_KEY)
+    return EditMode.GetPosition(cfg and cfg.editModePositions)
 end
 
 --- Saves an Edit Mode position for the given layout.
@@ -537,6 +531,10 @@ end
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
 function FrameMixinProto:_RegisterEditMode()
     local frame = self.InnerFrame
+    if not frame or self._editModeRegisteredFrame == frame then
+        return
+    end
+
     local module = self
     EditMode.RegisterFrame(frame, {
         name = "ECM: " .. self.Name,
@@ -579,6 +577,8 @@ function FrameMixinProto:_RegisterEditMode()
             },
         },
     })
+
+    self._editModeRegisteredFrame = frame
 end
 
 FrameMixin.Proto = FrameMixinProto

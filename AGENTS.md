@@ -60,6 +60,19 @@ These rules prevent recurring anti-patterns discovered during code review. Viola
 - Each piece of shared state or derived value must have exactly one canonical accessor or derivation point. All other call sites must delegate to it.
 - Do not create parallel accessor functions that reach the same underlying data through different paths. If a non-module caller needs access, expose a shared standalone function and alias it locally — don't reimplement the lookup.
 
+## No Duplicate Utility Functions
+
+- Pure-logic helpers (anchor geometry, color math, table operations) MUST live in one `Helpers/*.lua` file and be accessed via `ECM.<Module>.<fn>`. File-local copies are prohibited.
+- Before writing a new local helper, search `Helpers/` for an existing export that does the same thing. If one exists, use it. If it's close but not quite right, extend the shared version — don't fork a copy.
+- Do not create trivial passthrough wrappers that just forward arguments to another function. Callers should invoke the canonical function directly.
+- When a file references a shared module (e.g. `ECM.FrameUtil`) more than once, alias it as a file-level local at the top. Do not repeat the full path at every call site, and do not create a second alias mid-file.
+- `Helpers/FrameUtil.lua` owns: anchor splitting/building, parent size/position queries, position normalization, offset conversion, and lazy frame property setters.
+
+## Test Integrity
+
+- Test `before_each` / `LoadChunk` calls MUST mirror TOC load order. If file A depends on `ECM.B`, load file B first.
+- Test stubs must replace the canonical function, not a wrapper or alias. When a passthrough is removed, its test stubs must move to the canonical location.
+
 ## Derive Once, Read Everywhere
 
 - Transforms or derived keys (e.g. name casing conventions) MUST be computed in exactly one place and stored for later use. Other code reads the stored result — never re-derives it.

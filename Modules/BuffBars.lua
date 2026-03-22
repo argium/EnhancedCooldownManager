@@ -6,6 +6,7 @@ local _, ns = ...
 local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
 local ChainRightPoint = FrameMixin.ChainRightPoint
+local EditMode = ECM.EditMode
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
 
@@ -47,6 +48,21 @@ local function getChildrenOrdered(viewer)
     end)
 
     return result
+end
+
+local function saveViewerEditModePosition(module, point, relativePoint, x, y)
+    local cfg = module:GetModuleConfig()
+    if not cfg or cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
+        return
+    end
+
+    local layoutName = EditMode.GetActiveLayoutName()
+    if not layoutName then
+        return
+    end
+
+    local normalizedPoint, normalizedX, normalizedY = ECM.FrameUtil.NormalizePosition(point, relativePoint, x, y, UIParent)
+    EditMode.SavePosition(cfg, "editModePositions", layoutName, normalizedPoint, normalizedX, normalizedY)
 end
 
 --- Strips circular masks and hides overlay/border to produce a square icon.
@@ -579,6 +595,20 @@ function BuffBars:HookViewer()
             return
         end
         self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
+    end)
+
+    hooksecurefunc(viewer, "SetPoint", function(_, point, relativeTo, relativePoint, x, y)
+        if self._layoutRunning then
+            return
+        end
+        if not EditMode.Lib:IsInEditMode() then
+            return
+        end
+        if relativeTo ~= nil and relativeTo ~= UIParent then
+            return
+        end
+
+        saveViewerEditModePosition(self, point, relativePoint, x, y)
     end)
 
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")

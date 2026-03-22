@@ -69,6 +69,172 @@ function FrameUtil.GetBarBackground(statusBar)
 end
 
 --------------------------------------------------------------------------------
+-- Anchor Geometry — shared anchor math used by FrameMixin, Migration, Runtime
+--------------------------------------------------------------------------------
+
+local C = ECM.Constants
+
+--- Splits an anchor name like TOPLEFT into its vertical and horizontal parts.
+---@param point string|nil
+---@return string|nil, string|nil
+function FrameUtil.SplitAnchorName(point)
+    if point == nil or point == C.EDIT_MODE_DEFAULT_POINT then
+        return nil, nil
+    end
+
+    local vertical = point:find("TOP", 1, true) and "TOP" or (point:find("BOTTOM", 1, true) and "BOTTOM" or nil)
+    local horizontal = point:find("LEFT", 1, true) and "LEFT" or (point:find("RIGHT", 1, true) and "RIGHT" or nil)
+    return vertical, horizontal
+end
+
+--- Builds an anchor name from separate vertical and horizontal parts.
+--- Example: TOP + LEFT becomes TOPLEFT.
+---@param vertical string|nil
+---@param horizontal string|nil
+---@return string
+function FrameUtil.BuildAnchorName(vertical, horizontal)
+    if vertical == nil and horizontal == nil then
+        return C.EDIT_MODE_DEFAULT_POINT
+    end
+    if vertical == nil then
+        return horizontal
+    end
+    if horizontal == nil then
+        return vertical
+    end
+    return vertical .. horizontal
+end
+
+--- Gets the absolute position of one of the parent frame's anchor points.
+--- Example: TOP on UIParent is the middle of the top edge of the screen.
+---@param point string|nil
+---@param parentWidth number|nil
+---@param parentHeight number|nil
+---@return number, number
+function FrameUtil.GetParentAnchorPosition(point, parentWidth, parentHeight)
+    local vertical, horizontal = FrameUtil.SplitAnchorName(point)
+    local x = (parentWidth or 0) * 0.5
+    local y = (parentHeight or 0) * 0.5
+
+    if horizontal == "LEFT" then
+        x = 0
+    elseif horizontal == "RIGHT" then
+        x = parentWidth or 0
+    end
+
+    if vertical == "BOTTOM" then
+        y = 0
+    elseif vertical == "TOP" then
+        y = parentHeight or 0
+    end
+
+    return x, y
+end
+
+--- Gets a frame's width and height, preferring GetSize when available.
+---@param parent Frame|nil
+---@return number, number
+function FrameUtil.GetParentSize(parent)
+    if parent and parent.GetSize then
+        local width, height = parent:GetSize()
+        if width and height then
+            return width, height
+        end
+    end
+
+    local width = (parent and parent.GetWidth and parent:GetWidth()) or 0
+    local height = (parent and parent.GetHeight and parent:GetHeight()) or 0
+    return width, height
+end
+
+--- Gets the offset from the frame's centre to one of its anchor points.
+--- For example, on a 100px tall frame, TOP is +50 and BOTTOM is -50 on the y axis.
+---@param point string|nil
+---@param width number|nil
+---@param height number|nil
+---@return number, number
+function FrameUtil.GetOffsetFromFrameCenter(point, width, height)
+    local vertical, horizontal = FrameUtil.SplitAnchorName(point)
+    local halfWidth = (width or 0) * 0.5
+    local halfHeight = (height or 0) * 0.5
+
+    local x = 0
+    if horizontal == "LEFT" then
+        x = -halfWidth
+    elseif horizontal == "RIGHT" then
+        x = halfWidth
+    end
+
+    local y = 0
+    if vertical == "BOTTOM" then
+        y = -halfHeight
+    elseif vertical == "TOP" then
+        y = halfHeight
+    end
+
+    return x, y
+end
+
+--- Converts offsets from one anchor reference to another without changing the
+--- frame's visual position on its parent (anchor-only, no frame dimensions).
+---@param point string|nil
+---@param relativePoint string|nil
+---@param x number|nil
+---@param y number|nil
+---@param parent Frame|nil
+---@return string point
+---@return number x
+---@return number y
+function FrameUtil.NormalizePosition(point, relativePoint, x, y, parent)
+    local normalizedPoint = point or C.EDIT_MODE_DEFAULT_POINT
+    local normalizedRelativePoint = relativePoint or normalizedPoint
+    local normalizedX = x or 0
+    local normalizedY = y or 0
+
+    if normalizedPoint == normalizedRelativePoint then
+        return normalizedPoint, normalizedX, normalizedY
+    end
+
+    local parentWidth, parentHeight = FrameUtil.GetParentSize(parent or UIParent)
+    local sourceAnchorX, sourceAnchorY =
+        FrameUtil.GetParentAnchorPosition(normalizedRelativePoint, parentWidth, parentHeight)
+    local targetAnchorX, targetAnchorY =
+        FrameUtil.GetParentAnchorPosition(normalizedPoint, parentWidth, parentHeight)
+
+    return normalizedPoint,
+        normalizedX + sourceAnchorX - targetAnchorX,
+        normalizedY + sourceAnchorY - targetAnchorY
+end
+
+--- Converts offsets from one anchor reference to another while keeping the
+--- frame in the same visual position on its parent. Unlike NormalizePosition,
+--- this accounts for frame dimensions via GetOffsetFromFrameCenter.
+---@param point string
+---@param targetPoint string
+---@param x number
+---@param y number
+---@param width number|nil
+---@param height number|nil
+---@param parent Frame|nil
+---@return number x
+---@return number y
+function FrameUtil.ConvertOffsetToAnchor(point, targetPoint, x, y, width, height, parent)
+    if point == targetPoint then
+        return x, y
+    end
+
+    local parentWidth, parentHeight = FrameUtil.GetParentSize(parent or UIParent)
+    local sourceAnchorX, sourceAnchorY = FrameUtil.GetParentAnchorPosition(point, parentWidth, parentHeight)
+    local sourcePointX, sourcePointY = FrameUtil.GetOffsetFromFrameCenter(point, width, height)
+    local centerX = sourceAnchorX + (x or 0) - sourcePointX
+    local centerY = sourceAnchorY + (y or 0) - sourcePointY
+    local targetAnchorX, targetAnchorY = FrameUtil.GetParentAnchorPosition(targetPoint, parentWidth, parentHeight)
+    local targetPointX, targetPointY = FrameUtil.GetOffsetFromFrameCenter(targetPoint, width, height)
+
+    return centerX + targetPointX - targetAnchorX, centerY + targetPointY - targetAnchorY
+end
+
+--------------------------------------------------------------------------------
 -- Lazy Setters — change-detection-aware frame property setters
 --------------------------------------------------------------------------------
 

@@ -504,12 +504,12 @@ describe("FrameMixin real source", function()
         assert.is_nil(mod._pendingWhy)
     end)
 
-    it("GetEditModePosition falls back to the migrated layout entry", function()
+    it("GetEditModePosition returns default coordinates when the active layout has no saved position", function()
         local mod = {
             GetModuleConfig = function()
                 return {
                     editModePositions = {
-                        [ECM.Constants.EDIT_MODE_MIGRATED_KEY] = { point = "TOP", x = 12, y = -34 },
+                        Legacy = { point = "TOP", x = 12, y = -34 },
                     },
                 }
             end,
@@ -517,9 +517,9 @@ describe("FrameMixin real source", function()
 
         local position = FrameMixin.GetEditModePosition(mod)
 
-        assert.are.equal("TOP", position.point)
-        assert.are.equal(12, position.x)
-        assert.are.equal(-34, position.y)
+        assert.are.equal("CENTER", position.point)
+        assert.are.equal(0, position.x)
+        assert.are.equal(0, position.y)
     end)
 
     it("GetEditModePosition hydrates the active layout name before reading per-layout positions", function()
@@ -551,6 +551,23 @@ describe("FrameMixin real source", function()
         assert.is_true(hydrated)
     end)
 
+    it("GetActiveLayoutName falls back to LibEQOL's layoutNames cache when the hydrated name is still nil", function()
+        local lib = LibStub("LibEQOLEditMode-1.0")
+        local indexCalls = 0
+
+        lib.layoutNames = { "Modern", "Classic" }
+        lib.GetActiveLayoutName = function()
+            return nil
+        end
+        lib.GetActiveLayoutIndex = function()
+            indexCalls = indexCalls + 1
+            return 1
+        end
+
+        assert.are.equal("Modern", ECM.EditMode.GetActiveLayoutName())
+        assert.are.equal(1, indexCalls)
+    end)
+
     it("AddMixin skips Edit Mode registration when the module opts out", function()
         local registerCalls = 0
         local mod = {
@@ -577,6 +594,35 @@ describe("FrameMixin real source", function()
 
         assert.are.equal(0, registerCalls)
         assert.are.equal("ExternalFrame", mod.InnerFrame:GetName())
+    end)
+
+    it("EnsureFrame registers Edit Mode only once per frame", function()
+        local registerCalls = 0
+        local mod = {
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return true
+            end,
+            _RegisterEditMode = function(self)
+                registerCalls = registerCalls + 1
+                self._editModeRegisteredFrame = self.InnerFrame
+            end,
+            GetGlobalConfig = function()
+                return {}
+            end,
+            GetModuleConfig = function()
+                return {}
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        mod:EnsureFrame()
+        mod:EnsureFrame()
+
+        assert.are.equal(1, registerCalls)
     end)
 
     it("resolves mixin methods via metatable __index", function()

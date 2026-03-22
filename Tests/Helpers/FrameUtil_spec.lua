@@ -633,4 +633,271 @@ describe("FrameUtil", function()
         end)
     end)
 
+    describe("anchor geometry", function()
+        -- Use a parent with known dimensions for position math tests.
+        local parent
+        before_each(function()
+            parent = makeFrame({ name = "TestParent", width = 1024, height = 768 })
+        end)
+
+        describe("SplitAnchorName", function()
+            it("returns nil, nil for CENTER", function()
+                local v, h = FrameUtil.SplitAnchorName("CENTER")
+                assert.is_nil(v)
+                assert.is_nil(h)
+            end)
+
+            it("returns nil, nil for nil", function()
+                local v, h = FrameUtil.SplitAnchorName(nil)
+                assert.is_nil(v)
+                assert.is_nil(h)
+            end)
+
+            it("splits TOPLEFT into TOP and LEFT", function()
+                local v, h = FrameUtil.SplitAnchorName("TOPLEFT")
+                assert.are.equal("TOP", v)
+                assert.are.equal("LEFT", h)
+            end)
+
+            it("splits BOTTOMRIGHT into BOTTOM and RIGHT", function()
+                local v, h = FrameUtil.SplitAnchorName("BOTTOMRIGHT")
+                assert.are.equal("BOTTOM", v)
+                assert.are.equal("RIGHT", h)
+            end)
+
+            it("splits TOP into TOP and nil", function()
+                local v, h = FrameUtil.SplitAnchorName("TOP")
+                assert.are.equal("TOP", v)
+                assert.is_nil(h)
+            end)
+
+            it("splits LEFT into nil and LEFT", function()
+                local v, h = FrameUtil.SplitAnchorName("LEFT")
+                assert.is_nil(v)
+                assert.are.equal("LEFT", h)
+            end)
+
+            it("splits BOTTOM into BOTTOM and nil", function()
+                local v, h = FrameUtil.SplitAnchorName("BOTTOM")
+                assert.are.equal("BOTTOM", v)
+                assert.is_nil(h)
+            end)
+
+            it("splits RIGHT into nil and RIGHT", function()
+                local v, h = FrameUtil.SplitAnchorName("RIGHT")
+                assert.is_nil(v)
+                assert.are.equal("RIGHT", h)
+            end)
+        end)
+
+        describe("BuildAnchorName", function()
+            it("returns CENTER for nil, nil", function()
+                assert.are.equal("CENTER", FrameUtil.BuildAnchorName(nil, nil))
+            end)
+
+            it("returns TOPLEFT for TOP, LEFT", function()
+                assert.are.equal("TOPLEFT", FrameUtil.BuildAnchorName("TOP", "LEFT"))
+            end)
+
+            it("returns BOTTOMRIGHT for BOTTOM, RIGHT", function()
+                assert.are.equal("BOTTOMRIGHT", FrameUtil.BuildAnchorName("BOTTOM", "RIGHT"))
+            end)
+
+            it("returns TOP for TOP, nil", function()
+                assert.are.equal("TOP", FrameUtil.BuildAnchorName("TOP", nil))
+            end)
+
+            it("returns LEFT for nil, LEFT", function()
+                assert.are.equal("LEFT", FrameUtil.BuildAnchorName(nil, "LEFT"))
+            end)
+        end)
+
+        describe("GetParentAnchorPosition", function()
+            it("returns center for CENTER", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("CENTER", 1000, 600)
+                assert.are.equal(500, x)
+                assert.are.equal(300, y)
+            end)
+
+            it("returns top-left corner for TOPLEFT", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("TOPLEFT", 1000, 600)
+                assert.are.equal(0, x)
+                assert.are.equal(600, y)
+            end)
+
+            it("returns bottom-right corner for BOTTOMRIGHT", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("BOTTOMRIGHT", 1000, 600)
+                assert.are.equal(1000, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("returns top center for TOP", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("TOP", 1000, 600)
+                assert.are.equal(500, x)
+                assert.are.equal(600, y)
+            end)
+
+            it("returns left center for LEFT", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("LEFT", 1000, 600)
+                assert.are.equal(0, x)
+                assert.are.equal(300, y)
+            end)
+
+            it("returns 0,0 for nil dimensions", function()
+                local x, y = FrameUtil.GetParentAnchorPosition("TOPLEFT", nil, nil)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("returns center for nil point", function()
+                local x, y = FrameUtil.GetParentAnchorPosition(nil, 1000, 600)
+                assert.are.equal(500, x)
+                assert.are.equal(300, y)
+            end)
+        end)
+
+        describe("GetParentSize", function()
+            it("uses GetSize when available", function()
+                local p = { GetSize = function() return 800, 600 end }
+                local w, h = FrameUtil.GetParentSize(p)
+                assert.are.equal(800, w)
+                assert.are.equal(600, h)
+            end)
+
+            it("falls back to GetWidth/GetHeight", function()
+                local p = {
+                    GetWidth = function() return 1024 end,
+                    GetHeight = function() return 768 end,
+                }
+                local w, h = FrameUtil.GetParentSize(p)
+                assert.are.equal(1024, w)
+                assert.are.equal(768, h)
+            end)
+
+            it("falls back to GetWidth/GetHeight when GetSize returns nil", function()
+                local p = {
+                    GetSize = function() return nil, nil end,
+                    GetWidth = function() return 640 end,
+                    GetHeight = function() return 480 end,
+                }
+                local w, h = FrameUtil.GetParentSize(p)
+                assert.are.equal(640, w)
+                assert.are.equal(480, h)
+            end)
+
+            it("returns 0, 0 for nil parent", function()
+                local w, h = FrameUtil.GetParentSize(nil)
+                assert.are.equal(0, w)
+                assert.are.equal(0, h)
+            end)
+        end)
+
+        describe("GetOffsetFromFrameCenter", function()
+            it("returns 0, 0 for CENTER", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("CENTER", 100, 60)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("returns negative half-width and positive half-height for TOPLEFT", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", 100, 60)
+                assert.are.equal(-50, x)
+                assert.are.equal(30, y)
+            end)
+
+            it("returns positive half-width and negative half-height for BOTTOMRIGHT", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("BOTTOMRIGHT", 100, 60)
+                assert.are.equal(50, x)
+                assert.are.equal(-30, y)
+            end)
+
+            it("returns 0, 0 for nil dimensions", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", nil, nil)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("returns 0, 0 for nil point", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter(nil, 100, 60)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+        end)
+
+        describe("NormalizePosition", function()
+            it("no-ops when point equals relativePoint", function()
+                local p, x, y = FrameUtil.NormalizePosition("TOPLEFT", "TOPLEFT", 10, 20, parent)
+                assert.are.equal("TOPLEFT", p)
+                assert.are.equal(10, x)
+                assert.are.equal(20, y)
+            end)
+
+            it("no-ops when relativePoint is nil (defaults to point)", function()
+                local p, x, y = FrameUtil.NormalizePosition("CENTER", nil, 5, -5, parent)
+                assert.are.equal("CENTER", p)
+                assert.are.equal(5, x)
+                assert.are.equal(-5, y)
+            end)
+
+            it("rewrites offsets from BOTTOMLEFT to TOPLEFT", function()
+                local p, x, y = FrameUtil.NormalizePosition("TOPLEFT", "BOTTOMLEFT", 10, -350, parent)
+                assert.are.equal("TOPLEFT", p)
+                assert.are.equal(10, x)
+                assert.are.equal(-350 - 768, y)
+            end)
+
+            it("defaults nil point to CENTER", function()
+                local p, x, y = FrameUtil.NormalizePosition(nil, nil, 0, 0, parent)
+                assert.are.equal("CENTER", p)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("defaults nil x/y to 0", function()
+                local p, x, y = FrameUtil.NormalizePosition("CENTER", "CENTER", nil, nil, parent)
+                assert.are.equal("CENTER", p)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+        end)
+
+        describe("ConvertOffsetToAnchor", function()
+            it("no-ops when source and target points are the same", function()
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "CENTER", 10, 20, 100, 60, parent)
+                assert.are.equal(10, x)
+                assert.are.equal(20, y)
+            end)
+
+            it("converts CENTER to TOP accounting for frame height", function()
+                -- parent 1024x768, frame 100x60
+                -- parentAnchor CENTER=(512,384), TOP=(512,768)
+                -- frameCenter CENTER=(0,0), TOP=(0,30)
+                -- center: (512+10-0, 384+20-0) = (522, 404)
+                -- result: (522+0-512, 404+30-768) = (10, -334)
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "TOP", 10, 20, 100, 60, parent)
+                assert.are.equal(10, x)
+                assert.are.equal(-334, y)
+            end)
+
+            it("converts TOPLEFT to BOTTOMLEFT accounting for frame height", function()
+                -- parent 1024x768, frame 0x100
+                -- parentAnchor TOPLEFT=(0,768), BOTTOMLEFT=(0,0)
+                -- frameCenter TOPLEFT=(0,50), BOTTOMLEFT=(0,-50)
+                -- center: (0+0-0, 768+0-50) = (0, 718)
+                -- result: (0+0-0, 718+(-50)-0) = (0, 668)
+                local x, y = FrameUtil.ConvertOffsetToAnchor("TOPLEFT", "BOTTOMLEFT", 0, 0, 0, 100, parent)
+                assert.are.equal(0, x)
+                assert.are.equal(668, y)
+            end)
+
+            it("handles nil width and height", function()
+                -- With nil dims, GetOffsetFromFrameCenter returns 0,0
+                -- degrades to anchor-only offset conversion
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "TOP", 0, 0, nil, nil, parent)
+                assert.are.equal(0, x)
+                assert.are.equal(-384, y)
+            end)
+        end)
+    end)
+
 end)

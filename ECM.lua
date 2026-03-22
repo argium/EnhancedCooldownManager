@@ -593,6 +593,15 @@ function mod:GetECMModule(moduleName, silent)
     return module
 end
 
+-- V11 may intentionally defer when the active Edit Mode layout is not yet
+-- available during early startup. Retry on later lifecycle hooks so those
+-- profiles finish migrating once LibEQOL/Edit Mode state has hydrated.
+local function runPendingMigrations(profile)
+    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
+        ECM.Migration.Run(profile)
+    end
+end
+
 function mod:OnInitialize()
     -- Set up versioned SV store and point the active key at the current version.
     ECM.Migration.PrepareDatabase()
@@ -600,9 +609,7 @@ function mod:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ECM.defaults, true)
 
     local profile = self.db and self.db.profile
-    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ECM.Migration.Run(profile)
-    end
+    runPendingMigrations(profile)
 
     ECM.Migration.FlushLog()
 
@@ -630,6 +637,9 @@ function mod:OnEnable()
     C_CVar.SetCVar("cooldownViewerEnabled", "1")
     registerAddonCompartmentEntry()
 
+    local profile = self.db and self.db.profile
+    runPendingMigrations(profile)
+
     ECM.Runtime.OnCombatEnd = function()
         self:HandleOpenOptionsAfterCombat()
     end
@@ -648,6 +658,9 @@ end
 
 --- Re-evaluates module enable/disable states after a profile change and refreshes layout.
 function mod:OnProfileChangedHandler()
+    local profile = self.db and self.db.profile
+    -- Profile changes/imports can still be carrying a deferred migration.
+    runPendingMigrations(profile)
     ECM.Runtime.Enable(self)
     ECM.Runtime.ScheduleLayoutUpdate(0, "ProfileChanged")
 end

@@ -19,7 +19,7 @@ ECM.L = L
 L["ADDON_NAME"] = "Enhanced Cooldown Manager"
 L["ADDON_ABRV"] = "ECM"
 L["BETA_LOGIN_MESSAGE"] =
-    "You are using a pre-release version of this addon. Some features may not work as expected and you will encounter bugs. Your settings may have been migrated. If you encounter oddidies, you can restore your settings from the last stable version. Type /ecm migration for details."
+    "You are using a pre-release version. Some features may not work as expected and you may encounter bugs. Your settings from the previous version has been preserved, and will be there if you downgrade."
 
 --------------------------------------------------------------------------------
 -- Position Modes

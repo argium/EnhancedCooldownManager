@@ -24,7 +24,6 @@ local constants = {
     ANCHORMODE_FREE = "free",
     CONFIG_SECTION_GLOBAL = "global",
     EDIT_MODE_DEFAULT_POINT = "CENTER",
-    EDIT_MODE_MIGRATED_KEY = "__migrated",
     GROW_DIRECTION_DOWN = "down",
     GROW_DIRECTION_UP = "up",
 
@@ -152,6 +151,7 @@ local constants = {
     DIALOG_FRAME_HEIGHT_SMALL = 160,
     DIALOG_FRAME_WIDTH = 480,
     DIALOG_FRAME_WIDTH_SMALL = 400,
+    POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI",
     POPUP_PREFERRED_INDEX = 3,
 
     -- UI dimension constants

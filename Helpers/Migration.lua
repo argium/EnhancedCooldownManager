@@ -1,8 +1,18 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V10).
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
 
 local Migration = {}
 ECM.Migration = Migration
+
+-- Legacy free-mode bars used implicit default positions when offset fields were
+-- absent from SavedVariables. Keep these migration-local so the historical
+-- fallback data stays coupled to the schema upgrade that needs it.
+local LEGACY_FREE_POSITION_DEFAULTS = {
+    powerBar = { point = "CENTER", x = 0, y = -275 },
+    resourceBar = { point = "CENTER", x = 0, y = -300 },
+    runeBar = { point = "CENTER", x = 0, y = -325 },
+    buffBars = { point = "CENTER", x = 0, y = -350 },
+}
 
 --- Migration log buffer. Entries are collected during migration and persisted
 --- into the new version's SV slot so they survive across sessions.
@@ -181,6 +191,43 @@ local function normalizeBuffBarsCache(cfg)
         end
     end
 end
+
+local FrameUtil = ECM.FrameUtil
+
+---@param layoutName string|nil
+---@return string|nil
+local function resolveActiveLayoutName(layoutName)
+    if type(layoutName) == "string" and layoutName ~= "" then
+        return layoutName
+    end
+
+    local editMode = ECM.EditMode
+    if editMode and type(editMode.GetActiveLayoutName) == "function" then
+        local resolvedLayoutName = editMode.GetActiveLayoutName()
+        if type(resolvedLayoutName) == "string" and resolvedLayoutName ~= "" then
+            return resolvedLayoutName
+        end
+    end
+
+    if not LibStub then
+        return nil
+    end
+
+    local lib = LibStub("LibEQOLEditMode-1.0", true)
+    if not lib then
+        return nil
+    end
+
+    local resolvedLayoutName = type(lib.GetActiveLayoutName) == "function" and lib:GetActiveLayoutName() or nil
+
+    if type(resolvedLayoutName) == "string" and resolvedLayoutName ~= "" then
+        return resolvedLayoutName
+    end
+
+    return nil
+end
+
+local normalizeEditModePosition = FrameUtil.NormalizePosition
 
 --- Migrates profiles from the per-bar color settings to per-spell.
 ---@param profile table The profile to migrate
@@ -1041,14 +1088,34 @@ function Migration.Run(profile)
 
     if profile.schemaVersion < 11 then
         -- Migration: move offsetX/offsetY into editModePositions and remove
-        -- legacy BuffBars anchorPoint/relativePoint fields.
+        -- legacy BuffBars anchorPoint/relativePoint fields. Legacy free-mode
+        -- positions are written directly into the active Edit Mode layout.
+        local layoutName = resolveActiveLayoutName()
+        if not layoutName then
+            log("V11 active layout unavailable; deferring migration")
+            return
+        end
+
         for _, section in ipairs({ "powerBar", "resourceBar", "runeBar", "buffBars" }) do
             local cfg = profile[section]
             if type(cfg) == "table" then
+                local legacyPosition = LEGACY_FREE_POSITION_DEFAULTS[section]
                 local ox = cfg.offsetX
                 local oy = cfg.offsetY
                 local ap = cfg.anchorPoint
                 local rp = cfg.relativePoint
+                local isLegacyFreeMode = cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
+                local sourcePoint = ap or (legacyPosition and legacyPosition.point) or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+                local sourceRelativePoint = rp or ap or (legacyPosition and legacyPosition.point) or sourcePoint
+                local sourceX = ox ~= nil and ox or (legacyPosition and legacyPosition.x) or 0
+                local sourceY = oy ~= nil and oy or (legacyPosition and legacyPosition.y) or 0
+                local migrationSource = (ox ~= nil or oy ~= nil) and "saved-offsets"
+                    or ((isLegacyFreeMode and legacyPosition ~= nil) and "legacy-free-default" or "anchor-only")
+                local shouldMigratePosition = ox ~= nil
+                    or oy ~= nil
+                    or (isLegacyFreeMode and legacyPosition ~= nil)
+                    or ap ~= nil
+                    or rp ~= nil
                 log(
                     section
                         .. ": pre-migrate state"
@@ -1063,31 +1130,52 @@ function Migration.Run(profile)
                         .. " offsetY="
                         .. tostring(oy)
                 )
-                if ox or oy then
+                if shouldMigratePosition then
                     if type(cfg.editModePositions) ~= "table" then
                         cfg.editModePositions = {}
                     end
+                    local point, x, y = normalizeEditModePosition(
+                        sourcePoint,
+                        sourceRelativePoint,
+                        sourceX,
+                        sourceY,
+                        UIParent
+                    )
+                    local didNormalize = sourcePoint ~= sourceRelativePoint
                     local migrated = {
-                        point = ap or "CENTER",
-                        x = ox or 0,
-                        y = oy or 0,
+                        point = point,
+                        x = x,
+                        y = y,
                     }
-                    cfg.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY] = migrated
+                    if cfg.editModePositions[layoutName] == nil then
+                        cfg.editModePositions[layoutName] = migrated
+                        log(
+                            section
+                                .. ": migrated to editModePositions."
+                                .. layoutName
+                                .. " point="
+                                .. migrated.point
+                                .. " x="
+                                .. migrated.x
+                                .. " y="
+                                .. migrated.y
+                                .. " source="
+                                .. migrationSource
+                                .. " normalized="
+                                .. tostring(didNormalize)
+                        )
+                    else
+                        log(
+                            section
+                                .. ": preserved existing editModePositions."
+                                .. layoutName
+                                .. " while clearing legacy offsets"
+                        )
+                    end
                     cfg.offsetX = nil
                     cfg.offsetY = nil
-                    log(
-                        section
-                            .. ": migrated to editModePositions."
-                            .. ECM.Constants.EDIT_MODE_MIGRATED_KEY
-                            .. " point="
-                            .. migrated.point
-                            .. " x="
-                            .. migrated.x
-                            .. " y="
-                            .. migrated.y
-                    )
                 else
-                    log(section .. ": no offsetX/offsetY found, skipping")
+                    log(section .. ": no legacy free-mode position found, skipping")
                 end
                 cfg.anchorPoint = nil
                 cfg.relativePoint = nil
