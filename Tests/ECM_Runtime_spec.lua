@@ -315,6 +315,10 @@ describe("ECM.Runtime layout system", function()
         _G.CANCEL = "Cancel"
         _G.OKAY = "Okay"
         _G.CooldownViewerSettings = nil
+        _G.EssentialCooldownViewer = nil
+        _G.UtilityCooldownViewer = nil
+        _G.BuffIconCooldownViewer = nil
+        _G.BuffBarCooldownViewer = nil
 
         _G.C_CVar = {
             GetCVarBool = function(name)
@@ -717,6 +721,132 @@ describe("ECM.Runtime layout system", function()
             end
 
             assert.is_true(called)
+        end)
+    end)
+
+    describe("watchdog graceful degradation", function()
+        --- Creates a Blizzard frame stub in _G with HookScript call tracking.
+        local function makeBlizzardFrame(name)
+            local frame = makeFrame({ name = name })
+            frame._hookScriptCalls = 0
+            local origHookScript = frame.HookScript
+            function frame:HookScript(...)
+                self._hookScriptCalls = self._hookScriptCalls + 1
+                return origHookScript(self, ...)
+            end
+            _G[name] = frame
+            return frame
+        end
+
+        --- Places all 4 Blizzard frames + CooldownViewerSettings in _G.
+        local function createAllBlizzardFrames()
+            local frames = {}
+            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+                frames[name] = makeBlizzardFrame(name)
+            end
+            local settings = makeFrame({ name = "CooldownViewerSettings" })
+            settings._hookScriptCalls = 0
+            local origHS = settings.HookScript
+            function settings:HookScript(...)
+                self._hookScriptCalls = self._hookScriptCalls + 1
+                return origHS(self, ...)
+            end
+            _G.CooldownViewerSettings = settings
+            frames.CooldownViewerSettings = settings
+            return frames
+        end
+
+        it("skips setup calls once all frames hooked and settings bound", function()
+            local frames = createAllBlizzardFrames()
+            ECM.Runtime.Enable(fakeAddon)
+
+            local ticker = createdTickers[1]
+
+            -- First tick: hooks all frames + settings
+            ticker.callback()
+            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+                assert.are.equal(1, frames[name]._hookScriptCalls,
+                    name .. " should be hooked exactly once after first tick")
+            end
+            assert.are.equal(1, frames.CooldownViewerSettings._hookScriptCalls,
+                "CooldownViewerSettings should be hooked once")
+
+            -- Second tick: setup should be skipped
+            ticker.callback()
+            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+                assert.are.equal(1, frames[name]._hookScriptCalls,
+                    name .. " should still be hooked exactly once after second tick")
+            end
+            assert.are.equal(1, frames.CooldownViewerSettings._hookScriptCalls,
+                "CooldownViewerSettings should still be hooked once after second tick")
+        end)
+
+        it("still enforces Blizzard frame state after setup is complete", function()
+            local frames = createAllBlizzardFrames()
+            ECM.Runtime.Enable(fakeAddon)
+
+            local ticker = createdTickers[1]
+            ticker.callback() -- complete all setup
+
+            -- Simulate a Blizzard frame being externally hidden
+            frames[ECM.Constants.BLIZZARD_FRAMES[1]]:Hide()
+            assert.is_false(frames[ECM.Constants.BLIZZARD_FRAMES[1]]:IsShown())
+
+            -- Enforcement tick should re-show it
+            ticker.callback()
+            assert.is_true(frames[ECM.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
+                "Enforcement should re-show externally hidden Blizzard frame")
+        end)
+
+        it("continues setup when frames appear late", function()
+            -- Start with only 2 of 4 Blizzard frames
+            local firstTwo = {}
+            for i = 1, 2 do
+                local name = ECM.Constants.BLIZZARD_FRAMES[i]
+                firstTwo[name] = makeBlizzardFrame(name)
+            end
+
+            ECM.Runtime.Enable(fakeAddon)
+            local ticker = createdTickers[1]
+
+            -- First tick: hooks 2 frames, but no CooldownViewerSettings yet
+            ticker.callback()
+            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[1], ECM.Constants.BLIZZARD_FRAMES[2] }) do
+                assert.are.equal(1, firstTwo[name]._hookScriptCalls)
+            end
+
+            -- Second tick: still runs setup (incomplete)
+            ticker.callback()
+
+            -- Now add remaining frames + settings
+            local laterFrames = {}
+            for i = 3, 4 do
+                local name = ECM.Constants.BLIZZARD_FRAMES[i]
+                laterFrames[name] = makeBlizzardFrame(name)
+            end
+            local settings = makeFrame({ name = "CooldownViewerSettings" })
+            settings._hookScriptCalls = 0
+            local origHS = settings.HookScript
+            function settings:HookScript(...)
+                self._hookScriptCalls = self._hookScriptCalls + 1
+                return origHS(self, ...)
+            end
+            _G.CooldownViewerSettings = settings
+
+            -- Third tick: hooks remaining frames + settings, setup completes
+            ticker.callback()
+            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[3], ECM.Constants.BLIZZARD_FRAMES[4] }) do
+                assert.are.equal(1, laterFrames[name]._hookScriptCalls,
+                    name .. " should be hooked on third tick")
+            end
+            assert.are.equal(1, settings._hookScriptCalls)
+
+            -- Fourth tick: setup skipped, no additional hooks
+            ticker.callback()
+            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[3], ECM.Constants.BLIZZARD_FRAMES[4] }) do
+                assert.are.equal(1, laterFrames[name]._hookScriptCalls,
+                    name .. " should not be re-hooked after setup complete")
+            end
         end)
     end)
 end)

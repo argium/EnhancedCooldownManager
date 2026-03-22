@@ -457,6 +457,10 @@ function ItemIcons:UpdateLayout(why)
         icon:SetPoint("LEFT", frame, "LEFT", xOffset, 0)
         icon:Show()
 
+        -- Apply cooldown immediately; ThrottledRefresh may be suppressed
+        -- when BAG_UPDATE_COOLDOWN and BAG_UPDATE_DELAYED fire in the same batch.
+        updateIconCooldown(icon)
+
         if siblingFontPath and siblingFontSize then
             applyCooldownNumberFont(icon, siblingFontPath, siblingFontSize, siblingFontFlags)
         end

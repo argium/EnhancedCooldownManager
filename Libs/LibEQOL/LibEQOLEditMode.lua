@@ -4379,13 +4379,13 @@ local function beginSelectionDrag(self)
 end
 
 local function finishSelectionDrag(self)
+	if isInCombat() then
+		return
+	end
 	local parent = self.parent
 	parent:StopMovingOrSizing()
 	if EditModeManagerFrame and EditModeManagerFrame.ClearSnapPreviewFrame then
 		EditModeManagerFrame:ClearSnapPreviewFrame()
-	end
-	if isInCombat() then
-		return
 	end
 	if not isDragAllowed(parent) then
 		return
@@ -4589,12 +4589,17 @@ overlapGlobalFrame:RegisterEvent("GLOBAL_MOUSE_DOWN")
 overlapGlobalFrame:SetScript("OnEvent", overlapGlobalMouseDown)
 
 local function onEditModeEnter()
+	lib.isEditing = true
+	if isInCombat() then
+		lib._combatDeferredEnter = true
+		return
+	end
+	lib._combatDeferredEnter = nil
 	-- GetLayouts is allocation-heavy; only refresh when cache is missing.
 	if not lib.activeLayoutIndex or not State.layoutSnapshot then
 		updateActiveLayoutFromAPI()
 	end
 	restoreManagerExtraFrames(true)
-	lib.isEditing = true
 	resetSelectionIndicators()
 	Internal:RefreshManagerTogglePanel()
 	for _, callback in next, lib.eventHandlersEnter do
@@ -4604,6 +4609,10 @@ end
 
 local function onEditModeExit()
 	lib.isEditing = false
+	lib._combatDeferredEnter = nil
+	if isInCombat() then
+		return
+	end
 	resetSelectionIndicators(true)
 	hideOverlapMenu()
 	updateManagerEyeButton()
@@ -4641,8 +4650,21 @@ function Internal:EnsureDialog()
 		combatWatcher:SetScript("OnEvent", function(_, event)
 			if event == "PLAYER_REGEN_DISABLED" then
 				resetSelectionIndicators()
-			elseif event == "PLAYER_REGEN_ENABLED" and lib.isEditing then
-				resetSelectionIndicators()
+			elseif event == "PLAYER_REGEN_ENABLED" then
+				if lib._combatDeferredEnter and lib.isEditing then
+					lib._combatDeferredEnter = nil
+					if not lib.activeLayoutIndex or not State.layoutSnapshot then
+						updateActiveLayoutFromAPI()
+					end
+					restoreManagerExtraFrames(true)
+					resetSelectionIndicators()
+					Internal:RefreshManagerTogglePanel()
+					for _, callback in next, lib.eventHandlersEnter do
+						securecallfunction(callback)
+					end
+				elseif lib.isEditing then
+					resetSelectionIndicators()
+				end
 			elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 				Layout:HandleSpecChanged()
 			end

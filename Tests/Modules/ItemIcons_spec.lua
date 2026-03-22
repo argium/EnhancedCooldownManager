@@ -618,6 +618,37 @@ describe("ItemIcons real source", function()
         assert.are.equal(20, y)
     end)
 
+    it("applies cooldowns during UpdateLayout so throttled refresh cannot skip them", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function()
+            return 1
+        end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        -- Healthstone has an active shared cooldown (e.g. health potion just used)
+        itemCooldownByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = { 100, 60, true }
+
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return {
+                showTrinket1 = false,
+                showTrinket2 = false,
+                showCombatPotion = false,
+                showHealthPotion = false,
+                showHealthstone = true,
+            }
+        end
+
+        assert.is_true(ItemIcons:UpdateLayout("test"))
+        -- Cooldown must be set directly in UpdateLayout, not deferred to ThrottledRefresh
+        assert.same({ 100, 60 }, ItemIcons.InnerFrame._iconPool[1].Cooldown.__cooldown)
+    end)
+
     it("refreshes cooldowns for visible trinket and bag icons", function()
         local frame = ItemIcons:CreateFrame()
         frame._iconPool[1]:Show()
