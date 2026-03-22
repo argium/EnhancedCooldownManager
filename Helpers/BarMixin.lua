@@ -3,14 +3,10 @@
 -- Licensed under the GNU General Public License v3.0
 
 local FrameUtil = ECM.FrameUtil
-local FrameMixin = ECM.FrameMixin
 local BarMixin = {}
 ECM.BarMixin = BarMixin
 
-local BarMixinProto = {}
-for k, v in pairs(ECM.FrameMixin.Proto) do
-    BarMixinProto[k] = v
-end
+local BarMixinProto = setmetatable({}, { __index = ECM.FrameMixin.Proto })
 
 --------------------------------------------------------------------------------
 -- Tick Helpers
@@ -189,7 +185,7 @@ end
 --- @return boolean continue True if refresh completed, false if skipped
 function BarMixinProto:Refresh(why, force)
     -- call the frame mixin to check pre-conditions
-    if not FrameMixin.Refresh(self, why, force) then
+    if not ECM.FrameMixin.Proto.Refresh(self, why, force) then
         return false
     end
 
@@ -240,11 +236,18 @@ function BarMixinProto:Refresh(why, force)
     if ECM.IsDebugEnabled() then
         ECM.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
     end
+
+    -- Hook: modules override _OnBarRefreshed for post-refresh logic
+    -- (e.g. tick layout) without needing to manually call super.
+    if self._OnBarRefreshed then
+        self:_OnBarRefreshed(why)
+    end
+
     return true
 end
 
 function BarMixinProto:CreateFrame()
-    local frame = ECM.FrameMixin.CreateFrame(self)
+    local frame = ECM.FrameMixin.Proto.CreateFrame(self)
 
     -- StatusBar for value display
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -284,37 +287,7 @@ setmetatable(BarMixin, { __index = BarMixinProto })
 --- Applies bar, frame, and common module mixins to the target via metatable.
 --- Idempotent — safe to call more than once (no-op after first application).
 function BarMixin.AddMixin(module, name)
-    assert(module, "module required")
-    assert(name, "name required")
-    if module._mixinApplied then
-        return
-    end
-
-    local existingMt = getmetatable(module)
-    local existingIndex = existingMt and existingMt.__index
-
-    setmetatable(module, {
-        __index = function(_, k)
-            local v = BarMixinProto[k]
-            if v ~= nil then
-                return v
-            end
-            if type(existingIndex) == "function" then
-                return existingIndex(module, k)
-            end
-            if type(existingIndex) == "table" then
-                return existingIndex[k]
-            end
-        end,
-    })
-
-    local C = ECM.Constants
-    module.Name = name
-    module._configKey = C.ConfigKeyForModule(name)
-    if not module.GetGlobalConfig then
-        module.GetGlobalConfig = ECM.GetGlobalConfig
-    end
-    module.IsHidden = false
-    module._lastUpdate = GetTime()
-    module._mixinApplied = true
+    ECM.MixinUtil.Apply(module, BarMixinProto, name, function(target)
+        target._lastUpdate = GetTime()
+    end)
 end

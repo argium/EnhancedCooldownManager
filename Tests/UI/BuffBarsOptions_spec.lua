@@ -151,9 +151,6 @@ describe("BuffBarsOptions", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
-        -- Load PriorityKeyMap
-        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
-
         -- Load SpellColors
         local addonNS = {
             Addon = {
@@ -175,10 +172,12 @@ describe("BuffBarsOptions", function()
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/SpellColors/KeyType.lua", "Unable to load SpellColors/KeyType.lua")()
+        TestHelpers.LoadChunk("Helpers/SpellColors/Store.lua", "Unable to load SpellColors/Store.lua")(nil, addonNS)
         SpellColors = ECM.SpellColors
 
         -- Load Options (includes SettingsBuilder adapter)
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, addonNS)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         -- Create root category so subcategory calls work

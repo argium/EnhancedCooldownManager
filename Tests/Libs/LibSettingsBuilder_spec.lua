@@ -290,6 +290,7 @@ describe("LibSettingsBuilder", function()
             },
         }
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, addonNS)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         SB = ECM.SettingsBuilder

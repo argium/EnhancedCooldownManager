@@ -13,10 +13,7 @@ ECM.EditMode = EditMode
 local FrameMixin = {}
 ECM.FrameMixin = FrameMixin
 
-local FrameMixinProto = {}
-for k, v in pairs(ECM.ModuleMixin.Proto) do
-    FrameMixinProto[k] = v
-end
+local FrameMixinProto = setmetatable({}, { __index = ECM.ModuleMixin.Proto })
 
 --- Gets the active Edit Mode layout name.
 --- Hydrates LibEQOL's active layout cache, then falls back to its layout-name
@@ -595,35 +592,5 @@ end
 --- @param target table table to apply the mixin to.
 --- @param name string the module name. must be unique.
 function FrameMixin.AddMixin(target, name)
-    assert(target, "target required")
-    assert(name, "name required")
-    if target._mixinApplied then
-        return
-    end
-
-    local existingMt = getmetatable(target)
-    local existingIndex = existingMt and existingMt.__index
-
-    setmetatable(target, {
-        __index = function(_, k)
-            local v = FrameMixinProto[k]
-            if v ~= nil then
-                return v
-            end
-            if type(existingIndex) == "function" then
-                return existingIndex(target, k)
-            end
-            if type(existingIndex) == "table" then
-                return existingIndex[k]
-            end
-        end,
-    })
-
-    target.Name = name
-    target._configKey = C.ConfigKeyForModule(name)
-    if not target.GetGlobalConfig then
-        target.GetGlobalConfig = ECM.GetGlobalConfig
-    end
-    target.IsHidden = false
-    target._mixinApplied = true
+    ECM.MixinUtil.Apply(target, FrameMixinProto, name)
 end

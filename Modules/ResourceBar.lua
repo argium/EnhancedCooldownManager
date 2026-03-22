@@ -8,7 +8,7 @@ local ClassUtil = ECM.ClassUtil
 ns.Addon.ResourceBar = ResourceBar
 
 function ResourceBar:ShouldShow()
-    return ECM.FrameMixin.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
+    return ECM.FrameMixin.Proto.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
 end
 
 function ResourceBar:GetStatusBarValues()
@@ -45,12 +45,7 @@ function ResourceBar:GetStatusBarColor()
     return color or ECM.Constants.COLOR_WHITE
 end
 
-function ResourceBar:Refresh(why, force)
-    local continue = ECM.BarMixin.Refresh(self, why, force)
-    if not continue then
-        return false
-    end
-
+function ResourceBar:_OnBarRefreshed(why)
     -- Use the safe discrete count (3rd return) for tick layout to avoid
     -- secret value comparison/arithmetic.
     local resourceType = ClassUtil.GetPlayerResourceType()
@@ -65,7 +60,6 @@ function ResourceBar:Refresh(why, force)
     end
 
     ECM.Log(self.Name, "Refresh complete.")
-    return true
 end
 
 function ResourceBar:OnEventUpdate(event, ...)

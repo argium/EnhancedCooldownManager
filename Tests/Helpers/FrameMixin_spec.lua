@@ -240,6 +240,7 @@ describe("FrameMixin real source", function()
         TestHelpers.SetupLibEQOLEditModeStub()
         ns = { Addon = {} }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, ns)
         FrameMixin = assert(ECM.FrameMixin, "FrameMixin did not initialize")

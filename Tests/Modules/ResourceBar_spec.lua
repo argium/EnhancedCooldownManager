@@ -14,7 +14,6 @@ describe("ResourceBar real source", function()
     local addMixinCalls
     local registerFrameCalls
     local unregisterFrameCalls
-    local barRefreshResult
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
@@ -30,18 +29,16 @@ describe("ResourceBar real source", function()
         addMixinCalls = 0
         registerFrameCalls = 0
         unregisterFrameCalls = 0
-        barRefreshResult = true
 
         _G.ECM = {
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                },
             },
             BarMixin = {
-                Refresh = function()
-                    return barRefreshResult
-                end,
                 AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
@@ -104,7 +101,8 @@ describe("ResourceBar real source", function()
             hidePoolKey = poolKey
         end
 
-        assert.is_true(ResourceBar:Refresh("test"))
+        assert.is_nil(rawget(ResourceBar, 'Refresh'))
+        ResourceBar:_OnBarRefreshed("test")
         assert.are.equal(4, ensureCount)
         assert.are.equal(5, layoutCount)
         assert.is_nil(hidePoolKey)
@@ -126,12 +124,12 @@ describe("ResourceBar real source", function()
             error("HideAllTicks should not be called when safeMax > 1")
         end
 
-        assert.is_true(ResourceBar:Refresh("test"))
+        ResourceBar:_OnBarRefreshed("test")
         assert.are.equal(9, ensureCount)
         assert.are.equal(10, layoutCount)
     end)
 
-    it("Refresh hides ticks when safeMax is nil or too small", function()
+    it("_OnBarRefreshed hides ticks when safeMax is nil or too small", function()
         local hidePoolKey
         currentValues = { 1, 1, nil }
         ResourceBar.InnerFrame = { TicksFrame = {} }
@@ -145,7 +143,7 @@ describe("ResourceBar real source", function()
             hidePoolKey = poolKey
         end
 
-        assert.is_true(ResourceBar:Refresh("test"))
+        ResourceBar:_OnBarRefreshed("test")
         assert.are.equal("tickPool", hidePoolKey)
     end)
 
@@ -213,10 +211,7 @@ describe("ResourceBar real source", function()
         assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
     end)
 
-    it("returns false from Refresh when the base bar refresh stops the update", function()
-        barRefreshResult = false
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-
-        assert.is_false(ResourceBar:Refresh("test"))
+    it("does not define its own Refresh (uses _OnBarRefreshed hook instead)", function()
+        assert.is_nil(rawget(ResourceBar, 'Refresh'))
     end)
 end)

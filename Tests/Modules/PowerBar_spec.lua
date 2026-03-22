@@ -16,7 +16,6 @@ describe("PowerBar real source", function()
     local unitPowerMaxValue
     local unitPowerPercentValue
     local isSecretValue
-    local barRefreshResult
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -45,21 +44,19 @@ describe("PowerBar real source", function()
         unitPowerMaxValue = 100
         unitPowerPercentValue = 37
         isSecretValue = false
-        barRefreshResult = true
 
         _G.ECM = {
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                },
             },
             BarMixin = {
                 AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
-                end,
-                Refresh = function()
-                    return barRefreshResult
                 end,
             },
             ClassUtil = {
@@ -315,14 +312,7 @@ describe("PowerBar real source", function()
         assert.are.equal("tickPool", layoutArgs.poolKey)
     end)
 
-    it("returns false from Refresh when the base bar mixin stops the update", function()
-        barRefreshResult = false
-        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
-
-        assert.is_false(PowerBar:Refresh("test"))
-    end)
-
-    it("Refresh updates ticks when max power is visible", function()
+    it("_OnBarRefreshed updates ticks when max power is visible", function()
         local updatedMax
         local hiddenPoolKey
         PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
@@ -333,12 +323,12 @@ describe("PowerBar real source", function()
             hiddenPoolKey = poolKey
         end
 
-        assert.is_true(PowerBar:Refresh("test"))
+        PowerBar:_OnBarRefreshed("test")
         assert.are.equal(unitPowerMaxValue, updatedMax)
         assert.is_nil(hiddenPoolKey)
     end)
 
-    it("Refresh hides ticks when max power is secret", function()
+    it("_OnBarRefreshed hides ticks when max power is secret", function()
         local updatedMax
         local hiddenPoolKey
         isSecretValue = true
@@ -350,18 +340,18 @@ describe("PowerBar real source", function()
             hiddenPoolKey = poolKey
         end
 
-        assert.is_true(PowerBar:Refresh("test"))
+        PowerBar:_OnBarRefreshed("test")
         assert.is_nil(updatedMax)
         assert.are.equal("tickPool", hiddenPoolKey)
     end)
 
     it("shows non-mana power bars and respects the outer frame visibility guard", function()
-        ECM.FrameMixin.ShouldShow = function()
+        ECM.FrameMixin.Proto.ShouldShow = function()
             return false
         end
         assert.is_false(PowerBar:ShouldShow())
 
-        ECM.FrameMixin.ShouldShow = function()
+        ECM.FrameMixin.Proto.ShouldShow = function()
             return true
         end
         ECM.ClassUtil.GetCurrentPowerType = function()

@@ -169,24 +169,26 @@ describe("BuffBars real source", function()
                 end,
             },
             FrameMixin = {
-                ChainRightPoint = function(point, fallback)
-                    if point == "TOPLEFT" then
-                        return "TOPRIGHT"
-                    end
-                    if point == "BOTTOMLEFT" then
-                        return "BOTTOMRIGHT"
-                    end
-                    return fallback
-                end,
-                NormalizeGrowDirection = function(direction)
-                    return direction
-                end,
-                CalculateLayoutParams = function()
-                    return {}
-                end,
-                IsReady = function()
-                    return true
-                end,
+                Proto = {
+                    ChainRightPoint = function(point, fallback)
+                        if point == "TOPLEFT" then
+                            return "TOPRIGHT"
+                        end
+                        if point == "BOTTOMLEFT" then
+                            return "BOTTOMRIGHT"
+                        end
+                        return fallback
+                    end,
+                    NormalizeGrowDirection = function(direction)
+                        return direction
+                    end,
+                    CalculateLayoutParams = function()
+                        return {}
+                    end,
+                    IsReady = function()
+                        return true
+                    end,
+                },
                 AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
@@ -371,10 +373,10 @@ describe("BuffBars real source", function()
     it("uses FrameMixin positioning for detached mode", function()
         local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
         ECM.Runtime.DetachedAnchor = detachedAnchor
-        local originalCalculateLayoutParams = ECM.FrameMixin.CalculateLayoutParams
+        local originalCalculateLayoutParams = ECM.FrameMixin.Proto.CalculateLayoutParams
         local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
-        ECM.FrameMixin.CalculateLayoutParams = function(self)
+        ECM.FrameMixin.Proto.CalculateLayoutParams = function(self)
             local gc = self:GetGlobalConfig()
             return {
                 mode = ECM.Constants.ANCHORMODE_DETACHED,
@@ -419,7 +421,7 @@ describe("BuffBars real source", function()
         assert.are.equal(-2, BuffBarCooldownViewer.__anchors[1][5])
 
         ECM.Runtime.DetachedAnchor = nil
-        ECM.FrameMixin.CalculateLayoutParams = originalCalculateLayoutParams
+        ECM.FrameMixin.Proto.CalculateLayoutParams = originalCalculateLayoutParams
         ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 

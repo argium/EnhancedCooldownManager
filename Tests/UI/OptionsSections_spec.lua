@@ -119,6 +119,7 @@ describe("Options sections and root assembly", function()
             }
         end
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
         assert.is_table(createdModule)
@@ -200,6 +201,7 @@ describe("Options sections and root assembly", function()
             OptionsSections = {},
         }
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Options")(nil, ns)
         ECM.SettingsBuilder.CreateRootCategory("Test")
 

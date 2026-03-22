@@ -5,7 +5,7 @@
 local _, ns = ...
 local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
-local ChainRightPoint = FrameMixin.ChainRightPoint
+local ChainRightPoint = FrameMixin.Proto.ChainRightPoint
 local EditMode = ECM.EditMode
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
@@ -367,7 +367,7 @@ local function getViewerPosition(module)
     local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
     if mode ~= ECM.Constants.ANCHORMODE_FREE then
-        local params = FrameMixin.CalculateLayoutParams(module)
+        local params = FrameMixin.Proto.CalculateLayoutParams(module)
         return {
             mode = params.mode,
             anchor = params.anchor,
@@ -470,7 +470,7 @@ function BuffBars:CreateFrame()
 end
 
 function BuffBars:IsReady()
-    if not ECM.FrameMixin.IsReady(self) then
+    if not ECM.FrameMixin.Proto.IsReady(self) then
         return false
     end
 

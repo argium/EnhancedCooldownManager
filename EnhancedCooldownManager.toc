@@ -30,11 +30,12 @@ ECM_Defaults.lua
 Helpers\ClassUtil.lua
 Helpers\ColorUtil.lua
 Helpers\FrameUtil.lua
-Helpers\PriorityKeyMap.lua
-Helpers\SpellColors.lua
+Helpers\SpellColors\KeyType.lua
+Helpers\SpellColors\Store.lua
 Helpers\Migration.lua
 Helpers\ImportExport.lua
 
+Helpers\MixinUtil.lua
 Helpers\ModuleMixin.lua
 Helpers\FrameMixin.lua
 Helpers\BarMixin.lua
@@ -49,6 +50,7 @@ Modules\RuneBar.lua
 Modules\ItemIcons.lua
 
 UI\About.lua
+UI\OptionUtil.lua
 UI\Options.lua
 UI\PowerBarTickMarksOptions.lua
 UI\GeneralOptions.lua

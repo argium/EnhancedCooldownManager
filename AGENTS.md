@@ -19,7 +19,6 @@
 - Mutable state (flags, caches) must be scoped to the owning module instance (`self._field`), not file-level locals. File-level locals are only for truly global singletons or constants.
 - Do not create parallel table cloners or utility functions — reuse existing shared helpers (e.g. `ECM.CloneValue`).
 - When debug logging or string serialization is called on a hot path (layout loops, tickers, per-bar styling), guard with `if isDebugEnabled() then` at the call site to avoid string concatenation overhead in production.
-- Cross-module communication MUST use events/messages (LibEvent `SendMessage`/`RegisterMessage`), not monkey-patched callback fields on other modules' tables.
 
 ```sh
 # Run tests

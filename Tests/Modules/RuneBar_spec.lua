@@ -48,20 +48,22 @@ describe("RuneBar real source", function()
 
         _G.ECM = {
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
-                Refresh = function()
-                    return frameRefreshResult
-                end,
-                CreateFrame = function(self)
-                    local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
-                    frame.GetFrameLevel = function()
-                        return 1
-                    end
-                    frame.SetFrameLevel = function() end
-                    return frame
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                    Refresh = function()
+                        return frameRefreshResult
+                    end,
+                    CreateFrame = function(self)
+                        local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
+                        frame.GetFrameLevel = function()
+                            return 1
+                        end
+                        frame.SetFrameLevel = function() end
+                        return frame
+                    end,
+                },
             },
             BarMixin = {
                 AddMixin = function(target)

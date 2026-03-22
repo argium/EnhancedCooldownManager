@@ -72,12 +72,7 @@ function PowerBar:GetStatusBarColor()
     return color or ECM.Constants.COLOR_WHITE
 end
 
-function PowerBar:Refresh(why, force)
-    local result = ECM.BarMixin.Refresh(self, why, force)
-    if not result then
-        return false
-    end
-
+function PowerBar:_OnBarRefreshed(why)
     -- Update ticks specific to PowerBar (skip when max is a secret value)
     local frame = self.InnerFrame
     local powerType = ECM.ClassUtil.GetCurrentPowerType()
@@ -89,11 +84,10 @@ function PowerBar:Refresh(why, force)
     end
 
     ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
-    return true
 end
 
 function PowerBar:ShouldShow()
-    local show = ECM.FrameMixin.ShouldShow(self)
+    local show = ECM.FrameMixin.Proto.ShouldShow(self)
     if show then
         local _, class = UnitClass("player")
         local powerType = ECM.ClassUtil.GetCurrentPowerType()

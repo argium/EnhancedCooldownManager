@@ -919,6 +919,7 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
 
     local ns = { Addon = mod, OptionsSections = {} }
 
+    TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
     local SB = ECM.SettingsBuilder

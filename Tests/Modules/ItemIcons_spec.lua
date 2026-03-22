@@ -241,12 +241,14 @@ describe("ItemIcons real source", function()
         _G.ECM = {
             Log = function() end,
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
-                Refresh = function()
-                    return true
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                    Refresh = function()
+                        return true
+                    end,
+                },
                 AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end

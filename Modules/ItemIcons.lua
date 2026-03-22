@@ -354,7 +354,7 @@ end
 --- Override ShouldShow to check module enabled state and item availability.
 ---@return boolean shouldShow Whether the frame should be shown.
 function ItemIcons:ShouldShow()
-    if not ECM.FrameMixin.ShouldShow(self) then
+    if not ECM.FrameMixin.Proto.ShouldShow(self) then
         return false
     end
 
@@ -486,7 +486,7 @@ end
 --- Override Refresh to update cooldown states.
 function ItemIcons:Refresh(why, force)
     -- call the frame mixin to check pre-conditions
-    if not FrameMixin.Refresh(self, why, force) then
+    if not FrameMixin.Proto.Refresh(self, why, force) then
         return false
     end
 

@@ -249,7 +249,7 @@ end
 
 function RuneBar:CreateFrame()
     -- Create base frame using FrameMixin (not BarMixin, since we manage StatusBar ourselves)
-    local frame = ECM.FrameMixin.CreateFrame(self)
+    local frame = ECM.FrameMixin.Proto.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -269,11 +269,11 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.ShouldShow(self)
+    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.Proto.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
-    if not FrameMixin.Refresh(self, why, force) then
+    if not FrameMixin.Proto.Refresh(self, why, force) then
         return false
     end
 
