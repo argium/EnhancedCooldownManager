@@ -58,6 +58,9 @@ describe("ECM.Runtime layout system", function()
             self.__width = w
             self.__height = h
         end
+        function frame:GetSize()
+            return self.__width, self.__height
+        end
         function frame:SetFrameStrata() end
         function frame:SetPoint() end
         function frame:GetPoint() end
@@ -344,7 +347,7 @@ describe("ECM.Runtime layout system", function()
                 return ticker
             end,
         }
-        _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.UIParent = makeFrame({ name = "UIParent", width = 1000, height = 800 })
         _G.CreateFrame = function()
             local frame = makeFrame()
             createdFrames[#createdFrames + 1] = frame
@@ -549,6 +552,81 @@ describe("ECM.Runtime layout system", function()
     end)
 
     describe("detached anchor layout handling", function()
+        it("normalizes legacy center-saved detached positions to a stable top anchor", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local lib = LibStub("LibEQOLEditMode-1.0")
+            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.global.detachedGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN
+            _G._testDB.profile.global.detachedAnchorPositions = {
+                Modern = { point = "CENTER", x = 0, y = -265 },
+            }
+            mod.InnerFrame:SetHeight(24)
+            fakeAddon.GetECMModule = function(_, name)
+                return name == mod.Name and mod or nil
+            end
+
+            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+                frame.__ecmAnchorCache = anchors
+                frame.__anchors = anchors
+            end
+
+            lib.GetActiveLayoutName = function()
+                return "Modern"
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-center-normalize")
+
+            local anchor = ECM.Runtime.DetachedAnchor
+            assert.same({ "TOP", UIParent, "TOP", 0, -654 }, anchor.__anchors[1])
+
+            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        end)
+
+        it("positions the detached anchor before detached modules update", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local lib = LibStub("LibEQOLEditMode-1.0")
+            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+            local anchorDuringLayout
+
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.global.detachedBarWidth = 321
+            _G._testDB.profile.global.detachedAnchorPositions = {
+                Modern = { point = "TOPLEFT", x = 10, y = 20 },
+            }
+            mod.InnerFrame:SetHeight(24)
+            fakeAddon.GetECMModule = function(_, name)
+                return name == mod.Name and mod or nil
+            end
+
+            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+                frame.__ecmAnchorCache = anchors
+                frame.__anchors = anchors
+            end
+
+            lib.GetActiveLayoutName = function()
+                return "Modern"
+            end
+
+            mod.ThrottledUpdateLayout = function(_, reason)
+                local anchor = ECM.Runtime.DetachedAnchor
+                anchorDuringLayout = {
+                    anchors = anchor and anchor.__anchors and anchor.__anchors[1] or nil,
+                    width = anchor and anchor:GetWidth() or nil,
+                    reason = reason,
+                }
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-order")
+
+            assert.are.equal("detached-order", anchorDuringLayout.reason)
+            assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchorDuringLayout.anchors)
+            assert.are.equal(321, anchorDuringLayout.width)
+
+            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        end)
+
         it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()
             local mod = makeRegisteredModule("PowerBar")
             local lib = LibStub("LibEQOLEditMode-1.0")

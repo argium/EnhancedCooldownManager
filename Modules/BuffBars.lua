@@ -203,27 +203,6 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
         and issecretvalue(textureFileID)
     module._editLocked = module._editLocked or allSecret
 
-    if ECM.IsDebugEnabled() then
-        local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
-        local colorLog = (barColor and "|cff" .. hex .. "#" .. hex .. "|r" or "nil")
-        local logLine = "GetColorForBar[" .. barIndex .. "] "
-            .. "("
-            .. ECM.ToString(spellName)
-            .. ", "
-            .. ECM.ToString(spellID)
-            .. ", "
-            .. ECM.ToString(cooldownID)
-            .. ", "
-            .. ECM.ToString(textureFileID)
-            .. ") = "
-            .. colorLog
-        ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
-
-        if retryCount > 0 and not allSecret then
-            ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
-        end
-    end
-
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
@@ -320,10 +299,6 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
         FrameUtil.LazySetAnchors(bar.Duration, {
             { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         })
-    end
-
-    if ECM.IsDebugEnabled() then
-        ECM.Log(ECM.Constants.BUFFBARS, "GetColorForBar[" .. barIndex .. "] styled")
     end
 end
 

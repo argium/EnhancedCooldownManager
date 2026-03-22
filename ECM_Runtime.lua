@@ -214,7 +214,8 @@ local function updateFadeAndHiddenStates()
     enforceBlizzardFrameState()
 end
 
---- Gets the saved detached anchor position for the current or provided layout.
+--- Gets the saved detached anchor position for a layout.
+--- If no layout name is provided, this uses the current active Edit Mode layout.
 ---@param layoutName string|nil
 ---@return ECM_EditModePosition
 local function getDetachedAnchorPosition(layoutName)
@@ -222,7 +223,7 @@ local function getDetachedAnchorPosition(layoutName)
     return EditMode.GetPosition(gc and gc.detachedAnchorPositions, nil, layoutName)
 end
 
---- Saves the detached anchor position for the given layout.
+--- Saves the detached anchor position for a specific layout.
 ---@param layoutName string
 ---@param point string
 ---@param x number
@@ -230,6 +231,191 @@ end
 local function saveDetachedAnchorPosition(layoutName, point, x, y)
     local gc = ECM.GetGlobalConfig()
     EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, point, x, y)
+end
+
+-- Anchor names like TOPLEFT or BOTTOMRIGHT contain two separate choices:
+-- which vertical edge to use (TOP/BOTTOM) and which horizontal edge to use
+-- (LEFT/RIGHT). We split them so detached positioning can swap only the
+-- vertical side when grow direction changes, while preserving the user's
+-- horizontal alignment.
+--- Splits an anchor name like TOPLEFT into its vertical and horizontal parts.
+---@param point string|nil
+---@return string|nil, string|nil
+local function splitAnchorName(point)
+    if point == nil or point == "CENTER" then
+        return nil, nil
+    end
+
+    local vertical = point:find("TOP", 1, true) and "TOP" or (point:find("BOTTOM", 1, true) and "BOTTOM" or nil)
+    local horizontal = point:find("LEFT", 1, true) and "LEFT" or (point:find("RIGHT", 1, true) and "RIGHT" or nil)
+    return vertical, horizontal
+end
+
+--- Builds an anchor name from separate vertical and horizontal parts.
+--- Example: TOP + LEFT becomes TOPLEFT.
+---@param vertical string|nil
+---@param horizontal string|nil
+---@return string
+local function buildAnchorName(vertical, horizontal)
+    if vertical == nil and horizontal == nil then
+        return "CENTER"
+    end
+    if vertical == nil then
+        return horizontal
+    end
+    if horizontal == nil then
+        return vertical
+    end
+    return vertical .. horizontal
+end
+
+-- Returns the offset from the frame's centre to one of its named anchor
+-- points. For example, on a 100px tall frame, TOP is 50 units above the
+-- centre and BOTTOM is 50 units below it.
+--- Gets the offset from the frame's centre to one of its anchor points.
+--- This is used when converting one anchor-based position into another.
+---@param point string|nil
+---@param width number|nil
+---@param height number|nil
+---@return number, number
+local function getOffsetFromFrameCenter(point, width, height)
+    local vertical, horizontal = splitAnchorName(point)
+    local halfWidth = (width or 0) * 0.5
+    local halfHeight = (height or 0) * 0.5
+
+    local x = 0
+    if horizontal == "LEFT" then
+        x = -halfWidth
+    elseif horizontal == "RIGHT" then
+        x = halfWidth
+    end
+
+    local y = 0
+    if vertical == "BOTTOM" then
+        y = -halfHeight
+    elseif vertical == "TOP" then
+        y = halfHeight
+    end
+
+    return x, y
+end
+
+-- Returns the absolute position of one of the parent frame's anchor points.
+-- Example: UIParent/TOP is the middle of the screen's top edge.
+--- Gets the absolute position of one of the parent frame's anchor points.
+--- Example: TOP on UIParent is the middle of the top edge of the screen.
+---@param point string|nil
+---@param parentWidth number|nil
+---@param parentHeight number|nil
+---@return number, number
+local function getParentAnchorPosition(point, parentWidth, parentHeight)
+    local vertical, horizontal = splitAnchorName(point)
+    local x = (parentWidth or 0) * 0.5
+    local y = (parentHeight or 0) * 0.5
+
+    if horizontal == "LEFT" then
+        x = 0
+    elseif horizontal == "RIGHT" then
+        x = parentWidth or 0
+    end
+
+    if vertical == "BOTTOM" then
+        y = 0
+    elseif vertical == "TOP" then
+        y = parentHeight or 0
+    end
+
+    return x, y
+end
+
+--- Gets a frame's width and height, preferring GetSize when available.
+---@param parent Frame|nil
+---@return number, number
+local function getParentSize(parent)
+    if parent and parent.GetSize then
+        local width, height = parent:GetSize()
+        if width and height then
+            return width, height
+        end
+    end
+
+    local width = (parent and parent.GetWidth and parent:GetWidth()) or 0
+    local height = (parent and parent.GetHeight and parent:GetHeight()) or 0
+    return width, height
+end
+
+-- Converts offsets from one anchor reference to another without changing the
+-- frame's actual on-screen position.
+--
+-- Example: a saved position expressed relative to CENTER needs different x/y
+-- offsets when rewritten relative to TOP, even if the frame should stay in the
+-- same place visually.
+--
+-- To do that, we:
+-- 1) reconstruct the frame's real position on its parent using the source
+--    anchor and offsets;
+-- 2) calculate the offsets needed to express that same position using the
+--    target anchor instead.
+--
+-- This avoids the bug where switching from CENTER to TOP/BOTTOM only adjusted
+-- for frame height and accidentally changed the visible position.
+--- Converts offsets from one anchor reference to another while keeping the
+--- frame in the same visual position on its parent.
+---@param point string
+---@param targetPoint string
+---@param x number
+---@param y number
+---@param width number|nil
+---@param height number|nil
+---@param parent Frame|nil
+---@return number, number
+local function convertOffsetToAnchor(point, targetPoint, x, y, width, height, parent)
+    if point == targetPoint then
+        return x, y
+    end
+
+    local parentWidth, parentHeight = getParentSize(parent or UIParent)
+    local sourceAnchorX, sourceAnchorY = getParentAnchorPosition(point, parentWidth, parentHeight)
+    local sourcePointX, sourcePointY = getOffsetFromFrameCenter(point, width, height)
+    local centerX = sourceAnchorX + (x or 0) - sourcePointX
+    local centerY = sourceAnchorY + (y or 0) - sourcePointY
+    local targetAnchorX, targetAnchorY = getParentAnchorPosition(targetPoint, parentWidth, parentHeight)
+    local targetPointX, targetPointY = getOffsetFromFrameCenter(targetPoint, width, height)
+
+    return centerX + targetPointX - targetAnchorX, centerY + targetPointY - targetAnchorY
+end
+
+--- Returns whether detached stacks are configured to grow upward.
+---@return boolean
+local function detachedAnchorGrowsUp()
+    local gc = ECM.GetGlobalConfig()
+    return (gc and gc.detachedGrowDirection) == C.GROW_DIRECTION_UP
+end
+
+-- Detached stacks are more stable if their saved position is based on the edge
+-- they grow from, rather than the centre of the full stack.
+--
+-- That means:
+-- - grow down stacks are saved from their top edge;
+-- - grow up stacks are saved from their bottom edge.
+--
+-- With that rule, the "anchored" edge stays fixed even if the total stack
+-- height changes after reloads or after modules appear/disappear.
+--- Rewrites a detached position so it is saved from the stack's stable grow
+--- edge rather than from the middle of the detached stack.
+---@param point string|nil
+---@param x number|nil
+---@param y number|nil
+---@param width number|nil
+---@param height number|nil
+---@return string, number, number
+local function normalizeDetachedPositionToGrowEdge(point, x, y, width, height)
+    local sourcePoint = point or C.EDIT_MODE_DEFAULT_POINT
+    local _, horizontal = splitAnchorName(sourcePoint)
+    local targetVertical = detachedAnchorGrowsUp() and "BOTTOM" or "TOP"
+    local targetPoint = buildAnchorName(targetVertical, horizontal)
+    local offsetX, offsetY = convertOffsetToAnchor(sourcePoint, targetPoint, x or 0, y or 0, width, height, UIParent)
+    return targetPoint, offsetX, offsetY
 end
 
 --- Creates and registers the detached anchor frame with LibEQOL.
@@ -251,7 +437,18 @@ local function ensureDetachedAnchor()
     EditMode.RegisterFrame(frame, {
         name = "ECM: Detached Anchor",
         onPositionChanged = function(layoutName, point, x, y)
-            saveDetachedAnchorPosition(layoutName, point, x, y)
+            -- Edit Mode reports the drop position using the detached box's
+            -- current anchor. We immediately rewrite that position to the
+            -- detached stack's stable grow edge so later height changes do not
+            -- make the stack appear to move.
+            local normalizedPoint, normalizedX, normalizedY = normalizeDetachedPositionToGrowEdge(
+                point,
+                x,
+                y,
+                frame:GetWidth(),
+                frame:GetHeight()
+            )
+            saveDetachedAnchorPosition(layoutName, normalizedPoint, normalizedX, normalizedY)
             Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
         allowDrag = true,
@@ -345,6 +542,21 @@ local function getDetachedAnchorMetrics()
     return totalHeight, count
 end
 
+---@return boolean
+local function hasVisibleDetachedModules()
+    for _, moduleName in ipairs(C.CHAIN_ORDER) do
+        local barModule = ns.Addon and ns.Addon:GetECMModule(moduleName, true)
+        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
+            local mc = barModule:GetModuleConfig()
+            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED and barModule.InnerFrame then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 ---@param anchor Frame
 ---@param layoutName string|nil
 ---@return boolean
@@ -354,15 +566,50 @@ local function applyDetachedAnchorPosition(anchor, layoutName)
     end
 
     local pos = getDetachedAnchorPosition(layoutName)
+    local point, x, y = normalizeDetachedPositionToGrowEdge(
+        pos.point,
+        pos.x,
+        pos.y,
+        anchor:GetWidth(),
+        anchor:GetHeight()
+    )
     ECM.FrameUtil.LazySetAnchors(anchor, {
-        { pos.point, UIParent, pos.point, pos.x, pos.y },
+        { point, UIParent, point, x, y },
     })
     _detachedAnchorLayout = layoutName
     return true
 end
 
---- Updates the detached anchor frame's size and visibility.
---- Shows the anchor when any module uses detached mode, hides otherwise.
+--- Ensures the detached anchor exists and is already positioned for the active
+--- layout before detached modules calculate their own anchors.
+---@return Frame|nil
+local function prepareDetachedAnchorForLayout()
+    if not hasVisibleDetachedModules() then
+        return nil
+    end
+
+    local anchor = ensureDetachedAnchor()
+    local gc = ECM.GetGlobalConfig()
+    local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+    ECM.FrameUtil.LazySetWidth(anchor, barWidth)
+
+    local layoutName = EditMode.GetActiveLayoutName()
+    -- Detached modules ask for their root anchor during this same layout pass.
+    -- If the detached anchor is still using the wrong layout position here,
+    -- every detached child will calculate its own position from stale data.
+    if layoutName and (not anchor:IsShown() or layoutName ~= _detachedAnchorLayout) then
+        applyDetachedAnchorPosition(anchor, layoutName)
+    end
+
+    if not anchor:IsShown() then
+        anchor:Show()
+    end
+
+    return anchor
+end
+
+--- Updates the detached anchor's size and visibility to match the current set
+--- of shown detached modules.
 local function updateDetachedAnchorSize()
     local totalHeight, count = getDetachedAnchorMetrics()
     if count == 0 then
@@ -385,12 +632,17 @@ local function updateDetachedAnchorSize()
     ECM.FrameUtil.LazySetWidth(anchor, barWidth)
     ECM.FrameUtil.LazySetHeight(anchor, math.max(totalHeight, 1))
 
-    -- Apply saved position only when first showing or after a layout switch;
-    -- continuous re-application fights with LibEQOL drag state and can reset
-    -- the anchor to the default position when the layout name is momentarily
-    -- unavailable during edit mode transitions.
+    -- Apply the position again after width/height are final.
+    --
+    -- This matters for two cases:
+    -- - older saved data may still have been recorded from the centre;
+    -- - the current detached stack may have changed height because modules were
+    --   shown, hidden, enabled, or disabled.
+    --
+    -- Re-running the conversion with the final size keeps the visible anchored
+    -- edge consistent for the current layout.
     local layoutName = EditMode.GetActiveLayoutName()
-    if layoutName and (not anchor:IsShown() or layoutName ~= _detachedAnchorLayout) then
+    if layoutName then
         applyDetachedAnchorPosition(anchor, layoutName)
     end
 
@@ -400,6 +652,8 @@ local function updateDetachedAnchorSize()
 end
 
 local function updateAllLayouts(reason)
+    prepareDetachedAnchorForLayout()
+
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do

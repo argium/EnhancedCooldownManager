@@ -346,4 +346,110 @@ describe("LibEvent", function()
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
         assert.same({ "stable" }, calls)
     end)
+
+    it("initializes _stats as an empty table", function()
+        local target = {}
+        LibEvent:Embed(target)
+        assert.same({}, LibEvent.embeds[target]._stats)
+    end)
+
+    it("increments _stats on each event fire", function()
+        local target = { TEST_EVENT = function() end }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
+        assert.are.equal(3, LibEvent.embeds[target]._stats.TEST_EVENT)
+    end)
+
+    it("tracks stats independently per event", function()
+        local target = {
+            EVENT_A = function() end,
+            EVENT_B = function() end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("EVENT_A")
+        target:RegisterEvent("EVENT_B")
+        LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
+        LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
+        LibEvent.embeds[target].frame.onEvent(nil, "EVENT_B")
+
+        assert.are.equal(2, LibEvent.embeds[target]._stats.EVENT_A)
+        assert.are.equal(1, LibEvent.embeds[target]._stats.EVENT_B)
+    end)
+
+    it("tracks stats independently per target", function()
+        local first = { TEST_EVENT = function() end }
+        local second = { TEST_EVENT = function() end }
+        LibEvent:Embed(first)
+        LibEvent:Embed(second)
+
+        first:RegisterEvent("TEST_EVENT")
+        second:RegisterEvent("TEST_EVENT")
+        LibEvent.embeds[first].frame.onEvent(nil, "TEST_EVENT")
+        LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
+        LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
+
+        assert.are.equal(1, LibEvent.embeds[first]._stats.TEST_EVENT)
+        assert.are.equal(2, LibEvent.embeds[second]._stats.TEST_EVENT)
+    end)
+
+    it("GetEventStats returns the target's _stats table", function()
+        local target = { TEST_EVENT = function() end }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("TEST_EVENT")
+        LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
+
+        local stats = target:GetEventStats()
+        assert.are.equal(LibEvent.embeds[target]._stats, stats)
+        assert.are.equal(1, stats.TEST_EVENT)
+    end)
+
+    it("ResetEventStats clears all counters for the target", function()
+        local target = {
+            EVENT_A = function() end,
+            EVENT_B = function() end,
+        }
+        LibEvent:Embed(target)
+
+        target:RegisterEvent("EVENT_A")
+        target:RegisterEvent("EVENT_B")
+        LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
+        LibEvent.embeds[target].frame.onEvent(nil, "EVENT_B")
+
+        target:ResetEventStats()
+
+        assert.same({}, target:GetEventStats())
+    end)
+
+    it("ResetEventStats does not affect other targets", function()
+        local first = { TEST_EVENT = function() end }
+        local second = { TEST_EVENT = function() end }
+        LibEvent:Embed(first)
+        LibEvent:Embed(second)
+
+        first:RegisterEvent("TEST_EVENT")
+        second:RegisterEvent("TEST_EVENT")
+        LibEvent.embeds[first].frame.onEvent(nil, "TEST_EVENT")
+        LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
+
+        first:ResetEventStats()
+
+        assert.same({}, first:GetEventStats())
+        assert.are.equal(1, second:GetEventStats().TEST_EVENT)
+    end)
+
+    it("does not increment stats when no callbacks are registered for the event", function()
+        local target = {}
+        LibEvent:Embed(target)
+
+        LibEvent.embeds[target].frame.onEvent(nil, "UNREGISTERED_EVENT")
+
+        assert.is_nil(target:GetEventStats().UNREGISTERED_EVENT)
+    end)
 end)

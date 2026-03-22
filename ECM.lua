@@ -447,6 +447,7 @@ function mod:ChatCommand(input)
 
     if cmd == "help" then
         ECM.Print(L["CMD_HELP_DEBUG"])
+        ECM.Print(L["CMD_HELP_EVENTS"])
         ECM.Print(L["CMD_HELP_HELP"])
         ECM.Print(L["CMD_HELP_MIGRATION"])
         ECM.Print(L["CMD_HELP_OPTIONS"])
@@ -529,6 +530,55 @@ function mod:ChatCommand(input)
         gc.debug = newVal
         ECM.Print(L["DEBUG_STATUS"] .. " " .. (gc.debug and L["DEBUG_ON"] or L["DEBUG_OFF"]))
         return
+    end
+
+    if cmd == "events" then
+        self:HandleEventsCommand(arg)
+        return
+    end
+end
+
+function mod:HandleEventsCommand(arg)
+    if arg == "reset" then
+        self:ResetEventStats()
+        for _, m in self:IterateModules() do
+            if m.ResetEventStats then
+                m:ResetEventStats()
+            end
+        end
+        ECM.Print(L["EVENTS_RESET"])
+        return
+    end
+
+    -- Aggregate stats from the addon and all its modules.
+    local merged = {}
+    for event, count in pairs(self:GetEventStats()) do
+        merged[event] = (merged[event] or 0) + count
+    end
+    for _, m in self:IterateModules() do
+        if m.GetEventStats then
+            for event, count in pairs(m:GetEventStats()) do
+                merged[event] = (merged[event] or 0) + count
+            end
+        end
+    end
+
+    -- Sort descending by count.
+    local sorted = {}
+    for event, count in pairs(merged) do
+        sorted[#sorted + 1] = { event = event, count = count }
+    end
+
+    if #sorted == 0 then
+        ECM.Print(L["EVENTS_NONE"])
+        return
+    end
+
+    table.sort(sorted, function(a, b) return a.count > b.count end)
+
+    ECM.Print(L["EVENTS_HEADER"])
+    for i = 1, #sorted do
+        ECM.Print("  " .. sorted[i].event .. ": " .. sorted[i].count)
     end
 end
 

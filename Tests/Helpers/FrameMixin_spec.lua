@@ -522,6 +522,35 @@ describe("FrameMixin real source", function()
         assert.are.equal(-34, position.y)
     end)
 
+    it("GetEditModePosition hydrates the active layout name before reading per-layout positions", function()
+        local lib = LibStub("LibEQOLEditMode-1.0")
+        local hydrated = false
+        local mod = {
+            GetModuleConfig = function()
+                return {
+                    editModePositions = {
+                        Modern = { point = "TOP", x = 42, y = -17 },
+                    },
+                }
+            end,
+        }
+
+        lib.GetActiveLayoutName = function()
+            return hydrated and "Modern" or nil
+        end
+        lib.GetActiveLayoutIndex = function()
+            hydrated = true
+            return 1
+        end
+
+        local position = FrameMixin.GetEditModePosition(mod)
+
+        assert.are.equal("TOP", position.point)
+        assert.are.equal(42, position.x)
+        assert.are.equal(-17, position.y)
+        assert.is_true(hydrated)
+    end)
+
     it("AddMixin skips Edit Mode registration when the module opts out", function()
         local registerCalls = 0
         local mod = {

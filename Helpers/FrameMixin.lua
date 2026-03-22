@@ -18,10 +18,24 @@ for k, v in pairs(ECM.ModuleMixin.Proto) do
     FrameMixinProto[k] = v
 end
 
+--- Gets the active Edit Mode layout name.
+--- If LibEQOL has not populated the name yet, this forces the layout index
+--- lookup first so position reads use the correct layout.
 function EditMode.GetActiveLayoutName()
-    return LibEQOLEditMode:GetActiveLayoutName()
+    local layoutName = LibEQOLEditMode:GetActiveLayoutName()
+    if layoutName == nil and type(LibEQOLEditMode.GetActiveLayoutIndex) == "function" then
+        -- LibEQOL sometimes has the active layout selected internally before it
+        -- has populated the matching layout name. Touching the index forces the
+        -- library to finish that lookup, which prevents position reads from
+        -- falling back to defaults during early layout passes or transitions.
+        LibEQOLEditMode:GetActiveLayoutIndex()
+        layoutName = LibEQOLEditMode:GetActiveLayoutName()
+    end
+    return layoutName
 end
 
+--- Gets a saved Edit Mode position for the active layout, with an optional
+--- fallback key when that layout has no saved position yet.
 ---@param positions table<string, ECM_EditModePosition>|nil
 ---@param fallbackKey string|nil
 ---@param layoutName string|nil

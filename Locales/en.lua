@@ -283,6 +283,7 @@ L["EXPORT_FAILED"] = "Export failed: %s"
 --------------------------------------------------------------------------------
 
 L["CMD_HELP_DEBUG"] = "/ecm debug [on|off|toggle] - toggle debug mode (logs detailed info to the chat frame)"
+L["CMD_HELP_EVENTS"] = "/ecm events [reset] - show or reset event fire counts"
 L["CMD_HELP_HELP"] = "/ecm help - show this message"
 L["CMD_HELP_MIGRATION"] = "/ecm migration - show migration info and commands"
 L["CMD_HELP_OPTIONS"] = "/ecm options|config|settings|o - open the options menu"
@@ -296,6 +297,9 @@ L["DEBUG_STATUS"] = "Debug:"
 L["DEBUG_ON"] = "ON"
 L["DEBUG_OFF"] = "OFF"
 L["MODULE_NOT_FOUND"] = "Module not found:"
+L["EVENTS_HEADER"] = "Event fire counts:"
+L["EVENTS_NONE"] = "No events recorded."
+L["EVENTS_RESET"] = "Event stats reset."
 
 --------------------------------------------------------------------------------
 -- Import / Export Dialogs

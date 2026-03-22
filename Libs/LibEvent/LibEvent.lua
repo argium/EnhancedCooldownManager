@@ -3,9 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 ---@class LibEvent
----@field embeds table<table, { frame: Frame, _events: table<string, function[]> }> Stores embedded event instances by target table.
+---@field embeds table<table, { frame: Frame, _events: table<string, function[]>, _stats: table<string, number> }> Stores embedded event instances by target table.
 
-local MAJOR, MINOR = "LibEvent-1.0", 2
+local MAJOR, MINOR = "LibEvent-1.0", 3
 local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibEvent then
@@ -105,6 +105,17 @@ function LibEvent:UnregisterAllEvents()
     end
 end
 
+---Gets the event invocation stats for this embedded target.
+---@return table<string, number> A table mapping event names to their fire counts.
+function LibEvent:GetEventStats()
+    return getInstance(self)._stats
+end
+
+---Resets the event invocation stats for this embedded target.
+function LibEvent:ResetEventStats()
+    getInstance(self)._stats = {}
+end
+
 local function createInstance(target)
     local instance = LibEvent.embeds[target]
     if type(instance) ~= "table" then
@@ -113,12 +124,14 @@ local function createInstance(target)
 
     instance.frame = instance.frame or CreateFrame("Frame")
     instance._events = instance._events or {}
+    instance._stats = {}
 
     instance.frame:SetScript("OnEvent", function(_, event, ...)
         local callbacks = instance._events[event]
         if not callbacks then
             return
         end
+        instance._stats[event] = (instance._stats[event] or 0) + 1
         local snapshot = {}
         for i = 1, #callbacks do
             snapshot[i] = callbacks[i]
@@ -136,6 +149,8 @@ local mixins = {
     "RegisterEvent",
     "UnregisterEvent",
     "UnregisterAllEvents",
+    "GetEventStats",
+    "ResetEventStats",
 }
 
 ---Embeds the LibEvent API into a target table.

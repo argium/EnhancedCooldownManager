@@ -452,4 +452,95 @@ describe("ChatCommand migration", function()
         assert.are.equal("ChatCommand", scheduleLayoutCalls[1].reason)
         assert.are.equal("Refreshing all modules.", printedMessages[1])
     end)
+
+    describe("events command", function()
+        local addonStats
+        local moduleStats
+        local modules
+
+        before_each(function()
+            addonStats = {}
+            moduleStats = {}
+            modules = {}
+            mod.GetEventStats = function() return addonStats end
+            mod.ResetEventStats = function() addonStats = {} end
+            mod.IterateModules = function() return pairs(modules) end
+        end)
+
+        it("/ecm events prints no-events message when nothing recorded", function()
+            mod:ChatCommand("events")
+            assert.are.equal(1, #printedMessages)
+            assert.are.equal("No events recorded.", printedMessages[1])
+        end)
+
+        it("/ecm events prints sorted counts descending", function()
+            addonStats.UNIT_POWER_UPDATE = 10
+            addonStats.PLAYER_ENTERING_WORLD = 2
+
+            mod:ChatCommand("events")
+
+            assert.are.equal("Event fire counts:", printedMessages[1])
+            assert.is_not_nil(string.find(printedMessages[2], "UNIT_POWER_UPDATE: 10", 1, true))
+            assert.is_not_nil(string.find(printedMessages[3], "PLAYER_ENTERING_WORLD: 2", 1, true))
+        end)
+
+        it("/ecm events aggregates stats from addon and modules", function()
+            addonStats.UNIT_POWER_UPDATE = 5
+            modules.TestModule = {
+                GetEventStats = function() return { UNIT_POWER_UPDATE = 3, UNIT_AURA = 7 } end,
+            }
+
+            mod:ChatCommand("events")
+
+            assert.are.equal("Event fire counts:", printedMessages[1])
+            -- UNIT_POWER_UPDATE = 5+3 = 8, UNIT_AURA = 7 → UNIT_POWER_UPDATE first
+            assert.is_not_nil(string.find(printedMessages[2], "UNIT_POWER_UPDATE: 8", 1, true))
+            assert.is_not_nil(string.find(printedMessages[3], "UNIT_AURA: 7", 1, true))
+        end)
+
+        it("/ecm events skips modules without GetEventStats", function()
+            addonStats.TEST_EVENT = 1
+            modules.NoStats = {}
+
+            mod:ChatCommand("events")
+
+            assert.are.equal("Event fire counts:", printedMessages[1])
+            assert.is_not_nil(string.find(printedMessages[2], "TEST_EVENT: 1", 1, true))
+        end)
+
+        it("/ecm events reset clears addon and module stats", function()
+            local moduleResetCalled = false
+            addonStats.SOME_EVENT = 42
+            modules.TestModule = {
+                GetEventStats = function() return moduleStats end,
+                ResetEventStats = function() moduleResetCalled = true end,
+            }
+
+            mod:ChatCommand("events reset")
+
+            assert.are.equal("Event stats reset.", printedMessages[1])
+            assert.is_true(moduleResetCalled)
+        end)
+
+        it("/ecm events reset skips modules without ResetEventStats", function()
+            modules.NoReset = {}
+
+            mod:ChatCommand("events reset")
+
+            assert.are.equal("Event stats reset.", printedMessages[1])
+        end)
+
+        it("/ecm help includes events command", function()
+            mod:ChatCommand("help")
+
+            local hasEvents = false
+            for _, msg in ipairs(printedMessages) do
+                if string.find(msg, "/ecm events", 1, true) then
+                    hasEvents = true
+                    break
+                end
+            end
+            assert.is_true(hasEvents)
+        end)
+    end)
 end)
