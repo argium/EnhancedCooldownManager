@@ -492,7 +492,6 @@ ECM.SettingsBuilder = LSB:New({
             end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },
-
     },
 })
 

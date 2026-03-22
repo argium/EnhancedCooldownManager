@@ -359,15 +359,9 @@ function mod:ShowExportDialog(exportString)
     end
 
     if not exportFrame then
-        exportFrame = createCopyDialog(
-            "ECMExportFrame",
-            L["EXPORT_PROFILE_TITLE"],
-            L["COPY_CTRL_C"],
-            nil,
-            function()
-                ECM.Print(L["IMPORT_COPIED"])
-            end
-        )
+        exportFrame = createCopyDialog("ECMExportFrame", L["EXPORT_PROFILE_TITLE"], L["COPY_CTRL_C"], nil, function()
+            ECM.Print(L["IMPORT_COPIED"])
+        end)
     end
 
     showCopyDialog(exportFrame, exportString)
@@ -384,12 +378,7 @@ function mod:ShowCopyTextDialog(text, title)
     end
 
     if not copyTextFrame then
-        copyTextFrame = createCopyDialog(
-            "ECMCopyTextFrame",
-            "",
-            L["COPY_CTRL_C"],
-            "small"
-        )
+        copyTextFrame = createCopyDialog("ECMCopyTextFrame", "", L["COPY_CTRL_C"], "small")
     end
 
     copyTextFrame.title:SetText(title or L["COPY_LINK"])
@@ -401,8 +390,7 @@ local importFrame
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
     if not importFrame then
-        importFrame =
-            createDialogFrame("ECMImportFrame", L["IMPORT_PROFILE_TITLE"], L["IMPORT_PASTE_PROMPT"])
+        importFrame = createDialogFrame("ECMImportFrame", L["IMPORT_PROFILE_TITLE"], L["IMPORT_PASTE_PROMPT"])
 
         local cancelBtn = addButton(importFrame, CANCEL, { "BOTTOMRIGHT", -16, 8 }, function()
             importFrame:Hide()
@@ -574,7 +562,9 @@ function mod:HandleEventsCommand(arg)
         return
     end
 
-    table.sort(sorted, function(a, b) return a.count > b.count end)
+    table.sort(sorted, function(a, b)
+        return a.count > b.count
+    end)
 
     ECM.Print(L["EVENTS_HEADER"])
     for i = 1, #sorted do
@@ -627,8 +617,12 @@ function mod:OnInitialize()
         )
     end
 
-    LibConsole:RegisterCommand("enhancedcooldownmanager", function(input) mod:ChatCommand(input) end)
-    LibConsole:RegisterCommand("ecm", function(input) mod:ChatCommand(input) end)
+    LibConsole:RegisterCommand("enhancedcooldownmanager", function(input)
+        mod:ChatCommand(input)
+    end)
+    LibConsole:RegisterCommand("ecm", function(input)
+        mod:ChatCommand(input)
+    end)
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.

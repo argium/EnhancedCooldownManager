@@ -30,8 +30,11 @@ function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local resourceType = ClassUtil.GetPlayerResourceType()
 
-    if ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
-        and cfg.maxColorsEnabled and cfg.maxColorsEnabled[resourceType] then
+    if
+        ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
+        and cfg.maxColorsEnabled
+        and cfg.maxColorsEnabled[resourceType]
+    then
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
         if safeMax and current == safeMax then
             return cfg.maxColors and cfg.maxColors[resourceType] or ECM.Constants.COLOR_WHITE

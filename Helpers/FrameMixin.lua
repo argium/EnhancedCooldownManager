@@ -115,13 +115,19 @@ end
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
 LibEQOLEditMode:RegisterCallback("enter", function()
-    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter") end)
+    C_Timer.After(0, function()
+        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter")
+    end)
 end)
 LibEQOLEditMode:RegisterCallback("exit", function()
-    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit") end)
+    C_Timer.After(0, function()
+        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit")
+    end)
 end)
 LibEQOLEditMode:RegisterCallback("layout", function()
-    C_Timer.After(0, function() ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout") end)
+    C_Timer.After(0, function()
+        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout")
+    end)
 end)
 
 ---@alias AnchorPoint string
@@ -269,7 +275,9 @@ end
 ---@return table
 local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     local isDetached = mode == C.ANCHORMODE_DETACHED
-    if not isDetached then mode = C.ANCHORMODE_CHAIN end
+    if not isDetached then
+        mode = C.ANCHORMODE_CHAIN
+    end
 
     local anchor, isFirst = self:GetNextChainAnchor(self.Name, mode)
 
@@ -280,7 +288,8 @@ local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     if isDetached then
         gap = isFirst and 0 or ((globalConfig and globalConfig.detachedModuleSpacing) or 0)
     else
-        gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0) or ((globalConfig and globalConfig.moduleSpacing) or 0)
+        gap = isFirst and ((globalConfig and globalConfig.offsetY) or 0)
+            or ((globalConfig and globalConfig.moduleSpacing) or 0)
     end
 
     local anchorPoint = growsUp and "BOTTOMLEFT" or "TOPLEFT"
@@ -588,7 +597,9 @@ end
 function FrameMixin.AddMixin(target, name)
     assert(target, "target required")
     assert(name, "name required")
-    if target._mixinApplied then return end
+    if target._mixinApplied then
+        return
+    end
 
     local existingMt = getmetatable(target)
     local existingIndex = existingMt and existingMt.__index
@@ -596,10 +607,16 @@ function FrameMixin.AddMixin(target, name)
     setmetatable(target, {
         __index = function(_, k)
             local v = FrameMixinProto[k]
-            if v ~= nil then return v end
-            if type(existingIndex) == "function" then return existingIndex(target, k) end
-            if type(existingIndex) == "table" then return existingIndex[k] end
-        end
+            if v ~= nil then
+                return v
+            end
+            if type(existingIndex) == "function" then
+                return existingIndex(target, k)
+            end
+            if type(existingIndex) == "table" then
+                return existingIndex[k]
+            end
+        end,
     })
 
     target.Name = name

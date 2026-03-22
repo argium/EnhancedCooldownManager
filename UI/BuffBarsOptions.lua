@@ -279,10 +279,7 @@ function BuffBarsOptions.RegisterSettings(SB)
                 name = L["ENABLE_AURA_BARS"],
                 desc = L["ENABLE_AURA_BARS_DESC"],
                 order = 0,
-                onSet = ECM.OptionUtil.CreateModuleEnabledHandler(
-                    "BuffBars",
-                    L["DISABLE_AURA_BARS_RELOAD"]
-                ),
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
             },
 
             layoutMovedButton = ECM.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,

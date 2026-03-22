@@ -112,17 +112,13 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
         local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
         local max = C.RESOURCEBAR_COLLAPSING_STAR_MAX / 5
-        return max,
-            collapsingStar and collapsingStar.applications / 5 or 0,
-            max
+        return max, collapsingStar and collapsingStar.applications / 5 or 0, max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL then
         local soulFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
         local max = getDevourerSoulFragmentsMax() / 5
-        return max,
-            soulFragments and soulFragments.applications / 5 or 0,
-            max
+        return max, soulFragments and soulFragments.applications / 5 or 0, max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then

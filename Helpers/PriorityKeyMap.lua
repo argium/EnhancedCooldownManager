@@ -169,7 +169,11 @@ function PriorityKeyMap:Reconcile(keys)
                 if ECM.IsDebugEnabled() then
                     ECM.Log(
                         "PriorityKeyMap",
-                        "Reconcile - unified " .. self._keyDefs[i] .. " key " .. ECM.ToString(vkeys[i]) .. " to most recent",
+                        "Reconcile - unified "
+                        .. self._keyDefs[i]
+                            .. " key "
+                            .. ECM.ToString(vkeys[i])
+                            .. " to most recent",
                         { value = unwrap(winner) }
                     )
                 end

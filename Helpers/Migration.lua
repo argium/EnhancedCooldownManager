@@ -1049,12 +1049,20 @@ function Migration.Run(profile)
                 local oy = cfg.offsetY
                 local ap = cfg.anchorPoint
                 local rp = cfg.relativePoint
-                log(section .. ": pre-migrate state"
-                    .. " anchorMode=" .. tostring(cfg.anchorMode)
-                    .. " anchorPoint=" .. tostring(ap)
-                    .. " relativePoint=" .. tostring(rp)
-                    .. " offsetX=" .. tostring(ox)
-                    .. " offsetY=" .. tostring(oy))
+                log(
+                    section
+                        .. ": pre-migrate state"
+                        .. " anchorMode="
+                        .. tostring(cfg.anchorMode)
+                        .. " anchorPoint="
+                        .. tostring(ap)
+                        .. " relativePoint="
+                        .. tostring(rp)
+                        .. " offsetX="
+                        .. tostring(ox)
+                        .. " offsetY="
+                        .. tostring(oy)
+                )
                 if ox or oy then
                     if type(cfg.editModePositions) ~= "table" then
                         cfg.editModePositions = {}
@@ -1067,10 +1075,17 @@ function Migration.Run(profile)
                     cfg.editModePositions[ECM.Constants.EDIT_MODE_MIGRATED_KEY] = migrated
                     cfg.offsetX = nil
                     cfg.offsetY = nil
-                    log(section .. ": migrated to editModePositions." .. ECM.Constants.EDIT_MODE_MIGRATED_KEY
-                        .. " point=" .. migrated.point
-                        .. " x=" .. migrated.x
-                        .. " y=" .. migrated.y)
+                    log(
+                        section
+                            .. ": migrated to editModePositions."
+                            .. ECM.Constants.EDIT_MODE_MIGRATED_KEY
+                            .. " point="
+                            .. migrated.point
+                            .. " x="
+                            .. migrated.x
+                            .. " y="
+                            .. migrated.y
+                    )
                 else
                     log(section .. ": no offsetX/offsetY found, skipping")
                 end

@@ -90,8 +90,12 @@ function LayoutOptions.RegisterSettings(SB)
 
     SB.RegisterFromTable({
         name = L["LAYOUT_SUBCATEGORY"],
-        onShow = function() ECM.Runtime.SetLayoutPreview(true) end,
-        onHide = function() ECM.Runtime.SetLayoutPreview(false) end,
+        onShow = function()
+            ECM.Runtime.SetLayoutPreview(true)
+        end,
+        onHide = function()
+            ECM.Runtime.SetLayoutPreview(false)
+        end,
         args = args,
     })
 end

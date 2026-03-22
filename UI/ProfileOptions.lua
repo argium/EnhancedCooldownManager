@@ -84,13 +84,8 @@ function ProfileOptions.RegisterSettings(SB)
         return container:GetData()
     end
 
-    local _, getCopyProfile, clearCopyProfile = createProfilePicker(
-        cat,
-        "ECM_ProfileCopy",
-        L["COPY_FROM"],
-        L["COPY_FROM_DESC"],
-        otherProfilesGenerator
-    )
+    local _, getCopyProfile, clearCopyProfile =
+        createProfilePicker(cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
 
     SB.Button({
         name = L["APPLY_COPY"],

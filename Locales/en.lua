@@ -5,7 +5,11 @@
 ECM = ECM or {}
 
 -- Locale table with fallback: missing keys return the key name itself.
-local L = setmetatable({}, { __index = function(_, k) return k end })
+local L = setmetatable({}, {
+    __index = function(_, k)
+        return k
+    end,
+})
 ECM.L = L
 
 --------------------------------------------------------------------------------
@@ -14,13 +18,15 @@ ECM.L = L
 
 L["ADDON_NAME"] = "Enhanced Cooldown Manager"
 L["ADDON_ABRV"] = "ECM"
-L["BETA_LOGIN_MESSAGE"] = "You are using a pre-release version of this addon. Some features may not work as expected and you will encounter bugs. Your settings may have been migrated. If you encounter oddidies, you can restore your settings from the last stable version. Type /ecm migration for details."
+L["BETA_LOGIN_MESSAGE"] =
+    "You are using a pre-release version of this addon. Some features may not work as expected and you will encounter bugs. Your settings may have been migrated. If you encounter oddidies, you can restore your settings from the last stable version. Type /ecm migration for details."
 
 --------------------------------------------------------------------------------
 -- Position Modes
 --------------------------------------------------------------------------------
 
-L["POSITION_MODE_DESC"] = "Choose how this module is positioned.\n\n- Automatic: Keeps this module in the main stack next to Blizzard's cooldown icons. Uses the shared spacing and grow direction settings.\n- Detached automatic: Places this module in a separate shared stack. Move the detached stack anchor in Edit Mode. Width, spacing, and grow direction are shared by all detached modules.\n- Free placement: Places this module independently. Drag this module directly in Edit Mode to position it."
+L["POSITION_MODE_DESC"] =
+    "Choose how this module is positioned.\n\n- Automatic: Keeps this module in the main stack next to Blizzard's cooldown icons. Uses the shared spacing and grow direction settings.\n- Detached automatic: Places this module in a separate shared stack. Move the detached stack anchor in Edit Mode. Width, spacing, and grow direction are shared by all detached modules.\n- Free placement: Places this module independently. Drag this module directly in Edit Mode to position it."
 L["POSITION_MODE_AUTOMATIC"] = "Automatic"
 L["POSITION_MODE_DETACHED"] = "Automatic (detached)"
 L["POSITION_MODE_FREE"] = "Free placement"
@@ -52,7 +58,8 @@ L["DETACHED_GROW_DIRECTION_DESC"] = "Whether the detached stack grows upward or 
 L["VERTICAL_OFFSET"] = "Vertical Offset"
 L["VERTICAL_OFFSET_DESC"] = "Vertical gap between the main cooldown icons and the first attached bar."
 L["VERTICAL_SPACING"] = "Vertical Spacing"
-L["VERTICAL_SPACING_DESC"] = "Vertical spacing between attached modules. Spacing between aura bars is controlled separately."
+L["VERTICAL_SPACING_DESC"] =
+    "Vertical spacing between attached modules. Spacing between aura bars is controlled separately."
 L["GROW_DIRECTION_ATTACHED_DESC"] = "Whether the attached stack grows above or below the main cooldown icons."
 
 --------------------------------------------------------------------------------
@@ -84,7 +91,8 @@ L["SIZING"] = "Sizing"
 L["HIDE_WHEN_MOUNTED"] = "Hide when Mounted"
 L["HIDE_WHEN_MOUNTED_DESC"] = "Automatically hide icon and bars while mounted."
 L["HIDE_IN_REST_AREAS"] = "Hide in Rest Areas"
-L["HIDE_IN_REST_AREAS_DESC"] = "Automatically hide icon and bars when in rest areas. Bars will reappear if you enter combat."
+L["HIDE_IN_REST_AREAS_DESC"] =
+    "Automatically hide icon and bars when in rest areas. Bars will reappear if you enter combat."
 L["FADE_OUT_OF_COMBAT"] = "Fade when Out of Combat"
 L["FADE_OUT_OF_COMBAT_DESC"] = "Automatically fade bars when out of combat to reduce screen clutter."
 L["OUT_OF_COMBAT_OPACITY"] = "Out of Combat Opacity"
@@ -158,7 +166,8 @@ L["RESOURCE_SOUL_SHARDS"] = "Soul Shards"
 L["DK_ONLY_WARNING"] = "|cffFF8800These settings are only applicable to Death Knights.|r"
 L["ENABLE_RUNE_BAR"] = "Enable rune bar"
 L["USE_SPEC_COLOR"] = "Use specialization color"
-L["USE_SPEC_COLOR_DESC"] = "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below."
+L["USE_SPEC_COLOR_DESC"] =
+    "Use your current specialization's color for the rune bar. If disabled, you can set a custom color below."
 L["RUNE_COLOR"] = "Rune color"
 L["BLOOD_COLOR"] = "Blood color"
 L["FROST_COLOR"] = "Frost color"
@@ -169,7 +178,8 @@ L["UNHOLY_COLOR"] = "Unholy color"
 --------------------------------------------------------------------------------
 
 L["ENABLE_AURA_BARS"] = "Enable aura bars"
-L["ENABLE_AURA_BARS_DESC"] = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager."
+L["ENABLE_AURA_BARS_DESC"] =
+    "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager."
 L["DISABLE_AURA_BARS_RELOAD"] = "Disabling aura bars requires a UI reload. Reload now?"
 L["SHOW_ICON"] = "Show icon"
 L["SHOW_SPELL_NAME"] = "Show spell name"
@@ -182,12 +192,15 @@ L["CONFIGURE_SPELL_COLORS"] = "Configure Spell Colors"
 L["OPEN"] = "Open"
 
 L["SPELL_COLORS_SUBCAT"] = "Spell Colors"
-L["SPELL_COLORS_DESC"] = "Customize colors for individual spells. Spells that are tracked in the cooldown manager as bars will automatically appear here."
-L["SPELL_COLORS_SECRET_NAMES_DESC"] = "One or more spell names have become secret. This can be cleared by reloading the UI outside of restricted area, typically dungeons, raids, delves, and PVP."
+L["SPELL_COLORS_DESC"] =
+    "Customize colors for individual spells. Spells that are tracked in the cooldown manager as bars will automatically appear here."
+L["SPELL_COLORS_SECRET_NAMES_DESC"] =
+    "One or more spell names have become secret. This can be cleared by reloading the UI outside of restricted area, typically dungeons, raids, delves, and PVP."
 L["SPELL_COLORS_RELOAD_BUTTON"] = "Reload UI"
 L["SPELL_COLORS_RESET_CONFIRM"] = "Are you sure you want to reset all spell colors for this spec?"
 L["SPELL_COLORS_COMBAT_WARNING"] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
-L["SPELL_COLORS_SECRETS_WARNING"] = "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
+L["SPELL_COLORS_SECRETS_WARNING"] =
+    "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
 L["DEFAULT_COLOR"] = "Default color"
 
 --------------------------------------------------------------------------------
@@ -209,7 +222,8 @@ L["TICK_COUNT"] = "%s - %d tick mark(s) configured."
 --------------------------------------------------------------------------------
 
 L["ENABLE_ITEM_ICONS"] = "Enable item icons"
-L["ENABLE_ITEM_ICONS_DESC"] = "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns."
+L["ENABLE_ITEM_ICONS_DESC"] =
+    "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns."
 L["EQUIPMENT"] = "Equipment"
 L["CONSUMABLES"] = "Consumables"
 L["SHOW_FIRST_TRINKET"] = "Show first trinket"
@@ -240,7 +254,8 @@ L["DEBUG_MODE"] = "Debug Mode"
 L["DEBUG_MODE_DESC"] = "Enable debug logging to the chat frame and Dev Tools addon (if installed)."
 L["PERFORMANCE"] = "Performance"
 L["UPDATE_FREQUENCY"] = "Update Frequency"
-L["UPDATE_FREQUENCY_DESC"] = "How often (in seconds) to refresh bar displays. Lower values are smoother but use more CPU."
+L["UPDATE_FREQUENCY_DESC"] =
+    "How often (in seconds) to refresh bar displays. Lower values are smoother but use more CPU."
 
 --------------------------------------------------------------------------------
 -- Profile Options
@@ -314,7 +329,8 @@ L["IMPORT_PASTE_PROMPT"] = "Paste your import string below and click Import."
 L["IMPORT_CANCELLED"] = "Import cancelled: no string provided"
 L["IMPORT_FAILED"] = "Import failed: %s"
 L["IMPORT_APPLY_FAILED"] = "Import apply failed: %s"
-L["IMPORT_CONFIRM"] = "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI."
+L["IMPORT_CONFIRM"] =
+    "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI."
 L["INVALID_EXPORT_STRING"] = "Invalid export string provided"
 L["RELOAD_BLOCKED_COMBAT"] = "Cannot reload the UI right now: UI reload is blocked during combat."
 L["RELOAD_UI_PROMPT"] = "Reload the UI?"

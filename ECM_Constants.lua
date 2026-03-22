@@ -212,7 +212,8 @@ end
 
 local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
+constants.MODULE_ORDER =
+{ constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.CLASS_COLORS = CLASS_COLORS

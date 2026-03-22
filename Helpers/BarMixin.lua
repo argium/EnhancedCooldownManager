@@ -286,7 +286,9 @@ setmetatable(BarMixin, { __index = BarMixinProto })
 function BarMixin.AddMixin(module, name)
     assert(module, "module required")
     assert(name, "name required")
-    if module._mixinApplied then return end
+    if module._mixinApplied then
+        return
+    end
 
     local existingMt = getmetatable(module)
     local existingIndex = existingMt and existingMt.__index
@@ -294,10 +296,16 @@ function BarMixin.AddMixin(module, name)
     setmetatable(module, {
         __index = function(_, k)
             local v = BarMixinProto[k]
-            if v ~= nil then return v end
-            if type(existingIndex) == "function" then return existingIndex(module, k) end
-            if type(existingIndex) == "table" then return existingIndex[k] end
-        end
+            if v ~= nil then
+                return v
+            end
+            if type(existingIndex) == "function" then
+                return existingIndex(module, k)
+            end
+            if type(existingIndex) == "table" then
+                return existingIndex[k]
+            end
+        end,
     })
 
     local C = ECM.Constants

@@ -441,13 +441,8 @@ local function ensureDetachedAnchor()
             -- current anchor. We immediately rewrite that position to the
             -- detached stack's stable grow edge so later height changes do not
             -- make the stack appear to move.
-            local normalizedPoint, normalizedX, normalizedY = normalizeDetachedPositionToGrowEdge(
-                point,
-                x,
-                y,
-                frame:GetWidth(),
-                frame:GetHeight()
-            )
+            local normalizedPoint, normalizedX, normalizedY =
+                normalizeDetachedPositionToGrowEdge(point, x, y, frame:GetWidth(), frame:GetHeight())
             saveDetachedAnchorPosition(layoutName, normalizedPoint, normalizedX, normalizedY)
             Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
@@ -566,13 +561,8 @@ local function applyDetachedAnchorPosition(anchor, layoutName)
     end
 
     local pos = getDetachedAnchorPosition(layoutName)
-    local point, x, y = normalizeDetachedPositionToGrowEdge(
-        pos.point,
-        pos.x,
-        pos.y,
-        anchor:GetWidth(),
-        anchor:GetHeight()
-    )
+    local point, x, y =
+        normalizeDetachedPositionToGrowEdge(pos.point, pos.x, pos.y, anchor:GetWidth(), anchor:GetHeight())
     ECM.FrameUtil.LazySetAnchors(anchor, {
         { point, UIParent, point, x, y },
     })
@@ -820,9 +810,13 @@ local function enableLayoutEvents(addon)
     end
 
     for eventName in pairs(LAYOUT_EVENTS) do
-        addon:RegisterEvent(eventName, function(_, ...) handleLayoutEvent(addon, eventName, ...) end)
+        addon:RegisterEvent(eventName, function(_, ...)
+            handleLayoutEvent(addon, eventName, ...)
+        end)
     end
-    addon:RegisterEvent("CVAR_UPDATE", function(_, ...) handleLayoutEvent(addon, "CVAR_UPDATE", ...) end)
+    addon:RegisterEvent("CVAR_UPDATE", function(_, ...)
+        handleLayoutEvent(addon, "CVAR_UPDATE", ...)
+    end)
 
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
