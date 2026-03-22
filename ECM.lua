@@ -38,27 +38,14 @@ function ECM.IsDebugEnabled()
 end
 
 local function safeStrTostring(x)
-    if x == nil then
-        return "nil"
-    elseif issecretvalue(x) then
-        return "[secret]"
-    else
-        return tostring(x)
-    end
+    if x == nil then return "nil" end
+    return issecretvalue(x) and "[secret]" or tostring(x)
 end
 
 local function safeTableTostring(tbl, depth, seen)
-    if issecrettable(tbl) then
-        return "[secrettable]"
-    end
-
-    if seen[tbl] then
-        return "<cycle>"
-    end
-
-    if depth >= C.TOSTRING_MAX_DEPTH then
-        return "{...}"
-    end
+    if issecrettable(tbl) then return "[secrettable]" end
+    if seen[tbl] then return "<cycle>" end
+    if depth >= C.TOSTRING_MAX_DEPTH then return "{...}" end
 
     seen[tbl] = true
 
@@ -112,17 +99,9 @@ function ECM.ToString(v)
 end
 
 function ECM.GetTexture(texture)
-    if texture then
-        local fetched = getLsmMedia("statusbar", texture)
-        if fetched then
-            return fetched
-        end
-
-        if texture:find("\\") then
-            return texture
-        end
-    end
-
+    local fetched = texture and getLsmMedia("statusbar", texture)
+    if fetched then return fetched end
+    if texture and texture:find("\\") then return texture end
     return getLsmMedia("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
 end
 
@@ -194,43 +173,35 @@ function ECM.Log(module, message, data)
         return
     end
 
-    local prefix = "[" .. L["ADDON_ABRV"] .. (module and (" " .. module) or "") .. "]"
+    local coloredPrefix = "|cff" .. C.DEBUG_COLOR .. "[" .. L["ADDON_ABRV"]
+        .. (module and (" " .. module) or "") .. "]|r "
 
     if DevTool and DevTool.AddData then
-        local payload = {
+        pcall(DevTool.AddData, DevTool, {
             module = module or "nil",
             message = message,
             timestamp = GetTime(),
-            data = ECM.ToString(data),
-        }
-        pcall(DevTool.AddData, DevTool, payload, "|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
+            data = data and ECM.ToString(data),
+        }, coloredPrefix .. message)
     end
 
-    print("|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
+    print(coloredPrefix .. message)
 end
 
 local function registerAddonCompartmentEntry()
-    if mod._addonCompartmentRegistered then
+    if mod._addonCompartmentRegistered or not AddonCompartmentFrame then
         return
     end
 
-    if not (AddonCompartmentFrame and type(AddonCompartmentFrame.RegisterAddon) == "function") then
-        return
-    end
-
-    local text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"])
     local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
-        text = text,
+        text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"]),
         icon = C.ADDON_ICON_TEXTURE,
         notCheckable = true,
         func = function()
             mod:ChatCommand("options")
         end,
     })
-
-    if ok then
-        mod._addonCompartmentRegistered = true
-    end
+    mod._addonCompartmentRegistered = ok
 end
 
 --- Shows a confirmation popup and reloads the UI on accept.
@@ -624,12 +595,9 @@ function mod:OnInitialize()
         )
     end
 
-    LibConsole:RegisterCommand("enhancedcooldownmanager", function(input)
-        mod:ChatCommand(input)
-    end)
-    LibConsole:RegisterCommand("ecm", function(input)
-        mod:ChatCommand(input)
-    end)
+    local chatHandler = function(input) mod:ChatCommand(input) end
+    LibConsole:RegisterCommand("enhancedcooldownmanager", chatHandler)
+    LibConsole:RegisterCommand("ecm", chatHandler)
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.

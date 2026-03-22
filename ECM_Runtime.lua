@@ -47,6 +47,7 @@ local _layoutWatchdogTicker = nil
 local _cooldownViewerSettingsHooked = false
 local _layoutPreviewActive = false
 local _hookedBlizzardFrames = {}
+local _watchdogSetupComplete = false
 
 local _chainSet = {}
 for _, name in ipairs(C.CHAIN_ORDER) do
@@ -65,15 +66,9 @@ local function enforceBlizzardFrameState()
         local frame = _G[name]
         if frame then
             if _globallyHidden then
-                if frame:IsShown() then
-                    frame:Hide()
-                    ECM.Log(nil, "Enforced hide on " .. (frame:GetName() or "?"))
-                end
+                if frame:IsShown() then frame:Hide() end
             else
-                if not frame:IsShown() then
-                    frame:Show()
-                    ECM.Log(nil, "Enforced show on " .. (frame:GetName() or "?"))
-                end
+                if not frame:IsShown() then frame:Show() end
                 ECM.FrameUtil.LazySetAlpha(frame, alpha)
             end
         end
@@ -98,7 +93,6 @@ local function hookBlizzardFrame(frame, name)
     end)
 
     _hookedBlizzardFrames[name] = true
-    ECM.Log(nil, "Hooked Blizzard frame: " .. name)
 end
 
 --- Attempts to hook OnShow on all known Blizzard cooldown viewer frames.
@@ -112,19 +106,21 @@ local function hookBlizzardFrames()
     end
 end
 
+--- Checks whether all one-time watchdog setup targets have been handled.
+local function tryCompleteWatchdogSetup()
+    if not _cooldownViewerSettingsHooked then return end
+    for _, name in ipairs(C.BLIZZARD_FRAMES) do
+        if not _hookedBlizzardFrames[name] then return end
+    end
+    _watchdogSetupComplete = true
+end
+
 --- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 --- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
-local function setGloballyHidden(hidden, reason)
-    if _globallyHidden ~= hidden then
-        ECM.Log(
-            nil,
-            "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or "")
-        )
-    end
-
+local function setGloballyHidden(hidden)
+    if _globallyHidden == hidden then return end
     _globallyHidden = hidden
-
     for _, module in pairs(_modules) do
         module:SetHidden(hidden)
     end
@@ -133,8 +129,8 @@ end
 --- Applies alpha to all managed frames.
 --- @param alpha number
 local function setAlpha(alpha)
+    if _desiredAlpha == alpha then return end
     _desiredAlpha = alpha
-
     for _, module in pairs(_modules) do
         if module.InnerFrame then
             ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
@@ -158,59 +154,29 @@ local function updateFadeAndHiddenStates()
         return
     end
 
-    -- Determine hidden state
-    local hidden, reason = false, nil
-    if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
-        hidden, reason = true, "cvar"
-    elseif globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")) then
-        hidden, reason = true, "mounted"
-    elseif not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting() then
-        hidden, reason = true, "rest"
-    end
+    local hidden = not C_CVar.GetCVarBool("cooldownViewerEnabled")
+        or (globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")))
+        or (not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting())
 
-    setGloballyHidden(hidden, reason)
+    setGloballyHidden(hidden)
 
     -- Determine alpha (only matters when visible)
     local alpha = 1
     if not hidden then
         local fadeConfig = globalConfig.outOfCombatFade
         if not _inCombat and fadeConfig and fadeConfig.enabled then
-            local shouldSkipFade = false
-
-            if fadeConfig.exceptInInstance and IsInInstance() then
-                shouldSkipFade = true
-            end
-
             local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
+            local skipFade = (fadeConfig.exceptInInstance and IsInInstance())
+                or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target"))
+                or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeHelped and UnitCanAssist("player", "target"))
 
-            if
-                not shouldSkipFade
-                and hasLiveTarget
-                and fadeConfig.exceptIfTargetCanBeAttacked
-                and UnitCanAttack("player", "target")
-            then
-                shouldSkipFade = true
-            end
-
-            if
-                not shouldSkipFade
-                and hasLiveTarget
-                and fadeConfig.exceptIfTargetCanBeHelped
-                and UnitCanAssist("player", "target")
-            then
-                shouldSkipFade = true
-            end
-
-            if not shouldSkipFade then
-                local opacity = fadeConfig.opacity or 100
-                alpha = math.max(0, math.min(1, opacity / 100))
+            if not skipFade then
+                alpha = math.max(0, math.min(1, (fadeConfig.opacity or 100) / 100))
             end
         end
     end
 
     setAlpha(alpha)
-
-    -- Single enforcement pass for Blizzard frames after all state is settled
     enforceBlizzardFrameState()
 end
 
@@ -390,21 +356,6 @@ local function getDetachedAnchorMetrics()
     return totalHeight, count
 end
 
----@return boolean
-local function hasVisibleDetachedModules()
-    for _, moduleName in ipairs(C.CHAIN_ORDER) do
-        local barModule = ns.Addon and ns.Addon:GetECMModule(moduleName, true)
-        if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
-            local mc = barModule:GetModuleConfig()
-            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED and barModule.InnerFrame then
-                return true
-            end
-        end
-    end
-
-    return false
-end
-
 ---@param anchor Frame
 ---@param layoutName string|nil
 ---@return boolean
@@ -427,7 +378,8 @@ end
 --- layout before detached modules calculate their own anchors.
 ---@return Frame|nil
 local function prepareDetachedAnchorForLayout()
-    if not hasVisibleDetachedModules() then
+    local _, count = getDetachedAnchorMetrics()
+    if count == 0 then
         return nil
     end
 
@@ -553,14 +505,19 @@ function Runtime.SetLayoutPreview(active)
     Runtime.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
 end
 
---- Runs a layout update synchronously (no timer batching).
---- Use for Edit Mode drag where 1-frame latency is noticeable.
---- @param reason string|nil The lifecycle reason.
-function Runtime.UpdateLayoutImmediately(reason)
+--- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
+local function executeLayout(reason)
     _layoutPending = false
     hookCooldownViewerSettings()
     updateFadeAndHiddenStates()
     updateAllLayouts(reason)
+end
+
+--- Runs a layout update synchronously (no timer batching).
+--- Use for Edit Mode drag where 1-frame latency is noticeable.
+--- @param reason string|nil The lifecycle reason.
+function Runtime.UpdateLayoutImmediately(reason)
+    executeLayout(reason)
 end
 
 --- Schedules a layout update after a delay (debounced).
@@ -573,10 +530,7 @@ function Runtime.ScheduleLayoutUpdate(delay, reason)
 
     _layoutPending = true
     C_Timer.After(delay or 0, function()
-        _layoutPending = false
-        hookCooldownViewerSettings()
-        updateFadeAndHiddenStates()
-        updateAllLayouts(reason)
+        executeLayout(reason)
     end)
 end
 
@@ -613,7 +567,10 @@ end
 ---@param event string
 ---@param arg1 any
 local function handleLayoutEvent(_addon, event, arg1)
-    hookCooldownViewerSettings()
+    if not _watchdogSetupComplete then
+        hookCooldownViewerSettings()
+        tryCompleteWatchdogSetup()
+    end
 
     if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
         return
@@ -639,7 +596,7 @@ local function handleLayoutEvent(_addon, event, arg1)
         _inCombat = (event == "PLAYER_REGEN_DISABLED")
     end
 
-    if config.delay and config.delay > 0 then
+    if config.delay > 0 then
         C_Timer.After(config.delay, function()
             updateFadeAndHiddenStates()
             updateAllLayouts(event)
@@ -658,7 +615,7 @@ local function enableLayoutEvents(addon)
 
     _layoutEventsEnabled = true
 
-    if _layoutWatchdogTicker and type(_layoutWatchdogTicker.Cancel) == "function" then
+    if _layoutWatchdogTicker then
         _layoutWatchdogTicker:Cancel()
     end
 
@@ -674,8 +631,11 @@ local function enableLayoutEvents(addon)
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
     _layoutWatchdogTicker = C_Timer.NewTicker(C.WATCHDOG_INTERVAL, function()
-        hookBlizzardFrames()
-        hookCooldownViewerSettings()
+        if not _watchdogSetupComplete then
+            hookBlizzardFrames()
+            hookCooldownViewerSettings()
+            tryCompleteWatchdogSetup()
+        end
         enforceBlizzardFrameState()
 
         local alpha = _desiredAlpha
@@ -699,7 +659,7 @@ local function disableLayoutEvents(addon)
     end
     addon:UnregisterEvent("CVAR_UPDATE")
 
-    if _layoutWatchdogTicker and type(_layoutWatchdogTicker.Cancel) == "function" then
+    if _layoutWatchdogTicker then
         _layoutWatchdogTicker:Cancel()
     end
     _layoutWatchdogTicker = nil
