@@ -3,9 +3,7 @@ return {
     reportfile = "luacov.report.out",
     includeuntestedfiles = true,
     include = {
-        "^ECM%.lua$",
-        "^ECM_Constants%.lua$",
-        "^ECM_Defaults%.lua$",
+        "^ECM[^/]*%.lua$",
         "^Helpers/",
         "^Modules/",
         "^UI/",
