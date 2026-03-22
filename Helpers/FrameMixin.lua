@@ -158,26 +158,15 @@ function FrameMixinProto:GetNextChainAnchor(frameName, anchorMode)
         if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local moduleConfig = barModule:GetModuleConfig()
             if moduleConfig and moduleConfig.anchorMode == anchorMode and barModule.InnerFrame then
-                if ECM.IsDebugEnabled() then
-                    ECM.Log(self.Name, "GetNextChainAnchor " .. barName .. " <-- " .. (frameName or "nil"))
-                end
                 return barModule.InnerFrame, false
             end
         end
     end
 
-    -- Root anchor depends on the mode being resolved.
     if anchorMode == ECM.Constants.ANCHORMODE_DETACHED then
-        if ECM.IsDebugEnabled() then
-            ECM.Log(self.Name, "GetNextChainAnchor DetachedAnchor <-- " .. (frameName or "nil"))
-        end
         return ECM.Runtime.DetachedAnchor or UIParent, true
     end
 
-    -- If none of the preceding frames in the chain are valid, anchor to the viewer as the first.
-    if ECM.IsDebugEnabled() then
-        ECM.Log(self.Name, "GetNextChainAnchor Viewer <-- " .. (frameName or "nil"))
-    end
     return _G["EssentialCooldownViewer"] or UIParent, true
 end
 
@@ -441,7 +430,6 @@ end
 --- Internal: checks readiness and runs the coalesced layout update.
 local function updateLayoutDeferred(self)
     if not self:IsReady() then
-        ECM.Log(self.Name, "Layout update skipped (not ready)")
         self._updateLayoutPending = false
         self._pendingWhy = nil
         return

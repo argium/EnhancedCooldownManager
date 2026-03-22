@@ -16,60 +16,10 @@ local LibDeflate = LibStub("LibDeflate")
 -- Helper Functions
 --------------------------------------------------------------------------------
 
---- Deep copies a table, excluding specified paths.
----@param source table The table to copy
----@param excludePaths table|nil Array of dot-notation paths to exclude (e.g., {"buffBars.colors.cache"})
----@param currentPath string|nil Current path in recursion (internal use)
----@param seen table|nil Cycle-detection set (internal use)
----@return table copy The deep copy
-local function deepCopyExcluding(source, excludePaths, currentPath, seen)
-    if type(source) ~= "table" then
-        return source
-    end
-
-    seen = seen or {}
-    if seen[source] then
-        local path = currentPath or ""
-        local message = "Circular reference detected at path: " .. path
-        ECM.Log("ImportExport", message)
-        error(message)
-        return nil
-    end
-    seen[source] = true
-
-    currentPath = currentPath or ""
-    excludePaths = excludePaths or {}
-    local copy = {}
-
-    for key, value in pairs(source) do
-        local keyPath = currentPath == "" and tostring(key) or currentPath .. "." .. tostring(key)
-
-        local shouldExclude = false
-        for _, excludePath in ipairs(excludePaths) do
-            if keyPath == excludePath then
-                shouldExclude = true
-                break
-            end
-        end
-
-        if not shouldExclude then
-            if type(value) == "table" then
-                copy[key] = deepCopyExcluding(value, excludePaths, keyPath, seen)
-            else
-                copy[key] = value
-            end
-        end
-    end
-
-    seen[source] = nil
-    return copy
-end
-
 --- Generates metadata for export string.
 ---@return table metadata Metadata about the export
 local function generateMetadata()
     local version = C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "unknown"
-
     return {
         addonVersion = version,
         exportVersion = C.EXPORT_VERSION,
@@ -166,9 +116,11 @@ end
 local function prepareProfileForExport(profile)
     assert(profile, "profile is nil")
 
-    -- Exclude runtime cache data
-    local excludePaths = { "buffBars.colors.cache" }
-    local cleanedProfile = deepCopyExcluding(profile, excludePaths)
+    local cleanedProfile = ECM.CloneValue(profile)
+    -- Strip runtime cache data from the export
+    if cleanedProfile.buffBars and cleanedProfile.buffBars.colors then
+        cleanedProfile.buffBars.colors.cache = nil
+    end
 
     return {
         metadata = generateMetadata(),
@@ -226,7 +178,7 @@ function ImportExport.ApplyImportData(data)
     -- Preserve the cache if it exists (deep copy to avoid shared references)
     local existingCache = db.profile.buffBars and db.profile.buffBars.colors and db.profile.buffBars.colors.cache
     if existingCache then
-        existingCache = deepCopyExcluding(existingCache)
+        existingCache = ECM.CloneValue(existingCache)
     end
 
     -- Clear and replace profile

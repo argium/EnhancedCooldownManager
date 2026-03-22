@@ -73,13 +73,7 @@ end
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
 local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)
-    if not iconFrame then
-        return
-    end
-    if iconFrame.__ecmSquareStyled then
-        return
-    end
-    if not iconTexture then
+    if not iconFrame or iconFrame.__ecmSquareStyled or not iconTexture then
         return
     end
 
@@ -91,9 +85,7 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
             local mask = iconTexture:GetMaskTexture(i)
             if mask then
                 iconTexture:RemoveMaskTexture(mask)
-                if mask.Hide then
-                    mask:Hide()
-                end
+                if mask.Hide then mask:Hide() end
             end
         end
     elseif iconTexture.SetMask then
@@ -105,20 +97,13 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
         for _, region in ipairs({ iconFrame:GetRegions() }) do
             if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
                 pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                if region.Hide then
-                    region:Hide()
-                end
+                if region.Hide then region:Hide() end
             end
         end
     end
 
-    if iconOverlay then
-        iconOverlay:Hide()
-    end
-
-    if debuffBorder then
-        debuffBorder:Hide()
-    end
+    if iconOverlay then iconOverlay:Hide() end
+    if debuffBorder then debuffBorder:Hide() end
 
     iconFrame.__ecmSquareStyled = true
 end
@@ -479,15 +464,7 @@ function BuffBars:IsReady()
         return false
     end
 
-    -- Check if the viewer is in a state where we can enumerate children
-    local canGetChildren = pcall(function()
-        viewer:GetChildren()
-    end)
-    if not canGetChildren then
-        return false
-    end
-
-    return true
+    return pcall(viewer.GetChildren, viewer)
 end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
@@ -575,16 +552,11 @@ end
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
     local viewer = _G["BuffBarCooldownViewer"]
-    if not viewer then
-        return
-    end
-
-    if self._viewerHooked then
+    if not viewer or self._viewerHooked then
         return
     end
     self._viewerHooked = true
 
-    -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function()
         self:ThrottledUpdateLayout("viewer:OnShow")
     end)

@@ -351,8 +351,8 @@ local function createDetachedSettingSpecs()
             desc = L["DETACHED_GROW_DIRECTION_DESC"],
             default = C.GROW_DIRECTION_DOWN,
             values = {
-                { label = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
-                { label = L["UP"], value = C.GROW_DIRECTION_UP },
+                { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
+                { text = L["UP"], value = C.GROW_DIRECTION_UP },
             },
             updateReason = "DetachedAnchorGrowDirection",
         },
@@ -380,7 +380,7 @@ local function createDetachedStackArgs()
             arg.type = "select"
             arg.values = {}
             for _, option in ipairs(spec.values) do
-                arg.values[option.value] = option.label
+                arg.values[option.value] = option.text
             end
         else
             arg.type = "range"

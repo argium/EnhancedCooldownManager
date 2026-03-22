@@ -87,25 +87,20 @@ function PowerBar:_OnBarRefreshed(why)
 end
 
 function PowerBar:ShouldShow()
-    local show = ECM.FrameMixin.Proto.ShouldShow(self)
-    if show then
-        local _, class = UnitClass("player")
-        local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    if not ECM.FrameMixin.Proto.ShouldShow(self) then
+        return false
+    end
 
-        -- Hide mana bar for DPS specs (except mage/warlock/druid) and all tank specs
-        local role = GetSpecializationRole(GetSpecialization())
-        if powerType == Enum.PowerType.Mana then
-            if role == "TANK" then
-                return false
-            elseif role == "DAMAGER" then
-                return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false
-            end
-        end
-
+    local _, class = UnitClass("player")
+    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    if powerType ~= Enum.PowerType.Mana then
         return true
     end
 
-    return false
+    local role = GetSpecializationRole(GetSpecialization())
+    if role == "TANK" then return false end
+    if role == "DAMAGER" then return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false end
+    return true
 end
 
 function PowerBar:OnUnitPowerUpdate(event, unitID, ...)

@@ -93,15 +93,9 @@ end
 ---@param horizontal string|nil
 ---@return string
 function FrameUtil.BuildAnchorName(vertical, horizontal)
-    if vertical == nil and horizontal == nil then
-        return C.EDIT_MODE_DEFAULT_POINT
-    end
-    if vertical == nil then
-        return horizontal
-    end
-    if horizontal == nil then
-        return vertical
-    end
+    if not vertical and not horizontal then return C.EDIT_MODE_DEFAULT_POINT end
+    if not vertical then return horizontal end
+    if not horizontal then return vertical end
     return vertical .. horizontal
 end
 
@@ -141,7 +135,6 @@ function FrameUtil.GetParentSize(parent)
             return width, height
         end
     end
-
     local width = (parent and parent.GetWidth and parent:GetWidth()) or 0
     local height = (parent and parent.GetHeight and parent:GetHeight()) or 0
     return width, height
