@@ -7,6 +7,11 @@ local L = ECM.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local OU = ECM.OptionUtil
+local getGlobalConfig = ECM.GetGlobalConfig or function()
+    local db = ns.Addon and ns.Addon.db
+    local profile = db and db.profile
+    return profile and profile.global
+end
 
 --------------------------------------------------------------------------------
 -- SettingsBuilder instance
@@ -35,10 +40,12 @@ ECM.SettingsBuilder = LSB:New({
         FontOverrideGroup = {
             fontValues = LSMW.GetFontValues,
             fontFallback = function()
-                return ns.Addon.db.profile.global.font
+                local gc = getGlobalConfig()
+                return gc and gc.font
             end,
             fontSizeFallback = function()
-                return ns.Addon.db.profile.global.fontSize
+                local gc = getGlobalConfig()
+                return gc and gc.fontSize
             end,
             fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
         },

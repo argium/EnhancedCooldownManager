@@ -5,21 +5,16 @@
 local _, ns = ...
 local L = ECM.L
 local RuneBarOptions = {}
-
-local function isNotDeathKnight()
-    return not ECM.ClassUtil.IsDeathKnight()
-end
-
-local function isDisabled()
-    return isNotDeathKnight() or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "runeBar.enabled")
-end
+local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("runeBar")
 
 function RuneBarOptions.RegisterSettings(SB)
     local args = ECM.OptionUtil.CreateBarArgs(isDisabled, { showText = false, border = false })
     args.dkWarning = {
         type = "subheader",
         name = L["DK_ONLY_WARNING"],
-        condition = isNotDeathKnight,
+        condition = function()
+            return not ECM.ClassUtil.IsDeathKnight()
+        end,
         order = 0,
     }
     args.enabled = {
@@ -79,7 +74,9 @@ function RuneBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = L["RUNE_BAR"],
         path = "runeBar",
-        disabled = isNotDeathKnight,
+        disabled = function()
+            return not ECM.ClassUtil.IsDeathKnight()
+        end,
         args = args,
     })
 end

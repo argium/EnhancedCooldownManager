@@ -21,11 +21,7 @@ local RESOURCE_COLOR_DEFS = {
 }
 
 local ResourceBarOptions = {}
-
-local function isDisabled()
-    return ECM.ClassUtil.IsDeathKnight()
-        or not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "resourceBar.enabled")
-end
+local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("resourceBar")
 
 function ResourceBarOptions.RegisterSettings(SB)
     local args = ECM.OptionUtil.CreateBarArgs(isDisabled)

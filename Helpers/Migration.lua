@@ -31,31 +31,6 @@ end
 -- Helpers
 --------------------------------------------------------------------------------
 
---- Deep copies a table for migration purposes (no depth limit, no secret handling).
---- SavedVariable data is plain Lua tables with primitives and nested tables.
----@param value any
----@param seen table|nil
----@return any
-local function deepCopy(value, seen)
-    if type(value) ~= "table" then
-        return value
-    end
-
-    seen = seen or {}
-    if seen[value] then
-        return nil
-    end
-    seen[value] = true
-
-    local copy = {}
-    for k, v in pairs(value) do
-        copy[k] = deepCopy(v, seen)
-    end
-
-    seen[value] = nil
-    return copy
-end
-
 --- Aligns copied profile schemaVersion values with the slot they came from.
 --- The versioned slot key is the source of truth during reseeding; older slots
 --- may contain profiles that were previously migrated forward in-place.
@@ -139,6 +114,24 @@ local function normalizeColorTable(colorTable, defaultAlpha)
     for key, value in pairs(colorTable) do
         colorTable[key] = normalizeLegacyColor(value, defaultAlpha)
     end
+end
+
+-- Migration loads before ECM.lua during normal addon startup, so the canonical
+-- clone helper may not exist yet when PrepareDatabase reseeds versioned slots.
+local function cloneValue(value)
+    if ECM.CloneValue then
+        return ECM.CloneValue(value)
+    end
+
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for k, v in pairs(value) do
+        copy[k] = cloneValue(v)
+    end
+    return copy
 end
 
 local function normalizeBarConfig(cfg)
@@ -1228,7 +1221,7 @@ function Migration.PrepareDatabase()
         local priorVersion = findBestPriorVersion(versions, version)
         if priorVersion and versions[priorVersion] then
             log("Copying from schema V" .. priorVersion .. " to V" .. version)
-            versions[version] = deepCopy(versions[priorVersion])
+            versions[version] = cloneValue(versions[priorVersion])
             alignSlotProfileSchemas(versions[version], priorVersion)
         elseif sv.profiles then
             -- Seed from legacy top-level AceDB data (pre-versioning addon builds)
@@ -1237,8 +1230,8 @@ function Migration.PrepareDatabase()
             if hasProfiles then
                 log("Copying legacy profiles to versioned store V" .. version)
                 versions[version] = {
-                    profiles = deepCopy(sv.profiles),
-                    profileKeys = sv.profileKeys and deepCopy(sv.profileKeys) or nil,
+                    profiles = cloneValue(sv.profiles),
+                    profileKeys = sv.profileKeys and cloneValue(sv.profileKeys) or nil,
                 }
             end
         end

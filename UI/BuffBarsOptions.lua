@@ -269,6 +269,7 @@ BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
+    local defaultZero = ECM.OptionUtil.CreateDefaultValueTransform(0)
     SB.RegisterFromTable({
         name = L["AURA_BARS"],
         path = "buffBars",
@@ -310,9 +311,7 @@ function BuffBarsOptions.RegisterSettings(SB)
                 max = 40,
                 step = 1,
                 disabled = isDisabled,
-                getTransform = function(value)
-                    return value or 0
-                end,
+                getTransform = defaultZero,
                 setTransform = function(value)
                     return value > 0 and value or nil
                 end,
@@ -327,9 +326,7 @@ function BuffBarsOptions.RegisterSettings(SB)
                 max = 20,
                 step = 1,
                 disabled = isDisabled,
-                getTransform = function(value)
-                    return value or 0
-                end,
+                getTransform = defaultZero,
                 order = 25,
             },
             fontOverride = { type = "fontOverride", disabled = isDisabled, order = 26 },

@@ -25,6 +25,8 @@ local function createAnchorModeSpec(name, path, order, disabled)
 end
 
 function LayoutOptions.RegisterSettings(SB)
+    local defaultZero = ECM.OptionUtil.CreateDefaultValueTransform(0)
+    local defaultDetachedGrowDirection = ECM.OptionUtil.CreateDefaultValueTransform(C.GROW_DIRECTION_DOWN)
     local powerBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("powerBar")
     local resourceBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("resourceBar")
     local runeBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("runeBar")
@@ -63,9 +65,7 @@ function LayoutOptions.RegisterSettings(SB)
             min = 0,
             max = 20,
             step = 1,
-            getTransform = function(value)
-                return value or 0
-            end,
+            getTransform = defaultZero,
             order = 22,
         },
         moduleGrowDirection = {
@@ -77,9 +77,7 @@ function LayoutOptions.RegisterSettings(SB)
                 [C.GROW_DIRECTION_DOWN] = L["DOWN"],
                 [C.GROW_DIRECTION_UP] = L["UP"],
             },
-            getTransform = function(value)
-                return value or C.GROW_DIRECTION_DOWN
-            end,
+            getTransform = defaultDetachedGrowDirection,
             order = 23,
         },
     }

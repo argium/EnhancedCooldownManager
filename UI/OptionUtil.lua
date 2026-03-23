@@ -142,6 +142,12 @@ local function createLayoutBreadcrumbArgs(order)
     }
 end
 
+local function createDefaultValueTransform(defaultValue)
+    return function(value)
+        return value or defaultValue
+    end
+end
+
 --- Gets the nested value from table using dot-separated path
 ---@param tbl table The table to get the value from
 ---@param path string The dot-separated path to the value
@@ -360,6 +366,7 @@ local function createDetachedSettingSpecs()
 end
 
 local function createDetachedStackArgs()
+    local defaultZero = createDefaultValueTransform(0)
     local args = {
         detachedHeader = { type = "header", name = L["POSITION_MODE_DETACHED"], order = 30 },
     }
@@ -371,9 +378,7 @@ local function createDetachedStackArgs()
             name = spec.name,
             desc = spec.desc,
             order = order,
-            getTransform = function(value)
-                return value or spec.default
-            end,
+            getTransform = spec.default == 0 and defaultZero or createDefaultValueTransform(spec.default),
         }
 
         if spec.values then
@@ -444,6 +449,7 @@ ECM.OptionUtil = {
     CreateModuleEnabledHandler = createModuleEnabledHandler,
     OpenLayoutPage = openLayoutPage,
     CreateLayoutBreadcrumbArgs = createLayoutBreadcrumbArgs,
+    CreateDefaultValueTransform = createDefaultValueTransform,
     CreatePositioningExamplesCanvas = createPositioningExamplesCanvas,
     CreateBarArgs = createBarArgs,
     CreateDetachedStackArgs = createDetachedStackArgs,

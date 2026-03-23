@@ -30,8 +30,7 @@ function store.GetCurrentTicks()
     if not classID or not specIndex then
         return {}
     end
-    local ticksCfg = ns.Addon.db.profile.powerBar and ns.Addon.db.profile.powerBar.ticks
-    local mappings = ticksCfg and ticksCfg.mappings
+    local mappings = getTicksConfig().mappings
     local classMappings = mappings and mappings[classID]
     return classMappings and classMappings[specIndex] or {}
 end

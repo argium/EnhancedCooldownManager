@@ -204,11 +204,35 @@ local splitAnchorName = FU.SplitAnchorName
 local buildAnchorName = FU.BuildAnchorName
 local convertOffsetToAnchor = FU.ConvertOffsetToAnchor
 
+---@param key string
+---@param defaultValue any
+---@return any
+local function getDetachedConfigValue(key, defaultValue)
+    local gc = ECM.GetGlobalConfig()
+    local value = gc and gc[key]
+    if value == nil then
+        return defaultValue
+    end
+    return value
+end
+
+---@param key string
+---@param value any
+---@param updateReason string
+local function setDetachedConfigValue(key, value, updateReason)
+    local gc = ECM.GetGlobalConfig()
+    if not gc then
+        return
+    end
+
+    gc[key] = value
+    Runtime.UpdateLayoutImmediately(updateReason)
+end
+
 --- Returns whether detached stacks are configured to grow upward.
 ---@return boolean
 local function detachedAnchorGrowsUp()
-    local gc = ECM.GetGlobalConfig()
-    return (gc and gc.detachedGrowDirection) == C.GROW_DIRECTION_UP
+    return getDetachedConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
 end
 
 -- Detached stacks are more stable if their saved position is based on the edge
@@ -271,15 +295,10 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
-                    return (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+                    return getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    if gc then
-                        gc.detachedBarWidth = value
-                        Runtime.UpdateLayoutImmediately("DetachedAnchorWidth")
-                    end
+                    setDetachedConfigValue("detachedBarWidth", value, "DetachedAnchorWidth")
                 end,
                 default = C.DEFAULT_BAR_WIDTH,
                 minValue = 100,
@@ -291,15 +310,10 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Slider,
                 name = L["SPACING"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
-                    return (gc and gc.detachedModuleSpacing) or 0
+                    return getDetachedConfigValue("detachedModuleSpacing", 0)
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    if gc then
-                        gc.detachedModuleSpacing = value
-                        Runtime.UpdateLayoutImmediately("DetachedAnchorSpacing")
-                    end
+                    setDetachedConfigValue("detachedModuleSpacing", value, "DetachedAnchorSpacing")
                 end,
                 default = 0,
                 minValue = 0,
@@ -311,15 +325,10 @@ local function ensureDetachedAnchor()
                 kind = LibEQOLEditMode.SettingType.Dropdown,
                 name = L["GROW_DIRECTION"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
-                    return (gc and gc.detachedGrowDirection) or C.GROW_DIRECTION_DOWN
+                    return getDetachedConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN)
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    if gc then
-                        gc.detachedGrowDirection = value
-                        Runtime.UpdateLayoutImmediately("DetachedAnchorGrowDirection")
-                    end
+                    setDetachedConfigValue("detachedGrowDirection", value, "DetachedAnchorGrowDirection")
                 end,
                 values = {
                     { label = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
@@ -384,8 +393,7 @@ local function prepareDetachedAnchorForLayout()
     end
 
     local anchor = ensureDetachedAnchor()
-    local gc = ECM.GetGlobalConfig()
-    local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
+    local barWidth = getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
     ECM.FrameUtil.LazySetWidth(anchor, barWidth)
 
     local layoutName = EditMode.GetActiveLayoutName()
@@ -416,9 +424,8 @@ local function updateDetachedAnchorSize()
     end
 
     local anchor = ensureDetachedAnchor()
-    local gc = ECM.GetGlobalConfig()
-    local barWidth = (gc and gc.detachedBarWidth) or C.DEFAULT_BAR_WIDTH
-    local spacing = (gc and gc.detachedModuleSpacing) or 0
+    local barWidth = getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
+    local spacing = getDetachedConfigValue("detachedModuleSpacing", 0)
 
     if count > 1 then
         totalHeight = totalHeight + (spacing * (count - 1))
@@ -638,10 +645,9 @@ local function enableLayoutEvents(addon)
         end
         enforceBlizzardFrameState()
 
-        local alpha = _desiredAlpha
         for _, module in pairs(_modules) do
             if module.InnerFrame and not module.IsHidden then
-                ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+                ECM.FrameUtil.LazySetAlpha(module.InnerFrame, _desiredAlpha)
             end
         end
     end)
