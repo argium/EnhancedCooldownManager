@@ -22,32 +22,7 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     it("module loads and exposes RegisterSettings and Store", function()
-        _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
-        _G.YES = "Yes"
-        _G.NO = "No"
-        _G.SETTINGS_DEFAULTS = "Defaults"
-        _G.ECM = {
-            Constants = {
-                DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
-                CLASS_COLORS = { WARRIOR = "C79C6E" },
-                COLOR_WHITE_HEX = "FFFFFF",
-            },
-            L = setmetatable({}, { __index = function(_, k) return k end }),
-            CloneValue = TestHelpers.deepClone,
-            OptionUtil = {
-                GetCurrentClassSpec = function()
-                    return 1, 2, "Warrior", "Fury", "WARRIOR"
-                end,
-            },
-            ScheduleLayoutUpdate = function() end,
-        }
-
-        local addonNS = {
-            Addon = {
-                db = { profile = {} },
-            },
-        }
-        TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
+        TestHelpers.SetupPowerBarTickMarksEnv()
 
         assert.is_table(ECM.PowerBarTickMarksOptions)
         assert.is_function(ECM.PowerBarTickMarksOptions.RegisterSettings)

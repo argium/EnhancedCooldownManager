@@ -44,8 +44,7 @@ describe("BuffBarsOptions", function()
     end)
 
     before_each(function()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
+        TestHelpers.SetupOptionsGlobals()
 
         _G.UnitClass = function()
             return "Demon Hunter", "DEMONHUNTER", 12
@@ -94,30 +93,6 @@ describe("BuffBarsOptions", function()
                 GetCurrentClassSpec = function()
                     return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER"
                 end,
-                GetNestedValue = function(tbl, path)
-                    local current = tbl
-                    for key in path:gmatch("[^.]+") do
-                        if type(current) ~= "table" then
-                            return nil
-                        end
-                        current = current[key]
-                    end
-                    return current
-                end,
-                SetNestedValue = function(tbl, path, value)
-                    local parts = {}
-                    for key in path:gmatch("[^.]+") do
-                        parts[#parts + 1] = key
-                    end
-                    local current = tbl
-                    for i = 1, #parts - 1 do
-                        if current[parts[i]] == nil then
-                            current[parts[i]] = {}
-                        end
-                        current = current[parts[i]]
-                    end
-                    current[parts[#parts]] = value
-                end,
                 IsAnchorModeFree = function()
                     return false
                 end,
@@ -133,18 +108,12 @@ describe("BuffBarsOptions", function()
         }
 
         -- Load library
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        if lsmw then
-            lsmw.GetFontValues = function()
-                return {}
-            end
-            lsmw.GetStatusbarValues = function()
-                return {}
-            end
-            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
         end
 
         -- Load Constants

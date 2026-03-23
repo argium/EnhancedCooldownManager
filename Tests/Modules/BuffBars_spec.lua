@@ -32,21 +32,7 @@ describe("BuffBars real source", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    local function makeHookableFrame(opts)
-        local frame = makeFrame(opts)
-        frame._hooks = {}
-
-        function frame:HookScript(scriptName, callback)
-            self._hooks[scriptName] = self._hooks[scriptName] or {}
-            self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
-        end
-
-        function frame:GetHookCount(scriptName)
-            return self._hooks[scriptName] and #self._hooks[scriptName] or 0
-        end
-
-        return frame
-    end
+    local makeHookableFrame = TestHelpers.makeHookableFrame
 
     local function stubChildLayoutEnvironment()
         ECM.SpellColors.GetColorForBar = function()

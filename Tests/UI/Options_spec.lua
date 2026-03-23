@@ -36,18 +36,7 @@ describe("OptionUtil", function()
     end)
 
     before_each(function()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
-
-        _G.UnitClass = function()
-            return "Warrior", "WARRIOR", 1
-        end
-        _G.GetSpecialization = function()
-            return 1
-        end
-        _G.GetSpecializationInfo = function()
-            return nil, "Arms"
-        end
+        TestHelpers.SetupOptionsGlobals()
 
         TestHelpers.LoadLiveConstants()
         -- Test-specific sentinel values for anchor modes
@@ -57,13 +46,10 @@ describe("OptionUtil", function()
         ECM.Runtime = ECM.Runtime or {}
         ECM.Runtime.ScheduleLayoutUpdate = function() end
 
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end
-        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
 
         ns = {
             Addon = {

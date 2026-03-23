@@ -72,9 +72,8 @@ local function makeInitializer(setting)
         _parentInit = nil,
         _modifyPredicates = {},
         _shownPredicates = {},
-        SetParentInitializer = function(self, parent, predicate)
+        SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
-            self._parentPredicate = predicate
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates[#self._modifyPredicates + 1] = fn
@@ -142,15 +141,21 @@ end
 function TestHelpers.SetupLibEQOLEditModeStub()
     assert(_G.LibStub, "LibStub must be set up before calling SetupLibEQOLEditModeStub")
     local lib = _G.LibStub:NewLibrary("LibEQOLEditMode-1.0", 1) or _G.LibStub("LibEQOLEditMode-1.0")
-    lib.AddFrame = lib.AddFrame or function() end
-    lib.AddFrameSettings = lib.AddFrameSettings or function() end
-    lib.RegisterCallback = lib.RegisterCallback or function() end
-    lib.GetActiveLayoutName = lib.GetActiveLayoutName or function() return "Modern" end
-    lib.GetActiveLayoutIndex = lib.GetActiveLayoutIndex or function() return 1 end
-    lib.IsInEditMode = lib.IsInEditMode or function() return false end
-    lib.SetFrameDragEnabled = lib.SetFrameDragEnabled or function() end
-    lib.selectionRegistry = lib.selectionRegistry or {}
-    lib.SettingType = lib.SettingType or { Slider = 0, Dropdown = 1 }
+    lib.AddFrame = function() end
+    lib.AddFrameSettings = function() end
+    lib.RegisterCallback = function() end
+    lib.GetActiveLayoutName = function()
+        return "Modern"
+    end
+    lib.GetActiveLayoutIndex = function()
+        return 1
+    end
+    lib.IsInEditMode = function()
+        return false
+    end
+    lib.SetFrameDragEnabled = function() end
+    lib.selectionRegistry = {}
+    lib.SettingType = { Slider = 0, Dropdown = 1 }
     return lib
 end
 
@@ -380,9 +385,8 @@ function TestHelpers.SetupSettingsStubs()
             self.data = self.data or {}
             self.data.setting = setting
         end,
-        SetParentInitializer = function(self, parent, predicate)
+        SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
-            self._parentPredicate = predicate
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates = self._modifyPredicates or {}
@@ -405,6 +409,7 @@ end
 --------------------------------------------------------------------------------
 
 local unpack_fn = table.unpack or unpack
+TestHelpers.unpack_fn = unpack_fn
 
 function TestHelpers.incCalls(obj, name)
     obj.__calls = obj.__calls or {}
@@ -594,6 +599,34 @@ function TestHelpers.makeFrame(opts)
     return frame
 end
 
+function TestHelpers.makeHookableFrame(opts)
+    opts = type(opts) == "table" and opts or { shown = opts }
+
+    local frame = TestHelpers.makeFrame(opts)
+    frame._hooks = {}
+    frame._children = opts.children or {}
+
+    function frame:HookScript(scriptName, callback)
+        self._hooks[scriptName] = self._hooks[scriptName] or {}
+        self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
+    end
+
+    function frame:GetHookCount(scriptName)
+        return self._hooks[scriptName] and #self._hooks[scriptName] or 0
+    end
+
+    function frame:GetChildren()
+        return unpack_fn(self._children)
+    end
+
+    local baseGetPoint = frame.GetPoint
+    function frame:GetPoint(index)
+        return baseGetPoint(self, index or 1)
+    end
+
+    return frame
+end
+
 function TestHelpers.makeStatusBar(opts)
     local incCalls = TestHelpers.incCalls
     opts = opts or {}
@@ -733,6 +766,13 @@ TestHelpers.OPTIONS_GLOBALS = {
     "CreateScrollBoxListLinearView",
     "ScrollUtil",
     "SettingsPanel",
+    "C_AddOns",
+    "issecretvalue",
+    "issecrettable",
+    "canaccessvalue",
+    "canaccesstable",
+    "time",
+    "IsInInstance",
 }
 
 --- Load the live ECM_Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
@@ -771,11 +811,34 @@ function TestHelpers.SetupOptionsGlobals()
     _G.InCombatLockdown = function()
         return false
     end
+    _G.IsInInstance = function()
+        return false
+    end
     _G.UnitName = function()
         return "TestPlayer"
     end
     _G.date = function()
         return "120000"
+    end
+    _G.time = function()
+        return 1000
+    end
+    _G.C_AddOns = {
+        GetAddOnMetadata = function()
+            return nil
+        end,
+    }
+    _G.issecretvalue = function()
+        return false
+    end
+    _G.issecrettable = function()
+        return false
+    end
+    _G.canaccessvalue = function()
+        return true
+    end
+    _G.canaccesstable = function()
+        return true
     end
     _G.ColorPickerFrame = {
         SetupColorPickerAndShow = function() end,
@@ -940,12 +1003,8 @@ function TestHelpers.SetupOptionsGlobals()
     }
 end
 
---- Load LibSettingsBuilder + Options.lua and return the SB and ns.
---- @param profile table Profile data
---- @param defaults table Default profile data
---- @return table SB SettingsBuilder instance
---- @return table ns Addon namespace
-function TestHelpers.SetupOptionsEnv(profile, defaults)
+--- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.
+function TestHelpers.SetupLibSettingsBuilder()
     TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
     local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
@@ -957,6 +1016,17 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     end
     lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
     lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+
+    return lsmw
+end
+
+--- Load LibSettingsBuilder + Options.lua and return the SB and ns.
+--- @param profile table Profile data
+--- @param defaults table Default profile data
+--- @return table SB SettingsBuilder instance
+--- @return table ns Addon namespace
+function TestHelpers.SetupOptionsEnv(profile, defaults)
+    TestHelpers.SetupLibSettingsBuilder()
 
     TestHelpers.LoadLiveConstants()
     ECM.CloneValue = deepClone
@@ -1018,6 +1088,47 @@ function TestHelpers.CollectSettings(fn)
     fn()
     rawset(settings, "RegisterProxySetting", orig)
     return captured
+end
+
+--- Set up the PowerBar tick marks options/store environment and load the live module.
+--- @param opts table|nil Optional overrides for constants, profile, or GetCurrentClassSpec
+--- @return table addonNS
+function TestHelpers.SetupPowerBarTickMarksEnv(opts)
+    opts = opts or {}
+
+    _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
+    _G.YES = "Yes"
+    _G.NO = "No"
+    _G.SETTINGS_DEFAULTS = "Defaults"
+
+    _G.ECM = {
+        Constants = opts.constants or {
+            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
+            CLASS_COLORS = { WARRIOR = "C79C6E" },
+            COLOR_WHITE_HEX = "FFFFFF",
+        },
+        L = setmetatable({}, { __index = function(_, k)
+            return k
+        end }),
+        CloneValue = TestHelpers.deepClone,
+        OptionUtil = {
+            GetCurrentClassSpec = opts.getCurrentClassSpec or function()
+                return 1, 2, "Warrior", "Fury", "WARRIOR"
+            end,
+        },
+        ScheduleLayoutUpdate = function() end,
+    }
+
+    local addonNS = opts.addonNS or {
+        Addon = {
+            db = {
+                profile = opts.profile or {},
+            },
+        },
+    }
+
+    TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
+    return addonNS
 end
 
 return TestHelpers

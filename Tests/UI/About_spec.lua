@@ -10,12 +10,7 @@ describe("About section", function()
     local SB, ns
 
     setup(function()
-        local globals = {}
-        for _, v in ipairs(TestHelpers.OPTIONS_GLOBALS) do
-            globals[#globals + 1] = v
-        end
-        globals[#globals + 1] = "C_AddOns"
-        originalGlobals = TestHelpers.CaptureGlobals(globals)
+        originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
     end)
 
     teardown(function()

@@ -46,9 +46,7 @@ describe("SpellColors", function()
         return math.floor(value / divisor) % 2 == 1
     end
 
-    local function color(r, g, b, a)
-        return { r = r, g = g, b = b, a = a or 1 }
-    end
+    local color = TestHelpers.color
 
     local function makeFrame(opts)
         opts = opts or {}

@@ -4,35 +4,9 @@
 
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
-local unpack_fn = table.unpack or unpack
 local EditModeManagerFrame
 local UtilityCooldownViewer
-
-local function makeHookableFrame(shown)
-    local frame = TestHelpers.makeFrame({ shown = shown })
-    frame._hooks = {}
-    frame._children = {}
-
-    function frame:HookScript(scriptName, callback)
-        self._hooks[scriptName] = self._hooks[scriptName] or {}
-        self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
-    end
-
-    function frame:GetHookCount(scriptName)
-        return self._hooks[scriptName] and #self._hooks[scriptName] or 0
-    end
-
-    function frame:GetChildren()
-        return unpack_fn(self._children)
-    end
-
-    local baseGetPoint = frame.GetPoint
-    function frame:GetPoint(index)
-        return baseGetPoint(self, index or 1)
-    end
-
-    return frame
-end
+local makeHookableFrame = TestHelpers.makeHookableFrame
 
 describe("ItemIcons", function()
     local originalGlobals

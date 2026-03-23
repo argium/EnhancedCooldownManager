@@ -14,8 +14,6 @@ describe("ChatCommand migration", function()
     local printInfoCalled
     local printLogCalled
     local openOptionsCalls
-    local registeredEvents
-    local unregisteredEvents
     local scheduleLayoutCalls
 
     setup(function()
@@ -69,8 +67,6 @@ describe("ChatCommand migration", function()
         printInfoCalled = false
         printLogCalled = false
         openOptionsCalls = 0
-        registeredEvents = {}
-        unregisteredEvents = {}
         scheduleLayoutCalls = {}
 
         _G.strtrim = function(s)
@@ -244,12 +240,8 @@ describe("ChatCommand migration", function()
         fakeAddon = {
             db = { profile = { global = { debug = false } } },
         }
-        fakeAddon.RegisterEvent = function(_, eventName, handlerName)
-            registeredEvents[#registeredEvents + 1] = { eventName = eventName, handlerName = handlerName }
-        end
-        fakeAddon.UnregisterEvent = function(_, eventName)
-            unregisteredEvents[#unregisteredEvents + 1] = eventName
-        end
+        fakeAddon.RegisterEvent = function() end
+        fakeAddon.UnregisterEvent = function() end
         fakeAddon.GetModule = function(_, name)
             if name == "Options" then
                 return {

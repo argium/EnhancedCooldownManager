@@ -11,38 +11,6 @@ describe("LibSettingsBuilder", function()
     local layoutUpdateCalls
     local SB
 
-    local function getNestedValue(tbl, path)
-        local current = tbl
-        for segment in path:gmatch("[^.]+") do
-            if type(current) ~= "table" then
-                return nil
-            end
-            local val = current[segment]
-            if val == nil then
-                local num = tonumber(segment)
-                if num then
-                    val = current[num]
-                end
-            end
-            current = val
-        end
-        return current
-    end
-
-    local function setNestedValue(tbl, path, value)
-        local current, lastKey = tbl, nil
-        for segment in path:gmatch("[^.]+") do
-            if lastKey then
-                if current[lastKey] == nil then
-                    current[lastKey] = {}
-                end
-                current = current[lastKey]
-            end
-            lastKey = segment
-        end
-        current[lastKey] = value
-    end
-
     local function createSB2(varPrefix, categoryName)
         local LSB2 = LibStub("LibSettingsBuilder-1.0")
         local SB2 = LSB2:New({
@@ -53,8 +21,8 @@ describe("LibSettingsBuilder", function()
                 getDefaults = function()
                     return addonNS.Addon.db.defaults.profile
                 end,
-                getNestedValue = getNestedValue,
-                setNestedValue = setNestedValue,
+                getNestedValue = ECM.OptionUtil.GetNestedValue,
+                setNestedValue = ECM.OptionUtil.SetNestedValue,
             }),
             varPrefix = varPrefix,
             onChanged = function() end,
@@ -1879,8 +1847,8 @@ describe("LibSettingsBuilder", function()
                 pathAdapter = LSB.PathAdapter({
                     getStore = function() return addonNS.Addon.db.profile end,
                     getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-                    getNestedValue = getNestedValue,
-                    setNestedValue = setNestedValue,
+                    getNestedValue = ECM.OptionUtil.GetNestedValue,
+                    setNestedValue = ECM.OptionUtil.SetNestedValue,
                 }),
                 varPrefix = prefix or "T",
                 onChanged = function() end,
@@ -2030,8 +1998,8 @@ describe("LibSettingsBuilder", function()
                 pathAdapter = lsb.PathAdapter({
                     getStore = function() return addonNS.Addon.db.profile end,
                     getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-                    getNestedValue = getNestedValue,
-                    setNestedValue = setNestedValue,
+                    getNestedValue = ECM.OptionUtil.GetNestedValue,
+                    setNestedValue = ECM.OptionUtil.SetNestedValue,
                 }),
                 varPrefix = "D",
                 onChanged = function() end,

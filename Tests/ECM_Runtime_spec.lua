@@ -489,7 +489,7 @@ describe("ECM.Runtime layout system", function()
             }
             mod.InnerFrame:SetHeight(24)
             fakeAddon.GetECMModule = function(_, name)
-                return name == mod.Name and mod or nil
+                return name == mod.Name and mod
             end
 
             ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
@@ -522,7 +522,7 @@ describe("ECM.Runtime layout system", function()
             }
             mod.InnerFrame:SetHeight(24)
             fakeAddon.GetECMModule = function(_, name)
-                return name == mod.Name and mod or nil
+                return name == mod.Name and mod
             end
 
             ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
@@ -564,7 +564,7 @@ describe("ECM.Runtime layout system", function()
             }
             mod.InnerFrame:SetHeight(24)
             fakeAddon.GetECMModule = function(_, name)
-                return name == mod.Name and mod or nil
+                return name == mod.Name and mod
             end
 
             ECM.FrameUtil.LazySetAnchors = function(frame, anchors)

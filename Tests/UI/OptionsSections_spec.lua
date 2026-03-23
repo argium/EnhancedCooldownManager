@@ -35,23 +35,15 @@ describe("Options sections and root assembly", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    local function setupLibs()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+    it("root Options module creates categories and calls RegisterSettings on sections", function()
+        TestHelpers.SetupOptionsGlobals()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end
         lsmw.GetStatusbarValues = function()
             return {}
         end
-        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-        lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
-    end
-
-    it("root Options module creates categories and calls RegisterSettings on sections", function()
-        setupLibs()
 
         local registerSettingsCalls = {}
         local dbCallbacks = {}
@@ -66,9 +58,7 @@ describe("Options sections and root assembly", function()
             ScheduleLayoutUpdate = function() end,
         }
 
-        _G.ECM_DeepEquals = function(a, b)
-            return a == b
-        end
+        _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.ECM.CloneValue = function(v)
             return v
         end
@@ -142,7 +132,14 @@ describe("Options sections and root assembly", function()
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
-        setupLibs()
+        TestHelpers.SetupOptionsGlobals()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
+        end
 
         _G.UnitClass = function()
             return "Player", "WARRIOR", 1
