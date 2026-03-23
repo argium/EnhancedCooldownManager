@@ -6,21 +6,30 @@ local _, ns = ...
 local C = ECM.Constants
 local L = ECM.L
 
-local function getTicksConfig()
-    local powerBar = ns.Addon.db.profile.powerBar
-    if powerBar and powerBar.ticks then
-        return powerBar.ticks
-    end
-    if not ns.Addon.db.profile.powerBar then
-        ns.Addon.db.profile.powerBar = {}
+local function getPowerBarConfig()
+    local profile = ns.Addon.db.profile
+    local powerBar = profile.powerBar
+    if powerBar then
+        return powerBar
     end
 
-    ns.Addon.db.profile.powerBar.ticks = {
+    powerBar = {}
+    profile.powerBar = powerBar
+    return powerBar
+end
+
+local function getTicksConfig()
+    local powerBar = getPowerBarConfig()
+    if powerBar.ticks then
+        return powerBar.ticks
+    end
+
+    powerBar.ticks = {
         mappings = {},
         defaultColor = C.DEFAULT_POWERBAR_TICK_COLOR,
         defaultWidth = 1,
     }
-    return ns.Addon.db.profile.powerBar.ticks
+    return powerBar.ticks
 end
 
 local store = {}
