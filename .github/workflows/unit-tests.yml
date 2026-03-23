@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
     busted:
+        name: Unit Tests
         runs-on: ubuntu-latest
         permissions:
             contents: read
