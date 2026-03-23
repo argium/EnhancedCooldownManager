@@ -181,9 +181,53 @@ end)
 describe("FrameMixin real source", function()
     local originalGlobals
     local FrameMixin
+    local Migration
     local ns
     local timerQueue
+    local assertAbsolutePositionPreserved = TestHelpers.assertAbsolutePositionPreserved
+    local getAbsoluteAnchorPosition = TestHelpers.getAbsoluteAnchorPosition
     local makeFrame = TestHelpers.makeFrame
+    local color = TestHelpers.color
+
+    local LEGACY_FREE_POSITION_DEFAULTS = {
+        powerBar = { point = "CENTER", x = 0, y = -275 },
+        resourceBar = { point = "CENTER", x = 0, y = -300 },
+        runeBar = { point = "CENTER", x = 0, y = -325 },
+        buffBars = { point = "CENTER", x = 0, y = -350 },
+    }
+
+    local function assertFreeFramePositionPreserved(frame, expectedX, expectedY)
+        local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
+        assert.are.equal(_G.UIParent, relativeTo)
+        assert.are.equal(point, relativePoint)
+
+        local actualX, actualY = getAbsoluteAnchorPosition(point, x, y)
+        assert.are.equal(expectedX, actualX)
+        assert.are.equal(expectedY, actualY)
+    end
+
+    local function makeFreeModeModule(name, globalConfig, moduleConfig)
+        local mod = {
+            Name = name,
+            InnerFrame = makeFrame({ name = "ECM" .. name, shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+            GetGlobalConfig = function()
+                return globalConfig
+            end,
+            GetModuleConfig = function()
+                return moduleConfig
+            end,
+            Refresh = function() end,
+        }
+
+        FrameMixin.AddMixin(mod, name)
+        return mod
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -193,6 +237,7 @@ describe("FrameMixin real source", function()
             "UIParent",
             "EssentialCooldownViewer",
             "LibStub",
+            "date",
         })
     end)
 
@@ -231,8 +276,13 @@ describe("FrameMixin real source", function()
         _G.GetTime = function()
             return 0
         end
+        _G.date = function()
+            return "2026-03-23 00:00:00"
+        end
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
+        _G.UIParent:SetWidth(1920)
+        _G.UIParent:SetHeight(1080)
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
@@ -243,7 +293,9 @@ describe("FrameMixin real source", function()
         TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")()
         FrameMixin = assert(ECM.FrameMixin, "FrameMixin did not initialize")
+        Migration = assert(ECM.Migration, "Migration did not initialize")
     end)
 
     it("GetNextChainAnchor returns the nearest earlier chain module", function()
@@ -567,6 +619,73 @@ describe("FrameMixin real source", function()
 
         assert.are.equal("Modern", ECM.EditMode.GetActiveLayoutName())
         assert.are.equal(1, indexCalls)
+    end)
+
+    it("UpdateLayout preserves final frame placement for V11 seeded legacy free-mode defaults", function()
+        local globalConfig = {
+            barHeight = 20,
+            barWidth = 180,
+            barBgColor = color(0, 0, 0, 0.5),
+            updateFrequency = 0,
+        }
+        local profile = {
+            schemaVersion = 10,
+            global = globalConfig,
+            powerBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(1, 0, 0, 1) },
+            resourceBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(0, 1, 0, 1) },
+            runeBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(0, 0, 1, 1) },
+            buffBars = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(1, 1, 0, 1) },
+        }
+
+        ECM.EditMode.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        Migration.Run(profile)
+
+        for section, expected in pairs(LEGACY_FREE_POSITION_DEFAULTS) do
+            local expectedX, expectedY = getAbsoluteAnchorPosition(expected.point, expected.x, expected.y)
+            local mod = makeFreeModeModule(section, globalConfig, profile[section])
+
+            assert.is_true(mod:UpdateLayout("V11SeededLegacyDefaults"))
+            assertFreeFramePositionPreserved(mod.InnerFrame, expectedX, expectedY)
+        end
+    end)
+
+    it("UpdateLayout preserves final frame placement for V11 migrated free-mode anchors", function()
+        local globalConfig = {
+            barHeight = 20,
+            barWidth = 180,
+            barBgColor = color(0, 0, 0, 0.5),
+            updateFrequency = 0,
+        }
+        local profile = {
+            schemaVersion = 10,
+            global = globalConfig,
+            powerBar = {
+                enabled = true,
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOPLEFT",
+                relativePoint = "BOTTOM",
+                offsetX = 150,
+                offsetY = -50,
+                bgColor = color(1, 0, 0, 1),
+            },
+        }
+        ECM.EditMode.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        Migration.Run(profile)
+        local migrated = profile.powerBar.editModePositions.Modern
+
+        local mod = makeFreeModeModule("powerBar", globalConfig, profile.powerBar)
+        assert.is_true(mod:UpdateLayout("V11MigratedFreePosition"))
+        assertAbsolutePositionPreserved("TOPLEFT", "BOTTOM", 150, -50, migrated)
+        assertFreeFramePositionPreserved(
+            mod.InnerFrame,
+            getAbsoluteAnchorPosition(migrated.point, migrated.x, migrated.y)
+        )
     end)
 
     it("AddMixin skips Edit Mode registration when the module opts out", function()

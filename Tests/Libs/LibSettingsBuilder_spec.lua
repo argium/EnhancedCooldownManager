@@ -320,7 +320,7 @@ describe("LibSettingsBuilder", function()
 
     -- Checkbox
     it("Checkbox reads and writes profile value", function()
-        local init, setting = SB.Checkbox({
+        local _, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Hide",
         })
@@ -348,7 +348,7 @@ describe("LibSettingsBuilder", function()
 
     -- Slider
     it("Slider reads/writes with getTransform and setTransform", function()
-        local init, setting = SB.Slider({
+        local _, setting = SB.Slider({
             path = "powerBar.height",
             name = "Height",
             min = 0,
@@ -370,11 +370,12 @@ describe("LibSettingsBuilder", function()
 
     it("Slider applies default formatter when none specified", function()
         local capturedOpts
-        local origCreate = Settings.CreateSlider
-        Settings.CreateSlider = function(cat, setting, options, tooltip)
+        local settings = Settings
+        local origCreate = settings.CreateSlider
+        rawset(settings, "CreateSlider", function(cat, setting, options, tooltip)
             capturedOpts = options
             return origCreate(cat, setting, options, tooltip)
-        end
+        end)
 
         SB.Slider({
             path = "global.value",
@@ -384,7 +385,7 @@ describe("LibSettingsBuilder", function()
             step = 1,
         })
 
-        Settings.CreateSlider = origCreate
+        rawset(settings, "CreateSlider", origCreate)
 
         assert.are.equal(MinimalSliderWithSteppersMixin.Label.Right, capturedOpts._labelFormatterLocation)
         -- Default formatter renders integers without decimals
@@ -396,11 +397,12 @@ describe("LibSettingsBuilder", function()
 
     it("Slider uses custom formatter when specified", function()
         local capturedOpts
-        local origCreate = Settings.CreateSlider
-        Settings.CreateSlider = function(cat, setting, options, tooltip)
+        local settings = Settings
+        local origCreate = settings.CreateSlider
+        rawset(settings, "CreateSlider", function(cat, setting, options, tooltip)
             capturedOpts = options
             return origCreate(cat, setting, options, tooltip)
-        end
+        end)
 
         local customFormatter = function(value)
             return value .. "%%"
@@ -414,14 +416,14 @@ describe("LibSettingsBuilder", function()
             formatter = customFormatter,
         })
 
-        Settings.CreateSlider = origCreate
+        rawset(settings, "CreateSlider", origCreate)
 
         assert.are.equal(customFormatter, capturedOpts._labelFormatter)
     end)
 
     -- Dropdown
     it("Dropdown creates dropdown with values", function()
-        local init, setting = SB.Dropdown({
+        local _, setting = SB.Dropdown({
             path = "global.mode",
             name = "Mode",
             values = { solid = "Solid", flat = "Flat" },
@@ -435,7 +437,7 @@ describe("LibSettingsBuilder", function()
 
     -- Color
     it("Color reads/writes color as AARRGGBB hex", function()
-        local init, setting = SB.Color({
+        local _, setting = SB.Color({
             path = "global.color",
             name = "Color",
         })
@@ -451,7 +453,7 @@ describe("LibSettingsBuilder", function()
 
     -- Control dispatcher
     it("Control dispatches to checkbox", function()
-        local init, setting = SB.Control({
+        local _, setting = SB.Control({
             type = "checkbox",
             path = "global.hideWhenMounted",
             name = "Hide",
@@ -460,7 +462,7 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("Control dispatches to slider", function()
-        local init, setting = SB.Control({
+        local _, setting = SB.Control({
             type = "slider",
             path = "global.value",
             name = "Value",
@@ -472,7 +474,7 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("Control dispatches to dropdown", function()
-        local init, setting = SB.Control({
+        local _, setting = SB.Control({
             type = "dropdown",
             path = "global.mode",
             name = "Mode",
@@ -482,7 +484,7 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("Control dispatches to color", function()
-        local init, setting = SB.Control({
+        local _, setting = SB.Control({
             type = "color",
             path = "global.color",
             name = "Color",
@@ -550,16 +552,17 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("InfoRow falls back to GetExtent when SetExtent is unavailable", function()
-        local originalCreateElementInitializer = Settings.CreateElementInitializer
-        Settings.CreateElementInitializer = function(frameTemplate, data)
+        local settings = Settings
+        local originalCreateElementInitializer = settings.CreateElementInitializer
+        rawset(settings, "CreateElementInitializer", function(frameTemplate, data)
             local init = originalCreateElementInitializer(frameTemplate, data)
             init.SetExtent = nil
             return init
-        end
+        end)
 
         local init = SB.InfoRow({ name = "Author", value = "TestUser" })
 
-        Settings.CreateElementInitializer = originalCreateElementInitializer
+        rawset(settings, "CreateElementInitializer", originalCreateElementInitializer)
 
         assert.are.equal(26, init:GetExtent())
     end)
@@ -752,14 +755,15 @@ describe("LibSettingsBuilder", function()
         })
 
         local customEnabled
-        local originalCreateElementInitializer = Settings.CreateElementInitializer
-        Settings.CreateElementInitializer = function(frameTemplate, data)
+        local settings = Settings
+        local originalCreateElementInitializer = settings.CreateElementInitializer
+        rawset(settings, "CreateElementInitializer", function(frameTemplate, data)
             local init = originalCreateElementInitializer(frameTemplate, data)
             init.SetEnabled = function(_, enabled)
                 customEnabled = enabled
             end
             return init
-        end
+        end)
 
         local childInit = SB.Custom({
             path = "global.font",
@@ -771,7 +775,7 @@ describe("LibSettingsBuilder", function()
             end,
         })
 
-        Settings.CreateElementInitializer = originalCreateElementInitializer
+        rawset(settings, "CreateElementInitializer", originalCreateElementInitializer)
 
         local enabledPredicate = childInit._modifyPredicates[1]
         assert.is_true(customEnabled)
@@ -793,12 +797,13 @@ describe("LibSettingsBuilder", function()
 
         local childInit
         local controlEnabled
-        local origCreateCheckbox = Settings.CreateCheckbox
-        Settings.CreateCheckbox = function(cat, setting, tooltip)
+        local settings = Settings
+        local origCreateCheckbox = settings.CreateCheckbox
+        rawset(settings, "CreateCheckbox", function(cat, setting, tooltip)
             local init = origCreateCheckbox(cat, setting, tooltip)
             childInit = init
             return init
-        end
+        end)
 
         SB.Checkbox({
             path = "powerBar.showText",
@@ -808,7 +813,7 @@ describe("LibSettingsBuilder", function()
             end,
         })
 
-        Settings.CreateCheckbox = origCreateCheckbox
+        rawset(settings, "CreateCheckbox", origCreateCheckbox)
 
         -- Simulate a rendered frame for the child control
         frames[1] = {
@@ -846,12 +851,13 @@ describe("LibSettingsBuilder", function()
         })
 
         local childInit
-        local origCreateCheckbox = Settings.CreateCheckbox
-        Settings.CreateCheckbox = function(cat, setting, tooltip)
+        local settings = Settings
+        local origCreateCheckbox = settings.CreateCheckbox
+        rawset(settings, "CreateCheckbox", function(cat, setting, tooltip)
             local init = origCreateCheckbox(cat, setting, tooltip)
             childInit = init
             return init
-        end
+        end)
 
         SB.Checkbox({
             path = "powerBar.showText",
@@ -861,7 +867,7 @@ describe("LibSettingsBuilder", function()
             end,
         })
 
-        Settings.CreateCheckbox = origCreateCheckbox
+        rawset(settings, "CreateCheckbox", origCreateCheckbox)
 
         -- Initial state: enabled=true, so hidden()=false → shown
         local shownPredicate = childInit._shownPredicates[1]
@@ -1027,11 +1033,12 @@ describe("LibSettingsBuilder", function()
     -- Custom with varType override
     it("Custom respects varType override", function()
         local capturedVarType
-        local origRegister = Settings.RegisterProxySetting
-        Settings.RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
+        local settings = Settings
+        local origRegister = settings.RegisterProxySetting
+        rawset(settings, "RegisterProxySetting", function(cat, variable, varType, name, default, getter, setter)
             capturedVarType = varType
             return origRegister(cat, variable, varType, name, default, getter, setter)
-        end
+        end)
 
         SB.Custom({
             path = "global.value",
@@ -1040,7 +1047,7 @@ describe("LibSettingsBuilder", function()
             varType = Settings.VarType.Number,
         })
 
-        Settings.RegisterProxySetting = origRegister
+        rawset(settings, "RegisterProxySetting", origRegister)
         assert.are.equal(Settings.VarType.Number, capturedVarType)
     end)
 
@@ -1099,20 +1106,21 @@ describe("LibSettingsBuilder", function()
     -- Dropdown with scrollHeight
     it("Dropdown with scrollHeight uses scroll template", function()
         local capturedTemplate
-        local origCreateElementInitializer = Settings.CreateElementInitializer
-        Settings.CreateElementInitializer = function(template, data)
+        local settings = Settings
+        local origCreateElementInitializer = settings.CreateElementInitializer
+        rawset(settings, "CreateElementInitializer", function(template, data)
             capturedTemplate = template
             return origCreateElementInitializer(template, data)
-        end
+        end)
 
-        local init, setting = SB.Dropdown({
+        local _, setting = SB.Dropdown({
             path = "global.mode",
             name = "Scrollable Mode",
             values = { solid = "Solid", flat = "Flat" },
             scrollHeight = 300,
         })
 
-        Settings.CreateElementInitializer = origCreateElementInitializer
+        rawset(settings, "CreateElementInitializer", origCreateElementInitializer)
 
         assert.are.equal(SB.SCROLL_DROPDOWN_TEMPLATE, capturedTemplate)
         assert.are.equal("solid", setting:GetValue())
@@ -1123,11 +1131,12 @@ describe("LibSettingsBuilder", function()
 
     it("Dropdown without scrollHeight uses standard dropdown", function()
         local capturedTemplate = nil
-        local origCreateElementInitializer = Settings.CreateElementInitializer
-        Settings.CreateElementInitializer = function(template, data)
+        local settings = Settings
+        local origCreateElementInitializer = settings.CreateElementInitializer
+        rawset(settings, "CreateElementInitializer", function(template, data)
             capturedTemplate = template
             return origCreateElementInitializer(template, data)
-        end
+        end)
 
         SB.Dropdown({
             path = "global.mode",
@@ -1135,7 +1144,7 @@ describe("LibSettingsBuilder", function()
             values = { solid = "Solid", flat = "Flat" },
         })
 
-        Settings.CreateElementInitializer = origCreateElementInitializer
+        rawset(settings, "CreateElementInitializer", origCreateElementInitializer)
 
         -- Standard path uses Settings.CreateDropdown, not CreateElementInitializer
         -- with the scroll template
@@ -1234,7 +1243,6 @@ describe("LibSettingsBuilder", function()
 
     -- RegisterFromTable
     it("RegisterFromTable creates subcategory and controls from table", function()
-        local init, setting
         local SB2 = createSB2("TBL1", "TableTest")
 
         SB2.RegisterFromTable({
@@ -1256,7 +1264,6 @@ describe("LibSettingsBuilder", function()
         local disabledFn = function()
             return true
         end
-        local capturedSpecs = {}
         local SB2 = createSB2("TBL2", "InheritTest")
 
         SB2.RegisterFromTable({
@@ -1320,11 +1327,12 @@ describe("LibSettingsBuilder", function()
 
     it("RegisterFromTable supports desc as alias for tooltip", function()
         local capturedTooltip
-        local origCreateCheckbox = Settings.CreateCheckbox
-        Settings.CreateCheckbox = function(cat, setting, tooltip)
+        local settings = Settings
+        local origCreateCheckbox = settings.CreateCheckbox
+        rawset(settings, "CreateCheckbox", function(cat, setting, tooltip)
             capturedTooltip = tooltip
             return origCreateCheckbox(cat, setting, tooltip)
-        end
+        end)
 
         local SB2 = createSB2("TBL5", "DescTest")
 
@@ -1342,7 +1350,7 @@ describe("LibSettingsBuilder", function()
             },
         })
 
-        Settings.CreateCheckbox = origCreateCheckbox
+        rawset(settings, "CreateCheckbox", origCreateCheckbox)
         assert.are.equal("Hide when on a mount.", capturedTooltip)
     end)
 
@@ -1526,7 +1534,7 @@ describe("LibSettingsBuilder", function()
         local receivedSetting
         local receivedValue
 
-        local init, setting = SB.Checkbox({
+        local _, setting = SB.Checkbox({
             path = "global.hideWhenMounted",
             name = "Test onSet",
             onSet = function(value, s)

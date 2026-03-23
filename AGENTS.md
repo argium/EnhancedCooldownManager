@@ -61,16 +61,20 @@ These rules prevent recurring anti-patterns discovered during code review. Viola
 
 ## No Duplicate Utility Functions
 
-- Pure-logic helpers (anchor geometry, color math, table operations) MUST live in one `Helpers/*.lua` file and be accessed via `ECM.<Module>.<fn>`. File-local copies are prohibited.
-- Before writing a new local helper, search `Helpers/` for an existing export that does the same thing. If one exists, use it. If it's close but not quite right, extend the shared version — don't fork a copy.
+- Pure-logic helpers (anchor geometry, color math, table operations, normalization, table shaping, assertion helpers, builders, shared setup) MUST live in one canonical shared location. File-local copies are prohibited unless the helper is truly single-use.
+- Before writing a new local helper, search the codebase for an existing canonical implementation that does the same job. If one exists, use it. If it's close but not quite right, extend the shared version — don't fork a copy.
+- Do not copy-paste logic between production files, between test files, or across production/test boundaries. If the logic expresses real behavior, reuse the canonical implementation. If the helper is test-only and reused, promote it to a shared test helper instead of duplicating it.
+- Before adding any new helper function, check the current file and existing shared helper locations for an existing canonical implementation. Prefer extending the canonical helper over introducing a near-duplicate.
 - Do not create trivial passthrough wrappers that just forward arguments to another function. Callers should invoke the canonical function directly.
 - When a file references a shared module (e.g. `ECM.FrameUtil`) more than once, alias it as a file-level local at the top. Do not repeat the full path at every call site, and do not create a second alias mid-file.
-- `Helpers/FrameUtil.lua` owns: anchor splitting/building, parent size/position queries, position normalization, offset conversion, and lazy frame property setters.
+- Ownership of shared helper domains must remain explicit. When one module already owns a domain (for example anchor geometry or color math), extend that owner rather than creating a second implementation elsewhere.
 
 ## Test Integrity
 
 - Test `before_each` / `LoadChunk` calls MUST mirror TOC load order. If file A depends on `ECM.B`, load file B first.
 - Test stubs must replace the canonical function, not a wrapper or alias. When a passthrough is removed, its test stubs must move to the canonical location.
+- Regression tests must exercise the live implementation wherever practical. Do not create mirrored helper logic in specs just to restate what production code already computes.
+- If a test needs shared setup, expectation logic, builders, math, normalization, or assertions, prefer an existing canonical helper first; otherwise create one shared helper instead of copy-pasting local helpers across files.
 
 ## Derive Once, Read Everywhere
 

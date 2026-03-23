@@ -8,6 +8,7 @@ local TestHelpers =
 describe("BuffBars real source", function()
     local originalGlobals
     local BuffBars
+    local BuffBarCooldownViewer
     local ns
     local makeFrame = TestHelpers.makeFrame
     local registerFrameCalls
@@ -254,7 +255,8 @@ describe("BuffBars real source", function()
             },
         }
 
-        _G.BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        _G.BuffBarCooldownViewer = BuffBarCooldownViewer
         function BuffBarCooldownViewer:GetChildren()
             return
         end
@@ -360,10 +362,12 @@ describe("BuffBars real source", function()
     end)
 
     it("returns false from IsReady when the viewer is missing or cannot enumerate children", function()
+        BuffBarCooldownViewer = nil
         _G.BuffBarCooldownViewer = nil
         assert.is_false(BuffBars:IsReady())
 
-        _G.BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
+        _G.BuffBarCooldownViewer = BuffBarCooldownViewer
         function BuffBarCooldownViewer:GetChildren()
             error("forbidden")
         end
@@ -853,42 +857,9 @@ describe("BuffBars real source", function()
             frame.__alpha = value
         end
 
-        local function makeChild(name, shown, layoutIndex)
-            local child = makeHookableFrame({ name = name, shown = shown, width = 200, height = 20 })
-            child.layoutIndex = layoutIndex
-            child.Bar = {
-                Name = {
-                    GetText = function()
-                        return name
-                    end,
-                    SetShown = function(self, value)
-                        self.__shown = value
-                    end,
-                },
-                Duration = {
-                    SetShown = function(self, value)
-                        self.__shown = value
-                    end,
-                },
-                Pip = {
-                    Hide = function() end,
-                    SetTexture = function() end,
-                },
-            }
-            child.Icon = makeHookableFrame({ shown = false, width = 20, height = 20 })
-            child.Icon.SetShown = function(self, value)
-                self.__shown = value
-            end
-            child.Icon.Applications = {}
-            child.cooldownInfo = { spellID = layoutIndex }
-            child.cooldownID = 1000 + layoutIndex
-            child.iconTextureFileID = 2000 + layoutIndex
-            return child
-        end
-
-        local first = makeChild("First", true, 2)
-        local second = makeChild("Second", false, 1)
-        local ignored = makeChild("Ignored", true, 99)
+        local first = makeStyledChild("First", true, 2)
+        local second = makeStyledChild("Second", false, 1)
+        local ignored = makeStyledChild("Ignored", true, 99)
         ignored.ignoreInLayout = true
         function BuffBarCooldownViewer:GetChildren()
             return first, ignored, second

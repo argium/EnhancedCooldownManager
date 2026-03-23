@@ -9,6 +9,7 @@ describe("Migration", function()
     local originalGlobals
     local Migration
     local logMessages
+    local assertAbsolutePositionPreserved = TestHelpers.assertAbsolutePositionPreserved
 
     local function searchLogMessages(needle)
         local matches, firstIndex = {}, nil
@@ -755,6 +756,74 @@ describe("Migration", function()
         )
     end)
 
+    it("V11 preserves absolute free-position coordinates for all modules when seeding legacy defaults", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            resourceBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            runeBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            buffBars = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+        }
+
+        Migration.Run(profile)
+
+        assertAbsolutePositionPreserved(nil, nil, 0, -275, profile.powerBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(nil, nil, 0, -300, profile.resourceBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(nil, nil, 0, -325, profile.runeBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(nil, nil, 0, -350, profile.buffBars.editModePositions.Modern)
+    end)
+
+    it("V11 preserves absolute free-position coordinates for all explicitly positioned free-mode modules", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                offsetX = 5,
+                offsetY = -275,
+            },
+            resourceBar = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOP",
+                relativePoint = "BOTTOM",
+                offsetX = 0,
+                offsetY = -300,
+            },
+            runeBar = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "BOTTOMRIGHT",
+                relativePoint = "TOPLEFT",
+                offsetX = 15,
+                offsetY = -25,
+            },
+            buffBars = {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOPLEFT",
+                relativePoint = "BOTTOMLEFT",
+                offsetX = 10,
+                offsetY = -350,
+            },
+        }
+
+        Migration.Run(profile)
+
+        assertAbsolutePositionPreserved(nil, nil, 5, -275, profile.powerBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved("TOP", "BOTTOM", 0, -300, profile.resourceBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(
+            "BOTTOMRIGHT",
+            "TOPLEFT",
+            15,
+            -25,
+            profile.runeBar.editModePositions.Modern
+        )
+        assertAbsolutePositionPreserved(
+            "TOPLEFT",
+            "BOTTOMLEFT",
+            10,
+            -350,
+            profile.buffBars.editModePositions.Modern
+        )
+    end)
+
     it("V11 normalizes differing anchorPoint and relativePoint into exact edit-mode coordinates", function()
         local profile = {
             schemaVersion = 10,
@@ -776,6 +845,7 @@ describe("Migration", function()
         assert.are.equal("TOPLEFT", migrated.point)
         assert.are.equal(10, migrated.x)
         assert.are.equal(-1430, migrated.y)
+        assertAbsolutePositionPreserved("TOPLEFT", "BOTTOMLEFT", 10, -350, migrated)
     end)
 
     it("V11 logs migration source and normalization details", function()

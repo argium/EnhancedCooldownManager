@@ -5,6 +5,34 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 local unpack_fn = table.unpack or unpack
+local EditModeManagerFrame
+local UtilityCooldownViewer
+
+local function makeHookableFrame(shown)
+    local frame = TestHelpers.makeFrame({ shown = shown })
+    frame._hooks = {}
+    frame._children = {}
+
+    function frame:HookScript(scriptName, callback)
+        self._hooks[scriptName] = self._hooks[scriptName] or {}
+        self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
+    end
+
+    function frame:GetHookCount(scriptName)
+        return self._hooks[scriptName] and #self._hooks[scriptName] or 0
+    end
+
+    function frame:GetChildren()
+        return unpack_fn(self._children)
+    end
+
+    local baseGetPoint = frame.GetPoint
+    function frame:GetPoint(index)
+        return baseGetPoint(self, index or 1)
+    end
+
+    return frame
+end
 
 describe("ItemIcons", function()
     local originalGlobals
@@ -22,21 +50,6 @@ describe("ItemIcons", function()
     teardown(function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
-
-    local function makeHookableFrame(shown)
-        local frame = TestHelpers.makeFrame({ shown = shown })
-        frame._hookCounts = {}
-
-        function frame:HookScript(scriptName)
-            self._hookCounts[scriptName] = (self._hookCounts[scriptName] or 0) + 1
-        end
-
-        function frame:GetHookCount(scriptName)
-            return self._hookCounts[scriptName] or 0
-        end
-
-        return frame
-    end
 
     local function makeItemIcons()
         local mod = {
@@ -133,8 +146,10 @@ describe("ItemIcons", function()
                 UnregisterFrame = function() end,
             },
         }
-        _G.EditModeManagerFrame = makeHookableFrame(false)
-        _G.UtilityCooldownViewer = makeHookableFrame(true)
+        EditModeManagerFrame = makeHookableFrame(false)
+        UtilityCooldownViewer = makeHookableFrame(true)
+        _G.EditModeManagerFrame = EditModeManagerFrame
+        _G.UtilityCooldownViewer = UtilityCooldownViewer
     end)
 
     describe("hook lifecycle", function()
@@ -200,32 +215,6 @@ describe("ItemIcons real source", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    local function makeHookableFrame(shown)
-        local frame = TestHelpers.makeFrame({ shown = shown })
-        frame._hooks = {}
-        frame._children = {}
-
-        function frame:HookScript(scriptName, callback)
-            self._hooks[scriptName] = self._hooks[scriptName] or {}
-            self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
-        end
-
-        function frame:GetHookCount(scriptName)
-            return self._hooks[scriptName] and #self._hooks[scriptName] or 0
-        end
-
-        function frame:GetChildren()
-            return unpack_fn(self._children)
-        end
-
-        local baseGetPoint = frame.GetPoint
-        function frame:GetPoint(index)
-            return baseGetPoint(self, index or 1)
-        end
-
-        return frame
-    end
-
     before_each(function()
         createdCooldowns = {}
         registerFrameCalls = 0
@@ -264,8 +253,10 @@ describe("ItemIcons real source", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
-        _G.EditModeManagerFrame = makeHookableFrame(false)
-        _G.UtilityCooldownViewer = makeHookableFrame(true)
+        EditModeManagerFrame = makeHookableFrame(false)
+        UtilityCooldownViewer = makeHookableFrame(true)
+        _G.EditModeManagerFrame = EditModeManagerFrame
+        _G.UtilityCooldownViewer = UtilityCooldownViewer
         _G.C_Timer = {
             After = function(_, callback)
                 timerCallbacks[#timerCallbacks + 1] = callback

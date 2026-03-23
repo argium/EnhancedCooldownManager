@@ -486,8 +486,10 @@ function TestHelpers.makeFrame(opts)
         __height = opts.height or 0,
         __width = opts.width or 0,
         __alpha = opts.alpha == nil and 1 or opts.alpha,
+        __frameStrata = opts.frameStrata,
         __anchors = anchors,
         __regions = opts.regions or {},
+        __scripts = opts.scripts or {},
         __calls = {},
     }
 
@@ -503,6 +505,20 @@ function TestHelpers.makeFrame(opts)
         frame["Get" .. prop[1]] = function(self)
             return self[prop[2]]
         end
+    end
+
+    function frame:SetSize(width, height)
+        self:SetWidth(width)
+        self:SetHeight(height)
+    end
+    function frame:GetSize()
+        return self.__width, self.__height
+    end
+    function frame:SetFrameStrata(strata)
+        self.__frameStrata = strata
+    end
+    function frame:GetFrameStrata()
+        return self.__frameStrata
     end
 
     function frame:Show()
@@ -536,6 +552,43 @@ function TestHelpers.makeFrame(opts)
     end
     function frame:GetRegions()
         return unpack_fn(self.__regions)
+    end
+    function frame:SetScript(event, callback)
+        self.__scripts[event] = callback
+    end
+    function frame:GetScript(event)
+        return self.__scripts[event]
+    end
+    function frame:RegisterEvent(event)
+        self.__registeredEvents = self.__registeredEvents or {}
+        self.__registeredEvents[event] = true
+    end
+    function frame:UnregisterEvent(event)
+        self.__unregisteredEvents = self.__unregisteredEvents or {}
+        self.__unregisteredEvents[event] = true
+        if self.__registeredEvents then
+            self.__registeredEvents[event] = nil
+        end
+    end
+    function frame:HookScript() end
+    function frame:GetEffectiveScale()
+        return 1
+    end
+    function frame:GetBackdropBorderColor()
+        return 0, 0, 0, 1
+    end
+    function frame:GetBackdrop()
+        return nil
+    end
+    function frame:GetColorTexture()
+        return nil
+    end
+    function frame:SetColorTexture() end
+    function frame:GetVertexColor()
+        return nil
+    end
+    function frame:IsObjectType()
+        return false
     end
 
     return frame
@@ -597,28 +650,49 @@ function TestHelpers.makeBorder(opts)
     return border
 end
 
+local function assertEqual(expected, actual, label)
+    local bustedAssert = _G.assert
+    local are = type(bustedAssert) == "table" and rawget(bustedAssert, "are") or nil
+    local eq = are and rawget(are, "equal") or nil
+    if eq then
+        eq(expected, actual)
+        return
+    end
+
+    assert(expected == actual, ("%s: expected %s, got %s"):format(label, tostring(expected), tostring(actual)))
+end
+
 --- Asserts anchor values match. Uses busted's assert when available, plain assert otherwise.
 function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint, x, y)
     local ap, ar, arp, ax, ay = frame:GetPoint(index)
-    local bustedAssert = _G.assert
-    local are = type(bustedAssert) == "table" and rawget(bustedAssert, "are") or nil
-    local eq = are and rawget(are, "equal")
-    if eq then
-        eq(point, ap)
-        eq(relativeTo, ar)
-        eq(relativePoint, arp)
-        eq(x, ax)
-        eq(y, ay)
-    else
-        assert(point == ap, ("anchor point: expected %s, got %s"):format(tostring(point), tostring(ap)))
-        assert(relativeTo == ar, ("relativeTo: expected %s, got %s"):format(tostring(relativeTo), tostring(ar)))
-        assert(
-            relativePoint == arp,
-            ("relativePoint: expected %s, got %s"):format(tostring(relativePoint), tostring(arp))
-        )
-        assert(x == ax, ("x: expected %s, got %s"):format(tostring(x), tostring(ax)))
-        assert(y == ay, ("y: expected %s, got %s"):format(tostring(y), tostring(ay)))
-    end
+    assertEqual(point, ap, "anchor point")
+    assertEqual(relativeTo, ar, "relativeTo")
+    assertEqual(relativePoint, arp, "relativePoint")
+    assertEqual(x, ax, "x")
+    assertEqual(y, ay, "y")
+end
+
+--- Resolve a parent-relative anchor position into absolute coordinates on UIParent.
+function TestHelpers.getAbsoluteAnchorPosition(point, x, y, defaultPoint)
+    local frameUtil = assert(_G.ECM and ECM.FrameUtil, "ECM.FrameUtil must be initialized")
+    local parentFrame = assert(_G.UIParent, "UIParent must be initialized")
+    local anchorPoint = point or defaultPoint or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+    local parentWidth, parentHeight = frameUtil.GetParentSize(parentFrame)
+    local anchorX, anchorY = frameUtil.GetParentAnchorPosition(anchorPoint, parentWidth, parentHeight)
+    return anchorX + (x or 0), anchorY + (y or 0)
+end
+
+--- Assert that a migrated edit-mode position preserves the same absolute placement.
+function TestHelpers.assertAbsolutePositionPreserved(beforePoint, beforeRelativePoint, beforeX, beforeY, migrated, defaultPoint)
+    local beforeAbsX, beforeAbsY = TestHelpers.getAbsoluteAnchorPosition(
+        beforeRelativePoint or beforePoint,
+        beforeX,
+        beforeY,
+        defaultPoint
+    )
+    local afterAbsX, afterAbsY = TestHelpers.getAbsoluteAnchorPosition(migrated.point, migrated.x, migrated.y, defaultPoint)
+    assertEqual(beforeAbsX, afterAbsX, "absolute x")
+    assertEqual(beforeAbsY, afterAbsY, "absolute y")
 end
 
 --------------------------------------------------------------------------------
@@ -838,7 +912,7 @@ function TestHelpers.SetupOptionsGlobals()
     _G.CreateScrollBoxListLinearView = function()
         local view = {}
         view.SetElementExtent = function() end
-        view.SetElementInitializer = function(self, template, fn)
+        view.SetElementInitializer = function(self, _, fn)
             self._initFn = fn
         end
         return view
@@ -934,14 +1008,15 @@ end
 --- @return table Map of variable name → setting object
 function TestHelpers.CollectSettings(fn)
     local captured = {}
-    local orig = Settings.RegisterProxySetting
-    Settings.RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
+    local settings = Settings
+    local orig = settings.RegisterProxySetting
+    rawset(settings, "RegisterProxySetting", function(cat, variable, varType, name, default, getter, setter)
         local setting = orig(cat, variable, varType, name, default, getter, setter)
         captured[variable] = setting
         return setting
-    end
+    end)
     fn()
-    Settings.RegisterProxySetting = orig
+    rawset(settings, "RegisterProxySetting", orig)
     return captured
 end
 
