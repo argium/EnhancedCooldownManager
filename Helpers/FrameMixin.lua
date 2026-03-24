@@ -416,6 +416,10 @@ end
 
 --- Internal: checks readiness and runs the coalesced layout update.
 local function updateLayoutDeferred(self)
+    if not self._updateLayoutPending then
+        return
+    end
+
     if not self:IsReady() then
         self._updateLayoutPending = false
         self._pendingWhy = nil
@@ -433,7 +437,18 @@ local function updateLayoutDeferred(self)
     if self._secondPassPending then
         self._secondPassPending = false
         C_Timer.After(ECM.Constants.LIFECYCLE_SECOND_PASS_DELAY, function()
-            self:ThrottledUpdateLayout("SecondPass")
+            if self.IsEnabled and not self:IsEnabled() then
+                return
+            end
+            if self._updateLayoutPending then
+                return
+            end
+
+            -- The second-pass timer already deferred out of the original
+            -- layout batch, so run it directly unless a newer batch won the race.
+            self._pendingWhy = "SecondPass"
+            self._updateLayoutPending = true
+            updateLayoutDeferred(self)
         end)
     end
 end

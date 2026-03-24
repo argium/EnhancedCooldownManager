@@ -444,15 +444,26 @@ describe("ItemIcons real source", function()
         assert.is_false(ItemIcons:UpdateLayout("test"))
     end)
 
-    it("returns false from UpdateLayout during edit mode", function()
+    it("returns false from UpdateLayout during live edit mode and restores the viewer", function()
         ItemIcons.InnerFrame = TestHelpers.makeFrame({ shown = true })
         ItemIcons.GetModuleConfig = function()
             return { enabled = true }
         end
-        ItemIcons._isEditModeActive = true
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 50)
+        ItemIcons._viewerOriginalPoint = { "CENTER", UIParent, "CENTER", 10, 20 }
+        ItemIcons._isEditModeActive = nil
+        EditModeManagerFrame:Show()
 
         assert.is_false(ItemIcons:UpdateLayout("test"))
         assert.is_false(ItemIcons.InnerFrame:IsShown())
+        assert.is_nil(ItemIcons._viewerOriginalPoint)
+
+        local point, relativeTo, relativePoint, x, y = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal("CENTER", point)
+        assert.are.equal(UIParent, relativeTo)
+        assert.are.equal("CENTER", relativePoint)
+        assert.are.equal(10, x)
+        assert.are.equal(20, y)
     end)
 
     it("defers layout for delayed bag and world events", function()

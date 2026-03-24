@@ -8,6 +8,12 @@ local ClassUtil = ECM.ClassUtil
 local C, FrameMixin = ECM.Constants, ECM.FrameMixin
 ns.Addon.RuneBar = RuneBar
 
+local SPEC_COLOR_KEY_BY_SPEC = {
+    [C.DEATHKNIGHT_FROST_SPEC_INDEX] = "colorFrost",
+    [C.DEATHKNIGHT_UNHOLY_SPEC_INDEX] = "colorUnholy",
+    DEFAULT = "colorBlood",
+}
+
 local function getRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
     if runeReady or not start or start == 0 or not duration or duration == 0 then
@@ -85,21 +91,13 @@ local function ensureFragmentedBars(bar, maxResources, tex)
 end
 
 local function getColor(cfg)
-    local specId = GetSpecialization()
-
-    local specColor
     if cfg.useSpecColor then
-        if specId == C.DEATHKNIGHT_FROST_SPEC_INDEX then
-            specColor = cfg.colorFrost
-        elseif specId == C.DEATHKNIGHT_UNHOLY_SPEC_INDEX then
-            specColor = cfg.colorUnholy
-        else
-            specColor = cfg.colorBlood
-        end
+        local specColorKey = SPEC_COLOR_KEY_BY_SPEC[GetSpecialization()] or SPEC_COLOR_KEY_BY_SPEC.DEFAULT
+        local specColor = cfg[specColorKey]
+        return specColor or cfg.color or C.COLOR_WHITE
     end
 
-    -- Blood is the default to match DK class color
-    return specColor or cfg.color or ECM.Constants.COLOR_WHITE
+    return cfg.color or C.COLOR_WHITE
 end
 
 --- Updates fragmented rune display (individual bars per rune).

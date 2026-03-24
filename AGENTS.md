@@ -85,6 +85,7 @@ These rules prevent recurring anti-patterns discovered during code review. Viola
 
 - Do not leave unused fields, stale type annotations, or cleanup of non-existent state in teardown/disable methods.
 - If a function parameter or fallback branch can never execute (e.g. a fallback when the caller always provides the value), remove it.
+- `luacheck` does not catch unused locale entries. When UI labels, button row names, or tooltips are removed/blanked, grep the corresponding `L["..."]` keys and delete any locale strings that became unused.
 
 ## Periodic Work Must Degrade Gracefully
 

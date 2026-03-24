@@ -376,4 +376,63 @@ describe("RuneBar real source", function()
 
         assert.same({ "RUNE_POWER_UPDATE", "RuneStateChange" }, reasons)
     end)
+
+    it("ticker hot path uses specialization colors when enabled", function()
+        local specId = 0
+        local colorCases = {
+            { specId = ECM.Constants.DEATHKNIGHT_FROST_SPEC_INDEX, expected = { 0.1, 0.2, 0.3 } },
+            { specId = ECM.Constants.DEATHKNIGHT_UNHOLY_SPEC_INDEX, expected = { 0.4, 0.5, 0.6 } },
+            { specId = 99, expected = { 0.7, 0.8, 0.9 } },
+        }
+        _G.GetSpecialization = function()
+            return specId
+        end
+        RuneBar.GetModuleConfig = function()
+            return {
+                useSpecColor = true,
+                color = { r = 1, g = 1, b = 1 },
+                colorBlood = { r = 0.7, g = 0.8, b = 0.9 },
+                colorFrost = { r = 0.1, g = 0.2, b = 0.3 },
+                colorUnholy = { r = 0.4, g = 0.5, b = 0.6 },
+                texture = "Solid",
+            }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        _G.GetRuneCooldown = function()
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+
+        for _, case in ipairs(colorCases) do
+            local frags = {}
+            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+                frags[i] = {
+                    SetValue = function() end,
+                    SetStatusBarColor = function(self, r, g, b)
+                        self.__color = { r, g, b }
+                    end,
+                }
+            end
+            RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+            RuneBar.InnerFrame.FragmentedBars = frags
+            RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+            RuneBar.InnerFrame._lastReadySet = {}
+            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+                RuneBar.InnerFrame._lastReadySet[i] = true
+            end
+
+            specId = case.specId
+            now = now + 1
+            RuneBar:OnRunePowerUpdate()
+            RuneBar._valueTicker.callback()
+
+            assert.same(case.expected, frags[1].__color)
+        end
+    end)
 end)

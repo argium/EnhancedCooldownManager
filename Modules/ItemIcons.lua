@@ -60,23 +60,39 @@ local function getBestConsumable(priorityList)
     return nil
 end
 
---- Appends data to items if the config flag is set and data is non-nil.
-local function tryAdd(items, flag, getter, ...)
-    if flag then
-        local data = getter(...)
-        if data then items[#items + 1] = data end
-    end
-end
-
 --- Returns all display items in display order: Trinkets > Combat Potion > Health Potion > Healthstone.
 ---@param moduleConfig table Module configuration.
 ---@return ECM_IconData[] items Array of icon data.
 local function getDisplayItems(moduleConfig)
     local items = {}
-    tryAdd(items, moduleConfig.showTrinket1, getTrinketData, ECM.Constants.TRINKET_SLOT_1)
-    tryAdd(items, moduleConfig.showTrinket2, getTrinketData, ECM.Constants.TRINKET_SLOT_2)
-    tryAdd(items, moduleConfig.showCombatPotion, getBestConsumable, ECM.Constants.COMBAT_POTIONS)
-    tryAdd(items, moduleConfig.showHealthPotion, getBestConsumable, ECM.Constants.HEALTH_POTIONS)
+
+    if moduleConfig.showTrinket1 then
+        local trinket1 = getTrinketData(ECM.Constants.TRINKET_SLOT_1)
+        if trinket1 then
+            items[#items + 1] = trinket1
+        end
+    end
+
+    if moduleConfig.showTrinket2 then
+        local trinket2 = getTrinketData(ECM.Constants.TRINKET_SLOT_2)
+        if trinket2 then
+            items[#items + 1] = trinket2
+        end
+    end
+
+    if moduleConfig.showCombatPotion then
+        local combatPotion = getBestConsumable(ECM.Constants.COMBAT_POTIONS)
+        if combatPotion then
+            items[#items + 1] = combatPotion
+        end
+    end
+
+    if moduleConfig.showHealthPotion then
+        local healthPotion = getBestConsumable(ECM.Constants.HEALTH_POTIONS)
+        if healthPotion then
+            items[#items + 1] = healthPotion
+        end
+    end
 
     if moduleConfig.showHealthstone and C_Item.GetItemCount(ECM.Constants.HEALTHSTONE_ITEM_ID) > 0 then
         items[#items + 1] = {
@@ -195,84 +211,6 @@ local function applyCooldownNumberFont(icon, fontPath, fontSize, fontFlags)
     end
 end
 
---- Restores UtilityCooldownViewer to its original position.
----@param self ECM_ItemIconsModule
-local function restoreViewerPosition(self)
-    local orig = self._viewerOriginalPoint
-    if not orig then return end
-    local utilityViewer = _G["UtilityCooldownViewer"]
-    if not utilityViewer then return end
-    utilityViewer:ClearAllPoints()
-    utilityViewer:SetPoint(orig[1], orig[2], orig[3], orig[4], orig[5])
-end
-
---- Applies midpoint-preserving X offset to UtilityCooldownViewer for added item icons.
----@param self ECM_ItemIconsModule
----@param utilityViewer Frame
----@param totalWidth number Container width (unscaled) for visible item icons.
----@param spacing number Gap between viewer and item icons (unscaled).
----@param viewerScale number Scale applied to UtilityCooldownViewer icons.
-local function applyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
-    if not utilityViewer then return end
-
-    if not self._viewerOriginalPoint then
-        local point, relativeTo, relativePoint, x, y = utilityViewer:GetPoint()
-        self._viewerOriginalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
-    end
-
-    local scaledContainerWidth = totalWidth * viewerScale
-    local itemBlockWidth = scaledContainerWidth + spacing
-    local viewerOffsetX = -(itemBlockWidth / 2)
-    local orig = self._viewerOriginalPoint
-
-    utilityViewer:ClearAllPoints()
-    utilityViewer:SetPoint(orig[1], orig[2], orig[3], orig[4] + viewerOffsetX, orig[5])
-end
-
---- Returns whether Blizzard Edit Mode is currently active.
----@param self ECM_ItemIconsModule|nil
----@return boolean
-local function isEditModeActive(self)
-    if self and self._isEditModeActive ~= nil then
-        return self._isEditModeActive
-    end
-
-    local editModeManager = _G.EditModeManagerFrame
-    return editModeManager and editModeManager:IsShown() or false
-end
-
---- Gets the icon size, spacing, and scale from UtilityCooldownViewer.
---- Falls back to defaults if viewer is unavailable.
----@return number iconSize Base icon size in pixels (unscaled).
----@return number spacing Spacing between icons from Edit Mode IconPadding.
----@return number scale Icon scale factor from Edit Mode IconSize.
----@return boolean isStable True when settings were read from the live viewer.
-local function getUtilityViewerLayout()
-    local viewer = _G["UtilityCooldownViewer"]
-    if not viewer or not viewer:IsShown() then
-        return ECM.Constants.DEFAULT_ITEM_ICON_SIZE, 0, 1.0, false
-    end
-
-    local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
-    local iconScale = viewer.iconScale or 1.0
-    -- Blizzard's managed layout uses childXPadding for actual icon positioning.
-    -- This differs from the Edit Mode iconPadding setting by a constant offset of -4
-    -- (childXPadding = iconPadding - 4), accounting for transparent padding in icon atlases.
-    local spacing = viewer.childXPadding or 0
-    local isStable = viewer.childXPadding ~= nil
-
-    -- Get base icon size from a visible cooldown icon child.
-    -- Edit Mode "Icon Size" applies scale to individual icons, not the viewer.
-    for _, child in ipairs({ viewer:GetChildren() }) do
-        if child and child:IsShown() and child.GetSpellID then
-            iconSize = child:GetWidth() or iconSize
-            break
-        end
-    end
-
-    return iconSize, spacing, iconScale, isStable
-end
-
 --- Override CreateFrame to create the container for item icons.
 ---@return Frame container The container frame.
 function ItemIcons:CreateFrame()
@@ -310,17 +248,35 @@ function ItemIcons:UpdateLayout(why)
     end
 
     local moduleConfig = self:GetModuleConfig()
-    local isEditing = isEditModeActive(self)
+    local utilityViewer = _G["UtilityCooldownViewer"]
+    local isEditing = self._isEditModeActive
+    if isEditing == nil then
+        local editModeManager = _G.EditModeManagerFrame
+        isEditing = editModeManager and editModeManager:IsShown() or false
+    end
 
     -- Bail early: no config, edit mode active, or shouldn't show
     if not moduleConfig or isEditing or not self:ShouldShow() then
-        restoreViewerPosition(self)
-        if isEditing then self._viewerOriginalPoint = nil end
+        local viewerOriginalPoint = self._viewerOriginalPoint
+        if viewerOriginalPoint and utilityViewer then
+            utilityViewer:ClearAllPoints()
+            utilityViewer:SetPoint(
+                viewerOriginalPoint[1],
+                viewerOriginalPoint[2],
+                viewerOriginalPoint[3],
+                viewerOriginalPoint[4],
+                viewerOriginalPoint[5]
+            )
+        end
+
+        if isEditing then
+            self._viewerOriginalPoint = nil
+        end
+
         frame:Hide()
         return false
     end
 
-    local utilityViewer = _G["UtilityCooldownViewer"]
     local items = utilityViewer and getDisplayItems(moduleConfig) or {}
     local numItems = #items
 
@@ -330,20 +286,65 @@ function ItemIcons:UpdateLayout(why)
     end
 
     if numItems == 0 or not utilityViewer then
-        restoreViewerPosition(self)
+        local viewerOriginalPoint = self._viewerOriginalPoint
+        if viewerOriginalPoint and utilityViewer then
+            utilityViewer:ClearAllPoints()
+            utilityViewer:SetPoint(
+                viewerOriginalPoint[1],
+                viewerOriginalPoint[2],
+                viewerOriginalPoint[3],
+                viewerOriginalPoint[4],
+                viewerOriginalPoint[5]
+            )
+        end
+
         frame:Hide()
         return false
     end
 
     local siblingFontPath, siblingFontSize, siblingFontFlags = getSiblingCooldownNumberFont(utilityViewer)
-    local iconSize, spacing, viewerScale = getUtilityViewerLayout()
+    local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
+    local spacing = 0
+    local viewerScale = 1.0
+
+    if utilityViewer:IsShown() then
+        viewerScale = utilityViewer.iconScale or 1.0
+        -- Blizzard's managed layout uses childXPadding for actual icon positioning.
+        -- This differs from the Edit Mode iconPadding setting by a constant offset of -4
+        -- (childXPadding = iconPadding - 4), accounting for transparent padding in icon atlases.
+        spacing = utilityViewer.childXPadding or 0
+
+        -- Get base icon size from a visible cooldown icon child.
+        -- Edit Mode "Icon Size" applies scale to individual icons, not the viewer.
+        for _, child in ipairs({ utilityViewer:GetChildren() }) do
+            if child and child:IsShown() and child.GetSpellID then
+                iconSize = child:GetWidth() or iconSize
+                break
+            end
+        end
+    end
+
     frame:SetScale(viewerScale)
 
     -- Calculate container size (using base sizes, scale is applied separately)
     local totalWidth = (numItems * iconSize) + ((numItems - 1) * spacing)
     local totalHeight = iconSize
     frame:SetSize(totalWidth, totalHeight)
-    applyViewerMidpointOffset(self, utilityViewer, totalWidth, spacing, viewerScale)
+    if not self._viewerOriginalPoint then
+        local point, relativeTo, relativePoint, x, y = utilityViewer:GetPoint()
+        self._viewerOriginalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
+    end
+
+    local viewerOriginalPoint = self._viewerOriginalPoint
+    local viewerOffsetX = -(((totalWidth * viewerScale) + spacing) / 2)
+    utilityViewer:ClearAllPoints()
+    utilityViewer:SetPoint(
+        viewerOriginalPoint[1],
+        viewerOriginalPoint[2],
+        viewerOriginalPoint[3],
+        viewerOriginalPoint[4] + viewerOffsetX,
+        viewerOriginalPoint[5]
+    )
 
     -- Position and configure each icon
     local borderScale = ECM.Constants.ITEM_ICON_BORDER_SCALE

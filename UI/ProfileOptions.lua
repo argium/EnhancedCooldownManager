@@ -20,21 +20,38 @@ local ProfileOptions = {}
 --- Creates a proxy-backed dropdown for transient profile selection (not stored in SavedVars).
 local function createProfilePicker(cat, variable, name, tooltip, valuesGenerator)
     local selected = nil
+    local onSelectionChanged = nil
+
+    local function notifySelectionChanged()
+        if onSelectionChanged then
+            onSelectionChanged(selected)
+        end
+    end
+
     local setting = Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, name, "", function()
         return selected or ""
     end, function(value)
         selected = value
+        notifySelectionChanged()
     end)
     Settings.CreateDropdown(cat, setting, valuesGenerator, tooltip)
     return setting, function()
         return selected
     end, function()
         selected = nil
+        notifySelectionChanged()
+    end, function(callback)
+        onSelectionChanged = callback
+        notifySelectionChanged()
     end
 end
 
 function ProfileOptions.RegisterSettings(SB)
     local cat = SB.CreateSubcategory(L["PROFILES"])
+    local function isBlankSelection(getSelection)
+        local selection = getSelection()
+        return not selection or selection == ""
+    end
 
     -- Switch Profile
     SB.Header(L["ACTIVE_PROFILE"])
@@ -62,7 +79,7 @@ function ProfileOptions.RegisterSettings(SB)
     end, "Select a profile to switch to.")
 
     SB.Button({
-        name = L["CREATE_NEW_PROFILE"],
+        name = "",
         buttonText = L["NEW_PROFILE"],
         tooltip = L["NEW_PROFILE_DESC"],
         onClick = function()
@@ -85,13 +102,16 @@ function ProfileOptions.RegisterSettings(SB)
         return container:GetData()
     end
 
-    local _, getCopyProfile, clearCopyProfile =
+    local _, getCopyProfile, clearCopyProfile, setCopySelectionChanged =
         createProfilePicker(cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
 
-    SB.Button({
-        name = L["APPLY_COPY"],
+    local copyButton = SB.Button({
+        name = "",
         buttonText = L["COPY"],
         tooltip = L["COPY_DESC"],
+        disabled = function()
+            return isBlankSelection(getCopyProfile)
+        end,
         onClick = function()
             local profile = getCopyProfile()
             if not profile or profile == "" then
@@ -101,8 +121,13 @@ function ProfileOptions.RegisterSettings(SB)
             clearCopyProfile()
         end,
     })
+    setCopySelectionChanged(function(selection)
+        if copyButton and copyButton.SetEnabled then
+            copyButton:SetEnabled(selection ~= nil and selection ~= "")
+        end
+    end)
 
-    local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
+    local _, getDeleteProfile, clearDeleteProfile, setDeleteSelectionChanged = createProfilePicker(
         cat,
         "ECM_ProfileDelete",
         L["DELETE_PROFILE"],
@@ -110,10 +135,13 @@ function ProfileOptions.RegisterSettings(SB)
         otherProfilesGenerator
     )
 
-    SB.Button({
-        name = L["DELETE"],
+    local deleteButton = SB.Button({
+        name = "",
         buttonText = L["DELETE"],
         tooltip = L["DELETE_DESC"],
+        disabled = function()
+            return isBlankSelection(getDeleteProfile)
+        end,
         onClick = function()
             local profile = getDeleteProfile()
             if not profile or profile == "" then
@@ -128,6 +156,11 @@ function ProfileOptions.RegisterSettings(SB)
             StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE")
         end,
     })
+    setDeleteSelectionChanged(function(selection)
+        if deleteButton and deleteButton.SetEnabled then
+            deleteButton:SetEnabled(selection ~= nil and selection ~= "")
+        end
+    end)
 
     -- Reset
     SB.Header(L["RESET"])

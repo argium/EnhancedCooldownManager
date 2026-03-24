@@ -50,21 +50,6 @@ local function getChildrenOrdered(viewer)
     return result
 end
 
-local function saveViewerEditModePosition(module, point, relativePoint, x, y)
-    local cfg = module:GetModuleConfig()
-    if not cfg or cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
-        return
-    end
-
-    local layoutName = EditMode.GetActiveLayoutName()
-    if not layoutName then
-        return
-    end
-
-    local normalizedPoint, normalizedX, normalizedY = ECM.FrameUtil.NormalizePosition(point, relativePoint, x, y, UIParent)
-    EditMode.SavePosition(cfg, "editModePositions", layoutName, normalizedPoint, normalizedX, normalizedY)
-end
-
 --- Strips circular masks and hides overlay/border to produce a square icon.
 --- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
 --- frame via `__ecmSquareStyled` so it only runs once per icon frame.
@@ -374,14 +359,6 @@ local function getViewerPosition(module)
     }
 end
 
-local function getLayoutState(position, cfg)
-    -- Free-positioned buff bars no longer have a separate grow-direction setting,
-    -- so only bottom-left anchored placements stack upward; everything else stacks downward.
-    local growsUp = position.point == "BOTTOMLEFT"
-    local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
-    return growsUp, verticalSpacing
-end
-
 --- Positions all bar children in a vertical stack, preserving edit mode order.
 local function layoutBars(viewer, growsUp, verticalSpacing)
     local children = getChildrenOrdered(viewer)
@@ -411,33 +388,6 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
     else
         for _, entry in ipairs(children) do
             anchorChild(entry.frame)
-        end
-    end
-end
-
-local function applyViewerPosition(viewer, position)
-    if position.mode ~= ECM.Constants.ANCHORMODE_FREE then
-        local leftAnchorPoint = position.point or "TOPLEFT"
-        local leftRelativePoint = position.relativePoint or "BOTTOMLEFT"
-        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
-        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
-        FrameUtil.LazySetAnchors(viewer, {
-            { leftAnchorPoint, position.anchor, leftRelativePoint, position.x, position.y },
-            { rightAnchorPoint, position.anchor, rightRelativePoint, position.x, position.y },
-        })
-        return
-    end
-
-    FrameUtil.LazySetAnchors(viewer, {
-        { position.point, position.anchor, position.relativePoint, position.x, position.y },
-    })
-
-    local baseBarWidth = viewer.baseBarWidth
-    local barWidthScale = viewer.barWidthScale
-    if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
-        local width = baseBarWidth * barWidthScale
-        if width > 0 then
-            FrameUtil.LazySetWidth(viewer, width)
         end
     end
 end
@@ -490,8 +440,35 @@ function BuffBars:UpdateLayout(why)
     end
 
     local position = getViewerPosition(self)
-    local growsUp, verticalSpacing = getLayoutState(position, cfg)
-    applyViewerPosition(viewer, position)
+    -- Free-positioned buff bars no longer have a separate grow-direction setting,
+    -- so the effective anchor point decides stack direction: bottom-left grows upward,
+    -- everything else grows downward.
+    local growsUp = position.point == "BOTTOMLEFT"
+    local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
+
+    if position.mode == ECM.Constants.ANCHORMODE_FREE then
+        FrameUtil.LazySetAnchors(viewer, {
+            { position.point, position.anchor, position.relativePoint, position.x, position.y },
+        })
+
+        local baseBarWidth = viewer.baseBarWidth
+        local barWidthScale = viewer.barWidthScale
+        if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
+            local width = baseBarWidth * barWidthScale
+            if width > 0 then
+                FrameUtil.LazySetWidth(viewer, width)
+            end
+        end
+    else
+        local leftAnchorPoint = position.point or "TOPLEFT"
+        local leftRelativePoint = position.relativePoint or "BOTTOMLEFT"
+        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
+        FrameUtil.LazySetAnchors(viewer, {
+            { leftAnchorPoint, position.anchor, leftRelativePoint, position.x, position.y },
+            { rightAnchorPoint, position.anchor, rightRelativePoint, position.x, position.y },
+        })
+    end
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
     -- while we are actively styling and positioning bars.
@@ -580,7 +557,24 @@ function BuffBars:HookViewer()
             return
         end
 
-        saveViewerEditModePosition(self, point, relativePoint, x, y)
+        local cfg = self:GetModuleConfig()
+        if not cfg or cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
+            return
+        end
+
+        local layoutName = EditMode.GetActiveLayoutName()
+        if not layoutName then
+            return
+        end
+
+        local normalizedPoint, normalizedX, normalizedY = FrameUtil.NormalizePosition(
+            point,
+            relativePoint,
+            x,
+            y,
+            UIParent
+        )
+        EditMode.SavePosition(cfg, "editModePositions", layoutName, normalizedPoint, normalizedX, normalizedY)
     end)
 
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")

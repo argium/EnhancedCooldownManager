@@ -435,12 +435,103 @@ describe("ECM.Runtime layout system", function()
         end)
     end)
 
+    describe("deferred layout batching", function()
+        local origAfter
+        local timerQueue
+
+        before_each(function()
+            timerQueue = {}
+            origAfter = _G.C_Timer.After
+            _G.C_Timer.After = function(delay, callback)
+                timerQueue[#timerQueue + 1] = { delay = delay, callback = callback }
+            end
+        end)
+
+        after_each(function()
+            _G.C_Timer.After = origAfter
+        end)
+
+        it("ScheduleLayoutUpdate keeps the first reason and flushes modules in the batch callback", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            mod.UpdateLayoutImmediately = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+            mod.ThrottledUpdateLayout = function()
+                error("ScheduleLayoutUpdate should flush through UpdateLayoutImmediately when available")
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "First")
+            ECM.Runtime.ScheduleLayoutUpdate(0, "Second")
+
+            assert.are.equal(1, #timerQueue)
+            assert.are.equal(0, #reasons)
+
+            timerQueue[1].callback()
+
+            assert.same({ "First" }, reasons)
+        end)
+
+        it("zero-delay layout events update visibility immediately without adding a runtime timer hop", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            local libEvent = LibStub("LibEvent-1.0")
+
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            ECM.Runtime.Enable(fakeAddon)
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
+
+            isMounted = true
+            handler(addonFrame, "PLAYER_MOUNT_DISPLAY_CHANGED")
+
+            assert.is_true(mod.IsHidden)
+            assert.are.equal(0, #timerQueue)
+            assert.same({ "PLAYER_MOUNT_DISPLAY_CHANGED" }, reasons)
+        end)
+
+        it("delayed layout events flush modules when the delay expires without another hop", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            local libEvent = LibStub("LibEvent-1.0")
+
+            mod.UpdateLayoutImmediately = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+            mod.ThrottledUpdateLayout = function()
+                error("Delayed runtime batches should not add another zero-delay module hop")
+            end
+
+            ECM.Runtime.Enable(fakeAddon)
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
+
+            handler(addonFrame, "ZONE_CHANGED")
+
+            assert.are.equal(1, #timerQueue)
+            assert.are.equal(ECM.Constants.LAYOUT_ZONE_CHANGE_DELAY, timerQueue[1].delay)
+            assert.same({}, reasons)
+
+            timerQueue[1].callback()
+
+            assert.same({ "ZONE_CHANGED" }, reasons)
+        end)
+    end)
+
     describe("synchronous layout", function()
         it("UpdateLayoutImmediately runs layout without C_Timer", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.ThrottledUpdateLayout = function(_, reason)
+            mod.UpdateLayoutImmediately = function(_, reason)
                 reasons[#reasons + 1] = reason
+            end
+            mod.ThrottledUpdateLayout = function()
+                error("Runtime.UpdateLayoutImmediately should bypass the throttled path")
             end
 
             local timerCalled = false
@@ -460,8 +551,11 @@ describe("ECM.Runtime layout system", function()
         it("UpdateLayoutImmediately clears pending flag so ScheduleLayoutUpdate is not blocked", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.ThrottledUpdateLayout = function(_, reason)
+            mod.UpdateLayoutImmediately = function(_, reason)
                 reasons[#reasons + 1] = reason
+            end
+            mod.ThrottledUpdateLayout = function()
+                error("Runtime-scheduled batches should use the synchronous module path when available")
             end
 
             -- Schedule a deferred update (fires immediately in test due to stub)

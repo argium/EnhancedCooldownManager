@@ -402,6 +402,45 @@ describe("ECM layout system", function()
             assert.is_true(createdTickers[1].cancelled)
         end)
 
+        it("registers the addon compartment entry once and opens options from it", function()
+            local registrationCount = 0
+            local registeredEntry
+            local chatInputs = {}
+            _G.AddonCompartmentFrame = {
+                RegisterAddon = function(_, entry)
+                    registrationCount = registrationCount + 1
+                    registeredEntry = entry
+                end,
+            }
+            fakeAddon.ChatCommand = function(_, input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            assert.are.equal(1, registrationCount)
+            assert.are.equal(ECM.Constants.ADDON_ICON_TEXTURE, registeredEntry.icon)
+            assert.is_true(registeredEntry.notCheckable)
+            registeredEntry.func()
+            assert.same({ "options" }, chatInputs)
+        end)
+
+        it("retries addon compartment registration after a failure", function()
+            local registrationCount = 0
+            _G.AddonCompartmentFrame = {
+                RegisterAddon = function()
+                    registrationCount = registrationCount + 1
+                    error("boom")
+                end,
+            }
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            assert.are.equal(2, registrationCount)
+        end)
+
         it("registers both slash commands through LibConsole during OnInitialize", function()
             local chatInputs = {}
             local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)

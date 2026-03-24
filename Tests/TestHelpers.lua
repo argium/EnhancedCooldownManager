@@ -72,8 +72,12 @@ local function makeInitializer(setting)
         _parentInit = nil,
         _modifyPredicates = {},
         _shownPredicates = {},
+        _enabled = true,
         SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
+        end,
+        SetEnabled = function(self, enabled)
+            self._enabled = enabled
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates[#self._modifyPredicates + 1] = fn
@@ -96,7 +100,7 @@ local function makeInitializer(setting)
 end
 
 --- Create a minimal stub setting returned by Settings.RegisterProxySetting.
-local function makeSetting(getter, setter, default)
+local function makeSetting(getter, setter, default, name)
     return {
         GetValue = function()
             return getter()
@@ -105,6 +109,7 @@ local function makeSetting(getter, setter, default)
             setter(value)
         end,
         _default = default,
+        _name = name,
     }
 end
 
@@ -263,8 +268,8 @@ function TestHelpers.SetupSettingsStubs()
             return init
         end,
 
-        RegisterProxySetting = function(_, _, _, _, default, getter, setter)
-            return makeSetting(getter, setter, default)
+        RegisterProxySetting = function(_, _, _, name, default, getter, setter)
+            return makeSetting(getter, setter, default, name)
         end,
 
         CreateCheckbox = function(cat, setting)

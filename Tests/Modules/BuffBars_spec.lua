@@ -572,6 +572,29 @@ describe("BuffBars real source", function()
         assert.are.equal(-1430, saved.y)
     end)
 
+    it("viewer SetPoint hook ignores positions when Edit Mode has no active layout", function()
+        local cfg = {
+            anchorMode = ECM.Constants.ANCHORMODE_FREE,
+            editModePositions = {},
+        }
+
+        function BuffBars:GetModuleConfig()
+            return cfg
+        end
+
+        ECM.EditMode.Lib.IsInEditMode = function()
+            return true
+        end
+        ECM.EditMode.GetActiveLayoutName = function()
+            return nil
+        end
+
+        BuffBars:HookViewer()
+        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 12, -34)
+
+        assert.is_nil(next(cfg.editModePositions))
+    end)
+
     it("viewer SetPoint hook ignores non-free modes and internal layout writes", function()
         local cfg = {
             anchorMode = ECM.Constants.ANCHORMODE_CHAIN,

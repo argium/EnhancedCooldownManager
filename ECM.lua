@@ -81,16 +81,6 @@ local function getLsmMedia(mediaType, key)
     end
 end
 
-local function getAddonVersion()
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
-end
-
-local function isBetaVersion(version)
-    return type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil
-end
-
 function ECM.ToString(v)
     if type(v) == "table" then
         return safeTableTostring(v, 0, {})
@@ -186,22 +176,6 @@ function ECM.Log(module, message, data)
     end
 
     print(coloredPrefix .. message)
-end
-
-local function registerAddonCompartmentEntry()
-    if mod._addonCompartmentRegistered or not AddonCompartmentFrame then
-        return
-    end
-
-    local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
-        text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"]),
-        icon = C.ADDON_ICON_TEXTURE,
-        notCheckable = true,
-        func = function()
-            mod:ChatCommand("options")
-        end,
-    })
-    mod._addonCompartmentRegistered = ok
 end
 
 --- Shows a confirmation popup and reloads the UI on accept.
@@ -603,7 +577,17 @@ end
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
 function mod:OnEnable()
     C_CVar.SetCVar("cooldownViewerEnabled", "1")
-    registerAddonCompartmentEntry()
+    if not self._addonCompartmentRegistered and AddonCompartmentFrame then
+        local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
+            text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"]),
+            icon = C.ADDON_ICON_TEXTURE,
+            notCheckable = true,
+            func = function()
+                self:ChatCommand("options")
+            end,
+        })
+        self._addonCompartmentRegistered = ok
+    end
 
     local profile = self.db and self.db.profile
     runPendingMigrations(profile)
@@ -619,7 +603,12 @@ function mod:OnEnable()
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChangedHandler")
     self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChangedHandler")
 
-    if isBetaVersion(getAddonVersion()) then
+    local version
+    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+        version = C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
+    end
+
+    if type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil then
         ECM.Print(L["BETA_LOGIN_MESSAGE"])
     end
 end

@@ -480,10 +480,8 @@ describe("FrameMixin real source", function()
         assert.are.equal(2, #timerQueue)
 
         timerQueue[2].callback()
-        assert.are.equal(3, #timerQueue)
-
-        timerQueue[3].callback()
         assert.same({ "First", "SecondPass" }, updateReasons)
+        assert.are.equal(2, #timerQueue)
     end)
 
     it("UpdateLayoutImmediately runs layout synchronously without C_Timer", function()
@@ -531,7 +529,7 @@ describe("FrameMixin real source", function()
         assert.is_false(called)
     end)
 
-    it("UpdateLayoutImmediately clears pending deferred state", function()
+    it("UpdateLayoutImmediately clears pending deferred state and ignores stale callbacks", function()
         local updateReasons = {}
         local mod = {
             Name = "TestModule",
@@ -545,12 +543,15 @@ describe("FrameMixin real source", function()
             UpdateLayout = function(_, why)
                 updateReasons[#updateReasons + 1] = why
             end,
-            _updateLayoutPending = true,
-            _pendingWhy = "OldReason",
         }
+        mod.ThrottledUpdateLayout = FrameMixin.ThrottledUpdateLayout
         mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
 
+        FrameMixin.ThrottledUpdateLayout(mod, "Deferred")
+        assert.are.equal(1, #timerQueue)
+
         FrameMixin.UpdateLayoutImmediately(mod, "Immediate")
+        timerQueue[1].callback()
 
         assert.same({ "Immediate" }, updateReasons)
         assert.is_false(mod._updateLayoutPending)

@@ -401,22 +401,26 @@ local function updateDetachedAnchorLayout()
     return anchor
 end
 
-local function updateAllLayouts(reason)
+local function updateAllLayouts(reason, runImmediately)
     invalidateDetachedAnchorMetrics()
     updateDetachedAnchorLayout()
+
+    local layoutMethodName = runImmediately and "UpdateLayoutImmediately" or "ThrottledUpdateLayout"
 
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
         local module = _modules[moduleName]
         if module then
-            module:ThrottledUpdateLayout(reason)
+            local layoutMethod = module[layoutMethodName] or module.ThrottledUpdateLayout
+            layoutMethod(module, reason)
         end
     end
 
     for frameName, module in pairs(_modules) do
         if not _chainSet[frameName] then
-            module:ThrottledUpdateLayout(reason)
+            local layoutMethod = module[layoutMethodName] or module.ThrottledUpdateLayout
+            layoutMethod(module, reason)
         end
     end
 end
@@ -460,11 +464,11 @@ function Runtime.SetLayoutPreview(active)
 end
 
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
-local function executeLayout(reason)
+local function executeLayout(reason, runModuleLayoutsImmediately)
     _layoutPending = false
     hookCooldownViewerSettings()
     updateFadeAndHiddenStates()
-    updateAllLayouts(reason)
+    updateAllLayouts(reason, runModuleLayoutsImmediately)
 end
 
 --- Runs a layout update synchronously (no timer batching).
@@ -472,7 +476,7 @@ end
 --- @param reason string|nil The lifecycle reason.
 function Runtime.UpdateLayoutImmediately(reason)
     invalidateDetachedAnchorMetrics()
-    executeLayout(reason)
+    executeLayout(reason, true)
 end
 
 --- Schedules a layout update after a delay (debounced).
@@ -485,8 +489,9 @@ function Runtime.ScheduleLayoutUpdate(delay, reason)
 
     invalidateDetachedAnchorMetrics()
     _layoutPending = true
-    C_Timer.After(delay or 0, function()
-        executeLayout(reason)
+    local waitTime = delay or 0
+    C_Timer.After(waitTime, function()
+        executeLayout(reason, true)
     end)
 end
 
@@ -540,6 +545,7 @@ local function handleLayoutEvent(_addon, event, arg1)
 
     if event == "CVAR_UPDATE" then
         if arg1 == "cooldownViewerEnabled" then
+            updateFadeAndHiddenStates()
             Runtime.ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
         end
         return
@@ -556,8 +562,7 @@ local function handleLayoutEvent(_addon, event, arg1)
 
     if config.delay > 0 then
         C_Timer.After(config.delay, function()
-            updateFadeAndHiddenStates()
-            updateAllLayouts(event)
+            executeLayout(event, true)
         end)
         return
     end
