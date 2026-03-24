@@ -566,7 +566,7 @@ end
 
 -- V11 may intentionally defer when the active Edit Mode layout is not yet
 -- available during early startup. Retry on later lifecycle hooks so those
--- profiles finish migrating once LibEQOL/Edit Mode state has hydrated.
+-- profiles finish migrating once Edit Mode state has hydrated.
 local function runPendingMigrations(profile)
     if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
         ECM.Migration.Run(profile)

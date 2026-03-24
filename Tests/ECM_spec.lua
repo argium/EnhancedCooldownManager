@@ -201,7 +201,7 @@ describe("ECM layout system", function()
             end
             return fakeAddon
         end
-        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEditModeStub()
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()

@@ -12,7 +12,7 @@ assert(ns.Addon, "ECM.lua must be loaded before ECM_Runtime.lua")
 local C = ECM.Constants
 local L = ECM.L
 local EditMode = ECM.EditMode
-local LibEQOLEditMode = EditMode.Lib
+local LibEditMode = EditMode.Lib
 local Runtime = {}
 ECM.Runtime = Runtime
 
@@ -147,7 +147,7 @@ local function updateFadeAndHiddenStates()
 
     -- Force-show while edit mode or the Layout options preview is active so the
     -- user can see and position modules without hide/fade interference.
-    if LibEQOLEditMode:IsInEditMode() or _layoutPreviewActive then
+    if LibEditMode:IsInEditMode() or _layoutPreviewActive then
         setGloballyHidden(false)
         setAlpha(1)
         enforceBlizzardFrameState()
@@ -261,7 +261,7 @@ local function normalizeDetachedPositionToGrowEdge(point, x, y, width, height)
     return targetPoint, offsetX, offsetY
 end
 
---- Creates and registers the detached anchor frame with LibEQOL.
+--- Creates and registers the detached anchor frame with Edit Mode.
 local function ensureDetachedAnchor()
     if _detachedAnchor then
         return _detachedAnchor
@@ -289,10 +289,9 @@ local function ensureDetachedAnchor()
             saveDetachedAnchorPosition(layoutName, normalizedPoint, normalizedX, normalizedY)
             Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
-        allowDrag = true,
         settings = {
             {
-                kind = LibEQOLEditMode.SettingType.Slider,
+                kind = LibEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
                     return getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
@@ -307,7 +306,7 @@ local function ensureDetachedAnchor()
                 allowInput = true,
             },
             {
-                kind = LibEQOLEditMode.SettingType.Slider,
+                kind = LibEditMode.SettingType.Slider,
                 name = L["SPACING"],
                 get = function()
                     return getDetachedConfigValue("detachedModuleSpacing", 0)
@@ -322,7 +321,7 @@ local function ensureDetachedAnchor()
                 allowInput = true,
             },
             {
-                kind = LibEQOLEditMode.SettingType.Dropdown,
+                kind = LibEditMode.SettingType.Dropdown,
                 name = L["GROW_DIRECTION"],
                 get = function()
                     return getDetachedConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN)
@@ -331,8 +330,8 @@ local function ensureDetachedAnchor()
                     setDetachedConfigValue("detachedGrowDirection", value, "DetachedAnchorGrowDirection")
                 end,
                 values = {
-                    { label = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
-                    { label = L["UP"], value = C.GROW_DIRECTION_UP },
+                    { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
+                    { text = L["UP"], value = C.GROW_DIRECTION_UP },
                 },
             },
         },

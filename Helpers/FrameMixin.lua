@@ -6,9 +6,9 @@ local _, ns = ...
 local C = ECM.Constants
 local L = ECM.L
 local FrameUtil = ECM.FrameUtil
-local LibEQOLEditMode = LibStub("LibEQOLEditMode-1.0")
+local LibEditMode = LibStub("LibEditMode")
 local EditMode = ECM.EditMode or {}
-EditMode.Lib = LibEQOLEditMode
+EditMode.Lib = LibEditMode
 ECM.EditMode = EditMode
 local FrameMixin = {}
 ECM.FrameMixin = FrameMixin
@@ -16,19 +16,8 @@ ECM.FrameMixin = FrameMixin
 local FrameMixinProto = setmetatable({}, { __index = ECM.ModuleMixin.Proto })
 
 --- Gets the active Edit Mode layout name.
---- Hydrates LibEQOL's active layout cache, then falls back to its layout-name
---- map if the active name has not been copied onto the library state yet.
 function EditMode.GetActiveLayoutName()
-    local layoutName = LibEQOLEditMode:GetActiveLayoutName()
-    if layoutName == nil and type(LibEQOLEditMode.GetActiveLayoutIndex) == "function" then
-        local activeLayoutIndex = LibEQOLEditMode:GetActiveLayoutIndex()
-        layoutName = LibEQOLEditMode:GetActiveLayoutName()
-        if layoutName == nil then
-            local layoutNames = LibEQOLEditMode.layoutNames
-            layoutName = type(layoutNames) == "table" and layoutNames[activeLayoutIndex] or nil
-        end
-    end
-    return layoutName
+    return LibEditMode:GetActiveLayoutName()
 end
 
 --- Gets a saved Edit Mode position for the active layout.
@@ -77,18 +66,21 @@ function EditMode.RegisterFrame(frame, options)
         return
     end
 
+    local defaultPosition = options.defaultPosition or {
+        point = C.EDIT_MODE_DEFAULT_POINT,
+        x = 0,
+        y = 0,
+    }
+
     frame.editModeName = options.name
 
-    LibEQOLEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
+    LibEditMode:AddFrame(frame, function(_, layoutName, point, x, y)
         options.onPositionChanged(layoutName, point, x, y)
-    end, {
-        allowDrag = options.allowDrag,
-        showReset = options.showReset ~= false,
-        enableOverlayToggle = options.enableOverlayToggle ~= false,
-    })
+    end, defaultPosition, options.name)
 
     if options.hideSelection then
-        local selection = LibEQOLEditMode.selectionRegistry[frame]
+        local selections = LibEditMode.frameSelections
+        local selection = selections and selections[frame]
         if selection then
             selection:HookScript("OnShow", function(sel)
                 if options.hideSelection() then
@@ -99,23 +91,23 @@ function EditMode.RegisterFrame(frame, options)
     end
 
     if options.settings then
-        LibEQOLEditMode:AddFrameSettings(frame, options.settings)
+        LibEditMode:AddFrameSettings(frame, options.settings)
     end
 end
 
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
 -- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
-LibEQOLEditMode:RegisterCallback("enter", function()
+LibEditMode:RegisterCallback("enter", function()
     C_Timer.After(0, function()
         ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter")
     end)
 end)
-LibEQOLEditMode:RegisterCallback("exit", function()
+LibEditMode:RegisterCallback("exit", function()
     C_Timer.After(0, function()
         ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit")
     end)
 end)
-LibEQOLEditMode:RegisterCallback("layout", function()
+LibEditMode:RegisterCallback("layout", function()
     C_Timer.After(0, function()
         ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout")
     end)
@@ -511,7 +503,7 @@ function FrameMixinProto:_SaveEditModePosition(layoutName, point, x, y)
     EditMode.SavePosition(cfg, "editModePositions", layoutName, point, x, y)
 end
 
---- Registers this module's frame with LibEQOL Edit Mode for drag positioning.
+--- Registers this module's frame with Edit Mode for drag positioning.
 --- Called once during AddMixin after InnerFrame is created.
 --- No-op if InnerFrame is nil (e.g. when the Blizzard viewer hasn't loaded yet).
 function FrameMixinProto:_RegisterEditMode()
@@ -527,17 +519,13 @@ function FrameMixinProto:_RegisterEditMode()
             module:_SaveEditModePosition(layoutName, point, x, y)
             module:UpdateLayoutImmediately("EditModeDrag")
         end,
-        allowDrag = function()
-            local cfg = module:GetModuleConfig()
-            return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
-        end,
         hideSelection = function()
             local cfg = module:GetModuleConfig()
             return cfg and cfg.anchorMode ~= C.ANCHORMODE_FREE
         end,
         settings = {
             {
-                kind = LibEQOLEditMode.SettingType.Slider,
+                kind = LibEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
                     local cfg = module:GetModuleConfig()

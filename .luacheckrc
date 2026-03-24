@@ -6,7 +6,7 @@ exclude_files = {
     "Libs/AceEvent-3.0/",
     "Libs/CallbackHandler-1.0/",
     "Libs/LibDeflate/",
-    "Libs/LibEQOL/",
+    "Libs/LibEditMode/",
     "Libs/LibSerialize/",
     "Libs/LibSharedMedia-3.0/",
     "Libs/LibStub/",

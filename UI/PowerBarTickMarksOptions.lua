@@ -200,8 +200,8 @@ local function createTickRowWidgets(rowFrame, SB)
     bindSlider(widthSlider, widthText, "width")
 end
 
-local function createTickMarksCanvas(SB, subcatName)
-    local layout = SB.CreateCanvasLayout(subcatName)
+local function createTickMarksCanvas(SB, subcatName, parentCategory)
+    local layout = SB.CreateCanvasLayout(subcatName, parentCategory)
     local frame = layout.frame
 
     local function clearAllTicks()
@@ -329,7 +329,7 @@ local function createTickMarksCanvas(SB, subcatName)
 end
 
 ECM.PowerBarTickMarksOptions = {
-    RegisterSettings = function(SB)
-        createTickMarksCanvas(SB, "Tick Marks")
+    RegisterSettings = function(SB, parentCategory)
+        createTickMarksCanvas(SB, "Tick Marks", parentCategory)
     end,
 }

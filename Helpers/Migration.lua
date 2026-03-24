@@ -202,21 +202,6 @@ local function resolveActiveLayoutName(layoutName)
         end
     end
 
-    if not LibStub then
-        return nil
-    end
-
-    local lib = LibStub("LibEQOLEditMode-1.0", true)
-    if not lib then
-        return nil
-    end
-
-    local resolvedLayoutName = type(lib.GetActiveLayoutName) == "function" and lib:GetActiveLayoutName() or nil
-
-    if type(resolvedLayoutName) == "string" and resolvedLayoutName ~= "" then
-        return resolvedLayoutName
-    end
-
     return nil
 end
 

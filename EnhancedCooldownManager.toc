@@ -18,7 +18,7 @@ Libs\LibConsole\LibConsole.lua
 Libs\AceDB-3.0\AceDB-3.0.xml
 Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml
-Libs\LibEQOL\LibEQOL.xml
+Libs\LibEditMode\embed.xml
 Libs\LibSharedMedia-3.0\lib.xml
 Libs\LibSettingsBuilder\LibSettingsBuilder.lua
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml

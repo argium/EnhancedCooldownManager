@@ -915,23 +915,6 @@ describe("Migration", function()
         ECM.EditMode.GetActiveLayoutName = function()
             return nil
         end
-        _G.LibStub = function(name, silent)
-            if name ~= "LibEQOLEditMode-1.0" then
-                if not silent then
-                    error("Library not found: " .. tostring(name))
-                end
-                return nil
-            end
-
-            return {
-                GetActiveLayoutName = function()
-                    return nil
-                end,
-                GetActiveLayoutIndex = function()
-                    return nil
-                end,
-            }
-        end
 
         local profile = {
             schemaVersion = 10,

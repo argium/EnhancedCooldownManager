@@ -90,6 +90,25 @@ These rules prevent recurring anti-patterns discovered during code review. Viola
 
 - Tickers or polling loops that perform setup tasks (hooking frames, discovering late-created objects) must track completion and skip the setup calls once all targets are handled. Only ongoing enforcement work should remain in the steady-state tick.
 
+## No Single-Use Extracted Helpers
+
+- Do not extract a function from its only caller unless it has a clear, independently testable contract or is called from 2+ sites.
+- A single-use helper called on the next line adds a call frame and forces a mental jump without earning its keep. Inline it.
+- Sequential clusters of single-use helpers that all operate on the same data and are always called together should be merged into one coherent block.
+
+## Prefer Table Lookups Over Pure-Mapping Functions
+
+- If a function's output is determined entirely by its input with no state, and the input is from a small known set, use a constant lookup table instead of a function.
+
+## Minimise Timer Deferral Depth
+
+- Defer once out of a restricted execution context (e.g. secure callbacks), then execute synchronously. Do not stack sequential `C_Timer.After(0)` calls with no work between them.
+- Each additional deferral adds a frame of latency. The maximum acceptable chain is: secure-context deferral → batching scheduler → per-module throttle (3 levels).
+
+## Capture Config Once Per Scope
+
+- When a function reads the same config value multiple times, capture it in a local at the top of the scope. Do not re-traverse the config accessor chain for the same field twice in one function body.
+
 # Secret Values
 
 Do not perform any operations except nil checking (including reads) on the following secret values except for passing them into other built-in functions:

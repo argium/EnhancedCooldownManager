@@ -303,7 +303,7 @@ describe("ECM.Runtime layout system", function()
             end
             return fakeAddon
         end
-        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEditModeStub()
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
@@ -479,7 +479,7 @@ describe("ECM.Runtime layout system", function()
     describe("detached anchor layout handling", function()
         it("normalizes legacy center-saved detached positions to a stable top anchor", function()
             local mod = makeRegisteredModule("PowerBar")
-            local lib = LibStub("LibEQOLEditMode-1.0")
+            local lib = LibStub("LibEditMode")
             local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
             _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
@@ -511,7 +511,7 @@ describe("ECM.Runtime layout system", function()
 
         it("positions the detached anchor before detached modules update", function()
             local mod = makeRegisteredModule("PowerBar")
-            local lib = LibStub("LibEQOLEditMode-1.0")
+            local lib = LibStub("LibEditMode")
             local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
             local anchorDuringLayout
 
@@ -552,9 +552,29 @@ describe("ECM.Runtime layout system", function()
             ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
 
+        it("registers grow direction dropdown values with text labels", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local lib = LibStub("LibEditMode")
+
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            fakeAddon.GetECMModule = function(_, name)
+                return name == mod.Name and mod
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-settings-shape")
+
+            local settings = assert(lib.addFrameSettingsCalls[ECM.Runtime.DetachedAnchor])
+            local growDirection = assert(settings[3])
+
+            assert.same({
+                { text = ECM.L["DOWN"], value = ECM.Constants.GROW_DIRECTION_DOWN },
+                { text = ECM.L["UP"], value = ECM.Constants.GROW_DIRECTION_UP },
+            }, growDirection.values)
+        end)
+
         it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()
             local mod = makeRegisteredModule("PowerBar")
-            local lib = LibStub("LibEQOLEditMode-1.0")
+            local lib = LibStub("LibEditMode")
             local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
 
             _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED

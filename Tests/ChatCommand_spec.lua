@@ -229,7 +229,7 @@ describe("ChatCommand migration", function()
         }
 
         TestHelpers.SetupLibStub()
-        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEditModeStub()
         TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()

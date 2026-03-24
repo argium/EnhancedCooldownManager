@@ -47,7 +47,7 @@ function PowerBarOptions.RegisterSettings(SB)
     }
 
     SB.RegisterFromTable({ name = L["POWER_BAR"], path = "powerBar", args = args })
-    ECM.PowerBarTickMarksOptions.RegisterSettings(SB)
+    ECM.PowerBarTickMarksOptions.RegisterSettings(SB, SB._currentSubcategory)
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "PowerBar", PowerBarOptions)

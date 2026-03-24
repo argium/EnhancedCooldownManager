@@ -160,4 +160,19 @@ describe("PowerBarOptions getters/setters/defaults", function()
             end
         end)
     end)
+
+    describe("tick marks menu placement", function()
+        it("registers Tick Marks as a subcategory of Power Bar", function()
+            TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "PowerBarTickMarksOptions")(nil, ns)
+
+            ns.OptionsSections.PowerBar.RegisterSettings(SB)
+
+            local powerBarCategory = SB._subcategories[ECM.L["POWER_BAR"]]
+            local tickMarksCategory = SB._subcategories["Tick Marks"]
+
+            assert.is_not_nil(powerBarCategory)
+            assert.is_not_nil(tickMarksCategory)
+            assert.are.equal(powerBarCategory, tickMarksCategory._parent)
+        end)
+    end)
 end)

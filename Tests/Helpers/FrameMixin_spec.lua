@@ -287,7 +287,7 @@ describe("FrameMixin real source", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
-        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEditModeStub()
         ns = { Addon = {} }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
@@ -575,9 +575,8 @@ describe("FrameMixin real source", function()
         assert.are.equal(0, position.y)
     end)
 
-    it("GetEditModePosition hydrates the active layout name before reading per-layout positions", function()
-        local lib = LibStub("LibEQOLEditMode-1.0")
-        local hydrated = false
+    it("GetEditModePosition returns the saved coordinates for the active layout", function()
+        local lib = LibStub("LibEditMode")
         local mod = {
             GetModuleConfig = function()
                 return {
@@ -589,11 +588,7 @@ describe("FrameMixin real source", function()
         }
 
         lib.GetActiveLayoutName = function()
-            return hydrated and "Modern" or nil
-        end
-        lib.GetActiveLayoutIndex = function()
-            hydrated = true
-            return 1
+            return "Modern"
         end
 
         local position = FrameMixin.GetEditModePosition(mod)
@@ -601,24 +596,14 @@ describe("FrameMixin real source", function()
         assert.are.equal("TOP", position.point)
         assert.are.equal(42, position.x)
         assert.are.equal(-17, position.y)
-        assert.is_true(hydrated)
     end)
 
-    it("GetActiveLayoutName falls back to LibEQOL's layoutNames cache when the hydrated name is still nil", function()
-        local lib = LibStub("LibEQOLEditMode-1.0")
-        local indexCalls = 0
-
-        lib.layoutNames = { "Modern", "Classic" }
+    it("GetActiveLayoutName delegates to LibEditMode", function()
+        local lib = LibStub("LibEditMode")
         lib.GetActiveLayoutName = function()
-            return nil
+            return "Modern"
         end
-        lib.GetActiveLayoutIndex = function()
-            indexCalls = indexCalls + 1
-            return 1
-        end
-
         assert.are.equal("Modern", ECM.EditMode.GetActiveLayoutName())
-        assert.are.equal(1, indexCalls)
     end)
 
     it("UpdateLayout preserves final frame placement for V11 seeded legacy free-mode defaults", function()

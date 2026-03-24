@@ -136,25 +136,33 @@ function TestHelpers.SetupLibStub()
     return LibStub
 end
 
---- Registers a minimal LibEQOLEditMode-1.0 stub in an existing LibStub.
+--- Registers a minimal LibEditMode stub in an existing LibStub.
 --- Must be called after LibStub is available.
-function TestHelpers.SetupLibEQOLEditModeStub()
-    assert(_G.LibStub, "LibStub must be set up before calling SetupLibEQOLEditModeStub")
-    local lib = _G.LibStub:NewLibrary("LibEQOLEditMode-1.0", 1) or _G.LibStub("LibEQOLEditMode-1.0")
-    lib.AddFrame = function() end
-    lib.AddFrameSettings = function() end
+function TestHelpers.SetupLibEditModeStub()
+    assert(_G.LibStub, "LibStub must be set up before calling SetupLibEditModeStub")
+    local lib = _G.LibStub:NewLibrary("LibEditMode", 15) or _G.LibStub("LibEditMode")
+    lib.frameSelections = {}
+    lib.addFrameSettingsCalls = {}
+    lib.AddFrame = function(_, frame)
+        lib.frameSelections[frame] = {
+            HookScript = function(self, event, callback)
+                self[event] = callback
+            end,
+            Hide = function(self)
+                self.hidden = true
+            end,
+        }
+    end
+    lib.AddFrameSettings = function(_, frame, settings)
+        lib.addFrameSettingsCalls[frame] = settings
+    end
     lib.RegisterCallback = function() end
     lib.GetActiveLayoutName = function()
         return "Modern"
     end
-    lib.GetActiveLayoutIndex = function()
-        return 1
-    end
     lib.IsInEditMode = function()
         return false
     end
-    lib.SetFrameDragEnabled = function() end
-    lib.selectionRegistry = {}
     lib.SettingType = { Slider = 0, Dropdown = 1 }
     return lib
 end

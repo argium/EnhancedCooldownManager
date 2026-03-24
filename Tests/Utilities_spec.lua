@@ -93,7 +93,7 @@ describe("Utilities", function()
             end
             return nil
         end
-        TestHelpers.SetupLibEQOLEditModeStub()
+        TestHelpers.SetupLibEditModeStub()
         _G.ECM.ColorUtil = {
             Sparkle = function(text)
                 return text
