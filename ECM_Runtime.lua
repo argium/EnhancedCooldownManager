@@ -55,7 +55,7 @@ for _, name in ipairs(C.CHAIN_ORDER) do
 end
 
 local _detachedAnchor = nil
-local _detachedAnchorLayout = nil
+local _detachedAnchorMetrics = nil
 
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
@@ -180,59 +180,13 @@ local function updateFadeAndHiddenStates()
     enforceBlizzardFrameState()
 end
 
---- Gets the saved detached anchor position for a layout.
---- If no layout name is provided, this uses the current active Edit Mode layout.
----@param layoutName string|nil
----@return ECM_EditModePosition
-local function getDetachedAnchorPosition(layoutName)
-    local gc = ECM.GetGlobalConfig()
-    return EditMode.GetPosition(gc and gc.detachedAnchorPositions, layoutName)
-end
-
---- Saves the detached anchor position for a specific layout.
----@param layoutName string
----@param point string
----@param x number
----@param y number
-local function saveDetachedAnchorPosition(layoutName, point, x, y)
-    local gc = ECM.GetGlobalConfig()
-    EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, point, x, y)
-end
-
 local FU = ECM.FrameUtil
 local splitAnchorName = FU.SplitAnchorName
 local buildAnchorName = FU.BuildAnchorName
 local convertOffsetToAnchor = FU.ConvertOffsetToAnchor
 
----@param key string
----@param defaultValue any
----@return any
-local function getDetachedConfigValue(key, defaultValue)
-    local gc = ECM.GetGlobalConfig()
-    local value = gc and gc[key]
-    if value == nil then
-        return defaultValue
-    end
-    return value
-end
-
----@param key string
----@param value any
----@param updateReason string
-local function setDetachedConfigValue(key, value, updateReason)
-    local gc = ECM.GetGlobalConfig()
-    if not gc then
-        return
-    end
-
-    gc[key] = value
-    Runtime.UpdateLayoutImmediately(updateReason)
-end
-
---- Returns whether detached stacks are configured to grow upward.
----@return boolean
-local function detachedAnchorGrowsUp()
-    return getDetachedConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
+local function invalidateDetachedAnchorMetrics()
+    _detachedAnchorMetrics = nil
 end
 
 -- Detached stacks are more stable if their saved position is based on the edge
@@ -251,11 +205,12 @@ end
 ---@param y number|nil
 ---@param width number|nil
 ---@param height number|nil
+---@param growsUp boolean
 ---@return string, number, number
-local function normalizeDetachedPositionToGrowEdge(point, x, y, width, height)
+local function normalizeDetachedPositionToGrowEdge(point, x, y, width, height, growsUp)
     local sourcePoint = point or C.EDIT_MODE_DEFAULT_POINT
     local _, horizontal = splitAnchorName(sourcePoint)
-    local targetVertical = detachedAnchorGrowsUp() and "BOTTOM" or "TOP"
+    local targetVertical = growsUp and "BOTTOM" or "TOP"
     local targetPoint = buildAnchorName(targetVertical, horizontal)
     local offsetX, offsetY = convertOffsetToAnchor(sourcePoint, targetPoint, x or 0, y or 0, width, height, UIParent)
     return targetPoint, offsetX, offsetY
@@ -280,13 +235,16 @@ local function ensureDetachedAnchor()
     EditMode.RegisterFrame(frame, {
         name = "ECM: Detached Anchor",
         onPositionChanged = function(layoutName, point, x, y)
+            local gc = ECM.GetGlobalConfig()
+            ECM.DebugAssert(gc, "Detached anchor drag requires global config")
+            local growsUp = (gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
             -- Edit Mode reports the drop position using the detached box's
             -- current anchor. We immediately rewrite that position to the
             -- detached stack's stable grow edge so later height changes do not
             -- make the stack appear to move.
             local normalizedPoint, normalizedX, normalizedY =
-                normalizeDetachedPositionToGrowEdge(point, x, y, frame:GetWidth(), frame:GetHeight())
-            saveDetachedAnchorPosition(layoutName, normalizedPoint, normalizedX, normalizedY)
+                normalizeDetachedPositionToGrowEdge(point, x, y, frame:GetWidth(), frame:GetHeight(), growsUp)
+            EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, normalizedPoint, normalizedX, normalizedY)
             Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
         settings = {
@@ -294,10 +252,15 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
-                    return getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
+                    local gc = ECM.GetGlobalConfig()
+                    return gc and gc.detachedBarWidth or C.DEFAULT_BAR_WIDTH
                 end,
                 set = function(_, value)
-                    setDetachedConfigValue("detachedBarWidth", value, "DetachedAnchorWidth")
+                    local gc = ECM.GetGlobalConfig()
+                    ECM.DebugAssert(gc, "Detached anchor width requires global config")
+                    gc.detachedBarWidth = value
+                    invalidateDetachedAnchorMetrics()
+                    Runtime.UpdateLayoutImmediately("DetachedAnchorWidth")
                 end,
                 default = C.DEFAULT_BAR_WIDTH,
                 minValue = 100,
@@ -309,10 +272,15 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Slider,
                 name = L["SPACING"],
                 get = function()
-                    return getDetachedConfigValue("detachedModuleSpacing", 0)
+                    local gc = ECM.GetGlobalConfig()
+                    return gc and gc.detachedModuleSpacing or 0
                 end,
                 set = function(_, value)
-                    setDetachedConfigValue("detachedModuleSpacing", value, "DetachedAnchorSpacing")
+                    local gc = ECM.GetGlobalConfig()
+                    ECM.DebugAssert(gc, "Detached anchor spacing requires global config")
+                    gc.detachedModuleSpacing = value
+                    invalidateDetachedAnchorMetrics()
+                    Runtime.UpdateLayoutImmediately("DetachedAnchorSpacing")
                 end,
                 default = 0,
                 minValue = 0,
@@ -324,10 +292,14 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Dropdown,
                 name = L["GROW_DIRECTION"],
                 get = function()
-                    return getDetachedConfigValue("detachedGrowDirection", C.GROW_DIRECTION_DOWN)
+                    local gc = ECM.GetGlobalConfig()
+                    return gc and gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN
                 end,
                 set = function(_, value)
-                    setDetachedConfigValue("detachedGrowDirection", value, "DetachedAnchorGrowDirection")
+                    local gc = ECM.GetGlobalConfig()
+                    ECM.DebugAssert(gc, "Detached anchor grow direction requires global config")
+                    gc.detachedGrowDirection = value
+                    Runtime.UpdateLayoutImmediately("DetachedAnchorGrowDirection")
                 end,
                 values = {
                     { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
@@ -341,9 +313,13 @@ local function ensureDetachedAnchor()
     return frame
 end
 
----@return number
----@return number
+---@return { count: number, totalHeight: number }
 local function getDetachedAnchorMetrics()
+    local metrics = _detachedAnchorMetrics
+    if metrics then
+        return metrics
+    end
+
     local totalHeight = 0
     local count = 0
 
@@ -351,56 +327,71 @@ local function getDetachedAnchorMetrics()
         local barModule = ns.Addon and ns.Addon:GetECMModule(moduleName, true)
         if barModule and barModule:IsEnabled() and barModule:ShouldShow() then
             local mc = barModule:GetModuleConfig()
-            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED and barModule.InnerFrame then
-                local h = barModule.InnerFrame:GetHeight()
+            local frame = barModule.InnerFrame
+            if mc and mc.anchorMode == C.ANCHORMODE_DETACHED and frame then
+                count = count + 1
+                local h = frame:GetHeight()
                 if h and h > 0 then
                     totalHeight = totalHeight + h
-                    count = count + 1
                 end
             end
         end
     end
 
-    return totalHeight, count
+    local gc = ECM.GetGlobalConfig()
+    local spacing = gc and gc.detachedModuleSpacing or 0
+    if count > 1 then
+        totalHeight = totalHeight + (spacing * (count - 1))
+    end
+
+    metrics = {
+        count = count,
+        totalHeight = totalHeight,
+    }
+    _detachedAnchorMetrics = metrics
+    return metrics
 end
 
 ---@param anchor Frame
 ---@param layoutName string|nil
----@return boolean
-local function applyDetachedAnchorPosition(anchor, layoutName)
+---@param positions table<string, ECM_EditModePosition>|nil
+---@param growsUp boolean
+local function applyDetachedAnchorPosition(anchor, layoutName, positions, growsUp)
     if not layoutName then
-        return false
+        return
     end
 
-    local pos = getDetachedAnchorPosition(layoutName)
+    local pos = EditMode.GetPosition(positions, layoutName)
     local point, x, y =
-        normalizeDetachedPositionToGrowEdge(pos.point, pos.x, pos.y, anchor:GetWidth(), anchor:GetHeight())
+        normalizeDetachedPositionToGrowEdge(pos.point, pos.x, pos.y, anchor:GetWidth(), anchor:GetHeight(), growsUp)
     ECM.FrameUtil.LazySetAnchors(anchor, {
         { point, UIParent, point, x, y },
     })
-    _detachedAnchorLayout = layoutName
-    return true
 end
 
---- Ensures the detached anchor exists and is already positioned for the active
---- layout before detached modules calculate their own anchors.
+--- Ensures the detached anchor matches the current detached layout state before
+--- detached modules calculate their own anchors.
 ---@return Frame|nil
-local function prepareDetachedAnchorForLayout()
-    local _, count = getDetachedAnchorMetrics()
-    if count == 0 then
+local function updateDetachedAnchorLayout()
+    local metrics = getDetachedAnchorMetrics()
+    if metrics.count == 0 then
+        if _detachedAnchor and _detachedAnchor:IsShown() then
+            _detachedAnchor:Hide()
+        end
         return nil
     end
 
     local anchor = ensureDetachedAnchor()
-    local barWidth = getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
+    local gc = ECM.GetGlobalConfig()
+    local barWidth = gc and gc.detachedBarWidth or C.DEFAULT_BAR_WIDTH
+    local growsUp = (gc and gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
+
     ECM.FrameUtil.LazySetWidth(anchor, barWidth)
+    ECM.FrameUtil.LazySetHeight(anchor, math.max(metrics.totalHeight, 1))
 
     local layoutName = EditMode.GetActiveLayoutName()
-    -- Detached modules ask for their root anchor during this same layout pass.
-    -- If the detached anchor is still using the wrong layout position here,
-    -- every detached child will calculate its own position from stale data.
-    if layoutName and (not anchor:IsShown() or layoutName ~= _detachedAnchorLayout) then
-        applyDetachedAnchorPosition(anchor, layoutName)
+    if layoutName then
+        applyDetachedAnchorPosition(anchor, layoutName, gc and gc.detachedAnchorPositions, growsUp)
     end
 
     if not anchor:IsShown() then
@@ -410,50 +401,9 @@ local function prepareDetachedAnchorForLayout()
     return anchor
 end
 
---- Updates the detached anchor's size and visibility to match the current set
---- of shown detached modules.
-local function updateDetachedAnchorSize()
-    local totalHeight, count = getDetachedAnchorMetrics()
-    if count == 0 then
-        if _detachedAnchor and _detachedAnchor:IsShown() then
-            _detachedAnchor:Hide()
-        end
-        _detachedAnchorLayout = nil
-        return
-    end
-
-    local anchor = ensureDetachedAnchor()
-    local barWidth = getDetachedConfigValue("detachedBarWidth", C.DEFAULT_BAR_WIDTH)
-    local spacing = getDetachedConfigValue("detachedModuleSpacing", 0)
-
-    if count > 1 then
-        totalHeight = totalHeight + (spacing * (count - 1))
-    end
-
-    ECM.FrameUtil.LazySetWidth(anchor, barWidth)
-    ECM.FrameUtil.LazySetHeight(anchor, math.max(totalHeight, 1))
-
-    -- Apply the position again after width/height are final.
-    --
-    -- This matters for two cases:
-    -- - older saved data may still have been recorded from the centre;
-    -- - the current detached stack may have changed height because modules were
-    --   shown, hidden, enabled, or disabled.
-    --
-    -- Re-running the conversion with the final size keeps the visible anchored
-    -- edge consistent for the current layout.
-    local layoutName = EditMode.GetActiveLayoutName()
-    if layoutName then
-        applyDetachedAnchorPosition(anchor, layoutName)
-    end
-
-    if not anchor:IsShown() then
-        anchor:Show()
-    end
-end
-
 local function updateAllLayouts(reason)
-    prepareDetachedAnchorForLayout()
+    invalidateDetachedAnchorMetrics()
+    updateDetachedAnchorLayout()
 
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
@@ -469,8 +419,6 @@ local function updateAllLayouts(reason)
             module:ThrottledUpdateLayout(reason)
         end
     end
-
-    updateDetachedAnchorSize()
 end
 
 --- Hooks CooldownViewerSettings hide to force alpha/layout reapplication.
@@ -523,6 +471,7 @@ end
 --- Use for Edit Mode drag where 1-frame latency is noticeable.
 --- @param reason string|nil The lifecycle reason.
 function Runtime.UpdateLayoutImmediately(reason)
+    invalidateDetachedAnchorMetrics()
     executeLayout(reason)
 end
 
@@ -534,6 +483,7 @@ function Runtime.ScheduleLayoutUpdate(delay, reason)
         return
     end
 
+    invalidateDetachedAnchorMetrics()
     _layoutPending = true
     C_Timer.After(delay or 0, function()
         executeLayout(reason)
@@ -546,6 +496,7 @@ function Runtime.RegisterFrame(frame)
     ECM.FrameMixin.AssertValid(frame)
     assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
 
+    invalidateDetachedAnchorMetrics()
     _modules[frame.Name] = frame
     frame:SetHidden(_globallyHidden)
     ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
@@ -559,6 +510,7 @@ function Runtime.UnregisterFrame(frame)
     assert(_modules[frame.Name] ~= nil, "UnregisterFrame: frame with name '" .. frame.Name .. "' is not registered")
 
     local name = frame.Name
+    invalidateDetachedAnchorMetrics()
     _modules[name] = nil
     frame:SetHidden(true)
     ECM.Log(nil, "Frame unregistered: " .. name)

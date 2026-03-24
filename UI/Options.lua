@@ -60,6 +60,66 @@ ns.OptionsSections = ns.OptionsSections or {}
 
 local Options = ns.Addon:NewModule("Options")
 
+local function isTrackedECMCategory(category)
+    local SB = ECM.SettingsBuilder
+    return category ~= nil and SB ~= nil and SB._layouts ~= nil and SB._layouts[category] ~= nil
+end
+
+local function getCategoryOpenToken(category)
+    if category and type(category.GetID) == "function" then
+        return category:GetID()
+    end
+end
+
+local function rememberTrackedCategory(module, category)
+    if not isTrackedECMCategory(category) then
+        return
+    end
+
+    local token = getCategoryOpenToken(category)
+    if token ~= nil then
+        module._lastOpenedCategoryToken = token
+    end
+end
+
+local function getDefaultOptionsCategoryToken()
+    local SB = ECM.SettingsBuilder
+    local category = SB._subcategories[L["GENERAL"]] or SB._rootCategory
+    return getCategoryOpenToken(category)
+end
+
+function Options:InstallCategoryTracking()
+    if self._categoryTrackingInstalled then
+        return
+    end
+
+    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
+        if self._categoryTrackingDeferred or type(CreateFrame) ~= "function" then
+            return
+        end
+
+        self._categoryTrackingDeferred = true
+        local tracker = CreateFrame("Frame")
+        tracker:RegisterEvent("ADDON_LOADED")
+        tracker:SetScript("OnEvent", function(frame)
+            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
+                self._categoryTrackingDeferred = nil
+                self:InstallCategoryTracking()
+                if frame.UnregisterAllEvents then
+                    frame:UnregisterAllEvents()
+                end
+            end
+        end)
+        return
+    end
+
+    self._categoryTrackingInstalled = true
+    hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
+        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        rememberTrackedCategory(self, category)
+    end)
+end
+
 function Options:OnInitialize()
     local SB = ECM.SettingsBuilder
     SB.CreateRootCategory(L["ADDON_NAME"])
@@ -88,11 +148,17 @@ function Options:OnInitialize()
     end
 
     SB.RegisterCategories()
+    self:InstallCategoryTracking()
 end
 
 function Options:OpenOptions()
-    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(L["GENERAL"]) or ECM.SettingsBuilder.GetRootCategoryID()
-    if categoryID then
-        Settings.OpenToCategory(categoryID)
+    self:InstallCategoryTracking()
+
+    local currentCategory = SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
+    rememberTrackedCategory(self, currentCategory)
+
+    local categoryToken = self._lastOpenedCategoryToken or getDefaultOptionsCategoryToken()
+    if categoryToken then
+        Settings.OpenToCategory(categoryToken)
     end
 end

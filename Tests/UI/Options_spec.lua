@@ -8,6 +8,7 @@ local TestHelpers =
 describe("OptionUtil", function()
     local originalGlobals
     local ns
+    local optionsModule
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -57,8 +58,11 @@ describe("OptionUtil", function()
                     profile = {},
                     defaults = { profile = {} },
                 },
+                _modules = {},
                 NewModule = function(_, name)
-                    return { moduleName = name }
+                    local module = { moduleName = name }
+                    ns.Addon._modules[name] = module
+                    return module
                 end,
                 EnableModule = function() end,
                 DisableModule = function() end,
@@ -69,6 +73,7 @@ describe("OptionUtil", function()
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
+        optionsModule = ns.Addon._modules.Options
     end)
 
     describe("CreateModuleEnabledHandler", function()
@@ -313,6 +318,70 @@ describe("OptionUtil", function()
             local tbl = {}
             ECM.OptionUtil.SetNestedValue(tbl, "x.y.z", true)
             assert.is_true(tbl.x.y.z)
+        end)
+    end)
+
+    describe("Options:OpenOptions", function()
+        local openedCategory
+        local generalCategory
+        local profileCategory
+
+        before_each(function()
+            openedCategory = nil
+            generalCategory = nil
+            profileCategory = nil
+
+            rawset(Settings, "OpenToCategory", function(categoryID)
+                openedCategory = categoryID
+            end)
+
+            ns.OptionsSections["About"] = {
+                RegisterSettings = function() end,
+            }
+            ns.OptionsSections["General"] = {
+                RegisterSettings = function(SB)
+                    generalCategory = SB.CreateSubcategory(ECM.L["GENERAL"])
+                end,
+            }
+            ns.OptionsSections["Profile"] = {
+                RegisterSettings = function(SB)
+                    profileCategory = SB.CreateSubcategory(ECM.L["PROFILES"])
+                end,
+            }
+
+            optionsModule:OnInitialize()
+        end)
+
+        it("opens General when no ECM page has been visited yet", function()
+            optionsModule:OpenOptions()
+
+            assert.are.equal(generalCategory:GetID(), openedCategory)
+        end)
+
+        it("reopens the last visited ECM page", function()
+            SettingsPanel:SetCurrentCategory(profileCategory)
+            SettingsPanel:DisplayCategory(profileCategory)
+
+            optionsModule:OpenOptions()
+
+            assert.are.equal(profileCategory:GetID(), openedCategory)
+        end)
+
+        it("ignores non-ECM pages when remembering the last page", function()
+            local otherCategory = {
+                GetID = function()
+                    return "Other.Settings.Page"
+                end,
+            }
+
+            SettingsPanel:SetCurrentCategory(profileCategory)
+            SettingsPanel:DisplayCategory(profileCategory)
+            SettingsPanel:SetCurrentCategory(otherCategory)
+            SettingsPanel:DisplayCategory(otherCategory)
+
+            optionsModule:OpenOptions()
+
+            assert.are.equal(profileCategory:GetID(), openedCategory)
         end)
     end)
 end)

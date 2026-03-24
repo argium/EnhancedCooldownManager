@@ -363,7 +363,7 @@ local function getViewerPosition(module)
         }
     end
 
-    local pos = module:GetEditModePosition()
+    local pos = EditMode.GetPosition(cfg and cfg.editModePositions)
     return {
         mode = mode,
         anchor = UIParent,

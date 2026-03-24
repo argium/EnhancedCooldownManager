@@ -96,21 +96,16 @@ function EditMode.RegisterFrame(frame, options)
 end
 
 -- Re-apply layout for all registered modules on Edit Mode transitions and layout switches.
--- Deferred via C_Timer to avoid tainting the secure Edit Mode execution context.
+-- Runtime.ScheduleLayoutUpdate provides the single deferred escape hatch out of
+-- the secure Edit Mode execution context.
 LibEditMode:RegisterCallback("enter", function()
-    C_Timer.After(0, function()
-        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter")
-    end)
+    ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeEnter")
 end)
 LibEditMode:RegisterCallback("exit", function()
-    C_Timer.After(0, function()
-        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit")
-    end)
+    ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeExit")
 end)
 LibEditMode:RegisterCallback("layout", function()
-    C_Timer.After(0, function()
-        ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout")
-    end)
+    ECM.Runtime.ScheduleLayoutUpdate(0, "EditModeLayout")
 end)
 
 ---@alias AnchorPoint string
@@ -290,7 +285,7 @@ function FrameMixinProto:CalculateLayoutParams()
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
 
     if mode == C.ANCHORMODE_FREE then
-        local pos = self:GetEditModePosition()
+        local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
         return {
             mode = C.ANCHORMODE_FREE,
             anchor = UIParent,
@@ -483,14 +478,6 @@ function FrameMixinProto:ThrottledUpdateLayout(reason, opts)
             updateLayoutDeferred(self)
         end)
     end
-end
-
---- Gets the saved Edit Mode position for the current layout.
---- Returns CENTER (0, 0) when the active layout has no saved position.
----@return ECM_EditModePosition
-function FrameMixinProto:GetEditModePosition()
-    local cfg = self:GetModuleConfig()
-    return EditMode.GetPosition(cfg and cfg.editModePositions)
 end
 
 --- Saves an Edit Mode position for the given layout.
