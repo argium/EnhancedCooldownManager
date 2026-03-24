@@ -234,9 +234,9 @@ local defaults = {
                 [C.RESOURCEBAR_TYPE_DEVOURER_META] = true,
             },
             maxColors = {
-                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 1, g = 1, b = 1, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 1, g = 1, b = 1, a = 1 },
+                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
             },
         },
         runeBar = {
