@@ -557,41 +557,26 @@ describe("FrameMixin real source", function()
         assert.is_nil(mod._pendingWhy)
     end)
 
-    it("GetEditModePosition returns default coordinates when the active layout has no saved position", function()
-        local mod = {
-            GetModuleConfig = function()
-                return {
-                    editModePositions = {
-                        Legacy = { point = "TOP", x = 12, y = -34 },
-                    },
-                }
-            end,
-        }
-
-        local position = FrameMixin.GetEditModePosition(mod)
+    it("EditMode.GetPosition returns default coordinates when the active layout has no saved position", function()
+        local position = ECM.EditMode.GetPosition({
+            Legacy = { point = "TOP", x = 12, y = -34 },
+        })
 
         assert.are.equal("CENTER", position.point)
         assert.are.equal(0, position.x)
         assert.are.equal(0, position.y)
     end)
 
-    it("GetEditModePosition returns the saved coordinates for the active layout", function()
+    it("EditMode.GetPosition returns the saved coordinates for the active layout", function()
         local lib = LibStub("LibEditMode")
-        local mod = {
-            GetModuleConfig = function()
-                return {
-                    editModePositions = {
-                        Modern = { point = "TOP", x = 42, y = -17 },
-                    },
-                }
-            end,
-        }
 
         lib.GetActiveLayoutName = function()
             return "Modern"
         end
 
-        local position = FrameMixin.GetEditModePosition(mod)
+        local position = ECM.EditMode.GetPosition({
+            Modern = { point = "TOP", x = 42, y = -17 },
+        })
 
         assert.are.equal("TOP", position.point)
         assert.are.equal(42, position.x)
@@ -604,6 +589,29 @@ describe("FrameMixin real source", function()
             return "Modern"
         end
         assert.are.equal("Modern", ECM.EditMode.GetActiveLayoutName())
+    end)
+
+    it("EditMode callbacks schedule runtime layout updates without an extra timer hop", function()
+        local lib = LibStub("LibEditMode")
+        local scheduled = {}
+
+        ECM.Runtime.ScheduleLayoutUpdate = function(delay, reason)
+            scheduled[#scheduled + 1] = {
+                delay = delay,
+                reason = reason,
+            }
+        end
+
+        lib.callbacks.enter()
+        lib.callbacks.exit()
+        lib.callbacks.layout()
+
+        assert.same({
+            { delay = 0, reason = "EditModeEnter" },
+            { delay = 0, reason = "EditModeExit" },
+            { delay = 0, reason = "EditModeLayout" },
+        }, scheduled)
+        assert.are.equal(0, #timerQueue)
     end)
 
     it("UpdateLayout preserves final frame placement for V11 seeded legacy free-mode defaults", function()

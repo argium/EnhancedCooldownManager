@@ -75,6 +75,7 @@ function ProfileOptions.RegisterSettings(SB)
 
     local function otherProfilesGenerator()
         local container = Settings.CreateControlTextContainer()
+        container:Add("", "")
         local current = ns.Addon.db:GetCurrentProfile()
         for _, name in ipairs(ns.Addon.db:GetProfiles()) do
             if name ~= current then

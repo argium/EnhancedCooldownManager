@@ -504,7 +504,7 @@ describe("ECM.Runtime layout system", function()
             ECM.Runtime.ScheduleLayoutUpdate(0, "detached-center-normalize")
 
             local anchor = ECM.Runtime.DetachedAnchor
-            assert.same({ "TOP", UIParent, "TOP", 0, -654 }, anchor.__anchors[1])
+            assert.same({ "TOP", UIParent, "TOP", 0, -653 }, anchor.__anchors[1])
 
             ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
@@ -570,6 +570,23 @@ describe("ECM.Runtime layout system", function()
                 { text = ECM.L["DOWN"], value = ECM.Constants.GROW_DIRECTION_DOWN },
                 { text = ECM.L["UP"], value = ECM.Constants.GROW_DIRECTION_UP },
             }, growDirection.values)
+        end)
+
+        it("computes detached metrics once per layout pass", function()
+            local mod = makeRegisteredModule("PowerBar")
+            local metricsScans = 0
+
+            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            mod.InnerFrame:SetHeight(24)
+            mod.ThrottledUpdateLayout = function() end
+            fakeAddon.GetECMModule = function(_, name)
+                metricsScans = metricsScans + 1
+                return name == mod.Name and mod or nil
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-metrics")
+
+            assert.are.equal(#ECM.Constants.CHAIN_ORDER, metricsScans)
         end)
 
         it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()

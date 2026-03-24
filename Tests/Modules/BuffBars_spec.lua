@@ -142,6 +142,14 @@ describe("BuffBars real source", function()
                 GetActiveLayoutName = function()
                     return "Modern"
                 end,
+                GetPosition = function(positions, layoutName)
+                    local activeLayoutName = layoutName or "Modern"
+                    local position = positions and positions[activeLayoutName]
+                    if position then
+                        return position
+                    end
+                    return { point = "CENTER", x = 0, y = 0 }
+                end,
                 SavePosition = function(container, fieldName, layoutName, point, x, y)
                     container[fieldName] = container[fieldName] or {}
                     container[fieldName][layoutName] = { point = point, x = x, y = y }
@@ -442,7 +450,7 @@ describe("BuffBars real source", function()
         function BuffBars:GetGlobalConfig()
             return { texture = "Solid", barHeight = 18, barWidth = 250 }
         end
-        function BuffBars:GetEditModePosition()
+        ECM.EditMode.GetPosition = function()
             return { point = "CENTER", x = 12, y = -34 }
         end
         function BuffBars:ShouldShow()
@@ -479,7 +487,7 @@ describe("BuffBars real source", function()
         function BuffBars:GetGlobalConfig()
             return { texture = "Solid", barHeight = 18, barWidth = 250 }
         end
-        function BuffBars:GetEditModePosition()
+        ECM.EditMode.GetPosition = function()
             return { point = "CENTER", x = 12, y = -34 }
         end
         function BuffBars:ShouldShow()

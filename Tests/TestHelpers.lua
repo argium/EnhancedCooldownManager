@@ -141,6 +141,7 @@ end
 function TestHelpers.SetupLibEditModeStub()
     assert(_G.LibStub, "LibStub must be set up before calling SetupLibEditModeStub")
     local lib = _G.LibStub:NewLibrary("LibEditMode", 15) or _G.LibStub("LibEditMode")
+    lib.callbacks = {}
     lib.frameSelections = {}
     lib.addFrameSettingsCalls = {}
     lib.AddFrame = function(_, frame)
@@ -156,7 +157,9 @@ function TestHelpers.SetupLibEditModeStub()
     lib.AddFrameSettings = function(_, frame, settings)
         lib.addFrameSettingsCalls[frame] = settings
     end
-    lib.RegisterCallback = function() end
+    lib.RegisterCallback = function(_, eventName, callback)
+        lib.callbacks[eventName] = callback
+    end
     lib.GetActiveLayoutName = function()
         return "Modern"
     end
@@ -277,6 +280,7 @@ function TestHelpers.SetupSettingsStubs()
         CreateDropdown = function(cat, setting, optionsGen)
             local init = makeInitializer(setting)
             init._optionsGen = optionsGen
+            setting._optionsGen = optionsGen
             return init
         end,
 
