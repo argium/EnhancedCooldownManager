@@ -10,6 +10,7 @@ local constants = {
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
     VERSION_TAG_BETA = "beta",
+    RELEASE_POPUP_ENABLED = false,
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
@@ -152,6 +153,7 @@ local constants = {
     DIALOG_FRAME_WIDTH = 480,
     DIALOG_FRAME_WIDTH_SMALL = 400,
     POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI",
+    POPUP_WHATS_NEW = "ECM_WHATS_NEW",
     POPUP_PREFERRED_INDEX = 3,
 
     -- UI dimension constants

@@ -1,4 +1,6 @@
 param(
+    [Parameter(Mandatory = $true)]
+    [bool]$ShowReleasePopup,
     [string]$TocPath = "EnhancedCooldownManager.toc",
     [string]$Remote = "origin",
     [Alias("TagMessage", "ReleaseMessage")]
@@ -74,6 +76,39 @@ function Open-GitHubWorkflowsPage {
     }
 }
 
+function Set-ReleasePopupEnabled {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ConstantsPath,
+        [Parameter(Mandatory = $true)]
+        [bool]$Enabled
+    )
+
+    $constantsText = Get-Content -LiteralPath $ConstantsPath -Raw
+    $popupEnabledMatch = [regex]::Match(
+        $constantsText,
+        '(RELEASE_POPUP_ENABLED\s*=\s*)(true|false)\b'
+    )
+    if (-not $popupEnabledMatch.Success) {
+        throw "Could not find RELEASE_POPUP_ENABLED in $ConstantsPath"
+    }
+
+    $enabledLiteral = if ($Enabled) { "true" } else { "false" }
+    $valueGroup = $popupEnabledMatch.Groups[2]
+    $updatedText = $constantsText.Substring(0, $valueGroup.Index) +
+        $enabledLiteral +
+        $constantsText.Substring($valueGroup.Index + $valueGroup.Length)
+
+    if ($updatedText -ne $constantsText) {
+        $resolvedConstantsPath = (Resolve-Path -LiteralPath $ConstantsPath).Path
+        [System.IO.File]::WriteAllText(
+            $resolvedConstantsPath,
+            $updatedText,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    }
+}
+
 if (-not (Test-Path -LiteralPath $TocPath)) {
     throw "TOC file not found: $TocPath"
 }
@@ -89,6 +124,24 @@ if ([string]::IsNullOrWhiteSpace($version)) {
 }
 
 Write-Host "TOC version: $version"
+
+$constantsPath = "ECM_Constants.lua"
+if (-not (Test-Path -LiteralPath $constantsPath)) {
+    throw "Constants file not found: $constantsPath"
+}
+
+Set-ReleasePopupEnabled -ConstantsPath $constantsPath -Enabled $ShowReleasePopup
+Write-Host "Updated RELEASE_POPUP_ENABLED to: $(if ($ShowReleasePopup) { 'true' } else { 'false' })"
+
+$constantsText = Get-Content -LiteralPath $constantsPath -Raw
+$popupEnabledMatch = [regex]::Match($constantsText, 'RELEASE_POPUP_ENABLED\s*=\s*(true|false)\b')
+if (-not $popupEnabledMatch.Success) {
+    throw "RELEASE_POPUP_ENABLED must be explicitly set to true or false in $constantsPath"
+}
+
+$popupEnabled = $popupEnabledMatch.Groups[1].Value
+
+Write-Host "Release popup enabled: $popupEnabled"
 
 Invoke-Git -Arguments @("rev-parse", "--is-inside-work-tree")
 

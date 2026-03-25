@@ -569,6 +569,71 @@ describe("ItemIcons real source", function()
         assert.are.equal(50, y)
     end)
 
+    it("uses GetItemFrames and isActive to detect icon size and anchor container", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        activeFrame.isActive = true
+        local inactiveFrame = TestHelpers.makeFrame({ shown = false, width = 22, height = 22 })
+        inactiveFrame.isActive = false
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22) -- 1 active icon, no stale space
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { inactiveFrame, activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return { showTrinket1 = false, showTrinket2 = false, showCombatPotion = false, showHealthPotion = false, showHealthstone = true }
+        end
+
+        assert.is_true(ItemIcons:UpdateLayout("test"))
+        -- Icon size taken from active frame, not default
+        assert.are.equal(22, ItemIcons.InnerFrame:GetWidth())
+        -- Container anchors to the last active item frame, not the viewer
+        local _, anchorFrame = ItemIcons.InnerFrame:GetPoint(1)
+        assert.are.equal(activeFrame, anchorFrame)
+        -- With no stale space: viewerOffsetX = (22 - 22 - 4 - 22) / 2 = -13, so x = 100 - 13 = 87
+        local _, _, _, x = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal(87, x)
+    end)
+
+    it("anchors container to last active item frame when viewer layout is stale", function()
+        -- Viewer frame is wider than its single active icon (stale layout: 2-icon width).
+        local staleFrame = TestHelpers.makeFrame({ shown = false, width = 22, height = 22 })
+        staleFrame.isActive = false
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 2
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(46) -- stale: 2 * 22 + 2 spacing
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { staleFrame, activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_1] = 101
+        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_1] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return { showTrinket1 = true, showTrinket2 = false, showCombatPotion = false, showHealthPotion = false, showHealthstone = false }
+        end
+
+        assert.is_true(ItemIcons:UpdateLayout("test"))
+        -- Container must anchor to activeFrame, not the viewer (which has stale/wider width)
+        local _, anchorFrame = ItemIcons.InnerFrame:GetPoint(1)
+        assert.are.equal(activeFrame, anchorFrame)
+        -- Stale layout width is 46, with a single 22px icon and 2px padding on each side:
+        -- (46 - 22 - 2 - 22) / 2 = 0 unused space, so the viewer's x-offset stays at its original 100.
+        local _, _, _, x = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal(100, x) -- x should remain at the original SetPoint x-position
+    end)
+
     it("restores the utility viewer and hides the frame when no items are available", function()
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 50)
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()

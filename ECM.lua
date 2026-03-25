@@ -37,6 +37,20 @@ function ECM.IsDebugEnabled()
     return gc and gc.debug
 end
 
+local function getAddonVersion()
+    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
+    end
+end
+
+local function markReleasePopupSeen(version)
+    local gc = ECM.GetGlobalConfig()
+    ECM.DebugAssert(gc ~= nil, "Global config missing when marking release popup seen", { version = version })
+    if gc then
+        gc.releasePopupSeenVersion = version
+    end
+end
+
 local function safeStrTostring(x)
     if x == nil then return "nil" end
     return issecretvalue(x) and "[secret]" or tostring(x)
@@ -217,6 +231,62 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
 
     StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI].text = text or L["RELOAD_UI_PROMPT"]
     StaticPopup_Show(C.POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+end
+
+function mod:ShowReleasePopup(force)
+    local version = getAddonVersion()
+    local body = L["WHATS_NEW_BODY"]
+    if type(version) ~= "string" or version == "" or C.RELEASE_POPUP_ENABLED ~= true
+        or type(body) ~= "string" or body == "" or body == "WHATS_NEW_BODY" then
+        if force == true then
+            ECM.Print(L["WHATS_NEW_UNAVAILABLE"])
+        end
+        return false
+    end
+
+    if force ~= true then
+        local gc = ECM.GetGlobalConfig()
+        if self._releasePopupShownVersion == version
+            or not gc
+            or gc.showReleasePopupOnUpdate ~= true
+            or gc.releasePopupSeenVersion == version then
+            return false
+        end
+
+        self._releasePopupShownVersion = version
+    end
+
+    local dialog = StaticPopupDialogs[C.POPUP_WHATS_NEW]
+    if not dialog then
+        dialog = {
+            text = "",
+            button1 = L["GOT_IT"],
+            button2 = L["OPEN_SETTINGS"],
+            OnAccept = function(_, data)
+                if data and data.version then
+                    markReleasePopupSeen(data.version)
+                end
+            end,
+            OnCancel = function(_, data, reason)
+                if data and data.version then
+                    markReleasePopupSeen(data.version)
+                end
+                if reason == "clicked" then
+                    mod:ChatCommand("options")
+                end
+            end,
+            timeout = 0,
+            whileDead = 1,
+            hideOnEscape = 1,
+            preferredIndex = C.POPUP_PREFERRED_INDEX,
+        }
+        StaticPopupDialogs[C.POPUP_WHATS_NEW] = dialog
+    end
+
+    dialog.text = string.format("%s\n\n%s", string.format(L["WHATS_NEW_TITLE_FORMAT"], version), body)
+
+    StaticPopup_Show(C.POPUP_WHATS_NEW, nil, nil, { version = version })
+    return true
 end
 
 local DIALOG_SIZES = {
@@ -606,14 +676,13 @@ function mod:OnEnable()
     self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChangedHandler")
     self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChangedHandler")
 
-    local version
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        version = C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
+    local version = getAddonVersion()
 
     if type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil then
         ECM.Print(L["BETA_LOGIN_MESSAGE"])
     end
+
+    self:ShowReleasePopup()
 end
 
 --- Re-evaluates module enable/disable states after a profile change and refreshes layout.

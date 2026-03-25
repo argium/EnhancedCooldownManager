@@ -35,6 +35,10 @@ local function getTrinketData(slotId)
     end
 
     local texture = GetInventoryItemTexture("player", slotId)
+    if not texture then
+        return nil
+    end
+
     return {
         itemId = itemId,
         texture = texture,
@@ -50,11 +54,12 @@ local function getBestConsumable(priorityList)
         local itemId = entry.itemID
         if C_Item.GetItemCount(itemId) > 0 then
             local texture = C_Item.GetItemIconByID(itemId)
-            return {
-                itemId = itemId,
-                texture = texture,
-                slotId = nil,
-            }
+            if texture then
+                return {
+                    itemId = itemId,
+                    texture = texture,
+                }
+            end
         end
     end
     return nil
@@ -94,11 +99,9 @@ local function getDisplayItems(moduleConfig)
         end
     end
 
-    if moduleConfig.showHealthstone and C_Item.GetItemCount(ECM.Constants.HEALTHSTONE_ITEM_ID) > 0 then
-        items[#items + 1] = {
-            itemId = ECM.Constants.HEALTHSTONE_ITEM_ID,
-            texture = C_Item.GetItemIconByID(ECM.Constants.HEALTHSTONE_ITEM_ID),
-        }
+    if moduleConfig.showHealthstone then
+        local hs = getBestConsumable({ { itemID = ECM.Constants.HEALTHSTONE_ITEM_ID } })
+        if hs then items[#items + 1] = hs end
     end
 
     return items
@@ -175,14 +178,10 @@ end
 --- @param utilityViewer Frame
 --- @return string|nil fontPath, number|nil fontSize, string|nil fontFlags
 local function getSiblingCooldownNumberFont(utilityViewer)
-    if not utilityViewer then
-        return nil, nil, nil
-    end
-
     for _, child in ipairs({ utilityViewer:GetChildren() }) do
-        local cooldown = child and child.Cooldown
+        local cooldown = child.Cooldown
         if cooldown and cooldown.GetRegions then
-            local region = select(1, cooldown:GetRegions())
+            local region = cooldown:GetRegions()
             if region and region.IsObjectType and region:IsObjectType("FontString") and region.GetFont then
                 local fontPath, fontSize, fontFlags = region:GetFont()
                 if fontPath and fontSize then
@@ -191,8 +190,6 @@ local function getSiblingCooldownNumberFont(utilityViewer)
             end
         end
     end
-
-    return nil, nil, nil
 end
 
 --- Applies cooldown number font settings to one icon cooldown.
@@ -201,11 +198,7 @@ end
 --- @param fontSize number
 --- @param fontFlags string|nil
 local function applyCooldownNumberFont(icon, fontPath, fontSize, fontFlags)
-    if not (icon and icon.Cooldown and icon.Cooldown.GetRegions) then
-        return
-    end
-
-    local region = select(1, icon.Cooldown:GetRegions())
+    local region = icon.Cooldown:GetRegions()
     if region and region.IsObjectType and region:IsObjectType("FontString") and region.SetFont then
         region:SetFont(fontPath, fontSize, fontFlags)
     end
@@ -255,57 +248,31 @@ function ItemIcons:UpdateLayout(why)
         isEditing = editModeManager and editModeManager:IsShown() or false
     end
 
-    -- Bail early: no config, edit mode active, or shouldn't show
-    if not moduleConfig or isEditing or not self:ShouldShow() then
-        local viewerOriginalPoint = self._viewerOriginalPoint
-        if viewerOriginalPoint and utilityViewer then
-            utilityViewer:ClearAllPoints()
-            utilityViewer:SetPoint(
-                viewerOriginalPoint[1],
-                viewerOriginalPoint[2],
-                viewerOriginalPoint[3],
-                viewerOriginalPoint[4],
-                viewerOriginalPoint[5]
-            )
-        end
+    local items = (not moduleConfig or isEditing or not self:ShouldShow()) and {} or getDisplayItems(moduleConfig)
 
+    if #items == 0 then
+        local p = self._viewerOriginalPoint
+        if p and utilityViewer then
+            utilityViewer:ClearAllPoints()
+            utilityViewer:SetPoint(p[1], p[2], p[3], p[4], p[5])
+        end
         if isEditing then
             self._viewerOriginalPoint = nil
         end
-
         frame:Hide()
         return false
     end
 
-    local items = utilityViewer and getDisplayItems(moduleConfig) or {}
-    local numItems = #items
-
-    -- Hide all existing icons
     for _, icon in ipairs(frame._iconPool) do
         icon:Hide()
-    end
-
-    if numItems == 0 or not utilityViewer then
-        local viewerOriginalPoint = self._viewerOriginalPoint
-        if viewerOriginalPoint and utilityViewer then
-            utilityViewer:ClearAllPoints()
-            utilityViewer:SetPoint(
-                viewerOriginalPoint[1],
-                viewerOriginalPoint[2],
-                viewerOriginalPoint[3],
-                viewerOriginalPoint[4],
-                viewerOriginalPoint[5]
-            )
-        end
-
-        frame:Hide()
-        return false
     end
 
     local siblingFontPath, siblingFontSize, siblingFontFlags = getSiblingCooldownNumberFont(utilityViewer)
     local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
     local spacing = 0
     local viewerScale = 1.0
+    local lastActiveItemFrame = nil
+    local numActiveViewerIcons = 0
 
     if utilityViewer:IsShown() then
         viewerScale = utilityViewer.iconScale or 1.0
@@ -314,37 +281,47 @@ function ItemIcons:UpdateLayout(why)
         -- (childXPadding = iconPadding - 4), accounting for transparent padding in icon atlases.
         spacing = utilityViewer.childXPadding or 0
 
-        -- Get base icon size from a visible cooldown icon child.
-        -- Edit Mode "Icon Size" applies scale to individual icons, not the viewer.
-        for _, child in ipairs({ utilityViewer:GetChildren() }) do
-            if child and child:IsShown() and child.GetSpellID then
-                iconSize = child:GetWidth() or iconSize
-                break
+        -- GetItemFrames reports only managed slots; isActive flags visible ones.
+        -- This avoids anchoring to a stale viewer frame that reserves space for inactive icons.
+        if utilityViewer.GetItemFrames then
+            for _, itemFrame in ipairs(utilityViewer:GetItemFrames()) do
+                if itemFrame.isActive then
+                    iconSize = itemFrame:GetWidth() or iconSize
+                    lastActiveItemFrame = itemFrame
+                    numActiveViewerIcons = numActiveViewerIcons + 1
+                end
+            end
+        else
+            for _, child in ipairs({ utilityViewer:GetChildren() }) do
+                if child and child:IsShown() and child.GetSpellID then
+                    iconSize = child:GetWidth() or iconSize
+                    break
+                end
             end
         end
     end
 
     frame:SetScale(viewerScale)
 
-    -- Calculate container size (using base sizes, scale is applied separately)
-    local totalWidth = (numItems * iconSize) + ((numItems - 1) * spacing)
-    local totalHeight = iconSize
-    frame:SetSize(totalWidth, totalHeight)
+    local numItems = #items
+    local totalWidth = numItems * iconSize + (numItems - 1) * spacing
+    frame:SetSize(totalWidth, iconSize)
+
     if not self._viewerOriginalPoint then
         local point, relativeTo, relativePoint, x, y = utilityViewer:GetPoint()
         self._viewerOriginalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
     end
 
-    local viewerOriginalPoint = self._viewerOriginalPoint
-    local viewerOffsetX = -(((totalWidth * viewerScale) + spacing) / 2)
+    -- The viewer is shifted left to keep the combined group (viewer icons + ECM icons) centred.
+    -- When GetItemFrames is available, the viewer frame width may be stale (inactive slots still
+    -- occupying frame width), so we correct for dead space using the actual active content width.
+    local activeContentWidth = numActiveViewerIcons * iconSize + math.max(0, numActiveViewerIcons - 1) * spacing
+    local viewerWidth = numActiveViewerIcons > 0 and utilityViewer:GetWidth() or 0
+    local viewerOffsetX = (viewerWidth - activeContentWidth - spacing - totalWidth * viewerScale) / 2
+
+    local p = self._viewerOriginalPoint
     utilityViewer:ClearAllPoints()
-    utilityViewer:SetPoint(
-        viewerOriginalPoint[1],
-        viewerOriginalPoint[2],
-        viewerOriginalPoint[3],
-        viewerOriginalPoint[4] + viewerOffsetX,
-        viewerOriginalPoint[5]
-    )
+    utilityViewer:SetPoint(p[1], p[2], p[3], p[4] + viewerOffsetX, p[5])
 
     -- Position and configure each icon
     local borderScale = ECM.Constants.ITEM_ICON_BORDER_SCALE
@@ -358,9 +335,7 @@ function ItemIcons:UpdateLayout(why)
         icon.slotId = iconData.slotId
         icon.itemId = iconData.itemId
 
-        icon.Icon:SetTexture(iconData.texture or nil)
-
-        -- Position
+        icon.Icon:SetTexture(iconData.texture)
         icon:ClearAllPoints()
         icon:SetPoint("LEFT", frame, "LEFT", xOffset, 0)
         icon:Show()
@@ -376,13 +351,13 @@ function ItemIcons:UpdateLayout(why)
         xOffset = xOffset + iconSize + spacing
     end
 
-    -- Position container to the right of UtilityCooldownViewer
+    -- Anchor to the last active item frame rather than the viewer frame, since the viewer
+    -- frame width can be stale (reserving space for inactive icons) and cause a spurious gap.
     frame:ClearAllPoints()
-    frame:SetPoint("LEFT", utilityViewer, "RIGHT", spacing, 0)
+    frame:SetPoint("LEFT", lastActiveItemFrame or utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
     ECM.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")")
-
     self:ThrottledRefresh("UpdateLayout")
 
     return true

@@ -5,6 +5,11 @@
 local _, ns = ...
 local L = ECM.L
 local AdvancedOptions = {}
+local getGlobalConfig = ECM.GetGlobalConfig or function()
+    local db = ns.Addon and ns.Addon.db
+    local profile = db and db.profile
+    return profile and profile.global
+end
 
 function AdvancedOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
@@ -25,9 +30,34 @@ function AdvancedOptions.RegisterSettings(SB)
                 name = L["DEBUG_TO_CHAT"],
                 desc = L["DEBUG_TO_CHAT_DESC"],
                 order = 12,
-                disabled = function() return not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile.global, "debug") end,
+                disabled = function()
+                    local gc = getGlobalConfig()
+                    return not (gc and gc.debug)
+                end,
             },
-            perfHeader = { type = "header", name = L["PERFORMANCE"], order = 20 },
+            updatesHeader = { type = "header", name = L["UPDATES"], order = 20 },
+            showReleasePopupOnUpdate = {
+                type = "toggle",
+                path = "showReleasePopupOnUpdate",
+                name = L["SHOW_WHATS_NEW_ON_UPDATE"],
+                desc = L["SHOW_WHATS_NEW_ON_UPDATE_DESC"],
+                order = 21,
+            },
+            showWhatsNew = {
+                type = "button",
+                name = " ",
+                buttonText = L["SHOW_WHATS_NEW"],
+                tooltip = L["SHOW_WHATS_NEW_DESC"],
+                onClick = function()
+                    if ns.Addon and type(ns.Addon.ShowReleasePopup) == "function" then
+                        ns.Addon:ShowReleasePopup(true)
+                        return
+                    end
+                    ECM.Print(L["WHATS_NEW_UNAVAILABLE"])
+                end,
+                order = 22,
+            },
+            perfHeader = { type = "header", name = L["PERFORMANCE"], order = 30 },
             updateFrequency = {
                 type = "range",
                 path = "updateFrequency",
@@ -36,7 +66,7 @@ function AdvancedOptions.RegisterSettings(SB)
                 min = 0.04,
                 max = 0.5,
                 step = 0.04, -- TODO: this step doesn't work correctly with the slider widget.
-                order = 21,
+                order = 31,
             },
         },
     })

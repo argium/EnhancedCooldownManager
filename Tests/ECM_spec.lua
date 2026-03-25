@@ -272,6 +272,87 @@ describe("ECM layout system", function()
         end)
     end)
 
+    describe("release popup", function()
+        before_each(function()
+            addonVersion = "v1.2.3"
+            ECM.Constants.RELEASE_POPUP_ENABLED = true
+            ECM.L["WHATS_NEW_BODY"] = "New version notes"
+            _G._testDB.profile.global.showReleasePopupOnUpdate = true
+            _G._testDB.profile.global.releasePopupSeenVersion = ""
+        end)
+
+        it("shows the popup when enabled, opted in, and unseen", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+
+            fakeAddon:OnEnable()
+
+            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
+        end)
+
+        it("does not show the popup when opted out", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+            _G._testDB.profile.global.showReleasePopupOnUpdate = false
+
+            fakeAddon:OnEnable()
+
+            assert.same({}, getShownNames())
+        end)
+
+        it("does not show the popup when the release declaration is disabled", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+            ECM.Constants.RELEASE_POPUP_ENABLED = false
+
+            fakeAddon:OnEnable()
+
+            assert.same({}, getShownNames())
+        end)
+
+        it("does not automatically show the popup twice in the same session", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
+        end)
+
+        it("persists the seen version when the popup is acknowledged", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+
+            fakeAddon:OnEnable()
+            StaticPopupDialogs[ECM.Constants.POPUP_WHATS_NEW].OnAccept(nil, { version = addonVersion })
+
+            local getShownNamesAfterAck = TestHelpers.InstallPopupRecorder()
+            fakeAddon:OnEnable()
+
+            assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
+            assert.same({}, getShownNamesAfterAck())
+        end)
+
+        it("marks the popup seen and opens settings from the secondary button", function()
+            local chatInputs = {}
+            fakeAddon.ChatCommand = function(_, input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+
+            StaticPopupDialogs[ECM.Constants.POPUP_WHATS_NEW].OnCancel(nil, { version = addonVersion }, "clicked")
+
+            assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.same({ "options" }, chatInputs)
+        end)
+
+        it("prints unavailable when force showing without release notes", function()
+            ECM.L["WHATS_NEW_BODY"] = ""
+
+            assert.is_false(fakeAddon:ShowReleasePopup(true))
+            assert.is_truthy(printedMessages[#printedMessages])
+            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["WHATS_NEW_UNAVAILABLE"], 1, true))
+        end)
+    end)
+
     describe("profile change handling", function()
         it("registers AceDB profile callbacks on enable", function()
             local registeredEvents = {}
