@@ -43,10 +43,12 @@ function ResourceBarOptions.RegisterSettings(SB)
         end
     end
 
+    args.colorsHeader = { type = "header", name = L["COLORS"], disabled = isDisabled, order = 29 }
+
     args.colors = {
         type = "colorList",
         path = "colors",
-        label = L["COLORS"],
+        label = L["RESOURCE_TYPES"],
         defs = RESOURCE_COLOR_DEFS,
         disabled = isDisabled,
         order = 30,

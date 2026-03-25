@@ -9,6 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+$releasePopupVersionPattern = 'RELEASE_POPUP_VERSION\s*=\s*"(.*?)"'
 
 function Invoke-Git {
     param(
@@ -76,27 +77,26 @@ function Open-GitHubWorkflowsPage {
     }
 }
 
-function Set-ReleasePopupEnabled {
+function Set-ReleasePopupVersion {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ConstantsPath,
         [Parameter(Mandatory = $true)]
-        [bool]$Enabled
+        [string]$Version
     )
 
     $constantsText = Get-Content -LiteralPath $ConstantsPath -Raw
-    $popupEnabledMatch = [regex]::Match(
+    $popupVersionMatch = [regex]::Match(
         $constantsText,
-        '(RELEASE_POPUP_ENABLED\s*=\s*)(true|false)\b'
+        $releasePopupVersionPattern
     )
-    if (-not $popupEnabledMatch.Success) {
-        throw "Could not find RELEASE_POPUP_ENABLED in $ConstantsPath"
+    if (-not $popupVersionMatch.Success) {
+        throw "Could not find RELEASE_POPUP_VERSION in $ConstantsPath"
     }
 
-    $enabledLiteral = if ($Enabled) { "true" } else { "false" }
-    $valueGroup = $popupEnabledMatch.Groups[2]
+    $valueGroup = $popupVersionMatch.Groups[1]
     $updatedText = $constantsText.Substring(0, $valueGroup.Index) +
-        $enabledLiteral +
+        $Version +
         $constantsText.Substring($valueGroup.Index + $valueGroup.Length)
 
     if ($updatedText -ne $constantsText) {
@@ -130,18 +130,22 @@ if (-not (Test-Path -LiteralPath $constantsPath)) {
     throw "Constants file not found: $constantsPath"
 }
 
-Set-ReleasePopupEnabled -ConstantsPath $constantsPath -Enabled $ShowReleasePopup
-Write-Host "Updated RELEASE_POPUP_ENABLED to: $(if ($ShowReleasePopup) { 'true' } else { 'false' })"
-
-$constantsText = Get-Content -LiteralPath $constantsPath -Raw
-$popupEnabledMatch = [regex]::Match($constantsText, 'RELEASE_POPUP_ENABLED\s*=\s*(true|false)\b')
-if (-not $popupEnabledMatch.Success) {
-    throw "RELEASE_POPUP_ENABLED must be explicitly set to true or false in $constantsPath"
+if ($ShowReleasePopup) {
+    Set-ReleasePopupVersion -ConstantsPath $constantsPath -Version $version
+    Write-Host "Updated RELEASE_POPUP_VERSION to: $version"
+} else {
+    Write-Host "Leaving RELEASE_POPUP_VERSION unchanged."
 }
 
-$popupEnabled = $popupEnabledMatch.Groups[1].Value
+$constantsText = Get-Content -LiteralPath $constantsPath -Raw
+$popupVersionMatch = [regex]::Match($constantsText, $releasePopupVersionPattern)
+if (-not $popupVersionMatch.Success) {
+    throw "RELEASE_POPUP_VERSION must be explicitly set to a string in $constantsPath"
+}
 
-Write-Host "Release popup enabled: $popupEnabled"
+$popupVersion = $popupVersionMatch.Groups[1].Value
+
+Write-Host "Release popup version: $popupVersion"
 
 Invoke-Git -Arguments @("rev-parse", "--is-inside-work-tree")
 

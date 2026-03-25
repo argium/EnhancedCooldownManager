@@ -168,8 +168,120 @@ describe("ECM layout system", function()
             end,
         }
         _G.UIParent = makeFrame({ name = "UIParent" })
-        _G.CreateFrame = function()
-            local frame = makeFrame()
+        local function makeFontString()
+            local fontString = { _anchors = {} }
+
+            function fontString:SetPoint(...)
+                self._anchors[#self._anchors + 1] = { ... }
+            end
+
+            function fontString:GetNumPoints()
+                return #self._anchors
+            end
+
+            function fontString:GetPoint(index)
+                local point = self._anchors[index]
+                if point then
+                    return point[1], point[2], point[3], point[4], point[5]
+                end
+            end
+
+            function fontString:ClearAllPoints()
+                self._anchors = {}
+            end
+
+            function fontString:SetText(text)
+                self._text = text
+            end
+
+            function fontString:GetText()
+                return self._text
+            end
+
+            function fontString:SetWidth(width)
+                self._width = width
+            end
+
+            function fontString:GetWidth()
+                return self._width
+            end
+
+            function fontString:SetJustifyH(justifyH)
+                self._justifyH = justifyH
+            end
+
+            function fontString:SetJustifyV(justifyV)
+                self._justifyV = justifyV
+            end
+
+            function fontString:SetTextColor(...)
+                self._textColor = { ... }
+            end
+
+            function fontString:SetWordWrap(wordWrap)
+                self._wordWrap = wordWrap
+            end
+
+            return fontString
+        end
+
+        _G.CreateFrame = function(frameType, name, parent, template)
+            local frame = makeFrame({ name = name })
+            frame._frameType = frameType
+            frame._parent = parent
+            frame._template = template
+
+            function frame:SetBackdrop(backdrop)
+                self._backdrop = backdrop
+            end
+
+            function frame:SetBackdropColor(...)
+                self._backdropColor = { ... }
+            end
+
+            function frame:SetBackdropBorderColor(...)
+                self._backdropBorderColor = { ... }
+            end
+
+            function frame:EnableMouse(enabled)
+                self._mouseEnabled = enabled
+            end
+
+            function frame:SetMovable(movable)
+                self._movable = movable
+            end
+
+            function frame:RegisterForDrag(...)
+                self._dragButtons = { ... }
+            end
+
+            function frame:SetClampedToScreen(clamped)
+                self._clampedToScreen = clamped
+            end
+
+            function frame:StartMoving()
+                self._startedMoving = true
+            end
+
+            function frame:StopMovingOrSizing()
+                self._stoppedMoving = true
+            end
+
+            function frame:SetText(text)
+                self._text = text
+            end
+
+            function frame:GetText()
+                return self._text
+            end
+
+            function frame:CreateFontString()
+                local fontString = makeFontString()
+                self._fontStrings = self._fontStrings or {}
+                self._fontStrings[#self._fontStrings + 1] = fontString
+                return fontString
+            end
+
             createdFrames[#createdFrames + 1] = frame
             return frame
         end
@@ -273,61 +385,69 @@ describe("ECM layout system", function()
     end)
 
     describe("release popup", function()
+        local function getWhatsNewFrame()
+            for _, frame in ipairs(createdFrames) do
+                if frame:GetName() == ECM.Constants.WHATS_NEW_FRAME_NAME then
+                    return frame
+                end
+            end
+        end
+
         before_each(function()
             addonVersion = "v1.2.3"
-            ECM.Constants.RELEASE_POPUP_ENABLED = true
+            ECM.Constants.RELEASE_POPUP_VERSION = addonVersion
             ECM.L["WHATS_NEW_BODY"] = "New version notes"
-            _G._testDB.profile.global.showReleasePopupOnUpdate = true
             _G._testDB.profile.global.releasePopupSeenVersion = ""
         end)
 
-        it("shows the popup when enabled, opted in, and unseen", function()
-            local getShownNames = TestHelpers.InstallPopupRecorder()
-
+        it("shows the popup when enabled and unseen", function()
             fakeAddon:OnEnable()
 
-            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
         end)
 
-        it("does not show the popup when opted out", function()
-            local getShownNames = TestHelpers.InstallPopupRecorder()
-            _G._testDB.profile.global.showReleasePopupOnUpdate = false
+        it("does not show the popup when the release popup version has already been seen", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
 
             fakeAddon:OnEnable()
 
-            assert.same({}, getShownNames())
+            assert.is_nil(getWhatsNewFrame())
         end)
 
-        it("does not show the popup when the release declaration is disabled", function()
-            local getShownNames = TestHelpers.InstallPopupRecorder()
-            ECM.Constants.RELEASE_POPUP_ENABLED = false
+        it("does not show the popup when the release popup version does not match", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
 
             fakeAddon:OnEnable()
 
-            assert.same({}, getShownNames())
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("does not show the popup when the release popup version is empty", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = ""
+
+            fakeAddon:OnEnable()
+
+            assert.is_nil(getWhatsNewFrame())
         end)
 
         it("does not automatically show the popup twice in the same session", function()
-            local getShownNames = TestHelpers.InstallPopupRecorder()
-
             fakeAddon:OnEnable()
+            local frame = assert(getWhatsNewFrame())
             fakeAddon:OnEnable()
 
-            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
+            assert.are.equal(1, TestHelpers.getCalls(frame, "Show"))
         end)
 
         it("persists the seen version when the popup is acknowledged", function()
-            local getShownNames = TestHelpers.InstallPopupRecorder()
-
             fakeAddon:OnEnable()
-            StaticPopupDialogs[ECM.Constants.POPUP_WHATS_NEW].OnAccept(nil, { version = addonVersion })
-
-            local getShownNamesAfterAck = TestHelpers.InstallPopupRecorder()
+            local frame = assert(getWhatsNewFrame())
+            frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
+            fakeAddon._releasePopupShownVersion = nil
             fakeAddon:OnEnable()
 
             assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
-            assert.same({ ECM.Constants.POPUP_WHATS_NEW }, getShownNames())
-            assert.same({}, getShownNamesAfterAck())
+            assert.are.equal(1, TestHelpers.getCalls(frame, "Show"))
+            assert.is_false(frame:IsShown())
         end)
 
         it("marks the popup seen and opens settings from the secondary button", function()
@@ -337,19 +457,100 @@ describe("ECM layout system", function()
             end
 
             assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
 
-            StaticPopupDialogs[ECM.Constants.POPUP_WHATS_NEW].OnCancel(nil, { version = addonVersion }, "clicked")
+            frame.SettingsButton:GetScript("OnClick")(frame.SettingsButton)
 
             assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.is_false(frame:IsShown())
             assert.same({ "options" }, chatInputs)
         end)
 
-        it("prints unavailable when force showing without release notes", function()
+        it("formats markdown headings and list items for the popup body", function()
+            ECM.L["WHATS_NEW_BODY"] = "### Header\nBody line\n- First item\n- Second item"
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal(
+                "|cff" .. ECM.Constants.WHATS_NEW_HEADER_COLOR .. "Header|r\n"
+                    .. "Body line\n"
+                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " First item\n"
+                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " Second item",
+                frame.Body:GetText()
+            )
+        end)
+
+        it("uses sentence-case popup buttons", function()
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal("Got it", frame.CloseButton:GetText())
+            assert.are.equal("Open settings", frame.SettingsButton:GetText())
+        end)
+
+        it("creates a dedicated header and left-aligned body text", function()
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+
+            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
+            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
+            assert.are.equal(ECM.L["ADDON_NAME"], frame.Title:GetText())
+            assert.are.equal(string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
+            assert.are.equal("LEFT", frame.Title._justifyH)
+            assert.are.equal("LEFT", frame.Subtitle._justifyH)
+            assert.are.equal("LEFT", frame.Body._justifyH)
+            assert.are.equal("TOP", frame.Body._justifyV)
+            assert.same(
+                {
+                    { "TOPLEFT", frame, "TOPLEFT", ECM.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
+                    { "TOPRIGHT", frame, "TOPRIGHT", -ECM.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
+                },
+                frame.Title._anchors
+            )
+            assert.same(
+                {
+                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                },
+                frame.Subtitle._anchors
+            )
+            assert.same(
+                {
+                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
+                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
+                },
+                frame.Body._anchors
+            )
+        end)
+
+        it("does not show an empty popup when release notes are unavailable", function()
             ECM.L["WHATS_NEW_BODY"] = ""
 
             assert.is_false(fakeAddon:ShowReleasePopup(true))
-            assert.is_truthy(printedMessages[#printedMessages])
-            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["WHATS_NEW_UNAVAILABLE"], 1, true))
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("force showing ignores release popup version mismatch and always uses the shared notes", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal(
+                string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], "v9.9.9"),
+                frame.Subtitle:GetText()
+            )
+            assert.are.equal("New version notes", frame.Body:GetText())
+        end)
+
+        it("does not mark a mismatched force-shown popup version as seen", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
+
+            assert.are.equal("", _G._testDB.profile.global.releasePopupSeenVersion)
         end)
     end)
 

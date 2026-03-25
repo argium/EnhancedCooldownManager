@@ -128,7 +128,7 @@ function ProfileOptions.RegisterSettings(SB)
     end, L["SWITCH_PROFILE_DESC"])
 
     SB.Button({
-        name = " ",
+        name = L["NEW_PROFILE"],
         buttonText = L["NEW_PROFILE"],
         tooltip = L["NEW_PROFILE_DESC"],
         onClick = function()
@@ -165,7 +165,7 @@ function ProfileOptions.RegisterSettings(SB)
         createProfilePicker(cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
 
     SB.Button({
-        name = " ",
+        name = L["COPY"],
         buttonText = L["COPY"],
         tooltip = L["COPY_DESC"],
         onClick = function()
@@ -192,7 +192,7 @@ function ProfileOptions.RegisterSettings(SB)
     )
 
     SB.Button({
-        name = " ",
+        name = L["DELETE"],
         buttonText = L["DELETE"],
         tooltip = L["DELETE_DESC"],
         onClick = function()

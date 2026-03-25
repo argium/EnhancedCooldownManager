@@ -15,7 +15,7 @@ local function createAnchorModeSpec(name, path, order, disabled)
         name = name,
         desc = L["POSITION_MODE_DESC"],
         values = {
-            [C.ANCHORMODE_CHAIN] = L["POSITION_MODE_AUTOMATIC"],
+            [C.ANCHORMODE_CHAIN] = L["POSITION_MODE_ATTACHED"],
             [C.ANCHORMODE_DETACHED] = L["POSITION_MODE_DETACHED"],
             [C.ANCHORMODE_FREE] = L["POSITION_MODE_FREE"],
         },
@@ -46,7 +46,7 @@ function LayoutOptions.RegisterSettings(SB)
         runeBarMode = createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", 13, runeBarDisabled),
         buffBarsMode = createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", 14, buffBarsDisabled),
 
-        attachedHeader = { type = "header", name = L["POSITION_MODE_AUTOMATIC"], order = 20 },
+        attachedHeader = { type = "header", name = L["POSITION_MODE_ATTACHED"], order = 20 },
         offsetY = {
             type = "range",
             path = "global.offsetY",

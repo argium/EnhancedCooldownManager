@@ -162,7 +162,7 @@ local function ensureSubheaderTitle(frame)
     end
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    title:SetPoint("TOPLEFT", 35, -12)
+    title:SetPoint("TOPLEFT", 35, -8)
     title:SetJustifyH("LEFT")
     title:SetJustifyV("TOP")
     frame._lsbSubheaderTitle = title
@@ -194,7 +194,7 @@ end
 
 local function applySubheaderFrame(frame, data)
     local title = ensureSubheaderTitle(frame)
-    title:SetFontObject(GameFontNormal)
+    title:SetFontObject(GameFontHighlight)
     title:SetText(data.name)
     title:Show()
 end
@@ -1611,7 +1611,7 @@ function lib:New(config)
         local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
             _lsbKind = "subheader",
             name = spec.name,
-        }, 35, applySubheaderFrame)
+        }, 28, applySubheaderFrame)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer

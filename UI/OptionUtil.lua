@@ -42,9 +42,10 @@ local function createPositioningExamplesCanvas()
             title = L["POSITION_MODE_EXPLAINER_TITLE_ATTACHED"],
             caption = L["POSITION_MODE_EXPLAINER_CAPTION_ATTACHED"],
             build = function(preview)
-                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 18, -14, { 0.92, 0.78, 0.23, 1 })
-                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 36, -14, { 0.92, 0.78, 0.23, 1 })
-                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 54, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 12, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 31, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 51, -14, { 0.92, 0.78, 0.23, 1 })
+                createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 70, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBars(preview, {
                     { x = 12, y = -38, width = 72, height = 10, color = { 0.22, 0.74, 0.98, 1 } },
                     { x = 12, y = -52, width = 72, height = 10, color = { 0.65, 0.41, 0.96, 1 } },
@@ -59,8 +60,6 @@ local function createPositioningExamplesCanvas()
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 10, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 28, -14, { 0.92, 0.78, 0.23, 1 })
                 createPreviewBlock(preview, 14, 14, "TOPLEFT", preview, "TOPLEFT", 46, -14, { 0.92, 0.78, 0.23, 1 })
-                createPreviewBlock(preview, 2, 26, "TOPLEFT", preview, "TOPLEFT", 78, -34, { 0.95, 0.95, 0.95, 0.65 })
-                createPreviewBlock(preview, 26, 2, "TOPLEFT", preview, "TOPLEFT", 66, -22, { 0.95, 0.95, 0.95, 0.65 })
                 createPreviewBars(preview, {
                     { x = 92, y = -16, width = 60, height = 10, color = { 0.22, 0.74, 0.98, 1 } },
                     { x = 92, y = -30, width = 60, height = 10, color = { 0.65, 0.41, 0.96, 1 } },

@@ -36,13 +36,6 @@ function AdvancedOptions.RegisterSettings(SB)
                 end,
             },
             updatesHeader = { type = "header", name = L["UPDATES"], order = 20 },
-            showReleasePopupOnUpdate = {
-                type = "toggle",
-                path = "showReleasePopupOnUpdate",
-                name = L["SHOW_WHATS_NEW_ON_UPDATE"],
-                desc = L["SHOW_WHATS_NEW_ON_UPDATE_DESC"],
-                order = 21,
-            },
             showWhatsNew = {
                 type = "button",
                 name = " ",
@@ -51,11 +44,9 @@ function AdvancedOptions.RegisterSettings(SB)
                 onClick = function()
                     if ns.Addon and type(ns.Addon.ShowReleasePopup) == "function" then
                         ns.Addon:ShowReleasePopup(true)
-                        return
                     end
-                    ECM.Print(L["WHATS_NEW_UNAVAILABLE"])
                 end,
-                order = 22,
+                order = 21,
             },
             perfHeader = { type = "header", name = L["PERFORMANCE"], order = 30 },
             updateFrequency = {

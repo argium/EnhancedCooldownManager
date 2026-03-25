@@ -51,6 +51,110 @@ local function markReleasePopupSeen(version)
     end
 end
 
+local function formatWhatsNewText(text)
+    local lines = {}
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        if line:find("^### ") then
+            line = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, line:sub(5))
+        elseif line:find("^%- ") then
+            line = C.WHATS_NEW_LIST_BULLET .. " " .. line:sub(3)
+        end
+        lines[#lines + 1] = line
+    end
+    return table.concat(lines, "\n")
+end
+
+local whatsNewFrame
+
+local function createDialogShell(name, width, height, centerYOffset)
+    local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    frame:SetSize(width, height)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, centerYOffset or 0)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetBackdrop(C.DIALOG_BACKDROP)
+    frame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    frame:EnableMouse(true)
+    frame:Hide()
+    return frame
+end
+
+local function ensureWhatsNewFrame()
+    if whatsNewFrame then
+        return whatsNewFrame
+    end
+
+    local frame = createDialogShell(
+        C.WHATS_NEW_FRAME_NAME,
+        C.WHATS_NEW_FRAME_WIDTH,
+        C.WHATS_NEW_FRAME_HEIGHT,
+        C.WHATS_NEW_FRAME_OFFSET_Y
+    )
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        self:StartMoving()
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+    end)
+
+    local title = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
+    title:SetPoint("TOPLEFT", frame, "TOPLEFT", C.WHATS_NEW_FRAME_PADDING, -C.WHATS_NEW_FRAME_PADDING)
+    title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -C.WHATS_NEW_FRAME_PADDING, -C.WHATS_NEW_FRAME_PADDING)
+    title:SetJustifyH("LEFT")
+    frame.Title = title
+
+    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
+    subtitle:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
+    subtitle:SetJustifyH("LEFT")
+    frame.Subtitle = subtitle
+
+    local body = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    body:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -C.WHATS_NEW_BODY_SPACING)
+    body:SetPoint("TOPRIGHT", subtitle, "BOTTOMRIGHT", 0, -C.WHATS_NEW_BODY_SPACING)
+    body:SetJustifyH("LEFT")
+    body:SetJustifyV("TOP")
+    frame.Body = body
+
+    local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    closeButton:SetSize(C.WHATS_NEW_CLOSE_BUTTON_WIDTH, C.WHATS_NEW_BUTTON_HEIGHT)
+    closeButton:SetPoint(
+        "BOTTOMRIGHT",
+        frame,
+        "BOTTOMRIGHT",
+        -C.WHATS_NEW_FRAME_PADDING,
+        C.WHATS_NEW_BUTTON_BOTTOM_OFFSET
+    )
+    closeButton:SetText(L["GOT_IT"])
+    closeButton:SetScript("OnClick", function()
+        if frame._ecmSeenVersion then
+            markReleasePopupSeen(frame._ecmSeenVersion)
+        end
+        frame:Hide()
+    end)
+    frame.CloseButton = closeButton
+
+    local settingsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    settingsButton:SetSize(C.WHATS_NEW_SETTINGS_BUTTON_WIDTH, C.WHATS_NEW_BUTTON_HEIGHT)
+    settingsButton:SetPoint("RIGHT", closeButton, "LEFT", -C.WHATS_NEW_BUTTON_SPACING, 0)
+    settingsButton:SetText(L["OPEN_SETTINGS"])
+    settingsButton:SetScript("OnClick", function()
+        if frame._ecmSeenVersion then
+            markReleasePopupSeen(frame._ecmSeenVersion)
+        end
+        frame:Hide()
+        mod:ChatCommand("options")
+    end)
+    frame.SettingsButton = settingsButton
+
+    frame:Hide()
+    whatsNewFrame = frame
+    return frame
+end
+
 local function safeStrTostring(x)
     if x == nil then return "nil" end
     return issecretvalue(x) and "[secret]" or tostring(x)
@@ -235,57 +339,44 @@ end
 
 function mod:ShowReleasePopup(force)
     local version = getAddonVersion()
+    local popupVersion = C.RELEASE_POPUP_VERSION
     local body = L["WHATS_NEW_BODY"]
-    if type(version) ~= "string" or version == "" or C.RELEASE_POPUP_ENABLED ~= true
-        or type(body) ~= "string" or body == "" or body == "WHATS_NEW_BODY" then
-        if force == true then
-            ECM.Print(L["WHATS_NEW_UNAVAILABLE"])
-        end
+    local hasBody = type(body) == "string" and body ~= "" and body ~= "WHATS_NEW_BODY"
+    local displayVersion = popupVersion
+    if type(displayVersion) ~= "string" or displayVersion == "" then
+        displayVersion = type(version) == "string" and version or ""
+    end
+    local seenVersion = displayVersion
+    if seenVersion == "" or (force == true and seenVersion ~= version) then
+        seenVersion = nil
+    end
+    if not hasBody or displayVersion == "" then
         return false
     end
 
     if force ~= true then
-        local gc = ECM.GetGlobalConfig()
-        if self._releasePopupShownVersion == version
-            or not gc
-            or gc.showReleasePopupOnUpdate ~= true
-            or gc.releasePopupSeenVersion == version then
+        if type(version) ~= "string" or version == ""
+            or type(popupVersion) ~= "string" or popupVersion == "" or popupVersion ~= version
+            or not hasBody then
             return false
         end
 
-        self._releasePopupShownVersion = version
+        local gc = ECM.GetGlobalConfig()
+        if self._releasePopupShownVersion == popupVersion
+            or not gc
+            or gc.releasePopupSeenVersion == popupVersion then
+            return false
+        end
+
+        self._releasePopupShownVersion = popupVersion
     end
 
-    local dialog = StaticPopupDialogs[C.POPUP_WHATS_NEW]
-    if not dialog then
-        dialog = {
-            text = "",
-            button1 = L["GOT_IT"],
-            button2 = L["OPEN_SETTINGS"],
-            OnAccept = function(_, data)
-                if data and data.version then
-                    markReleasePopupSeen(data.version)
-                end
-            end,
-            OnCancel = function(_, data, reason)
-                if data and data.version then
-                    markReleasePopupSeen(data.version)
-                end
-                if reason == "clicked" then
-                    mod:ChatCommand("options")
-                end
-            end,
-            timeout = 0,
-            whileDead = 1,
-            hideOnEscape = 1,
-            preferredIndex = C.POPUP_PREFERRED_INDEX,
-        }
-        StaticPopupDialogs[C.POPUP_WHATS_NEW] = dialog
-    end
-
-    dialog.text = string.format("%s\n\n%s", string.format(L["WHATS_NEW_TITLE_FORMAT"], version), body)
-
-    StaticPopup_Show(C.POPUP_WHATS_NEW, nil, nil, { version = version })
+    local frame = ensureWhatsNewFrame()
+    frame.Title:SetText(ECM.ColorUtil.Sparkle(L["ADDON_NAME"]))
+    frame.Subtitle:SetText(string.format(L["WHATS_NEW_TITLE_FORMAT"], displayVersion))
+    frame.Body:SetText(formatWhatsNewText(body))
+    frame._ecmSeenVersion = seenVersion
+    frame:Show()
     return true
 end
 
@@ -296,15 +387,7 @@ local DIALOG_SIZES = {
 
 local function createDialogFrame(name, titleText, explainText, size)
     local dims = type(size) == "table" and size or DIALOG_SIZES[size] or DIALOG_SIZES.large
-    local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    f:SetSize(dims[1], dims[2])
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetBackdrop(C.DIALOG_BACKDROP)
-    f:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
-    f:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
-    f:EnableMouse(true)
-    f:Hide()
+    local f = createDialogShell(name, dims[1], dims[2])
     tinsert(UISpecialFrames, name)
 
     local title = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")

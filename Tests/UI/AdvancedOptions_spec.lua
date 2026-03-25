@@ -59,17 +59,8 @@ describe("AdvancedOptions getters/setters/defaults", function()
     end)
 
     describe("showReleasePopupOnUpdate", function()
-        it("getter returns profile value", function()
-            assert.is_false(settings["ECM_global_showReleasePopupOnUpdate"]:GetValue())
-        end)
-
-        it("setter writes to profile", function()
-            settings["ECM_global_showReleasePopupOnUpdate"]:SetValue(true)
-            assert.is_true(profile.global.showReleasePopupOnUpdate)
-        end)
-
-        it("default matches expected", function()
-            assert.is_false(settings["ECM_global_showReleasePopupOnUpdate"]._default)
+        it("does not register a show on update toggle", function()
+            assert.is_nil(settings["ECM_global_showReleasePopupOnUpdate"])
         end)
     end)
 

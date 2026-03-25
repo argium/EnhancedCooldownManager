@@ -10,7 +10,7 @@ local constants = {
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
     VERSION_TAG_BETA = "beta",
-    RELEASE_POPUP_ENABLED = false,
+    RELEASE_POPUP_VERSION = "v0.7.0-beta2",
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
@@ -153,8 +153,21 @@ local constants = {
     DIALOG_FRAME_WIDTH = 480,
     DIALOG_FRAME_WIDTH_SMALL = 400,
     POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI",
-    POPUP_WHATS_NEW = "ECM_WHATS_NEW",
     POPUP_PREFERRED_INDEX = 3,
+    WHATS_NEW_BUTTON_BOTTOM_OFFSET = 16,
+    WHATS_NEW_BUTTON_HEIGHT = 24,
+    WHATS_NEW_BUTTON_SPACING = 8,
+    WHATS_NEW_BODY_SPACING = 12,
+    WHATS_NEW_CLOSE_BUTTON_WIDTH = 120,
+    WHATS_NEW_FRAME_HEIGHT = 320,
+    WHATS_NEW_FRAME_NAME = "ECMWhatsNewFrame",
+    WHATS_NEW_FRAME_OFFSET_Y = 20,
+    WHATS_NEW_FRAME_PADDING = 18,
+    WHATS_NEW_FRAME_WIDTH = 520,
+    WHATS_NEW_HEADER_COLOR = "FFD100",
+    WHATS_NEW_LIST_BULLET = "\194\183",
+    WHATS_NEW_SETTINGS_BUTTON_WIDTH = 140,
+    WHATS_NEW_SUBTITLE_SPACING = 8,
 
     -- UI dimension constants
     POSITION_MODE_EXPLAINER_HEIGHT = 150,
@@ -197,6 +210,11 @@ local resourceBarMaxColorTypes = {
     [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
 }
 
+local resourceBarCastableMaxColorSpells = {
+    [constants.RESOURCEBAR_TYPE_DEVOURER_META] = constants.SPELLID_COLLAPSING_STAR,
+    [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = constants.SPELLID_VOID_META,
+}
+
 --- Authoritative mapping from module name to its profile config key.
 local moduleConfigKeys = {
     [constants.POWERBAR] = "powerBar",
@@ -218,6 +236,7 @@ constants.MODULE_ORDER =
 { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
+constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes
 

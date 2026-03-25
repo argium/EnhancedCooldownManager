@@ -148,7 +148,6 @@ local defaults = {
         global = {
             debug = false,
             debugToChat = false,
-            showReleasePopupOnUpdate = false,
             releasePopupSeenVersion = "",
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
