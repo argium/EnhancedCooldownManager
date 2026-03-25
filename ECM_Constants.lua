@@ -10,7 +10,7 @@ local constants = {
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
     VERSION_TAG_BETA = "beta",
-    RELEASE_POPUP_VERSION = "v0.7.0-beta2",
+    RELEASE_POPUP_VERSION = "v0.7.0-beta4",
 
     -- Module identifiers
     BUFFBARS = "BuffBars",

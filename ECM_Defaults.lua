@@ -218,7 +218,7 @@ local defaults = {
             },
             colors = {
                 [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.416, g = 0.435, b = 0.910, a = 1 },
                 [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.494, g = 0.549, b = 1.000, a = 1 },
                 [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
                 [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
