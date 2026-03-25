@@ -344,7 +344,10 @@ function TestHelpers.SetupSettingsStubs()
         return init
     end
 
-    _G.MinimalSliderWithSteppersMixin = { Label = { Right = 1 } }
+    _G.MinimalSliderWithSteppersMixin = {
+        Label = { Right = 1 },
+        Event = { OnValueChanged = "OnValueChanged" },
+    }
 
     _G.CreateColor = function(r, g, b, a)
         return { r = r, g = g, b = b, a = a or 1 }
@@ -893,13 +896,18 @@ function TestHelpers.SetupOptionsGlobals()
 
     -- Minimal CreateFrame stub for canvas layouts
     local function makeFrameStub()
-        local f = { scripts = {}, _children = {} }
+        local f = { scripts = {}, hooks = {}, callbacks = {}, _children = {} }
         local noop = function() end
+        local value, minValue, maxValue, stepValue = nil, 0, 0, 1
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
         f.GetScript = function(self, event)
             return self.scripts[event]
+        end
+        f.HookScript = function(self, event, fn)
+            self.hooks[event] = self.hooks[event] or {}
+            self.hooks[event][#self.hooks[event] + 1] = fn
         end
         f.GetHeight = function()
             return 0
@@ -921,6 +929,9 @@ function TestHelpers.SetupOptionsGlobals()
             return
         end
         f.SetEnabled = noop
+        f.RegisterForClicks = noop
+        f.SetAutoFocus = noop
+        f.SetNumeric = noop
         f.SetText = noop
         f.GetText = function()
             return ""
@@ -928,12 +939,44 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetWordWrap = noop
         f.SetJustifyH = noop
         f.SetColorRGB = noop
+        f.SetFocus = noop
+        f.ClearFocus = noop
+        f.HighlightText = noop
         f.SetBackdrop = noop
         f.SetBackdropBorderColor = noop
         f.SetMinMaxValues = noop
         f.SetValueStep = noop
         f.SetObeyStepOnDrag = noop
+        f.RegisterCallback = function(self, event, fn, owner)
+            self.callbacks[event] = self.callbacks[event] or {}
+            self.callbacks[event][#self.callbacks[event] + 1] = { fn = fn, owner = owner }
+        end
+        f.Init = function(self, initialValue, initialMin, initialMax)
+            value = initialValue
+            minValue = initialMin
+            maxValue = initialMax
+        end
+        f.SetValue = function(self, newValue)
+            value = newValue
+            for _, callback in ipairs(self.callbacks.OnValueChanged or {}) do
+                callback.fn(callback.owner or self, newValue)
+            end
+        end
+        f.GetValue = function()
+            return value
+        end
         f.SetDataProvider = noop
+        f.Slider = {
+            SetValueStep = function(_, step)
+                stepValue = step
+            end,
+            GetValueStep = function()
+                return stepValue
+            end,
+            GetMinMaxValues = function()
+                return minValue, maxValue
+            end,
+        }
         f.CreateFontString = function()
             return makeFrameStub()
         end
@@ -953,7 +996,11 @@ function TestHelpers.SetupOptionsGlobals()
         return f
     end
     _G.CreateFrame = function()
-        return makeFrameStub()
+        local frame = makeFrameStub()
+        frame.RightText = makeFrameStub()
+        frame.MinText = makeFrameStub()
+        frame.MaxText = makeFrameStub()
+        return frame
     end
 
     _G.CreateDataProvider = function()
@@ -1219,6 +1266,15 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
             DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
             CLASS_COLORS = { WARRIOR = "C79C6E" },
             COLOR_WHITE_HEX = "FFFFFF",
+            VALUE_SLIDER_TIERS = {
+                { ceiling = 200,    step = 1 },
+                { ceiling = 1000,   step = 5 },
+                { ceiling = 5000,   step = 25 },
+                { ceiling = 10000,  step = 50 },
+                { ceiling = 50000,  step = 250 },
+                { ceiling = 100000, step = 500 },
+                { ceiling = 500000, step = 2500 },
+            },
         },
         L = setmetatable({}, { __index = function(_, k)
             return k

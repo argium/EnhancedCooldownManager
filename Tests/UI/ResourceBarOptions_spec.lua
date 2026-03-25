@@ -117,13 +117,12 @@ describe("ResourceBarOptions getters/setters/defaults", function()
 
     -- Color list (spot check)
     describe("colors", function()
-        it("all 11 resource type color settings exist", function()
+        it("all non-secret resource type color settings exist", function()
             local keys = {
                 "souls",
                 "devourerNormal",
                 "devourerMeta",
                 "icicles",
-                "16",
                 "12",
                 "4",
                 "19",
@@ -137,6 +136,8 @@ describe("ResourceBarOptions getters/setters/defaults", function()
                     "Missing color setting for resource type " .. key
                 )
             end
+
+            assert.is_nil(settings["ECM_resourceBar_colors_16"])
         end)
         it("souls color getter returns hex string", function()
             local hex = settings["ECM_resourceBar_colors_souls"]:GetValue()
@@ -145,6 +146,23 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         it("ComboPoints color setter writes to profile", function()
             settings["ECM_resourceBar_colors_4"]:SetValue("FFFFFF00")
             assert.is_table(profile.resourceBar.colors[4])
+        end)
+        it("prefixes each resource label with its class icon and color", function()
+            local defsByKey = {}
+            for _, def in ipairs(capturedTable.args.colors.defs) do
+                defsByKey[def.key] = def.name
+            end
+
+            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DH"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS])
+            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL])
+            assert.are.equal("|A:classicon-mage:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MAGE .. ECM.L["RESOURCE_ICICLES"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_ICICLES])
+            assert.are.equal("|A:classicon-monk:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MONK .. ECM.L["RESOURCE_CHI"] .. "|r", defsByKey[Enum.PowerType.Chi])
+            assert.are.equal("|A:classicon-rogue:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.ROGUE .. ECM.L["RESOURCE_COMBO_POINTS"] .. "|r", defsByKey[Enum.PowerType.ComboPoints])
+            assert.are.equal("|A:classicon-evoker:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.EVOKER .. ECM.L["RESOURCE_ESSENCE"] .. "|r", defsByKey[Enum.PowerType.Essence])
+            assert.are.equal("|A:classicon-paladin:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.PALADIN .. ECM.L["RESOURCE_HOLY_POWER"] .. "|r", defsByKey[Enum.PowerType.HolyPower])
+            assert.are.equal("|A:classicon-shaman:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.SHAMAN .. ECM.L["RESOURCE_MAELSTROM_WEAPON"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON])
+            assert.are.equal("|A:classicon-warlock:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.WARLOCK .. ECM.L["RESOURCE_SOUL_SHARDS"] .. "|r", defsByKey[Enum.PowerType.SoulShards])
+            assert.is_nil(defsByKey[Enum.PowerType.ArcaneCharges])
         end)
     end)
 
@@ -180,6 +198,25 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         it("setter writes to profile", function()
             settings["ECM_resourceBar_maxColors_icicles"]:SetValue("FF0000FF")
             assert.is_table(profile.resourceBar.maxColors.icicles)
+        end)
+        it("reuses the icon-prefixed names for capped resource rows", function()
+            local defsByKey = {}
+            for _, def in ipairs(capturedTable.args.maxColors.defs) do
+                defsByKey[def.key] = def.name
+            end
+
+            assert.are.equal(
+                "|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r",
+                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL]
+            )
+            assert.are.equal(
+                "|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] .. "|r",
+                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META]
+            )
+            assert.are.equal(
+                "|A:classicon-mage:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MAGE .. ECM.L["RESOURCE_ICICLES"] .. "|r",
+                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_ICICLES]
+            )
         end)
     end)
 end)

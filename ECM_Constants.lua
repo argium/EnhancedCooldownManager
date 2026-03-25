@@ -9,8 +9,8 @@ local constants = {
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
-    VERSION_TAG_BETA = "beta",
     RELEASE_POPUP_VERSION = "v0.7.0-beta4",
+    VERSION_TAG_BETA = "beta",
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
@@ -177,6 +177,16 @@ local constants = {
     SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET = 8,
     SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET = 42,
     SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT = 40,
+
+    VALUE_SLIDER_TIERS = {
+        { ceiling = 200,    step = 1 },
+        { ceiling = 1000,   step = 5 },
+        { ceiling = 5000,   step = 25 },
+        { ceiling = 10000,  step = 50 },
+        { ceiling = 50000,  step = 250 },
+        { ceiling = 100000, step = 500 },
+        { ceiling = 500000, step = 2500 },
+    },
 }
 
 local BLIZZARD_FRAMES = {
@@ -232,8 +242,7 @@ end
 
 local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER =
-{ constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
+constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells

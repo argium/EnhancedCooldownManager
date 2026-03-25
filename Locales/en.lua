@@ -322,6 +322,7 @@ L["EXPORT_FAILED"] = "Export failed: %s"
 -- Chat Commands
 --------------------------------------------------------------------------------
 
+L["CMD_HELP_CLEARSEEN"] = "/ecm clearseen - clear the What's New seen flag (reload or relog to show it again)"
 L["CMD_HELP_DEBUG"] = "/ecm debug [on|off|toggle] - toggle debug mode (logs detailed info to the chat frame)"
 L["CMD_HELP_EVENTS"] = "/ecm events [reset] - show or reset event fire counts"
 L["CMD_HELP_HELP"] = "/ecm help - show this message"
@@ -340,6 +341,7 @@ L["MODULE_NOT_FOUND"] = "Module not found:"
 L["EVENTS_HEADER"] = "Event fire counts:"
 L["EVENTS_NONE"] = "No events recorded."
 L["EVENTS_RESET"] = "Event stats reset."
+L["SEEN_CLEARED"] = "What's New seen flag cleared. Reload or relog to show the popup again."
 
 --------------------------------------------------------------------------------
 -- Import / Export Dialogs

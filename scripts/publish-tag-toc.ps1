@@ -1,15 +1,13 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [bool]$ShowReleasePopup,
     [string]$TocPath = "EnhancedCooldownManager.toc",
     [string]$Remote = "origin",
     [Alias("TagMessage", "ReleaseMessage")]
-    [string]$Message
+    [string]$Message,
+    [switch]$ShowReleasePopup
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-$releasePopupVersionPattern = 'RELEASE_POPUP_VERSION\s*=\s*"(.*?)"'
 
 function Invoke-Git {
     param(
@@ -77,38 +75,6 @@ function Open-GitHubWorkflowsPage {
     }
 }
 
-function Set-ReleasePopupVersion {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ConstantsPath,
-        [Parameter(Mandatory = $true)]
-        [string]$Version
-    )
-
-    $constantsText = Get-Content -LiteralPath $ConstantsPath -Raw
-    $popupVersionMatch = [regex]::Match(
-        $constantsText,
-        $releasePopupVersionPattern
-    )
-    if (-not $popupVersionMatch.Success) {
-        throw "Could not find RELEASE_POPUP_VERSION in $ConstantsPath"
-    }
-
-    $valueGroup = $popupVersionMatch.Groups[1]
-    $updatedText = $constantsText.Substring(0, $valueGroup.Index) +
-        $Version +
-        $constantsText.Substring($valueGroup.Index + $valueGroup.Length)
-
-    if ($updatedText -ne $constantsText) {
-        $resolvedConstantsPath = (Resolve-Path -LiteralPath $ConstantsPath).Path
-        [System.IO.File]::WriteAllText(
-            $resolvedConstantsPath,
-            $updatedText,
-            [System.Text.UTF8Encoding]::new($false)
-        )
-    }
-}
-
 if (-not (Test-Path -LiteralPath $TocPath)) {
     throw "TOC file not found: $TocPath"
 }
@@ -125,27 +91,33 @@ if ([string]::IsNullOrWhiteSpace($version)) {
 
 Write-Host "TOC version: $version"
 
-$constantsPath = "ECM_Constants.lua"
-if (-not (Test-Path -LiteralPath $constantsPath)) {
-    throw "Constants file not found: $constantsPath"
+function Set-ReleasePopupVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Version,
+        [string]$ConstantsPath = "ECM_Constants.lua"
+    )
+
+    if (-not (Test-Path -LiteralPath $ConstantsPath)) {
+        throw "Constants file not found: $ConstantsPath"
+    }
+
+    $content = Get-Content -LiteralPath $ConstantsPath -Raw
+    $pattern = '(RELEASE_POPUP_VERSION\s*=\s*")[^"]*(")'
+    if ($content -notmatch 'RELEASE_POPUP_VERSION') {
+        throw "Could not find RELEASE_POPUP_VERSION in $ConstantsPath"
+    }
+
+    $newContent = $content -replace $pattern, "`${1}$Version`${2}"
+    Set-Content -LiteralPath $ConstantsPath -Value $newContent -NoNewline
+    Write-Host "Updated RELEASE_POPUP_VERSION to '$Version' in $ConstantsPath"
 }
 
 if ($ShowReleasePopup) {
-    Set-ReleasePopupVersion -ConstantsPath $constantsPath -Version $version
-    Write-Host "Updated RELEASE_POPUP_VERSION to: $version"
-} else {
-    Write-Host "Leaving RELEASE_POPUP_VERSION unchanged."
+    Set-ReleasePopupVersion -Version $version
+    Invoke-Git -Arguments @("add", "ECM_Constants.lua")
+    Invoke-Git -Arguments @("commit", "--amend", "--no-edit")
 }
-
-$constantsText = Get-Content -LiteralPath $constantsPath -Raw
-$popupVersionMatch = [regex]::Match($constantsText, $releasePopupVersionPattern)
-if (-not $popupVersionMatch.Success) {
-    throw "RELEASE_POPUP_VERSION must be explicitly set to a string in $constantsPath"
-}
-
-$popupVersion = $popupVersionMatch.Groups[1].Value
-
-Write-Host "Release popup version: $popupVersion"
 
 Invoke-Git -Arguments @("rev-parse", "--is-inside-work-tree")
 

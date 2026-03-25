@@ -406,6 +406,19 @@ describe("ChatCommand migration", function()
         assert.is_true(hasMigration)
     end)
 
+    it("/ecm help includes clearseen command", function()
+        mod:ChatCommand("help")
+
+        local hasClearSeen = false
+        for _, msg in ipairs(printedMessages) do
+            if string.find(msg, "/ecm clearseen", 1, true) then
+                hasClearSeen = true
+                break
+            end
+        end
+        assert.is_true(hasClearSeen)
+    end)
+
     it("/ecm help does not include migrationlog", function()
         mod:ChatCommand("help")
 
@@ -443,6 +456,18 @@ describe("ChatCommand migration", function()
         assert.are.equal(0, scheduleLayoutCalls[1].delay)
         assert.are.equal("ChatCommand", scheduleLayoutCalls[1].reason)
         assert.are.equal("Refreshing all modules.", printedMessages[1])
+    end)
+
+    it("/ecm clearseen clears the persisted What's New version and prints reload guidance", function()
+        fakeAddon.db.profile.global.releasePopupSeenVersion = "v1.2.3"
+
+        mod:ChatCommand("clearseen")
+
+        assert.is_nil(fakeAddon.db.profile.global.releasePopupSeenVersion)
+        assert.are.equal(
+            "What's New seen flag cleared. Reload or relog to show the popup again.",
+            printedMessages[1]
+        )
     end)
 
     describe("events command", function()
@@ -503,15 +528,25 @@ describe("ChatCommand migration", function()
         it("/ecm events reset clears addon and module stats", function()
             local moduleResetCalled = false
             addonStats.SOME_EVENT = 42
+            moduleStats.OTHER_EVENT = 10
             modules.TestModule = {
                 GetEventStats = function() return moduleStats end,
-                ResetEventStats = function() moduleResetCalled = true end,
+                ResetEventStats = function()
+                    moduleResetCalled = true
+                    moduleStats = {}
+                end,
             }
 
             mod:ChatCommand("events reset")
 
             assert.are.equal("Event stats reset.", printedMessages[1])
             assert.is_true(moduleResetCalled)
+            assert.same({}, addonStats)
+
+            -- Verify subsequent display shows no events.
+            printedMessages = {}
+            mod:ChatCommand("events")
+            assert.are.equal("No events recorded.", printedMessages[1])
         end)
 
         it("/ecm events reset skips modules without ResetEventStats", function()
@@ -520,6 +555,16 @@ describe("ChatCommand migration", function()
             mod:ChatCommand("events reset")
 
             assert.are.equal("Event stats reset.", printedMessages[1])
+        end)
+
+        it("/ecm events reset works when global config is nil", function()
+            addonStats.SOME_EVENT = 5
+            fakeAddon.db = nil
+
+            mod:ChatCommand("events reset")
+
+            assert.are.equal("Event stats reset.", printedMessages[1])
+            assert.same({}, addonStats)
         end)
 
         it("/ecm help includes events command", function()

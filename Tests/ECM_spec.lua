@@ -406,7 +406,7 @@ describe("ECM layout system", function()
             assert.is_true(assert(getWhatsNewFrame()):IsShown())
         end)
 
-        it("does not show the popup when the release popup version has already been seen", function()
+        it("does not show the popup when the current version has already been seen", function()
             _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
 
             fakeAddon:OnEnable()
@@ -414,19 +414,26 @@ describe("ECM layout system", function()
             assert.is_nil(getWhatsNewFrame())
         end)
 
-        it("does not show the popup when the release popup version does not match", function()
-            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
+        it("does not show the popup when the addon version is unavailable", function()
+            addonVersion = nil
+
+            fakeAddon:OnEnable()
+
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
+        end)
+
+        it("does not show the popup when RELEASE_POPUP_VERSION is nil", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = nil
 
             fakeAddon:OnEnable()
 
             assert.is_nil(getWhatsNewFrame())
         end)
 
-        it("does not show the popup when the release popup version is empty", function()
+        it("does not show the popup when RELEASE_POPUP_VERSION is empty", function()
             ECM.Constants.RELEASE_POPUP_VERSION = ""
 
-            fakeAddon:OnEnable()
-
+            assert.is_false(fakeAddon:ShowReleasePopup(true))
             assert.is_nil(getWhatsNewFrame())
         end)
 
@@ -442,7 +449,6 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
             local frame = assert(getWhatsNewFrame())
             frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
-            fakeAddon._releasePopupShownVersion = nil
             fakeAddon:OnEnable()
 
             assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
@@ -480,10 +486,10 @@ describe("ECM layout system", function()
             )
         end)
 
-        it("uses sentence-case popup buttons", function()
+        it("uses the standard popup button labels", function()
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
-            assert.are.equal("Got it", frame.CloseButton:GetText())
+            assert.are.equal("Close", frame.CloseButton:GetText())
             assert.are.equal("Open settings", frame.SettingsButton:GetText())
         end)
 
@@ -531,26 +537,26 @@ describe("ECM layout system", function()
             assert.is_nil(getWhatsNewFrame())
         end)
 
-        it("force showing ignores release popup version mismatch and always uses the shared notes", function()
-            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
+        it("force showing ignores the seen flag", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
 
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
             assert.are.equal(
-                string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], "v9.9.9"),
+                string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion),
                 frame.Subtitle:GetText()
             )
             assert.are.equal("New version notes", frame.Body:GetText())
         end)
 
-        it("does not mark a mismatched force-shown popup version as seen", function()
-            ECM.Constants.RELEASE_POPUP_VERSION = "v9.9.9"
+        it("clearseen allows the popup to show again after a reload", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
 
-            assert.is_true(fakeAddon:ShowReleasePopup(true))
-            local frame = assert(getWhatsNewFrame())
-            frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
+            fakeAddon:ChatCommand("clearseen")
+            fakeAddon:OnEnable()
 
-            assert.are.equal("", _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
+            assert.is_nil(_G._testDB.profile.global.releasePopupSeenVersion)
         end)
     end)
 

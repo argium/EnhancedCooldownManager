@@ -106,7 +106,7 @@ local function ensureWhatsNewFrame()
     title:SetJustifyH("LEFT")
     frame.Title = title
 
-    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
     subtitle:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
     subtitle:SetJustifyH("LEFT")
@@ -130,9 +130,7 @@ local function ensureWhatsNewFrame()
     )
     closeButton:SetText(L["CLOSE"])
     closeButton:SetScript("OnClick", function()
-        if frame._ecmSeenVersion then
-            markReleasePopupSeen(frame._ecmSeenVersion)
-        end
+        markReleasePopupSeen(C.RELEASE_POPUP_VERSION)
         frame:Hide()
     end)
     frame.CloseButton = closeButton
@@ -142,9 +140,7 @@ local function ensureWhatsNewFrame()
     settingsButton:SetPoint("RIGHT", closeButton, "LEFT", -C.WHATS_NEW_BUTTON_SPACING, 0)
     settingsButton:SetText(L["OPEN_SETTINGS"])
     settingsButton:SetScript("OnClick", function()
-        if frame._ecmSeenVersion then
-            markReleasePopupSeen(frame._ecmSeenVersion)
-        end
+        markReleasePopupSeen(C.RELEASE_POPUP_VERSION)
         frame:Hide()
         mod:ChatCommand("options")
     end)
@@ -338,44 +334,27 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
 end
 
 function mod:ShowReleasePopup(force)
-    local version = getAddonVersion()
     local popupVersion = C.RELEASE_POPUP_VERSION
     local body = L["WHATS_NEW_BODY"]
     local hasBody = type(body) == "string" and body ~= "" and body ~= "WHATS_NEW_BODY"
-    local displayVersion = popupVersion
-    if type(displayVersion) ~= "string" or displayVersion == "" then
-        displayVersion = type(version) == "string" and version or ""
-    end
-    local seenVersion = displayVersion
-    if seenVersion == "" or (force == true and seenVersion ~= version) then
-        seenVersion = nil
-    end
-    if not hasBody or displayVersion == "" then
+    if not popupVersion or popupVersion == "" or not hasBody then
         return false
     end
 
     if force ~= true then
-        if type(version) ~= "string" or version == ""
-            or type(popupVersion) ~= "string" or popupVersion == "" or popupVersion ~= version
-            or not hasBody then
-            return false
-        end
-
         local gc = ECM.GetGlobalConfig()
-        if self._releasePopupShownVersion == popupVersion
-            or not gc
-            or gc.releasePopupSeenVersion == popupVersion then
+        if not gc or gc.releasePopupSeenVersion == popupVersion then
             return false
         end
-
-        self._releasePopupShownVersion = popupVersion
+        if whatsNewFrame and whatsNewFrame:IsShown() then
+            return false
+        end
     end
 
     local frame = ensureWhatsNewFrame()
     frame.Title:SetText(ECM.ColorUtil.Sparkle(L["ADDON_NAME"]))
-    frame.Subtitle:SetText(string.format(L["WHATS_NEW_TITLE_FORMAT"], displayVersion))
+    frame.Subtitle:SetText(string.format(L["WHATS_NEW_TITLE_FORMAT"], popupVersion))
     frame.Body:SetText(formatWhatsNewText(body))
-    frame._ecmSeenVersion = seenVersion
     frame:Show()
     return true
 end
@@ -535,6 +514,7 @@ function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
+        ECM.Print(L["CMD_HELP_CLEARSEEN"])
         ECM.Print(L["CMD_HELP_DEBUG"])
         ECM.Print(L["CMD_HELP_EVENTS"])
         ECM.Print(L["CMD_HELP_HELP"])
@@ -599,6 +579,11 @@ function mod:ChatCommand(input)
         return
     end
 
+    if cmd == "events" then
+        self:HandleEventsCommand(arg)
+        return
+    end
+
     local gc = ECM.GetGlobalConfig()
     if not gc then
         return
@@ -621,8 +606,9 @@ function mod:ChatCommand(input)
         return
     end
 
-    if cmd == "events" then
-        self:HandleEventsCommand(arg)
+    if cmd == "clearseen" then
+        gc.releasePopupSeenVersion = nil
+        ECM.Print(L["SEEN_CLEARED"])
         return
     end
 end

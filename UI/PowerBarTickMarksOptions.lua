@@ -117,6 +117,143 @@ local function roundToStep(value)
     return math.floor(value + 0.5)
 end
 
+local function getValueSliderRange(currentValue)
+    for _, tier in ipairs(C.VALUE_SLIDER_TIERS) do
+        if currentValue <= tier.ceiling then
+            return tier.ceiling, tier.step
+        end
+    end
+    local last = C.VALUE_SLIDER_TIERS[#C.VALUE_SLIDER_TIERS]
+    return math.ceil(currentValue / last.step) * last.step, last.step
+end
+
+local function roundSliderValue(value, step, minValue, maxValue)
+    local actualStep = step or 1
+    local baseValue = minValue or 0
+    local rounded = math.floor(((value - baseValue) / actualStep) + 0.5) * actualStep + baseValue
+    if minValue then
+        rounded = math.max(minValue, rounded)
+    end
+    if maxValue then
+        rounded = math.min(maxValue, rounded)
+    end
+    return rounded
+end
+
+local function getSliderStepCount(minValue, maxValue, step)
+    return math.max(1, math.floor(((maxValue - minValue) / (step or 1)) + 0.5))
+end
+
+local function createSliderFormatters()
+    if not MinimalSliderWithSteppersMixin or not MinimalSliderWithSteppersMixin.Label then
+        return nil
+    end
+
+    return {
+        [MinimalSliderWithSteppersMixin.Label.Right] = function()
+            return ""
+        end,
+    }
+end
+
+local function attachSliderValueEditor(slider, textLabel, editBoxWidth)
+    if slider._ecmValueButton then
+        return
+    end
+
+    local function hideEditBox()
+        if slider._ecmEditBox and slider._ecmEditBox.ClearFocus then
+            slider._ecmEditBox:ClearFocus()
+        end
+        if slider._ecmEditBox then
+            slider._ecmEditBox:Hide()
+        end
+        textLabel:Show()
+    end
+
+    local function applyEditBoxValue()
+        local editBox = slider._ecmEditBox
+        local enteredValue = editBox and tonumber(editBox:GetText())
+        if enteredValue then
+            local clamped = math.max(slider._ecmMinValue or 1, math.floor(enteredValue + 0.5))
+            if slider._ecmRescale then
+                slider._ecmRescale(clamped)
+            end
+            slider:SetValue(roundSliderValue(clamped, slider._ecmStep, slider._ecmMinValue, slider._ecmMaxValue))
+        end
+        hideEditBox()
+    end
+
+    local valueButton = CreateFrame("Button", nil, slider)
+    valueButton:RegisterForClicks("LeftButtonDown")
+    valueButton:SetAllPoints(textLabel)
+    slider._ecmValueButton = valueButton
+
+    local editBox = CreateFrame("EditBox", nil, slider, "InputBoxTemplate")
+    editBox:SetAutoFocus(false)
+    editBox:SetNumeric(false)
+    editBox:SetSize(editBoxWidth, 20)
+    editBox:SetPoint("CENTER", textLabel, "CENTER")
+    editBox:SetJustifyH("CENTER")
+    editBox:Hide()
+    slider._ecmEditBox = editBox
+
+    editBox:SetScript("OnEnterPressed", applyEditBoxValue)
+    editBox:SetScript("OnEscapePressed", hideEditBox)
+    editBox:SetScript("OnEditFocusLost", hideEditBox)
+
+    valueButton:SetScript("OnClick", function()
+        valueButton:ClearAllPoints()
+        valueButton:SetAllPoints(textLabel)
+        editBox:SetText(textLabel:GetText())
+        textLabel:Hide()
+        editBox:Show()
+        editBox:SetFocus()
+        editBox:HighlightText()
+    end)
+end
+
+local function configureSlider(slider, textLabel, minValue, maxValue, step, editBoxWidth, onValueChanged)
+    slider._ecmMinValue = minValue
+    slider._ecmMaxValue = maxValue
+    slider._ecmStep = step
+
+    if slider.MinText then
+        slider.MinText:Hide()
+    end
+    if slider.MaxText then
+        slider.MaxText:Hide()
+    end
+    if slider.RightText then
+        slider.RightText:Hide()
+    end
+
+    if slider.Init then
+        slider:Init(minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createSliderFormatters())
+        if slider.Slider and slider.Slider.SetValueStep then
+            slider.Slider:SetValueStep(step)
+        end
+    else
+        slider:SetMinMaxValues(minValue, maxValue)
+        slider:SetValueStep(step)
+        slider:SetObeyStepOnDrag(true)
+    end
+
+    attachSliderValueEditor(slider, textLabel, editBoxWidth)
+
+    local function handleValueChanged(_, value)
+        local rounded = roundSliderValue(value, slider._ecmStep, slider._ecmMinValue, slider._ecmMaxValue)
+        textLabel:SetText(tostring(roundToStep(rounded)))
+        onValueChanged(rounded)
+    end
+
+    if slider.RegisterCallback and MinimalSliderWithSteppersMixin and MinimalSliderWithSteppersMixin.Event then
+        slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, handleValueChanged, slider)
+    else
+        slider:HookScript("OnValueChanged", handleValueChanged)
+    end
+end
+
 local function createTickRowWidgets(rowFrame, SB)
     rowFrame:SetHeight(34)
 
@@ -143,23 +280,17 @@ local function createTickRowWidgets(rowFrame, SB)
     local valueSlider = CreateFrame("Slider", nil, rowFrame, "MinimalSliderWithSteppersTemplate")
     valueSlider:SetPoint("LEFT", label, "RIGHT", 8, 0)
     valueSlider:SetWidth(150)
-    valueSlider:SetMinMaxValues(1, 200)
-    valueSlider:SetValueStep(1)
-    valueSlider:SetObeyStepOnDrag(true)
     rowFrame._valueSlider = valueSlider
 
     local valueText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     valueText:SetPoint("LEFT", valueSlider, "RIGHT", 6, 0)
-    valueText:SetWidth(28)
+    valueText:SetWidth(50)
     valueText:SetJustifyH("LEFT")
     rowFrame._valueText = valueText
 
     local widthSlider = CreateFrame("Slider", nil, rowFrame, "MinimalSliderWithSteppersTemplate")
     widthSlider:SetPoint("LEFT", valueText, "RIGHT", 12, 0)
     widthSlider:SetWidth(90)
-    widthSlider:SetMinMaxValues(1, 5)
-    widthSlider:SetValueStep(1)
-    widthSlider:SetObeyStepOnDrag(true)
     rowFrame._widthSlider = widthSlider
 
     local widthText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -178,26 +309,36 @@ local function createTickRowWidgets(rowFrame, SB)
     removeBtn:SetText(L["REMOVE"])
     rowFrame._removeBtn = removeBtn
 
-    local function bindSlider(slider, textLabel, storeField)
-        slider:SetScript("OnValueChanged", function(_, val)
-            local rounded = roundToStep(val)
-            textLabel:SetText(tostring(rounded))
-            if rowFrame._isRefreshing then
-                return
+    local function rescaleValueSlider(targetValue)
+        local newMax, newStep = getValueSliderRange(math.max(1, targetValue))
+        if newMax ~= valueSlider._ecmMaxValue then
+            valueSlider._ecmMaxValue = newMax
+            valueSlider._ecmStep = newStep
+            if valueSlider.Init then
+                valueSlider:Init(targetValue, 1, newMax, getSliderStepCount(1, newMax, newStep), createSliderFormatters())
+                if valueSlider.Slider and valueSlider.Slider.SetValueStep then
+                    valueSlider.Slider:SetValueStep(newStep)
+                end
             end
-            if rounded ~= val then
-                rowFrame._isRefreshing = true
-                slider:SetValue(rounded)
-                rowFrame._isRefreshing = false
-                return
-            end
-            store.UpdateTick(rowFrame._rowIndex, storeField, rounded)
-            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-        end)
+        end
     end
 
-    bindSlider(valueSlider, valueText, "value")
-    bindSlider(widthSlider, widthText, "width")
+    configureSlider(valueSlider, valueText, 1, 200, 1, 60, function(rounded)
+        if rowFrame._isRefreshing then
+            return
+        end
+        store.UpdateTick(rowFrame._rowIndex, "value", rounded)
+        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+    end)
+    valueSlider._ecmRescale = rescaleValueSlider
+
+    configureSlider(widthSlider, widthText, 1, 5, 1, 34, function(rounded)
+        if rowFrame._isRefreshing then
+            return
+        end
+        store.UpdateTick(rowFrame._rowIndex, "width", rounded)
+        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+    end)
 end
 
 local function createTickMarksCanvas(SB, subcatName, parentCategory)
@@ -236,9 +377,7 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
     end)
 
     local _, defaultWidthSlider, defaultWidthText = layout:AddSlider(L["DEFAULT_WIDTH"], 1, 5, 1)
-    defaultWidthSlider:SetScript("OnValueChanged", function(_, value)
-        local rounded = roundToStep(value)
-        defaultWidthText:SetText(tostring(rounded))
+    configureSlider(defaultWidthSlider, defaultWidthText, 1, 5, 1, 44, function(rounded)
         store.SetDefaultWidth(rounded)
     end)
 
@@ -265,6 +404,9 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
         local tickWidth = data.tick.width or store.GetDefaultWidth()
 
         rowFrame._isRefreshing = true
+        if rowFrame._valueSlider._ecmRescale then
+            rowFrame._valueSlider._ecmRescale(tickValue)
+        end
         rowFrame._valueSlider:SetValue(tickValue)
         rowFrame._valueText:SetText(tostring(roundToStep(tickValue)))
         rowFrame._widthSlider:SetValue(tickWidth)

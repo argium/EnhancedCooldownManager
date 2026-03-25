@@ -5,19 +5,60 @@
 local _, ns = ...
 local C = ECM.Constants
 local L = ECM.L
+local COLOR_WHITE_HEX = C.COLOR_WHITE_HEX or "FFFFFF"
+
+local function createResourceColorName(className, label)
+    local color = (C.CLASS_COLORS and C.CLASS_COLORS[className]) or COLOR_WHITE_HEX
+    local icon = className and ("|A:classicon-" .. string.lower(className) .. ":14:14|a ") or ""
+    return icon .. "|cff" .. color .. label .. "|r"
+end
 
 local RESOURCE_COLOR_DEFS = {
-    { key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS, name = L["RESOURCE_SOUL_FRAGMENTS_DH"] },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL, name = L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] },
-    { key = C.RESOURCEBAR_TYPE_DEVOURER_META, name = L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] },
-    { key = C.RESOURCEBAR_TYPE_ICICLES, name = L["RESOURCE_ICICLES"] },
-    { key = Enum.PowerType.ArcaneCharges, name = L["RESOURCE_ARCANE_CHARGES"] },
-    { key = Enum.PowerType.Chi, name = L["RESOURCE_CHI"] },
-    { key = Enum.PowerType.ComboPoints, name = L["RESOURCE_COMBO_POINTS"] },
-    { key = Enum.PowerType.Essence, name = L["RESOURCE_ESSENCE"] },
-    { key = Enum.PowerType.HolyPower, name = L["RESOURCE_HOLY_POWER"] },
-    { key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON, name = L["RESOURCE_MAELSTROM_WEAPON"] },
-    { key = Enum.PowerType.SoulShards, name = L["RESOURCE_SOUL_SHARDS"] },
+    {
+        key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS,
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DH"]),
+    },
+    {
+        key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"]),
+    },
+    {
+        key = C.RESOURCEBAR_TYPE_DEVOURER_META,
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_VOID_FRAGMENTS_DEVOURER"]),
+    },
+    {
+        key = C.RESOURCEBAR_TYPE_ICICLES,
+        name = createResourceColorName("MAGE", L["RESOURCE_ICICLES"]),
+    },
+    -- {
+    --     -- Secret 2026/03
+    --     key = Enum.PowerType.ArcaneCharges,
+    --     name = createResourceColorName("MAGE", L["RESOURCE_ARCANE_CHARGES"]),
+    -- },
+    {
+        key = Enum.PowerType.Chi,
+        name = createResourceColorName("MONK", L["RESOURCE_CHI"]),
+    },
+    {
+        key = Enum.PowerType.ComboPoints,
+        name = createResourceColorName("ROGUE", L["RESOURCE_COMBO_POINTS"]),
+    },
+    {
+        key = Enum.PowerType.Essence,
+        name = createResourceColorName("EVOKER", L["RESOURCE_ESSENCE"]),
+    },
+    {
+        key = Enum.PowerType.HolyPower,
+        name = createResourceColorName("PALADIN", L["RESOURCE_HOLY_POWER"]),
+    },
+    {
+        key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
+        name = createResourceColorName("SHAMAN", L["RESOURCE_MAELSTROM_WEAPON"]),
+    },
+    {
+        key = Enum.PowerType.SoulShards,
+        name = createResourceColorName("WARLOCK", L["RESOURCE_SOUL_SHARDS"]),
+    },
 }
 
 local ResourceBarOptions = {}

@@ -50,10 +50,10 @@ describe("ProfileOptions getters/setters/defaults", function()
             settings["ECM_ProfileSwitch"]:SetValue("Other")
             assert.are.equal("Other", called)
         end)
-        it("uses a placeholder label for the New Profile button row", function()
+        it("uses the localized New Profile row label", function()
             local newProfileButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["NEW_PROFILE"]))
 
-            assert.are.equal(" ", newProfileButton._name)
+            assert.are.equal(ECM.L["NEW_PROFILE"], newProfileButton._name)
         end)
         it("prompts for a profile name then switches to it", function()
             local switched
@@ -109,16 +109,16 @@ describe("ProfileOptions getters/setters/defaults", function()
     end)
 
     describe("profile action buttons", function()
-        it("uses a placeholder label for the Copy button row", function()
+        it("uses the localized Copy row label", function()
             local copyButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["COPY"]))
 
-            assert.are.equal(" ", copyButton._name)
+            assert.are.equal(ECM.L["COPY"], copyButton._name)
         end)
 
-        it("uses a placeholder label for the Delete button row", function()
+        it("uses the localized Delete row label", function()
             local deleteButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["DELETE"]))
 
-            assert.are.equal(" ", deleteButton._name)
+            assert.are.equal(ECM.L["DELETE"], deleteButton._name)
         end)
 
         it("Copy shows a confirmation dialog before copying", function()
