@@ -19,6 +19,14 @@ function AdvancedOptions.RegisterSettings(SB)
                 desc = L["DEBUG_MODE_DESC"],
                 order = 11,
             },
+            debugToChat = {
+                type = "toggle",
+                path = "debugToChat",
+                name = L["DEBUG_TO_CHAT"],
+                desc = L["DEBUG_TO_CHAT_DESC"],
+                order = 12,
+                disabled = function() return not ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile.global, "debug") end,
+            },
             perfHeader = { type = "header", name = L["PERFORMANCE"], order = 20 },
             updateFrequency = {
                 type = "range",

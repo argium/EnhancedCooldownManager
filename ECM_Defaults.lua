@@ -147,6 +147,7 @@ local defaults = {
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             debug = false,
+            debugToChat = false,
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
             updateFrequency = 0.04,

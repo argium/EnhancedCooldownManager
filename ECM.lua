@@ -175,7 +175,10 @@ function ECM.Log(module, message, data)
         }, coloredPrefix .. message)
     end
 
-    print(coloredPrefix .. message)
+    local cfg = ECM.GetGlobalConfig()
+    if cfg and cfg.debugToChat then
+        print(coloredPrefix .. message)
+    end
 end
 
 --- Shows a confirmation popup and reloads the UI on accept.
