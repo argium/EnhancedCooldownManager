@@ -260,7 +260,7 @@ L["WHATS_NEW_BODY"] =
     .. "### Settings UI Refresh\n"
     .. "- Options pages have been reorganized and cleaned up for easier navigation\n"
     .. "- Improvements to the profile management interface"
-L["GOT_IT"] = "Got it"
+L["CLOSE"] = "Close"
 L["OPEN_SETTINGS"] = "Open settings"
 
 --------------------------------------------------------------------------------

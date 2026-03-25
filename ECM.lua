@@ -106,7 +106,7 @@ local function ensureWhatsNewFrame()
     title:SetJustifyH("LEFT")
     frame.Title = title
 
-    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
     subtitle:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
     subtitle:SetJustifyH("LEFT")
@@ -128,7 +128,7 @@ local function ensureWhatsNewFrame()
         -C.WHATS_NEW_FRAME_PADDING,
         C.WHATS_NEW_BUTTON_BOTTOM_OFFSET
     )
-    closeButton:SetText(L["GOT_IT"])
+    closeButton:SetText(L["CLOSE"])
     closeButton:SetScript("OnClick", function()
         if frame._ecmSeenVersion then
             markReleasePopupSeen(frame._ecmSeenVersion)
