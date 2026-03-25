@@ -355,15 +355,14 @@ describe("ECM layout system", function()
 
     describe("initialization wiring", function()
         it("defines the reload popup constant used by ConfirmReloadUI", function()
-            local shownName
-            _G.StaticPopup_Show = function(name)
-                shownName = name
-            end
+            local getShownNames = TestHelpers.InstallPopupRecorder()
 
             fakeAddon:ConfirmReloadUI("Reload now?")
 
+            local shownNames = getShownNames()
+
             assert.are.equal("ECM_CONFIRM_RELOAD_UI", ECM.Constants.POPUP_CONFIRM_RELOAD_UI)
-            assert.are.equal(ECM.Constants.POPUP_CONFIRM_RELOAD_UI, shownName)
+            assert.are.equal(ECM.Constants.POPUP_CONFIRM_RELOAD_UI, shownNames[1])
             assert.is_table(StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI])
             assert.are.equal("Reload now?", StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI].text)
         end)

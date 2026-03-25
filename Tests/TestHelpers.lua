@@ -362,11 +362,22 @@ function TestHelpers.SetupSettingsStubs()
     _G.StaticPopup_Show = function(name)
         local dialog = _G.StaticPopupDialogs[name]
         if dialog and dialog.OnAccept then
-            dialog.OnAccept()
+            if dialog.hasEditBox then
+                local text = ""
+                local editBox = { GetText = function() return text end, SetText = function(_, t) text = t end, HighlightText = function() end }
+                local self = { editBox = editBox, button1 = { IsEnabled = function() return true end } }
+                if dialog.OnShow then dialog.OnShow(self) end
+                dialog.OnAccept(self)
+            else
+                dialog.OnAccept()
+            end
         end
     end
     _G.YES = "Yes"
     _G.NO = "No"
+    _G.OKAY = "Okay"
+    _G.CANCEL = "Cancel"
+    _G.strtrim = function(s) return (s:match("^%s*(.-)%s*$")) end
 
     _G.ECM = _G.ECM or {}
     _G.ECM.CloneValue = deepClone
@@ -763,6 +774,9 @@ TestHelpers.OPTIONS_GLOBALS = {
     "StaticPopup_Show",
     "YES",
     "NO",
+    "OKAY",
+    "CANCEL",
+    "strtrim",
     "UnitClass",
     "GetSpecialization",
     "GetSpecializationInfo",
@@ -1105,6 +1119,88 @@ function TestHelpers.CollectSettings(fn)
     fn()
     rawset(settings, "RegisterProxySetting", orig)
     return captured
+end
+
+--- Find a button initializer by button text from a layout initializer list.
+--- @param initializers table
+--- @param buttonText string
+--- @return table|nil
+function TestHelpers.FindButtonInitializer(initializers, buttonText)
+    for _, initializer in ipairs(initializers or {}) do
+        if initializer._type == "button" and initializer._buttonText == buttonText then
+            return initializer
+        end
+    end
+    return nil
+end
+
+--- Override StaticPopup_Show to capture the popup key and auto-accept it.
+--- For edit-box dialogs, optionally sets provided text before OnAccept.
+--- @param editText string|nil
+--- @return function getShownPopupName
+function TestHelpers.InstallPopupAutoAccept(editText)
+    local shown
+    _G.StaticPopup_Show = function(name)
+        shown = name
+        local dialog = _G.StaticPopupDialogs and _G.StaticPopupDialogs[name]
+        if not dialog then
+            return
+        end
+
+        if dialog.hasEditBox then
+            local text = ""
+            local editBox = {
+                GetText = function()
+                    return text
+                end,
+                SetText = function(_, value)
+                    text = value
+                end,
+                HighlightText = function() end,
+            }
+            local popupFrame = {
+                EditBox = editBox,
+                editBox = editBox,
+                button1 = {
+                    IsEnabled = function()
+                        return true
+                    end,
+                },
+            }
+
+            if dialog.OnShow then
+                dialog.OnShow(popupFrame)
+            end
+            if editText ~= nil then
+                editBox:SetText(editText)
+            end
+            if dialog.OnAccept then
+                dialog.OnAccept(popupFrame)
+            end
+            return
+        end
+
+        if dialog.OnAccept then
+            dialog.OnAccept()
+        end
+    end
+
+    return function()
+        return shown
+    end
+end
+
+--- Override StaticPopup_Show to record popup keys without auto-accepting them.
+--- @return function getShownPopupNames
+function TestHelpers.InstallPopupRecorder()
+    local shownNames = {}
+    _G.StaticPopup_Show = function(name)
+        shownNames[#shownNames + 1] = name
+    end
+
+    return function()
+        return shownNames
+    end
 end
 
 --- Set up the PowerBar tick marks options/store environment and load the live module.

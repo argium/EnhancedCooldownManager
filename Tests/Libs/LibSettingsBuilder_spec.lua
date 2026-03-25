@@ -633,10 +633,7 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("Button confirm uses isolated dialog registrations per button", function()
-        local shownNames = {}
-        _G.StaticPopup_Show = function(name)
-            shownNames[#shownNames + 1] = name
-        end
+        local getShownNames = TestHelpers.InstallPopupRecorder()
 
         local clicked = {}
         local resetButton = SB.Button({
@@ -656,6 +653,8 @@ describe("LibSettingsBuilder", function()
 
         resetButton._onClick()
         deleteButton._onClick()
+
+    local shownNames = getShownNames()
 
         assert.are.equal(2, #shownNames)
         assert.is_not_equal(shownNames[1], shownNames[2])
