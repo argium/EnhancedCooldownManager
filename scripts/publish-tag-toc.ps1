@@ -123,7 +123,7 @@ if ($ShowReleasePopup) {
     $releasePopupVersionChanged = Set-ReleasePopupVersion -Version $version
     if ($releasePopupVersionChanged) {
         Invoke-Git -Arguments @("add", "ECM_Constants.lua")
-        Invoke-Git -Arguments @("commit", "--amend", "--no-edit")
+        Invoke-Git -Arguments @("commit", "-m", "Set release popup version to $version")
     }
 }
 
