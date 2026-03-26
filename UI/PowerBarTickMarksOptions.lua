@@ -5,6 +5,11 @@
 local _, ns = ...
 local C = ECM.Constants
 local L = ECM.L
+local store = ECM.PowerBarTickMarksStore or {}
+local PowerBarTickMarksOptions = ECM.PowerBarTickMarksOptions or {}
+
+ECM.PowerBarTickMarksStore = store
+ECM.PowerBarTickMarksOptions = PowerBarTickMarksOptions
 
 local function getPowerBarConfig()
     local profile = ns.Addon.db.profile
@@ -31,8 +36,6 @@ local function getTicksConfig()
     }
     return powerBar.ticks
 end
-
-local store = {}
 
 function store.GetCurrentTicks()
     local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
@@ -100,8 +103,6 @@ end
 function store.SetDefaultWidth(width)
     getTicksConfig().defaultWidth = width
 end
-
-ECM.PowerBarTickMarksStore = store
 
 StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ECM.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
 
@@ -462,8 +463,6 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
     end)
 end
 
-ECM.PowerBarTickMarksOptions = {
-    RegisterSettings = function(SB, parentCategory)
-        createTickMarksCanvas(SB, "Tick Marks", parentCategory)
-    end,
-}
+function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
+    createTickMarksCanvas(SB, "Tick Marks", parentCategory)
+end

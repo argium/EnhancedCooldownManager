@@ -15,20 +15,9 @@ end
 local ipairs = ipairs
 local pairs = pairs
 local type = type
+local wipe = wipe
 
 LibEvent.embeds = LibEvent.embeds or {}
-
-local function resolveCallback(target, event, callback)
-    if callback == nil then
-        return target[event]
-    end
-
-    if type(callback) == "string" then
-        return target[callback]
-    end
-
-    return callback
-end
 
 local function getInstance(target)
     local instance = LibEvent.embeds[target]
@@ -37,15 +26,12 @@ local function getInstance(target)
 end
 
 ---Registers a callback for a WoW event on the embedded target.
----If the same callback is already registered for this event, the call is a no-op.
 ---@param event string The event name to register.
----@param callback? string|fun(target: table, event: string, ...: any) The callback function or method name to invoke.
+---@param callback fun(target: table, event: string, ...: any) The callback function to invoke.
 function LibEvent:RegisterEvent(event, callback)
     local instance = getInstance(self)
-    assert(type(event) == "string" and event ~= "", "Usage: RegisterEvent(event, [callback])")
-
-    callback = resolveCallback(self, event, callback)
-    assert(type(callback) == "function", "Callback must resolve to a function")
+    assert(type(event) == "string" and event ~= "", "Usage: RegisterEvent(event, callback)")
+    assert(type(callback) == "function", "Callback must be a function")
 
     local callbacks = instance._events[event]
     if not callbacks then
@@ -65,7 +51,7 @@ end
 
 ---Unregisters a previously registered WoW event callback from the embedded target.
 ---@param event string The event name to unregister.
----@param callback? string|fun(target: table, event: string, ...: any) Specific callback to remove. If omitted, removes all callbacks for the event.
+---@param callback? fun(target: table, event: string, ...: any) Specific callback to remove. If omitted, removes all callbacks for the event.
 function LibEvent:UnregisterEvent(event, callback)
     local instance = getInstance(self)
     local callbacks = instance._events[event]
@@ -79,9 +65,7 @@ function LibEvent:UnregisterEvent(event, callback)
         return
     end
 
-    if type(callback) == "string" then
-        callback = self[callback]
-    end
+    assert(type(callback) == "function", "Callback must be a function")
 
     for i = #callbacks, 1, -1 do
         if callbacks[i] == callback then
@@ -113,32 +97,41 @@ end
 
 ---Resets the event invocation stats for this embedded target.
 function LibEvent:ResetEventStats()
-    getInstance(self)._stats = {}
+    wipe(getInstance(self)._stats)
 end
 
 local function createInstance(target)
     local instance = LibEvent.embeds[target]
     if type(instance) ~= "table" then
-        instance = {}
+        instance = { _events = {}, _stats = {} }
+    else
+        -- Preserve existing events and stats on re-embed (library upgrade)
+        instance._events = instance._events or {}
+        instance._stats = instance._stats or {}
     end
 
     instance.frame = instance.frame or CreateFrame("Frame")
-    instance._events = instance._events or {}
-    instance._stats = {}
 
+    -- Dispatch without snapshot: use index-based iteration that tolerates
+    -- mid-loop unregisters (reverse iteration is not needed because
+    -- unregister shifts elements down — we just re-check the current index).
     instance.frame:SetScript("OnEvent", function(_, event, ...)
-        local callbacks = instance._events[event]
-        if not callbacks then
+        local cbs = instance._events[event]
+        if not cbs then
             return
         end
         instance._stats[event] = (instance._stats[event] or 0) + 1
-        local snapshot = {}
-        for i = 1, #callbacks do
-            snapshot[i] = callbacks[i]
+        instance._dispatching = true
+        local i = 1
+        while i <= #cbs do
+            local cb = cbs[i]
+            cb(target, event, ...)
+            -- Advance only if the callback wasn't removed during dispatch
+            if i <= #cbs and cbs[i] == cb then
+                i = i + 1
+            end
         end
-        for i = 1, #snapshot do
-            snapshot[i](target, event, ...)
-        end
+        instance._dispatching = false
     end)
 
     LibEvent.embeds[target] = instance

@@ -362,7 +362,7 @@ function TestHelpers.SetupSettingsStubs()
     end
 
     _G.StaticPopupDialogs = {}
-    _G.StaticPopup_Show = function(name)
+    _G.StaticPopup_Show = function(name, _text1, _text2, data)
         local dialog = _G.StaticPopupDialogs[name]
         if dialog and dialog.OnAccept then
             if dialog.hasEditBox then
@@ -370,9 +370,9 @@ function TestHelpers.SetupSettingsStubs()
                 local editBox = { GetText = function() return text end, SetText = function(_, t) text = t end, HighlightText = function() end }
                 local self = { editBox = editBox, button1 = { IsEnabled = function() return true end } }
                 if dialog.OnShow then dialog.OnShow(self) end
-                dialog.OnAccept(self)
+                dialog.OnAccept(self, data)
             else
-                dialog.OnAccept()
+                dialog.OnAccept(nil, data)
             end
         end
     end
@@ -1187,7 +1187,7 @@ end
 --- @return function getShownPopupName
 function TestHelpers.InstallPopupAutoAccept(editText)
     local shown
-    _G.StaticPopup_Show = function(name)
+    _G.StaticPopup_Show = function(name, _text1, _text2, data)
         shown = name
         local dialog = _G.StaticPopupDialogs and _G.StaticPopupDialogs[name]
         if not dialog then
@@ -1222,13 +1222,13 @@ function TestHelpers.InstallPopupAutoAccept(editText)
                 editBox:SetText(editText)
             end
             if dialog.OnAccept then
-                dialog.OnAccept(popupFrame)
+                dialog.OnAccept(popupFrame, data)
             end
             return
         end
 
         if dialog.OnAccept then
-            dialog.OnAccept()
+            dialog.OnAccept(nil, data)
         end
     end
 
@@ -1241,7 +1241,7 @@ end
 --- @return function getShownPopupNames
 function TestHelpers.InstallPopupRecorder()
     local shownNames = {}
-    _G.StaticPopup_Show = function(name)
+    _G.StaticPopup_Show = function(name, _text1, _text2, _data)
         shownNames[#shownNames + 1] = name
     end
 

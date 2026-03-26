@@ -937,12 +937,16 @@ function lib:New(config)
             default = spec.getTransform(default)
         end
 
+        if default == nil then
+            default = defaultFallback
+        end
+
         setting = Settings.RegisterProxySetting(
             cat,
             variable,
             varType,
             spec.name,
-            default ~= nil and default or defaultFallback,
+            default,
             getter,
             setter
         )
@@ -1045,8 +1049,9 @@ function lib:New(config)
             frame:EnableMouse(enabled)
         end
         if frame.GetChildren then
-            for _, child in ipairs({ frame:GetChildren() }) do
-                setCanvasInteractive(child, enabled)
+            local children = { frame:GetChildren() }
+            for i = 1, #children do
+                setCanvasInteractive(children[i], enabled)
             end
         end
     end
@@ -1299,7 +1304,9 @@ function lib:New(config)
             default = spec.getTransform(default)
         end
 
-        local varType = type(default) == "number" and Settings.VarType.Number or Settings.VarType.String
+        local varType = spec.varType
+            or (type(default) == "number" and Settings.VarType.Number)
+            or Settings.VarType.String
 
         local setting = makeProxySetting(spec, varType, "", binding)
 
@@ -1663,6 +1670,21 @@ function lib:New(config)
         return initializer
     end
 
+    local CONFIRM_DIALOG_NAME = confirmDialogName
+    StaticPopupDialogs[CONFIRM_DIALOG_NAME] = {
+        text = "%s",
+        button1 = YES,
+        button2 = NO,
+        OnAccept = function(_, data)
+            if data and data.onAccept then
+                data.onAccept()
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+
     function SB.Button(spec)
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
 
@@ -1670,19 +1692,8 @@ function lib:New(config)
         if spec.confirm then
             local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
             local originalClick = onClick
-            lib._nextConfirmDialogId = (lib._nextConfirmDialogId or 0) + 1
-            local dialogName = confirmDialogName .. "_" .. lib._nextConfirmDialogId
             onClick = function()
-                StaticPopupDialogs[dialogName] = {
-                    text = confirmText,
-                    button1 = YES,
-                    button2 = NO,
-                    OnAccept = originalClick,
-                    timeout = 0,
-                    whileDead = true,
-                    hideOnEscape = true,
-                }
-                StaticPopup_Show(dialogName)
+                StaticPopup_Show(CONFIRM_DIALOG_NAME, confirmText, nil, { onAccept = originalClick })
             end
         end
 
@@ -1707,7 +1718,7 @@ function lib:New(config)
         description = "subheader",
     }
 
-    local SPEC_EXCLUDE = { type = true, order = true, _key = true, defs = true, label = true, condition = true }
+    local SPEC_EXCLUDE = { type = true, order = true, defs = true, label = true, condition = true }
 
     -- Composite type dispatch: returns init, setting from a composite builder
     local COMPOSITE_DISPATCH = {
@@ -1760,19 +1771,24 @@ function lib:New(config)
             return
         end
 
-        -- Sort entries by order field
+        -- Sort entries by order field (stable: secondary key breaks ties)
         local sorted = {}
         for key, entry in pairs(tbl.args) do
-            entry._key = key
-            sorted[#sorted + 1] = entry
+            sorted[#sorted + 1] = { key = key, entry = entry }
         end
         table.sort(sorted, function(a, b)
-            return (a.order or 100) < (b.order or 100)
+            local oa, ob = a.entry.order or 100, b.entry.order or 100
+            if oa ~= ob then
+                return oa < ob
+            end
+            return a.key < b.key
         end)
 
         local created = {}
 
-        for _, entry in ipairs(sorted) do
+        for _, item in ipairs(sorted) do
+            local entryKey = item.key
+            local entry = item.entry
             local entryType = TYPE_ALIASES[entry.type] or entry.type
 
             -- Evaluate condition (skip entry if false)
@@ -1804,18 +1820,17 @@ function lib:New(config)
                 -- Resolve parent string references
                 if type(spec.parent) == "string" then
                     local ref = created[spec.parent]
-                    if ref then
-                        spec.parent = ref.initializer
-                        if spec.parentCheck == "checked" then
-                            local s = ref.setting
-                            spec.parentCheck = function()
-                                return s:GetValue()
-                            end
-                        elseif spec.parentCheck == "notChecked" then
-                            local s = ref.setting
-                            spec.parentCheck = function()
-                                return not s:GetValue()
-                            end
+                    assert(ref, "RegisterFromTable: parent '" .. spec.parent .. "' not found (misspelled or forward-referenced?)")
+                    spec.parent = ref.initializer
+                    if spec.parentCheck == "checked" then
+                        local s = ref.setting
+                        spec.parentCheck = function()
+                            return s:GetValue()
+                        end
+                    elseif spec.parentCheck == "notChecked" then
+                        local s = ref.setting
+                        spec.parentCheck = function()
+                            return not s:GetValue()
                         end
                     end
                 end
@@ -1863,13 +1878,13 @@ function lib:New(config)
                     end
                     -- Handler mode: fall back to entry key as spec.key if not set
                     if spec.get and not spec.key then
-                        spec.key = entry._key
+                        spec.key = entryKey
                     end
                     spec.type = entryType
                     init, setting = SB.Control(spec)
                 end
 
-                created[entry._key] = { initializer = init, setting = setting }
+                created[entryKey] = { initializer = init, setting = setting }
             end
         end
     end

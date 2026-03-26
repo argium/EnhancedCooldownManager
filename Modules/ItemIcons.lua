@@ -464,10 +464,10 @@ function ItemIcons:OnEnable()
     self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
-    self:RegisterEvent("BAG_UPDATE_COOLDOWN", "OnBagUpdateCooldown") -- very noisy but required for cooldown updates on bag items
-    self:RegisterEvent("BAG_UPDATE_DELAYED", "OnBagUpdateDelayed")
-    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnPlayerEquipmentChanged")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerEnteringWorld")
+    self:RegisterEvent("BAG_UPDATE_COOLDOWN", function(...) self:OnBagUpdateCooldown(...) end) -- very noisy but required for cooldown updates on bag items
+    self:RegisterEvent("BAG_UPDATE_DELAYED", function(...) self:OnBagUpdateDelayed(...) end)
+    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function(...) self:OnPlayerEquipmentChanged(...) end)
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", function(...) self:OnPlayerEnteringWorld(...) end)
 
     -- Hook the utility viewer after a short delay to ensure Blizzard frames are loaded
     C_Timer.After(0.1, function()

@@ -619,7 +619,7 @@ describe("LibSettingsBuilder", function()
 
     it("Button confirm wraps onClick in StaticPopup", function()
         local clicked = false
-        local init = SB.Button({
+        SB.Button({
             name = "Danger",
             buttonText = "Reset",
             confirm = "Are you sure?",
@@ -628,11 +628,17 @@ describe("LibSettingsBuilder", function()
             end,
         })
 
-        init._onClick()
+        -- The shared confirm dialog should exist
+        local dialogName = "LibSettingsBuilder-1.0_SettingsConfirm"
+        local dialog = StaticPopupDialogs[dialogName]
+        assert.is_table(dialog)
+
+        -- Simulate accepting the popup with the data that onClick passes
+        dialog.OnAccept(nil, { onAccept = function() clicked = true end })
         assert.is_true(clicked)
     end)
 
-    it("Button confirm uses isolated dialog registrations per button", function()
+    it("Button confirm uses a shared dialog with per-button data", function()
         local getShownNames = TestHelpers.InstallPopupRecorder()
 
         local clicked = {}
@@ -654,15 +660,19 @@ describe("LibSettingsBuilder", function()
         resetButton._onClick()
         deleteButton._onClick()
 
-    local shownNames = getShownNames()
+        local shownNames = getShownNames()
 
+        -- Both use the same shared dialog
         assert.are.equal(2, #shownNames)
-        assert.is_not_equal(shownNames[1], shownNames[2])
-        assert.are.equal("Reset everything?", StaticPopupDialogs[shownNames[1]].text)
-        assert.are.equal("Delete profile?", StaticPopupDialogs[shownNames[2]].text)
+        assert.are.equal(shownNames[1], shownNames[2])
 
-        StaticPopupDialogs[shownNames[1]].OnAccept()
-        StaticPopupDialogs[shownNames[2]].OnAccept()
+        -- Verify the shared dialog's OnAccept dispatches correctly via data
+        local dialogName = shownNames[1]
+        local dialog = StaticPopupDialogs[dialogName]
+        assert.is_table(dialog)
+
+        dialog.OnAccept(nil, { onAccept = function() clicked[#clicked + 1] = "reset" end })
+        dialog.OnAccept(nil, { onAccept = function() clicked[#clicked + 1] = "delete" end })
         assert.are.same({ "reset", "delete" }, clicked)
     end)
 

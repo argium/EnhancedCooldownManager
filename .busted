@@ -6,9 +6,6 @@ return {
         coverage = true,
     },
     libsettingsbuilder = {
-        pattern = "LibSettingsBuilder_spec%.lua$",
-    },
-    ecm = {
-        exclude_pattern = "LibSettingsBuilder_spec%.lua$",
+        ROOT = { "Libs/LibSettingsBuilder/Tests" },
     },
 }

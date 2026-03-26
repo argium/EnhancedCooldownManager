@@ -15,6 +15,7 @@ describe("LibEvent", function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "CreateFrame",
             "LibStub",
+            "wipe",
         })
     end)
 
@@ -28,7 +29,10 @@ describe("LibEvent", function()
 
         TestHelpers.SetupLibStub()
 
-        _G.CreateFrame = function(_, name)
+        -- wipe is a WoW Lua 5.1 built-in not available in busted's Lua 5.3+
+        _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
+
+        _G.CreateFrame= function(_, name)
             createFrameCalls = createFrameCalls + 1
             local frame = {
                 name = name,
@@ -91,7 +95,7 @@ describe("LibEvent", function()
         assert.are.equal(createdFrames[2], LibEvent.embeds[second].frame)
     end)
 
-    it("dispatches to the default event-named method", function()
+    it("dispatches to an explicit event-named callback", function()
         local calls = {}
         local target = {
             TEST_EVENT = function(self, event, arg1, arg2)
@@ -100,7 +104,7 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT", "a", "b")
 
         assert.are.equal(1, #calls)
@@ -110,7 +114,7 @@ describe("LibEvent", function()
         assert.are.equal("b", calls[1].arg2)
     end)
 
-    it("dispatches to an explicitly named method", function()
+    it("dispatches to a function reference callback", function()
         local calls = {}
         local target = {
             HandleEvent = function(self, event, arg1)
@@ -119,7 +123,7 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "HandleEvent")
+        target:RegisterEvent("TEST_EVENT", target.HandleEvent)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT", 42)
 
         assert.are.equal(1, #calls)
@@ -150,8 +154,8 @@ describe("LibEvent", function()
         LibEvent:Embed(first)
         LibEvent:Embed(second)
 
-        first:RegisterEvent("TEST_EVENT")
-        second:RegisterEvent("TEST_EVENT")
+        first:RegisterEvent("TEST_EVENT", first.TEST_EVENT)
+        second:RegisterEvent("TEST_EVENT", second.TEST_EVENT)
 
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[first].frame.registeredEvents)
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[second].frame.registeredEvents)
@@ -173,8 +177,8 @@ describe("LibEvent", function()
         LibEvent:Embed(first)
         LibEvent:Embed(second)
 
-        first:RegisterEvent("TEST_EVENT")
-        second:RegisterEvent("TEST_EVENT")
+        first:RegisterEvent("TEST_EVENT", first.TEST_EVENT)
+        second:RegisterEvent("TEST_EVENT", second.TEST_EVENT)
         first:UnregisterEvent("TEST_EVENT")
         LibEvent.embeds[first].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
@@ -189,7 +193,7 @@ describe("LibEvent", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
         target:UnregisterEvent("TEST_EVENT")
 
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.unregisteredEvents)
@@ -202,8 +206,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT")
-        target:RegisterEvent("OTHER_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
+        target:RegisterEvent("OTHER_EVENT", target.OTHER_EVENT)
         target:UnregisterAllEvents()
 
         local instance = LibEvent.embeds[target]
@@ -215,7 +219,7 @@ describe("LibEvent", function()
     it("cleans up via OnEmbedDisable", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
-        target:RegisterEvent("TEST_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
 
         LibEvent:OnEmbedDisable(target)
 
@@ -236,8 +240,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "First")
-        target:RegisterEvent("TEST_EVENT", "Second")
+        target:RegisterEvent("TEST_EVENT", target.First)
+        target:RegisterEvent("TEST_EVENT", target.Second)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.registeredEvents)
@@ -254,8 +258,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "Handler")
-        target:RegisterEvent("TEST_EVENT", "Handler")
+        target:RegisterEvent("TEST_EVENT", target.Handler)
+        target:RegisterEvent("TEST_EVENT", target.Handler)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
         assert.are.equal(1, calls)
@@ -274,9 +278,9 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "First")
-        target:RegisterEvent("TEST_EVENT", "Second")
-        target:UnregisterEvent("TEST_EVENT", "First")
+        target:RegisterEvent("TEST_EVENT", target.First)
+        target:RegisterEvent("TEST_EVENT", target.Second)
+        target:UnregisterEvent("TEST_EVENT", target.First)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
         assert.are.equal(0, firstCalls)
@@ -290,8 +294,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "Handler")
-        target:UnregisterEvent("TEST_EVENT", "Handler")
+        target:RegisterEvent("TEST_EVENT", target.Handler)
+        target:UnregisterEvent("TEST_EVENT", target.Handler)
 
         assert.same({ "TEST_EVENT" }, LibEvent.embeds[target].frame.unregisteredEvents)
         assert.is_nil(LibEvent.embeds[target]._events.TEST_EVENT)
@@ -310,8 +314,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT", "First")
-        target:RegisterEvent("TEST_EVENT", "Second")
+        target:RegisterEvent("TEST_EVENT", target.First)
+        target:RegisterEvent("TEST_EVENT", target.Second)
         target:UnregisterEvent("TEST_EVENT")
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
@@ -357,7 +361,7 @@ describe("LibEvent", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
@@ -372,8 +376,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("EVENT_A")
-        target:RegisterEvent("EVENT_B")
+        target:RegisterEvent("EVENT_A", target.EVENT_A)
+        target:RegisterEvent("EVENT_B", target.EVENT_B)
         LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
         LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
         LibEvent.embeds[target].frame.onEvent(nil, "EVENT_B")
@@ -388,8 +392,8 @@ describe("LibEvent", function()
         LibEvent:Embed(first)
         LibEvent:Embed(second)
 
-        first:RegisterEvent("TEST_EVENT")
-        second:RegisterEvent("TEST_EVENT")
+        first:RegisterEvent("TEST_EVENT", first.TEST_EVENT)
+        second:RegisterEvent("TEST_EVENT", second.TEST_EVENT)
         LibEvent.embeds[first].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
@@ -402,7 +406,7 @@ describe("LibEvent", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("TEST_EVENT")
+        target:RegisterEvent("TEST_EVENT", target.TEST_EVENT)
         LibEvent.embeds[target].frame.onEvent(nil, "TEST_EVENT")
 
         local stats = target:GetEventStats()
@@ -417,8 +421,8 @@ describe("LibEvent", function()
         }
         LibEvent:Embed(target)
 
-        target:RegisterEvent("EVENT_A")
-        target:RegisterEvent("EVENT_B")
+        target:RegisterEvent("EVENT_A", target.EVENT_A)
+        target:RegisterEvent("EVENT_B", target.EVENT_B)
         LibEvent.embeds[target].frame.onEvent(nil, "EVENT_A")
         LibEvent.embeds[target].frame.onEvent(nil, "EVENT_B")
 
@@ -433,8 +437,8 @@ describe("LibEvent", function()
         LibEvent:Embed(first)
         LibEvent:Embed(second)
 
-        first:RegisterEvent("TEST_EVENT")
-        second:RegisterEvent("TEST_EVENT")
+        first:RegisterEvent("TEST_EVENT", first.TEST_EVENT)
+        second:RegisterEvent("TEST_EVENT", second.TEST_EVENT)
         LibEvent.embeds[first].frame.onEvent(nil, "TEST_EVENT")
         LibEvent.embeds[second].frame.onEvent(nil, "TEST_EVENT")
 

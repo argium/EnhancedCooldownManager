@@ -24,9 +24,14 @@
 # Run tests
 busted Tests
 
+# Run LibSettingsBuilder tests only
+busted --run libsettingsbuilder
+
 # Lint
 luacheck . -q
 ```
+
+- Changes to `Libs/LibSettingsBuilder/` MUST also run `busted --run libsettingsbuilder` and verify all tests pass.
 
 <CopyrightHeader>
 -- Enhanced Cooldown Manager addon for World of Warcraft
