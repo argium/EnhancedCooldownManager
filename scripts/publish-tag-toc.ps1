@@ -109,14 +109,22 @@ function Set-ReleasePopupVersion {
     }
 
     $newContent = $content -replace $pattern, "`${1}$Version`${2}"
+    if ($newContent -eq $content) {
+        Write-Host "RELEASE_POPUP_VERSION is already '$Version' in $ConstantsPath"
+        return $false
+    }
+
     Set-Content -LiteralPath $ConstantsPath -Value $newContent -NoNewline
     Write-Host "Updated RELEASE_POPUP_VERSION to '$Version' in $ConstantsPath"
+    return $true
 }
 
 if ($ShowReleasePopup) {
-    Set-ReleasePopupVersion -Version $version
-    Invoke-Git -Arguments @("add", "ECM_Constants.lua")
-    Invoke-Git -Arguments @("commit", "--amend", "--no-edit")
+    $releasePopupVersionChanged = Set-ReleasePopupVersion -Version $version
+    if ($releasePopupVersionChanged) {
+        Invoke-Git -Arguments @("add", "ECM_Constants.lua")
+        Invoke-Git -Arguments @("commit", "--amend", "--no-edit")
+    }
 }
 
 Invoke-Git -Arguments @("rev-parse", "--is-inside-work-tree")
