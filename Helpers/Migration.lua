@@ -1033,8 +1033,8 @@ end
 _migrations[11] = function(profile)
     local layoutName = resolveActiveLayoutName()
     if not layoutName then
-        log("V11 active layout unavailable; deferring migration")
-        return false
+        log("V11 active layout unavailable; skipping position migration")
+        return
     end
 
     for _, section in ipairs({ "powerBar", "resourceBar", "runeBar", "buffBars" }) do
@@ -1127,9 +1127,6 @@ _migrations[11] = function(profile)
 end
 
 --- Runs all schema migrations on a profile from its current version to CURRENT_SCHEMA_VERSION.
---- Iterates through registered migration steps in order. A step returning
---- false defers the migration chain (e.g. when a required resource is
---- unavailable), preserving progress up to that point.
 ---@param profile table The profile to migrate
 function Migration.Run(profile)
     if not profile.schemaVersion then
@@ -1142,11 +1139,7 @@ function Migration.Run(profile)
     for version = startVersion + 1, ECM.Constants.CURRENT_SCHEMA_VERSION do
         local step = _migrations[version]
         if step then
-            local result = step(profile)
-            if result == false then
-                log("Migration deferred at V" .. version)
-                break
-            end
+            step(profile)
             profile.schemaVersion = version
             log("Migrated to V" .. version)
         end

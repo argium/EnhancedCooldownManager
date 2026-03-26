@@ -911,7 +911,7 @@ describe("Migration", function()
         assert.same({ point = "CENTER", x = 0, y = -275 }, profile.powerBar.editModePositions.Modern)
     end)
 
-    it("V11 leaves the schema unchanged when the active layout name cannot be resolved", function()
+    it("V11 advances schema even when the active layout name cannot be resolved", function()
         ECM.EditMode.GetActiveLayoutName = function()
             return nil
         end
@@ -926,10 +926,10 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(10, profile.schemaVersion)
+        assert.are.equal(11, profile.schemaVersion)
         assert.is_nil(profile.powerBar.editModePositions)
         assert.are.equal(-275, profile.powerBar.offsetY)
-        assert.is_not_nil(searchLogMessages("V11 active layout unavailable; deferring migration"))
+        assert.is_not_nil(searchLogMessages("V11 active layout unavailable; skipping position migration"))
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

@@ -624,21 +624,6 @@ describe("ECM layout system", function()
 
             ECM.Migration.Run = origRun
         end)
-
-        it("OnEnable retries migration when initialization left the profile on an older schema", function()
-            local migrationProfiles = {}
-            local origRun = ECM.Migration.Run
-            ECM.Migration.Run = function(profile)
-                migrationProfiles[#migrationProfiles + 1] = profile
-            end
-
-            _G._testDB.profile.schemaVersion = 10
-            fakeAddon:OnEnable()
-
-            assert.same({ _G._testDB.profile }, migrationProfiles)
-
-            ECM.Migration.Run = origRun
-        end)
     end)
 
     describe("initialization wiring", function()
