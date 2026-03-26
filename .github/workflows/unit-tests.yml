@@ -41,10 +41,10 @@ jobs:
                   mkdir -p test-results
                   rm -f luacov.stats.out luacov.report.out luacov.report.html
                   busted -r coverage Tests --output=junit > test-results/busted-junit.xml
-                  busted --run libsettingsbuilder --output=junit > test-results/lsb-junit.xml
-                  busted --run libconsole --output=junit > test-results/libconsole-junit.xml
-                  busted --run libevent --output=junit > test-results/libevent-junit.xml
-                  busted --run liblsmsettingswidgets --output=junit > test-results/liblsm-junit.xml
+                  busted -r coverage --run libsettingsbuilder --output=junit > test-results/lsb-junit.xml
+                  busted -r coverage --run libconsole --output=junit > test-results/libconsole-junit.xml
+                  busted -r coverage --run libevent --output=junit > test-results/libevent-junit.xml
+                  busted -r coverage --run liblsmsettingswidgets --output=junit > test-results/liblsm-junit.xml
                   luacov
                   luacov --config .luacov-html
                   mv luacov.report.out test-results/luacov.report.out
