@@ -93,88 +93,54 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
     iconFrame.__ecmSquareStyled = true
 end
 
---- Applies all sizing, styling, visibility, and anchoring to a single buff bar
---- child frame. Lazy setters ensure no-ops when values haven't changed.
----@param frame ECM_BuffBarMixin
----@param config table Module config
----@param globalConfig table Global config
----@param barIndex number Index of the bar (for logging)
----@param retryCount number|nil Number of times this function has been retried
-local function styleChildFrame(module, frame, config, globalConfig, barIndex, retryCount)
-    if not (frame and frame.__ecmHooked) then
-        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
+local function styleBarHeight(frame, bar, iconFrame, config, globalConfig)
+    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
+    if height <= 0 then
+        return
+    end
+    FrameUtil.LazySetHeight(frame, height)
+    FrameUtil.LazySetHeight(bar, height)
+    if iconFrame then
+        FrameUtil.LazySetHeight(iconFrame, height)
+        FrameUtil.LazySetWidth(iconFrame, height)
+    end
+end
+
+local function styleBarBackground(frame, barBG, config, globalConfig)
+    if not barBG then
         return
     end
 
-    retryCount = retryCount or 0
-    local bar = frame.Bar
-    local iconFrame = frame.Icon
-    local barBG = FrameUtil.GetBarBackground(bar)
-
-    -- frame
-    --  - Bar
-    --     - Name
-    --     - Duration
-    --     - Pip
-    --     - BarBG
-    --  - Icon
-    --    - Applications
-    --  - DebuffBorder
-
-    --------------------------------------------------------------------------
-    -- Heights
-    --------------------------------------------------------------------------
-    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
-    if height > 0 then
-        FrameUtil.LazySetHeight(frame, height)
-        FrameUtil.LazySetHeight(bar, height)
-        if iconFrame then
-            FrameUtil.LazySetHeight(iconFrame, height)
-            FrameUtil.LazySetWidth(iconFrame, height)
-        end
+    -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
+    -- so Blizzard cannot override our anchors. SetAllPoints does not fire
+    -- SetPoint hooks, so no re-entrancy guard is needed.
+    if not barBG.__ecmBGHooked then
+        barBG.__ecmBGHooked = true
+        barBG:SetParent(frame)
+        hooksecurefunc(barBG, "SetPoint", function()
+            barBG:ClearAllPoints()
+            barBG:SetAllPoints(frame)
+        end)
     end
 
-    --------------------------------------------------------------------------
-    -- Pip — always hidden
-    --------------------------------------------------------------------------
-    bar.Pip:Hide()
-    bar.Pip:SetTexture(nil)
+    local bgColor = (config and config.bgColor)
+        or (globalConfig and globalConfig.barBgColor)
+        or ECM.Constants.COLOR_BLACK
+    barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
+    barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
+    barBG:ClearAllPoints()
+    barBG:SetAllPoints(frame)
+    barBG:SetDrawLayer("BACKGROUND", 0)
+end
 
-    --------------------------------------------------------------------------
-    -- Bar background (BarBG texture)
-    --------------------------------------------------------------------------
-    if barBG then
-        -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
-        -- so Blizzard cannot override our anchors. SetAllPoints does not fire
-        -- SetPoint hooks, so no re-entrancy guard is needed.
-        if not barBG.__ecmBGHooked then
-            barBG.__ecmBGHooked = true
-            barBG:SetParent(frame)
-            hooksecurefunc(barBG, "SetPoint", function()
-                barBG:ClearAllPoints()
-                barBG:SetAllPoints(frame)
-            end)
-        end
-
-        local bgColor = (config and config.bgColor)
-            or (globalConfig and globalConfig.barBgColor)
-            or ECM.Constants.COLOR_BLACK
-        barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
-        barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
-        barBG:ClearAllPoints()
-        barBG:SetAllPoints(frame)
-        barBG:SetDrawLayer("BACKGROUND", 0)
-    end
-
-    --------------------------------------------------------------------------
-    -- StatusBar texture & color
-    --------------------------------------------------------------------------
+--- Resolves the spell color for a bar, handling secret values with retry.
+--- Returns true if the module's _editLocked flag was set by this call.
+local function styleBarColor(module, frame, bar, globalConfig, retryCount)
     local textureName = globalConfig and globalConfig.texture
-    local texture = ECM.GetTexture(textureName)
-    FrameUtil.LazySetStatusBarTexture(bar, texture)
+    FrameUtil.LazySetStatusBarTexture(bar, ECM.GetTexture(textureName))
 
     local barColor = ECM.SpellColors.GetColorForBar(frame)
-    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()
+    local spellName = bar.Name and bar.Name.GetText and bar.Name:GetText()
     local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
     local cooldownID = frame.cooldownID
     local textureFileID = FrameUtil.GetIconTextureFileID(frame)
@@ -192,12 +158,12 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
-                styleChildFrame(module, frame, config, globalConfig, barIndex, retryCount + 1)
+                styleBarColor(module, frame, bar, globalConfig, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
-            barColor = nil
+            return
         elseif ECM.IsDebugEnabled() and not module._warned then
             ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             module._warned = true
@@ -210,27 +176,15 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
+end
 
-    --------------------------------------------------------------------------
-    -- Fonts (before visibility/positioning — font changes affect layout)
-    --------------------------------------------------------------------------
-    ECM.ApplyFont(bar.Name, globalConfig, config)
-    ECM.ApplyFont(bar.Duration, globalConfig, config)
+local function styleBarIcon(frame, iconFrame, config)
+    local showIcon = config and config.showIcon ~= false
 
-    --------------------------------------------------------------------------
-    -- Icon anchor
-    --------------------------------------------------------------------------
     if iconFrame then
         FrameUtil.LazySetAnchors(iconFrame, {
             { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
         })
-    end
-
-    --------------------------------------------------------------------------
-    -- Visibility — icon, name, duration, debuff border, applications
-    --------------------------------------------------------------------------
-    local showIcon = config and config.showIcon ~= false
-    if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
         applySquareIconStyle(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
@@ -244,10 +198,12 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
         FrameUtil.LazySetAlpha(frame.DebuffBorder, 0)
         frame.DebuffBorder:Hide()
     end
-    if iconFrame.Applications then
+    if iconFrame and iconFrame.Applications then
         FrameUtil.LazySetAlpha(iconFrame.Applications, showIcon and 1 or 0)
     end
+end
 
+local function styleBarAnchors(frame, bar, iconFrame, config)
     local showSpellName = config and config.showSpellName ~= false
     local showDuration = config and config.showDuration ~= false
     if bar.Name then
@@ -257,25 +213,14 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
         bar.Duration:SetShown(showDuration)
     end
 
-    --------------------------------------------------------------------------
-    -- Bar anchors (relative to icon visibility)
-    --------------------------------------------------------------------------
     local iconVisible = iconFrame and iconFrame:IsShown()
-    if iconVisible then
-        FrameUtil.LazySetAnchors(bar, {
-            { "TOPLEFT", iconFrame, "TOPRIGHT", 0, 0 },
-            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
-        })
-    else
-        FrameUtil.LazySetAnchors(bar, {
-            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
-            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
-        })
-    end
+    local barLeftAnchor = iconVisible and iconFrame or frame
+    local barLeftPoint = iconVisible and "TOPRIGHT" or "TOPLEFT"
+    FrameUtil.LazySetAnchors(bar, {
+        { "TOPLEFT", barLeftAnchor, barLeftPoint, 0, 0 },
+        { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+    })
 
-    --------------------------------------------------------------------------
-    -- Name
-    --------------------------------------------------------------------------
     FrameUtil.LazySetAnchors(bar.Name, {
         { "LEFT", bar, "LEFT", ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
@@ -286,6 +231,32 @@ local function styleChildFrame(module, frame, config, globalConfig, barIndex, re
             { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         })
     end
+end
+
+--- Applies all sizing, styling, visibility, and anchoring to a single buff bar
+--- child frame. Lazy setters ensure no-ops when values haven't changed.
+local function styleChildFrame(module, frame, config, globalConfig)
+    if not (frame and frame.__ecmHooked) then
+        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
+        return
+    end
+
+    local bar = frame.Bar
+    local iconFrame = frame.Icon
+
+    styleBarHeight(frame, bar, iconFrame, config, globalConfig)
+
+    bar.Pip:Hide()
+    bar.Pip:SetTexture(nil)
+
+    styleBarBackground(frame, FrameUtil.GetBarBackground(bar), config, globalConfig)
+    styleBarColor(module, frame, bar, globalConfig, 0)
+
+    ECM.ApplyFont(bar.Name, globalConfig, config)
+    ECM.ApplyFont(bar.Duration, globalConfig, config)
+
+    styleBarIcon(frame, iconFrame, config)
+    styleBarAnchors(frame, bar, iconFrame, config)
 end
 
 local function hookChildFrame(child, module)
@@ -307,7 +278,7 @@ local function hookChildFrame(child, module)
         if cached then
             FrameUtil.LazySetAnchors(child, cached)
         end
-        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
@@ -317,7 +288,7 @@ local function hookChildFrame(child, module)
             return
         end
         module._layoutRunning = true
-        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
@@ -478,9 +449,9 @@ function BuffBars:UpdateLayout(why)
     self._warned = false
     self._editLocked = false
     local ok, err = pcall(function()
-        for barIndex, entry in ipairs(visibleChildren) do
+        for _, entry in ipairs(visibleChildren) do
             hookChildFrame(entry.frame, self)
-            styleChildFrame(self, entry.frame, cfg, globalConfig, barIndex)
+            styleChildFrame(self, entry.frame, cfg, globalConfig)
         end
 
         layoutBars(viewer, growsUp, verticalSpacing)
