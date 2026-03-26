@@ -958,4 +958,172 @@ describe("BuffBars real source", function()
         -- DebugAssert was called with a failure condition
         assert.is_false(assertedCondition)
     end)
+
+    -- Helper: runs a single child through UpdateLayout and returns it styled.
+    local function layoutSingleChild(child, moduleConfig, globalConfig)
+        stubChildLayoutEnvironment()
+        ECM.SpellColors.DiscoverBar = function() end
+        function BuffBarCooldownViewer:GetChildren() return child end
+        function BuffBars:ShouldShow() return true end
+        function BuffBars:GetGlobalConfig() return globalConfig end
+        function BuffBars:GetModuleConfig() return moduleConfig end
+        BuffBars:UpdateLayout("test")
+    end
+
+    local function defaultGlobal(overrides)
+        local g = { texture = "Solid", barHeight = 18, barBgColor = { r = 0, g = 0, b = 0, a = 0.8 } }
+        if overrides then for k, v in pairs(overrides) do g[k] = v end end
+        return g
+    end
+
+    local function defaultModule(overrides)
+        local m = {
+            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            showIcon = true, showSpellName = true, showDuration = true,
+        }
+        if overrides then for k, v in pairs(overrides) do m[k] = v end end
+        return m
+    end
+
+    describe("styleBarHeight", function()
+        it("propagates height to frame, bar, and icon", function()
+            local child = makeStyledChild("H", true, 1)
+            layoutSingleChild(child, defaultModule(), defaultGlobal({ barHeight = 24 }))
+
+            assert.are.equal(24, child.__height)
+            assert.are.equal(24, child.Bar.__height)
+            assert.are.equal(24, child.Icon.__height)
+            assert.are.equal(24, child.Icon.__width)
+        end)
+
+        it("uses module config height when provided", function()
+            local child = makeStyledChild("H", true, 1)
+            layoutSingleChild(child, defaultModule({ height = 30 }), defaultGlobal({ barHeight = 18 }))
+
+            assert.are.equal(30, child.__height)
+        end)
+    end)
+
+    describe("styleBarBackground", function()
+        it("applies background color and texture", function()
+            local bgRegion = {
+                SetParent = function() end,
+                SetPoint = function() end,
+                SetTexture = function(self, t) self.__texture = t end,
+                SetVertexColor = function(self, r, g, b, a) self.__vcolor = { r, g, b, a } end,
+                ClearAllPoints = function() end,
+                SetAllPoints = function() end,
+                SetDrawLayer = function(self, layer, sub) self.__drawLayer = { layer, sub } end,
+            }
+
+            local child = makeStyledChild("BG", true, 1)
+            local bgColor = { r = 0.1, g = 0.2, b = 0.3, a = 0.5 }
+            stubChildLayoutEnvironment()
+            ECM.SpellColors.DiscoverBar = function() end
+            ECM.FrameUtil.GetBarBackground = function() return bgRegion end
+            function BuffBarCooldownViewer:GetChildren() return child end
+            function BuffBars:ShouldShow() return true end
+            function BuffBars:GetGlobalConfig() return defaultGlobal() end
+            function BuffBars:GetModuleConfig() return defaultModule({ bgColor = bgColor }) end
+            BuffBars:UpdateLayout("test")
+
+            assert.are.equal(ECM.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
+            assert.same({ 0.1, 0.2, 0.3, 0.5 }, bgRegion.__vcolor)
+            assert.same({ "BACKGROUND", 0 }, bgRegion.__drawLayer)
+        end)
+    end)
+
+    describe("styleBarColor", function()
+        it("applies spell color to the status bar", function()
+            local appliedColor
+            local child = makeStyledChild("C", true, 1)
+            stubChildLayoutEnvironment()
+            ECM.SpellColors.DiscoverBar = function() end
+            ECM.FrameUtil.LazySetStatusBarColor = function(_, r, g, b, a)
+                appliedColor = { r, g, b, a }
+            end
+            function BuffBarCooldownViewer:GetChildren() return child end
+            function BuffBars:ShouldShow() return true end
+            function BuffBars:GetGlobalConfig() return defaultGlobal() end
+            function BuffBars:GetModuleConfig() return defaultModule() end
+            BuffBars:UpdateLayout("test")
+
+            assert.is_not_nil(appliedColor)
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, appliedColor)
+        end)
+
+        it("schedules retry when all identifiers are secret", function()
+            local child = makeStyledChild("S", true, 1)
+            _G.issecretvalue = function() return true end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal())
+
+            assert.are.equal(1, #timerCallbacks, "expected one retry timer")
+        end)
+    end)
+
+    describe("styleBarIcon", function()
+        it("hides icon when showIcon is false", function()
+            local child = makeStyledChild("I", true, 1)
+            layoutSingleChild(child, defaultModule({ showIcon = false }), defaultGlobal())
+
+            assert.is_false(child.Icon.__shown)
+        end)
+
+        it("shows icon when showIcon is true", function()
+            local child = makeStyledChild("I", true, 1)
+            layoutSingleChild(child, defaultModule({ showIcon = true }), defaultGlobal())
+
+            assert.is_true(child.Icon.__shown)
+        end)
+
+        it("hides DebuffBorder with zero alpha", function()
+            local child = makeStyledChild("I", true, 1)
+            child.DebuffBorder = makeFrame({ shown = true })
+            child.DebuffBorder.Hide = function(self) self.__hidden = true end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal())
+
+            assert.are.equal(0, child.DebuffBorder.__alpha)
+        end)
+    end)
+
+    describe("styleBarAnchors", function()
+        it("anchors bar to icon right edge when icon is visible", function()
+            local child = makeStyledChild("A", true, 1)
+            child.Icon.__shown = true
+            child.Icon.IsShown = function() return true end
+
+            layoutSingleChild(child, defaultModule({ showIcon = true }), defaultGlobal())
+
+            local barAnchors = child.Bar.__anchors
+            assert.is_not_nil(barAnchors)
+            assert.are.equal("TOPRIGHT", barAnchors[1][3])
+            assert.are.equal(child.Icon, barAnchors[1][2])
+        end)
+
+        it("anchors bar to frame left edge when icon is hidden", function()
+            local child = makeStyledChild("A", true, 1)
+            layoutSingleChild(child, defaultModule({ showIcon = false }), defaultGlobal())
+
+            local barAnchors = child.Bar.__anchors
+            assert.is_not_nil(barAnchors)
+            assert.are.equal("TOPLEFT", barAnchors[1][3])
+            assert.are.equal(child, barAnchors[1][2])
+        end)
+
+        it("hides spell name when showSpellName is false", function()
+            local child = makeStyledChild("A", true, 1)
+            layoutSingleChild(child, defaultModule({ showSpellName = false }), defaultGlobal())
+
+            assert.is_false(child.Bar.Name.__shown)
+        end)
+
+        it("hides duration when showDuration is false", function()
+            local child = makeStyledChild("A", true, 1)
+            layoutSingleChild(child, defaultModule({ showDuration = false }), defaultGlobal())
+
+            assert.is_false(child.Bar.Duration.__shown)
+        end)
+    end)
 end)

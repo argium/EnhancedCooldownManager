@@ -4,6 +4,7 @@ ignore:
   - Tests
   - TODO.md
   - docs
+  - '**/Tests'
   - '*.code-workspace'
   - '*.rockspec'
   - package

@@ -8,4 +8,13 @@ return {
     libsettingsbuilder = {
         ROOT = { "Libs/LibSettingsBuilder/Tests" },
     },
+    libconsole = {
+        ROOT = { "Libs/LibConsole/Tests" },
+    },
+    libevent = {
+        ROOT = { "Libs/LibEvent/Tests" },
+    },
+    liblsmsettingswidgets = {
+        ROOT = { "Libs/LibLSMSettingsWidgets/Tests" },
+    },
 }
