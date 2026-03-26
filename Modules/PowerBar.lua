@@ -118,7 +118,7 @@ end
 function PowerBar:OnEnable()
     self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
-    self:RegisterEvent("UNIT_POWER_UPDATE", function(...) self:OnUnitPowerUpdate(...) end)
+    self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnUnitPowerUpdate(...) end)
 end
 
 function PowerBar:OnDisable()

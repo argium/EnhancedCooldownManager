@@ -350,7 +350,7 @@ function RuneBar:OnEnable()
     self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
-    self:RegisterEvent("RUNE_POWER_UPDATE", function(...) self:OnRunePowerUpdate(...) end)
+    self:RegisterEvent("RUNE_POWER_UPDATE", function(_, ...) self:OnRunePowerUpdate(...) end)
 end
 
 function RuneBar:OnRunePowerUpdate()

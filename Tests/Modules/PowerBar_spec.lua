@@ -218,6 +218,27 @@ describe("PowerBar real source", function()
         assert.same({ "UNIT_POWER_UPDATE" }, reasons)
     end)
 
+    it("registered callback drops LibEvent target and forwards event args", function()
+        local captured = {}
+        function PowerBar:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        function PowerBar:UnregisterAllEvents() end
+
+        PowerBar:OnInitialize()
+        PowerBar:OnEnable()
+
+        local reasons = {}
+        function PowerBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        local cb = assert(captured["UNIT_POWER_UPDATE"], "expected UNIT_POWER_UPDATE registration")
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        cb(PowerBar, "UNIT_POWER_UPDATE", "player")
+        assert.same({ "UNIT_POWER_UPDATE" }, reasons)
+    end)
+
     it("registers and unregisters with the frame system", function()
         function PowerBar:RegisterEvent() end
         function PowerBar:UnregisterAllEvents() end

@@ -521,6 +521,27 @@ describe("ECM.Runtime layout system", function()
             assert.same({ "PLAYER_MOUNT_DISPLAY_CHANGED" }, reasons)
         end)
 
+        it("vehicle events forward the unit token so non-player events are ignored", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            local libEvent = LibStub("LibEvent-1.0")
+
+            mod.ThrottledUpdateLayout = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            ECM.Runtime.Enable(fakeAddon)
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
+
+            handler(addonFrame, "UNIT_ENTERED_VEHICLE", "pet")
+            assert.same({}, reasons)
+
+            handler(addonFrame, "UNIT_ENTERED_VEHICLE", "player")
+            assert.same({ "UNIT_ENTERED_VEHICLE" }, reasons)
+        end)
+
         it("delayed layout events flush modules when the delay expires without another hop", function()
             local mod = makeRegisteredModule()
             local reasons = {}

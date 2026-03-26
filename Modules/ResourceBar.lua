@@ -81,8 +81,8 @@ function ResourceBar:OnEnable()
     self:EnsureFrame()
     ECM.Runtime.RegisterFrame(self)
 
-    self:RegisterEvent("UNIT_AURA", function(...) self:OnEventUpdate(...) end)
-    self:RegisterEvent("UNIT_POWER_UPDATE", function(...) self:OnEventUpdate(...) end)
+    self:RegisterEvent("UNIT_AURA", function(_, ...) self:OnEventUpdate(...) end)
+    self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnEventUpdate(...) end)
 end
 
 function ResourceBar:OnDisable()

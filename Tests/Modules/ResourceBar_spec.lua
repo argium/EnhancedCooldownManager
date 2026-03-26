@@ -160,6 +160,27 @@ describe("ResourceBar real source", function()
         assert.same({ "UNIT_AURA", "UNIT_POWER_UPDATE" }, reasons)
     end)
 
+    it("registered callbacks drop LibEvent target and forward event args", function()
+        local captured = {}
+        function ResourceBar:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        function ResourceBar:UnregisterAllEvents() end
+
+        ResourceBar:OnInitialize()
+        ResourceBar:OnEnable()
+
+        local reasons = {}
+        function ResourceBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        local cb = assert(captured["UNIT_AURA"], "expected UNIT_AURA registration")
+        cb(ResourceBar, "UNIT_AURA", "player")
+        assert.same({ "UNIT_AURA" }, reasons)
+    end)
+
     it("registers and unregisters with the frame system", function()
         function ResourceBar:RegisterEvent() end
         function ResourceBar:UnregisterAllEvents() end

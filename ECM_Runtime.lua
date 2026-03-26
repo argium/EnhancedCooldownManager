@@ -595,11 +595,11 @@ local function enableLayoutEvents(addon)
     end
 
     for eventName in pairs(LAYOUT_EVENTS) do
-        addon:RegisterEvent(eventName, function(_, ...)
+        addon:RegisterEvent(eventName, function(_, _event, ...)
             handleLayoutEvent(addon, eventName, ...)
         end)
     end
-    addon:RegisterEvent("CVAR_UPDATE", function(_, ...)
+    addon:RegisterEvent("CVAR_UPDATE", function(_, _event, ...)
         handleLayoutEvent(addon, "CVAR_UPDATE", ...)
     end)
 

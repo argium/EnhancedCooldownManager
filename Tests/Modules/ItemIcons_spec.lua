@@ -361,6 +361,32 @@ describe("ItemIcons real source", function()
         assert.same({ "OnPlayerEquipmentChanged", "OnPlayerEquipmentChanged" }, reasons)
     end)
 
+    it("registered equipment callback drops LibEvent target and forwards slotId", function()
+        local captured = {}
+        function ItemIcons:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        function ItemIcons:UnregisterAllEvents() end
+        function ItemIcons:EnsureFrame() end
+
+        local origRegister = ECM.Runtime.RegisterFrame
+        ECM.Runtime.RegisterFrame = function() end
+
+        ItemIcons:OnEnable()
+
+        ECM.Runtime.RegisterFrame = origRegister
+
+        local reasons = {}
+        function ItemIcons:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        local cb = assert(captured["PLAYER_EQUIPMENT_CHANGED"], "expected PLAYER_EQUIPMENT_CHANGED registration")
+        cb(ItemIcons, "PLAYER_EQUIPMENT_CHANGED", ECM.Constants.TRINKET_SLOT_1)
+        assert.same({ "OnPlayerEquipmentChanged" }, reasons)
+    end)
+
     it("hooks edit mode only once", function()
         ItemIcons:HookEditMode()
         ItemIcons:HookEditMode()
