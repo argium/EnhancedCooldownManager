@@ -103,15 +103,7 @@ end
 
 ECM.PowerBarTickMarksStore = store
 
-StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = {
-    text = L["TICK_MARKS_CLEAR_CONFIRM"],
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
+StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ECM.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
 
 local function roundToStep(value)
     return math.floor(value + 0.5)

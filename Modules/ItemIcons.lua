@@ -65,45 +65,29 @@ local function getBestConsumable(priorityList)
     return nil
 end
 
+local HEALTHSTONE_PRIORITY = { { itemID = ECM.Constants.HEALTHSTONE_ITEM_ID } }
+
+local DISPLAY_ITEM_SOURCES = {
+    { flag = "showTrinket1",      getter = getTrinketData,   arg = ECM.Constants.TRINKET_SLOT_1 },
+    { flag = "showTrinket2",      getter = getTrinketData,   arg = ECM.Constants.TRINKET_SLOT_2 },
+    { flag = "showCombatPotion",  getter = getBestConsumable, arg = ECM.Constants.COMBAT_POTIONS },
+    { flag = "showHealthPotion",  getter = getBestConsumable, arg = ECM.Constants.HEALTH_POTIONS },
+    { flag = "showHealthstone",   getter = getBestConsumable, arg = HEALTHSTONE_PRIORITY },
+}
+
 --- Returns all display items in display order: Trinkets > Combat Potion > Health Potion > Healthstone.
 ---@param moduleConfig table Module configuration.
 ---@return ECM_IconData[] items Array of icon data.
 local function getDisplayItems(moduleConfig)
     local items = {}
-
-    if moduleConfig.showTrinket1 then
-        local trinket1 = getTrinketData(ECM.Constants.TRINKET_SLOT_1)
-        if trinket1 then
-            items[#items + 1] = trinket1
+    for _, source in ipairs(DISPLAY_ITEM_SOURCES) do
+        if moduleConfig[source.flag] then
+            local item = source.getter(source.arg)
+            if item then
+                items[#items + 1] = item
+            end
         end
     end
-
-    if moduleConfig.showTrinket2 then
-        local trinket2 = getTrinketData(ECM.Constants.TRINKET_SLOT_2)
-        if trinket2 then
-            items[#items + 1] = trinket2
-        end
-    end
-
-    if moduleConfig.showCombatPotion then
-        local combatPotion = getBestConsumable(ECM.Constants.COMBAT_POTIONS)
-        if combatPotion then
-            items[#items + 1] = combatPotion
-        end
-    end
-
-    if moduleConfig.showHealthPotion then
-        local healthPotion = getBestConsumable(ECM.Constants.HEALTH_POTIONS)
-        if healthPotion then
-            items[#items + 1] = healthPotion
-        end
-    end
-
-    if moduleConfig.showHealthstone then
-        local hs = getBestConsumable({ { itemID = ECM.Constants.HEALTHSTONE_ITEM_ID } })
-        if hs then items[#items + 1] = hs end
-    end
-
     return items
 end
 

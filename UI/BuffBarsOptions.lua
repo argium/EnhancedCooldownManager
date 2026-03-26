@@ -71,15 +71,7 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
-    text = L["SPELL_COLORS_RESET_CONFIRM"],
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
+StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = ECM.OptionUtil.MakeConfirmDialog(L["SPELL_COLORS_RESET_CONFIRM"])
 
 local function createSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)

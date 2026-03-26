@@ -32,25 +32,8 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     hideOnEscape = true,
 }
 
-StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = {
-    text = "",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
-
-StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = {
-    text = "",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
+StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
+StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
 
 local ProfileOptions = {}
 

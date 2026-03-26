@@ -119,7 +119,6 @@ end
 
 --- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
---- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
 local function setGloballyHidden(hidden)
     if _globallyHidden == hidden then return end
     _globallyHidden = hidden

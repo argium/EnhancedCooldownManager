@@ -1284,6 +1284,17 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
             GetCurrentClassSpec = opts.getCurrentClassSpec or function()
                 return 1, 2, "Warrior", "Fury", "WARRIOR"
             end,
+            MakeConfirmDialog = function(text)
+                return {
+                    text = text,
+                    button1 = _G.YES,
+                    button2 = _G.NO,
+                    OnAccept = function() end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                }
+            end,
         },
         ScheduleLayoutUpdate = function() end,
     }

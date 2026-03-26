@@ -8,8 +8,11 @@
 local _, ns = ...
 local C = ECM.Constants
 local L = ECM.L
+local OptionUtil = ECM.OptionUtil or {}
 
-local function isAnchorModeFree(cfg)
+ECM.OptionUtil = OptionUtil
+
+function OptionUtil.IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
 end
 
@@ -29,7 +32,7 @@ local function createPreviewBars(parent, positions)
     end
 end
 
-local function createPositioningExamplesCanvas()
+function OptionUtil.CreatePositioningExamplesCanvas()
     if type(CreateFrame) ~= "function" then
         return {}
     end
@@ -121,27 +124,27 @@ local function createPositioningExamplesCanvas()
     return frame
 end
 
-local function openLayoutPage()
+function OptionUtil.OpenLayoutPage()
     local categoryID = ECM.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
 end
 
-local function createLayoutBreadcrumbArgs(order)
+function OptionUtil.CreateLayoutBreadcrumbArgs(order)
     order = order or 10
     return {
         layoutMovedButton = {
             type = "button",
             name = L["LAYOUT_SUBCATEGORY"],
             buttonText = L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"],
-            onClick = openLayoutPage,
+            onClick = OptionUtil.OpenLayoutPage,
             order = order,
         },
     }
 end
 
-local function createDefaultValueTransform(defaultValue)
+function OptionUtil.CreateDefaultValueTransform(defaultValue)
     return function(value)
         return value or defaultValue
     end
@@ -151,7 +154,7 @@ end
 ---@param tbl table The table to get the value from
 ---@param path string The dot-separated path to the value
 ---@return any The value at the specified path, or nil if any part of the path is invalid
-local function getNestedValue(tbl, path)
+function OptionUtil.GetNestedValue(tbl, path)
     local current = tbl
     for segment in path:gmatch("[^.]+") do
         if type(current) ~= "table" then
@@ -173,7 +176,7 @@ end
 ---@param tbl table The table to set the value in
 ---@param path string The dot-separated path to the value
 ---@param value any The value to set at the specified path
-local function setNestedValue(tbl, path, value)
+function OptionUtil.SetNestedValue(tbl, path, value)
     local current, lastKey = tbl, nil
     for segment in path:gmatch("[^.]+") do
         if lastKey then
@@ -207,7 +210,7 @@ end
 ---@return string localisedClassName
 ---@return string specName
 ---@return string className
-local function getCurrentClassSpec()
+function OptionUtil.GetCurrentClassSpec()
     local localisedClassName, className, classID = UnitClass("player")
     local specIndex = GetSpecialization()
     local specName
@@ -222,7 +225,7 @@ end
 ---@param currentColor {r:number, g:number, b:number, a:number|nil}
 ---@param hasOpacity boolean
 ---@param onChange fun(color: {r:number, g:number, b:number, a:number})
-local function openColorPicker(currentColor, hasOpacity, onChange)
+function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
     ColorPickerFrame:SetupColorPickerAndShow({
         r = currentColor.r,
         g = currentColor.g,
@@ -243,10 +246,10 @@ end
 --- Returns a closure that checks if the module at configPath is disabled.
 ---@param configPath string e.g. "powerBar"
 ---@return fun(): boolean
-local function getIsDisabledDelegate(configPath)
+function OptionUtil.GetIsDisabledDelegate(configPath)
     local enabledPath = configPath .. ".enabled"
     return function()
-        return not getNestedValue(ns.Addon.db.profile, enabledPath)
+        return not OptionUtil.GetNestedValue(ns.Addon.db.profile, enabledPath)
     end
 end
 
@@ -269,7 +272,7 @@ end
 ---@param moduleName string The module name (e.g., "PowerBar")
 ---@param requiresReload string|nil If set, disabling shows a reload confirmation with this message
 ---@return fun(value: boolean, setting: table)
-local function createModuleEnabledHandler(moduleName, requiresReload)
+function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
     return function(value, setting)
         if value then
             ns.Addon:EnableModule(moduleName)
@@ -295,11 +298,11 @@ end
 ---@param isDisabled fun(): boolean
 ---@param options table|nil { showText: boolean, border: boolean, layoutOrder: number, appearanceOrder: number }
 ---@return table args Partial args table to merge into RegisterFromTable
-local function createBarArgs(isDisabled, options)
+function OptionUtil.CreateBarArgs(isDisabled, options)
     options = options or {}
     local layoutOrder = options.layoutOrder or 10
     local appearanceOrder = options.appearanceOrder or 20
-    local breadcrumbArgs = createLayoutBreadcrumbArgs(layoutOrder)
+    local breadcrumbArgs = OptionUtil.CreateLayoutBreadcrumbArgs(layoutOrder)
 
     local args = {
         layoutMovedButton = breadcrumbArgs.layoutMovedButton,
@@ -364,8 +367,8 @@ local function createDetachedSettingSpecs()
     }
 end
 
-local function createDetachedStackArgs()
-    local defaultZero = createDefaultValueTransform(0)
+function OptionUtil.CreateDetachedStackArgs()
+    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
     local args = {
         detachedHeader = { type = "header", name = L["POSITION_MODE_DETACHED"], order = 30 },
     }
@@ -377,7 +380,7 @@ local function createDetachedStackArgs()
             name = spec.name,
             desc = spec.desc,
             order = order,
-            getTransform = spec.default == 0 and defaultZero or createDefaultValueTransform(spec.default),
+            getTransform = spec.default == 0 and defaultZero or OptionUtil.CreateDefaultValueTransform(spec.default),
         }
 
         if spec.values then
@@ -400,7 +403,7 @@ local function createDetachedStackArgs()
     return args
 end
 
-local function createDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
+function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
     local settingType = ECM.EditMode.Lib.SettingType
     local settings = {}
 
@@ -438,19 +441,14 @@ local function createDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
     return settings
 end
 
-ECM.OptionUtil = {
-    GetNestedValue = getNestedValue,
-    SetNestedValue = setNestedValue,
-    IsAnchorModeFree = isAnchorModeFree,
-    GetCurrentClassSpec = getCurrentClassSpec,
-    OpenColorPicker = openColorPicker,
-    GetIsDisabledDelegate = getIsDisabledDelegate,
-    CreateModuleEnabledHandler = createModuleEnabledHandler,
-    OpenLayoutPage = openLayoutPage,
-    CreateLayoutBreadcrumbArgs = createLayoutBreadcrumbArgs,
-    CreateDefaultValueTransform = createDefaultValueTransform,
-    CreatePositioningExamplesCanvas = createPositioningExamplesCanvas,
-    CreateBarArgs = createBarArgs,
-    CreateDetachedStackArgs = createDetachedStackArgs,
-    CreateDetachedAnchorEditModeSettings = createDetachedAnchorEditModeSettings,
-}
+function OptionUtil.MakeConfirmDialog(text)
+    return {
+        text = text,
+        button1 = YES,
+        button2 = NO,
+        OnAccept = function() end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+end
