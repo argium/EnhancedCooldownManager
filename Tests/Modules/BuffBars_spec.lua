@@ -131,6 +131,7 @@ describe("BuffBars real source", function()
         timerCallbacks = {}
         _G.ECM = {
             Log = function() end,
+            DebugAssert = function() end,
             IsDebugEnabled = function() return false end,
             Constants = nil,
             EditMode = {
@@ -906,5 +907,55 @@ describe("BuffBars real source", function()
         assert.are.equal(2, #appliedTextures)
         assert.are.equal(2, #appliedColors)
         assert.is_true(BuffBarCooldownViewer:IsShown())
+    end)
+
+    it("clears _layoutRunning even when styleChildFrame throws", function()
+        ECM.SpellColors.DiscoverBar = function() end
+        ECM.SpellColors.GetColorForBar = function()
+            error("simulated style error")
+        end
+        ECM.SpellColors.GetDefaultColor = function()
+            return { r = 1, g = 1, b = 1, a = 1 }
+        end
+        ECM.ColorUtil = { ColorToHex = function() return "ffffff" end }
+        ECM.ToString = tostring
+        ECM.GetTexture = function() return "Solid" end
+        ECM.ApplyFont = function() end
+        local assertedCondition
+        ECM.DebugAssert = function(cond) assertedCondition = cond end
+        ECM.FrameUtil.GetBarBackground = function() return nil end
+        ECM.FrameUtil.GetIconTexture = function() return nil end
+        ECM.FrameUtil.GetIconOverlay = function() return nil end
+        ECM.FrameUtil.LazySetHeight = function() end
+        ECM.FrameUtil.LazySetWidth = function() end
+        ECM.FrameUtil.LazySetStatusBarTexture = function() end
+        ECM.FrameUtil.LazySetStatusBarColor = function() end
+        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            frame.__ecmAnchorCache = anchors
+        end
+        ECM.FrameUtil.LazySetAlpha = function() end
+
+        local child = makeStyledChild("Boom", true, 1)
+        function BuffBarCooldownViewer:GetChildren() return child end
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid", barHeight = 18 }
+        end
+        function BuffBars:GetModuleConfig()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                showIcon = false, showSpellName = true, showDuration = true,
+            }
+        end
+        function BuffBars:ShouldShow() return true end
+
+        -- Should not propagate the error
+        assert.has_no.errors(function()
+            BuffBars:UpdateLayout("test-error")
+        end)
+
+        -- Critical: the flag must be cleared so future layouts aren't blocked
+        assert.is_nil(BuffBars._layoutRunning)
+        -- DebugAssert was called with a failure condition
+        assert.is_false(assertedCondition)
     end)
 end)

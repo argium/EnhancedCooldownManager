@@ -477,14 +477,18 @@ function BuffBars:UpdateLayout(why)
     -- Style all visible children (lazy setters make redundant calls no-ops)
     self._warned = false
     self._editLocked = false
-    for barIndex, entry in ipairs(visibleChildren) do
-        hookChildFrame(entry.frame, self)
-        styleChildFrame(self, entry.frame, cfg, globalConfig, barIndex)
-    end
+    local ok, err = pcall(function()
+        for barIndex, entry in ipairs(visibleChildren) do
+            hookChildFrame(entry.frame, self)
+            styleChildFrame(self, entry.frame, cfg, globalConfig, barIndex)
+        end
 
-    layoutBars(viewer, growsUp, verticalSpacing)
+        layoutBars(viewer, growsUp, verticalSpacing)
+    end)
 
     self._layoutRunning = nil
+    ECM.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
+
     viewer:Show()
     ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = position.mode,
