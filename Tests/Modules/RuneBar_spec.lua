@@ -99,6 +99,8 @@ describe("RuneBar real source", function()
             end,
         }
         _G.UIParent = makeFrame({ name = "UIParent" })
+        -- wipe is a WoW Lua 5.1 built-in not available in busted's Lua 5.3+
+        _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
         _G.GetSpecialization = function()
             return 1
         end

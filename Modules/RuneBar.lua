@@ -26,9 +26,9 @@ local function getRuneCooldownState(index, now)
     return false, remaining, frac
 end
 
-local function buildRuneStateTables(maxRunes, now)
-    local readySet = {}
-    local cdLookup = {}
+local function buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+    wipe(readySet)
+    wipe(cdLookup)
 
     for i = 1, maxRunes do
         local isReady, remaining, frac = getRuneCooldownState(i, now)
@@ -38,8 +38,6 @@ local function buildRuneStateTables(maxRunes, now)
             cdLookup[i] = { remaining = remaining, frac = frac }
         end
     end
-
-    return readySet, cdLookup
 end
 
 local function runeReadyStatesDiffer(lastReadySet, readySet, maxRunes)
@@ -123,34 +121,52 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
 
     local now = GetTime()
     local color = getColor(moduleConfig)
-    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
+
+    -- Reuse per-bar tables to avoid per-call allocation
+    bar._readySet = bar._readySet or {}
+    bar._cdLookup = bar._cdLookup or {}
+    local readySet, cdLookup = bar._readySet, bar._cdLookup
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+
     local statesChanged = (bar._lastReadySet == nil) or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
     local dimensionsChanged = (bar._lastBarWidth ~= barWidth) or (bar._lastBarHeight ~= barHeight)
 
     if statesChanged or dimensionsChanged then
-        bar._lastReadySet = readySet
+        -- Snapshot ready state for next comparison
+        bar._lastReadySet = bar._lastReadySet or {}
+        wipe(bar._lastReadySet)
+        for i = 1, maxRunes do
+            bar._lastReadySet[i] = readySet[i]
+        end
         bar._lastBarWidth = barWidth
         bar._lastBarHeight = barHeight
 
-        local readyList = {}
-        local cdList = {}
+        -- Build display order: ready runes first, then cooldown runes sorted by remaining
+        bar._displayOrder = bar._displayOrder or {}
+        wipe(bar._displayOrder)
+        local orderLen = 0
+
+        -- Collect cooldown runes and sort by remaining time
+        bar._cdSortBuf = bar._cdSortBuf or {}
+        wipe(bar._cdSortBuf)
+        local cdLen = 0
         for i = 1, maxRunes do
             if readySet[i] then
-                table.insert(readyList, i)
+                orderLen = orderLen + 1
+                bar._displayOrder[orderLen] = i
             else
-                table.insert(cdList, { index = i, remaining = cdLookup[i] and cdLookup[i].remaining or math.huge })
+                cdLen = cdLen + 1
+                bar._cdSortBuf[cdLen] = i
             end
         end
-        table.sort(cdList, function(a, b)
-            return a.remaining < b.remaining
+        table.sort(bar._cdSortBuf, function(a, b)
+            local ra = cdLookup[a] and cdLookup[a].remaining or math.huge
+            local rb = cdLookup[b] and cdLookup[b].remaining or math.huge
+            return ra < rb
         end)
-
-        bar._displayOrder = {}
-        for _, idx in ipairs(readyList) do
-            table.insert(bar._displayOrder, idx)
-        end
-        for _, v in ipairs(cdList) do
-            table.insert(bar._displayOrder, v.index)
+        for j = 1, cdLen do
+            orderLen = orderLen + 1
+            bar._displayOrder[orderLen] = bar._cdSortBuf[j]
         end
 
         local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
@@ -180,18 +196,8 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
             applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
-end
 
---- Returns true if any rune is currently on cooldown.
-local function anyRuneOnCooldown(maxRunes)
-    local now = GetTime()
-    for i = 1, maxRunes do
-        local isReady = getRuneCooldownState(i, now)
-        if not isReady then
-            return true
-        end
-    end
-    return false
+    return next(cdLookup) ~= nil
 end
 
 --- Lightweight per-frame rune value updater.
@@ -222,7 +228,11 @@ local function updateRuneValues(self, frame)
 
     local cfg = self:GetModuleConfig()
     local color = getColor(cfg)
-    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
+
+    frame._readySet = frame._readySet or {}
+    frame._cdLookup = frame._cdLookup or {}
+    local readySet, cdLookup = frame._readySet, frame._cdLookup
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
 
     -- Detect state transitions to trigger full reorder/reposition
     if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
@@ -240,7 +250,7 @@ local function updateRuneValues(self, frame)
     end
 
     -- Stop the animation ticker when all runes are ready
-    if not anyRuneOnCooldown(maxRunes) then
+    if next(cdLookup) == nil then
         self:_StopAnimationTicker()
     end
 end
@@ -298,8 +308,8 @@ function RuneBar:Refresh(why, force)
     updateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
     self:LayoutResourceTicks(maxRunes, C.COLOR_BLACK, 1, "tickPool")
 
-    -- Start animation ticker if any rune is on cooldown
-    if anyRuneOnCooldown(maxRunes) then
+    -- Start animation ticker if any rune is on cooldown (derived from layout pass)
+    if frame._cdLookup and next(frame._cdLookup) ~= nil then
         self:_StartAnimationTicker()
     end
 

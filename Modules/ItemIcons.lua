@@ -175,9 +175,15 @@ local function updateIconCooldown(icon)
 end
 
 --- Gets cooldown number font info from a Blizzard utility cooldown icon.
+--- Caches the result on the viewer to avoid per-layout table allocation and child scan.
 --- @param utilityViewer Frame
 --- @return string|nil fontPath, number|nil fontSize, string|nil fontFlags
 local function getSiblingCooldownNumberFont(utilityViewer)
+    local cached = utilityViewer.__ecmCDFont
+    if cached then
+        return cached[1], cached[2], cached[3]
+    end
+
     for _, child in ipairs({ utilityViewer:GetChildren() }) do
         local cooldown = child.Cooldown
         if cooldown and cooldown.GetRegions then
@@ -185,6 +191,7 @@ local function getSiblingCooldownNumberFont(utilityViewer)
             if region and region.IsObjectType and region:IsObjectType("FontString") and region.GetFont then
                 local fontPath, fontSize, fontFlags = region:GetFont()
                 if fontPath and fontSize then
+                    utilityViewer.__ecmCDFont = { fontPath, fontSize, fontFlags }
                     return fontPath, fontSize, fontFlags
                 end
             end

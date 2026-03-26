@@ -258,6 +258,17 @@ describe("ECM.Runtime layout system", function()
             After = function(_, callback)
                 callback()
             end,
+            NewTimer = function(_, callback)
+                local timer = {
+                    cancelled = false,
+                    callback = callback,
+                }
+                function timer:Cancel()
+                    self.cancelled = true
+                end
+                callback()
+                return timer
+            end,
             NewTicker = function(_, callback)
                 local ticker = {
                     cancelled = false,
@@ -436,18 +447,34 @@ describe("ECM.Runtime layout system", function()
     end)
 
     describe("deferred layout batching", function()
+        local origNewTimer
         local origAfter
         local timerQueue
 
         before_each(function()
             timerQueue = {}
+            origNewTimer = _G.C_Timer.NewTimer
             origAfter = _G.C_Timer.After
+            local function makeTimer(delay, callback)
+                local timer = {
+                    delay = delay,
+                    callback = callback,
+                    cancelled = false,
+                }
+                function timer:Cancel()
+                    self.cancelled = true
+                end
+                timerQueue[#timerQueue + 1] = timer
+                return timer
+            end
+            _G.C_Timer.NewTimer = makeTimer
             _G.C_Timer.After = function(delay, callback)
-                timerQueue[#timerQueue + 1] = { delay = delay, callback = callback }
+                makeTimer(delay, callback)
             end
         end)
 
         after_each(function()
+            _G.C_Timer.NewTimer = origNewTimer
             _G.C_Timer.After = origAfter
         end)
 
@@ -520,6 +547,27 @@ describe("ECM.Runtime layout system", function()
             timerQueue[1].callback()
 
             assert.same({ "ZONE_CHANGED" }, reasons)
+        end)
+
+        it("ScheduleLayoutUpdate with a shorter delay supersedes a pending longer-delay timer", function()
+            local mod = makeRegisteredModule()
+            local reasons = {}
+            mod.UpdateLayoutImmediately = function(_, reason)
+                reasons[#reasons + 1] = reason
+            end
+
+            ECM.Runtime.ScheduleLayoutUpdate(0.5, "Slow")
+            assert.are.equal(1, #timerQueue)
+            assert.is_false(timerQueue[1].cancelled)
+
+            ECM.Runtime.ScheduleLayoutUpdate(0, "Urgent")
+            assert.are.equal(2, #timerQueue)
+            -- The first timer should have been cancelled
+            assert.is_true(timerQueue[1].cancelled)
+            assert.are.equal(0, timerQueue[2].delay)
+
+            timerQueue[2].callback()
+            assert.same({ "Urgent" }, reasons)
         end)
     end)
 

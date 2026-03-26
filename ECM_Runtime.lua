@@ -42,6 +42,8 @@ local _globallyHidden = false
 local _desiredAlpha = 1
 local _inCombat = InCombatLockdown()
 local _layoutPending = false
+local _layoutPendingDelay = nil
+local _layoutPendingTimer = nil
 local _layoutEventsEnabled = false
 local _layoutWatchdogTicker = nil
 local _cooldownViewerSettingsHooked = false
@@ -466,6 +468,8 @@ end
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
 local function executeLayout(reason, runModuleLayoutsImmediately)
     _layoutPending = false
+    _layoutPendingDelay = nil
+    _layoutPendingTimer = nil
     hookCooldownViewerSettings()
     updateFadeAndHiddenStates()
     updateAllLayouts(reason, runModuleLayoutsImmediately)
@@ -480,17 +484,26 @@ function Runtime.UpdateLayoutImmediately(reason)
 end
 
 --- Schedules a layout update after a delay (debounced).
+--- A later call with a shorter delay supersedes an earlier pending timer.
 --- @param delay number Delay in seconds
 --- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
 function Runtime.ScheduleLayoutUpdate(delay, reason)
-    if _layoutPending then
+    local waitTime = delay or 0
+
+    -- Skip if already pending with an equal or shorter delay
+    if _layoutPending and _layoutPendingDelay ~= nil and _layoutPendingDelay <= waitTime then
         return
+    end
+
+    -- Cancel the existing timer if we're superseding it
+    if _layoutPendingTimer and _layoutPendingTimer.Cancel then
+        _layoutPendingTimer:Cancel()
     end
 
     invalidateDetachedAnchorMetrics()
     _layoutPending = true
-    local waitTime = delay or 0
-    C_Timer.After(waitTime, function()
+    _layoutPendingDelay = waitTime
+    _layoutPendingTimer = C_Timer.NewTimer(waitTime, function()
         executeLayout(reason, true)
     end)
 end
