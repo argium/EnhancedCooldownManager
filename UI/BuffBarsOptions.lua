@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local C = ECM.Constants
+local L = ECM.L
 
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
@@ -70,15 +71,7 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = {
-    text = "Are you sure you want to reset all spell colors for this spec?",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
+StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = ECM.OptionUtil.MakeConfirmDialog(L["SPELL_COLORS_RESET_CONFIRM"])
 
 local function createSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
@@ -87,7 +80,7 @@ local function createSpellColorCanvas(SB, subcatName)
     local function resetAllSpellColors()
         ECM.SpellColors.ClearCurrentSpecColors()
         frame:RefreshSpellList()
-        ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
     -- Header — uses SettingsListTemplate's built-in Title, divider, and DefaultsButton
@@ -104,7 +97,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
     layout:AddSpacer(2)
 
-    local descRow = layout:AddDescription(C.SPELL_COLORS_DESC_TEXT, "GameFontHighlight")
+    local descRow = layout:AddDescription(L["SPELL_COLORS_DESC"], "GameFontHighlight")
     descRow._text:SetWordWrap(true)
 
     local warningRow = layout:AddDescription("")
@@ -128,7 +121,7 @@ local function createSpellColorCanvas(SB, subcatName)
         ECM.OptionUtil.OpenColorPicker(c, false, function(color)
             ECM.SpellColors.SetDefaultColor(color)
             defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
-            ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 
@@ -149,14 +142,14 @@ local function createSpellColorCanvas(SB, subcatName)
     secretNameDescText:SetPoint("TOPRIGHT", secretNameDescRow, "TOPRIGHT", -10, 0)
     secretNameDescText:SetJustifyH("LEFT")
     secretNameDescText:SetWordWrap(true)
-    secretNameDescText:SetText(C.SPELL_COLORS_SECRET_NAMES_DESC_TEXT)
+    secretNameDescText:SetText(L["SPELL_COLORS_SECRET_NAMES_DESC"])
     secretNameDescRow._text = secretNameDescText
     secretNameDescRow:ClearAllPoints()
     secretNameDescRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
     secretNameDescRow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
     secretNameDescRow:Hide()
 
-    local secretNameButtonRow, secretNameReloadButton = layout:AddButton("", C.SPELL_COLORS_RELOAD_BUTTON_TEXT)
+    local secretNameButtonRow, secretNameReloadButton = layout:AddButton("", L["SPELL_COLORS_RELOAD_BUTTON"])
     secretNameButtonRow._label:SetText("")
     secretNameButtonRow:ClearAllPoints()
     secretNameButtonRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET)
@@ -169,7 +162,7 @@ local function createSpellColorCanvas(SB, subcatName)
     )
     secretNameButtonRow:Hide()
     secretNameReloadButton:SetScript("OnClick", function()
-        ns.Addon:ConfirmReloadUI(C.SPELL_COLORS_SECRET_NAMES_DESC_TEXT)
+        ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
     end)
 
     frame._secretNameDescRow = secretNameDescRow
@@ -202,7 +195,7 @@ local function createSpellColorCanvas(SB, subcatName)
             ECM.OptionUtil.OpenColorPicker(current, false, function(color)
                 ECM.SpellColors.SetColorByKey(data.key, color)
                 control.ColorSwatch:SetColorRGB(color.r, color.g, color.b)
-                ECM.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
         end)
     end)
@@ -223,10 +216,9 @@ local function createSpellColorCanvas(SB, subcatName)
         local parts = {}
         local locked, reason = ns.Addon.BuffBars:IsEditLocked()
         if locked and reason == "combat" then
-            parts[#parts + 1] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
+            parts[#parts + 1] = L["SPELL_COLORS_COMBAT_WARNING"]
         elseif locked and reason == "secrets" then
-            parts[#parts + 1] =
-                "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
+            parts[#parts + 1] = L["SPELL_COLORS_SECRETS_WARNING"]
         end
         warningText:SetText(table.concat(parts, "\n"))
 
@@ -269,85 +261,49 @@ BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
 local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
+    local defaultZero = ECM.OptionUtil.CreateDefaultValueTransform(0)
     SB.RegisterFromTable({
-        name = "Aura Bars",
+        name = L["AURA_BARS"],
         path = "buffBars",
         args = {
             enabled = {
                 type = "toggle",
                 path = "enabled",
-                name = "Enable aura bars",
-                desc = "Styles and repositions Blizzard's aura duration bars that are part of the Cooldown Manager.",
+                name = L["ENABLE_AURA_BARS"],
+                desc = L["ENABLE_AURA_BARS_DESC"],
                 order = 0,
-                onSet = ECM.OptionUtil.CreateModuleEnabledHandler(
-                    "BuffBars",
-                    "Disabling aura bars requires a UI reload. Reload now?"
-                ),
+                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
             },
 
-            -- Layout
-            layoutHeader = { type = "header", name = "Layout", disabled = isDisabled, order = 10 },
-            positioning = {
-                type = "positioning",
-                disabled = isDisabled,
-                includeOffsetX = false,
-                order = 11,
-                positionModes = {
-                    [C.ANCHORMODE_CHAIN] = "Locked to Cooldown Manager",
-                    [C.ANCHORMODE_FREE] = "Manual using Edit Mode",
-                },
-            },
-            freeGrowDirection = {
-                type = "select",
-                path = "freeGrowDirection",
-                name = "Free Grow Direction",
-                desc = "Choose whether aura bars stack downward or upward in free positioning mode.",
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                disabled = isDisabled,
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                parent = "positioning",
-                parentCheck = function()
-                    return ECM.OptionUtil.IsAnchorModeFree(
-                        ECM.OptionUtil.GetNestedValue(ns.Addon.db.profile, "buffBars")
-                    )
-                end,
-                order = 12,
-            },
+            layoutMovedButton = ECM.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
 
             -- Appearance
-            appearanceHeader = { type = "header", name = "Appearance", disabled = isDisabled, order = 20 },
-            showIcon = { type = "toggle", path = "showIcon", name = "Show icon", disabled = isDisabled, order = 21 },
+            appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = 20 },
+            showIcon = { type = "toggle", path = "showIcon", name = L["SHOW_ICON"], disabled = isDisabled, order = 21 },
             showSpellName = {
                 type = "toggle",
                 path = "showSpellName",
-                name = "Show spell name",
+                name = L["SHOW_SPELL_NAME"],
                 disabled = isDisabled,
                 order = 22,
             },
             showDuration = {
                 type = "toggle",
                 path = "showDuration",
-                name = "Show remaining duration",
+                name = L["SHOW_REMAINING_DURATION"],
                 disabled = isDisabled,
                 order = 23,
             },
             height = {
                 type = "range",
                 path = "height",
-                name = "Height Override",
-                desc = "Override the default bar height. Set to 0 to use the global default.",
+                name = L["HEIGHT_OVERRIDE"],
+                desc = L["HEIGHT_OVERRIDE_DESC"],
                 min = 0,
                 max = 40,
                 step = 1,
                 disabled = isDisabled,
-                getTransform = function(value)
-                    return value or 0
-                end,
+                getTransform = defaultZero,
                 setTransform = function(value)
                     return value > 0 and value or nil
                 end,
@@ -356,28 +312,26 @@ function BuffBarsOptions.RegisterSettings(SB)
             verticalSpacing = {
                 type = "range",
                 path = "verticalSpacing",
-                name = "Vertical Spacing",
-                desc = "Vertical gap between aura bars. Set to 0 for no spacing.",
+                name = L["AURA_VERTICAL_SPACING"],
+                desc = L["AURA_VERTICAL_SPACING_DESC"],
                 min = 0,
                 max = 20,
                 step = 1,
                 disabled = isDisabled,
-                getTransform = function(value)
-                    return value or 0
-                end,
+                getTransform = defaultZero,
                 order = 25,
             },
             fontOverride = { type = "fontOverride", disabled = isDisabled, order = 26 },
         },
     })
 
-    createSpellColorCanvas(SB, C.SPELL_COLORS_SUBCAT)
+    createSpellColorCanvas(SB, L["SPELL_COLORS_SUBCAT"])
 
     SB.Button({
-        name = "Configure Spell Colors",
-        buttonText = "Open",
+        name = L["CONFIGURE_SPELL_COLORS"],
+        buttonText = L["OPEN"],
         onClick = function()
-            local catID = SB.GetSubcategoryID(C.SPELL_COLORS_SUBCAT)
+            local catID = SB.GetSubcategoryID(L["SPELL_COLORS_SUBCAT"])
             if catID then
                 Settings.OpenToCategory(catID)
             end

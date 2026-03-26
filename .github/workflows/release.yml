@@ -44,6 +44,10 @@ jobs:
                   mkdir -p test-results
                   rm -f luacov.stats.out luacov.report.out luacov.report.html
                   busted -r coverage Tests --output=junit > test-results/busted-junit.xml
+                  busted --run libsettingsbuilder --output=junit > test-results/lsb-junit.xml
+                  busted --run libconsole --output=junit > test-results/libconsole-junit.xml
+                  busted --run libevent --output=junit > test-results/libevent-junit.xml
+                  busted --run liblsmsettingswidgets --output=junit > test-results/liblsm-junit.xml
                   luacov
                   luacov --config .luacov-html
                   mv luacov.report.out test-results/luacov.report.out
@@ -70,7 +74,12 @@ jobs:
                   action_fail: true
                   action_fail_on_inconclusive: true
                   comment_mode: off
-                  files: test-results/busted-junit.xml
+                  files: |
+                      test-results/busted-junit.xml
+                      test-results/lsb-junit.xml
+                      test-results/libconsole-junit.xml
+                      test-results/libevent-junit.xml
+                      test-results/liblsm-junit.xml
 
             - name: Validate tag matches TOC version
               run: |

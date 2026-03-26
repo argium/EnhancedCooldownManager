@@ -9,7 +9,6 @@ local TestHelpers = assert(
 
 describe("PowerBarTickMarksStore", function()
     local originalGlobals
-    local addonNS
     local currentClassID
     local currentSpecIndex
 
@@ -27,35 +26,16 @@ describe("PowerBarTickMarksStore", function()
         currentClassID = 1
         currentSpecIndex = 2
 
-        _G.ECM = {
-            Constants = {
+        TestHelpers.SetupPowerBarTickMarksEnv({
+            constants = {
                 DEFAULT_POWERBAR_TICK_COLOR = { r = 0.9, g = 0.8, b = 0.7, a = 0.6 },
                 CLASS_COLORS = { WARRIOR = "C79C6E" },
                 COLOR_WHITE_HEX = "FFFFFF",
             },
-            CloneValue = TestHelpers.deepClone,
-            OptionUtil = {
-                GetCurrentClassSpec = function()
-                    return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
-                end,
-            },
-            ScheduleLayoutUpdate = function() end,
-        }
-
-        _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
-        _G.YES = "Yes"
-        _G.NO = "No"
-        _G.SETTINGS_DEFAULTS = "Defaults"
-
-        addonNS = {
-            Addon = {
-                db = {
-                    profile = {},
-                },
-            },
-        }
-
-        TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
+            getCurrentClassSpec = function()
+                return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
+            end,
+        })
     end)
 
     it("returns empty ticks when class/spec is unavailable", function()

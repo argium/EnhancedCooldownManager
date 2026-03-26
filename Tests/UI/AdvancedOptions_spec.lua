@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("AdvancedOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, advancedCategory, initializers
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -28,6 +28,8 @@ describe("AdvancedOptions getters/setters/defaults", function()
             TestHelpers.LoadChunk("UI/AdvancedOptions.lua", "AdvancedOptions")(nil, ns)
             ns.OptionsSections["Advanced Options"].RegisterSettings(SB)
         end)
+        advancedCategory = SB._subcategories[ECM.L["ADVANCED_OPTIONS"]]
+        initializers = SB._layouts[advancedCategory]._initializers
     end)
 
     describe("debug", function()
@@ -53,6 +55,30 @@ describe("AdvancedOptions getters/setters/defaults", function()
         end)
         it("default matches expected", function()
             assert.are.equal(0.04, settings["ECM_global_updateFrequency"]._default)
+        end)
+    end)
+
+    describe("showReleasePopupOnUpdate", function()
+        it("does not register a show on update toggle", function()
+            assert.is_nil(settings["ECM_global_showReleasePopupOnUpdate"])
+        end)
+    end)
+
+    describe("Show What's New button", function()
+        it("uses a placeholder label for the button row", function()
+            local button = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["SHOW_WHATS_NEW"]))
+            assert.are.equal(" ", button._name)
+        end)
+
+        it("forces the popup open through the addon method", function()
+            local forced
+            ns.Addon.ShowReleasePopup = function(_, force)
+                forced = force
+            end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["SHOW_WHATS_NEW"])._onClick()
+
+            assert.is_true(forced)
         end)
     end)
 end)

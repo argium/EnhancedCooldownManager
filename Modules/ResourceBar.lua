@@ -3,12 +3,12 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local ResourceBar = ns.Addon:NewModule("ResourceBar", "AceEvent-3.0")
+local ResourceBar = ns.Addon:NewModule("ResourceBar")
 local ClassUtil = ECM.ClassUtil
 ns.Addon.ResourceBar = ResourceBar
 
 function ResourceBar:ShouldShow()
-    return ECM.FrameMixin.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
+    return ECM.FrameMixin.Proto.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
 end
 
 function ResourceBar:GetStatusBarValues()
@@ -30,8 +30,11 @@ function ResourceBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local resourceType = ClassUtil.GetPlayerResourceType()
 
-    if ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
-        and cfg.maxColorsEnabled and cfg.maxColorsEnabled[resourceType] then
+    if
+        ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
+        and cfg.maxColorsEnabled
+        and cfg.maxColorsEnabled[resourceType]
+    then
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
         if safeMax and current == safeMax then
             return cfg.maxColors and cfg.maxColors[resourceType] or ECM.Constants.COLOR_WHITE
@@ -42,25 +45,12 @@ function ResourceBar:GetStatusBarColor()
     return color or ECM.Constants.COLOR_WHITE
 end
 
-function ResourceBar:Refresh(why, force)
-    local continue = ECM.BarMixin.Refresh(self, why, force)
-    if not continue then
-        return false
-    end
-
+function ResourceBar:_OnBarRefreshed(why)
     -- Use the safe discrete count (3rd return) for tick layout to avoid
-    -- secret value comparison/arithmetic. Devourer types have large counts
-    -- (30/35) that should not produce tick dividers.
+    -- secret value comparison/arithmetic.
     local resourceType = ClassUtil.GetPlayerResourceType()
     local _, _, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
-    local isDevourer = (
-        resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
-        or resourceType == ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
-    )
-
-    if isDevourer then
-        self:HideAllTicks("tickPool")
-    elseif safeMax and safeMax > 1 then
+    if safeMax and safeMax > 1 then
         local frame = self.InnerFrame
         local tickCount = safeMax - 1
         self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
@@ -70,7 +60,6 @@ function ResourceBar:Refresh(why, force)
     end
 
     ECM.Log(self.Name, "Refresh complete.")
-    return true
 end
 
 function ResourceBar:OnEventUpdate(event, ...)
@@ -84,15 +73,19 @@ function ResourceBar:OnEventUpdate(event, ...)
     self:ThrottledUpdateLayout(event or "OnEventUpdate")
 end
 
-function ResourceBar:OnEnable()
+function ResourceBar:OnInitialize()
     ECM.BarMixin.AddMixin(self, "ResourceBar")
-    ECM.RegisterFrame(self)
+end
 
-    self:RegisterEvent("UNIT_AURA", "OnEventUpdate")
-    self:RegisterEvent("UNIT_POWER_UPDATE", "OnEventUpdate")
+function ResourceBar:OnEnable()
+    self:EnsureFrame()
+    ECM.Runtime.RegisterFrame(self)
+
+    self:RegisterEvent("UNIT_AURA", function(_, ...) self:OnEventUpdate(...) end)
+    self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnEventUpdate(...) end)
 end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

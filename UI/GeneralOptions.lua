@@ -3,44 +3,44 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
+local L = ECM.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
 local GeneralOptions = {}
 
 function GeneralOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
-        name = "General",
+        name = L["GENERAL"],
         path = "global",
         args = {
             -- Visibility
-            visHeader = { type = "header", name = "Visibility", order = 10 },
+            visHeader = { type = "header", name = L["VISIBILITY"], order = 10 },
             hideWhenMounted = {
                 type = "toggle",
                 path = "hideWhenMounted",
-                name = "Hide when Mounted",
-                desc = "Automatically hide icon and bars while mounted.",
+                name = L["HIDE_WHEN_MOUNTED"],
+                desc = L["HIDE_WHEN_MOUNTED_DESC"],
                 order = 11,
             },
             hideInRestAreas = {
                 type = "toggle",
                 path = "hideOutOfCombatInRestAreas",
-                name = "Hide in Rest Areas",
-                desc = "Automatically hide icon and bars when in rest areas. Bars will reappear if you enter combat.",
+                name = L["HIDE_IN_REST_AREAS"],
+                desc = L["HIDE_IN_REST_AREAS_DESC"],
                 order = 12,
             },
             fade = {
                 type = "toggle",
                 path = "global.outOfCombatFade.enabled",
-                name = "Fade when Out of Combat",
-                desc = "Automatically fade bars when out of combat to reduce screen clutter.",
+                name = L["FADE_OUT_OF_COMBAT"],
+                desc = L["FADE_OUT_OF_COMBAT_DESC"],
                 order = 13,
             },
             fadeOpacity = {
                 type = "range",
                 path = "global.outOfCombatFade.opacity",
-                name = "Out of Combat Opacity",
-                desc = "How visible the bars are when faded (0%% = invisible, 100%% = fully visible).",
+                name = L["OUT_OF_COMBAT_OPACITY"],
+                desc = L["OUT_OF_COMBAT_OPACITY_DESC"],
                 min = 0,
                 max = 100,
                 step = 5,
@@ -50,47 +50,47 @@ function GeneralOptions.RegisterSettings(SB)
             fadeExceptInstance = {
                 type = "toggle",
                 path = "global.outOfCombatFade.exceptInInstance",
-                name = "Except Inside Instances",
+                name = L["EXCEPT_INSIDE_INSTANCES"],
                 parent = "fade",
                 order = 15,
             },
             fadeExceptHostile = {
                 type = "toggle",
                 path = "global.outOfCombatFade.exceptIfTargetCanBeAttacked",
-                name = "Except if Target is Hostile",
+                name = L["EXCEPT_TARGET_HOSTILE"],
                 parent = "fade",
                 order = 16,
             },
             fadeExceptFriendly = {
                 type = "toggle",
                 path = "global.outOfCombatFade.exceptIfTargetCanBeHelped",
-                name = "Except if Target is Friendly",
+                name = L["EXCEPT_TARGET_FRIENDLY"],
                 parent = "fade",
                 order = 17,
             },
 
             -- Appearance
-            appearHeader = { type = "header", name = "Appearance", order = 20 },
+            appearHeader = { type = "header", name = L["APPEARANCE"], order = 20 },
             texture = {
                 type = "custom",
                 path = "texture",
-                name = "Bar Texture",
-                desc = "Select the texture used for bars.",
+                name = L["BAR_TEXTURE"],
+                desc = L["BAR_TEXTURE_DESC"],
                 template = LSMW.TEXTURE_PICKER_TEMPLATE,
                 order = 21,
             },
             font = {
                 type = "custom",
                 path = "font",
-                name = "Font",
-                desc = "Select the font used for bar text.",
+                name = L["FONT"],
+                desc = L["FONT_DESC"],
                 template = LSMW.FONT_PICKER_TEMPLATE,
                 order = 22,
             },
             fontSize = {
                 type = "range",
                 path = "fontSize",
-                name = "Font Size",
+                name = L["FONT_SIZE"],
                 min = 6,
                 max = 32,
                 step = 1,
@@ -102,71 +102,34 @@ function GeneralOptions.RegisterSettings(SB)
             fontOutline = {
                 type = "select",
                 path = "fontOutline",
-                name = "Font Outline",
+                name = L["FONT_OUTLINE"],
                 values = {
-                    NONE = "None",
-                    OUTLINE = "Outline",
-                    THICKOUTLINE = "Thick Outline",
-                    MONOCHROME = "Monochrome",
+                    NONE = L["FONT_OUTLINE_NONE"],
+                    OUTLINE = L["FONT_OUTLINE_OUTLINE"],
+                    THICKOUTLINE = L["FONT_OUTLINE_THICK"],
+                    MONOCHROME = L["FONT_OUTLINE_MONOCHROME"],
                 },
                 order = 24,
             },
             fontShadow = {
                 type = "toggle",
                 path = "fontShadow",
-                name = "Font Shadow",
-                desc = "Enable a shadow behind bar text.",
+                name = L["FONT_SHADOW"],
+                desc = L["FONT_SHADOW_DESC"],
                 order = 25,
             },
 
-            -- Layout
-            layoutHeader = { type = "header", name = "Layout", order = 30 },
+            -- Sizing
+            layoutHeader = { type = "header", name = L["SIZING"], order = 30 },
             barHeight = {
                 type = "range",
                 path = "barHeight",
-                name = "Bar Height",
-                desc = "Default height for all bars.",
+                name = L["BAR_HEIGHT"],
+                desc = L["BAR_HEIGHT_DESC"],
                 min = 10,
                 max = 40,
                 step = 1,
                 order = 31,
-            },
-            offsetY = {
-                type = "range",
-                path = "offsetY",
-                name = "Vertical Offset",
-                desc = "Vertical gap between the main icons and the first bar.",
-                min = 0,
-                max = 20,
-                step = 1,
-                order = 32,
-            },
-            moduleSpacing = {
-                type = "range",
-                path = "moduleSpacing",
-                name = "Vertical Spacing",
-                desc = "Vertical spacing between modules. Spacing between buff bars is controlled separately.",
-                min = 0,
-                max = 20,
-                step = 1,
-                getTransform = function(value)
-                    return value or 0
-                end,
-                order = 33,
-            },
-            growDirection = {
-                type = "select",
-                path = "moduleGrowDirection",
-                name = "Grow Direction",
-                desc = "Display bars above or below the cooldown viewer.",
-                values = {
-                    [C.GROW_DIRECTION_DOWN] = "Down",
-                    [C.GROW_DIRECTION_UP] = "Up",
-                },
-                getTransform = function(value)
-                    return value or C.GROW_DIRECTION_DOWN
-                end,
-                order = 34,
             },
         },
     })

@@ -17,6 +17,73 @@ lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
 lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
+lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
+lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
+
+--- Installs one-time hooks on SettingsPanel to fire page-level onShow/onHide
+--- callbacks registered via RegisterFromTable.  Defers automatically if
+--- SettingsPanel has not been created yet (Blizzard_Settings loads on demand).
+local function installPageLifecycleHooks()
+    if lib._pageLifecycleHooked then
+        return
+    end
+
+    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
+        -- SettingsPanel not yet loaded; listen for ADDON_LOADED to retry.
+        if lib._pageLifecycleDeferred or type(CreateFrame) ~= "function" then
+            return
+        end
+        lib._pageLifecycleDeferred = true
+        local f = CreateFrame("Frame")
+        f:RegisterEvent("ADDON_LOADED")
+        f:SetScript("OnEvent", function(self)
+            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
+                self:UnregisterAllEvents()
+                installPageLifecycleHooks()
+            end
+        end)
+        return
+    end
+
+    lib._pageLifecycleHooked = true
+
+    -- DisplayCategory fires for both sidebar clicks and OpenToCategory.
+    -- Retrieve the active category via GetCurrentCategory inside the hook.
+    hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
+        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        local old = lib._activeLifecycleCategory
+        if old == category then
+            return
+        end
+
+        if old then
+            local cbs = lib._pageLifecycleCallbacks[old]
+            if cbs and cbs.onHide then
+                cbs.onHide()
+            end
+        end
+
+        lib._activeLifecycleCategory = category
+        if category then
+            local cbs = lib._pageLifecycleCallbacks[category]
+            if cbs and cbs.onShow then
+                cbs.onShow()
+            end
+        end
+    end)
+
+    SettingsPanel:HookScript("OnHide", function()
+        local active = lib._activeLifecycleCategory
+        if active then
+            local cbs = lib._pageLifecycleCallbacks[active]
+            if cbs and cbs.onHide then
+                cbs.onHide()
+            end
+        end
+        lib._activeLifecycleCategory = nil
+    end)
+end
+
 local confirmDialogName = MAJOR .. "_SettingsConfirm"
 local listElementKeysToHide = { "_lsbSubheaderTitle", "_lsbInfoTitle", "_lsbInfoValue", "_lsbCanvas" }
 
@@ -95,7 +162,7 @@ local function ensureSubheaderTitle(frame)
     end
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    title:SetPoint("TOPLEFT", 35, -12)
+    title:SetPoint("TOPLEFT", 35, -8)
     title:SetJustifyH("LEFT")
     title:SetJustifyV("TOP")
     frame._lsbSubheaderTitle = title
@@ -127,7 +194,7 @@ end
 
 local function applySubheaderFrame(frame, data)
     local title = ensureSubheaderTitle(frame)
-    title:SetFontObject(GameFontNormal)
+    title:SetFontObject(GameFontHighlight)
     title:SetText(data.name)
     title:Show()
 end
@@ -870,12 +937,16 @@ function lib:New(config)
             default = spec.getTransform(default)
         end
 
+        if default == nil then
+            default = defaultFallback
+        end
+
         setting = Settings.RegisterProxySetting(
             cat,
             variable,
             varType,
             spec.name,
-            default ~= nil and default or defaultFallback,
+            default,
             getter,
             setter
         )
@@ -978,8 +1049,9 @@ function lib:New(config)
             frame:EnableMouse(enabled)
         end
         if frame.GetChildren then
-            for _, child in ipairs({ frame:GetChildren() }) do
-                setCanvasInteractive(child, enabled)
+            local children = { frame:GetChildren() }
+            for i = 1, #children do
+                setCanvasInteractive(children[i], enabled)
             end
         end
     end
@@ -1185,6 +1257,18 @@ function lib:New(config)
         return category and category:GetID()
     end
 
+    function SB.GetRootCategory()
+        return SB._rootCategory
+    end
+
+    function SB.GetSubcategory(name)
+        return SB._subcategories[name]
+    end
+
+    function SB.HasCategory(category)
+        return category ~= nil and SB._layouts[category] ~= nil
+    end
+
     ----------------------------------------------------------------------------
     -- Proxy controls
     ----------------------------------------------------------------------------
@@ -1220,7 +1304,9 @@ function lib:New(config)
             default = spec.getTransform(default)
         end
 
-        local varType = type(default) == "number" and Settings.VarType.Number or Settings.VarType.String
+        local varType = spec.varType
+            or (type(default) == "number" and Settings.VarType.Number)
+            or Settings.VarType.String
 
         local setting = makeProxySetting(spec, varType, "", binding)
 
@@ -1517,104 +1603,6 @@ function lib:New(config)
         return results
     end
 
-    --- Positioning group.
-    --- Required spec fields:
-    ---   positionModes     table         value → label map
-    ---   isAnchorModeFree  function(cfg) -> bool
-    --- Optional spec fields:
-    ---   applyPositionMode function(cfg, mode)
-    ---   defaultBarWidth   number (default 250)
-    function SB.PositioningGroup(configPath, spec)
-        spec = mergeCompositeDefaults("PositioningGroup", spec)
-        assert(spec.positionModes, "PositioningGroup: spec.positionModes is required")
-        assert(spec.isAnchorModeFree, "PositioningGroup: spec.isAnchorModeFree is required")
-
-        local modeSpec = {
-            path = configPath .. ".anchorMode",
-            name = spec.modeName or "Position Mode",
-            tooltip = spec.modeTooltip,
-            values = spec.positionModes,
-            onSet = function(value)
-                if spec.applyPositionMode then
-                    spec.applyPositionMode(adapter:read(configPath), value)
-                end
-            end,
-        }
-        propagateModifiers(modeSpec, spec)
-        local modeInit, modeSetting = SB.Dropdown(modeSpec)
-
-        local function isFreeMode()
-            return spec.isAnchorModeFree(adapter:read(configPath))
-        end
-
-        local defaultBarWidth = spec.defaultBarWidth or 250
-
-        local widthSpec = {
-            path = configPath .. ".width",
-            name = spec.widthName or "Width",
-            tooltip = spec.widthTooltip or "Width when free positioning is enabled.",
-            min = spec.widthMin or 100,
-            max = spec.widthMax or 600,
-            step = spec.widthStep or 1,
-            parent = modeInit,
-            parentCheck = isFreeMode,
-            getTransform = function(value)
-                return value or defaultBarWidth
-            end,
-        }
-        propagateModifiers(widthSpec, spec)
-        local widthInit = SB.Slider(widthSpec)
-
-        local offsetXInit
-        if spec.includeOffsetX ~= false then
-            local offsetXSpec = {
-                path = configPath .. ".offsetX",
-                name = spec.offsetXName or "Offset X",
-                tooltip = spec.offsetXTooltip or "Horizontal offset when free positioning is enabled.",
-                min = -800,
-                max = 800,
-                step = 1,
-                parent = modeInit,
-                parentCheck = isFreeMode,
-                getTransform = function(value)
-                    return value or 0
-                end,
-                setTransform = function(value)
-                    return value ~= 0 and value or nil
-                end,
-            }
-            propagateModifiers(offsetXSpec, spec)
-            offsetXInit = SB.Slider(offsetXSpec)
-        end
-
-        local offsetYSpec = {
-            path = configPath .. ".offsetY",
-            name = spec.offsetYName or "Offset Y",
-            tooltip = spec.offsetYTooltip or "Vertical offset when free positioning is enabled.",
-            min = -800,
-            max = 800,
-            step = 1,
-            parent = modeInit,
-            parentCheck = isFreeMode,
-            getTransform = function(value)
-                return value or 0
-            end,
-            setTransform = function(value)
-                return value ~= 0 and value or nil
-            end,
-        }
-        propagateModifiers(offsetYSpec, spec)
-        local offsetYInit = SB.Slider(offsetYSpec)
-
-        return {
-            modeInit = modeInit,
-            modeSetting = modeSetting,
-            widthInit = widthInit,
-            offsetXInit = offsetXInit,
-            offsetYInit = offsetYInit,
-        }
-    end
-
     ----------------------------------------------------------------------------
     -- Utility helpers
     ----------------------------------------------------------------------------
@@ -1642,7 +1630,7 @@ function lib:New(config)
         local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
             _lsbKind = "subheader",
             name = spec.name,
-        }, 35, applySubheaderFrame)
+        }, 28, applySubheaderFrame)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
         return initializer
@@ -1682,6 +1670,21 @@ function lib:New(config)
         return initializer
     end
 
+    local CONFIRM_DIALOG_NAME = confirmDialogName
+    StaticPopupDialogs[CONFIRM_DIALOG_NAME] = {
+        text = "%s",
+        button1 = YES,
+        button2 = NO,
+        OnAccept = function(_, data)
+            if data and data.onAccept then
+                data.onAccept()
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+
     function SB.Button(spec)
         local cat = spec.category or SB._currentSubcategory or SB._rootCategory
 
@@ -1689,19 +1692,8 @@ function lib:New(config)
         if spec.confirm then
             local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
             local originalClick = onClick
-            lib._nextConfirmDialogId = (lib._nextConfirmDialogId or 0) + 1
-            local dialogName = confirmDialogName .. "_" .. lib._nextConfirmDialogId
             onClick = function()
-                StaticPopupDialogs[dialogName] = {
-                    text = confirmText,
-                    button1 = YES,
-                    button2 = NO,
-                    OnAccept = originalClick,
-                    timeout = 0,
-                    whileDead = true,
-                    hideOnEscape = true,
-                }
-                StaticPopup_Show(dialogName)
+                StaticPopup_Show(CONFIRM_DIALOG_NAME, confirmText, nil, { onAccept = originalClick })
             end
         end
 
@@ -1726,14 +1718,10 @@ function lib:New(config)
         description = "subheader",
     }
 
-    local SPEC_EXCLUDE = { type = true, order = true, _key = true, defs = true, label = true, condition = true }
+    local SPEC_EXCLUDE = { type = true, order = true, defs = true, label = true, condition = true }
 
     -- Composite type dispatch: returns init, setting from a composite builder
     local COMPOSITE_DISPATCH = {
-        positioning = function(path, spec)
-            local r = SB.PositioningGroup(path, spec)
-            return r.modeInit, r.modeSetting
-        end,
         border = function(path, spec)
             local r = SB.BorderGroup(path, spec)
             return r.enabledInit, r.enabledSetting
@@ -1748,6 +1736,8 @@ function lib:New(config)
     }
 
     --- Walks an AceConfig-inspired option table and calls the imperative API.
+    --- Top-level `onShow`/`onHide` callbacks fire when the page is selected or
+    --- navigated away from (via SettingsPanel.SelectCategory hook).
     function SB.RegisterFromTable(tbl)
         assert(tbl.name, "RegisterFromTable: tbl.name is required")
 
@@ -1755,6 +1745,14 @@ function lib:New(config)
             SB._currentSubcategory = SB._rootCategory
         else
             SB.CreateSubcategory(tbl.name)
+        end
+
+        if tbl.onShow or tbl.onHide then
+            lib._pageLifecycleCallbacks[SB._currentSubcategory] = {
+                onShow = tbl.onShow,
+                onHide = tbl.onHide,
+            }
+            installPageLifecycleHooks()
         end
 
         local groupPath = tbl.path or ""
@@ -1773,19 +1771,24 @@ function lib:New(config)
             return
         end
 
-        -- Sort entries by order field
+        -- Sort entries by order field (stable: secondary key breaks ties)
         local sorted = {}
         for key, entry in pairs(tbl.args) do
-            entry._key = key
-            sorted[#sorted + 1] = entry
+            sorted[#sorted + 1] = { key = key, entry = entry }
         end
         table.sort(sorted, function(a, b)
-            return (a.order or 100) < (b.order or 100)
+            local oa, ob = a.entry.order or 100, b.entry.order or 100
+            if oa ~= ob then
+                return oa < ob
+            end
+            return a.key < b.key
         end)
 
         local created = {}
 
-        for _, entry in ipairs(sorted) do
+        for _, item in ipairs(sorted) do
+            local entryKey = item.key
+            local entry = item.entry
             local entryType = TYPE_ALIASES[entry.type] or entry.type
 
             -- Evaluate condition (skip entry if false)
@@ -1817,18 +1820,17 @@ function lib:New(config)
                 -- Resolve parent string references
                 if type(spec.parent) == "string" then
                     local ref = created[spec.parent]
-                    if ref then
-                        spec.parent = ref.initializer
-                        if spec.parentCheck == "checked" then
-                            local s = ref.setting
-                            spec.parentCheck = function()
-                                return s:GetValue()
-                            end
-                        elseif spec.parentCheck == "notChecked" then
-                            local s = ref.setting
-                            spec.parentCheck = function()
-                                return not s:GetValue()
-                            end
+                    assert(ref, "RegisterFromTable: parent '" .. spec.parent .. "' not found (misspelled or forward-referenced?)")
+                    spec.parent = ref.initializer
+                    if spec.parentCheck == "checked" then
+                        local s = ref.setting
+                        spec.parentCheck = function()
+                            return s:GetValue()
+                        end
+                    elseif spec.parentCheck == "notChecked" then
+                        local s = ref.setting
+                        spec.parentCheck = function()
+                            return not s:GetValue()
                         end
                     end
                 end
@@ -1876,13 +1878,13 @@ function lib:New(config)
                     end
                     -- Handler mode: fall back to entry key as spec.key if not set
                     if spec.get and not spec.key then
-                        spec.key = entry._key
+                        spec.key = entryKey
                     end
                     spec.type = entryType
                     init, setting = SB.Control(spec)
                 end
 
-                created[entry._key] = { initializer = init, setting = setting }
+                created[entryKey] = { initializer = init, setting = setting }
             end
         end
     end

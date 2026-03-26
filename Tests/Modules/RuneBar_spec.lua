@@ -5,271 +5,6 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
-describe("RuneBar", function()
-    local originalGlobals
-    local UnitStub
-    local makeFrame = TestHelpers.makeFrame
-    local makeStatusBar = TestHelpers.makeStatusBar
-    local getCalls = TestHelpers.getCalls
-
-    local CAPTURED_GLOBALS = {
-        "ECM",
-        "Enum",
-        "UnitClass",
-        "GetSpecialization",
-        "GetRuneCooldown",
-        "GetTime",
-        "CreateFrame",
-        "UIParent",
-        "issecretvalue",
-    }
-
-    setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals(CAPTURED_GLOBALS)
-    end)
-
-    teardown(function()
-        TestHelpers.RestoreGlobals(originalGlobals)
-    end)
-
-    before_each(function()
-        _G.ECM = {}
-        _G.ECM.Log = function() end
-        _G.ECM.DebugAssert = function() end
-        _G.GetSpecialization = function()
-            return 1
-        end
-        _G.issecretvalue = function()
-            return false
-        end
-        _G.GetTime = function()
-            return 0
-        end
-        _G.UIParent = makeFrame({ name = "UIParent", width = 1, height = 1 })
-        _G.CreateFrame = function(frameType, name, parent)
-            if frameType == "StatusBar" then
-                return makeStatusBar({ name = name })
-            end
-            return makeFrame({ name = name })
-        end
-        _G.GetRuneCooldown = function(index)
-            return 0, 0, true
-        end
-
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadStub("Enums.lua")
-
-        UnitStub = TestHelpers.LoadStub("Unit.lua")
-        UnitStub.Install()
-
-        TestHelpers.LoadChunk("Helpers/ClassUtil.lua", "Unable to load Helpers/ClassUtil.lua")()
-
-        -- Provide PixelSnap and GetTexture stubs
-        ECM.PixelSnap = function(v)
-            return math.floor(v + 0.5)
-        end
-        ECM.GetTexture = function()
-            return "Interface\\TargetingFrame\\UI-StatusBar"
-        end
-    end)
-
-    --- Creates a minimal RuneBar stub with the ShouldShow method loaded from source.
-    local function makeRuneBar(opts)
-        opts = opts or {}
-        local mod = {}
-
-        -- Load the production ShouldShow via chunk extraction
-        local ClassUtil = ECM.ClassUtil
-        local FrameMixin = ECM.FrameMixin or {}
-        ECM.FrameMixin = FrameMixin
-
-        -- Provide a base ShouldShow on FrameMixin that requires GetModuleConfig
-        FrameMixin.ShouldShow = function(self)
-            local config = self:GetModuleConfig()
-            return not self.IsHidden and (config == nil or config.enabled ~= false)
-        end
-
-        -- Mirror production ShouldShow
-        function mod:ShouldShow()
-            return ClassUtil.IsDeathKnight() and FrameMixin.ShouldShow(self)
-        end
-
-        if opts.withMixin then
-            mod.GetModuleConfig = function()
-                return opts.moduleConfig or { enabled = true }
-            end
-        end
-
-        mod.IsHidden = opts.isHidden or false
-
-        return mod
-    end
-
-    describe("ShouldShow", function()
-        it("returns false for non-DK without requiring GetModuleConfig", function()
-            UnitStub.SetClass("player", "WARRIOR")
-            local mod = makeRuneBar({ withMixin = false })
-
-            assert.is_false(mod:ShouldShow())
-        end)
-
-        it("returns true for DK with mixin and enabled config", function()
-            UnitStub.SetClass("player", "DEATHKNIGHT")
-            local mod = makeRuneBar({ withMixin = true, moduleConfig = { enabled = true } })
-
-            assert.is_true(mod:ShouldShow())
-        end)
-
-        it("returns false for DK when config.enabled is false", function()
-            UnitStub.SetClass("player", "DEATHKNIGHT")
-            local mod = makeRuneBar({ withMixin = true, moduleConfig = { enabled = false } })
-
-            assert.is_false(mod:ShouldShow())
-        end)
-
-        it("returns false for DK when IsHidden is true", function()
-            UnitStub.SetClass("player", "DEATHKNIGHT")
-            local mod = makeRuneBar({ withMixin = true, isHidden = true })
-
-            assert.is_false(mod:ShouldShow())
-        end)
-
-        it("does not call GetModuleConfig for non-DK players", function()
-            UnitStub.SetClass("player", "MAGE")
-            local mod = makeRuneBar({ withMixin = false })
-
-            -- Should not error even though GetModuleConfig is absent
-            assert.has_no.errors(function()
-                mod:ShouldShow()
-            end)
-        end)
-    end)
-
-    describe("updateFragmentedRuneDisplay", function()
-        -- Mirrors the production repositioning decision logic from RuneBar.lua
-        -- to verify fragments are repositioned when dimensions change.
-
-        local C = ECM.Constants
-
-        local function runeReadyStatesDiffer(lastReadySet, readySet, maxRunes)
-            for i = 1, maxRunes do
-                if (readySet[i] or false) ~= ((lastReadySet and lastReadySet[i]) or false) then
-                    return true
-                end
-            end
-            return false
-        end
-
-        --- Mirrors updateFragmentedRuneDisplay's repositioning decision.
-        --- Returns true if fragments would be repositioned.
-        local function wouldReposition(bar, readySet, maxRunes)
-            local barWidth = bar:GetWidth()
-            local barHeight = bar:GetHeight()
-            if barWidth <= 0 or barHeight <= 0 then
-                return false
-            end
-
-            local statesChanged = (bar._lastReadySet == nil)
-                or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
-            local dimensionsChanged = (bar._lastBarWidth ~= barWidth) or (bar._lastBarHeight ~= barHeight)
-
-            if statesChanged or dimensionsChanged then
-                bar._lastReadySet = readySet
-                bar._lastBarWidth = barWidth
-                bar._lastBarHeight = barHeight
-                return true
-            end
-            return false
-        end
-
-        local function allRunesReady(maxRunes)
-            local set = {}
-            for i = 1, maxRunes do
-                set[i] = true
-            end
-            return set
-        end
-
-        it("repositions on first call when _lastReadySet is nil", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            assert.is_true(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("does not reposition when states and dimensions are unchanged", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES) -- initial
-            assert.is_false(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("repositions when rune states change", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES)
-
-            -- Rune 1 goes on cooldown
-            local newReadySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-            newReadySet[1] = nil
-
-            assert.is_true(wouldReposition(bar, newReadySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("repositions when bar width changes (resize on talent change)", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES)
-
-            -- Bar width changes (e.g., talent change triggers layout)
-            bar:SetWidth(400)
-
-            assert.is_true(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("repositions when bar height changes", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES)
-
-            bar:SetHeight(30)
-
-            assert.is_true(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("skips repositioning for zero-width bars", function()
-            local bar = makeFrame({ width = 0, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            assert.is_false(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("skips repositioning for zero-height bars", function()
-            local bar = makeFrame({ width = 300, height = 0 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            assert.is_false(wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES))
-        end)
-
-        it("caches new dimensions after repositioning", function()
-            local bar = makeFrame({ width = 300, height = 20 })
-            local readySet = allRunesReady(C.RUNEBAR_MAX_RUNES)
-
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES)
-            assert.are.equal(300, bar._lastBarWidth)
-            assert.are.equal(20, bar._lastBarHeight)
-
-            bar:SetWidth(400)
-            wouldReposition(bar, readySet, C.RUNEBAR_MAX_RUNES)
-            assert.are.equal(400, bar._lastBarWidth)
-        end)
-    end)
-end)
-
 describe("RuneBar real source", function()
     local originalGlobals
     local RuneBar
@@ -313,24 +48,27 @@ describe("RuneBar real source", function()
 
         _G.ECM = {
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
-                Refresh = function()
-                    return frameRefreshResult
-                end,
-                CreateFrame = function(self)
-                    local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
-                    frame.GetFrameLevel = function()
-                        return 1
-                    end
-                    frame.SetFrameLevel = function() end
-                    return frame
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                    Refresh = function()
+                        return frameRefreshResult
+                    end,
+                    CreateFrame = function(self)
+                        local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
+                        frame.GetFrameLevel = function()
+                            return 1
+                        end
+                        frame.SetFrameLevel = function() end
+                        return frame
+                    end,
+                },
             },
             BarMixin = {
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             ClassUtil = {
@@ -338,12 +76,14 @@ describe("RuneBar real source", function()
                     return isDeathKnight
                 end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function()
-                unregisterFrameCalls = unregisterFrameCalls + 1
-            end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function()
+                    unregisterFrameCalls = unregisterFrameCalls + 1
+                end,
+            },
             Log = function() end,
         }
         _G.C_Timer = {
@@ -359,6 +99,8 @@ describe("RuneBar real source", function()
             end,
         }
         _G.UIParent = makeFrame({ name = "UIParent" })
+        -- wipe is a WoW Lua 5.1 built-in not available in busted's Lua 5.3+
+        _G.wipe = function(t) for k in pairs(t) do t[k] = nil end end
         _G.GetSpecialization = function()
             return 1
         end
@@ -368,7 +110,7 @@ describe("RuneBar real source", function()
         _G.GetRuneCooldown = function()
             return 0, 0, true
         end
-        _G.CreateFrame = function(frameType, name, parent)
+        _G.CreateFrame = function(_, name)
             createFrameCalls = createFrameCalls + 1
             local frame = makeFrame({ name = name, shown = true, width = 300, height = 20 })
             frame.SetFrameLevel = function() end
@@ -386,6 +128,7 @@ describe("RuneBar real source", function()
             return frame
         end
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
         ns = {
             Addon = {
@@ -414,20 +157,34 @@ describe("RuneBar real source", function()
     end)
 
     it("returns early from OnEnable for non-death-knights", function()
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
 
-        assert.are.equal(0, addMixinCalls)
+        assert.are.equal(1, addMixinCalls)
         assert.are.equal(0, registerFrameCalls)
         assert.are.equal(0, tickerCount)
     end)
 
-    it("creates a ticker and registers the frame for death knights", function()
+    it("registers the frame for death knights without starting a ticker", function()
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
 
         assert.are.equal(1, addMixinCalls)
         assert.are.equal(1, registerFrameCalls)
+        assert.are.equal(0, tickerCount)
+        assert.is_nil(RuneBar._valueTicker)
+    end)
+
+    it("starts the animation ticker on rune power update", function()
+        isDeathKnight = true
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+
+        RuneBar:OnRunePowerUpdate()
+
         assert.are.equal(1, tickerCount)
         assert.is_not_nil(RuneBar._valueTicker)
     end)
@@ -478,7 +235,6 @@ describe("RuneBar real source", function()
     it("Refresh initializes fragmented bars and lays out ticks", function()
         local ensureTicksCount
         local layoutTicksMax
-        local updateArgs
         local frame = {
             StatusBar = {
                 SetMinMaxValues = function() end,
@@ -523,7 +279,7 @@ describe("RuneBar real source", function()
         ECM.PixelSnap = function(v)
             return math.floor(v + 0.5)
         end
-        _G.GetRuneCooldown = function(index)
+        _G.GetRuneCooldown = function()
             return 0, 0, true
         end
 
@@ -570,11 +326,16 @@ describe("RuneBar real source", function()
         end
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+        RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
         assert.are.equal(1, frags[1].__value)
         assert.same({ 0.8, 0.1, 0.2 }, frags[1].__color)
+        -- Ticker should self-stop since all runes are ready
+        assert.is_nil(RuneBar._valueTicker)
     end)
 
     it("ticker hot path requests relayout when rune ready states change", function()
@@ -610,9 +371,70 @@ describe("RuneBar real source", function()
         end
         isDeathKnight = true
 
+        RuneBar:OnInitialize()
         RuneBar:OnEnable()
+        RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
-        assert.same({ "RuneStateChange" }, reasons)
+        assert.same({ "RUNE_POWER_UPDATE", "RuneStateChange" }, reasons)
+    end)
+
+    it("ticker hot path uses specialization colors when enabled", function()
+        local specId = 0
+        local colorCases = {
+            { specId = ECM.Constants.DEATHKNIGHT_FROST_SPEC_INDEX, expected = { 0.1, 0.2, 0.3 } },
+            { specId = ECM.Constants.DEATHKNIGHT_UNHOLY_SPEC_INDEX, expected = { 0.4, 0.5, 0.6 } },
+            { specId = 99, expected = { 0.7, 0.8, 0.9 } },
+        }
+        _G.GetSpecialization = function()
+            return specId
+        end
+        RuneBar.GetModuleConfig = function()
+            return {
+                useSpecColor = true,
+                color = { r = 1, g = 1, b = 1 },
+                colorBlood = { r = 0.7, g = 0.8, b = 0.9 },
+                colorFrost = { r = 0.1, g = 0.2, b = 0.3 },
+                colorUnholy = { r = 0.4, g = 0.5, b = 0.6 },
+                texture = "Solid",
+            }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        _G.GetRuneCooldown = function()
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        function RuneBar:ThrottledUpdateLayout() end
+
+        for _, case in ipairs(colorCases) do
+            local frags = {}
+            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+                frags[i] = {
+                    SetValue = function() end,
+                    SetStatusBarColor = function(self, r, g, b)
+                        self.__color = { r, g, b }
+                    end,
+                }
+            end
+            RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+            RuneBar.InnerFrame.FragmentedBars = frags
+            RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+            RuneBar.InnerFrame._lastReadySet = {}
+            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+                RuneBar.InnerFrame._lastReadySet[i] = true
+            end
+
+            specId = case.specId
+            now = now + 1
+            RuneBar:OnRunePowerUpdate()
+            RuneBar._valueTicker.callback()
+
+            assert.same(case.expected, frags[1].__color)
+        end
     end)
 end)

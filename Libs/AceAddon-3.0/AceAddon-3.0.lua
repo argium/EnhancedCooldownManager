@@ -93,11 +93,11 @@ end
 -- @param lib List of libraries to embed into the addon
 -- @usage
 -- -- Create a simple addon object
--- MyAddon = LibStub("AceAddon-3.0"):NewAddon("MyAddon", "AceEvent-3.0")
+-- MyAddon = LibStub("AceAddon-3.0"):NewAddon("MyAddon", "LibEvent-1.0")
 --
 -- -- Create a Addon object based on the table of a frame
 -- local MyFrame = CreateFrame("Frame")
--- MyAddon = LibStub("AceAddon-3.0"):NewAddon(MyFrame, "MyAddon", "AceEvent-3.0")
+-- MyAddon = LibStub("AceAddon-3.0"):NewAddon(MyFrame, "MyAddon", "LibEvent-1.0")
 function AceAddon:NewAddon(objectorname, ...)
 	local object,name
 	local i=1
@@ -223,11 +223,11 @@ local function IsModuleTrue(self) return true end
 -- @param lib List of libraries to embed into the addon
 -- @usage
 -- -- Create a module with some embeded libraries
--- MyModule = MyAddon:NewModule("MyModule", "AceEvent-3.0", "AceHook-3.0")
+-- MyModule = MyAddon:NewModule("MyModule", "LibEvent-1.0", "AceHook-3.0")
 --
 -- -- Create a module with a prototype
 -- local prototype = { OnEnable = function(self) print("OnEnable called!") end }
--- MyModule = MyAddon:NewModule("MyModule", prototype, "AceEvent-3.0", "AceHook-3.0")
+-- MyModule = MyAddon:NewModule("MyModule", prototype, "LibEvent-1.0", "AceHook-3.0")
 function NewModule(self, name, prototype, ...)
 	if type(name) ~= "string" then error(("Usage: NewModule(name, [prototype, [lib, lib, lib, ...]): 'name' - string expected got '%s'."):format(type(name)), 2) end
 	if type(prototype) ~= "string" and type(prototype) ~= "table" and type(prototype) ~= "nil" then error(("Usage: NewModule(name, [prototype, [lib, lib, lib, ...]): 'prototype' - table (prototype), string (lib) or nil expected got '%s'."):format(type(prototype)), 2) end
@@ -356,8 +356,8 @@ end
 -- @usage
 -- -- Create the addon object
 -- MyAddon = LibStub("AceAddon-3.0"):NewAddon("MyAddon")
--- -- Configure default libraries for modules (all modules need AceEvent-3.0)
--- MyAddon:SetDefaultModuleLibraries("AceEvent-3.0")
+-- -- Configure default libraries for modules (all modules need LibEvent-1.0)
+-- MyAddon:SetDefaultModuleLibraries("LibEvent-1.0")
 -- -- Create a module
 -- MyModule = MyAddon:NewModule("MyModule")
 function SetDefaultModuleLibraries(self, ...)

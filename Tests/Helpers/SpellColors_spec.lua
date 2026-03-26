@@ -46,9 +46,7 @@ describe("SpellColors", function()
         return math.floor(value / divisor) % 2 == 1
     end
 
-    local function color(r, g, b, a)
-        return { r = r, g = g, b = b, a = a or 1 }
-    end
+    local color = TestHelpers.color
 
     local function makeFrame(opts)
         opts = opts or {}
@@ -105,6 +103,7 @@ describe("SpellColors", function()
         currentSpecID = 2
 
         _G.ECM = {
+            IsDebugEnabled = function() return false end,
             FrameUtil = {
                 GetIconTextureFileID = function(frame)
                     return frame and frame.__textureFileID or nil
@@ -149,7 +148,7 @@ describe("SpellColors", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
         buffBarsConfig = {}
         local addonNS = {
@@ -162,7 +161,8 @@ describe("SpellColors", function()
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/SpellColors/KeyType.lua", "Unable to load Helpers/SpellColors/KeyType.lua")()
+        TestHelpers.LoadChunk("Helpers/SpellColors/Store.lua", "Unable to load Helpers/SpellColors/Store.lua")(nil, addonNS)
 
         SpellColors = assert(ECM.SpellColors, "SpellColors module did not initialize")
     end)
@@ -443,33 +443,16 @@ describe("SpellColors", function()
         end)
     end)
 
-    it("ReconcileBar unifies conflicting entries to the most recent write", function()
+    it("ReconcileAllKeys unifies conflicting entries to the most recent write", function()
         local older = color(0.1, 0.1, 0.1)
         local newer = color(0.9, 0.9, 0.2)
 
         SpellColors.SetColorByKey(SpellColors.MakeKey("Fel Rush", nil, nil, 5678), older)
         SpellColors.SetColorByKey(SpellColors.MakeKey(nil, nil, nil, 5678), newer)
 
-        SpellColors.ReconcileBar(makeFrame({ spellName = "Fel Rush", textureFileID = 5678 }))
+        SpellColors.ReconcileAllKeys({ SpellColors.MakeKey("Fel Rush", nil, nil, 5678) })
 
         assert.are.same(newer, SpellColors.GetColorByKey({ spellName = "Fel Rush" }))
-    end)
-
-    it("ReconcileAllBars reports changed count and skips invalid frames", function()
-        local older = color(0.1, 0.2, 0.3)
-        local newer = color(0.7, 0.8, 0.9)
-
-        SpellColors.SetColorByKey(SpellColors.MakeKey("Blur", nil, nil, 6789), older)
-        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, nil, nil, 6789), newer)
-
-        local changed = SpellColors.ReconcileAllBars({
-            {},
-            makeFrame({ hooked = false, spellName = "Blur", textureFileID = 6789 }),
-            makeFrame({ spellName = "Blur", textureFileID = 6789 }),
-        })
-
-        assert.are.equal(1, changed)
-        assert.are.same(newer, SpellColors.GetColorByKey({ spellName = "Blur" }))
     end)
 
     it("GetAllColorEntries returns deduplicated entries for shared references", function()
@@ -581,10 +564,7 @@ describe("SpellColors", function()
         local persisted = color(0.6, 0.1, 0.9)
         SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 1357, nil, nil), persisted)
 
-        SpellColors.ReconcileBar(makeFrame({
-            spellName = "Persisted Name",
-            spellID = 1357,
-        }))
+        SpellColors.ReconcileAllKeys({ SpellColors.MakeKey("Persisted Name", 1357, nil, nil) })
 
         assert.are.same(persisted, SpellColors.GetColorByKey({ spellName = "Persisted Name" }))
 
@@ -767,25 +747,6 @@ describe("SpellColors", function()
         }))
 
         assert.are.equal(0, #SpellColors.GetAllColorEntries())
-    end)
-
-    it("ReconcileDiscoveredKeys reconciles discovered keys with persistent store", function()
-        SpellColors.ClearDiscoveredKeys()
-
-        local c = color(0.3, 0.4, 0.5)
-        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 198013, nil, nil), c)
-
-        SpellColors.DiscoverBar(makeFrame({
-            spellName = "Eye Beam",
-            spellID = 198013,
-            cooldownID = 55,
-        }))
-
-        local changed = SpellColors.ReconcileDiscoveredKeys()
-        assert.is_true(changed > 0)
-
-        -- After reconciliation, the color is accessible by spellName
-        assert.are.same(c, SpellColors.GetColorByKey({ spellName = "Eye Beam" }))
     end)
 
     it("ClearDiscoveredKeys on spec change prevents cross-spec leaking", function()

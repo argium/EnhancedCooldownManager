@@ -33,6 +33,7 @@ describe("FrameMixin", function()
         fakeTime = 0
 
         _G.ECM = {}
+        _G.ECM.IsDebugEnabled = function() return false end
         _G.ECM.ColorUtil = {
             AreEqual = function(a, b)
                 if a == nil and b == nil then
@@ -180,9 +181,53 @@ end)
 describe("FrameMixin real source", function()
     local originalGlobals
     local FrameMixin
+    local Migration
     local ns
     local timerQueue
+    local assertAbsolutePositionPreserved = TestHelpers.assertAbsolutePositionPreserved
+    local getAbsoluteAnchorPosition = TestHelpers.getAbsoluteAnchorPosition
     local makeFrame = TestHelpers.makeFrame
+    local color = TestHelpers.color
+
+    local LEGACY_FREE_POSITION_DEFAULTS = {
+        powerBar = { point = "CENTER", x = 0, y = -275 },
+        resourceBar = { point = "CENTER", x = 0, y = -300 },
+        runeBar = { point = "CENTER", x = 0, y = -325 },
+        buffBars = { point = "CENTER", x = 0, y = -350 },
+    }
+
+    local function assertFreeFramePositionPreserved(frame, expectedX, expectedY)
+        local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
+        assert.are.equal(_G.UIParent, relativeTo)
+        assert.are.equal(point, relativePoint)
+
+        local actualX, actualY = getAbsoluteAnchorPosition(point, x, y)
+        assert.are.equal(expectedX, actualX)
+        assert.are.equal(expectedY, actualY)
+    end
+
+    local function makeFreeModeModule(name, globalConfig, moduleConfig)
+        local mod = {
+            Name = name,
+            InnerFrame = makeFrame({ name = "ECM" .. name, shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+            GetGlobalConfig = function()
+                return globalConfig
+            end,
+            GetModuleConfig = function()
+                return moduleConfig
+            end,
+            Refresh = function() end,
+        }
+
+        FrameMixin.AddMixin(mod, name)
+        return mod
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -191,6 +236,8 @@ describe("FrameMixin real source", function()
             "GetTime",
             "UIParent",
             "EssentialCooldownViewer",
+            "LibStub",
+            "date",
         })
     end)
 
@@ -202,6 +249,7 @@ describe("FrameMixin real source", function()
         timerQueue = {}
 
         _G.ECM = {
+            IsDebugEnabled = function() return false end,
             Log = function() end,
             DebugAssert = function(condition, message)
                 if not condition then
@@ -228,15 +276,26 @@ describe("FrameMixin real source", function()
         _G.GetTime = function()
             return 0
         end
+        _G.date = function()
+            return "2026-03-23 00:00:00"
+        end
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
+        _G.UIParent:SetWidth(1920)
+        _G.UIParent:SetHeight(1080)
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEditModeStub()
         ns = { Addon = {} }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")()
         FrameMixin = assert(ECM.FrameMixin, "FrameMixin did not initialize")
+        Migration = assert(ECM.Migration, "Migration did not initialize")
     end)
 
     it("GetNextChainAnchor returns the nearest earlier chain module", function()
@@ -273,8 +332,99 @@ describe("FrameMixin real source", function()
 
         local anchor, isFirst = FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, ECM.Constants.CHAIN_ORDER[1])
 
-        assert.are.equal(EssentialCooldownViewer, anchor)
+        assert.are.equal(_G.EssentialCooldownViewer, anchor)
         assert.is_true(isFirst)
+    end)
+
+    it("CalculateLayoutParams keeps the first chained module anchored below the viewer", function()
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local mod = {
+            Name = ECM.Constants.CHAIN_ORDER[1],
+            GetGlobalConfig = function()
+                return {
+                    moduleGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN,
+                    offsetY = 4,
+                    barHeight = 20,
+                }
+            end,
+            GetModuleConfig = function()
+                return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+            end,
+            GetNextChainAnchor = FrameMixin.GetNextChainAnchor,
+            NormalizeGrowDirection = FrameMixin.NormalizeGrowDirection,
+        }
+
+        local params = FrameMixin.CalculateLayoutParams(mod)
+
+        assert.are.equal(ECM.Constants.ANCHORMODE_CHAIN, params.mode)
+        assert.are.equal(_G.EssentialCooldownViewer, params.anchor)
+        assert.is_true(params.isFirst)
+        assert.are.equal("TOPLEFT", params.anchorPoint)
+        assert.are.equal("BOTTOMLEFT", params.anchorRelativePoint)
+        assert.are.equal(-4, params.offsetY)
+    end)
+
+    it("GetNextChainAnchor with detached mode finds nearest prior detached module", function()
+        local order = ECM.Constants.CHAIN_ORDER
+        local detachedFrame = makeFrame({ name = order[2] })
+        local modules = {
+            [order[1]] = {
+                IsEnabled = function()
+                    return true
+                end,
+                ShouldShow = function()
+                    return true
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+                end,
+                InnerFrame = makeFrame({ name = order[1] }),
+            },
+            [order[2]] = {
+                IsEnabled = function()
+                    return true
+                end,
+                ShouldShow = function()
+                    return true
+                end,
+                GetModuleConfig = function()
+                    return { anchorMode = ECM.Constants.ANCHORMODE_DETACHED }
+                end,
+                InnerFrame = detachedFrame,
+            },
+        }
+        ns.Addon.GetECMModule = function(_, name)
+            return modules[name]
+        end
+
+        local anchor, isFirst =
+            FrameMixin.GetNextChainAnchor({ Name = "TestModule" }, order[3], ECM.Constants.ANCHORMODE_DETACHED)
+
+        assert.are.equal(detachedFrame, anchor)
+        assert.is_false(isFirst)
+    end)
+
+    it("GetNextChainAnchor with detached mode falls back to DetachedAnchor", function()
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local detachedAnchor = makeFrame({ name = "ECMDetachedAnchor" })
+        ECM.Runtime.DetachedAnchor = detachedAnchor
+
+        local anchor, isFirst = FrameMixin.GetNextChainAnchor(
+            { Name = "TestModule" },
+            ECM.Constants.CHAIN_ORDER[1],
+            ECM.Constants.ANCHORMODE_DETACHED
+        )
+
+        assert.are.equal(detachedAnchor, anchor)
+        assert.is_true(isFirst)
+
+        ECM.Runtime.DetachedAnchor = nil
     end)
 
     it("SetHidden hides immediately and defers showing", function()
@@ -330,9 +480,316 @@ describe("FrameMixin real source", function()
         assert.are.equal(2, #timerQueue)
 
         timerQueue[2].callback()
-        assert.are.equal(3, #timerQueue)
-
-        timerQueue[3].callback()
         assert.same({ "First", "SecondPass" }, updateReasons)
+        assert.are.equal(2, #timerQueue)
+    end)
+
+    it("UpdateLayoutImmediately runs layout synchronously without C_Timer", function()
+        local updateReasons = {}
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function(_, why)
+                updateReasons[#updateReasons + 1] = why
+            end,
+        }
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        local timersBefore = #timerQueue
+        FrameMixin.UpdateLayoutImmediately(mod, "ImmediateTest")
+
+        assert.same({ "ImmediateTest" }, updateReasons)
+        assert.are.equal(timersBefore, #timerQueue)
+    end)
+
+    it("UpdateLayoutImmediately skips layout when module is disabled", function()
+        local called = false
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return false
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function()
+                called = true
+            end,
+        }
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        FrameMixin.UpdateLayoutImmediately(mod, "DisabledTest")
+        assert.is_false(called)
+    end)
+
+    it("UpdateLayoutImmediately clears pending deferred state and ignores stale callbacks", function()
+        local updateReasons = {}
+        local mod = {
+            Name = "TestModule",
+            InnerFrame = makeFrame({ shown = true }),
+            IsEnabled = function()
+                return true
+            end,
+            IsReady = function()
+                return true
+            end,
+            UpdateLayout = function(_, why)
+                updateReasons[#updateReasons + 1] = why
+            end,
+        }
+        mod.ThrottledUpdateLayout = FrameMixin.ThrottledUpdateLayout
+        mod.UpdateLayoutImmediately = FrameMixin.UpdateLayoutImmediately
+
+        FrameMixin.ThrottledUpdateLayout(mod, "Deferred")
+        assert.are.equal(1, #timerQueue)
+
+        FrameMixin.UpdateLayoutImmediately(mod, "Immediate")
+        timerQueue[1].callback()
+
+        assert.same({ "Immediate" }, updateReasons)
+        assert.is_false(mod._updateLayoutPending)
+        assert.is_nil(mod._pendingWhy)
+    end)
+
+    it("EditMode.GetPosition returns default coordinates when the active layout has no saved position", function()
+        local position = ECM.EditMode.GetPosition({
+            Legacy = { point = "TOP", x = 12, y = -34 },
+        })
+
+        assert.are.equal("CENTER", position.point)
+        assert.are.equal(0, position.x)
+        assert.are.equal(0, position.y)
+    end)
+
+    it("EditMode.GetPosition returns the saved coordinates for the active layout", function()
+        local lib = LibStub("LibEditMode")
+
+        lib.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        local position = ECM.EditMode.GetPosition({
+            Modern = { point = "TOP", x = 42, y = -17 },
+        })
+
+        assert.are.equal("TOP", position.point)
+        assert.are.equal(42, position.x)
+        assert.are.equal(-17, position.y)
+    end)
+
+    it("GetActiveLayoutName delegates to LibEditMode", function()
+        local lib = LibStub("LibEditMode")
+        lib.GetActiveLayoutName = function()
+            return "Modern"
+        end
+        assert.are.equal("Modern", ECM.EditMode.GetActiveLayoutName())
+    end)
+
+    it("EditMode callbacks schedule runtime layout updates without an extra timer hop", function()
+        local lib = LibStub("LibEditMode")
+        local scheduled = {}
+
+        ECM.Runtime.ScheduleLayoutUpdate = function(delay, reason)
+            scheduled[#scheduled + 1] = {
+                delay = delay,
+                reason = reason,
+            }
+        end
+
+        lib.callbacks.enter()
+        lib.callbacks.exit()
+        lib.callbacks.layout()
+
+        assert.same({
+            { delay = 0, reason = "EditModeEnter" },
+            { delay = 0, reason = "EditModeExit" },
+            { delay = 0, reason = "EditModeLayout" },
+        }, scheduled)
+        assert.are.equal(0, #timerQueue)
+    end)
+
+    it("UpdateLayout preserves final frame placement for V11 seeded legacy free-mode defaults", function()
+        local globalConfig = {
+            barHeight = 20,
+            barWidth = 180,
+            barBgColor = color(0, 0, 0, 0.5),
+            updateFrequency = 0,
+        }
+        local profile = {
+            schemaVersion = 10,
+            global = globalConfig,
+            powerBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(1, 0, 0, 1) },
+            resourceBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(0, 1, 0, 1) },
+            runeBar = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(0, 0, 1, 1) },
+            buffBars = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(1, 1, 0, 1) },
+        }
+
+        ECM.EditMode.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        Migration.Run(profile)
+
+        for section, expected in pairs(LEGACY_FREE_POSITION_DEFAULTS) do
+            local expectedX, expectedY = getAbsoluteAnchorPosition(expected.point, expected.x, expected.y)
+            local mod = makeFreeModeModule(section, globalConfig, profile[section])
+
+            assert.is_true(mod:UpdateLayout("V11SeededLegacyDefaults"))
+            assertFreeFramePositionPreserved(mod.InnerFrame, expectedX, expectedY)
+        end
+    end)
+
+    it("UpdateLayout preserves final frame placement for V11 migrated free-mode anchors", function()
+        local globalConfig = {
+            barHeight = 20,
+            barWidth = 180,
+            barBgColor = color(0, 0, 0, 0.5),
+            updateFrequency = 0,
+        }
+        local profile = {
+            schemaVersion = 10,
+            global = globalConfig,
+            powerBar = {
+                enabled = true,
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorPoint = "TOPLEFT",
+                relativePoint = "BOTTOM",
+                offsetX = 150,
+                offsetY = -50,
+                bgColor = color(1, 0, 0, 1),
+            },
+        }
+        ECM.EditMode.GetActiveLayoutName = function()
+            return "Modern"
+        end
+
+        Migration.Run(profile)
+        local migrated = profile.powerBar.editModePositions.Modern
+
+        local mod = makeFreeModeModule("powerBar", globalConfig, profile.powerBar)
+        assert.is_true(mod:UpdateLayout("V11MigratedFreePosition"))
+        assertAbsolutePositionPreserved("TOPLEFT", "BOTTOM", 150, -50, migrated)
+        assertFreeFramePositionPreserved(
+            mod.InnerFrame,
+            getAbsoluteAnchorPosition(migrated.point, migrated.x, migrated.y)
+        )
+    end)
+
+    it("AddMixin skips Edit Mode registration when the module opts out", function()
+        local registerCalls = 0
+        local mod = {
+            Name = "ExternalFrameModule",
+            CreateFrame = function()
+                return makeFrame({ name = "ExternalFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+            _RegisterEditMode = function()
+                registerCalls = registerCalls + 1
+            end,
+            GetGlobalConfig = function()
+                return {}
+            end,
+            GetModuleConfig = function()
+                return {}
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "ExternalFrameModule")
+        mod:EnsureFrame()
+
+        assert.are.equal(0, registerCalls)
+        assert.are.equal("ExternalFrame", mod.InnerFrame:GetName())
+    end)
+
+    it("EnsureFrame registers Edit Mode only once per frame", function()
+        local registerCalls = 0
+        local mod = {
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return true
+            end,
+            _RegisterEditMode = function(self)
+                registerCalls = registerCalls + 1
+                self._editModeRegisteredFrame = self.InnerFrame
+            end,
+            GetGlobalConfig = function()
+                return {}
+            end,
+            GetModuleConfig = function()
+                return {}
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        mod:EnsureFrame()
+        mod:EnsureFrame()
+
+        assert.are.equal(1, registerCalls)
+    end)
+
+    it("resolves mixin methods via metatable __index", function()
+        local mod = {
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        assert.is_nil(rawget(mod, "UpdateLayout"))
+        assert.is_function(mod.UpdateLayout)
+        assert.is_nil(rawget(mod, "GetModuleConfig"))
+        assert.is_function(mod.GetModuleConfig)
+        assert.is_function(mod.EnsureFrame)
+    end)
+
+    it("preserves existing metatable chain (AceAddon compatibility)", function()
+        local aceEnabled = function() return true end
+        local aceMt = { __index = { IsEnabled = aceEnabled } }
+        local mod = setmetatable({
+            CreateFrame = function()
+                return makeFrame({ name = "TestFrame" })
+            end,
+            ShouldRegisterEditMode = function()
+                return false
+            end,
+        }, aceMt)
+
+        FrameMixin.AddMixin(mod, "TestModule")
+
+        assert.are.equal(aceEnabled, mod.IsEnabled)
+        assert.is_function(mod.UpdateLayout)
+        assert.is_function(mod.GetModuleConfig)
+        assert.is_function(mod.EnsureFrame)
+    end)
+
+    it("AddMixin is idempotent — second call is a no-op", function()
+        local mod = {
+            ShouldRegisterEditMode = function() return false end,
+        }
+
+        FrameMixin.AddMixin(mod, "TestModule")
+        local mt1 = getmetatable(mod)
+
+        FrameMixin.AddMixin(mod, "TestModule")
+        local mt2 = getmetatable(mod)
+
+        assert.are.equal(mt1, mt2)
+        assert.is_true(mod._mixinApplied)
     end)
 end)

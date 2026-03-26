@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("RuneBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -25,6 +25,12 @@ describe("RuneBarOptions getters/setters/defaults", function()
         _G.UnitClass = function() return "Death Knight", "DEATHKNIGHT", 6 end
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
@@ -97,24 +103,13 @@ describe("RuneBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    -- Positioning composite
-    describe("anchorMode", function()
-        it("getter returns profile value", function()
-            assert.are.equal("chain", settings["ECM_runeBar_anchorMode"]:GetValue())
+    describe("layout breadcrumb", function()
+        it("removes anchorMode from the module page", function()
+            assert.is_nil(settings["ECM_runeBar_anchorMode"])
         end)
-        it("setter writes to profile", function()
-            settings["ECM_runeBar_anchorMode"]:SetValue("free")
-            assert.are.equal("free", profile.runeBar.anchorMode)
-        end)
-    end)
-
-    describe("width", function()
-        it("getter returns profile value", function()
-            assert.are.equal(300, settings["ECM_runeBar_width"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_runeBar_width"]:SetValue(400)
-            assert.are.equal(400, profile.runeBar.width)
+        it("adds a breadcrumb to the Layout page", function()
+            assert.is_nil(capturedTable.args.layoutMovedInfo)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
         end)
     end)
 
@@ -161,7 +156,7 @@ describe("RuneBarOptions class gating (non-DK)", function()
         TestHelpers.SetupOptionsGlobals()
         _G.UnitClass = function() return "Warrior", "WARRIOR", 1 end
         local profile, defaults = TestHelpers.MakeOptionsProfile()
-        local SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+        local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
         assert.is_not_nil(ns.OptionsSections.RuneBar)

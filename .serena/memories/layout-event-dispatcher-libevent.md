@@ -1,0 +1,1 @@
+Use a dedicated LibEvent-embedded target for ECM-wide layout events in `ECM.lua`. `LibEvent-1.0` stores a single callback per event per embedded target, so registering layout events on `mod` can clobber addon-specific handlers like `PLAYER_REGEN_ENABLED` used by chat-command option deferral.

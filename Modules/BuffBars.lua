@@ -5,12 +5,10 @@
 local _, ns = ...
 local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
-local ChainRightPoint = FrameMixin.ChainRightPoint
-local NormalizeGrowDirection = FrameMixin.NormalizeGrowDirection
-local BuffBars = ns.Addon:NewModule("BuffBars", "AceEvent-3.0")
+local ChainRightPoint = FrameMixin.Proto.ChainRightPoint
+local EditMode = ECM.EditMode
+local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
-local _warned = false
-local _editLocked = false
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
@@ -60,13 +58,7 @@ end
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
 local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)
-    if not iconFrame then
-        return
-    end
-    if iconFrame.__ecmSquareStyled then
-        return
-    end
-    if not iconTexture then
+    if not iconFrame or iconFrame.__ecmSquareStyled or not iconTexture then
         return
     end
 
@@ -78,9 +70,7 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
             local mask = iconTexture:GetMaskTexture(i)
             if mask then
                 iconTexture:RemoveMaskTexture(mask)
-                if mask.Hide then
-                    mask:Hide()
-                end
+                if mask.Hide then mask:Hide() end
             end
         end
     elseif iconTexture.SetMask then
@@ -92,106 +82,65 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
         for _, region in ipairs({ iconFrame:GetRegions() }) do
             if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
                 pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                if region.Hide then
-                    region:Hide()
-                end
+                if region.Hide then region:Hide() end
             end
         end
     end
 
-    if iconOverlay then
-        iconOverlay:Hide()
-    end
-
-    if debuffBorder then
-        debuffBorder:Hide()
-    end
+    if iconOverlay then iconOverlay:Hide() end
+    if debuffBorder then debuffBorder:Hide() end
 
     iconFrame.__ecmSquareStyled = true
 end
 
---- Applies all sizing, styling, visibility, and anchoring to a single buff bar
---- child frame. Lazy setters ensure no-ops when values haven't changed.
----@param frame ECM_BuffBarMixin
----@param config table Module config
----@param globalConfig table Global config
----@param barIndex number Index of the bar (for logging)
----@param retryCount number|nil Number of times this function has been retried
-local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount)
-    if not (frame and frame.__ecmHooked) then
-        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
+local function styleBarHeight(frame, bar, iconFrame, config, globalConfig)
+    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
+    if height <= 0 then
+        return
+    end
+    FrameUtil.LazySetHeight(frame, height)
+    FrameUtil.LazySetHeight(bar, height)
+    if iconFrame then
+        FrameUtil.LazySetHeight(iconFrame, height)
+        FrameUtil.LazySetWidth(iconFrame, height)
+    end
+end
+
+local function styleBarBackground(frame, barBG, config, globalConfig)
+    if not barBG then
         return
     end
 
-    retryCount = retryCount or 0
-    local bar = frame.Bar
-    local iconFrame = frame.Icon
-    local barBG = FrameUtil.GetBarBackground(bar)
-
-    -- frame
-    --  - Bar
-    --     - Name
-    --     - Duration
-    --     - Pip
-    --     - BarBG
-    --  - Icon
-    --    - Applications
-    --  - DebuffBorder
-
-    --------------------------------------------------------------------------
-    -- Heights
-    --------------------------------------------------------------------------
-    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
-    if height > 0 then
-        FrameUtil.LazySetHeight(frame, height)
-        FrameUtil.LazySetHeight(bar, height)
-        if iconFrame then
-            FrameUtil.LazySetHeight(iconFrame, height)
-            FrameUtil.LazySetWidth(iconFrame, height)
-        end
+    -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
+    -- so Blizzard cannot override our anchors. SetAllPoints does not fire
+    -- SetPoint hooks, so no re-entrancy guard is needed.
+    if not barBG.__ecmBGHooked then
+        barBG.__ecmBGHooked = true
+        barBG:SetParent(frame)
+        hooksecurefunc(barBG, "SetPoint", function()
+            barBG:ClearAllPoints()
+            barBG:SetAllPoints(frame)
+        end)
     end
 
-    --------------------------------------------------------------------------
-    -- Pip — always hidden
-    --------------------------------------------------------------------------
-    bar.Pip:Hide()
-    bar.Pip:SetTexture(nil)
+    local bgColor = (config and config.bgColor)
+        or (globalConfig and globalConfig.barBgColor)
+        or ECM.Constants.COLOR_BLACK
+    barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
+    barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
+    barBG:ClearAllPoints()
+    barBG:SetAllPoints(frame)
+    barBG:SetDrawLayer("BACKGROUND", 0)
+end
 
-    --------------------------------------------------------------------------
-    -- Bar background (BarBG texture)
-    --------------------------------------------------------------------------
-    if barBG then
-        -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
-        -- so Blizzard cannot override our anchors. SetAllPoints does not fire
-        -- SetPoint hooks, so no re-entrancy guard is needed.
-        if not barBG.__ecmBGHooked then
-            barBG.__ecmBGHooked = true
-            barBG:SetParent(frame)
-            hooksecurefunc(barBG, "SetPoint", function()
-                barBG:ClearAllPoints()
-                barBG:SetAllPoints(frame)
-            end)
-        end
-
-        local bgColor = (config and config.bgColor)
-            or (globalConfig and globalConfig.barBgColor)
-            or ECM.Constants.COLOR_BLACK
-        barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
-        barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
-        barBG:ClearAllPoints()
-        barBG:SetAllPoints(frame)
-        barBG:SetDrawLayer("BACKGROUND", 0)
-    end
-
-    --------------------------------------------------------------------------
-    -- StatusBar texture & color
-    --------------------------------------------------------------------------
+--- Resolves the spell color for a bar, handling secret values with retry.
+--- Returns true if the module's _editLocked flag was set by this call.
+local function styleBarColor(module, frame, bar, globalConfig, retryCount)
     local textureName = globalConfig and globalConfig.texture
-    local texture = ECM.GetTexture(textureName)
-    FrameUtil.LazySetStatusBarTexture(bar, texture)
+    FrameUtil.LazySetStatusBarTexture(bar, ECM.GetTexture(textureName))
 
     local barColor = ECM.SpellColors.GetColorForBar(frame)
-    local spellName = frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText()
+    local spellName = bar.Name and bar.Name.GetText and bar.Name:GetText()
     local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
     local cooldownID = frame.cooldownID
     local textureFileID = FrameUtil.GetIconTextureFileID(frame)
@@ -204,40 +153,21 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         and issecretvalue(spellID)
         and issecretvalue(cooldownID)
         and issecretvalue(textureFileID)
-    _editLocked = _editLocked or allSecret
-
-    -- Purely diagnostics to help track down issues with secrets
-    local hex = barColor and string.upper(ECM.ColorUtil.ColorToHex(barColor)) or nil
-    local colorLog = (barColor and "|cff" .. hex .. "#" .. hex .. "|r" or "nil")
-    local logPrefix = "GetColorForBar[" .. barIndex .. "] "
-    local logLine = logPrefix
-        .. "("
-        .. ECM.ToString(spellName)
-        .. ", "
-        .. ECM.ToString(spellID)
-        .. ", "
-        .. ECM.ToString(cooldownID)
-        .. ", "
-        .. ECM.ToString(textureFileID)
-        .. ") = "
-        .. colorLog
-    ECM.Log(ECM.Constants.BUFFBARS, logLine, { frame = frame, cooldownID = cooldownID, spellID = spellID })
+    module._editLocked = module._editLocked or allSecret
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
             C_Timer.After(1, function()
-                styleChildFrame(frame, config, globalConfig, barIndex, retryCount + 1)
+                styleBarColor(module, frame, bar, globalConfig, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
-            barColor = nil
-        elseif not _warned then
+            return
+        elseif ECM.IsDebugEnabled() and not module._warned then
             ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
-            _warned = true
+            module._warned = true
         end
-    elseif retryCount > 0 then
-        ECM.Log(ECM.Constants.BUFFBARS, "Successfully retrieved values on retry. " .. logLine)
     end
 
     if barColor == nil and not allSecret then
@@ -246,27 +176,15 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
     end
+end
 
-    --------------------------------------------------------------------------
-    -- Fonts (before visibility/positioning — font changes affect layout)
-    --------------------------------------------------------------------------
-    ECM.ApplyFont(bar.Name, globalConfig, config)
-    ECM.ApplyFont(bar.Duration, globalConfig, config)
+local function styleBarIcon(frame, iconFrame, config)
+    local showIcon = config and config.showIcon ~= false
 
-    --------------------------------------------------------------------------
-    -- Icon anchor
-    --------------------------------------------------------------------------
     if iconFrame then
         FrameUtil.LazySetAnchors(iconFrame, {
             { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
         })
-    end
-
-    --------------------------------------------------------------------------
-    -- Visibility — icon, name, duration, debuff border, applications
-    --------------------------------------------------------------------------
-    local showIcon = config and config.showIcon ~= false
-    if iconFrame then
         local iconTexture = FrameUtil.GetIconTexture(frame)
         local iconOverlay = FrameUtil.GetIconOverlay(frame)
         applySquareIconStyle(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
@@ -280,10 +198,12 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         FrameUtil.LazySetAlpha(frame.DebuffBorder, 0)
         frame.DebuffBorder:Hide()
     end
-    if iconFrame.Applications then
+    if iconFrame and iconFrame.Applications then
         FrameUtil.LazySetAlpha(iconFrame.Applications, showIcon and 1 or 0)
     end
+end
 
+local function styleBarAnchors(frame, bar, iconFrame, config)
     local showSpellName = config and config.showSpellName ~= false
     local showDuration = config and config.showDuration ~= false
     if bar.Name then
@@ -293,25 +213,14 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
         bar.Duration:SetShown(showDuration)
     end
 
-    --------------------------------------------------------------------------
-    -- Bar anchors (relative to icon visibility)
-    --------------------------------------------------------------------------
     local iconVisible = iconFrame and iconFrame:IsShown()
-    if iconVisible then
-        FrameUtil.LazySetAnchors(bar, {
-            { "TOPLEFT", iconFrame, "TOPRIGHT", 0, 0 },
-            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
-        })
-    else
-        FrameUtil.LazySetAnchors(bar, {
-            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
-            { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
-        })
-    end
+    local barLeftAnchor = iconVisible and iconFrame or frame
+    local barLeftPoint = iconVisible and "TOPRIGHT" or "TOPLEFT"
+    FrameUtil.LazySetAnchors(bar, {
+        { "TOPLEFT", barLeftAnchor, barLeftPoint, 0, 0 },
+        { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
+    })
 
-    --------------------------------------------------------------------------
-    -- Name
-    --------------------------------------------------------------------------
     FrameUtil.LazySetAnchors(bar.Name, {
         { "LEFT", bar, "LEFT", ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
@@ -322,8 +231,32 @@ local function styleChildFrame(frame, config, globalConfig, barIndex, retryCount
             { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
         })
     end
+end
 
-    ECM.Log(ECM.Constants.BUFFBARS, logPrefix .. "styled")
+--- Applies all sizing, styling, visibility, and anchoring to a single buff bar
+--- child frame. Lazy setters ensure no-ops when values haven't changed.
+local function styleChildFrame(module, frame, config, globalConfig)
+    if not (frame and frame.__ecmHooked) then
+        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
+        return
+    end
+
+    local bar = frame.Bar
+    local iconFrame = frame.Icon
+
+    styleBarHeight(frame, bar, iconFrame, config, globalConfig)
+
+    bar.Pip:Hide()
+    bar.Pip:SetTexture(nil)
+
+    styleBarBackground(frame, FrameUtil.GetBarBackground(bar), config, globalConfig)
+    styleBarColor(module, frame, bar, globalConfig, 0)
+
+    ECM.ApplyFont(bar.Name, globalConfig, config)
+    ECM.ApplyFont(bar.Duration, globalConfig, config)
+
+    styleBarIcon(frame, iconFrame, config)
+    styleBarAnchors(frame, bar, iconFrame, config)
 end
 
 local function hookChildFrame(child, module)
@@ -345,7 +278,7 @@ local function hookChildFrame(child, module)
         if cached then
             FrameUtil.LazySetAnchors(child, cached)
         end
-        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
     end)
@@ -355,7 +288,7 @@ local function hookChildFrame(child, module)
             return
         end
         module._layoutRunning = true
-        styleChildFrame(child, module:GetModuleConfig(), module:GetGlobalConfig(), 0)
+        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
         module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
     end)
@@ -370,16 +303,31 @@ local function hookChildFrame(child, module)
     child.__ecmHooked = true
 end
 
-local function getLayoutState(params, cfg)
-    local growsUp
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
-        growsUp = params.anchorPoint == "BOTTOMLEFT"
-    else
-        growsUp = NormalizeGrowDirection(cfg and cfg.freeGrowDirection) == ECM.Constants.GROW_DIRECTION_UP
+local function getViewerPosition(module)
+    local cfg = module:GetModuleConfig()
+    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
+
+    if mode ~= ECM.Constants.ANCHORMODE_FREE then
+        local params = FrameMixin.Proto.CalculateLayoutParams(module)
+        return {
+            mode = params.mode,
+            anchor = params.anchor,
+            point = params.anchorPoint,
+            relativePoint = params.anchorRelativePoint,
+            x = params.offsetX,
+            y = params.offsetY,
+        }
     end
 
-    local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
-    return growsUp, verticalSpacing
+    local pos = EditMode.GetPosition(cfg and cfg.editModePositions)
+    return {
+        mode = mode,
+        anchor = UIParent,
+        point = pos.point,
+        relativePoint = pos.point,
+        x = pos.x,
+        y = pos.y,
+    }
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
@@ -415,57 +363,12 @@ local function layoutBars(viewer, growsUp, verticalSpacing)
     end
 end
 
-local function applyViewerPosition(viewer, params, cfg, globalConfig)
-    if params.mode == ECM.Constants.ANCHORMODE_CHAIN then
-        local leftAnchorPoint = params.anchorPoint or "TOPLEFT"
-        local leftRelativePoint = params.anchorRelativePoint or "BOTTOMLEFT"
-        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
-        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
-        FrameUtil.LazySetAnchors(viewer, {
-            { leftAnchorPoint, params.anchor, leftRelativePoint, params.offsetX, params.offsetY },
-            { rightAnchorPoint, params.anchor, rightRelativePoint, params.offsetX, params.offsetY },
-        })
-        return
-    end
-
-    -- Chain mode sets 2-point anchors (TOPLEFT+TOPRIGHT) which
-    -- override explicit width. If stale chain anchors remain,
-    -- collapse to the first anchor point so SetWidth can work.
-    -- Blizzard's edit mode manages positioning from here on.
-    if viewer:GetNumPoints() > 1 then
-        local point, relativeTo, relativePoint, ofsX, ofsY = viewer:GetPoint(1)
-        viewer:ClearAllPoints()
-        if point and relativeTo then
-            viewer:SetPoint(point, relativeTo, relativePoint, ofsX, ofsY)
-        end
-    end
-
-    local width = (cfg and cfg.width) or (globalConfig and globalConfig.barWidth) or 300
-    if width and width > 0 then
-        FrameUtil.LazySetWidth(viewer, width)
-    end
-end
-
---- Override to support custom anchor points in free mode.
----@return table params Layout parameters
-function BuffBars:CalculateLayoutParams()
-    local cfg = self:GetModuleConfig()
-    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
-
-    if mode == ECM.Constants.ANCHORMODE_CHAIN then
-        return FrameMixin.CalculateLayoutParams(self)
-    end
-
-    return {
-        mode = mode,
-        anchor = UIParent,
-        isFirst = false,
-        anchorPoint = cfg.anchorPoint or "CENTER",
-        anchorRelativePoint = cfg.relativePoint or "CENTER",
-        offsetX = cfg.offsetX or 0,
-        offsetY = cfg.offsetY or 0,
-        width = cfg.width,
-    }
+--- Buff bars are backed by Blizzard's BuffBarCooldownViewer system frame.
+--- Registering that frame with the addon Edit Mode wrapper taints Blizzard's
+--- own Edit Mode selection handling, so BuffBars must opt out.
+---@return boolean
+function BuffBars:ShouldRegisterEditMode()
+    return false
 end
 
 function BuffBars:CreateFrame()
@@ -473,7 +376,7 @@ function BuffBars:CreateFrame()
 end
 
 function BuffBars:IsReady()
-    if not ECM.FrameMixin.IsReady(self) then
+    if not ECM.FrameMixin.Proto.IsReady(self) then
         return false
     end
 
@@ -482,15 +385,7 @@ function BuffBars:IsReady()
         return false
     end
 
-    -- Check if the viewer is in a state where we can enumerate children
-    local canGetChildren = pcall(function()
-        viewer:GetChildren()
-    end)
-    if not canGetChildren then
-        return false
-    end
-
-    return true
+    return pcall(viewer.GetChildren, viewer)
 end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
@@ -515,35 +410,65 @@ function BuffBars:UpdateLayout(why)
         return false
     end
 
-    local params = self:CalculateLayoutParams()
-    local growsUp, verticalSpacing = getLayoutState(params, cfg)
-    applyViewerPosition(viewer, params, cfg, globalConfig)
+    local position = getViewerPosition(self)
+    -- Free-positioned buff bars no longer have a separate grow-direction setting,
+    -- so the effective anchor point decides stack direction: bottom-left grows upward,
+    -- everything else grows downward.
+    local growsUp = position.point == "BOTTOMLEFT"
+    local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
+
+    if position.mode == ECM.Constants.ANCHORMODE_FREE then
+        FrameUtil.LazySetAnchors(viewer, {
+            { position.point, position.anchor, position.relativePoint, position.x, position.y },
+        })
+
+        local baseBarWidth = viewer.baseBarWidth
+        local barWidthScale = viewer.barWidthScale
+        if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
+            local width = baseBarWidth * barWidthScale
+            if width > 0 then
+                FrameUtil.LazySetWidth(viewer, width)
+            end
+        end
+    else
+        local leftAnchorPoint = position.point or "TOPLEFT"
+        local leftRelativePoint = position.relativePoint or "BOTTOMLEFT"
+        local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
+        local rightRelativePoint = ChainRightPoint(leftRelativePoint, "BOTTOMRIGHT")
+        FrameUtil.LazySetAnchors(viewer, {
+            { leftAnchorPoint, position.anchor, leftRelativePoint, position.x, position.y },
+            { rightAnchorPoint, position.anchor, rightRelativePoint, position.x, position.y },
+        })
+    end
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
     -- while we are actively styling and positioning bars.
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
-    _warned = false
-    _editLocked = false
-    for barIndex, entry in ipairs(visibleChildren) do
-        hookChildFrame(entry.frame, self)
-        styleChildFrame(entry.frame, cfg, globalConfig, barIndex)
-    end
+    self._warned = false
+    self._editLocked = false
+    local ok, err = pcall(function()
+        for _, entry in ipairs(visibleChildren) do
+            hookChildFrame(entry.frame, self)
+            styleChildFrame(self, entry.frame, cfg, globalConfig)
+        end
 
-    layoutBars(viewer, growsUp, verticalSpacing)
+        layoutBars(viewer, growsUp, verticalSpacing)
+    end)
 
     self._layoutRunning = nil
+    ECM.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
+
     viewer:Show()
     ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
-        mode = params.mode,
+        mode = position.mode,
         childCount = #visibleChildren,
-        viewerWidth = params.width or -1,
-        anchor = params.anchor and params.anchor:GetName() or "nil",
-        anchorPoint = params.anchorPoint,
-        anchorRelativePoint = params.anchorRelativePoint,
-        offsetX = params.offsetX,
-        offsetY = params.offsetY,
+        anchor = position.anchor and position.anchor:GetName() or "nil",
+        anchorPoint = position.point,
+        anchorRelativePoint = position.relativePoint,
+        offsetX = position.x,
+        offsetY = position.y,
     })
     return true
 end
@@ -579,16 +504,11 @@ end
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
     local viewer = _G["BuffBarCooldownViewer"]
-    if not viewer then
-        return
-    end
-
-    if self._viewerHooked then
+    if not viewer or self._viewerHooked then
         return
     end
     self._viewerHooked = true
 
-    -- Hook OnShow for initial layout
     viewer:HookScript("OnShow", function()
         self:ThrottledUpdateLayout("viewer:OnShow")
     end)
@@ -601,41 +521,38 @@ function BuffBars:HookViewer()
         self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
     end)
 
-    ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
-end
-
---- Hooks EditModeManagerFrame to re-apply layout on exit.
-function BuffBars:HookEditMode()
-    if self._editModeHooked then
-        return
-    end
-
-    if not EditModeManagerFrame then
-        return
-    end
-
-    self._editModeHooked = true
-
-    hooksecurefunc(EditModeManagerFrame, "ExitEditMode", function()
-        -- Edit mode exit is infrequent, so perform an immediate restyle pass.
-        local viewer = _G["BuffBarCooldownViewer"]
-        if viewer and viewer:IsShown() then
-            self:ThrottledUpdateLayout("EditModeExit")
+    hooksecurefunc(viewer, "SetPoint", function(_, point, relativeTo, relativePoint, x, y)
+        if self._layoutRunning then
+            return
         end
+        if not EditMode.Lib:IsInEditMode() then
+            return
+        end
+        if relativeTo ~= nil and relativeTo ~= UIParent then
+            return
+        end
+
+        local cfg = self:GetModuleConfig()
+        if not cfg or cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
+            return
+        end
+
+        local layoutName = EditMode.GetActiveLayoutName()
+        if not layoutName then
+            return
+        end
+
+        local normalizedPoint, normalizedX, normalizedY = FrameUtil.NormalizePosition(
+            point,
+            relativePoint,
+            x,
+            y,
+            UIParent
+        )
+        EditMode.SavePosition(cfg, "editModePositions", layoutName, normalizedPoint, normalizedX, normalizedY)
     end)
 
-    hooksecurefunc(EditModeManagerFrame, "EnterEditMode", function()
-        -- Re-apply style during edit mode so bars look correct while editing
-        self:ThrottledUpdateLayout("EditModeEnter")
-    end)
-
-    ECM.Log(self.Name, "Hooked EditModeManagerFrame")
-end
-
-function BuffBars:OnUnitAura(_, unit)
-    if unit == "player" then
-        self:ThrottledUpdateLayout("OnUnitAura")
-    end
+    ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 function BuffBars:OnZoneChanged()
@@ -646,8 +563,12 @@ end
 --- @return boolean isEditLocked Whether editing is locked due to combat or secrets
 --- @return string reason Reason editing is locked ("combat", "secrets", or nil)
 function BuffBars:IsEditLocked()
-    local reason = InCombatLockdown() and "combat" or (_editLocked and "secrets") or nil
+    local reason = InCombatLockdown() and "combat" or (self._editLocked and "secrets") or nil
     return reason ~= nil, reason
+end
+
+function BuffBars:OnInitialize()
+    ECM.FrameMixin.AddMixin(self, "BuffBars")
 end
 
 function BuffBars:OnEnable()
@@ -655,17 +576,16 @@ function BuffBars:OnEnable()
         return self:GetModuleConfig()
     end)
 
-    ECM.FrameMixin.AddMixin(self, "BuffBars")
-    ECM.RegisterFrame(self)
+    self:EnsureFrame()
+    ECM.Runtime.RegisterFrame(self)
 
-    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnZoneChanged")
-    self:RegisterEvent("ZONE_CHANGED", "OnZoneChanged")
-    self:RegisterEvent("ZONE_CHANGED_INDOORS", "OnZoneChanged")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", "OnZoneChanged")
+    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", function(_, ...) self:OnZoneChanged(...) end)
+    self:RegisterEvent("ZONE_CHANGED", function(_, ...) self:OnZoneChanged(...) end)
+    self:RegisterEvent("ZONE_CHANGED_INDOORS", function(_, ...) self:OnZoneChanged(...) end)
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, ...) self:OnZoneChanged(...) end)
 
     C_Timer.After(0.1, function()
         self:HookViewer()
-        self:HookEditMode()
         self:ThrottledUpdateLayout("ModuleInit")
     end)
 end
@@ -673,5 +593,5 @@ end
 function BuffBars:OnDisable()
     ECM.SpellColors.SetConfigAccessor(nil)
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

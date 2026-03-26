@@ -2,7 +2,8 @@ param(
     [string]$TocPath = "EnhancedCooldownManager.toc",
     [string]$Remote = "origin",
     [Alias("TagMessage", "ReleaseMessage")]
-    [string]$Message
+    [string]$Message,
+    [switch]$ShowReleasePopup
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,6 +90,34 @@ if ([string]::IsNullOrWhiteSpace($version)) {
 }
 
 Write-Host "TOC version: $version"
+
+function Set-ReleasePopupVersion {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Version,
+        [string]$ConstantsPath = "ECM_Constants.lua"
+    )
+
+    if (-not (Test-Path -LiteralPath $ConstantsPath)) {
+        throw "Constants file not found: $ConstantsPath"
+    }
+
+    $content = Get-Content -LiteralPath $ConstantsPath -Raw
+    $pattern = '(RELEASE_POPUP_VERSION\s*=\s*")[^"]*(")'
+    if ($content -notmatch 'RELEASE_POPUP_VERSION') {
+        throw "Could not find RELEASE_POPUP_VERSION in $ConstantsPath"
+    }
+
+    $newContent = $content -replace $pattern, "`${1}$Version`${2}"
+    Set-Content -LiteralPath $ConstantsPath -Value $newContent -NoNewline
+    Write-Host "Updated RELEASE_POPUP_VERSION to '$Version' in $ConstantsPath"
+}
+
+if ($ShowReleasePopup) {
+    Set-ReleasePopupVersion -Version $version
+    Invoke-Git -Arguments @("add", "ECM_Constants.lua")
+    Invoke-Git -Arguments @("commit", "--amend", "--no-edit")
+}
 
 Invoke-Git -Arguments @("rev-parse", "--is-inside-work-tree")
 

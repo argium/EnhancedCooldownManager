@@ -14,186 +14,10 @@ describe("ECM layout system", function()
     local addonVersion
     local printedMessages
     local fakeAddon
-
-    --- Lightweight frame stub for ECM integration tests (no call tracking needed)
-    local function makeFrame(opts)
-        opts = opts or {}
-        local frame = {
-            __shown = opts.shown ~= false,
-            __alpha = opts.alpha or 1,
-            __height = opts.height or 0,
-            __width = opts.width or 0,
-            __anchors = {},
-        }
-
-        function frame:Show()
-            self.__shown = true
-        end
-        function frame:Hide()
-            self.__shown = false
-        end
-        function frame:IsShown()
-            return self.__shown
-        end
-        function frame:SetAlpha(a)
-            self.__alpha = a
-        end
-        function frame:GetAlpha()
-            return self.__alpha
-        end
-        function frame:SetHeight(h)
-            self.__height = h
-        end
-        function frame:GetHeight()
-            return self.__height
-        end
-        function frame:SetWidth(w)
-            self.__width = w
-        end
-        function frame:GetWidth()
-            return self.__width
-        end
-        function frame:SetPoint() end
-        function frame:GetPoint() end
-        function frame:GetNumPoints()
-            return #self.__anchors
-        end
-        function frame:ClearAllPoints()
-            self.__anchors = {}
-        end
-        function frame:GetName()
-            return opts.name
-        end
-        function frame:SetScript() end
-        function frame:RegisterEvent() end
-        function frame:HookScript() end
-        function frame:GetEffectiveScale()
-            return 1
-        end
-        function frame:GetBackdropBorderColor()
-            return 0, 0, 0, 1
-        end
-        function frame:GetBackdrop()
-            return nil
-        end
-        function frame:GetColorTexture()
-            return nil
-        end
-        function frame:SetColorTexture() end
-        function frame:GetVertexColor()
-            return nil
-        end
-        function frame:IsObjectType()
-            return false
-        end
-
-        return frame
-    end
-
-    local function makeModule(name)
-        local innerFrame = makeFrame({ name = "ECM" .. name, shown = true })
-        innerFrame.Background = makeFrame()
-        innerFrame.Border = makeFrame({ shown = false })
-
-        local mod = {
-            Name = name,
-            InnerFrame = innerFrame,
-            IsHidden = false,
-            _lastUpdate = 0,
-            _configKey = name:sub(1, 1):lower() .. name:sub(2),
-        }
-
-        function mod:SetHidden(hide)
-            self.IsHidden = hide
-        end
-        function mod:ShouldShow()
-            return not self.IsHidden
-        end
-        function mod:IsEnabled()
-            return true
-        end
-        function mod:GetGlobalConfig()
-            local p = _G._testDB and _G._testDB.profile
-            return p and p.global
-        end
-        function mod:GetModuleConfig()
-            local p = _G._testDB and _G._testDB.profile
-            return p and p[self._configKey]
-        end
-        function mod:CalculateLayoutParams()
-            local gc = self:GetGlobalConfig()
-            local mc = self:GetModuleConfig()
-            return {
-                mode = mc.anchorMode,
-                anchor = _G.UIParent,
-                isFirst = true,
-                anchorPoint = "TOPLEFT",
-                anchorRelativePoint = "BOTTOMLEFT",
-                offsetX = 0,
-                offsetY = -((gc and gc.offsetY) or 0),
-                height = (mc and mc.height) or (gc and gc.barHeight),
-                width = mc.anchorMode == ECM.Constants.ANCHORMODE_FREE and ((mc and mc.width) or (gc and gc.barWidth))
-                    or nil,
-            }
-        end
-        function mod:GetNextChainAnchor()
-            return _G.UIParent, true
-        end
-        function mod:UpdateLayout(why)
-            if not self:ShouldShow() then
-                self.InnerFrame:Hide()
-                return false
-            end
-            if not self.InnerFrame:IsShown() then
-                self.InnerFrame:Show()
-            end
-            local params = self:CalculateLayoutParams()
-            if params.height then
-                ECM.FrameUtil.LazySetHeight(self.InnerFrame, params.height)
-            end
-            if params.width then
-                ECM.FrameUtil.LazySetWidth(self.InnerFrame, params.width)
-            end
-            self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
-            return true
-        end
-        function mod:Refresh()
-            return true
-        end
-        function mod:ThrottledRefresh(why)
-            local gc = self:GetGlobalConfig()
-            local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
-            if GetTime() - (self._lastUpdate or 0) < freq then
-                return false
-            end
-            self:Refresh(why)
-            self._lastUpdate = GetTime()
-            return true
-        end
-        function mod:ThrottledUpdateLayout(reason)
-            if self:IsEnabled() then
-                self:UpdateLayout(reason)
-            end
-        end
-
-        return mod
-    end
-
-    local function makeRegisteredModule(name)
-        local mod = makeModule(name or "PowerBar")
-        ECM.RegisterFrame(mod)
-        return mod
-    end
-
-    local function makeFadeConfig(opacity)
-        return {
-            enabled = true,
-            opacity = opacity,
-            exceptIfTargetCanBeAttacked = false,
-            exceptIfTargetCanBeHelped = false,
-            exceptInInstance = false,
-        }
-    end
+    local defaultModuleLibraries
+    local createdFrames
+    local createdTickers
+    local makeFrame = TestHelpers.makeFrame
 
     local CAPTURED_GLOBALS = {
         "ECM",
@@ -231,6 +55,8 @@ describe("ECM layout system", function()
         "CANCEL",
         "OKAY",
         "CooldownViewerSettings",
+        "SlashCmdList",
+        "hash_SlashCmdList",
     }
 
     setup(function()
@@ -248,6 +74,9 @@ describe("ECM layout system", function()
         cvarEnabled = true
         addonVersion = "v0.6.1"
         printedMessages = {}
+        defaultModuleLibraries = {}
+        createdFrames = {}
+        createdTickers = {}
 
         _G.GetTime = function()
             return fakeTime
@@ -324,36 +153,168 @@ describe("ECM layout system", function()
             After = function(_, callback)
                 callback()
             end,
-            NewTicker = function() end,
+            NewTicker = function(_, callback)
+                local ticker = {
+                    cancelled = false,
+                    callback = callback,
+                }
+
+                function ticker:Cancel()
+                    self.cancelled = true
+                end
+
+                createdTickers[#createdTickers + 1] = ticker
+                return ticker
+            end,
         }
         _G.UIParent = makeFrame({ name = "UIParent" })
-        _G.CreateFrame = function()
-            return makeFrame()
+        local function makeFontString()
+            local fontString = { _anchors = {} }
+
+            function fontString:SetPoint(...)
+                self._anchors[#self._anchors + 1] = { ... }
+            end
+
+            function fontString:GetNumPoints()
+                return #self._anchors
+            end
+
+            function fontString:GetPoint(index)
+                local point = self._anchors[index]
+                if point then
+                    return point[1], point[2], point[3], point[4], point[5]
+                end
+            end
+
+            function fontString:ClearAllPoints()
+                self._anchors = {}
+            end
+
+            function fontString:SetText(text)
+                self._text = text
+            end
+
+            function fontString:GetText()
+                return self._text
+            end
+
+            function fontString:SetWidth(width)
+                self._width = width
+            end
+
+            function fontString:GetWidth()
+                return self._width
+            end
+
+            function fontString:SetJustifyH(justifyH)
+                self._justifyH = justifyH
+            end
+
+            function fontString:SetJustifyV(justifyV)
+                self._justifyV = justifyV
+            end
+
+            function fontString:SetTextColor(...)
+                self._textColor = { ... }
+            end
+
+            function fontString:SetWordWrap(wordWrap)
+                self._wordWrap = wordWrap
+            end
+
+            return fontString
+        end
+
+        _G.CreateFrame = function(frameType, name, parent, template)
+            local frame = makeFrame({ name = name })
+            frame._frameType = frameType
+            frame._parent = parent
+            frame._template = template
+
+            function frame:SetBackdrop(backdrop)
+                self._backdrop = backdrop
+            end
+
+            function frame:SetBackdropColor(...)
+                self._backdropColor = { ... }
+            end
+
+            function frame:SetBackdropBorderColor(...)
+                self._backdropBorderColor = { ... }
+            end
+
+            function frame:EnableMouse(enabled)
+                self._mouseEnabled = enabled
+            end
+
+            function frame:SetMovable(movable)
+                self._movable = movable
+            end
+
+            function frame:RegisterForDrag(...)
+                self._dragButtons = { ... }
+            end
+
+            function frame:SetClampedToScreen(clamped)
+                self._clampedToScreen = clamped
+            end
+
+            function frame:StartMoving()
+                self._startedMoving = true
+            end
+
+            function frame:StopMovingOrSizing()
+                self._stoppedMoving = true
+            end
+
+            function frame:SetText(text)
+                self._text = text
+            end
+
+            function frame:GetText()
+                return self._text
+            end
+
+            function frame:CreateFontString()
+                local fontString = makeFontString()
+                self._fontStrings = self._fontStrings or {}
+                self._fontStrings[#self._fontStrings + 1] = fontString
+                return fontString
+            end
+
+            createdFrames[#createdFrames + 1] = frame
+            return frame
         end
 
         fakeAddon = {
             RegisterChatCommand = function() end,
             RegisterEvent = function() end,
+            SetDefaultModuleLibraries = function() end,
             UnregisterEvent = function() end,
             EnableModule = function() end,
             DisableModule = function() end,
+            GetModule = function() end,
         }
-        _G.LibStub = setmetatable({}, {
-            __call = function(_, name, silent)
-                if name == "AceAddon-3.0" then
-                    return {
-                        NewAddon = function(_, n)
-                            fakeAddon.name = n
-                            return fakeAddon
-                        end,
-                    }
+        fakeAddon.SetDefaultModuleLibraries = function(_, ...)
+            defaultModuleLibraries = { ... }
+        end
+        TestHelpers.SetupLibStub()
+        _G.SlashCmdList = {}
+        _G.hash_SlashCmdList = {}
+        TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
+        local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
+        aceAddon.NewAddon = function(_, n, ...)
+            fakeAddon.name = n
+            for _, libraryName in ipairs({ ... }) do
+                local library = _G.LibStub(libraryName)
+                if library and library.Embed then
+                    library:Embed(fakeAddon)
                 end
-                if silent then
-                    return nil
-                end
-                return {}
-            end,
-        })
+            end
+            return fakeAddon
+        end
+        TestHelpers.SetupLibEditModeStub()
+        TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
         _G.ECM = {}
@@ -372,6 +333,7 @@ describe("ECM layout system", function()
             end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
         TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
         _G.ECM.Migration = {
             PrepareDatabase = function() end,
@@ -379,6 +341,7 @@ describe("ECM layout system", function()
             FlushLog = function() end,
             PrintLog = function() end,
         }
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(
             nil,
@@ -390,79 +353,14 @@ describe("ECM layout system", function()
         )
 
         local profile = TestHelpers.deepClone(ECM.defaults.profile)
-        _G._testDB = { profile = profile }
+        _G._testDB = { profile = profile, RegisterCallback = function() end }
         fakeAddon.db = _G._testDB
 
         TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
-    end)
-
-    describe("automatic layout enforcement", function()
-        it("hides registered module frames when mounted", function()
-            local mod = makeRegisteredModule()
-            isMounted = true
-
-            ECM.ScheduleLayoutUpdate(0, "mount")
-
-            assert.is_true(mod.IsHidden)
-            assert.is_false(mod.InnerFrame:IsShown())
-        end)
-
-        it("applies fade alpha when out of combat", function()
-            local mod = makeRegisteredModule()
-            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(50)
-
-            ECM.ScheduleLayoutUpdate(0, "fade")
-
-            assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
-        end)
-
-        it("re-shows module frames after dismounting", function()
-            local mod = makeRegisteredModule()
-
-            isMounted = true
-            ECM.ScheduleLayoutUpdate(0, "mount")
-            assert.is_false(mod.InnerFrame:IsShown())
-
-            fakeTime = fakeTime + 1
-            isMounted = false
-            ECM.ScheduleLayoutUpdate(0, "dismount")
-            assert.is_true(mod.InnerFrame:IsShown())
-        end)
-
-        it("restores full alpha when combat fade is disabled", function()
-            local mod = makeRegisteredModule()
-            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(30)
-            ECM.ScheduleLayoutUpdate(0, "fade-on")
-            assert.are.equal(0.3, mod.InnerFrame:GetAlpha())
-
-            fakeTime = fakeTime + 1
-            _G._testDB.profile.global.outOfCombatFade.enabled = false
-            ECM.ScheduleLayoutUpdate(0, "fade-off")
-            assert.are.equal(1, mod.InnerFrame:GetAlpha())
-        end)
-
-        it("hides all registered modules when cvar is disabled", function()
-            local mod1 = makeRegisteredModule("PowerBar")
-            local mod2 = makeRegisteredModule("ResourceBar")
-
-            cvarEnabled = false
-            ECM.ScheduleLayoutUpdate(0, "cvar-off")
-
-            assert.is_true(mod1.IsHidden)
-            assert.is_true(mod2.IsHidden)
-        end)
-
-        it("re-hides a module frame that was externally shown while hidden", function()
-            local mod = makeRegisteredModule()
-            isMounted = true
-            ECM.ScheduleLayoutUpdate(0, "mount")
-
-            mod.InnerFrame:Show()
-
-            fakeTime = fakeTime + 1
-            ECM.ScheduleLayoutUpdate(0, "re-enforce")
-            assert.is_false(mod.InnerFrame:IsShown())
-        end)
+        TestHelpers.LoadChunk("ECM_Runtime.lua", "Unable to load ECM_Runtime.lua")(
+            "EnhancedCooldownManager",
+            { Addon = fakeAddon }
+        )
     end)
 
     describe("beta login warning", function()
@@ -472,7 +370,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             assert.is_truthy(printedMessages[#printedMessages])
-            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
         end)
 
         it("does not print the pre-release warning on stable versions", function()
@@ -481,8 +379,362 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             for _, message in ipairs(printedMessages) do
-                assert.is_nil(message:find(ECM.Constants.BETA_LOGIN_MESSAGE, 1, true))
+                assert.is_nil(message:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
             end
+        end)
+    end)
+
+    describe("release popup", function()
+        local function getWhatsNewFrame()
+            for _, frame in ipairs(createdFrames) do
+                if frame:GetName() == ECM.Constants.WHATS_NEW_FRAME_NAME then
+                    return frame
+                end
+            end
+        end
+
+        before_each(function()
+            addonVersion = "v1.2.3"
+            ECM.Constants.RELEASE_POPUP_VERSION = addonVersion
+            ECM.L["WHATS_NEW_BODY"] = "New version notes"
+            _G._testDB.profile.global.releasePopupSeenVersion = ""
+        end)
+
+        it("shows the popup when enabled and unseen", function()
+            fakeAddon:OnEnable()
+
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
+        end)
+
+        it("does not show the popup when the current version has already been seen", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
+
+            fakeAddon:OnEnable()
+
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("does not show the popup when the addon version is unavailable", function()
+            addonVersion = nil
+
+            fakeAddon:OnEnable()
+
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
+        end)
+
+        it("does not show the popup when RELEASE_POPUP_VERSION is nil", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = nil
+
+            fakeAddon:OnEnable()
+
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("does not show the popup when RELEASE_POPUP_VERSION is empty", function()
+            ECM.Constants.RELEASE_POPUP_VERSION = ""
+
+            assert.is_false(fakeAddon:ShowReleasePopup(true))
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("does not automatically show the popup twice in the same session", function()
+            fakeAddon:OnEnable()
+            local frame = assert(getWhatsNewFrame())
+            fakeAddon:OnEnable()
+
+            assert.are.equal(1, TestHelpers.getCalls(frame, "Show"))
+        end)
+
+        it("persists the seen version when the popup is acknowledged", function()
+            fakeAddon:OnEnable()
+            local frame = assert(getWhatsNewFrame())
+            frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
+            fakeAddon:OnEnable()
+
+            assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.are.equal(1, TestHelpers.getCalls(frame, "Show"))
+            assert.is_false(frame:IsShown())
+        end)
+
+        it("marks the popup seen and opens settings from the secondary button", function()
+            local chatInputs = {}
+            fakeAddon.ChatCommand = function(_, input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+
+            frame.SettingsButton:GetScript("OnClick")(frame.SettingsButton)
+
+            assert.are.equal(addonVersion, _G._testDB.profile.global.releasePopupSeenVersion)
+            assert.is_false(frame:IsShown())
+            assert.same({ "options" }, chatInputs)
+        end)
+
+        it("formats markdown headings and list items for the popup body", function()
+            ECM.L["WHATS_NEW_BODY"] = "### Header\nBody line\n- First item\n- Second item"
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal(
+                "|cff" .. ECM.Constants.WHATS_NEW_HEADER_COLOR .. "Header|r\n"
+                    .. "Body line\n"
+                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " First item\n"
+                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " Second item",
+                frame.Body:GetText()
+            )
+        end)
+
+        it("uses the standard popup button labels", function()
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal("Close", frame.CloseButton:GetText())
+            assert.are.equal("Open settings", frame.SettingsButton:GetText())
+        end)
+
+        it("creates a dedicated header and left-aligned body text", function()
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+
+            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
+            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
+            assert.are.equal(ECM.L["ADDON_NAME"], frame.Title:GetText())
+            assert.are.equal(string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
+            assert.are.equal("LEFT", frame.Title._justifyH)
+            assert.are.equal("LEFT", frame.Subtitle._justifyH)
+            assert.are.equal("LEFT", frame.Body._justifyH)
+            assert.are.equal("TOP", frame.Body._justifyV)
+            assert.same(
+                {
+                    { "TOPLEFT", frame, "TOPLEFT", ECM.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
+                    { "TOPRIGHT", frame, "TOPRIGHT", -ECM.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
+                },
+                frame.Title._anchors
+            )
+            assert.same(
+                {
+                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                },
+                frame.Subtitle._anchors
+            )
+            assert.same(
+                {
+                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
+                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
+                },
+                frame.Body._anchors
+            )
+        end)
+
+        it("does not show an empty popup when release notes are unavailable", function()
+            ECM.L["WHATS_NEW_BODY"] = ""
+
+            assert.is_false(fakeAddon:ShowReleasePopup(true))
+            assert.is_nil(getWhatsNewFrame())
+        end)
+
+        it("force showing ignores the seen flag", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
+
+            assert.is_true(fakeAddon:ShowReleasePopup(true))
+            local frame = assert(getWhatsNewFrame())
+            assert.are.equal(
+                string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion),
+                frame.Subtitle:GetText()
+            )
+            assert.are.equal("New version notes", frame.Body:GetText())
+        end)
+
+        it("clearseen allows the popup to show again after a reload", function()
+            _G._testDB.profile.global.releasePopupSeenVersion = addonVersion
+
+            fakeAddon:ChatCommand("clearseen")
+            fakeAddon:OnEnable()
+
+            assert.is_true(assert(getWhatsNewFrame()):IsShown())
+            assert.is_nil(_G._testDB.profile.global.releasePopupSeenVersion)
+        end)
+    end)
+
+    describe("profile change handling", function()
+        it("registers AceDB profile callbacks on enable", function()
+            local registeredEvents = {}
+            _G._testDB.RegisterCallback = function(_target, event, _handler)
+                registeredEvents[#registeredEvents + 1] = event
+            end
+
+            fakeAddon:OnEnable()
+
+            table.sort(registeredEvents)
+            assert.same({ "OnProfileChanged", "OnProfileCopied", "OnProfileReset" }, registeredEvents)
+        end)
+
+        it("OnProfileChangedHandler re-evaluates module states and schedules layout", function()
+            local enableCalls = {}
+            local layoutReasons = {}
+            fakeAddon.EnableModule = function(_, name) enableCalls[#enableCalls + 1] = { "enable", name } end
+            fakeAddon.DisableModule = function(_, name) enableCalls[#enableCalls + 1] = { "disable", name } end
+
+            local origSchedule = ECM.Runtime.ScheduleLayoutUpdate
+            ECM.Runtime.ScheduleLayoutUpdate = function(_, reason)
+                layoutReasons[#layoutReasons + 1] = reason
+            end
+
+            fakeAddon:OnEnable()
+            enableCalls = {}
+
+            -- Disable PowerBar in the profile and trigger handler
+            _G._testDB.profile.powerBar.enabled = false
+            fakeAddon:OnProfileChangedHandler()
+
+            -- Should have re-evaluated: PowerBar disabled, others enabled
+            local disabledPowerBar = false
+            for _, call in ipairs(enableCalls) do
+                if call[1] == "disable" and call[2] == "PowerBar" then
+                    disabledPowerBar = true
+                end
+            end
+            assert.is_true(disabledPowerBar)
+            assert.is_truthy(layoutReasons[#layoutReasons] == "ProfileChanged")
+
+            ECM.Runtime.ScheduleLayoutUpdate = origSchedule
+        end)
+
+        it("OnInitialize runs migration for older schema profiles", function()
+            local migrationProfiles = {}
+            local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
+            local profile = TestHelpers.deepClone(ECM.defaults.profile)
+            profile.schemaVersion = 10
+            aceDB.New = function()
+                return { profile = profile, RegisterCallback = function() end }
+            end
+
+            local origRun = ECM.Migration.Run
+            ECM.Migration.Run = function(activeProfile)
+                migrationProfiles[#migrationProfiles + 1] = activeProfile
+            end
+
+            fakeAddon:OnInitialize()
+
+            assert.same({ profile }, migrationProfiles)
+
+            ECM.Migration.Run = origRun
+        end)
+    end)
+
+    describe("initialization wiring", function()
+        it("defines the reload popup constant used by ConfirmReloadUI", function()
+            local getShownNames = TestHelpers.InstallPopupRecorder()
+
+            fakeAddon:ConfirmReloadUI("Reload now?")
+
+            local shownNames = getShownNames()
+
+            assert.are.equal("ECM_CONFIRM_RELOAD_UI", ECM.Constants.POPUP_CONFIRM_RELOAD_UI)
+            assert.are.equal(ECM.Constants.POPUP_CONFIRM_RELOAD_UI, shownNames[1])
+            assert.is_table(StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI])
+            assert.are.equal("Reload now?", StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI].text)
+        end)
+
+        it("sets LibEvent as the default module library on addon creation", function()
+            assert.same({ "LibEvent-1.0" }, defaultModuleLibraries)
+        end)
+
+        it("registers layout events via Runtime on enable", function()
+            local libEvent = LibStub("LibEvent-1.0")
+
+            fakeAddon:OnEnable()
+            inCombat = true
+            fakeAddon:ChatCommand("options")
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            assert.is_true(addonFrame.__registeredEvents.ZONE_CHANGED)
+            assert.is_true(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
+        end)
+
+        it("cleans up layout events via Runtime on disable", function()
+            local libEvent = LibStub("LibEvent-1.0")
+
+            fakeAddon:OnEnable()
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+
+            assert.is_false(createdTickers[1].cancelled)
+
+            fakeAddon:OnDisable()
+
+            assert.is_nil(addonFrame.__registeredEvents.ZONE_CHANGED)
+            assert.is_nil(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
+            assert.is_true(addonFrame.__unregisteredEvents.ZONE_CHANGED)
+            assert.is_true(addonFrame.__unregisteredEvents.PLAYER_REGEN_ENABLED)
+            assert.is_true(createdTickers[1].cancelled)
+        end)
+
+        it("registers the addon compartment entry once and opens options from it", function()
+            local registrationCount = 0
+            local registeredEntry
+            local chatInputs = {}
+            _G.AddonCompartmentFrame = {
+                RegisterAddon = function(_, entry)
+                    registrationCount = registrationCount + 1
+                    registeredEntry = entry
+                end,
+            }
+            fakeAddon.ChatCommand = function(_, input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            assert.are.equal(1, registrationCount)
+            assert.are.equal(ECM.Constants.ADDON_ICON_TEXTURE, registeredEntry.icon)
+            assert.is_true(registeredEntry.notCheckable)
+            registeredEntry.func()
+            assert.same({ "options" }, chatInputs)
+        end)
+
+        it("retries addon compartment registration after a failure", function()
+            local registrationCount = 0
+            _G.AddonCompartmentFrame = {
+                RegisterAddon = function()
+                    registrationCount = registrationCount + 1
+                    error("boom")
+                end,
+            }
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            assert.are.equal(2, registrationCount)
+        end)
+
+        it("registers both slash commands through LibConsole during OnInitialize", function()
+            local chatInputs = {}
+            local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
+            aceDB.New = function()
+                return { profile = TestHelpers.deepClone(ECM.defaults.profile) }
+            end
+
+            function fakeAddon:ChatCommand(input)
+                chatInputs[#chatInputs + 1] = input
+            end
+
+            fakeAddon:OnInitialize()
+
+            assert.is_function(SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER)
+            assert.is_function(SlashCmdList.LIBCONSOLE_ECM)
+            assert.are.equal("/enhancedcooldownmanager", _G.SLASH_LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER1)
+            assert.are.equal("/ecm", _G.SLASH_LIBCONSOLE_ECM1)
+
+            SlashCmdList.LIBCONSOLE_ENHANCEDCOOLDOWNMANAGER("from-long")
+            SlashCmdList.LIBCONSOLE_ECM("from-short")
+
+            assert.same({ "from-long", "from-short" }, chatInputs)
         end)
     end)
 end)

@@ -44,8 +44,7 @@ describe("BuffBarsOptions", function()
     end)
 
     before_each(function()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
+        TestHelpers.SetupOptionsGlobals()
 
         _G.UnitClass = function()
             return "Demon Hunter", "DEMONHUNTER", 12
@@ -94,30 +93,6 @@ describe("BuffBarsOptions", function()
                 GetCurrentClassSpec = function()
                     return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER"
                 end,
-                GetNestedValue = function(tbl, path)
-                    local current = tbl
-                    for key in path:gmatch("[^.]+") do
-                        if type(current) ~= "table" then
-                            return nil
-                        end
-                        current = current[key]
-                    end
-                    return current
-                end,
-                SetNestedValue = function(tbl, path, value)
-                    local parts = {}
-                    for key in path:gmatch("[^.]+") do
-                        parts[#parts + 1] = key
-                    end
-                    local current = tbl
-                    for i = 1, #parts - 1 do
-                        if current[parts[i]] == nil then
-                            current[parts[i]] = {}
-                        end
-                        current = current[parts[i]]
-                    end
-                    current[parts[#parts]] = value
-                end,
                 IsAnchorModeFree = function()
                     return false
                 end,
@@ -133,25 +108,17 @@ describe("BuffBarsOptions", function()
         }
 
         -- Load library
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
-        if lsmw then
-            lsmw.GetFontValues = function()
-                return {}
-            end
-            lsmw.GetStatusbarValues = function()
-                return {}
-            end
-            lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-            lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
         end
 
         -- Load Constants
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-
-        -- Load PriorityKeyMap
-        TestHelpers.LoadChunk("Helpers/PriorityKeyMap.lua", "Unable to load Helpers/PriorityKeyMap.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
         -- Load SpellColors
         local addonNS = {
@@ -174,10 +141,12 @@ describe("BuffBarsOptions", function()
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("Helpers/SpellColors/KeyType.lua", "Unable to load SpellColors/KeyType.lua")()
+        TestHelpers.LoadChunk("Helpers/SpellColors/Store.lua", "Unable to load SpellColors/Store.lua")(nil, addonNS)
         SpellColors = ECM.SpellColors
 
         -- Load Options (includes SettingsBuilder adapter)
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, addonNS)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         -- Create root category so subcategory calls work

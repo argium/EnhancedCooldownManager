@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("PowerBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -25,6 +25,12 @@ describe("PowerBarOptions getters/setters/defaults", function()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         ECM.PowerBarTickMarksOptions = { RegisterSettings = function() end }
+
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/PowerBarOptions.lua", "PowerBarOptions")(nil, ns)
@@ -66,42 +72,14 @@ describe("PowerBarOptions getters/setters/defaults", function()
         end)
     end)
 
-    -- Positioning composite
-    describe("anchorMode", function()
-        it("getter returns profile value", function()
-            assert.are.equal("chain", settings["ECM_powerBar_anchorMode"]:GetValue())
+    describe("layout breadcrumb", function()
+        it("removes anchorMode from the module page", function()
+            assert.is_nil(settings["ECM_powerBar_anchorMode"])
         end)
-        it("setter writes to profile", function()
-            settings["ECM_powerBar_anchorMode"]:SetValue("free")
-            assert.are.equal("free", profile.powerBar.anchorMode)
-        end)
-    end)
-
-    describe("width", function()
-        it("getter returns profile value", function()
-            assert.are.equal(300, settings["ECM_powerBar_width"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_powerBar_width"]:SetValue(400)
-            assert.are.equal(400, profile.powerBar.width)
-        end)
-    end)
-
-    describe("offsetY", function()
-        it("getter returns profile value", function()
-            assert.are.equal(-275, settings["ECM_powerBar_offsetY"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_powerBar_offsetY"]:SetValue(-200)
-            assert.are.equal(-200, profile.powerBar.offsetY)
-        end)
-        it("getter applies transform for nil", function()
-            profile.powerBar.offsetY = nil
-            assert.are.equal(0, settings["ECM_powerBar_offsetY"]:GetValue())
-        end)
-        it("setter transforms zero to nil", function()
-            settings["ECM_powerBar_offsetY"]:SetValue(0)
-            assert.is_nil(profile.powerBar.offsetY)
+        it("adds a breadcrumb to the Layout page", function()
+            assert.is_nil(capturedTable.args.layoutMovedInfo)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+            assert.are.equal(ECM.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedTable.args.layoutMovedButton.buttonText)
         end)
     end)
 
@@ -180,6 +158,21 @@ describe("PowerBarOptions getters/setters/defaults", function()
                 assert.is_not_nil(settings["ECM_powerBar_colors_" .. key],
                     "Missing color setting for power type " .. key)
             end
+        end)
+    end)
+
+    describe("tick marks menu placement", function()
+        it("registers Tick Marks as a subcategory of Power Bar", function()
+            TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "PowerBarTickMarksOptions")(nil, ns)
+
+            ns.OptionsSections.PowerBar.RegisterSettings(SB)
+
+            local powerBarCategory = SB._subcategories[ECM.L["POWER_BAR"]]
+            local tickMarksCategory = SB._subcategories["Tick Marks"]
+
+            assert.is_not_nil(powerBarCategory)
+            assert.is_not_nil(tickMarksCategory)
+            assert.are.equal(powerBarCategory, tickMarksCategory._parent)
         end)
     end)
 end)

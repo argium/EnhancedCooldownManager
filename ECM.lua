@@ -2,45 +2,164 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@class ECM_Addon : AceAddon Core addon object (AceAddon instance).
+---@field db AceDBObject-3.0 AceDB database handle.
+---@field _addonCompartmentRegistered boolean Whether the addon compartment entry has been registered.
+---@field _openOptionsAfterCombat boolean Whether to open options after leaving combat.
+
 local ADDON_NAME, ns = ...
-local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "AceEvent-3.0", "AceConsole-3.0")
+local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "LibEvent-1.0")
+mod:SetDefaultModuleLibraries("LibEvent-1.0")
 ns.Addon = mod
 ECM = ECM or {}
 assert(ECM.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
 assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
 assert(ECM.Migration, "Migration.lua must be loaded before ECM.lua")
 assert(ECM.FrameMixin, "FrameMixin.lua must be loaded before ECM.lua")
+assert(ECM.EditMode, "ECM.EditMode must be initialized before ECM.lua")
 
+local LibConsole = LibStub("LibConsole-1.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)
-local POPUP_CONFIRM_RELOAD_UI = "ECM_CONFIRM_RELOAD_UI"
 local C = ECM.Constants
+local L = ECM.L
 
-local function isDebugEnabled()
-    return ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global.debug
+--- Returns the global config section. Standalone accessor for non-module callers.
+---@return table|nil
+function ECM.GetGlobalConfig()
+    local db = ns.Addon and ns.Addon.db
+    local profile = db and db.profile
+    return profile and profile[C.CONFIG_SECTION_GLOBAL]
+end
+
+--- Returns whether debug mode is enabled.
+function ECM.IsDebugEnabled()
+    local gc = ECM.GetGlobalConfig()
+    return gc and gc.debug
+end
+
+local function getAddonVersion()
+    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
+    end
+end
+
+local function markReleasePopupSeen(version)
+    local gc = ECM.GetGlobalConfig()
+    ECM.DebugAssert(gc ~= nil, "Global config missing when marking release popup seen", { version = version })
+    if gc then
+        gc.releasePopupSeenVersion = version
+    end
+end
+
+local function formatWhatsNewText(text)
+    local lines = {}
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        if line:find("^### ") then
+            line = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, line:sub(5))
+        elseif line:find("^%- ") then
+            line = C.WHATS_NEW_LIST_BULLET .. " " .. line:sub(3)
+        end
+        lines[#lines + 1] = line
+    end
+    return table.concat(lines, "\n")
+end
+
+local whatsNewFrame
+
+local function createDialogShell(name, width, height, centerYOffset)
+    local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    frame:SetSize(width, height)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, centerYOffset or 0)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetBackdrop(C.DIALOG_BACKDROP)
+    frame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    frame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    frame:EnableMouse(true)
+    frame:Hide()
+    return frame
+end
+
+local function ensureWhatsNewFrame()
+    if whatsNewFrame then
+        return whatsNewFrame
+    end
+
+    local frame = createDialogShell(
+        C.WHATS_NEW_FRAME_NAME,
+        C.WHATS_NEW_FRAME_WIDTH,
+        C.WHATS_NEW_FRAME_HEIGHT,
+        C.WHATS_NEW_FRAME_OFFSET_Y
+    )
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        self:StartMoving()
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+    end)
+
+    local title = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
+    title:SetPoint("TOPLEFT", frame, "TOPLEFT", C.WHATS_NEW_FRAME_PADDING, -C.WHATS_NEW_FRAME_PADDING)
+    title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -C.WHATS_NEW_FRAME_PADDING, -C.WHATS_NEW_FRAME_PADDING)
+    title:SetJustifyH("LEFT")
+    frame.Title = title
+
+    local subtitle = frame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
+    subtitle:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -C.WHATS_NEW_SUBTITLE_SPACING)
+    subtitle:SetJustifyH("LEFT")
+    frame.Subtitle = subtitle
+
+    local body = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    body:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -C.WHATS_NEW_BODY_SPACING)
+    body:SetPoint("TOPRIGHT", subtitle, "BOTTOMRIGHT", 0, -C.WHATS_NEW_BODY_SPACING)
+    body:SetJustifyH("LEFT")
+    body:SetJustifyV("TOP")
+    frame.Body = body
+
+    local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    closeButton:SetSize(C.WHATS_NEW_CLOSE_BUTTON_WIDTH, C.WHATS_NEW_BUTTON_HEIGHT)
+    closeButton:SetPoint(
+        "BOTTOMRIGHT",
+        frame,
+        "BOTTOMRIGHT",
+        -C.WHATS_NEW_FRAME_PADDING,
+        C.WHATS_NEW_BUTTON_BOTTOM_OFFSET
+    )
+    closeButton:SetText(L["CLOSE"])
+    closeButton:SetScript("OnClick", function()
+        markReleasePopupSeen(C.RELEASE_POPUP_VERSION)
+        frame:Hide()
+    end)
+    frame.CloseButton = closeButton
+
+    local settingsButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    settingsButton:SetSize(C.WHATS_NEW_SETTINGS_BUTTON_WIDTH, C.WHATS_NEW_BUTTON_HEIGHT)
+    settingsButton:SetPoint("RIGHT", closeButton, "LEFT", -C.WHATS_NEW_BUTTON_SPACING, 0)
+    settingsButton:SetText(L["OPEN_SETTINGS"])
+    settingsButton:SetScript("OnClick", function()
+        markReleasePopupSeen(C.RELEASE_POPUP_VERSION)
+        frame:Hide()
+        mod:ChatCommand("options")
+    end)
+    frame.SettingsButton = settingsButton
+
+    frame:Hide()
+    whatsNewFrame = frame
+    return frame
 end
 
 local function safeStrTostring(x)
-    if x == nil then
-        return "nil"
-    elseif issecretvalue(x) then
-        return "[secret]"
-    else
-        return tostring(x)
-    end
+    if x == nil then return "nil" end
+    return issecretvalue(x) and "[secret]" or tostring(x)
 end
 
 local function safeTableTostring(tbl, depth, seen)
-    if issecrettable(tbl) then
-        return "[secrettable]"
-    end
-
-    if seen[tbl] then
-        return "<cycle>"
-    end
-
-    if depth >= C.TOSTRING_MAX_DEPTH then
-        return "{...}"
-    end
+    if issecrettable(tbl) then return "[secrettable]" end
+    if seen[tbl] then return "<cycle>" end
+    if depth >= C.TOSTRING_MAX_DEPTH then return "{...}" end
 
     seen[tbl] = true
 
@@ -76,16 +195,6 @@ local function getLsmMedia(mediaType, key)
     end
 end
 
-local function getAddonVersion()
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
-end
-
-local function isBetaVersion(version)
-    return type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil
-end
-
 function ECM.ToString(v)
     if type(v) == "table" then
         return safeTableTostring(v, 0, {})
@@ -94,22 +203,14 @@ function ECM.ToString(v)
 end
 
 function ECM.GetTexture(texture)
-    if texture then
-        local fetched = getLsmMedia("statusbar", texture)
-        if fetched then
-            return fetched
-        end
-
-        if texture:find("\\") then
-            return texture
-        end
-    end
-
+    local fetched = texture and getLsmMedia("statusbar", texture)
+    if fetched then return fetched end
+    if texture and texture:find("\\") then return texture end
     return getLsmMedia("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
 end
 
 function ECM.DebugAssert(condition, message, data)
-    if not isDebugEnabled() then
+    if not ECM.IsDebugEnabled() then
         return
     end
 
@@ -120,7 +221,7 @@ function ECM.DebugAssert(condition, message, data)
 end
 
 function ECM.ApplyFont(fontString, globalConfig, moduleConfig)
-    local config = globalConfig or (ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.global)
+    local config = globalConfig or ECM.GetGlobalConfig()
     local useModuleOverride = moduleConfig and moduleConfig.overrideFont
     local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font))
         or C.DEFAULT_FONT
@@ -167,377 +268,30 @@ function ECM.CloneValue(value)
     return copy
 end
 
-function ECM.Print(...)
-    local prefix = ECM.ColorUtil.Sparkle(C.ADDON_ABRV .. ":")
-    local args = { ... }
-    for i = 1, #args do
-        args[i] = tostring(args[i])
-    end
-    local message = table.concat(args, " ")
-    print(prefix .. " " .. message)
-end
+ECM.Print = LibConsole:NewPrinter(function(message)
+    print(ECM.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
+end)
 
 function ECM.Log(module, message, data)
-    if not isDebugEnabled() then
+    if not ECM.IsDebugEnabled() then
         return
     end
 
-    local prefix = "[" .. C.ADDON_ABRV .. (module and (" " .. module) or "") .. "]"
+    local coloredPrefix = "|cff" .. C.DEBUG_COLOR .. "[" .. L["ADDON_ABRV"]
+        .. (module and (" " .. module) or "") .. "]|r "
 
     if DevTool and DevTool.AddData then
-        local payload = {
+        pcall(DevTool.AddData, DevTool, {
             module = module or "nil",
             message = message,
             timestamp = GetTime(),
-            data = ECM.ToString(data),
-        }
-        pcall(DevTool.AddData, DevTool, payload, "|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
+            data = data and ECM.ToString(data),
+        }, coloredPrefix .. message)
     end
 
-    print("|cff" .. C.DEBUG_COLOR .. prefix .. "|r " .. message)
-end
-
---------------------------------------------------------------------------------
--- Layout — global visibility, fade, Blizzard frame enforcement, event dispatch
---------------------------------------------------------------------------------
-
-local LAYOUT_EVENTS = {
-    PLAYER_MOUNT_DISPLAY_CHANGED = { delay = 0 },
-    UNIT_ENTERED_VEHICLE = { delay = 0 },
-    UNIT_EXITED_VEHICLE = { delay = 0 },
-    VEHICLE_UPDATE = { delay = 0 },
-    PLAYER_UPDATE_RESTING = { delay = 0 },
-    PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
-    PLAYER_ENTERING_WORLD = { delay = C.LAYOUT_ENTERING_WORLD_DELAY },
-    PLAYER_TARGET_CHANGED = { delay = 0 },
-    PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true },
-    PLAYER_REGEN_DISABLED = { delay = 0, combatChange = true },
-    ZONE_CHANGED_NEW_AREA = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
-    ZONE_CHANGED = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
-    ZONE_CHANGED_INDOORS = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
-    UPDATE_SHAPESHIFT_FORM = { delay = 0 },
-}
-
-local _modules = {}
-local _globallyHidden = false
-local _desiredAlpha = 1
-local _inCombat = InCombatLockdown()
-local _layoutPending = false
-local _cooldownViewerSettingsHooked = false
-local _hookedBlizzardFrames = {}
-
-local _chainSet = {}
-for _, name in ipairs(C.CHAIN_ORDER) do
-    _chainSet[name] = true
-end
-
---- Enforces the current desired visibility and alpha on all Blizzard frames.
---- Single enforcement point called from state changes, OnShow hooks, and the
---- watchdog ticker.
-local function enforceBlizzardFrameState()
-    local alpha = _desiredAlpha
-    for _, name in ipairs(C.BLIZZARD_FRAMES) do
-        local frame = _G[name]
-        if frame then
-            if _globallyHidden then
-                if frame:IsShown() then
-                    frame:Hide()
-                    ECM.Log(nil, "Enforced hide on " .. (frame:GetName() or "?"))
-                end
-            else
-                if not frame:IsShown() then
-                    frame:Show()
-                    ECM.Log(nil, "Enforced show on " .. (frame:GetName() or "?"))
-                end
-                ECM.FrameUtil.LazySetAlpha(frame, alpha)
-            end
-        end
-    end
-end
-
---- Hooks a Blizzard frame's OnShow to immediately re-enforce desired state.
---- Provides sub-frame correction when the game externally re-shows a frame.
---- @param frame Frame
---- @param name string
-local function hookBlizzardFrame(frame, name)
-    if _hookedBlizzardFrames[name] then
-        return
-    end
-
-    frame:HookScript("OnShow", function(self)
-        if _globallyHidden then
-            self:Hide()
-        else
-            ECM.FrameUtil.LazySetAlpha(self, _desiredAlpha)
-        end
-    end)
-
-    _hookedBlizzardFrames[name] = true
-    ECM.Log(nil, "Hooked Blizzard frame: " .. name)
-end
-
---- Attempts to hook OnShow on all known Blizzard cooldown viewer frames.
---- Frames may be created lazily; called periodically to catch latecomers.
-local function hookBlizzardFrames()
-    for _, name in ipairs(C.BLIZZARD_FRAMES) do
-        local frame = _G[name]
-        if frame then
-            hookBlizzardFrame(frame, name)
-        end
-    end
-end
-
---- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
---- @param hidden boolean Whether to hide all frames
---- @param reason string|nil Reason for hiding ("mounted", "rest", "cvar")
-local function setGloballyHidden(hidden, reason)
-    if _globallyHidden ~= hidden then
-        ECM.Log(
-            nil,
-            "SetGloballyHidden " .. (hidden and "HIDDEN" or "VISIBLE") .. (reason and (" due to " .. reason) or "")
-        )
-    end
-
-    _globallyHidden = hidden
-
-    for _, module in pairs(_modules) do
-        module:SetHidden(hidden)
-    end
-end
-
---- Applies alpha to all managed frames.
---- @param alpha number
-local function setAlpha(alpha)
-    _desiredAlpha = alpha
-
-    for _, module in pairs(_modules) do
-        if module.InnerFrame then
-            ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
-        end
-    end
-end
-
---- Checks all fade and hide conditions and updates global state.
-local function updateFadeAndHiddenStates()
-    local globalConfig = mod.db and mod.db.profile and mod.db.profile.global
-    if not globalConfig then
-        return
-    end
-
-    -- Determine hidden state
-    local hidden, reason = false, nil
-    if not C_CVar.GetCVarBool("cooldownViewerEnabled") then
-        hidden, reason = true, "cvar"
-    elseif globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")) then
-        hidden, reason = true, "mounted"
-    elseif not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting() then
-        hidden, reason = true, "rest"
-    end
-
-    setGloballyHidden(hidden, reason)
-
-    -- Determine alpha (only matters when visible)
-    local alpha = 1
-    if not hidden then
-        local fadeConfig = globalConfig.outOfCombatFade
-        if not _inCombat and fadeConfig and fadeConfig.enabled then
-            local shouldSkipFade = false
-
-            if fadeConfig.exceptInInstance and IsInInstance() then
-                shouldSkipFade = true
-            end
-
-            local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
-
-            if
-                not shouldSkipFade
-                and hasLiveTarget
-                and fadeConfig.exceptIfTargetCanBeAttacked
-                and UnitCanAttack("player", "target")
-            then
-                shouldSkipFade = true
-            end
-
-            if
-                not shouldSkipFade
-                and hasLiveTarget
-                and fadeConfig.exceptIfTargetCanBeHelped
-                and UnitCanAssist("player", "target")
-            then
-                shouldSkipFade = true
-            end
-
-            if not shouldSkipFade then
-                local opacity = fadeConfig.opacity or 100
-                alpha = math.max(0, math.min(1, opacity / 100))
-            end
-        end
-    end
-
-    setAlpha(alpha)
-
-    -- Single enforcement pass for Blizzard frames after all state is settled
-    enforceBlizzardFrameState()
-end
-
-local function updateAllLayouts(reason)
-    -- Chain frames update in deterministic order so downstream bars can
-    -- resolve anchors against already-laid-out predecessors.
-    for _, moduleName in ipairs(C.CHAIN_ORDER) do
-        local module = _modules[moduleName]
-        if module then
-            module:ThrottledUpdateLayout(reason)
-        end
-    end
-
-    for frameName, module in pairs(_modules) do
-        if not _chainSet[frameName] then
-            module:ThrottledUpdateLayout(reason)
-        end
-    end
-end
-
---- Hooks CooldownViewerSettings hide to force alpha/layout reapplication.
-local function hookCooldownViewerSettings()
-    if _cooldownViewerSettingsHooked then
-        return
-    end
-
-    local settingsFrame = _G.CooldownViewerSettings
-    if not settingsFrame then
-        return
-    end
-
-    settingsFrame:HookScript("OnHide", function()
-        updateFadeAndHiddenStates()
-        updateAllLayouts("OnHide:CooldownViewerSettings")
-    end)
-
-    _cooldownViewerSettingsHooked = true
-    ECM.Log(nil, "Hooked CooldownViewerSettings OnHide")
-end
-
---- Schedules a layout update after a delay (debounced).
---- @param delay number Delay in seconds
---- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
-function ECM.ScheduleLayoutUpdate(delay, reason)
-    if _layoutPending then
-        return
-    end
-
-    _layoutPending = true
-    C_Timer.After(delay or 0, function()
-        _layoutPending = false
-        hookCooldownViewerSettings()
-        updateFadeAndHiddenStates()
-        updateAllLayouts(reason)
-    end)
-end
-
---- Registers a FrameMixin to receive layout update events.
---- @param frame FrameMixin The frame to register
-function ECM.RegisterFrame(frame)
-    ECM.FrameMixin.AssertValid(frame)
-    assert(_modules[frame.Name] == nil, "registerFrame: frame with name '" .. frame.Name .. "' is already registered")
-
-    _modules[frame.Name] = frame
-    frame:SetHidden(_globallyHidden)
-    ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
-    ECM.Log(nil, "Frame registered: " .. frame.Name)
-end
-
---- Unregisters a FrameMixin from layout update events.
---- @param frame FrameMixin The frame to unregister
-function ECM.UnregisterFrame(frame)
-    ECM.FrameMixin.AssertValid(frame)
-    assert(_modules[frame.Name] ~= nil, "UnregisterFrame: frame with name '" .. frame.Name .. "' is not registered")
-
-    local name = frame.Name
-    _modules[name] = nil
-    frame:SetHidden(true)
-    ECM.Log(nil, "Frame unregistered: " .. name)
-end
-
---- Registers layout events and starts event-driven state updates.
-local function enableLayoutEvents()
-    local eventFrame = CreateFrame("Frame")
-
-    for eventName in pairs(LAYOUT_EVENTS) do
-        eventFrame:RegisterEvent(eventName)
-    end
-    eventFrame:RegisterEvent("CVAR_UPDATE")
-
-    eventFrame:SetScript("OnEvent", function(self, event, arg1, ...)
-        hookCooldownViewerSettings()
-
-        if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
-            return
-        end
-
-        if event == "CVAR_UPDATE" then
-            if arg1 == "cooldownViewerEnabled" then
-                ECM.ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
-            end
-            return
-        end
-
-        local config = LAYOUT_EVENTS[event]
-        if not config then
-            return
-        end
-
-        if config.combatChange then
-            _inCombat = (event == "PLAYER_REGEN_DISABLED")
-        end
-
-        if config.delay and config.delay > 0 then
-            C_Timer.After(config.delay, function()
-                updateFadeAndHiddenStates()
-                updateAllLayouts(event)
-            end)
-        else
-            updateFadeAndHiddenStates()
-            updateAllLayouts(event)
-        end
-    end)
-
-    -- Watchdog — catches cases where the game externally re-shows or resets alpha
-    -- on Blizzard cooldown viewer frames between layout events.
-    C_Timer.NewTicker(C.WATCHDOG_INTERVAL, function()
-        hookBlizzardFrames()
-        hookCooldownViewerSettings()
-        enforceBlizzardFrameState()
-
-        local alpha = _desiredAlpha
-        for _, module in pairs(_modules) do
-            if module.InnerFrame and not module.IsHidden then
-                ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
-            end
-        end
-    end)
-end
-
-local function registerAddonCompartmentEntry()
-    if mod._addonCompartmentRegistered then
-        return
-    end
-
-    if not (AddonCompartmentFrame and type(AddonCompartmentFrame.RegisterAddon) == "function") then
-        return
-    end
-
-    local text = ECM.ColorUtil.Sparkle(C.ADDON_NAME)
-    local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
-        text = text,
-        icon = C.ADDON_ICON_TEXTURE,
-        notCheckable = true,
-        func = function()
-            mod:ChatCommand("options")
-        end,
-    })
-
-    if ok then
-        mod._addonCompartmentRegistered = true
+    local cfg = ECM.GetGlobalConfig()
+    if cfg and cfg.debugToChat then
+        print(coloredPrefix .. message)
     end
 end
 
@@ -548,13 +302,13 @@ end
 ---@param onCancel fun()|nil
 function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if InCombatLockdown() then
-        ECM.Print("Cannot reload the UI right now: UI reload is blocked during combat.")
+        ECM.Print(L["RELOAD_BLOCKED_COMBAT"])
         return
     end
 
-    if not StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] then
-        StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI] = {
-            text = "Reload the UI?",
+    if not StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] then
+        StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] = {
+            text = L["RELOAD_UI_PROMPT"],
             button1 = YES or "Yes",
             button2 = NO or "No",
             OnAccept = function(_, data)
@@ -575,8 +329,34 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
         }
     end
 
-    StaticPopupDialogs[POPUP_CONFIRM_RELOAD_UI].text = text or "Reload the UI?"
-    StaticPopup_Show(POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+    StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI].text = text or L["RELOAD_UI_PROMPT"]
+    StaticPopup_Show(C.POPUP_CONFIRM_RELOAD_UI, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+end
+
+function mod:ShowReleasePopup(force)
+    local popupVersion = C.RELEASE_POPUP_VERSION
+    local body = L["WHATS_NEW_BODY"]
+    local hasBody = type(body) == "string" and body ~= "" and body ~= "WHATS_NEW_BODY"
+    if not popupVersion or popupVersion == "" or not hasBody then
+        return false
+    end
+
+    if force ~= true then
+        local gc = ECM.GetGlobalConfig()
+        if not gc or gc.releasePopupSeenVersion == popupVersion then
+            return false
+        end
+        if whatsNewFrame and whatsNewFrame:IsShown() then
+            return false
+        end
+    end
+
+    local frame = ensureWhatsNewFrame()
+    frame.Title:SetText(ECM.ColorUtil.Sparkle(L["ADDON_NAME"]))
+    frame.Subtitle:SetText(string.format(L["WHATS_NEW_TITLE_FORMAT"], popupVersion))
+    frame.Body:SetText(formatWhatsNewText(body))
+    frame:Show()
+    return true
 end
 
 local DIALOG_SIZES = {
@@ -586,15 +366,7 @@ local DIALOG_SIZES = {
 
 local function createDialogFrame(name, titleText, explainText, size)
     local dims = type(size) == "table" and size or DIALOG_SIZES[size] or DIALOG_SIZES.large
-    local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-    f:SetSize(dims[1], dims[2])
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetBackdrop(C.DIALOG_BACKDROP)
-    f:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
-    f:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
-    f:EnableMouse(true)
-    f:Hide()
+    local f = createDialogShell(name, dims[1], dims[2])
     tinsert(UISpecialFrames, name)
 
     local title = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
@@ -662,20 +434,14 @@ local exportFrame
 ---@param exportString string
 function mod:ShowExportDialog(exportString)
     if not exportString or exportString == "" then
-        ECM.Print("Invalid export string provided")
+        ECM.Print(L["INVALID_EXPORT_STRING"])
         return
     end
 
     if not exportFrame then
-        exportFrame = createCopyDialog(
-            "ECMExportFrame",
-            "Export Profile",
-            "Press Ctrl+C to copy. The dialog will close automatically.",
-            nil,
-            function()
-                ECM.Print("Import string copied to clipboard.")
-            end
-        )
+        exportFrame = createCopyDialog("ECMExportFrame", L["EXPORT_PROFILE_TITLE"], L["COPY_CTRL_C"], nil, function()
+            ECM.Print(L["IMPORT_COPIED"])
+        end)
     end
 
     showCopyDialog(exportFrame, exportString)
@@ -692,15 +458,10 @@ function mod:ShowCopyTextDialog(text, title)
     end
 
     if not copyTextFrame then
-        copyTextFrame = createCopyDialog(
-            "ECMCopyTextFrame",
-            "",
-            "Press Ctrl+C to copy. The dialog will close automatically.",
-            "small"
-        )
+        copyTextFrame = createCopyDialog("ECMCopyTextFrame", "", L["COPY_CTRL_C"], "small")
     end
 
-    copyTextFrame.title:SetText(title or "Copy Link")
+    copyTextFrame.title:SetText(title or L["COPY_LINK"])
     showCopyDialog(copyTextFrame, text)
 end
 
@@ -709,8 +470,7 @@ local importFrame
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
     if not importFrame then
-        importFrame =
-            createDialogFrame("ECMImportFrame", "Import Profile", "Paste your import string below and click Import.")
+        importFrame = createDialogFrame("ECMImportFrame", L["IMPORT_PROFILE_TITLE"], L["IMPORT_PASTE_PROMPT"])
 
         local cancelBtn = addButton(importFrame, CANCEL, { "BOTTOMRIGHT", -16, 8 }, function()
             importFrame:Hide()
@@ -719,28 +479,25 @@ function mod:ShowImportDialog()
             local input = importFrame.Scroll.ScrollBox.EditBox:GetText()
 
             if strtrim(input) == "" then
-                mod:Print("Import cancelled: no string provided")
+                ECM.Print(L["IMPORT_CANCELLED"])
                 return
             end
 
             local data, errorMsg = ECM.ImportExport.ValidateImportString(input)
             if not data then
-                mod:Print("Import failed: " .. (errorMsg or "unknown error"))
+                ECM.Print(string.format(L["IMPORT_FAILED"], errorMsg or "unknown error"))
                 return
             end
 
             importFrame:Hide()
 
             local versionStr = data.metadata and data.metadata.addonVersion or "unknown"
-            local confirmText = string.format(
-                "Import profile settings (exported from v%s)?\n\nThis will replace your current profile and reload the UI.",
-                versionStr
-            )
+            local confirmText = string.format(L["IMPORT_CONFIRM"], versionStr)
 
             mod:ConfirmReloadUI(confirmText, function()
                 local success, applyErr = ECM.ImportExport.ApplyImportData(data)
                 if not success then
-                    mod:Print("Import apply failed: " .. (applyErr or "unknown error"))
+                    ECM.Print(string.format(L["IMPORT_APPLY_FAILED"], applyErr or "unknown error"))
                 end
             end, nil)
         end)
@@ -757,17 +514,19 @@ function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
     if cmd == "help" then
-        ECM.Print("/ecm debug [on|off||toggle] - toggle debug mode (logs detailed info to the chat frame)")
-        ECM.Print("/ecm help - show this message")
-        ECM.Print("/ecm migration - show migration info and commands")
-        ECM.Print("/ecm options|config|settings|o - open the options menu")
-        ECM.Print("/ecm rl||reload||refresh - refresh and reapply layout for all modules")
+        ECM.Print(L["CMD_HELP_CLEARSEEN"])
+        ECM.Print(L["CMD_HELP_DEBUG"])
+        ECM.Print(L["CMD_HELP_EVENTS"])
+        ECM.Print(L["CMD_HELP_HELP"])
+        ECM.Print(L["CMD_HELP_MIGRATION"])
+        ECM.Print(L["CMD_HELP_OPTIONS"])
+        ECM.Print(L["CMD_HELP_REFRESH"])
         return
     end
 
     if cmd == "rl" or cmd == "reload" or cmd == "refresh" then
-        ECM.ScheduleLayoutUpdate(0, "ChatCommand")
-        ECM.Print("Refreshing all modules.")
+        ECM.Runtime.ScheduleLayoutUpdate(0, "ChatCommand")
+        ECM.Print(L["REFRESHING_ALL_MODULES"])
         return
     end
 
@@ -781,11 +540,11 @@ function mod:ChatCommand(input)
         if subcmd == "rollback" then
             local n = tonumber(subarg)
             if not n then
-                ECM.Print("Usage: /ecm migration rollback <version>")
+                ECM.Print(L["MIGRATION_ROLLBACK_USAGE"])
                 return
             end
             if n == 0 then
-                ECM.Print("Version 0 is not valid.")
+                ECM.Print(L["VERSION_ZERO_INVALID"])
                 return
             end
             if n == -1 then
@@ -808,11 +567,8 @@ function mod:ChatCommand(input)
 
     if cmd == "" or cmd == "options" or cmd == "config" or cmd == "settings" or cmd == "o" then
         if InCombatLockdown() then
-            ECM.Print("Options cannot be opened during combat. They will open when combat ends.")
-            if not self._openOptionsAfterCombat then
-                self._openOptionsAfterCombat = true
-                self:RegisterEvent("PLAYER_REGEN_ENABLED", "HandleOpenOptionsAfterCombat")
-            end
+            ECM.Print(L["OPTIONS_BLOCKED_COMBAT"])
+            self._openOptionsAfterCombat = true
             return
         end
 
@@ -823,26 +579,83 @@ function mod:ChatCommand(input)
         return
     end
 
-    local profile = self.db and self.db.profile
-    if not profile then
+    if cmd == "events" then
+        self:HandleEventsCommand(arg)
+        return
+    end
+
+    local gc = ECM.GetGlobalConfig()
+    if not gc then
         return
     end
 
     if cmd == "debug" then
         local newVal
         if arg == "" or arg == "toggle" then
-            newVal = not profile.global.debug
+            newVal = not gc.debug
         elseif arg == "on" then
             newVal = true
         elseif arg == "off" then
             newVal = false
         else
-            ECM.Print("Usage: expected on|off|toggle")
+            ECM.Print(L["DEBUG_USAGE"])
             return
         end
-        profile.global.debug = newVal
-        ECM.Print("Debug:", profile.global.debug and "ON" or "OFF")
+        gc.debug = newVal
+        ECM.Print(L["DEBUG_STATUS"] .. " " .. (gc.debug and L["DEBUG_ON"] or L["DEBUG_OFF"]))
         return
+    end
+
+    if cmd == "clearseen" then
+        gc.releasePopupSeenVersion = nil
+        ECM.Print(L["SEEN_CLEARED"])
+        return
+    end
+end
+
+function mod:HandleEventsCommand(arg)
+    if arg == "reset" then
+        self:ResetEventStats()
+        for _, m in self:IterateModules() do
+            if m.ResetEventStats then
+                m:ResetEventStats()
+            end
+        end
+        ECM.Print(L["EVENTS_RESET"])
+        return
+    end
+
+    -- Aggregate stats from the addon and all its modules.
+    local merged = {}
+    for event, count in pairs(self:GetEventStats()) do
+        merged[event] = (merged[event] or 0) + count
+    end
+    for _, m in self:IterateModules() do
+        if m.GetEventStats then
+            for event, count in pairs(m:GetEventStats()) do
+                merged[event] = (merged[event] or 0) + count
+            end
+        end
+    end
+
+    -- Sort descending by count.
+    local sorted = {}
+    for event, count in pairs(merged) do
+        sorted[#sorted + 1] = { event = event, count = count }
+    end
+
+    if #sorted == 0 then
+        ECM.Print(L["EVENTS_NONE"])
+        return
+    end
+
+    table.sort(sorted, function(a, b)
+        return a.count > b.count
+    end)
+
+    ECM.Print(L["EVENTS_HEADER"])
+    for i = 1, #sorted do
+        ECM.Print("  " .. sorted[i].event .. ": " .. sorted[i].count)
     end
 end
 
@@ -852,7 +665,6 @@ function mod:HandleOpenOptionsAfterCombat()
     end
 
     self._openOptionsAfterCombat = nil
-    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 
     local optionsModule = self:GetModule("Options", true)
     if optionsModule then
@@ -863,7 +675,7 @@ end
 function mod:GetECMModule(moduleName, silent)
     local module = self[moduleName] or ECM[moduleName]
     if not module and not silent then
-        ECM.Print("Module not found:", moduleName)
+        ECM.Print(L["MODULE_NOT_FOUND"] .. " " .. moduleName)
     end
     return module
 end
@@ -874,10 +686,7 @@ function mod:OnInitialize()
 
     self.db = LibStub("AceDB-3.0"):New(C.ACTIVE_SV_KEY, ECM.defaults, true)
 
-    local profile = self.db and self.db.profile
-    if profile and profile.schemaVersion and profile.schemaVersion < C.CURRENT_SCHEMA_VERSION then
-        ECM.Migration.Run(profile)
-    end
+    ECM.Migration.Run(self.db.profile)
 
     ECM.Migration.FlushLog()
 
@@ -892,38 +701,53 @@ function mod:OnInitialize()
         )
     end
 
-    self:RegisterChatCommand("enhancedcooldownmanager", "ChatCommand")
-    self:RegisterChatCommand("ecm", "ChatCommand")
+    local chatHandler = function(input) mod:ChatCommand(input) end
+    LibConsole:RegisterCommand("enhancedcooldownmanager", chatHandler)
+    LibConsole:RegisterCommand("ecm", chatHandler)
 end
 
 --- Enables the addon and ensures Blizzard's cooldown viewer is turned on.
 function mod:OnEnable()
-    pcall(C_CVar.SetCVar, "cooldownViewerEnabled", "1")
-    registerAddonCompartmentEntry()
-    local profile = self.db and self.db.profile
-
-    local moduleOrder = {
-        C.POWERBAR,
-        C.RESOURCEBAR,
-        C.RUNEBAR,
-        C.BUFFBARS,
-        C.ITEMICONS,
-    }
-
-    for _, moduleName in ipairs(moduleOrder) do
-        local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
-        local moduleConfig = profile and profile[configKey]
-        local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)
-        if shouldEnable then
-            self:EnableModule(moduleName)
-        else
-            self:DisableModule(moduleName)
-        end
+    C_CVar.SetCVar("cooldownViewerEnabled", "1")
+    if not self._addonCompartmentRegistered and AddonCompartmentFrame then
+        local ok = pcall(AddonCompartmentFrame.RegisterAddon, AddonCompartmentFrame, {
+            text = ECM.ColorUtil.Sparkle(L["ADDON_NAME"]),
+            icon = C.ADDON_ICON_TEXTURE,
+            notCheckable = true,
+            func = function()
+                self:ChatCommand("options")
+            end,
+        })
+        self._addonCompartmentRegistered = ok
     end
 
-    enableLayoutEvents()
-
-    if isBetaVersion(getAddonVersion()) then
-        ECM.Print(C.BETA_LOGIN_MESSAGE)
+    ECM.Runtime.OnCombatEnd = function()
+        self:HandleOpenOptionsAfterCombat()
     end
+
+    ECM.Runtime.Enable(self)
+
+    -- Re-evaluate module enable/disable states on profile switch.
+    self.db.RegisterCallback(self, "OnProfileChanged", "OnProfileChangedHandler")
+    self.db.RegisterCallback(self, "OnProfileCopied", "OnProfileChangedHandler")
+    self.db.RegisterCallback(self, "OnProfileReset", "OnProfileChangedHandler")
+
+    local version = getAddonVersion()
+
+    if type(version) == "string" and version:lower():find(C.VERSION_TAG_BETA, 1, true) ~= nil then
+        ECM.Print(L["BETA_LOGIN_MESSAGE"])
+    end
+
+    self:ShowReleasePopup()
+end
+
+--- Re-evaluates module enable/disable states after a profile change and refreshes layout.
+function mod:OnProfileChangedHandler()
+    ECM.Migration.Run(self.db.profile)
+    ECM.Runtime.Enable(self)
+    ECM.Runtime.ScheduleLayoutUpdate(0, "ProfileChanged")
+end
+
+function mod:OnDisable()
+    ECM.Runtime.Disable(self)
 end

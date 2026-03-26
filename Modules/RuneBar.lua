@@ -3,10 +3,16 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local RuneBar = ns.Addon:NewModule("RuneBar", "AceEvent-3.0")
+local RuneBar = ns.Addon:NewModule("RuneBar")
 local ClassUtil = ECM.ClassUtil
 local C, FrameMixin = ECM.Constants, ECM.FrameMixin
 ns.Addon.RuneBar = RuneBar
+
+local SPEC_COLOR_KEY_BY_SPEC = {
+    [C.DEATHKNIGHT_FROST_SPEC_INDEX] = "colorFrost",
+    [C.DEATHKNIGHT_UNHOLY_SPEC_INDEX] = "colorUnholy",
+    DEFAULT = "colorBlood",
+}
 
 local function getRuneCooldownState(index, now)
     local start, duration, runeReady = GetRuneCooldown(index)
@@ -20,9 +26,9 @@ local function getRuneCooldownState(index, now)
     return false, remaining, frac
 end
 
-local function buildRuneStateTables(maxRunes, now)
-    local readySet = {}
-    local cdLookup = {}
+local function buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+    wipe(readySet)
+    wipe(cdLookup)
 
     for i = 1, maxRunes do
         local isReady, remaining, frac = getRuneCooldownState(i, now)
@@ -32,8 +38,6 @@ local function buildRuneStateTables(maxRunes, now)
             cdLookup[i] = { remaining = remaining, frac = frac }
         end
     end
-
-    return readySet, cdLookup
 end
 
 local function runeReadyStatesDiffer(lastReadySet, readySet, maxRunes)
@@ -85,21 +89,13 @@ local function ensureFragmentedBars(bar, maxResources, tex)
 end
 
 local function getColor(cfg)
-    local specId = GetSpecialization()
-
-    local specColor
     if cfg.useSpecColor then
-        if specId == C.DEATHKNIGHT_FROST_SPEC_INDEX then
-            specColor = cfg.colorFrost
-        elseif specId == C.DEATHKNIGHT_UNHOLY_SPEC_INDEX then
-            specColor = cfg.colorUnholy
-        else
-            specColor = cfg.colorBlood
-        end
+        local specColorKey = SPEC_COLOR_KEY_BY_SPEC[GetSpecialization()] or SPEC_COLOR_KEY_BY_SPEC.DEFAULT
+        local specColor = cfg[specColorKey]
+        return specColor or cfg.color or C.COLOR_WHITE
     end
 
-    -- Blood is the default to match DK class color
-    return specColor or cfg.color or ECM.Constants.COLOR_WHITE
+    return cfg.color or C.COLOR_WHITE
 end
 
 --- Updates fragmented rune display (individual bars per rune).
@@ -125,34 +121,52 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
 
     local now = GetTime()
     local color = getColor(moduleConfig)
-    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
+
+    -- Reuse per-bar tables to avoid per-call allocation
+    bar._readySet = bar._readySet or {}
+    bar._cdLookup = bar._cdLookup or {}
+    local readySet, cdLookup = bar._readySet, bar._cdLookup
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+
     local statesChanged = (bar._lastReadySet == nil) or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
     local dimensionsChanged = (bar._lastBarWidth ~= barWidth) or (bar._lastBarHeight ~= barHeight)
 
     if statesChanged or dimensionsChanged then
-        bar._lastReadySet = readySet
+        -- Snapshot ready state for next comparison
+        bar._lastReadySet = bar._lastReadySet or {}
+        wipe(bar._lastReadySet)
+        for i = 1, maxRunes do
+            bar._lastReadySet[i] = readySet[i]
+        end
         bar._lastBarWidth = barWidth
         bar._lastBarHeight = barHeight
 
-        local readyList = {}
-        local cdList = {}
+        -- Build display order: ready runes first, then cooldown runes sorted by remaining
+        bar._displayOrder = bar._displayOrder or {}
+        wipe(bar._displayOrder)
+        local orderLen = 0
+
+        -- Collect cooldown runes and sort by remaining time
+        bar._cdSortBuf = bar._cdSortBuf or {}
+        wipe(bar._cdSortBuf)
+        local cdLen = 0
         for i = 1, maxRunes do
             if readySet[i] then
-                table.insert(readyList, i)
+                orderLen = orderLen + 1
+                bar._displayOrder[orderLen] = i
             else
-                table.insert(cdList, { index = i, remaining = cdLookup[i] and cdLookup[i].remaining or math.huge })
+                cdLen = cdLen + 1
+                bar._cdSortBuf[cdLen] = i
             end
         end
-        table.sort(cdList, function(a, b)
-            return a.remaining < b.remaining
+        table.sort(bar._cdSortBuf, function(a, b)
+            local ra = cdLookup[a] and cdLookup[a].remaining or math.huge
+            local rb = cdLookup[b] and cdLookup[b].remaining or math.huge
+            return ra < rb
         end)
-
-        bar._displayOrder = {}
-        for _, idx in ipairs(readyList) do
-            table.insert(bar._displayOrder, idx)
-        end
-        for _, v in ipairs(cdList) do
-            table.insert(bar._displayOrder, v.index)
+        for j = 1, cdLen do
+            orderLen = orderLen + 1
+            bar._displayOrder[orderLen] = bar._cdSortBuf[j]
         end
 
         local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
@@ -182,11 +196,14 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
             applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
+
+    return next(cdLookup) ~= nil
 end
 
 --- Lightweight per-frame rune value updater.
 --- Only updates fill values and colors on existing fragment bars.
 --- Triggers a full layout refresh when rune ready/CD states change.
+--- Self-stops the animation ticker when all runes are ready.
 ---@param self RuneBar
 ---@param frame Frame
 local function updateRuneValues(self, frame)
@@ -211,7 +228,11 @@ local function updateRuneValues(self, frame)
 
     local cfg = self:GetModuleConfig()
     local color = getColor(cfg)
-    local readySet, cdLookup = buildRuneStateTables(maxRunes, now)
+
+    frame._readySet = frame._readySet or {}
+    frame._cdLookup = frame._cdLookup or {}
+    local readySet, cdLookup = frame._readySet, frame._cdLookup
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
 
     -- Detect state transitions to trigger full reorder/reposition
     if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
@@ -227,11 +248,16 @@ local function updateRuneValues(self, frame)
             applyRuneFragmentVisual(frag, readySet[i], cdLookup[i], color)
         end
     end
+
+    -- Stop the animation ticker when all runes are ready
+    if next(cdLookup) == nil then
+        self:_StopAnimationTicker()
+    end
 end
 
 function RuneBar:CreateFrame()
     -- Create base frame using FrameMixin (not BarMixin, since we manage StatusBar ourselves)
-    local frame = ECM.FrameMixin.CreateFrame(self)
+    local frame = ECM.FrameMixin.Proto.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -251,11 +277,11 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.ShouldShow(self)
+    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.Proto.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
-    if not FrameMixin.Refresh(self, why, force) then
+    if not FrameMixin.Proto.Refresh(self, why, force) then
         return false
     end
 
@@ -282,9 +308,38 @@ function RuneBar:Refresh(why, force)
     updateFragmentedRuneDisplay(frame, maxRunes, cfg, globalConfig)
     self:LayoutResourceTicks(maxRunes, C.COLOR_BLACK, 1, "tickPool")
 
+    -- Start animation ticker if any rune is on cooldown (derived from layout pass)
+    if frame._cdLookup and next(frame._cdLookup) ~= nil then
+        self:_StartAnimationTicker()
+    end
+
     frame:Show()
     ECM.Log(self.Name, "Refresh complete.")
     return true
+end
+
+--- Starts the cooldown animation ticker if not already running.
+function RuneBar:_StartAnimationTicker()
+    if self._valueTicker then
+        return
+    end
+    self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
+        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
+            updateRuneValues(self, self.InnerFrame)
+        end
+    end)
+end
+
+--- Stops the cooldown animation ticker.
+function RuneBar:_StopAnimationTicker()
+    if self._valueTicker then
+        self._valueTicker:Cancel()
+        self._valueTicker = nil
+    end
+end
+
+function RuneBar:OnInitialize()
+    ECM.BarMixin.AddMixin(self, "RuneBar")
 end
 
 function RuneBar:OnEnable()
@@ -292,21 +347,14 @@ function RuneBar:OnEnable()
         return
     end
 
-    ECM.BarMixin.AddMixin(self, "RuneBar")
-    ECM.RegisterFrame(self)
+    self:EnsureFrame()
+    ECM.Runtime.RegisterFrame(self)
 
-    if self._valueTicker then
-        self._valueTicker:Cancel()
-    end
-    self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
-        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
-            updateRuneValues(self, self.InnerFrame)
-        end
-    end)
-    self:RegisterEvent("RUNE_POWER_UPDATE", "OnRunePowerUpdate")
+    self:RegisterEvent("RUNE_POWER_UPDATE", function(_, ...) self:OnRunePowerUpdate(...) end)
 end
 
 function RuneBar:OnRunePowerUpdate()
+    self:_StartAnimationTicker()
     self:ThrottledUpdateLayout("RUNE_POWER_UPDATE")
 end
 
@@ -314,11 +362,8 @@ function RuneBar:OnDisable()
     self:UnregisterAllEvents()
 
     if self.InnerFrame then
-        ECM.UnregisterFrame(self)
+        ECM.Runtime.UnregisterFrame(self)
     end
 
-    if self._valueTicker then
-        self._valueTicker:Cancel()
-        self._valueTicker = nil
-    end
+    self:_StopAnimationTicker()
 end

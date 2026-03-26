@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
+local L = ECM.L
 
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
 local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
@@ -21,17 +21,17 @@ local function createLinksCanvas()
     local curseforge = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     curseforge:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
     curseforge:SetPoint("TOPLEFT", BUTTON_X, 0)
-    curseforge:SetText("CurseForge")
+    curseforge:SetText(L["CURSEFORGE"])
     curseforge:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, "CurseForge")
+        ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
     end)
 
     local github = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     github:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
     github:SetPoint("TOPLEFT", BUTTON_X, -BUTTON_HEIGHT)
-    github:SetText("GitHub")
+    github:SetText(L["GITHUB"])
     github:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(GITHUB_URL, "GitHub")
+        ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
     end)
 
     frame._curseforge = curseforge
@@ -47,30 +47,30 @@ function About.RegisterSettings(SB)
     local linksCanvas = createLinksCanvas()
 
     SB.RegisterFromTable({
-        name = C.ADDON_NAME,
+        name = L["ADDON_NAME"],
         rootCategory = true,
         args = {
             author = {
                 type = "info",
-                name = "Author",
+                name = L["AUTHOR"],
                 value = authorText,
                 order = 1,
             },
             contributors = {
                 type = "info",
-                name = "Contributors",
+                name = L["CONTRIBUTORS"],
                 value = "kayti-wow",
                 order = 2,
             },
             version = {
                 type = "info",
-                name = "Version",
+                name = L["VERSION"],
                 value = version,
                 order = 3,
             },
             linksHeader = {
                 type = "description",
-                name = "Links",
+                name = L["LINKS"],
                 order = 9,
             },
             links = {

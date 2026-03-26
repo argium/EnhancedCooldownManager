@@ -20,6 +20,7 @@ describe("BarMixin", function()
             "UIParent",
             "CreateFrame",
             "issecretvalue",
+            "LibStub",
         })
     end)
 
@@ -63,7 +64,7 @@ describe("BarMixin", function()
         end
 
         -- Minimal CreateFrame stub for FrameMixin:CreateFrame
-        _G.CreateFrame = function(frameType, name, parent, template)
+        _G.CreateFrame = function(_, name, _, _)
             local f = makeFrame({ name = name })
             f.CreateTexture = function()
                 return makeTexture()
@@ -90,7 +91,12 @@ describe("BarMixin", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEditModeStub()
         TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
         TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
         TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
         TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")()
@@ -119,7 +125,7 @@ describe("BarMixin", function()
             return mod
         end
 
-        it("copies BarMixin methods to the target module", function()
+        it("resolves BarMixin methods on the target module via metatable", function()
             local mod = makeModule()
             BarMixin.AddMixin(mod, "TestBar")
 
@@ -161,9 +167,36 @@ describe("BarMixin", function()
         it("creates InnerFrame with StatusBar for modules without custom CreateFrame", function()
             local mod = makeModule()
             BarMixin.AddMixin(mod, "TestBar")
+            mod:EnsureFrame()
 
             assert.is_not_nil(mod.InnerFrame, "InnerFrame should exist")
             assert.is_not_nil(mod.InnerFrame.StatusBar, "InnerFrame.StatusBar should exist")
+        end)
+
+        it("preserves existing metatable chain (AceAddon compatibility)", function()
+            local aceEnabled = function() return true end
+            local aceMt = { __index = { IsEnabled = aceEnabled } }
+            local mod = setmetatable(makeModule({ IsEnabled = nil }), aceMt)
+            mod.IsEnabled = nil
+
+            BarMixin.AddMixin(mod, "TestBar")
+
+            assert.are.equal(aceEnabled, mod.IsEnabled)
+            assert.is_function(mod.EnsureTicks)
+            assert.is_function(mod.GetModuleConfig)
+            assert.is_function(mod.EnsureFrame)
+        end)
+
+        it("is idempotent — second call is a no-op", function()
+            local mod = makeModule()
+            BarMixin.AddMixin(mod, "TestBar")
+            local mt1 = getmetatable(mod)
+
+            BarMixin.AddMixin(mod, "TestBar")
+            local mt2 = getmetatable(mod)
+
+            assert.are.equal(mt1, mt2)
+            assert.is_true(mod._mixinApplied)
         end)
     end)
 

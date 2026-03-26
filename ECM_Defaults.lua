@@ -8,10 +8,14 @@
 ---@field b number Blue channel (0-1).
 ---@field a number Alpha channel (0-1).
 
+---@class ECM_EditModePosition Saved position for one Edit Mode layout.
+---@field point string Anchor point (e.g. "CENTER", "TOPLEFT").
+---@field x number X offset from anchor.
+---@field y number Y offset from anchor.
+
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
----@field offsetX number|nil Horizontal offset when free anchor.
----@field offsetY number|nil Vertical offset when free anchor.
+---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
 ---@field width number|nil Bar width override.
 ---@field height number|nil Bar height override.
 ---@field texture string|nil Bar texture override.
@@ -20,7 +24,7 @@
 ---@field fontSize number|nil Font size override for bar text.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase Power bar configuration.
 ---@field showManaAsPercent boolean Whether to show mana as a percent.
@@ -59,6 +63,10 @@
 ---@field fontOutline "NONE"|"OUTLINE"|"THICKOUTLINE"|"MONOCHROME" Font outline style.
 ---@field fontShadow boolean Whether font shadow is enabled.
 ---@field outOfCombatFade ECM_CombatFadeConfig Out of combat fade configuration.
+---@field detachedAnchorPositions table<string, ECM_EditModePosition>|nil Per-layout positions for the detached anchor frame.
+---@field detachedBarWidth number|nil Shared width for all detached bars.
+---@field detachedModuleSpacing number|nil Vertical gap between detached modules.
+---@field detachedGrowDirection "down"|"up"|nil Vertical grow direction for detached modules.
 
 ---@class ECM_BorderConfig Border configuration.
 ---@field enabled boolean Whether border is enabled.
@@ -79,11 +87,8 @@
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
----@field width number|nil Buff bar width when free anchor.
----@field offsetY number|nil Vertical offset when free anchor.
+---@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
----@field freeGrowDirection "down"|"up"|nil Vertical grow direction for buff bars in free mode.
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
 ---@field showDuration boolean|nil Whether to show durations.
@@ -142,6 +147,8 @@ local defaults = {
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             debug = false,
+            debugToChat = false,
+            releasePopupSeenVersion = "",
             hideWhenMounted = true,
             hideOutOfCombatInRestAreas = false,
             updateFrequency = 0.04,
@@ -162,12 +169,16 @@ local defaults = {
                 exceptIfTargetCanBeHelped = false,
                 exceptInInstance = true,
             },
+            detachedAnchorPositions = {},
+            detachedBarWidth = 300,
+            detachedModuleSpacing = 0,
+            detachedGrowDirection = C.GROW_DIRECTION_DOWN,
         },
         powerBar = {
             enabled = true,
             anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -275,
+            editModePositions = {},
             showText = true,
             overrideFont = false,
             ticks = {
@@ -199,7 +210,7 @@ local defaults = {
             overrideFont = false,
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -300,
+            editModePositions = {},
             border = {
                 enabled = false,
                 thickness = C.DEFAULT_BORDER_THICKNESS,
@@ -207,8 +218,8 @@ local defaults = {
             },
             colors = {
                 [C.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.416, g = 0.435, b = 0.910, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.494, g = 0.549, b = 1.000, a = 1 },
                 [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
                 [Enum.PowerType.ArcaneCharges] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
                 [Enum.PowerType.Chi] = { r = 0.00, g = 1.00, b = 0.59, a = 1 },
@@ -218,18 +229,23 @@ local defaults = {
                 [C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON] = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
                 [Enum.PowerType.SoulShards] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
             },
+            -- Remember to enable the resource type in Constants too.
             maxColorsEnabled = {
                 [C.RESOURCEBAR_TYPE_ICICLES] = true,
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = true,
             },
             maxColors = {
-                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
+                [C.RESOURCEBAR_TYPE_ICICLES] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
+                [C.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
             },
         },
         runeBar = {
             enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
-            offsetY = -325,
+            editModePositions = {},
             overrideFont = false,
             useSpecColor = true,
             color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
@@ -240,10 +256,8 @@ local defaults = {
         buffBars = {
             enabled = true,
             anchorMode = C.ANCHORMODE_CHAIN,
-            width = 300,
-            offsetY = -350,
+            editModePositions = {},
             verticalSpacing = 0,
-            freeGrowDirection = C.GROW_DIRECTION_DOWN,
             showIcon = false,
             showSpellName = true,
             showDuration = true,

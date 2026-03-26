@@ -72,9 +72,12 @@ local function makeInitializer(setting)
         _parentInit = nil,
         _modifyPredicates = {},
         _shownPredicates = {},
-        SetParentInitializer = function(self, parent, predicate)
+        _enabled = true,
+        SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
-            self._parentPredicate = predicate
+        end,
+        SetEnabled = function(self, enabled)
+            self._enabled = enabled
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates[#self._modifyPredicates + 1] = fn
@@ -97,7 +100,7 @@ local function makeInitializer(setting)
 end
 
 --- Create a minimal stub setting returned by Settings.RegisterProxySetting.
-local function makeSetting(getter, setter, default)
+local function makeSetting(getter, setter, default, name)
     return {
         GetValue = function()
             return getter()
@@ -106,6 +109,7 @@ local function makeSetting(getter, setter, default)
             setter(value)
         end,
         _default = default,
+        _name = name,
     }
 end
 
@@ -135,6 +139,40 @@ function TestHelpers.SetupLibStub()
     })
     _G.LibStub = LibStub
     return LibStub
+end
+
+--- Registers a minimal LibEditMode stub in an existing LibStub.
+--- Must be called after LibStub is available.
+function TestHelpers.SetupLibEditModeStub()
+    assert(_G.LibStub, "LibStub must be set up before calling SetupLibEditModeStub")
+    local lib = _G.LibStub:NewLibrary("LibEditMode", 15) or _G.LibStub("LibEditMode")
+    lib.callbacks = {}
+    lib.frameSelections = {}
+    lib.addFrameSettingsCalls = {}
+    lib.AddFrame = function(_, frame)
+        lib.frameSelections[frame] = {
+            HookScript = function(self, event, callback)
+                self[event] = callback
+            end,
+            Hide = function(self)
+                self.hidden = true
+            end,
+        }
+    end
+    lib.AddFrameSettings = function(_, frame, settings)
+        lib.addFrameSettingsCalls[frame] = settings
+    end
+    lib.RegisterCallback = function(_, eventName, callback)
+        lib.callbacks[eventName] = callback
+    end
+    lib.GetActiveLayoutName = function()
+        return "Modern"
+    end
+    lib.IsInEditMode = function()
+        return false
+    end
+    lib.SettingType = { Slider = 0, Dropdown = 1 }
+    return lib
 end
 
 --- Install all Settings API stubs into _G. Returns the list of global names
@@ -230,8 +268,8 @@ function TestHelpers.SetupSettingsStubs()
             return init
         end,
 
-        RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
-            return makeSetting(getter, setter, default)
+        RegisterProxySetting = function(_, _, _, name, default, getter, setter)
+            return makeSetting(getter, setter, default, name)
         end,
 
         CreateCheckbox = function(cat, setting)
@@ -247,6 +285,7 @@ function TestHelpers.SetupSettingsStubs()
         CreateDropdown = function(cat, setting, optionsGen)
             local init = makeInitializer(setting)
             init._optionsGen = optionsGen
+            setting._optionsGen = optionsGen
             return init
         end,
 
@@ -305,7 +344,10 @@ function TestHelpers.SetupSettingsStubs()
         return init
     end
 
-    _G.MinimalSliderWithSteppersMixin = { Label = { Right = 1 } }
+    _G.MinimalSliderWithSteppersMixin = {
+        Label = { Right = 1 },
+        Event = { OnValueChanged = "OnValueChanged" },
+    }
 
     _G.CreateColor = function(r, g, b, a)
         return { r = r, g = g, b = b, a = a or 1 }
@@ -320,14 +362,25 @@ function TestHelpers.SetupSettingsStubs()
     end
 
     _G.StaticPopupDialogs = {}
-    _G.StaticPopup_Show = function(name)
+    _G.StaticPopup_Show = function(name, _text1, _text2, data)
         local dialog = _G.StaticPopupDialogs[name]
         if dialog and dialog.OnAccept then
-            dialog.OnAccept()
+            if dialog.hasEditBox then
+                local text = ""
+                local editBox = { GetText = function() return text end, SetText = function(_, t) text = t end, HighlightText = function() end }
+                local self = { editBox = editBox, button1 = { IsEnabled = function() return true end } }
+                if dialog.OnShow then dialog.OnShow(self) end
+                dialog.OnAccept(self, data)
+            else
+                dialog.OnAccept(nil, data)
+            end
         end
     end
     _G.YES = "Yes"
     _G.NO = "No"
+    _G.OKAY = "Okay"
+    _G.CANCEL = "Cancel"
+    _G.strtrim = function(s) return (s:match("^%s*(.-)%s*$")) end
 
     _G.ECM = _G.ECM or {}
     _G.ECM.CloneValue = deepClone
@@ -363,9 +416,8 @@ function TestHelpers.SetupSettingsStubs()
             self.data = self.data or {}
             self.data.setting = setting
         end,
-        SetParentInitializer = function(self, parent, predicate)
+        SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
-            self._parentPredicate = predicate
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates = self._modifyPredicates or {}
@@ -388,6 +440,7 @@ end
 --------------------------------------------------------------------------------
 
 local unpack_fn = table.unpack or unpack
+TestHelpers.unpack_fn = unpack_fn
 
 function TestHelpers.incCalls(obj, name)
     obj.__calls = obj.__calls or {}
@@ -469,8 +522,10 @@ function TestHelpers.makeFrame(opts)
         __height = opts.height or 0,
         __width = opts.width or 0,
         __alpha = opts.alpha == nil and 1 or opts.alpha,
+        __frameStrata = opts.frameStrata,
         __anchors = anchors,
         __regions = opts.regions or {},
+        __scripts = opts.scripts or {},
         __calls = {},
     }
 
@@ -486,6 +541,20 @@ function TestHelpers.makeFrame(opts)
         frame["Get" .. prop[1]] = function(self)
             return self[prop[2]]
         end
+    end
+
+    function frame:SetSize(width, height)
+        self:SetWidth(width)
+        self:SetHeight(height)
+    end
+    function frame:GetSize()
+        return self.__width, self.__height
+    end
+    function frame:SetFrameStrata(strata)
+        self.__frameStrata = strata
+    end
+    function frame:GetFrameStrata()
+        return self.__frameStrata
     end
 
     function frame:Show()
@@ -519,6 +588,71 @@ function TestHelpers.makeFrame(opts)
     end
     function frame:GetRegions()
         return unpack_fn(self.__regions)
+    end
+    function frame:SetScript(event, callback)
+        self.__scripts[event] = callback
+    end
+    function frame:GetScript(event)
+        return self.__scripts[event]
+    end
+    function frame:RegisterEvent(event)
+        self.__registeredEvents = self.__registeredEvents or {}
+        self.__registeredEvents[event] = true
+    end
+    function frame:UnregisterEvent(event)
+        self.__unregisteredEvents = self.__unregisteredEvents or {}
+        self.__unregisteredEvents[event] = true
+        if self.__registeredEvents then
+            self.__registeredEvents[event] = nil
+        end
+    end
+    function frame:HookScript() end
+    function frame:GetEffectiveScale()
+        return 1
+    end
+    function frame:GetBackdropBorderColor()
+        return 0, 0, 0, 1
+    end
+    function frame:GetBackdrop()
+        return nil
+    end
+    function frame:GetColorTexture()
+        return nil
+    end
+    function frame:SetColorTexture() end
+    function frame:GetVertexColor()
+        return nil
+    end
+    function frame:IsObjectType()
+        return false
+    end
+
+    return frame
+end
+
+function TestHelpers.makeHookableFrame(opts)
+    opts = type(opts) == "table" and opts or { shown = opts }
+
+    local frame = TestHelpers.makeFrame(opts)
+    frame._hooks = {}
+    frame._children = opts.children or {}
+
+    function frame:HookScript(scriptName, callback)
+        self._hooks[scriptName] = self._hooks[scriptName] or {}
+        self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
+    end
+
+    function frame:GetHookCount(scriptName)
+        return self._hooks[scriptName] and #self._hooks[scriptName] or 0
+    end
+
+    function frame:GetChildren()
+        return unpack_fn(self._children)
+    end
+
+    local baseGetPoint = frame.GetPoint
+    function frame:GetPoint(index)
+        return baseGetPoint(self, index or 1)
     end
 
     return frame
@@ -580,26 +714,49 @@ function TestHelpers.makeBorder(opts)
     return border
 end
 
+local function assertEqual(expected, actual, label)
+    local bustedAssert = _G.assert
+    local are = type(bustedAssert) == "table" and rawget(bustedAssert, "are") or nil
+    local eq = are and rawget(are, "equal") or nil
+    if eq then
+        eq(expected, actual)
+        return
+    end
+
+    assert(expected == actual, ("%s: expected %s, got %s"):format(label, tostring(expected), tostring(actual)))
+end
+
 --- Asserts anchor values match. Uses busted's assert when available, plain assert otherwise.
 function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint, x, y)
     local ap, ar, arp, ax, ay = frame:GetPoint(index)
-    local eq = (type(assert) == "table" and assert.are and assert.are.equal)
-    if eq then
-        eq(point, ap)
-        eq(relativeTo, ar)
-        eq(relativePoint, arp)
-        eq(x, ax)
-        eq(y, ay)
-    else
-        assert(point == ap, ("anchor point: expected %s, got %s"):format(tostring(point), tostring(ap)))
-        assert(relativeTo == ar, ("relativeTo: expected %s, got %s"):format(tostring(relativeTo), tostring(ar)))
-        assert(
-            relativePoint == arp,
-            ("relativePoint: expected %s, got %s"):format(tostring(relativePoint), tostring(arp))
-        )
-        assert(x == ax, ("x: expected %s, got %s"):format(tostring(x), tostring(ax)))
-        assert(y == ay, ("y: expected %s, got %s"):format(tostring(y), tostring(ay)))
-    end
+    assertEqual(point, ap, "anchor point")
+    assertEqual(relativeTo, ar, "relativeTo")
+    assertEqual(relativePoint, arp, "relativePoint")
+    assertEqual(x, ax, "x")
+    assertEqual(y, ay, "y")
+end
+
+--- Resolve a parent-relative anchor position into absolute coordinates on UIParent.
+function TestHelpers.getAbsoluteAnchorPosition(point, x, y, defaultPoint)
+    local frameUtil = assert(_G.ECM and ECM.FrameUtil, "ECM.FrameUtil must be initialized")
+    local parentFrame = assert(_G.UIParent, "UIParent must be initialized")
+    local anchorPoint = point or defaultPoint or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+    local parentWidth, parentHeight = frameUtil.GetParentSize(parentFrame)
+    local anchorX, anchorY = frameUtil.GetParentAnchorPosition(anchorPoint, parentWidth, parentHeight)
+    return anchorX + (x or 0), anchorY + (y or 0)
+end
+
+--- Assert that a migrated edit-mode position preserves the same absolute placement.
+function TestHelpers.assertAbsolutePositionPreserved(beforePoint, beforeRelativePoint, beforeX, beforeY, migrated, defaultPoint)
+    local beforeAbsX, beforeAbsY = TestHelpers.getAbsoluteAnchorPosition(
+        beforeRelativePoint or beforePoint,
+        beforeX,
+        beforeY,
+        defaultPoint
+    )
+    local afterAbsX, afterAbsY = TestHelpers.getAbsoluteAnchorPosition(migrated.point, migrated.x, migrated.y, defaultPoint)
+    assertEqual(beforeAbsX, afterAbsX, "absolute x")
+    assertEqual(beforeAbsY, afterAbsY, "absolute y")
 end
 
 --------------------------------------------------------------------------------
@@ -620,6 +777,9 @@ TestHelpers.OPTIONS_GLOBALS = {
     "StaticPopup_Show",
     "YES",
     "NO",
+    "OKAY",
+    "CANCEL",
+    "strtrim",
     "UnitClass",
     "GetSpecialization",
     "GetSpecializationInfo",
@@ -639,128 +799,38 @@ TestHelpers.OPTIONS_GLOBALS = {
     "hooksecurefunc",
     "CreateScrollBoxListLinearView",
     "ScrollUtil",
+    "SettingsPanel",
+    "C_AddOns",
+    "issecretvalue",
+    "issecrettable",
+    "canaccessvalue",
+    "canaccesstable",
+    "time",
+    "IsInInstance",
 }
 
---- Create a full default profile for option tests.
+--- Load the live ECM_Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
+function TestHelpers.LoadLiveConstants()
+    _G.ECM = _G.ECM or {}
+    if not ECM.Constants then
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+    end
+    if not ECM.L then
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+    end
+end
+
+--- Load the live ECM_Defaults.lua to populate ECM.defaults.
+--- Requires ECM.Constants and Enum to be set up first.
+function TestHelpers.LoadLiveDefaults()
+    TestHelpers.LoadLiveConstants()
+    TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
+end
+
+--- Create a full default profile for option tests using the live defaults file.
 function TestHelpers.MakeOptionsProfile()
-    local border = { enabled = false, thickness = 4, color = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 } }
-    local profile = {
-        schemaVersion = 10,
-        global = {
-            debug = false,
-            hideWhenMounted = true,
-            hideOutOfCombatInRestAreas = false,
-            updateFrequency = 0.04,
-            barHeight = 22,
-            barBgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.75 },
-            offsetY = 4,
-            moduleSpacing = 0,
-            moduleGrowDirection = "down",
-            texture = "Solid",
-            font = "Expressway",
-            fontSize = 11,
-            fontOutline = "OUTLINE",
-            fontShadow = false,
-            outOfCombatFade = {
-                enabled = false,
-                opacity = 60,
-                exceptIfTargetCanBeAttacked = true,
-                exceptIfTargetCanBeHelped = false,
-                exceptInInstance = true,
-            },
-        },
-        powerBar = {
-            enabled = true,
-            anchorMode = "chain",
-            width = 300,
-            offsetY = -275,
-            showText = true,
-            overrideFont = false,
-            showManaAsPercent = true,
-            border = deepClone(border),
-            ticks = { mappings = {}, defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }, defaultWidth = 1 },
-            colors = {
-                [0] = { r = 0, g = 0, b = 1, a = 1 },
-                [1] = { r = 1, g = 0, b = 0, a = 1 },
-                [2] = { r = 1, g = 0.57, b = 0.31, a = 1 },
-                [3] = { r = 0.85, g = 0.65, b = 0.13, a = 1 },
-                [6] = { r = 0, g = 0.82, b = 1, a = 1 },
-                [8] = { r = 0.3, g = 0.52, b = 0.9, a = 1 },
-                [11] = { r = 0, g = 0.439, b = 0.871, a = 1 },
-                [13] = { r = 0.4, g = 0, b = 0.8, a = 1 },
-                [17] = { r = 0.788, g = 0.259, b = 0.992, a = 1 },
-            },
-        },
-        resourceBar = {
-            enabled = true,
-            showText = false,
-            overrideFont = false,
-            anchorMode = "chain",
-            width = 300,
-            offsetY = -300,
-            border = deepClone(border),
-            colors = {
-                souls = { r = 0.259, g = 0.6, b = 0.91, a = 1 },
-                devourerNormal = { r = 0.216, g = 0.153, b = 0.447, a = 1 },
-                devourerMeta = { r = 0.365, g = 0.204, b = 0.788, a = 1 },
-                icicles = { r = 0.72, g = 0.9, b = 1.0, a = 1 },
-                [16] = { r = 102 / 255, g = 195 / 255, b = 250 / 255, a = 1 },
-                [12] = { r = 0, g = 1, b = 0.59, a = 1 },
-                [4] = { r = 1, g = 0.96, b = 0.41, a = 1 },
-                [19] = { r = 0.2, g = 0.58, b = 0.5, a = 1 },
-                [9] = { r = 0.886, g = 0.824, b = 0.239, a = 1 },
-                maelstromWeapon = { r = 0.043, g = 0.631, b = 0.890, a = 1 },
-                [7] = { r = 0.58, g = 0.51, b = 0.79, a = 1 },
-            },
-            maxColorsEnabled = {
-                icicles = true,
-            },
-            maxColors = {
-                icicles = { r = 1, g = 1, b = 1, a = 1 },
-            },
-        },
-        runeBar = {
-            enabled = true,
-            anchorMode = "chain",
-            width = 300,
-            offsetY = -325,
-            overrideFont = false,
-            useSpecColor = true,
-            color = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
-            colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
-            colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
-            colorUnholy = { r = 0, g = 0.61, b = 0, a = 1 },
-        },
-        buffBars = {
-            enabled = true,
-            anchorMode = "chain",
-            width = 300,
-            offsetY = -350,
-            verticalSpacing = 0,
-            freeGrowDirection = "down",
-            showIcon = false,
-            showSpellName = true,
-            showDuration = true,
-            overrideFont = false,
-            colors = {
-                byName = {},
-                bySpellID = {},
-                byCooldownID = {},
-                byTexture = {},
-                cache = {},
-                defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
-            },
-        },
-        itemIcons = {
-            enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
-        },
-    }
-    return profile, deepClone(profile)
+    TestHelpers.LoadLiveDefaults()
+    return deepClone(ECM.defaults.profile), deepClone(ECM.defaults.profile)
 end
 
 --- Install common WoW globals for option tests.
@@ -775,11 +845,34 @@ function TestHelpers.SetupOptionsGlobals()
     _G.InCombatLockdown = function()
         return false
     end
+    _G.IsInInstance = function()
+        return false
+    end
     _G.UnitName = function()
         return "TestPlayer"
     end
     _G.date = function()
         return "120000"
+    end
+    _G.time = function()
+        return 1000
+    end
+    _G.C_AddOns = {
+        GetAddOnMetadata = function()
+            return nil
+        end,
+    }
+    _G.issecretvalue = function()
+        return false
+    end
+    _G.issecrettable = function()
+        return false
+    end
+    _G.canaccessvalue = function()
+        return true
+    end
+    _G.canaccesstable = function()
+        return true
     end
     _G.ColorPickerFrame = {
         SetupColorPickerAndShow = function() end,
@@ -803,13 +896,18 @@ function TestHelpers.SetupOptionsGlobals()
 
     -- Minimal CreateFrame stub for canvas layouts
     local function makeFrameStub()
-        local f = { scripts = {}, _children = {} }
+        local f = { scripts = {}, hooks = {}, callbacks = {}, _children = {} }
         local noop = function() end
+        local value, minValue, maxValue, stepValue = nil, 0, 0, 1
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
         f.GetScript = function(self, event)
             return self.scripts[event]
+        end
+        f.HookScript = function(self, event, fn)
+            self.hooks[event] = self.hooks[event] or {}
+            self.hooks[event][#self.hooks[event] + 1] = fn
         end
         f.GetHeight = function()
             return 0
@@ -831,6 +929,9 @@ function TestHelpers.SetupOptionsGlobals()
             return
         end
         f.SetEnabled = noop
+        f.RegisterForClicks = noop
+        f.SetAutoFocus = noop
+        f.SetNumeric = noop
         f.SetText = noop
         f.GetText = function()
             return ""
@@ -838,12 +939,44 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetWordWrap = noop
         f.SetJustifyH = noop
         f.SetColorRGB = noop
+        f.SetFocus = noop
+        f.ClearFocus = noop
+        f.HighlightText = noop
         f.SetBackdrop = noop
         f.SetBackdropBorderColor = noop
         f.SetMinMaxValues = noop
         f.SetValueStep = noop
         f.SetObeyStepOnDrag = noop
+        f.RegisterCallback = function(self, event, fn, owner)
+            self.callbacks[event] = self.callbacks[event] or {}
+            self.callbacks[event][#self.callbacks[event] + 1] = { fn = fn, owner = owner }
+        end
+        f.Init = function(self, initialValue, initialMin, initialMax)
+            value = initialValue
+            minValue = initialMin
+            maxValue = initialMax
+        end
+        f.SetValue = function(self, newValue)
+            value = newValue
+            for _, callback in ipairs(self.callbacks.OnValueChanged or {}) do
+                callback.fn(callback.owner or self, newValue)
+            end
+        end
+        f.GetValue = function()
+            return value
+        end
         f.SetDataProvider = noop
+        f.Slider = {
+            SetValueStep = function(_, step)
+                stepValue = step
+            end,
+            GetValueStep = function()
+                return stepValue
+            end,
+            GetMinMaxValues = function()
+                return minValue, maxValue
+            end,
+        }
         f.CreateFontString = function()
             return makeFrameStub()
         end
@@ -863,7 +996,11 @@ function TestHelpers.SetupOptionsGlobals()
         return f
     end
     _G.CreateFrame = function()
-        return makeFrameStub()
+        local frame = makeFrameStub()
+        frame.RightText = makeFrameStub()
+        frame.MinText = makeFrameStub()
+        frame.MaxText = makeFrameStub()
+        return frame
     end
 
     _G.CreateDataProvider = function()
@@ -881,12 +1018,42 @@ function TestHelpers.SetupOptionsGlobals()
         }
     end
 
-    _G.hooksecurefunc = function() end
+    _G.hooksecurefunc = function(tbl, method, hook)
+        if type(tbl) == "table" and type(method) == "string" and type(hook) == "function" then
+            local orig = tbl[method]
+            if type(orig) == "function" then
+                tbl[method] = function(...)
+                    orig(...)
+                    hook(...)
+                end
+            end
+        end
+    end
+
+    local settingsPanelScripts = {}
+    local settingsPanelCurrentCategory = nil
+    _G.SettingsPanel = {
+        SelectCategory = function() end,
+        DisplayCategory = function() end,
+        GetCurrentCategory = function() return settingsPanelCurrentCategory end,
+        SetCurrentCategory = function(_, cat) settingsPanelCurrentCategory = cat end,
+        IsShown = function() return false end,
+        GetSettingsList = function() return nil end,
+        HookScript = function(_, event, fn)
+            settingsPanelScripts[event] = settingsPanelScripts[event] or {}
+            settingsPanelScripts[event][#settingsPanelScripts[event] + 1] = fn
+        end,
+        _fireScript = function(event)
+            for _, fn in ipairs(settingsPanelScripts[event] or {}) do
+                fn(_G.SettingsPanel)
+            end
+        end,
+    }
 
     _G.CreateScrollBoxListLinearView = function()
         local view = {}
         view.SetElementExtent = function() end
-        view.SetElementInitializer = function(self, template, fn)
+        view.SetElementInitializer = function(self, _, fn)
             self._initFn = fn
         end
         return view
@@ -914,12 +1081,8 @@ function TestHelpers.SetupOptionsGlobals()
     }
 end
 
---- Load LibSettingsBuilder + Options.lua and return the SB and ns.
---- @param profile table Profile data
---- @param defaults table Default profile data
---- @return table SB SettingsBuilder instance
---- @return table ns Addon namespace
-function TestHelpers.SetupOptionsEnv(profile, defaults)
+--- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.
+function TestHelpers.SetupLibSettingsBuilder()
     TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
 
     local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
@@ -932,40 +1095,25 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
     lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
 
-    _G.ECM = {
-        Constants = {
-            ADDON_NAME = "Enhanced Cooldown Manager",
-            ANCHORMODE_CHAIN = "chain",
-            ANCHORMODE_FREE = "free",
-            GROW_DIRECTION_DOWN = "down",
-            GROW_DIRECTION_UP = "up",
-            SPELL_COLORS_SUBCAT = "Spell Colors",
-            SPELL_COLORS_DESC_TEXT = "Configure per-spell aura bar colors.",
-            SCROLL_ROW_HEIGHT_COMPACT = 20,
-            DEFAULT_BAR_WIDTH = 250,
-            DEFAULT_BAR_HEIGHT = 20,
-            DEFAULT_BORDER_THICKNESS = 4,
-            DEFAULT_BORDER_COLOR = { r = 0.15, g = 0.15, b = 0.15, a = 0.5 },
-            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 0.8 },
-            RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
-            RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
-            RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
-            RESOURCEBAR_TYPE_ICICLES = "icicles",
-            RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
-            RESOURCEBAR_MAX_COLOR_TYPES = {
-                ["icicles"] = true,
-            },
-            DEMONHUNTER_CLASS_ID = 12,
-            DEMONHUNTER_DEVOURER_SPEC_INDEX = 3,
-            CURRENT_SCHEMA_VERSION = 10,
-        },
-        CloneValue = deepClone,
-        ScheduleLayoutUpdate = function() end,
-        ClassUtil = {
-            IsDeathKnight = function()
-                return false
-            end,
-        },
+    return lsmw
+end
+
+--- Load LibSettingsBuilder + Options.lua and return the SB and ns.
+--- @param profile table Profile data
+--- @param defaults table Default profile data
+--- @return table SB SettingsBuilder instance
+--- @return table ns Addon namespace
+function TestHelpers.SetupOptionsEnv(profile, defaults)
+    TestHelpers.SetupLibSettingsBuilder()
+
+    TestHelpers.LoadLiveConstants()
+    ECM.CloneValue = deepClone
+    ECM.Runtime = ECM.Runtime or {}
+    ECM.Runtime.ScheduleLayoutUpdate = function() end
+    ECM.ClassUtil = {
+        IsDeathKnight = function()
+            return false
+        end,
     }
 
     local mod = {
@@ -993,6 +1141,7 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
 
     local ns = { Addon = mod, OptionsSections = {} }
 
+    TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
     local SB = ECM.SettingsBuilder
@@ -1007,15 +1156,159 @@ end
 --- @return table Map of variable name → setting object
 function TestHelpers.CollectSettings(fn)
     local captured = {}
-    local orig = Settings.RegisterProxySetting
-    Settings.RegisterProxySetting = function(cat, variable, varType, name, default, getter, setter)
+    local settings = Settings
+    local orig = settings.RegisterProxySetting
+    rawset(settings, "RegisterProxySetting", function(cat, variable, varType, name, default, getter, setter)
         local setting = orig(cat, variable, varType, name, default, getter, setter)
         captured[variable] = setting
         return setting
-    end
+    end)
     fn()
-    Settings.RegisterProxySetting = orig
+    rawset(settings, "RegisterProxySetting", orig)
     return captured
+end
+
+--- Find a button initializer by button text from a layout initializer list.
+--- @param initializers table
+--- @param buttonText string
+--- @return table|nil
+function TestHelpers.FindButtonInitializer(initializers, buttonText)
+    for _, initializer in ipairs(initializers or {}) do
+        if initializer._type == "button" and initializer._buttonText == buttonText then
+            return initializer
+        end
+    end
+    return nil
+end
+
+--- Override StaticPopup_Show to capture the popup key and auto-accept it.
+--- For edit-box dialogs, optionally sets provided text before OnAccept.
+--- @param editText string|nil
+--- @return function getShownPopupName
+function TestHelpers.InstallPopupAutoAccept(editText)
+    local shown
+    _G.StaticPopup_Show = function(name, _text1, _text2, data)
+        shown = name
+        local dialog = _G.StaticPopupDialogs and _G.StaticPopupDialogs[name]
+        if not dialog then
+            return
+        end
+
+        if dialog.hasEditBox then
+            local text = ""
+            local editBox = {
+                GetText = function()
+                    return text
+                end,
+                SetText = function(_, value)
+                    text = value
+                end,
+                HighlightText = function() end,
+            }
+            local popupFrame = {
+                EditBox = editBox,
+                editBox = editBox,
+                button1 = {
+                    IsEnabled = function()
+                        return true
+                    end,
+                },
+            }
+
+            if dialog.OnShow then
+                dialog.OnShow(popupFrame)
+            end
+            if editText ~= nil then
+                editBox:SetText(editText)
+            end
+            if dialog.OnAccept then
+                dialog.OnAccept(popupFrame, data)
+            end
+            return
+        end
+
+        if dialog.OnAccept then
+            dialog.OnAccept(nil, data)
+        end
+    end
+
+    return function()
+        return shown
+    end
+end
+
+--- Override StaticPopup_Show to record popup keys without auto-accepting them.
+--- @return function getShownPopupNames
+function TestHelpers.InstallPopupRecorder()
+    local shownNames = {}
+    _G.StaticPopup_Show = function(name, _text1, _text2, _data)
+        shownNames[#shownNames + 1] = name
+    end
+
+    return function()
+        return shownNames
+    end
+end
+
+--- Set up the PowerBar tick marks options/store environment and load the live module.
+--- @param opts table|nil Optional overrides for constants, profile, or GetCurrentClassSpec
+--- @return table addonNS
+function TestHelpers.SetupPowerBarTickMarksEnv(opts)
+    opts = opts or {}
+
+    _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
+    _G.YES = "Yes"
+    _G.NO = "No"
+    _G.SETTINGS_DEFAULTS = "Defaults"
+
+    _G.ECM = {
+        Constants = opts.constants or {
+            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
+            CLASS_COLORS = { WARRIOR = "C79C6E" },
+            COLOR_WHITE_HEX = "FFFFFF",
+            VALUE_SLIDER_TIERS = {
+                { ceiling = 200,    step = 1 },
+                { ceiling = 1000,   step = 5 },
+                { ceiling = 5000,   step = 25 },
+                { ceiling = 10000,  step = 50 },
+                { ceiling = 50000,  step = 250 },
+                { ceiling = 100000, step = 500 },
+                { ceiling = 500000, step = 2500 },
+            },
+        },
+        L = setmetatable({}, { __index = function(_, k)
+            return k
+        end }),
+        CloneValue = TestHelpers.deepClone,
+        OptionUtil = {
+            GetCurrentClassSpec = opts.getCurrentClassSpec or function()
+                return 1, 2, "Warrior", "Fury", "WARRIOR"
+            end,
+            MakeConfirmDialog = function(text)
+                return {
+                    text = text,
+                    button1 = _G.YES,
+                    button2 = _G.NO,
+                    OnAccept = function() end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                }
+            end,
+        },
+        ScheduleLayoutUpdate = function() end,
+    }
+
+    local addonNS = opts.addonNS or {
+        Addon = {
+            db = {
+                profile = opts.profile or {},
+            },
+        },
+    }
+
+    TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
+    return addonNS
 end
 
 return TestHelpers

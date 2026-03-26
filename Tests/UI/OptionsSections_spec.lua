@@ -35,40 +35,30 @@ describe("Options sections and root assembly", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    local function setupLibs()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+    it("root Options module creates categories and calls RegisterSettings on sections", function()
+        TestHelpers.SetupOptionsGlobals()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end
         lsmw.GetStatusbarValues = function()
             return {}
         end
-        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-        lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
-    end
-
-    it("root Options module creates categories and calls RegisterSettings on sections", function()
-        setupLibs()
 
         local registerSettingsCalls = {}
         local dbCallbacks = {}
 
         _G.ECM = {
             Constants = {
-                ADDON_NAME = "ECM",
                 ANCHORMODE_CHAIN = 1,
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
             },
+            L = setmetatable({}, { __index = function(_, k) return k end }),
             ScheduleLayoutUpdate = function() end,
         }
 
-        _G.ECM_DeepEquals = function(a, b)
-            return a == b
-        end
+        _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.ECM.CloneValue = function(v)
             return v
         end
@@ -88,7 +78,7 @@ describe("Options sections and root assembly", function()
             db = {
                 profile = {},
                 defaults = { profile = {} },
-                RegisterCallback = function(_, owner, eventName, methodName)
+                RegisterCallback = function(_, _, eventName, methodName)
                     dbCallbacks[#dbCallbacks + 1] = { eventName = eventName, methodName = methodName }
                 end,
             },
@@ -103,6 +93,7 @@ describe("Options sections and root assembly", function()
         for _, key in ipairs({
             "About",
             "General",
+            "Layout",
             "PowerBar",
             "ResourceBar",
             "RuneBar",
@@ -118,6 +109,7 @@ describe("Options sections and root assembly", function()
             }
         end
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
         assert.is_table(createdModule)
@@ -126,6 +118,7 @@ describe("Options sections and root assembly", function()
         assert.are.same({
             "About",
             "General",
+            "Layout",
             "PowerBar",
             "ResourceBar",
             "RuneBar",
@@ -134,12 +127,19 @@ describe("Options sections and root assembly", function()
             "Profile",
             "Advanced Options",
         }, registerSettingsCalls)
-        assert.are.equal(3, #dbCallbacks)
+        assert.are.equal(0, #dbCallbacks)
         assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
-        setupLibs()
+        TestHelpers.SetupOptionsGlobals()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
+        end
 
         _G.UnitClass = function()
             return "Player", "WARRIOR", 1
@@ -162,21 +162,13 @@ describe("Options sections and root assembly", function()
             },
         }
 
-        _G.ECM = {
-            Constants = {
-                CLASS = { DEATHKNIGHT = "DEATHKNIGHT" },
-                RESOURCEBAR_TYPE_VENGEANCE_SOULS = "souls",
-                RESOURCEBAR_TYPE_DEVOURER_NORMAL = "devourerNormal",
-                RESOURCEBAR_TYPE_DEVOURER_META = "devourerMeta",
-                RESOURCEBAR_TYPE_ICICLES = "icicles",
-                RESOURCEBAR_TYPE_MAELSTROM_WEAPON = "maelstromWeapon",
-                RESOURCEBAR_MAX_COLOR_TYPES = { ["icicles"] = true },
-                ANCHORMODE_CHAIN = 1,
-                ANCHORMODE_FREE = 2,
-                DEFAULT_BAR_WIDTH = 300,
-            },
-            ScheduleLayoutUpdate = function() end,
-        }
+        TestHelpers.LoadLiveConstants()
+        -- Test-specific sentinel values
+        ECM.Constants.ANCHORMODE_CHAIN = 1
+        ECM.Constants.ANCHORMODE_FREE = 2
+        ECM.Constants.DEFAULT_BAR_WIDTH = 300
+        ECM.Runtime = ECM.Runtime or {}
+        ECM.Runtime.ScheduleLayoutUpdate = function() end
 
         local border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }
         local profileData = {
@@ -206,6 +198,7 @@ describe("Options sections and root assembly", function()
             OptionsSections = {},
         }
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Options")(nil, ns)
         ECM.SettingsBuilder.CreateRootCategory("Test")
 

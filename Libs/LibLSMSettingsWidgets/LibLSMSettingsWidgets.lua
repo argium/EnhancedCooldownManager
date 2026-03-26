@@ -14,27 +14,54 @@ lib.TEXTURE_PICKER_TEMPLATE = "LibLSMSettingsWidgets_TexturePickerTemplate"
 -- Media value helpers
 --------------------------------------------------------------------------------
 
-local function getMediaValues(mediaType, fallback)
-    local values = {}
+local mediaCache = {}
+
+local function invalidateMediaCache()
+    wipe(mediaCache)
+end
+
+if LSM and LSM.RegisterCallback then
+    LSM:RegisterCallback("LibSharedMedia_Registered", invalidateMediaCache)
+end
+
+local function getSortedMediaNames(mediaType, fallback)
+    local cached = mediaCache[mediaType]
+    if cached then
+        return cached
+    end
+
+    local sorted = {}
     if LSM and LSM.List then
         for _, name in ipairs(LSM:List(mediaType)) do
-            values[name] = name
+            sorted[#sorted + 1] = name
         end
     end
 
-    if not next(values) then
-        values[fallback] = fallback
+    if #sorted == 0 then
+        sorted[1] = fallback
     end
 
-    return values
+    table.sort(sorted)
+    mediaCache[mediaType] = sorted
+    return sorted
 end
 
 function lib.GetFontValues()
-    return getMediaValues("font", "Expressway")
+    local names = getSortedMediaNames("font", "Expressway")
+    local values = {}
+    for _, name in ipairs(names) do
+        values[name] = name
+    end
+    return values
 end
 
 function lib.GetStatusbarValues()
-    return getMediaValues("statusbar", "Blizzard")
+    local names = getSortedMediaNames("statusbar", "Blizzard")
+    local values = {}
+    for _, name in ipairs(names) do
+        values[name] = name
+    end
+    return values
 end
 
 --------------------------------------------------------------------------------
@@ -64,7 +91,7 @@ end
 local function initPicker(self, initializer)
     SettingsListElementMixin.Init(self, initializer)
 
-    local data = initializer:GetData()
+    local data = initializer:GetData() or {}
     self.setting = initializer:GetSetting() or data.setting
 
     if data.name and self.Text then
@@ -75,12 +102,16 @@ local function initPicker(self, initializer)
     self:UpdatePreview()
 
     local frame = self
-    initializer.SetEnabled = function(_, enabled)
+    local oldSetEnabled = initializer.SetEnabled
+    initializer.SetEnabled = function(init, enabled)
+        if oldSetEnabled then
+            oldSetEnabled(init, enabled)
+        end
         frame:SetEnabled(enabled)
     end
 end
 
-local function setupMediaDropdown(self, getValues)
+local function setupMediaDropdown(self, mediaType, fallback)
     local setting = self.setting
     local picker = self
 
@@ -89,12 +120,7 @@ local function setupMediaDropdown(self, getValues)
     self.DropDown:SetupMenu(function(_, rootDescription)
         rootDescription:SetScrollMode(200)
 
-        local values = getValues()
-        local sorted = {}
-        for name in pairs(values) do
-            sorted[#sorted + 1] = name
-        end
-        table.sort(sorted)
+        local sorted = getSortedMediaNames(mediaType, fallback)
 
         for _, name in ipairs(sorted) do
             rootDescription:CreateRadio(name,
@@ -146,14 +172,19 @@ LibLSMSettingsWidgets_FontPickerMixin.Init = initPicker
 LibLSMSettingsWidgets_FontPickerMixin.SetEnabled = setPickerEnabled
 
 function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
-    setupMediaDropdown(self, lib.GetFontValues)
+    setupMediaDropdown(self, "font", "Expressway")
 end
 
 function LibLSMSettingsWidgets_FontPickerMixin:UpdatePreview()
     local _, fontPath = updateDropdownText(self, "font")
-    if fontPath and self.Preview then
-        self.Preview:SetFont(fontPath, 14, "")
-        self.Preview:SetText("AaBbCcDd 1234")
+    if self.Preview then
+        if fontPath then
+            self.Preview:SetFont(fontPath, 14, "")
+            self.Preview:SetText("AaBbCcDd 1234")
+        else
+            self.Preview:SetFontObject(GameFontHighlight)
+            self.Preview:SetText("")
+        end
     end
 end
 
@@ -178,12 +209,16 @@ LibLSMSettingsWidgets_TexturePickerMixin.Init = initPicker
 LibLSMSettingsWidgets_TexturePickerMixin.SetEnabled = setPickerEnabled
 
 function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
-    setupMediaDropdown(self, lib.GetStatusbarValues)
+    setupMediaDropdown(self, "statusbar", "Blizzard")
 end
 
 function LibLSMSettingsWidgets_TexturePickerMixin:UpdatePreview()
     local _, texturePath = updateDropdownText(self, "statusbar")
-    if texturePath and self.Preview then
-        self.Preview:SetTexture(texturePath)
+    if self.Preview then
+        if texturePath then
+            self.Preview:SetTexture(texturePath)
+        else
+            self.Preview:SetTexture(nil)
+        end
     end
 end

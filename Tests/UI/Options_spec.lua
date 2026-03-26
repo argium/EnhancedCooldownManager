@@ -8,6 +8,7 @@ local TestHelpers =
 describe("OptionUtil", function()
     local originalGlobals
     local ns
+    local optionsModule
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -36,34 +37,20 @@ describe("OptionUtil", function()
     end)
 
     before_each(function()
-        TestHelpers.SetupLibStub()
-        TestHelpers.SetupSettingsStubs()
+        TestHelpers.SetupOptionsGlobals()
 
-        _G.UnitClass = function()
-            return "Warrior", "WARRIOR", 1
-        end
-        _G.GetSpecialization = function()
-            return 1
-        end
-        _G.GetSpecializationInfo = function()
-            return nil, "Arms"
-        end
+        TestHelpers.LoadLiveConstants()
+        -- Test-specific sentinel values for anchor modes
+        ECM.Constants.ANCHORMODE_CHAIN = 1
+        ECM.Constants.ANCHORMODE_DETACHED = 3
+        ECM.Constants.ANCHORMODE_FREE = 2
+        ECM.Runtime = ECM.Runtime or {}
+        ECM.Runtime.ScheduleLayoutUpdate = function() end
 
-        _G.ECM = {
-            Constants = {
-                ANCHORMODE_CHAIN = 1,
-                ANCHORMODE_FREE = 2,
-            },
-            ScheduleLayoutUpdate = function() end,
-        }
-
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
-
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end
-        lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
 
         ns = {
             Addon = {
@@ -71,8 +58,11 @@ describe("OptionUtil", function()
                     profile = {},
                     defaults = { profile = {} },
                 },
+                _modules = {},
                 NewModule = function(_, name)
-                    return { moduleName = name }
+                    local module = { moduleName = name }
+                    ns.Addon._modules[name] = module
+                    return module
                 end,
                 EnableModule = function() end,
                 DisableModule = function() end,
@@ -81,7 +71,9 @@ describe("OptionUtil", function()
             OptionsSections = {},
         }
 
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
+        optionsModule = ns.Addon._modules.Options
     end)
 
     describe("CreateModuleEnabledHandler", function()
@@ -204,14 +196,13 @@ describe("OptionUtil", function()
             end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
-            assert.is_table(args.layoutHeader)
-            assert.are.equal("header", args.layoutHeader.type)
-            assert.are.equal("Layout", args.layoutHeader.name)
-            assert.are.equal(10, args.layoutHeader.order)
+            assert.is_nil(args.layoutMovedInfo)
 
-            assert.is_table(args.positioning)
-            assert.are.equal("positioning", args.positioning.type)
-            assert.are.equal(11, args.positioning.order)
+            assert.is_table(args.layoutMovedButton)
+            assert.are.equal("button", args.layoutMovedButton.type)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
+            assert.are.equal("Open", args.layoutMovedButton.buttonText)
+            assert.are.equal(10, args.layoutMovedButton.order)
 
             assert.is_table(args.appearanceHeader)
             assert.are.equal("header", args.appearanceHeader.type)
@@ -284,8 +275,7 @@ describe("OptionUtil", function()
             end
             local args = ECM.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
 
-            assert.are.equal(1, args.layoutHeader.order)
-            assert.are.equal(2, args.positioning.order)
+            assert.are.equal(1, args.layoutMovedButton.order)
             assert.are.equal(5, args.appearanceHeader.order)
             assert.are.equal(6, args.showText.order)
             assert.are.equal(7, args.heightOverride.order)
@@ -299,8 +289,6 @@ describe("OptionUtil", function()
             end
             local args = ECM.OptionUtil.CreateBarArgs(disabled)
 
-            assert.are.equal(disabled, args.layoutHeader.disabled)
-            assert.are.equal(disabled, args.positioning.disabled)
             assert.are.equal(disabled, args.appearanceHeader.disabled)
             assert.are.equal(disabled, args.showText.disabled)
             assert.are.equal(disabled, args.heightOverride.disabled)
@@ -330,6 +318,70 @@ describe("OptionUtil", function()
             local tbl = {}
             ECM.OptionUtil.SetNestedValue(tbl, "x.y.z", true)
             assert.is_true(tbl.x.y.z)
+        end)
+    end)
+
+    describe("Options:OpenOptions", function()
+        local openedCategory
+        local generalCategory
+        local profileCategory
+
+        before_each(function()
+            openedCategory = nil
+            generalCategory = nil
+            profileCategory = nil
+
+            rawset(Settings, "OpenToCategory", function(categoryID)
+                openedCategory = categoryID
+            end)
+
+            ns.OptionsSections["About"] = {
+                RegisterSettings = function() end,
+            }
+            ns.OptionsSections["General"] = {
+                RegisterSettings = function(SB)
+                    generalCategory = SB.CreateSubcategory(ECM.L["GENERAL"])
+                end,
+            }
+            ns.OptionsSections["Profile"] = {
+                RegisterSettings = function(SB)
+                    profileCategory = SB.CreateSubcategory(ECM.L["PROFILES"])
+                end,
+            }
+
+            optionsModule:OnInitialize()
+        end)
+
+        it("opens General when no ECM page has been visited yet", function()
+            optionsModule:OpenOptions()
+
+            assert.are.equal(generalCategory:GetID(), openedCategory)
+        end)
+
+        it("reopens the last visited ECM page", function()
+            SettingsPanel:SetCurrentCategory(profileCategory)
+            SettingsPanel:DisplayCategory(profileCategory)
+
+            optionsModule:OpenOptions()
+
+            assert.are.equal(profileCategory:GetID(), openedCategory)
+        end)
+
+        it("ignores non-ECM pages when remembering the last page", function()
+            local otherCategory = {
+                GetID = function()
+                    return "Other.Settings.Page"
+                end,
+            }
+
+            SettingsPanel:SetCurrentCategory(profileCategory)
+            SettingsPanel:DisplayCategory(profileCategory)
+            SettingsPanel:SetCurrentCategory(otherCategory)
+            SettingsPanel:DisplayCategory(otherCategory)
+
+            optionsModule:OpenOptions()
+
+            assert.are.equal(profileCategory:GetID(), openedCategory)
         end)
     end)
 end)

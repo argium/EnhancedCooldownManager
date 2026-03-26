@@ -5,167 +5,6 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
-describe("PowerBar", function()
-    local originalGlobals
-    local UnitStub
-
-    local CAPTURED_GLOBALS = {
-        "ECM",
-        "Enum",
-        "UnitClass",
-        "UnitPowerMax",
-        "UnitPower",
-        "UnitPowerType",
-        "GetSpecialization",
-        "GetSpecializationRole",
-        "CurveConstants",
-        "issecretvalue",
-    }
-
-    setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals(CAPTURED_GLOBALS)
-    end)
-
-    teardown(function()
-        TestHelpers.RestoreGlobals(originalGlobals)
-    end)
-
-    before_each(function()
-        _G.ECM = {}
-        _G.ECM.Log = function() end
-        _G.ECM.DebugAssert = function() end
-        _G.GetSpecialization = function()
-            return 1
-        end
-        _G.GetSpecializationRole = function()
-            return "DAMAGER"
-        end
-        _G.CurveConstants = { ScaleTo100 = 1 }
-        _G.issecretvalue = function()
-            return false
-        end
-
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadStub("Enums.lua")
-
-        UnitStub = TestHelpers.LoadStub("Unit.lua")
-        UnitStub.Install()
-
-        _G.UnitPowerType = function()
-            return Enum.PowerType.Energy
-        end
-
-        TestHelpers.LoadChunk("Helpers/ClassUtil.lua", "Unable to load Helpers/ClassUtil.lua")()
-    end)
-
-    --- Creates a minimal PowerBar stub that mirrors the Refresh tick logic.
-    local function makePowerBar()
-        local mod = {
-            InnerFrame = {
-                StatusBar = {},
-                TicksFrame = {},
-            },
-            tickPool = {},
-            _updateTicksCalled = false,
-            _updateTicksMax = nil,
-            _hideAllTicksCalled = false,
-            _hideAllTicksPoolKey = nil,
-        }
-
-        function mod:UpdateTicks(frame, max)
-            self._updateTicksCalled = true
-            self._updateTicksMax = max
-        end
-
-        function mod:HideAllTicks(poolKey)
-            self._hideAllTicksCalled = true
-            self._hideAllTicksPoolKey = poolKey
-        end
-
-        -- Mirror the production Refresh tick logic
-        function mod:RefreshTicks()
-            local powerType = ECM.ClassUtil.GetCurrentPowerType()
-            local max = UnitPowerMax("player", powerType)
-            if not issecretvalue(max) then
-                self:UpdateTicks(self.InnerFrame, max)
-            else
-                self:HideAllTicks("tickPool")
-            end
-        end
-
-        return mod
-    end
-
-    describe("Refresh tick updates", function()
-        it("calls UpdateTicks when max is not a secret value", function()
-            UnitStub.SetClass("player", "ROGUE")
-            _G.UnitPowerType = function()
-                return Enum.PowerType.Energy
-            end
-            UnitStub.SetPowerMax(Enum.PowerType.Energy, 100)
-            _G.issecretvalue = function()
-                return false
-            end
-
-            local mod = makePowerBar()
-            mod:RefreshTicks()
-
-            assert.is_true(mod._updateTicksCalled)
-            assert.are.equal(100, mod._updateTicksMax)
-        end)
-
-        it("skips UpdateTicks when max is a secret value", function()
-            UnitStub.SetClass("player", "ROGUE")
-            _G.UnitPowerType = function()
-                return Enum.PowerType.Energy
-            end
-            UnitStub.SetPowerMax(Enum.PowerType.Energy, 100)
-            _G.issecretvalue = function()
-                return true
-            end
-
-            local mod = makePowerBar()
-            mod:RefreshTicks()
-
-            assert.is_false(mod._updateTicksCalled)
-            assert.is_nil(mod._updateTicksMax)
-        end)
-
-        it("hides stale ticks when max becomes a secret value", function()
-            UnitStub.SetClass("player", "ROGUE")
-            _G.UnitPowerType = function()
-                return Enum.PowerType.Energy
-            end
-            UnitStub.SetPowerMax(Enum.PowerType.Energy, 100)
-            _G.issecretvalue = function()
-                return true
-            end
-
-            local mod = makePowerBar()
-            mod:RefreshTicks()
-
-            assert.is_true(mod._hideAllTicksCalled)
-            assert.are.equal("tickPool", mod._hideAllTicksPoolKey)
-        end)
-
-        it("calls UpdateTicks with correct max value", function()
-            UnitStub.SetClass("player", "ROGUE")
-            _G.UnitPowerType = function()
-                return Enum.PowerType.Energy
-            end
-            UnitStub.SetPowerMax(Enum.PowerType.Energy, 150)
-            _G.issecretvalue = function()
-                return false
-            end
-
-            local mod = makePowerBar()
-            mod:RefreshTicks()
-
-            assert.are.equal(150, mod._updateTicksMax)
-        end)
-    end)
-end)
-
 describe("PowerBar real source", function()
     local originalGlobals
     local PowerBar
@@ -177,7 +16,6 @@ describe("PowerBar real source", function()
     local unitPowerMaxValue
     local unitPowerPercentValue
     local isSecretValue
-    local barRefreshResult
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -206,20 +44,19 @@ describe("PowerBar real source", function()
         unitPowerMaxValue = 100
         unitPowerPercentValue = 37
         isSecretValue = false
-        barRefreshResult = true
 
         _G.ECM = {
             FrameMixin = {
-                ShouldShow = function()
-                    return true
-                end,
+                Proto = {
+                    ShouldShow = function()
+                        return true
+                    end,
+                },
             },
             BarMixin = {
-                AddMixin = function()
+                AddMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
-                end,
-                Refresh = function()
-                    return barRefreshResult
+                    target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
             ClassUtil = {
@@ -227,12 +64,14 @@ describe("PowerBar real source", function()
                     return Enum.PowerType.Mana
                 end,
             },
-            RegisterFrame = function()
-                registerFrameCalls = registerFrameCalls + 1
-            end,
-            UnregisterFrame = function()
-                unregisterFrameCalls = unregisterFrameCalls + 1
-            end,
+            Runtime = {
+                RegisterFrame = function()
+                    registerFrameCalls = registerFrameCalls + 1
+                end,
+                UnregisterFrame = function()
+                    unregisterFrameCalls = unregisterFrameCalls + 1
+                end,
+            },
             Log = function() end,
         }
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
@@ -379,10 +218,32 @@ describe("PowerBar real source", function()
         assert.same({ "UNIT_POWER_UPDATE" }, reasons)
     end)
 
+    it("registered callback drops LibEvent target and forwards event args", function()
+        local captured = {}
+        function PowerBar:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        function PowerBar:UnregisterAllEvents() end
+
+        PowerBar:OnInitialize()
+        PowerBar:OnEnable()
+
+        local reasons = {}
+        function PowerBar:ThrottledUpdateLayout(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        local cb = assert(captured["UNIT_POWER_UPDATE"], "expected UNIT_POWER_UPDATE registration")
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        cb(PowerBar, "UNIT_POWER_UPDATE", "player")
+        assert.same({ "UNIT_POWER_UPDATE" }, reasons)
+    end)
+
     it("registers and unregisters with the frame system", function()
         function PowerBar:RegisterEvent() end
         function PowerBar:UnregisterAllEvents() end
 
+        PowerBar:OnInitialize()
         PowerBar:OnEnable()
         PowerBar:OnDisable()
 
@@ -472,14 +333,7 @@ describe("PowerBar real source", function()
         assert.are.equal("tickPool", layoutArgs.poolKey)
     end)
 
-    it("returns false from Refresh when the base bar mixin stops the update", function()
-        barRefreshResult = false
-        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
-
-        assert.is_false(PowerBar:Refresh("test"))
-    end)
-
-    it("Refresh updates ticks when max power is visible", function()
+    it("_OnBarRefreshed updates ticks when max power is visible", function()
         local updatedMax
         local hiddenPoolKey
         PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
@@ -490,12 +344,12 @@ describe("PowerBar real source", function()
             hiddenPoolKey = poolKey
         end
 
-        assert.is_true(PowerBar:Refresh("test"))
+        PowerBar:_OnBarRefreshed("test")
         assert.are.equal(unitPowerMaxValue, updatedMax)
         assert.is_nil(hiddenPoolKey)
     end)
 
-    it("Refresh hides ticks when max power is secret", function()
+    it("_OnBarRefreshed hides ticks when max power is secret", function()
         local updatedMax
         local hiddenPoolKey
         isSecretValue = true
@@ -507,18 +361,18 @@ describe("PowerBar real source", function()
             hiddenPoolKey = poolKey
         end
 
-        assert.is_true(PowerBar:Refresh("test"))
+        PowerBar:_OnBarRefreshed("test")
         assert.is_nil(updatedMax)
         assert.are.equal("tickPool", hiddenPoolKey)
     end)
 
     it("shows non-mana power bars and respects the outer frame visibility guard", function()
-        ECM.FrameMixin.ShouldShow = function()
+        ECM.FrameMixin.Proto.ShouldShow = function()
             return false
         end
         assert.is_false(PowerBar:ShouldShow())
 
-        ECM.FrameMixin.ShouldShow = function()
+        ECM.FrameMixin.Proto.ShouldShow = function()
             return true
         end
         ECM.ClassUtil.GetCurrentPowerType = function()

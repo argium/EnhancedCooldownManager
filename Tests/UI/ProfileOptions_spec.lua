@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("ProfileOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, profileCategory, initializers
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -36,6 +36,8 @@ describe("ProfileOptions getters/setters/defaults", function()
             TestHelpers.LoadChunk("UI/ProfileOptions.lua", "ProfileOptions")(nil, ns)
             ns.OptionsSections.Profile.RegisterSettings(SB)
         end)
+        profileCategory = SB._subcategories[ECM.L["PROFILES"]]
+        initializers = SB._layouts[profileCategory]._initializers
     end)
 
     describe("switch profile", function()
@@ -48,14 +50,37 @@ describe("ProfileOptions getters/setters/defaults", function()
             settings["ECM_ProfileSwitch"]:SetValue("Other")
             assert.are.equal("Other", called)
         end)
+        it("uses the localized New Profile row label", function()
+            local newProfileButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["NEW_PROFILE"]))
+
+            assert.are.equal(ECM.L["NEW_PROFILE"], newProfileButton._name)
+        end)
+        it("prompts for a profile name then switches to it", function()
+            local switched
+            ns.Addon.db.SetProfile = function(_, value) switched = value end
+
+            local getShown = TestHelpers.InstallPopupAutoAccept("MyCustomProfile")
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["NEW_PROFILE"])._onClick()
+
+            assert.are.equal("ECM_NEW_PROFILE", getShown())
+            assert.are.equal("MyCustomProfile", switched)
+        end)
     end)
 
     describe("copy profile picker", function()
         it("setting exists", function()
             assert.is_not_nil(settings["ECM_ProfileCopy"])
         end)
-        it("getter returns empty by default", function()
-            assert.are.equal("", settings["ECM_ProfileCopy"]:GetValue())
+        it("defaults to the first available profile when Default is unavailable", function()
+            assert.are.equal("Other", settings["ECM_ProfileCopy"]:GetValue())
+        end)
+        it("keeps the picker row label", function()
+            assert.are.equal(ECM.L["COPY_FROM"], settings["ECM_ProfileCopy"]._name)
+        end)
+        it("options do not include a blank entry", function()
+            local options = settings["ECM_ProfileCopy"]._optionsGen()
+            assert.same({ value = "Other", label = "Other" }, options[1])
         end)
         it("setter updates transient selection", function()
             settings["ECM_ProfileCopy"]:SetValue("Other")
@@ -67,12 +92,152 @@ describe("ProfileOptions getters/setters/defaults", function()
         it("setting exists", function()
             assert.is_not_nil(settings["ECM_ProfileDelete"])
         end)
-        it("getter returns empty by default", function()
-            assert.are.equal("", settings["ECM_ProfileDelete"]:GetValue())
+        it("defaults to the first available profile when Default is unavailable", function()
+            assert.are.equal("Other", settings["ECM_ProfileDelete"]:GetValue())
+        end)
+        it("keeps the picker row label", function()
+            assert.are.equal(ECM.L["DELETE_PROFILE"], settings["ECM_ProfileDelete"]._name)
+        end)
+        it("options do not include a blank entry", function()
+            local options = settings["ECM_ProfileDelete"]._optionsGen()
+            assert.same({ value = "Other", label = "Other" }, options[1])
         end)
         it("setter updates transient selection", function()
             settings["ECM_ProfileDelete"]:SetValue("Other")
             assert.are.equal("Other", settings["ECM_ProfileDelete"]:GetValue())
+        end)
+    end)
+
+    describe("profile action buttons", function()
+        it("uses the localized Copy row label", function()
+            local copyButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["COPY"]))
+
+            assert.are.equal(ECM.L["COPY"], copyButton._name)
+        end)
+
+        it("uses the localized Delete row label", function()
+            local deleteButton = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["DELETE"]))
+
+            assert.are.equal(ECM.L["DELETE"], deleteButton._name)
+        end)
+
+        it("Copy shows a confirmation dialog before copying", function()
+            settings["ECM_ProfileCopy"]:SetValue("Other")
+            local getShown = TestHelpers.InstallPopupAutoAccept()
+            local copied
+            ns.Addon.db.CopyProfile = function(_, p) copied = p end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["COPY"])._onClick()
+
+            assert.are.equal("ECM_CONFIRM_COPY_PROFILE", getShown())
+            assert.are.equal("Other", copied)
+        end)
+
+        it("Copy does nothing when selection is empty", function()
+            local copied = false
+            ns.Addon.db.CopyProfile = function() copied = true end
+            local current = ns.Addon.db:GetCurrentProfile()
+            ns.Addon.db.GetProfiles = function()
+                return { current }
+            end
+            settings["ECM_ProfileCopy"]:SetValue("")
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["COPY"])._onClick()
+
+            assert.is_false(copied)
+        end)
+
+        it("Delete shows a confirmation dialog before deleting", function()
+            settings["ECM_ProfileDelete"]:SetValue("Other")
+            local getShown = TestHelpers.InstallPopupAutoAccept()
+            local deleted
+            ns.Addon.db.DeleteProfile = function(_, p) deleted = p end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["DELETE"])._onClick()
+
+            assert.are.equal("ECM_CONFIRM_DELETE_PROFILE", getShown())
+            assert.are.equal("Other", deleted)
+        end)
+
+        it("Delete does nothing when selection is empty", function()
+            local deleted = false
+            ns.Addon.db.DeleteProfile = function() deleted = true end
+            local current = ns.Addon.db:GetCurrentProfile()
+            ns.Addon.db.GetProfiles = function()
+                return { current }
+            end
+            settings["ECM_ProfileDelete"]:SetValue("")
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["DELETE"])._onClick()
+
+            assert.is_false(deleted)
+        end)
+    end)
+
+    describe("reset profile", function()
+        it("calls db:ResetProfile", function()
+            local reset = false
+            ns.Addon.db.ResetProfile = function() reset = true end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["RESET_PROFILE_BUTTON"])._onClick()
+
+            assert.is_true(reset)
+        end)
+    end)
+
+    describe("import", function()
+        it("opens import dialog when out of combat", function()
+            _G.InCombatLockdown = function() return false end
+            local opened = false
+            ns.Addon.ShowImportDialog = function() opened = true end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["IMPORT"])._onClick()
+
+            assert.is_true(opened)
+        end)
+
+        it("blocks import during combat", function()
+            _G.InCombatLockdown = function() return true end
+            local opened = false
+            local printed
+            ns.Addon.ShowImportDialog = function() opened = true end
+            ECM.Print = function(msg) printed = msg end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["IMPORT"])._onClick()
+
+            assert.is_false(opened)
+            assert.are.equal(ECM.L["CANNOT_IMPORT_IN_COMBAT"], printed)
+        end)
+    end)
+
+    describe("export", function()
+        it("opens export dialog on success", function()
+            local exportedWith
+            ns.Addon.ShowExportDialog = function(_, str) exportedWith = str end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["EXPORT"])._onClick()
+
+            assert.are.equal("exported_string", exportedWith)
+        end)
+
+        it("prints error when export fails", function()
+            ECM.ImportExport.ExportCurrentProfile = function() return nil, "codec broke" end
+            local printed
+            ECM.Print = function(msg) printed = msg end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["EXPORT"])._onClick()
+
+            assert.are.equal(string.format(ECM.L["EXPORT_FAILED"], "codec broke"), printed)
+        end)
+
+        it("prints fallback error when export fails with nil reason", function()
+            ECM.ImportExport.ExportCurrentProfile = function() return nil end
+            local printed
+            ECM.Print = function(msg) printed = msg end
+
+            TestHelpers.FindButtonInitializer(initializers, ECM.L["EXPORT"])._onClick()
+
+            assert.are.equal(string.format(ECM.L["EXPORT_FAILED"], "Unknown error"), printed)
         end)
     end)
 end)

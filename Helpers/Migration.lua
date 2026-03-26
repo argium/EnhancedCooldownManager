@@ -1,8 +1,18 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V10).
+-- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
 
 local Migration = {}
 ECM.Migration = Migration
+
+-- Legacy free-mode bars used implicit default positions when offset fields were
+-- absent from SavedVariables. Keep these migration-local so the historical
+-- fallback data stays coupled to the schema upgrade that needs it.
+local LEGACY_FREE_POSITION_DEFAULTS = {
+    powerBar = { point = "CENTER", x = 0, y = -275 },
+    resourceBar = { point = "CENTER", x = 0, y = -300 },
+    runeBar = { point = "CENTER", x = 0, y = -325 },
+    buffBars = { point = "CENTER", x = 0, y = -350 },
+}
 
 --- Migration log buffer. Entries are collected during migration and persisted
 --- into the new version's SV slot so they survive across sessions.
@@ -20,31 +30,6 @@ end
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
-
---- Deep copies a table for migration purposes (no depth limit, no secret handling).
---- SavedVariable data is plain Lua tables with primitives and nested tables.
----@param value any
----@param seen table|nil
----@return any
-local function deepCopy(value, seen)
-    if type(value) ~= "table" then
-        return value
-    end
-
-    seen = seen or {}
-    if seen[value] then
-        return nil
-    end
-    seen[value] = true
-
-    local copy = {}
-    for k, v in pairs(value) do
-        copy[k] = deepCopy(v, seen)
-    end
-
-    seen[value] = nil
-    return copy
-end
 
 --- Aligns copied profile schemaVersion values with the slot they came from.
 --- The versioned slot key is the source of truth during reseeding; older slots
@@ -131,6 +116,24 @@ local function normalizeColorTable(colorTable, defaultAlpha)
     end
 end
 
+-- Migration loads before ECM.lua during normal addon startup, so the canonical
+-- clone helper may not exist yet when PrepareDatabase reseeds versioned slots.
+local function cloneValue(value)
+    if ECM.CloneValue then
+        return ECM.CloneValue(value)
+    end
+
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for k, v in pairs(value) do
+        copy[k] = cloneValue(v)
+    end
+    return copy
+end
+
 local function normalizeBarConfig(cfg)
     if not cfg then
         return
@@ -182,6 +185,28 @@ local function normalizeBuffBarsCache(cfg)
     end
 end
 
+local FrameUtil = ECM.FrameUtil
+
+---@param layoutName string|nil
+---@return string|nil
+local function resolveActiveLayoutName(layoutName)
+    if type(layoutName) == "string" and layoutName ~= "" then
+        return layoutName
+    end
+
+    local editMode = ECM.EditMode
+    if editMode and type(editMode.GetActiveLayoutName) == "function" then
+        local resolvedLayoutName = editMode.GetActiveLayoutName()
+        if type(resolvedLayoutName) == "string" and resolvedLayoutName ~= "" then
+            return resolvedLayoutName
+        end
+    end
+
+    return nil
+end
+
+local normalizeEditModePosition = FrameUtil.NormalizePosition
+
 --- Migrates profiles from the per-bar color settings to per-spell.
 ---@param profile table The profile to migrate
 local function migrateToPerSpellColors(profile)
@@ -203,13 +228,13 @@ local function migrateToPerSpellColors(profile)
 
     local perSpell = cfg.colors.perSpell
 
-    local function doSpellMigration(perBar, perSpell, cache)
-        for i, v in ipairs(cache) do
+    local function doSpellMigration(perBarStore, perSpellStore, cacheStore)
+        for i, v in ipairs(cacheStore) do
             if not v.color and v.spellName then
-                local bc = perBar[i]
+                local bc = perBarStore[i]
                 if bc then
-                    perSpell[v.spellName] = bc
-                    cache[i] = {
+                    perSpellStore[v.spellName] = bc
+                    cacheStore[i] = {
                         lastSeen = v.lastSeen,
                         spellName = v.spellName,
                     }
@@ -219,7 +244,7 @@ local function migrateToPerSpellColors(profile)
     end
 
     for classID, spec in pairs(perBar) do
-        for specID, colors in pairs(spec) do
+        for specID in pairs(spec) do
             if not perSpell[classID] then
                 perSpell[classID] = {}
             end
@@ -751,8 +776,357 @@ end
 -- Schema Migrations
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- Schema Migrations — registered per-version steps
+--------------------------------------------------------------------------------
+
+--- Registry of migration steps, keyed by target version.
+--- Each function receives the profile and returns false to defer (stop the
+--- migration chain), or any other value to indicate success.
+local _migrations = {}
+
+-- V2 → V3: buffBarColors -> buffBars.colors
+_migrations[3] = function(profile)
+    if profile.buffBarColors then
+        log("Migrating buffBarColors to buffBars.colors")
+
+        profile.buffBars = profile.buffBars or {}
+        profile.buffBars.colors = profile.buffBars.colors or {}
+
+        local src = profile.buffBarColors
+        local dst = profile.buffBars.colors
+
+        dst.perBar = dst.perBar or src.colors or {}
+        dst.cache = dst.cache or src.cache or {}
+        dst.defaultColor = dst.defaultColor or src.defaultColor
+        profile.buffBarColors = nil
+    end
+
+    local colorsConfig = profile.buffBars and profile.buffBars.colors
+    if colorsConfig and colorsConfig.colors and not colorsConfig.perBar then
+        log("Renaming buffBars.colors.colors to buffBars.colors.perBar")
+        colorsConfig.perBar = colorsConfig.colors
+        colorsConfig.colors = nil
+    end
+end
+
+-- V3 → V4: tick colors, color normalization, powerBarTicks restructure
+_migrations[4] = function(profile)
+    local ticksCfg = profile.powerBarTicks
+    if ticksCfg and isColorMatch(ticksCfg.defaultColor, 0, 0, 0, 0.5) then
+        ticksCfg.defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }
+    end
+
+    local resourceCfg = profile.resourceBar
+    local colors = resourceCfg and resourceCfg.colors
+    local soulsColor = colors and colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
+    if isColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
+        colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
+    end
+
+    if profile.powerBarTicks then
+        profile.powerBar = profile.powerBar or {}
+        if not profile.powerBar.ticks then
+            profile.powerBar.ticks = profile.powerBarTicks
+        end
+        profile.powerBarTicks = nil
+    end
+
+    local gbl = profile.global
+    if gbl then
+        gbl.barBgColor = normalizeLegacyColor(gbl.barBgColor, 1)
+    end
+
+    normalizeBarConfig(profile.powerBar)
+    normalizeBarConfig(profile.resourceBar)
+    normalizeBarConfig(profile.runeBar)
+
+    local powerBar = profile.powerBar
+    if powerBar and powerBar.ticks then
+        local tickCfg = powerBar.ticks
+        tickCfg.defaultColor = normalizeLegacyColor(tickCfg.defaultColor, 1)
+        if tickCfg.mappings then
+            for _, specMap in pairs(tickCfg.mappings) do
+                for _, ticks in pairs(specMap) do
+                    for _, tick in ipairs(ticks) do
+                        if tick and tick.color then
+                            tick.color = normalizeLegacyColor(
+                                tick.color,
+                                tickCfg.defaultColor and tickCfg.defaultColor.a or 1
+                            )
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local buffBars = profile.buffBars
+    if buffBars and buffBars.colors then
+        buffBars.colors.defaultColor = normalizeLegacyColor(buffBars.colors.defaultColor, 1)
+        local perBar = buffBars.colors.perBar
+        if type(perBar) == "table" then
+            for _, specMap in pairs(perBar) do
+                for _, bars in pairs(specMap) do
+                    if type(bars) == "table" then
+                        for index, color in pairs(bars) do
+                            bars[index] = normalizeLegacyColor(color, 1)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- V4 → V5: combatFade -> global.outOfCombatFade
+_migrations[5] = function(profile)
+    local legacyCombatFade = profile.combatFade
+    if legacyCombatFade then
+        profile.global = profile.global or {}
+        profile.global.outOfCombatFade = profile.global.outOfCombatFade or {}
+
+        local fadeConfig = profile.global.outOfCombatFade
+        if legacyCombatFade.enabled ~= nil then
+            fadeConfig.enabled = legacyCombatFade.enabled
+        end
+        if legacyCombatFade.opacity ~= nil then
+            fadeConfig.opacity = legacyCombatFade.opacity
+        end
+        if legacyCombatFade.exceptInInstance ~= nil then
+            fadeConfig.exceptInInstance = legacyCombatFade.exceptInInstance
+        end
+        if legacyCombatFade.exceptIfTargetCanBeAttacked ~= nil then
+            fadeConfig.exceptIfTargetCanBeAttacked = legacyCombatFade.exceptIfTargetCanBeAttacked
+        end
+
+        profile.combatFade = nil
+    end
+end
+
+-- V5 → V6: perBar -> perSpell colors
+_migrations[6] = function(profile)
+    migrateToPerSpellColors(profile)
+end
+
+-- V6 → V7: normalize buff bar cache entries
+_migrations[7] = function(profile)
+    local buffBars = profile.buffBars
+    if buffBars then
+        normalizeBuffBarsCache(buffBars)
+    end
+end
+
+-- V7 → V8: split flat perSpell map into separate byName / byTexture tables
+_migrations[8] = function(profile)
+    local buffBars = profile.buffBars
+    if buffBars and type(buffBars.colors) == "table" then
+        local colors = buffBars.colors
+        local perSpell = colors.perSpell
+
+        if type(perSpell) == "table" then
+            if type(colors.byName) ~= "table" then
+                colors.byName = {}
+            end
+            if type(colors.byTexture) ~= "table" then
+                colors.byTexture = {}
+            end
+
+            for classID, specTable in pairs(perSpell) do
+                if type(specTable) == "table" then
+                    for specID, entries in pairs(specTable) do
+                        if type(entries) == "table" then
+                            colors.byName[classID] = colors.byName[classID] or {}
+                            colors.byName[classID][specID] = colors.byName[classID][specID] or {}
+                            colors.byTexture[classID] = colors.byTexture[classID] or {}
+                            colors.byTexture[classID][specID] = colors.byTexture[classID][specID] or {}
+
+                            for key, color in pairs(entries) do
+                                local wrapped = { value = color, t = 0 }
+                                if type(key) == "string" then
+                                    colors.byName[classID][specID][key] = wrapped
+                                elseif type(key) == "number" then
+                                    colors.byTexture[classID][specID][key] = wrapped
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            colors.perSpell = nil
+        end
+
+        if type(colors.bySpellID) ~= "table" then
+            colors.bySpellID = {}
+        end
+        if type(colors.byCooldownID) ~= "table" then
+            colors.byCooldownID = {}
+        end
+    end
+end
+
+-- V8 → V9: repair spell color metadata and fallback tier links
+_migrations[9] = function(profile)
+    repairSpellColorStores(profile)
+end
+
+-- V9 → V10: normalize spell color wrapper metadata and collapse fragmented entries
+_migrations[10] = function(profile)
+    local v10Stats = normalizeSpellColorStoresV10(profile)
+    if v10Stats and v10Stats.skipped then
+        log("V10 spell color normalization skipped: " .. (v10Stats.skipReason or "unknown reason"))
+    elseif v10Stats then
+        local createdTiers = {}
+        for _, tier in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
+            if v10Stats.tierStoresCreated[tier] then
+                createdTiers[#createdTiers + 1] = tier
+            end
+        end
+
+        log(
+            string.format(
+                "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
+                v10Stats.classesProcessed,
+                v10Stats.specsProcessed,
+                v10Stats.entriesScanned,
+                v10Stats.validEntries,
+                v10Stats.canonicalEntries,
+                v10Stats.aliasLinksMerged,
+                v10Stats.invalidEntries,
+                v10Stats.invalidRetained,
+                v10Stats.invalidKeyCollisions,
+                v10Stats.entriesMetaNormalized,
+                v10Stats.finalEntries
+            )
+        )
+        log(
+            string.format(
+                "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
+                v10Stats.perTier.byName.scanned,
+                v10Stats.perTier.byName.invalid,
+                v10Stats.perTier.byName.final,
+                v10Stats.perTier.bySpellID.scanned,
+                v10Stats.perTier.bySpellID.invalid,
+                v10Stats.perTier.bySpellID.final,
+                v10Stats.perTier.byCooldownID.scanned,
+                v10Stats.perTier.byCooldownID.invalid,
+                v10Stats.perTier.byCooldownID.final,
+                v10Stats.perTier.byTexture.scanned,
+                v10Stats.perTier.byTexture.invalid,
+                v10Stats.perTier.byTexture.final
+            )
+        )
+        if #createdTiers > 0 then
+            log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
+        end
+        for _, msg in ipairs(v10Stats.anomalySpecs) do
+            log("V10 anomaly: " .. msg)
+        end
+        if v10Stats.anomalySpecsOverflow > 0 then
+            log("V10 anomaly: additional specs omitted=" .. v10Stats.anomalySpecsOverflow)
+        end
+    end
+end
+
+-- V10 → V11: move legacy offsets into editModePositions
+_migrations[11] = function(profile)
+    local layoutName = resolveActiveLayoutName()
+    if not layoutName then
+        log("V11 active layout unavailable; skipping position migration")
+        return
+    end
+
+    for _, section in ipairs({ "powerBar", "resourceBar", "runeBar", "buffBars" }) do
+        local cfg = profile[section]
+        if type(cfg) == "table" then
+            local legacyPosition = LEGACY_FREE_POSITION_DEFAULTS[section]
+            local ox = cfg.offsetX
+            local oy = cfg.offsetY
+            local ap = cfg.anchorPoint
+            local rp = cfg.relativePoint
+            local isLegacyFreeMode = cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
+            local sourcePoint = ap or (legacyPosition and legacyPosition.point) or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+            local sourceRelativePoint = rp or ap or (legacyPosition and legacyPosition.point) or sourcePoint
+            local sourceX = ox ~= nil and ox or (legacyPosition and legacyPosition.x) or 0
+            local sourceY = oy ~= nil and oy or (legacyPosition and legacyPosition.y) or 0
+            local migrationSource = (ox ~= nil or oy ~= nil) and "saved-offsets"
+                or ((isLegacyFreeMode and legacyPosition ~= nil) and "legacy-free-default" or "anchor-only")
+            local shouldMigratePosition = ox ~= nil
+                or oy ~= nil
+                or (isLegacyFreeMode and legacyPosition ~= nil)
+                or ap ~= nil
+                or rp ~= nil
+            log(
+                section
+                    .. ": pre-migrate state"
+                    .. " anchorMode="
+                    .. tostring(cfg.anchorMode)
+                    .. " anchorPoint="
+                    .. tostring(ap)
+                    .. " relativePoint="
+                    .. tostring(rp)
+                    .. " offsetX="
+                    .. tostring(ox)
+                    .. " offsetY="
+                    .. tostring(oy)
+            )
+            if shouldMigratePosition then
+                if type(cfg.editModePositions) ~= "table" then
+                    cfg.editModePositions = {}
+                end
+                local point, x, y = normalizeEditModePosition(
+                    sourcePoint,
+                    sourceRelativePoint,
+                    sourceX,
+                    sourceY,
+                    UIParent
+                )
+                local didNormalize = sourcePoint ~= sourceRelativePoint
+                local migrated = {
+                    point = point,
+                    x = x,
+                    y = y,
+                }
+                if cfg.editModePositions[layoutName] == nil then
+                    cfg.editModePositions[layoutName] = migrated
+                    log(
+                        section
+                            .. ": migrated to editModePositions."
+                            .. layoutName
+                            .. " point="
+                            .. migrated.point
+                            .. " x="
+                            .. migrated.x
+                            .. " y="
+                            .. migrated.y
+                            .. " source="
+                            .. migrationSource
+                            .. " normalized="
+                            .. tostring(didNormalize)
+                    )
+                else
+                    log(
+                        section
+                            .. ": preserved existing editModePositions."
+                            .. layoutName
+                            .. " while clearing legacy offsets"
+                    )
+                end
+                cfg.offsetX = nil
+                cfg.offsetY = nil
+            else
+                log(section .. ": no legacy free-mode position found, skipping")
+            end
+            cfg.anchorPoint = nil
+            cfg.relativePoint = nil
+        else
+            log(section .. ": section missing or not a table")
+        end
+    end
+end
+
 --- Runs all schema migrations on a profile from its current version to CURRENT_SCHEMA_VERSION.
---- Each migration is gated by schemaVersion to ensure it only runs once.
 ---@param profile table The profile to migrate
 function Migration.Run(profile)
     if not profile.schemaVersion then
@@ -762,281 +1136,13 @@ function Migration.Run(profile)
     local startVersion = profile.schemaVersion
     log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
 
-    -- Migration: buffBarColors -> buffBars.colors (schema 2 -> 3)
-    if profile.schemaVersion < 3 then
-        if profile.buffBarColors then
-            log("Migrating buffBarColors to buffBars.colors")
-
-            profile.buffBars = profile.buffBars or {}
-            profile.buffBars.colors = profile.buffBars.colors or {}
-
-            local src = profile.buffBarColors
-            local dst = profile.buffBars.colors
-
-            dst.perBar = dst.perBar or src.colors or {}
-            dst.cache = dst.cache or src.cache or {}
-            dst.defaultColor = dst.defaultColor or src.defaultColor
-            profile.buffBarColors = nil
+    for version = startVersion + 1, ECM.Constants.CURRENT_SCHEMA_VERSION do
+        local step = _migrations[version]
+        if step then
+            step(profile)
+            profile.schemaVersion = version
+            log("Migrated to V" .. version)
         end
-
-        -- Migration: colors.colors -> colors.perBar (rename within buffBars.colors)
-        local colorsConfig = profile.buffBars and profile.buffBars.colors
-        if colorsConfig and colorsConfig.colors and not colorsConfig.perBar then
-            log("Renaming buffBars.colors.colors to buffBars.colors.perBar")
-            colorsConfig.perBar = colorsConfig.colors
-            colorsConfig.colors = nil
-        end
-
-        log("Migrated to V3")
-        profile.schemaVersion = 3
-    end
-
-    if profile.schemaVersion < 4 then
-        -- Migration: powerBarTicks.defaultColor -> bold semi-transparent white (schema 3 -> 4)
-        local ticksCfg = profile.powerBarTicks
-        if ticksCfg and isColorMatch(ticksCfg.defaultColor, 0, 0, 0, 0.5) then
-            ticksCfg.defaultColor = { r = 1, g = 1, b = 1, a = 0.8 }
-        end
-
-        -- Migration: demon hunter souls default color update
-        local resourceCfg = profile.resourceBar
-        local colors = resourceCfg and resourceCfg.colors
-        local soulsColor = colors and colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
-        if isColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
-            colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
-        end
-
-        -- Migration: powerBarTicks -> powerBar.ticks
-        if profile.powerBarTicks then
-            profile.powerBar = profile.powerBar or {}
-            if not profile.powerBar.ticks then
-                profile.powerBar.ticks = profile.powerBarTicks
-            end
-            profile.powerBarTicks = nil
-        end
-
-        -- Normalize stored colors to ECM_Color (legacy conversion happens once here)
-        local gbl = profile.global
-        if gbl then
-            gbl.barBgColor = normalizeLegacyColor(gbl.barBgColor, 1)
-        end
-
-        normalizeBarConfig(profile.powerBar)
-        normalizeBarConfig(profile.resourceBar)
-        normalizeBarConfig(profile.runeBar)
-
-        local powerBar = profile.powerBar
-        if powerBar and powerBar.ticks then
-            local tickCfg = powerBar.ticks
-            tickCfg.defaultColor = normalizeLegacyColor(tickCfg.defaultColor, 1)
-            if tickCfg.mappings then
-                for _, specMap in pairs(tickCfg.mappings) do
-                    for _, ticks in pairs(specMap) do
-                        for _, tick in ipairs(ticks) do
-                            if tick and tick.color then
-                                tick.color = normalizeLegacyColor(
-                                    tick.color,
-                                    tickCfg.defaultColor and tickCfg.defaultColor.a or 1
-                                )
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        local buffBars = profile.buffBars
-        if buffBars and buffBars.colors then
-            buffBars.colors.defaultColor = normalizeLegacyColor(buffBars.colors.defaultColor, 1)
-            local perBar = buffBars.colors.perBar
-            if type(perBar) == "table" then
-                for _, specMap in pairs(perBar) do
-                    for _, bars in pairs(specMap) do
-                        if type(bars) == "table" then
-                            for index, color in pairs(bars) do
-                                bars[index] = normalizeLegacyColor(color, 1)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        log("Migrated to V4")
-        profile.schemaVersion = 4
-    end
-
-    if profile.schemaVersion < 5 then
-        -- Migration: combatFade -> global.outOfCombatFade
-        local legacyCombatFade = profile.combatFade
-        if legacyCombatFade then
-            profile.global = profile.global or {}
-            profile.global.outOfCombatFade = profile.global.outOfCombatFade or {}
-
-            local fadeConfig = profile.global.outOfCombatFade
-            if legacyCombatFade.enabled ~= nil then
-                fadeConfig.enabled = legacyCombatFade.enabled
-            end
-            if legacyCombatFade.opacity ~= nil then
-                fadeConfig.opacity = legacyCombatFade.opacity
-            end
-            if legacyCombatFade.exceptInInstance ~= nil then
-                fadeConfig.exceptInInstance = legacyCombatFade.exceptInInstance
-            end
-            if legacyCombatFade.exceptIfTargetCanBeAttacked ~= nil then
-                fadeConfig.exceptIfTargetCanBeAttacked = legacyCombatFade.exceptIfTargetCanBeAttacked
-            end
-
-            profile.combatFade = nil
-        end
-
-        log("Migrated to V5")
-        profile.schemaVersion = 5
-    end
-
-    if profile.schemaVersion < 6 then
-        -- Migration: perBar -> perSpell
-        migrateToPerSpellColors(profile)
-
-        log("Migrated to V6")
-        profile.schemaVersion = 6
-    end
-
-    if profile.schemaVersion < 7 then
-        -- Migration: normalize buff bar cache entries (remove legacy cache.color and unknown names)
-        local buffBars = profile.buffBars
-        if buffBars then
-            normalizeBuffBarsCache(buffBars)
-        end
-
-        log("Migrated to V7")
-        profile.schemaVersion = 7
-    end
-
-    if profile.schemaVersion < 8 then
-        -- Migration: split flat perSpell map into separate byName / byTexture tables.
-        -- String keys go to byName, number keys go to byTexture.
-        -- Each entry is wrapped as { value = color, t = 0 } so that any fresh
-        -- write will win during PriorityKeyMap reconciliation.
-        local buffBars = profile.buffBars
-        if buffBars and type(buffBars.colors) == "table" then
-            local colors = buffBars.colors
-            local perSpell = colors.perSpell
-
-            if type(perSpell) == "table" then
-                if type(colors.byName) ~= "table" then
-                    colors.byName = {}
-                end
-                if type(colors.byTexture) ~= "table" then
-                    colors.byTexture = {}
-                end
-
-                for classID, specTable in pairs(perSpell) do
-                    if type(specTable) == "table" then
-                        for specID, entries in pairs(specTable) do
-                            if type(entries) == "table" then
-                                colors.byName[classID] = colors.byName[classID] or {}
-                                colors.byName[classID][specID] = colors.byName[classID][specID] or {}
-                                colors.byTexture[classID] = colors.byTexture[classID] or {}
-                                colors.byTexture[classID][specID] = colors.byTexture[classID][specID] or {}
-
-                                for key, color in pairs(entries) do
-                                    local wrapped = { value = color, t = 0 }
-                                    if type(key) == "string" then
-                                        colors.byName[classID][specID][key] = wrapped
-                                    elseif type(key) == "number" then
-                                        colors.byTexture[classID][specID][key] = wrapped
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-                colors.perSpell = nil
-            end
-
-            -- Ensure new key-tier tables exist (lazily populated at runtime
-            -- by PriorityKeyMap reconciliation; no data migration needed).
-            if type(colors.bySpellID) ~= "table" then
-                colors.bySpellID = {}
-            end
-            if type(colors.byCooldownID) ~= "table" then
-                colors.byCooldownID = {}
-            end
-        end
-
-        log("Migrated to V8")
-        profile.schemaVersion = 8
-    end
-
-    if profile.schemaVersion < 9 then
-        -- Migration: repair spell color metadata and fallback tier links.
-        repairSpellColorStores(profile)
-
-        log("Migrated to V9")
-        profile.schemaVersion = 9
-    end
-
-    if profile.schemaVersion < 10 then
-        -- Migration: normalize spell color wrapper metadata and collapse fragmented entries.
-        local v10Stats = normalizeSpellColorStoresV10(profile)
-        if v10Stats and v10Stats.skipped then
-            log("V10 spell color normalization skipped: " .. (v10Stats.skipReason or "unknown reason"))
-        elseif v10Stats then
-            local createdTiers = {}
-            for _, tier in ipairs({ "byName", "bySpellID", "byCooldownID", "byTexture" }) do
-                if v10Stats.tierStoresCreated[tier] then
-                    createdTiers[#createdTiers + 1] = tier
-                end
-            end
-
-            log(
-                string.format(
-                    "V10 spell color normalization summary: classes=%d specs=%d scanned=%d valid=%d canonical=%d aliases=%d invalid=%d invalidRetained=%d invalidKeyCollisions=%d metaNormalized=%d final=%d",
-                    v10Stats.classesProcessed,
-                    v10Stats.specsProcessed,
-                    v10Stats.entriesScanned,
-                    v10Stats.validEntries,
-                    v10Stats.canonicalEntries,
-                    v10Stats.aliasLinksMerged,
-                    v10Stats.invalidEntries,
-                    v10Stats.invalidRetained,
-                    v10Stats.invalidKeyCollisions,
-                    v10Stats.entriesMetaNormalized,
-                    v10Stats.finalEntries
-                )
-            )
-            log(
-                string.format(
-                    "V10 tier breakdown: byName(s=%d i=%d f=%d), bySpellID(s=%d i=%d f=%d), byCooldownID(s=%d i=%d f=%d), byTexture(s=%d i=%d f=%d)",
-                    v10Stats.perTier.byName.scanned,
-                    v10Stats.perTier.byName.invalid,
-                    v10Stats.perTier.byName.final,
-                    v10Stats.perTier.bySpellID.scanned,
-                    v10Stats.perTier.bySpellID.invalid,
-                    v10Stats.perTier.bySpellID.final,
-                    v10Stats.perTier.byCooldownID.scanned,
-                    v10Stats.perTier.byCooldownID.invalid,
-                    v10Stats.perTier.byCooldownID.final,
-                    v10Stats.perTier.byTexture.scanned,
-                    v10Stats.perTier.byTexture.invalid,
-                    v10Stats.perTier.byTexture.final
-                )
-            )
-            if #createdTiers > 0 then
-                log("V10 created missing tier stores: " .. table.concat(createdTiers, ", "))
-            end
-            for _, msg in ipairs(v10Stats.anomalySpecs) do
-                log("V10 anomaly: " .. msg)
-            end
-            if v10Stats.anomalySpecsOverflow > 0 then
-                log("V10 anomaly: additional specs omitted=" .. v10Stats.anomalySpecsOverflow)
-            end
-        end
-
-        log("Migrated to V10")
-        profile.schemaVersion = 10
     end
 
     log("Migration complete (V" .. startVersion .. " -> V" .. profile.schemaVersion .. ")")
@@ -1093,21 +1199,17 @@ function Migration.PrepareDatabase()
         local priorVersion = findBestPriorVersion(versions, version)
         if priorVersion and versions[priorVersion] then
             log("Copying from schema V" .. priorVersion .. " to V" .. version)
-            versions[version] = deepCopy(versions[priorVersion])
+            versions[version] = cloneValue(versions[priorVersion])
             alignSlotProfileSchemas(versions[version], priorVersion)
         elseif sv.profiles then
             -- Seed from legacy top-level AceDB data (pre-versioning addon builds)
-            local hasProfiles = false
-            for _ in pairs(sv.profiles) do
-                hasProfiles = true
-                break
-            end
+            local hasProfiles = next(sv.profiles) ~= nil
 
             if hasProfiles then
                 log("Copying legacy profiles to versioned store V" .. version)
                 versions[version] = {
-                    profiles = deepCopy(sv.profiles),
-                    profileKeys = sv.profileKeys and deepCopy(sv.profileKeys) or nil,
+                    profiles = cloneValue(sv.profiles),
+                    profileKeys = sv.profileKeys and cloneValue(sv.profileKeys) or nil,
                 }
             end
         end

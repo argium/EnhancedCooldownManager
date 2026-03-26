@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("BuffBarsOptions settings getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings
+    local profile, defaults, SB, ns, settings, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -41,6 +41,12 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         }
         ns.Addon.ConfirmReloadUI = function(_, _, cb) if cb then cb() end end
 
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
+
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "BuffBarsOptions")(nil, ns)
             ns.OptionsSections.BuffBars.RegisterSettings(SB)
@@ -64,46 +70,21 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
 
     -- Positioning composite
     describe("anchorMode", function()
-        it("getter returns profile value", function()
-            assert.are.equal("chain", settings["ECM_buffBars_anchorMode"]:GetValue())
+        it("moves off the Aura Bars page", function()
+            assert.is_nil(settings["ECM_buffBars_anchorMode"])
         end)
-        it("setter writes to profile", function()
-            settings["ECM_buffBars_anchorMode"]:SetValue("free")
-            assert.are.equal("free", profile.buffBars.anchorMode)
-        end)
-    end)
-
-    describe("width", function()
-        it("getter returns profile value", function()
-            assert.are.equal(300, settings["ECM_buffBars_width"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_buffBars_width"]:SetValue(400)
-            assert.are.equal(400, profile.buffBars.width)
-        end)
-    end)
-
-    describe("offsetY", function()
-        it("getter returns profile value", function()
-            assert.are.equal(-350, settings["ECM_buffBars_offsetY"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_buffBars_offsetY"]:SetValue(-400)
-            assert.are.equal(-400, profile.buffBars.offsetY)
+        it("uses the updated labels and help text", function()
+            local args = capturedTable.args
+            assert.is_nil(args.layoutMovedInfo)
+            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
+            assert.is_nil(args.positioning)
         end)
     end)
 
     describe("freeGrowDirection", function()
-        it("getter returns profile value", function()
-            assert.are.equal("down", settings["ECM_buffBars_freeGrowDirection"]:GetValue())
-        end)
-        it("getter applies transform for nil", function()
-            profile.buffBars.freeGrowDirection = nil
-            assert.are.equal("down", settings["ECM_buffBars_freeGrowDirection"]:GetValue())
-        end)
-        it("setter writes to profile", function()
-            settings["ECM_buffBars_freeGrowDirection"]:SetValue("up")
-            assert.are.equal("up", profile.buffBars.freeGrowDirection)
+        it("moves off the Aura Bars page", function()
+            assert.is_nil(settings["ECM_buffBars_freeGrowDirection"])
+            assert.is_nil(capturedTable.args.freeGrowDirection)
         end)
     end)
 

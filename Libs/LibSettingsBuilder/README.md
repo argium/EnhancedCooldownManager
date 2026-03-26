@@ -79,6 +79,16 @@ SB.RegisterCategories()
 - [Migration Guide](docs/MIGRATION_GUIDE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 
+## Testing
+
+Tests live in `Tests/` and use [busted](https://olivinelabs.com/busted/). Run from the **host addon root** (the directory containing `.busted`):
+
+```sh
+busted --run libsettingsbuilder
+```
+
+The `.busted` config defines the `libsettingsbuilder` task pointing at this library's test directory.
+
 ## Notes for library consumers
 
 - Embed the library inside your addon's `Libs/` folder.

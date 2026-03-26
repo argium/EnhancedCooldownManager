@@ -21,8 +21,8 @@ local discreteResourceTypes = {
 function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
-            local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
-            if voidFragments then
+            local voidMeta = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_META)
+            if voidMeta then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
                 return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL
@@ -78,6 +78,14 @@ local function getMaelstromWeaponMax()
     return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
+-- Gets the max devourer soul fragments needed for void meta form based on talents
+local function getDevourerSoulFragmentsMax()
+    if C_SpellBook.IsSpellKnown(C.SPELLID_SOUL_GLUTTEN) then
+        return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX - 15
+    end
+    return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX
+end
+
 --- Returns max, current, and a safe discrete count for the given resource type.
 --- The 3rd return (safeMax) is always a non-secret number suitable for comparison
 --- and arithmetic (e.g., tick layout). For special resource types, max and safeMax
@@ -101,17 +109,16 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0, C.RESOURCEBAR_ICICLES_MAX
     end
 
-    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL or resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
-        -- Devourer is tracked by two spells - one for void meta, and one not.
-        local voidFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_FRAGMENTS)
+    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
         local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
-        if collapsingStar then
-            return C.RESOURCEBAR_DEVOURER_META_MAX, collapsingStar.applications or 0, C.RESOURCEBAR_DEVOURER_META_MAX
-        end
+        local max = C.RESOURCEBAR_COLLAPSING_STAR_MAX / 5
+        return max, collapsingStar and collapsingStar.applications / 5 or 0, max
+    end
 
-        return C.RESOURCEBAR_DEVOURER_NORMAL_MAX,
-            voidFragments and voidFragments.applications or 0,
-            C.RESOURCEBAR_DEVOURER_NORMAL_MAX
+    if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL then
+        local soulFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
+        local max = getDevourerSoulFragmentsMax() / 5
+        return max, soulFragments and soulFragments.applications / 5 or 0, max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then
@@ -147,7 +154,7 @@ function ClassUtil.GetCurrentPowerType()
     local specIndex = GetSpecialization()
 
     if class == "SHAMAN" and specIndex then
-        if specIndex == ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX then
+        if specIndex == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
             return Enum.PowerType.Maelstrom
         end
 

@@ -6,9 +6,15 @@ return {
         coverage = true,
     },
     libsettingsbuilder = {
-        pattern = "LibSettingsBuilder_spec%.lua$",
+        ROOT = { "Libs/LibSettingsBuilder/Tests" },
     },
-    ecm = {
-        exclude_pattern = "LibSettingsBuilder_spec%.lua$",
+    libconsole = {
+        ROOT = { "Libs/LibConsole/Tests" },
+    },
+    libevent = {
+        ROOT = { "Libs/LibEvent/Tests" },
+    },
+    liblsmsettingswidgets = {
+        ROOT = { "Libs/LibLSMSettingsWidgets/Tests" },
     },
 }

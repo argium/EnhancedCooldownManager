@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local PowerBar = ns.Addon:NewModule("PowerBar", "AceEvent-3.0")
+local PowerBar = ns.Addon:NewModule("PowerBar")
 ns.Addon.PowerBar = PowerBar
 
 --- Returns the tick marks configured for the current class and spec.
@@ -72,12 +72,7 @@ function PowerBar:GetStatusBarColor()
     return color or ECM.Constants.COLOR_WHITE
 end
 
-function PowerBar:Refresh(why, force)
-    local result = ECM.BarMixin.Refresh(self, why, force)
-    if not result then
-        return false
-    end
-
+function PowerBar:_OnBarRefreshed(why)
     -- Update ticks specific to PowerBar (skip when max is a secret value)
     local frame = self.InnerFrame
     local powerType = ECM.ClassUtil.GetCurrentPowerType()
@@ -89,29 +84,23 @@ function PowerBar:Refresh(why, force)
     end
 
     ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
-    return true
 end
 
 function PowerBar:ShouldShow()
-    local show = ECM.FrameMixin.ShouldShow(self)
-    if show then
-        local _, class = UnitClass("player")
-        local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    if not ECM.FrameMixin.Proto.ShouldShow(self) then
+        return false
+    end
 
-        -- Hide mana bar for DPS specs (except mage/warlock/druid) and all tank specs
-        local role = GetSpecializationRole(GetSpecialization())
-        if powerType == Enum.PowerType.Mana then
-            if role == "TANK" then
-                return false
-            elseif role == "DAMAGER" then
-                return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false
-            end
-        end
-
+    local _, class = UnitClass("player")
+    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    if powerType ~= Enum.PowerType.Mana then
         return true
     end
 
-    return false
+    local role = GetSpecializationRole(GetSpecialization())
+    if role == "TANK" then return false end
+    if role == "DAMAGER" then return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false end
+    return true
 end
 
 function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
@@ -122,13 +111,17 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
     self:ThrottledUpdateLayout(event or "OnUnitPowerUpdate")
 end
 
-function PowerBar:OnEnable()
+function PowerBar:OnInitialize()
     ECM.BarMixin.AddMixin(self, "PowerBar")
-    ECM.RegisterFrame(self)
-    self:RegisterEvent("UNIT_POWER_UPDATE", "OnUnitPowerUpdate")
+end
+
+function PowerBar:OnEnable()
+    self:EnsureFrame()
+    ECM.Runtime.RegisterFrame(self)
+    self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnUnitPowerUpdate(...) end)
 end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.UnregisterFrame(self)
+    ECM.Runtime.UnregisterFrame(self)
 end

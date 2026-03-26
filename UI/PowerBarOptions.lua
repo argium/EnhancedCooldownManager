@@ -3,17 +3,18 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
+local L = ECM.L
 
 local POWER_COLOR_DEFS = {
-    { key = Enum.PowerType.Mana, name = "Mana" },
-    { key = Enum.PowerType.Rage, name = "Rage" },
-    { key = Enum.PowerType.Focus, name = "Focus" },
-    { key = Enum.PowerType.Energy, name = "Energy" },
-    { key = Enum.PowerType.RunicPower, name = "Runic Power" },
-    { key = Enum.PowerType.LunarPower, name = "Lunar Power" },
-    { key = Enum.PowerType.Maelstrom, name = "Maelstrom" },
-    { key = Enum.PowerType.Insanity, name = "Insanity" },
-    { key = Enum.PowerType.Fury, name = "Fury" },
+    { key = Enum.PowerType.Mana, name = L["POWER_MANA"] },
+    { key = Enum.PowerType.Rage, name = L["POWER_RAGE"] },
+    { key = Enum.PowerType.Focus, name = L["POWER_FOCUS"] },
+    { key = Enum.PowerType.Energy, name = L["POWER_ENERGY"] },
+    { key = Enum.PowerType.RunicPower, name = L["POWER_RUNIC_POWER"] },
+    { key = Enum.PowerType.LunarPower, name = L["POWER_LUNAR_POWER"] },
+    { key = Enum.PowerType.Maelstrom, name = L["POWER_MAELSTROM"] },
+    { key = Enum.PowerType.Insanity, name = L["POWER_INSANITY"] },
+    { key = Enum.PowerType.Fury, name = L["POWER_FURY"] },
 }
 
 local PowerBarOptions = {}
@@ -24,29 +25,29 @@ function PowerBarOptions.RegisterSettings(SB)
     args.enabled = {
         type = "toggle",
         path = "enabled",
-        name = "Enable power bar",
+        name = L["ENABLE_POWER_BAR"],
         order = 0,
         onSet = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
     }
     args.showManaAsPercent = {
         type = "toggle",
         path = "showManaAsPercent",
-        name = "Show mana as percent",
-        desc = "Display mana as percentage instead of raw value.",
+        name = L["SHOW_MANA_AS_PERCENT"],
+        desc = L["SHOW_MANA_AS_PERCENT_DESC"],
         disabled = isDisabled,
         order = 22,
     }
     args.colors = {
         type = "colorList",
         path = "colors",
-        label = "Colors",
+        label = L["COLORS"],
         defs = POWER_COLOR_DEFS,
         disabled = isDisabled,
         order = 30,
     }
 
-    SB.RegisterFromTable({ name = "Power Bar", path = "powerBar", args = args })
-    ECM.PowerBarTickMarksOptions.RegisterSettings(SB)
+    SB.RegisterFromTable({ name = L["POWER_BAR"], path = "powerBar", args = args })
+    ECM.PowerBarTickMarksOptions.RegisterSettings(SB, SB._currentSubcategory)
 end
 
 ECM.SettingsBuilder.RegisterSection(ns, "PowerBar", PowerBarOptions)
