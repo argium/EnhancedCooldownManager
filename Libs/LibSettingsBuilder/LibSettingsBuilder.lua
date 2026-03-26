@@ -1252,6 +1252,18 @@ function lib:New(config)
         return category and category:GetID()
     end
 
+    function SB.GetRootCategory()
+        return SB._rootCategory
+    end
+
+    function SB.GetSubcategory(name)
+        return SB._subcategories[name]
+    end
+
+    function SB.HasCategory(category)
+        return category ~= nil and SB._layouts[category] ~= nil
+    end
+
     ----------------------------------------------------------------------------
     -- Proxy controls
     ----------------------------------------------------------------------------

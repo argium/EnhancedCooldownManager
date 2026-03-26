@@ -62,7 +62,7 @@ local Options = ns.Addon:NewModule("Options")
 
 local function isTrackedECMCategory(category)
     local SB = ECM.SettingsBuilder
-    return category ~= nil and SB ~= nil and SB._layouts ~= nil and SB._layouts[category] ~= nil
+    return SB ~= nil and SB.HasCategory(category)
 end
 
 local function getCategoryOpenToken(category)
@@ -84,7 +84,7 @@ end
 
 local function getDefaultOptionsCategoryToken()
     local SB = ECM.SettingsBuilder
-    local category = SB._subcategories[L["GENERAL"]] or SB._rootCategory
+    local category = SB.GetSubcategory(L["GENERAL"]) or SB.GetRootCategory()
     return getCategoryOpenToken(category)
 end
 
