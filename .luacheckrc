@@ -41,7 +41,7 @@ read_globals = {
 
     -- Externals
     "AddonCompartmentFrame",
-    "C_AddOns", "C_CVar", "C_Item", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
+    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
     "CANCEL",
     "ColorPickerFrame",
     "CLOSE",

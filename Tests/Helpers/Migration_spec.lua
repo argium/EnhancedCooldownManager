@@ -61,6 +61,7 @@ describe("Migration", function()
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
+            "C_EditMode",
             "date",
             "strtrim",
             "UIParent",
@@ -76,9 +77,9 @@ describe("Migration", function()
     before_each(function()
         logMessages = {}
         _G.ECM = {}
-        _G.ECM.EditMode = {
-            GetActiveLayoutName = function()
-                return "Modern"
+        _G.C_EditMode = {
+            GetLayouts = function()
+                return { activeLayout = 1, layouts = {} }
             end,
         }
         _G.ECM.Log = function(_, message)
@@ -738,22 +739,16 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.same(
-            { point = "CENTER", x = 0, y = -275 },
-            profile.powerBar.editModePositions.Modern
-        )
-        assert.same(
-            { point = "CENTER", x = 0, y = -300 },
-            profile.resourceBar.editModePositions.Modern
-        )
-        assert.same(
-            { point = "CENTER", x = 0, y = -325 },
-            profile.runeBar.editModePositions.Modern
-        )
-        assert.same(
-            { point = "CENTER", x = 0, y = -350 },
-            profile.buffBars.editModePositions.Modern
-        )
+        local expected = {
+            powerBar = { point = "CENTER", x = 0, y = -275 },
+            resourceBar = { point = "CENTER", x = 0, y = -300 },
+            runeBar = { point = "CENTER", x = 0, y = -325 },
+            buffBars = { point = "CENTER", x = 0, y = -350 },
+        }
+        for section, pos in pairs(expected) do
+            assert.same(pos, profile[section].editModePositions.Modern)
+            assert.same(pos, profile[section].editModePositions.Classic)
+        end
     end)
 
     it("V11 preserves absolute free-position coordinates for all modules when seeding legacy defaults", function()
@@ -865,11 +860,11 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        local powerLog = assert(searchLogMessages("powerBar: migrated to editModePositions.Modern"))
+        local powerLog = assert(searchLogMessages("powerBar: migrated to editModePositions["))
         assert.is_not_nil(string.find(powerLog, "source=legacy-free-default", 1, true))
         assert.is_not_nil(string.find(powerLog, "normalized=false", 1, true))
 
-        local buffLog = assert(searchLogMessages("buffBars: migrated to editModePositions.Modern"))
+        local buffLog = assert(searchLogMessages("buffBars: migrated to editModePositions["))
         assert.is_not_nil(string.find(buffLog, "source=saved-offsets", 1, true))
         assert.is_not_nil(string.find(buffLog, "normalized=true", 1, true))
     end)
@@ -888,14 +883,37 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        -- Existing active-layout entry is preserved
+        -- Existing Modern entry is preserved; Classic gets the migrated value
         assert.are.equal(50, profile.powerBar.editModePositions.Modern.x)
+        assert.same({ point = "CENTER", x = 0, y = -275 }, profile.powerBar.editModePositions.Classic)
     end)
 
-    it("V11 uses the shared active layout accessor", function()
-        ECM.EditMode.GetActiveLayoutName = function()
-            return "Modern"
-        end
+    it("V11 seeds all layouts from C_EditMode.GetLayouts()", function()
+        local profile = {
+            schemaVersion = 10,
+            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            resourceBar = {},
+            runeBar = {},
+            buffBars = {},
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(11, profile.schemaVersion)
+        local expected = { point = "CENTER", x = 0, y = -275 }
+        assert.same(expected, profile.powerBar.editModePositions.Modern)
+        assert.same(expected, profile.powerBar.editModePositions.Classic)
+    end)
+
+    it("V11 seeds custom layout names from C_EditMode.GetLayouts()", function()
+        _G.C_EditMode = {
+            GetLayouts = function()
+                return {
+                    activeLayout = 3,
+                    layouts = { { layoutName = "MyCustomLayout" } },
+                }
+            end,
+        }
 
         local profile = {
             schemaVersion = 10,
@@ -908,13 +926,14 @@ describe("Migration", function()
         Migration.Run(profile)
 
         assert.are.equal(11, profile.schemaVersion)
-        assert.same({ point = "CENTER", x = 0, y = -275 }, profile.powerBar.editModePositions.Modern)
+        local expected = { point = "CENTER", x = 0, y = -275 }
+        assert.same(expected, profile.powerBar.editModePositions.Modern)
+        assert.same(expected, profile.powerBar.editModePositions.Classic)
+        assert.same(expected, profile.powerBar.editModePositions.MyCustomLayout)
     end)
 
     it("V11 advances schema even when the active layout name cannot be resolved", function()
-        ECM.EditMode.GetActiveLayoutName = function()
-            return nil
-        end
+        _G.C_EditMode = nil
 
         local profile = {
             schemaVersion = 10,
@@ -929,7 +948,7 @@ describe("Migration", function()
         assert.are.equal(11, profile.schemaVersion)
         assert.is_nil(profile.powerBar.editModePositions)
         assert.are.equal(-275, profile.powerBar.offsetY)
-        assert.is_not_nil(searchLogMessages("V11 active layout unavailable; skipping position migration"))
+        assert.is_not_nil(searchLogMessages("V11 no layouts available; skipping position migration"))
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()
@@ -1101,6 +1120,48 @@ describe("Migration", function()
             Migration.PrintInfo()
 
             assert.are.equal("No versioned settings found.", printedMessages[2])
+        end)
+    end)
+
+    describe("GetLogText", function()
+        it("returns nil when SV_NAME global is nil", function()
+            _G[ECM.Constants.SV_NAME] = nil
+            assert.is_nil(Migration.GetLogText())
+        end)
+
+        it("returns nil when versions table is missing", function()
+            _G[ECM.Constants.SV_NAME] = {}
+            assert.is_nil(Migration.GetLogText())
+        end)
+
+        it("returns nil when current version slot is missing", function()
+            _G[ECM.Constants.SV_NAME] = { _versions = {} }
+            assert.is_nil(Migration.GetLogText())
+        end)
+
+        it("returns nil when migration log is empty", function()
+            _G[ECM.Constants.SV_NAME] = {
+                _versions = { [ECM.Constants.CURRENT_SCHEMA_VERSION] = { _migrationLog = {} } },
+            }
+            assert.is_nil(Migration.GetLogText())
+        end)
+
+        it("returns newline-joined log entries", function()
+            _G[ECM.Constants.SV_NAME] = {
+                _versions = {
+                    [ECM.Constants.CURRENT_SCHEMA_VERSION] = {
+                        _migrationLog = {
+                            "2024-01-01 00:00:00  migrated V2 to V3",
+                            "2024-01-01 00:00:01  migrated V3 to V4",
+                        },
+                    },
+                },
+            }
+            local result = Migration.GetLogText()
+            assert.are.equal(
+                "2024-01-01 00:00:00  migrated V2 to V3\n2024-01-01 00:00:01  migrated V3 to V4",
+                result
+            )
         end)
     end)
 end)

@@ -160,6 +160,12 @@ describe("BuffBars real source", function()
                 NormalizePosition = function(point, _, x, y)
                     return point, x, y
                 end,
+                GetParentSize = function(parent)
+                    if parent and parent.GetSize then
+                        return parent:GetSize()
+                    end
+                    return 0, 0
+                end,
                 GetIconTextureFileID = function(frame)
                     return frame.iconTextureFileID
                 end,
@@ -218,7 +224,7 @@ describe("BuffBars real source", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
 
-        _G.UIParent = makeFrame({ name = "UIParent" })
+        _G.UIParent = makeFrame({ name = "UIParent", width = 1920, height = 1080 })
         _G.hooksecurefunc = function(object, methodName, callback)
             local original = object[methodName]
             object[methodName] = function(self, ...)
@@ -424,12 +430,15 @@ describe("BuffBars real source", function()
         ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 
-    it("applies free-mode width from baseBarWidth and barWidthScale", function()
+    it("free mode sets width from baseBarWidth*barWidthScale without touching viewer anchors", function()
         local appliedWidths = {}
+        local anchorCalls = {}
         ECM.FrameUtil.LazySetWidth = function(frame, value)
             appliedWidths[#appliedWidths + 1] = { frame = frame, value = value }
         end
+        local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
         ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            anchorCalls[#anchorCalls + 1] = frame
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
         end
@@ -443,16 +452,10 @@ describe("BuffBars real source", function()
         function BuffBars:GetModuleConfig()
             return {
                 anchorMode = ECM.Constants.ANCHORMODE_FREE,
-                editModePositions = {
-                    Modern = { point = "CENTER", x = 12, y = -34 },
-                },
             }
         end
         function BuffBars:GetGlobalConfig()
             return { texture = "Solid", barHeight = 18, barWidth = 250 }
-        end
-        ECM.EditMode.GetPosition = function()
-            return { point = "CENTER", x = 12, y = -34 }
         end
         function BuffBars:ShouldShow()
             return true
@@ -461,25 +464,34 @@ describe("BuffBars real source", function()
         local result = BuffBars:UpdateLayout("test")
 
         assert.is_true(result)
+        -- Width should be set from baseBarWidth * barWidthScale
         assert.are.equal(1, #appliedWidths)
         assert.are.equal(BuffBarCooldownViewer, appliedWidths[1].frame)
         assert.are.equal(225, appliedWidths[1].value)
-        assert.same({ "CENTER", UIParent, "CENTER", 12, -34 }, BuffBarCooldownViewer.__anchors[1])
+        -- Viewer anchors must NOT be touched in free mode
+        for _, frame in ipairs(anchorCalls) do
+            assert.are_not.equal(BuffBarCooldownViewer, frame,
+                "Free mode must not set anchors on the viewer")
+        end
+
+        ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 
-    it("ignores removed free grow direction config in free mode", function()
+    it("free mode does not clobber Blizzard-managed viewer position across edit mode cycles", function()
         stubChildLayoutEnvironment()
 
         local first = makeStyledChild("First", true, 1)
-        local second = makeStyledChild("Second", true, 2)
-
         function BuffBarCooldownViewer:GetChildren()
-            return first, second
+            return first
         end
+
+        -- Simulate Blizzard placing the viewer at a specific position
+        BuffBarCooldownViewer.__anchors = { { "CENTER", UIParent, "CENTER", 100, -200 } }
+        BuffBarCooldownViewer.__width = 300
+
         function BuffBars:GetModuleConfig()
             return {
                 anchorMode = ECM.Constants.ANCHORMODE_FREE,
-                freeGrowDirection = ECM.Constants.GROW_DIRECTION_UP,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -488,16 +500,54 @@ describe("BuffBars real source", function()
         function BuffBars:GetGlobalConfig()
             return { texture = "Solid", barHeight = 18, barWidth = 250 }
         end
-        ECM.EditMode.GetPosition = function()
-            return { point = "CENTER", x = 12, y = -34 }
+        function BuffBars:ShouldShow()
+            return true
+        end
+
+        -- Run multiple layout passes (simulating edit mode enter/exit)
+        BuffBars:UpdateLayout("EditModeEnter")
+        BuffBars:UpdateLayout("EditModeExit")
+        BuffBars:UpdateLayout("SecondPass")
+
+        -- Verify the viewer's own anchor was never replaced with a chain anchor
+        local pt = BuffBarCooldownViewer.__anchors[1]
+        assert.are.equal("CENTER", pt[1])
+        assert.are.equal(UIParent, pt[2])
+        assert.are.equal("CENTER", pt[3])
+    end)
+
+    it("free mode infers downward growth from non-BOTTOM viewer anchor", function()
+        stubChildLayoutEnvironment()
+
+        local first = makeStyledChild("First", true, 1)
+        local second = makeStyledChild("Second", true, 2)
+        function BuffBarCooldownViewer:GetChildren()
+            return first, second
+        end
+        -- Simulate viewer anchored at TOP (should grow down)
+        BuffBarCooldownViewer.__anchors = { { "TOP", UIParent, "CENTER", 0, -50 } }
+
+        function BuffBars:GetModuleConfig()
+            return {
+                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                showIcon = false,
+                showSpellName = true,
+                showDuration = true,
+            }
+        end
+        function BuffBars:GetGlobalConfig()
+            return { texture = "Solid", barHeight = 18, barWidth = 250 }
         end
         function BuffBars:ShouldShow()
             return true
         end
 
-        assert.is_true(BuffBars:UpdateLayout("test"))
-        assert.same({ "TOPLEFT", BuffBarCooldownViewer, "TOPLEFT", 0, 0 }, first.__anchors[1])
-        assert.same({ "TOPLEFT", first, "BOTTOMLEFT", 0, 0 }, second.__anchors[1])
+        BuffBars:UpdateLayout("test")
+
+        -- growsUp=false → children anchored TOP edge
+        assert.are.equal("TOPLEFT", first.__anchors[1][1])
+        assert.are.equal("TOPLEFT", second.__anchors[1][1])
+        assert.are.equal("BOTTOMLEFT", second.__anchors[1][3])
     end)
 
     it("viewer hooks defer layout and respect the layout-running guard", function()
@@ -514,111 +564,6 @@ describe("BuffBars real source", function()
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
 
         assert.same({ "viewer:OnShow", "viewer:OnSizeChanged" }, reasons)
-    end)
-
-    it("viewer SetPoint hook persists free-mode positions during Edit Mode", function()
-        local cfg = {
-            anchorMode = ECM.Constants.ANCHORMODE_FREE,
-            editModePositions = {},
-        }
-
-        function BuffBars:GetModuleConfig()
-            return cfg
-        end
-
-        ECM.EditMode.Lib.IsInEditMode = function()
-            return true
-        end
-
-        BuffBars:HookViewer()
-
-        BuffBarCooldownViewer:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 10, -350)
-
-        local saved = cfg.editModePositions.Modern
-        assert.is_not_nil(saved)
-        assert.are.equal("TOPLEFT", saved.point)
-        assert.are.equal(10, saved.x)
-        assert.are.equal(-350, saved.y)
-    end)
-
-    it("viewer SetPoint hook saves the normalized position returned by EditMode", function()
-        local cfg = {
-            anchorMode = ECM.Constants.ANCHORMODE_FREE,
-            editModePositions = {},
-        }
-
-        local normalizeCalls = {}
-
-        function BuffBars:GetModuleConfig()
-            return cfg
-        end
-
-        ECM.EditMode.Lib.IsInEditMode = function()
-            return true
-        end
-        ECM.FrameUtil.NormalizePosition = function(point, relativePoint, x, y)
-            normalizeCalls[#normalizeCalls + 1] = { point, relativePoint, x, y }
-            return "TOPLEFT", 10, -1430
-        end
-
-        BuffBars:HookViewer()
-
-        BuffBarCooldownViewer:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 10, -350)
-
-        assert.same({ { "TOPLEFT", "BOTTOMLEFT", 10, -350 } }, normalizeCalls)
-        local saved = cfg.editModePositions.Modern
-        assert.is_not_nil(saved)
-        assert.are.equal("TOPLEFT", saved.point)
-        assert.are.equal(10, saved.x)
-        assert.are.equal(-1430, saved.y)
-    end)
-
-    it("viewer SetPoint hook ignores positions when Edit Mode has no active layout", function()
-        local cfg = {
-            anchorMode = ECM.Constants.ANCHORMODE_FREE,
-            editModePositions = {},
-        }
-
-        function BuffBars:GetModuleConfig()
-            return cfg
-        end
-
-        ECM.EditMode.Lib.IsInEditMode = function()
-            return true
-        end
-        ECM.EditMode.GetActiveLayoutName = function()
-            return nil
-        end
-
-        BuffBars:HookViewer()
-        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 12, -34)
-
-        assert.is_nil(next(cfg.editModePositions))
-    end)
-
-    it("viewer SetPoint hook ignores non-free modes and internal layout writes", function()
-        local cfg = {
-            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
-            editModePositions = {},
-        }
-
-        function BuffBars:GetModuleConfig()
-            return cfg
-        end
-
-        ECM.EditMode.Lib.IsInEditMode = function()
-            return true
-        end
-
-        BuffBars:HookViewer()
-        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 12, -34)
-        assert.is_nil(cfg.editModePositions.Modern)
-
-        cfg.anchorMode = ECM.Constants.ANCHORMODE_FREE
-        BuffBars._layoutRunning = true
-        BuffBarCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 50, 60)
-        BuffBars._layoutRunning = nil
-        assert.is_nil(cfg.editModePositions.Modern)
     end)
 
     it("child SetPoint hooks restore cached anchors and respect the layout-running guard", function()

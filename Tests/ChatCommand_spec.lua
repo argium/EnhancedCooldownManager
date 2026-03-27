@@ -12,7 +12,8 @@ describe("ChatCommand migration", function()
     local printedMessages
     local confirmReloadCalls
     local printInfoCalled
-    local printLogCalled
+    local getLogTextResult
+    local shownMigrationLog
     local openOptionsCalls
     local scheduleLayoutCalls
 
@@ -65,7 +66,8 @@ describe("ChatCommand migration", function()
         printedMessages = {}
         confirmReloadCalls = {}
         printInfoCalled = false
-        printLogCalled = false
+        getLogTextResult = nil
+        shownMigrationLog = nil
         openOptionsCalls = 0
         scheduleLayoutCalls = {}
 
@@ -200,8 +202,8 @@ describe("ChatCommand migration", function()
             PrintInfo = function()
                 printInfoCalled = true
             end,
-            PrintLog = function()
-                printLogCalled = true
+            GetLogText = function()
+                return getLogTextResult
             end,
             ValidateRollback = function()
                 return false, "mock error"
@@ -287,13 +289,24 @@ describe("ChatCommand migration", function()
     it("/ecm migration calls PrintInfo", function()
         mod:ChatCommand("migration")
         assert.is_true(printInfoCalled)
-        assert.is_false(printLogCalled)
+        assert.is_nil(shownMigrationLog)
     end)
 
-    it("/ecm migration log calls PrintLog", function()
+    it("/ecm migration log shows dialog when log has entries", function()
+        getLogTextResult = "2024-01-01 00:00:00  migrated V2 to V3"
+        mod.ShowMigrationLogDialog = function(_, text)
+            shownMigrationLog = text
+        end
         mod:ChatCommand("migration log")
-        assert.is_true(printLogCalled)
+        assert.equal(getLogTextResult, shownMigrationLog)
         assert.is_false(printInfoCalled)
+    end)
+
+    it("/ecm migration log prints message when log is empty", function()
+        getLogTextResult = nil
+        mod:ChatCommand("migration log")
+        assert.is_nil(shownMigrationLog)
+        assert.truthy(#printedMessages > 0)
     end)
 
     it("/ecm migration with unrecognized subcmd calls PrintInfo", function()

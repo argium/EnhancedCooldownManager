@@ -134,6 +134,7 @@ These rules prevent recurring anti-patterns discovered during code review. Viola
 
 ## Test Integrity
 
+- IMPORTANT: Be EXTREMELY SKEPTICAL about making changes to tests as a result of failures. Those failures may be highlighting real regressions.
 - Test `before_each` / `LoadChunk` calls MUST mirror TOC load order. If file A depends on `ECM.B`, load file B first.
 - Test stubs must replace the canonical function, not a wrapper or alias. When a passthrough is removed, its test stubs must move to the canonical location.
 - Regression tests must exercise the live implementation wherever practical. Do not create mirrored helper logic in specs just to restate what production code already computes.

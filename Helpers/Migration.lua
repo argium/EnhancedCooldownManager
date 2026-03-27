@@ -187,22 +187,36 @@ end
 
 local FrameUtil = ECM.FrameUtil
 
----@param layoutName string|nil
----@return string|nil
-local function resolveActiveLayoutName(layoutName)
-    if type(layoutName) == "string" and layoutName ~= "" then
-        return layoutName
+-- Built-in Edit Mode layout indices (frozen for migration stability).
+local EDIT_MODE_BUILTIN_NAMES = { "Modern", "Classic" }
+
+---@return string[]|nil names All layout names, or nil if unavailable.
+local function resolveAllLayoutNames()
+    if type(C_EditMode) ~= "table" or type(C_EditMode.GetLayouts) ~= "function" then
+        return nil
     end
 
-    local editMode = ECM.EditMode
-    if editMode and type(editMode.GetActiveLayoutName) == "function" then
-        local resolvedLayoutName = editMode.GetActiveLayoutName()
-        if type(resolvedLayoutName) == "string" and resolvedLayoutName ~= "" then
-            return resolvedLayoutName
+    local layoutInfo = C_EditMode.GetLayouts()
+    if not layoutInfo then
+        return nil
+    end
+
+    local names = {}
+    for i, builtin in ipairs(EDIT_MODE_BUILTIN_NAMES) do
+        names[i] = builtin
+    end
+
+    local customs = layoutInfo.layouts
+    if customs then
+        for i = 1, #customs do
+            local name = customs[i].layoutName
+            if type(name) == "string" and name ~= "" then
+                names[#names + 1] = name
+            end
         end
     end
 
-    return nil
+    return #names > 0 and names or nil
 end
 
 local normalizeEditModePosition = FrameUtil.NormalizePosition
@@ -1029,13 +1043,17 @@ _migrations[10] = function(profile)
     end
 end
 
--- V10 → V11: move legacy offsets into editModePositions
+-- V10 → V11: move legacy offsets into editModePositions.
+-- V10 had a single position for all layouts; seed every known layout with the
+-- same value so the bar appears correctly regardless of which layout is active.
 _migrations[11] = function(profile)
-    local layoutName = resolveActiveLayoutName()
-    if not layoutName then
-        log("V11 active layout unavailable; skipping position migration")
+    local allLayouts = resolveAllLayoutNames()
+    if not allLayouts then
+        log("V11 no layouts available; skipping position migration")
         return
     end
+
+    log("V11 resolved layouts: " .. table.concat(allLayouts, ", "))
 
     for _, section in ipairs({ "powerBar", "resourceBar", "runeBar", "buffBars" }) do
         local cfg = profile[section]
@@ -1088,13 +1106,26 @@ _migrations[11] = function(profile)
                     x = x,
                     y = y,
                 }
-                if cfg.editModePositions[layoutName] == nil then
-                    cfg.editModePositions[layoutName] = migrated
+                local seeded = {}
+                local preserved = {}
+                for _, layoutName in ipairs(allLayouts) do
+                    if cfg.editModePositions[layoutName] == nil then
+                        cfg.editModePositions[layoutName] = {
+                            point = migrated.point,
+                            x = migrated.x,
+                            y = migrated.y,
+                        }
+                        seeded[#seeded + 1] = layoutName
+                    else
+                        preserved[#preserved + 1] = layoutName
+                    end
+                end
+                if #seeded > 0 then
                     log(
                         section
-                            .. ": migrated to editModePositions."
-                            .. layoutName
-                            .. " point="
+                            .. ": migrated to editModePositions["
+                            .. table.concat(seeded, ", ")
+                            .. "] point="
                             .. migrated.point
                             .. " x="
                             .. migrated.x
@@ -1105,13 +1136,9 @@ _migrations[11] = function(profile)
                             .. " normalized="
                             .. tostring(didNormalize)
                     )
-                else
-                    log(
-                        section
-                            .. ": preserved existing editModePositions."
-                            .. layoutName
-                            .. " while clearing legacy offsets"
-                    )
+                end
+                if #preserved > 0 then
+                    log(section .. ": preserved existing editModePositions[" .. table.concat(preserved, ", ") .. "]")
                 end
                 cfg.offsetX = nil
                 cfg.offsetY = nil
@@ -1134,6 +1161,10 @@ function Migration.Run(profile)
     end
 
     local startVersion = profile.schemaVersion
+    if startVersion >= ECM.Constants.CURRENT_SCHEMA_VERSION then
+        return
+    end
+
     log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
 
     for version = startVersion + 1, ECM.Constants.CURRENT_SCHEMA_VERSION do
@@ -1249,23 +1280,18 @@ function Migration.FlushLog()
     wipe(migrationLog)
 end
 
-function Migration.PrintLog()
+--- Returns the migration log as a single string, or nil if empty/missing.
+---@return string|nil
+function Migration.GetLogText()
     local sv = _G[ECM.Constants.SV_NAME]
     local versions = sv and sv._versions
     local slot = versions and versions[ECM.Constants.CURRENT_SCHEMA_VERSION]
-    if not slot then
-        return
+    local entries = slot and slot._migrationLog
+    if not entries or #entries == 0 then
+        return nil
     end
 
-    if #slot._migrationLog == 0 then
-        print("No migration log entries.")
-        return
-    end
-
-    print("Schema Migration Log:")
-    for _, entry in ipairs(slot._migrationLog) do
-        print("- " .. entry)
-    end
+    return table.concat(entries, "\n")
 end
 
 function Migration.PrintInfo()

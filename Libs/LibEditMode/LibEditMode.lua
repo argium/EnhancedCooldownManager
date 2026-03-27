@@ -172,6 +172,12 @@ local function onDragStop(self)
 	-- FrameXML/EditModeUtil.lua
 
 	updatePosition(self)
+
+	-- Notify Blizzard that custom frames have been repositioned so the
+	-- Save/Revert buttons reflect pending changes.
+	if EditModeManagerFrame and EditModeManagerFrame.SetHasActiveChanges then
+		EditModeManagerFrame:SetHasActiveChanges(true)
+	end
 end
 
 local function onMouseDown(self) -- replacement for EditModeSystemMixin:SelectSystem()
@@ -707,7 +713,7 @@ end
 --[[ LibEditMode:GetActiveLayout() ![](https://img.shields.io/badge/function-blue)
 Returns the active Edit Mode layout.
 
-This will not return valid data until after the layout has been loaded from the server.  
+This will not return valid data until after the layout has been loaded from the server.
 Data will be available for the ["layout" callback](#libeditmoderegistercallbackevent-callback).
 --]]
 function lib:GetActiveLayout()
@@ -717,7 +723,7 @@ end
 --[[ LibEditMode:GetActiveLayoutName() ![](https://img.shields.io/badge/function-blue)
 Returns the active Edit Mode layout name.
 
-This will not return valid data until after the layout has been loaded from the server.  
+This will not return valid data until after the layout has been loaded from the server.
 Data will be available for the ["layout" callback](#libeditmoderegistercallbackevent-callback).
 --]]
 function lib:GetActiveLayoutName()
@@ -854,7 +860,7 @@ Table containing the following entries:
 |:-----------|:---------------------------------|:--------|:---------|:--------|
 | hasOpacity | whether or not to enable opacity | boolean | no       | false   |
 
-The `default` field and the getter expects a [ColorMixin](https://warcraft.wiki.gg/wiki/ColorMixin) object, and the setter will pass one as its value.  
+The `default` field and the getter expects a [ColorMixin](https://warcraft.wiki.gg/wiki/ColorMixin) object, and the setter will pass one as its value.
 Even if `hasOpacity` is set to `false` (which is the default value) the ColorMixin object will contain an alpha value, this is the default behavior of the ColorMixin.
 
 ### Divider

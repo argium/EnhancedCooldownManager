@@ -232,6 +232,7 @@ describe("FrameMixin real source", function()
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ECM",
+            "C_EditMode",
             "C_Timer",
             "GetTime",
             "UIParent",
@@ -283,6 +284,11 @@ describe("FrameMixin real source", function()
         _G.EssentialCooldownViewer = makeFrame({ name = "EssentialCooldownViewer" })
         _G.UIParent:SetWidth(1920)
         _G.UIParent:SetHeight(1080)
+        _G.C_EditMode = {
+            GetLayouts = function()
+                return { activeLayout = 1, layouts = {} }
+            end,
+        }
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
         _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
@@ -631,10 +637,6 @@ describe("FrameMixin real source", function()
             buffBars = { enabled = true, anchorMode = ECM.Constants.ANCHORMODE_FREE, bgColor = color(1, 1, 0, 1) },
         }
 
-        ECM.EditMode.GetActiveLayoutName = function()
-            return "Modern"
-        end
-
         Migration.Run(profile)
 
         for section, expected in pairs(LEGACY_FREE_POSITION_DEFAULTS) do
@@ -666,10 +668,6 @@ describe("FrameMixin real source", function()
                 bgColor = color(1, 0, 0, 1),
             },
         }
-        ECM.EditMode.GetActiveLayoutName = function()
-            return "Modern"
-        end
-
         Migration.Run(profile)
         local migrated = profile.powerBar.editModePositions.Modern
 

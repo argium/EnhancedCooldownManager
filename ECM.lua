@@ -359,35 +359,102 @@ function mod:ShowReleasePopup(force)
     return true
 end
 
-local DIALOG_SIZES = {
-    small = { C.DIALOG_FRAME_WIDTH_SMALL, C.DIALOG_FRAME_HEIGHT_SMALL },
-    large = { C.DIALOG_FRAME_WIDTH, C.DIALOG_FRAME_HEIGHT },
-}
-
-local function createDialogFrame(name, titleText, explainText, size)
-    local dims = type(size) == "table" and size or DIALOG_SIZES[size] or DIALOG_SIZES.large
-    local f = createDialogShell(name, dims[1], dims[2])
+--- Creates a dialog with a title, optional subtitle, and a scrolling edit box.
+---@param name string Frame name registered in UISpecialFrames (ESC-closable).
+---@param opts table
+---  title       string?   Title text (default "")
+---  subtitle    string?   Explanation text below title; shifts edit box down
+---  width       number?   Frame width  (default DIALOG_FRAME_WIDTH)
+---  height      number?   Frame height (default DIALOG_FRAME_HEIGHT)
+---  readOnly    boolean?  Disable editing
+---  movable     boolean?  Allow dragging to reposition
+---  resizable   boolean?  Add a drag-resize grip at bottom-right
+---  minWidth    number?   Min resize width  (default 400)
+---  minHeight   number?   Min resize height (default 200)
+---  closeOnCopy boolean?  Auto-close when Ctrl+C is pressed
+---  onCopied    function? Callback after Ctrl+C close
+local function createTextDialog(name, opts)
+    local f = createDialogShell(name, opts.width or C.DIALOG_FRAME_WIDTH, opts.height or C.DIALOG_FRAME_HEIGHT)
     tinsert(UISpecialFrames, name)
 
-    local title = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
-    title:SetPoint("TOP", 0, -16)
-    title:SetText(titleText)
+    if opts.movable then
+        f:SetMovable(true)
+        f:SetClampedToScreen(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+        f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+    end
+
+    local title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(opts.title or "")
     f.title = title
 
-    local explain = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    explain:SetPoint("TOP", 0, -40)
-    explain:SetPoint("LEFT", 24, 0)
-    explain:SetPoint("RIGHT", -24, 0)
-    explain:SetJustifyH("LEFT")
-    explain:SetJustifyV("TOP")
-    explain:SetText(explainText)
+    local scrollTop = -42
+    if opts.subtitle then
+        local explain = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        explain:SetPoint("TOP", 0, -40)
+        explain:SetPoint("LEFT", 24, 0)
+        explain:SetPoint("RIGHT", -24, 0)
+        explain:SetJustifyH("LEFT")
+        explain:SetJustifyV("TOP")
+        explain:SetText(opts.subtitle)
+        scrollTop = -88
+    end
 
     local scroll = CreateFrame("Frame", nil, f, "ScrollingEditBoxTemplate")
     scroll.hideCharCount = true
     scroll.maxLetters = 0
-    scroll:SetPoint("TOPLEFT", 16, -88)
+    scroll:SetPoint("TOPLEFT", 16, scrollTop)
     scroll:SetPoint("BOTTOMRIGHT", -16, 48)
     f.Scroll = scroll
+
+    local editBox = scroll.ScrollBox.EditBox
+
+    if opts.readOnly then
+        local restoring = false
+        editBox:HookScript("OnTextChanged", function(self)
+            if restoring then return end
+            if f._readOnlyText and self:GetText() ~= f._readOnlyText then
+                restoring = true
+                self:SetText(f._readOnlyText)
+                restoring = false
+            end
+        end)
+    end
+
+    if opts.closeOnCopy then
+        editBox:SetScript("OnKeyDown", function(_, key)
+            if key == "C" and IsControlKeyDown() then
+                C_Timer.After(0.1, function()
+                    f:Hide()
+                    if opts.onCopied then opts.onCopied() end
+                end)
+            end
+        end)
+    end
+
+    if opts.resizable then
+        f:SetResizable(true)
+        f:SetResizeBounds(opts.minWidth or 400, opts.minHeight or 200)
+        local grip = CreateFrame("Button", nil, f)
+        grip:SetSize(16, 16)
+        grip:SetPoint("BOTTOMRIGHT")
+        grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+        grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+        grip:SetScript("OnMouseDown", function()
+            -- Re-anchor from TOPLEFT so BOTTOMRIGHT sizing doesn't fight the CENTER anchor.
+            local left, top = f:GetLeft(), f:GetTop()
+            local parentTop = UIParent:GetTop()
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", UIParent, "TOPLEFT", left, top - parentTop)
+            f:StartSizing("BOTTOMRIGHT")
+        end)
+        grip:SetScript("OnMouseUp", function()
+            f:StopMovingOrSizing()
+        end)
+    end
 
     return f
 end
@@ -399,25 +466,6 @@ local function addButton(parent, label, anchor, onClick)
     btn:SetText(label)
     btn:SetScript("OnClick", onClick)
     return btn
-end
-
---- Creates a lazily-initialized copy dialog with Ctrl+C auto-close.
-local function createCopyDialog(name, titleText, explainText, size, onCopied)
-    local frame = createDialogFrame(name, titleText, explainText, size)
-    addButton(frame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
-        frame:Hide()
-    end)
-    frame.Scroll.ScrollBox.EditBox:SetScript("OnKeyDown", function(_, key)
-        if key == "C" and IsControlKeyDown() then
-            C_Timer.After(0.1, function()
-                frame:Hide()
-                if onCopied then
-                    onCopied()
-                end
-            end)
-        end
-    end)
-    return frame
 end
 
 local function showCopyDialog(frame, text)
@@ -439,8 +487,14 @@ function mod:ShowExportDialog(exportString)
     end
 
     if not exportFrame then
-        exportFrame = createCopyDialog("ECMExportFrame", L["EXPORT_PROFILE_TITLE"], L["COPY_CTRL_C"], nil, function()
-            ECM.Print(L["IMPORT_COPIED"])
+        exportFrame = createTextDialog("ECMExportFrame", {
+            title = L["EXPORT_PROFILE_TITLE"],
+            subtitle = L["COPY_CTRL_C"],
+            closeOnCopy = true,
+            onCopied = function() ECM.Print(L["IMPORT_COPIED"]) end,
+        })
+        addButton(exportFrame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
+            exportFrame:Hide()
         end)
     end
 
@@ -458,11 +512,43 @@ function mod:ShowCopyTextDialog(text, title)
     end
 
     if not copyTextFrame then
-        copyTextFrame = createCopyDialog("ECMCopyTextFrame", "", L["COPY_CTRL_C"], "small")
+        copyTextFrame = createTextDialog("ECMCopyTextFrame", {
+            subtitle = L["COPY_CTRL_C"],
+            width = C.DIALOG_FRAME_WIDTH_SMALL,
+            height = C.DIALOG_FRAME_HEIGHT_SMALL,
+            closeOnCopy = true,
+        })
+        addButton(copyTextFrame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
+            copyTextFrame:Hide()
+        end)
     end
 
     copyTextFrame.title:SetText(title or L["COPY_LINK"])
     showCopyDialog(copyTextFrame, text)
+end
+
+local migrationLogFrame
+
+--- Shows the migration log in a read-only dialog window.
+---@param text string
+function mod:ShowMigrationLogDialog(text)
+    if not migrationLogFrame then
+        migrationLogFrame = createTextDialog("ECMMigrationLogFrame", {
+            title = L["MIGRATION_LOG_TITLE"],
+            width = C.DIALOG_FRAME_WIDTH * 2,
+            height = C.DIALOG_FRAME_HEIGHT * 2,
+            readOnly = true,
+            movable = true,
+            resizable = true,
+        })
+        addButton(migrationLogFrame, CLOSE, { "BOTTOMRIGHT", -16, 8 }, function()
+            migrationLogFrame:Hide()
+        end)
+    end
+
+    migrationLogFrame._readOnlyText = text
+    migrationLogFrame:Show()
+    migrationLogFrame.Scroll.ScrollBox.EditBox:SetText(text)
 end
 
 local importFrame
@@ -470,7 +556,10 @@ local importFrame
 --- Shows a dialog to paste an import string and handles the import process.
 function mod:ShowImportDialog()
     if not importFrame then
-        importFrame = createDialogFrame("ECMImportFrame", L["IMPORT_PROFILE_TITLE"], L["IMPORT_PASTE_PROMPT"])
+        importFrame = createTextDialog("ECMImportFrame", {
+            title = L["IMPORT_PROFILE_TITLE"],
+            subtitle = L["IMPORT_PASTE_PROMPT"],
+        })
 
         local cancelBtn = addButton(importFrame, CANCEL, { "BOTTOMRIGHT", -16, 8 }, function()
             importFrame:Hide()
@@ -533,7 +622,12 @@ function mod:ChatCommand(input)
     if cmd == "migration" then
         local subcmd, subarg = arg:match("^(%S*)%s*(.-)%s*$")
         if subcmd == "log" then
-            ECM.Migration.PrintLog()
+            local text = ECM.Migration.GetLogText()
+            if not text then
+                ECM.Print(L["MIGRATION_LOG_EMPTY"])
+            else
+                self:ShowMigrationLogDialog(text)
+            end
             return
         end
 

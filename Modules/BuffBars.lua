@@ -6,7 +6,6 @@ local _, ns = ...
 local FrameMixin = ECM.FrameMixin
 local FrameUtil = ECM.FrameUtil
 local ChainRightPoint = FrameMixin.Proto.ChainRightPoint
-local EditMode = ECM.EditMode
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
 
@@ -307,26 +306,20 @@ local function getViewerPosition(module)
     local cfg = module:GetModuleConfig()
     local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
 
-    if mode ~= ECM.Constants.ANCHORMODE_FREE then
-        local params = FrameMixin.Proto.CalculateLayoutParams(module)
-        return {
-            mode = params.mode,
-            anchor = params.anchor,
-            point = params.anchorPoint,
-            relativePoint = params.anchorRelativePoint,
-            x = params.offsetX,
-            y = params.offsetY,
-        }
+    -- In free mode Blizzard owns the viewer position entirely — return nil
+    -- so UpdateLayout knows not to reposition.
+    if mode == ECM.Constants.ANCHORMODE_FREE then
+        return nil
     end
 
-    local pos = EditMode.GetPosition(cfg and cfg.editModePositions)
+    local params = FrameMixin.Proto.CalculateLayoutParams(module)
     return {
-        mode = mode,
-        anchor = UIParent,
-        point = pos.point,
-        relativePoint = pos.point,
-        x = pos.x,
-        y = pos.y,
+        mode = params.mode,
+        anchor = params.anchor,
+        point = params.anchorPoint,
+        relativePoint = params.anchorRelativePoint,
+        x = params.offsetX,
+        y = params.offsetY,
     }
 end
 
@@ -411,26 +404,10 @@ function BuffBars:UpdateLayout(why)
     end
 
     local position = getViewerPosition(self)
-    -- Free-positioned buff bars no longer have a separate grow-direction setting,
-    -- so the effective anchor point decides stack direction: bottom-left grows upward,
-    -- everything else grows downward.
-    local growsUp = position.point == "BOTTOMLEFT"
     local verticalSpacing = math.max(0, cfg and cfg.verticalSpacing or 0)
 
-    if position.mode == ECM.Constants.ANCHORMODE_FREE then
-        FrameUtil.LazySetAnchors(viewer, {
-            { position.point, position.anchor, position.relativePoint, position.x, position.y },
-        })
-
-        local baseBarWidth = viewer.baseBarWidth
-        local barWidthScale = viewer.barWidthScale
-        if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
-            local width = baseBarWidth * barWidthScale
-            if width > 0 then
-                FrameUtil.LazySetWidth(viewer, width)
-            end
-        end
-    else
+    if position then
+        -- Chain/detached: ECM owns the viewer position.
         local leftAnchorPoint = position.point or "TOPLEFT"
         local leftRelativePoint = position.relativePoint or "BOTTOMLEFT"
         local rightAnchorPoint = ChainRightPoint(leftAnchorPoint, "TOPRIGHT")
@@ -439,6 +416,32 @@ function BuffBars:UpdateLayout(why)
             { leftAnchorPoint, position.anchor, leftRelativePoint, position.x, position.y },
             { rightAnchorPoint, position.anchor, rightRelativePoint, position.x, position.y },
         })
+    else
+        -- Free mode: Blizzard owns position and width. Snapshot the viewer's
+        -- current width so child 2-point anchoring works even after Blizzard
+        -- stops actively managing the frame (e.g. after exiting edit mode).
+        local viewerWidth = viewer:GetWidth()
+        local baseBarWidth = viewer.baseBarWidth
+        local barWidthScale = viewer.barWidthScale
+        if type(baseBarWidth) == "number" and type(barWidthScale) == "number" then
+            local computed = baseBarWidth * barWidthScale
+            if computed > 0 then
+                viewerWidth = computed
+            end
+        end
+        if viewerWidth and viewerWidth > 0 then
+            FrameUtil.LazySetWidth(viewer, viewerWidth)
+        end
+    end
+
+    -- Determine stack direction from the resolved anchor point.
+    local growsUp
+    if position then
+        growsUp = position.point == "BOTTOMLEFT"
+    else
+        -- In free mode, infer from the viewer's current (Blizzard-managed) anchor.
+        local currentPoint = viewer.GetPoint and viewer:GetPoint(1)
+        growsUp = currentPoint == "BOTTOMLEFT" or currentPoint == "BOTTOM" or currentPoint == "BOTTOMRIGHT"
     end
 
     -- Guard against child SetPoint hooks scheduling redundant layout updates
@@ -462,13 +465,13 @@ function BuffBars:UpdateLayout(why)
 
     viewer:Show()
     ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
-        mode = position.mode,
+        mode = position and position.mode or "free",
         childCount = #visibleChildren,
-        anchor = position.anchor and position.anchor:GetName() or "nil",
-        anchorPoint = position.point,
-        anchorRelativePoint = position.relativePoint,
-        offsetX = position.x,
-        offsetY = position.y,
+        anchor = position and position.anchor and position.anchor:GetName() or "(blizzard)",
+        anchorPoint = position and position.point,
+        anchorRelativePoint = position and position.relativePoint,
+        offsetX = position and position.x,
+        offsetY = position and position.y,
     })
     return true
 end
@@ -519,37 +522,6 @@ function BuffBars:HookViewer()
             return
         end
         self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
-    end)
-
-    hooksecurefunc(viewer, "SetPoint", function(_, point, relativeTo, relativePoint, x, y)
-        if self._layoutRunning then
-            return
-        end
-        if not EditMode.Lib:IsInEditMode() then
-            return
-        end
-        if relativeTo ~= nil and relativeTo ~= UIParent then
-            return
-        end
-
-        local cfg = self:GetModuleConfig()
-        if not cfg or cfg.anchorMode ~= ECM.Constants.ANCHORMODE_FREE then
-            return
-        end
-
-        local layoutName = EditMode.GetActiveLayoutName()
-        if not layoutName then
-            return
-        end
-
-        local normalizedPoint, normalizedX, normalizedY = FrameUtil.NormalizePosition(
-            point,
-            relativePoint,
-            x,
-            y,
-            UIParent
-        )
-        EditMode.SavePosition(cfg, "editModePositions", layoutName, normalizedPoint, normalizedX, normalizedY)
     end)
 
     ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
