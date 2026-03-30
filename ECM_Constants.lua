@@ -117,7 +117,12 @@ local constants = {
         { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
         { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
     },
+    DEMONIC_HEALTHSTONE_ITEM_ID = 224464,
     HEALTHSTONE_ITEM_ID = 5512,
+    HEALTHSTONES = {
+        { itemID = 224464 }, -- Demonic Healthstone
+        { itemID = 5512 }, -- Healthstone
+    },
     TRINKET_SLOT_1 = 13,
     TRINKET_SLOT_2 = 14,
 

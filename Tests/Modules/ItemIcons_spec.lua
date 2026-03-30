@@ -627,6 +627,36 @@ describe("ItemIcons real source", function()
         assert.are.equal(87, x)
     end)
 
+    it("prefers demonic healthstone over the legacy healthstone", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function()
+            return 1
+        end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = "demonic-healthstone"
+        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ItemIcons.InnerFrame = ItemIcons:CreateFrame()
+        ItemIcons.GetModuleConfig = function()
+            return {
+                showTrinket1 = false,
+                showTrinket2 = false,
+                showCombatPotion = false,
+                showHealthPotion = false,
+                showHealthstone = true,
+            }
+        end
+
+        assert.is_true(ItemIcons:UpdateLayout("test"))
+        assert.are.equal(ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[1].itemId)
+    end)
+
     it("anchors container to last active item frame when viewer layout is stale", function()
         -- Viewer frame is wider than its single active icon (stale layout: 2-icon width).
         local staleFrame = TestHelpers.makeFrame({ shown = false, width = 22, height = 22 })

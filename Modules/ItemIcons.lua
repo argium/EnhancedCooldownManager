@@ -65,7 +65,7 @@ local function getBestConsumable(priorityList)
     return nil
 end
 
-local HEALTHSTONE_PRIORITY = { { itemID = ECM.Constants.HEALTHSTONE_ITEM_ID } }
+local HEALTHSTONE_PRIORITY = ECM.Constants.HEALTHSTONES
 
 local DISPLAY_ITEM_SOURCES = {
     { flag = "showTrinket1",      getter = getTrinketData,   arg = ECM.Constants.TRINKET_SLOT_1 },
