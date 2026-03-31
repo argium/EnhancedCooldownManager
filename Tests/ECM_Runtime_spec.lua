@@ -140,6 +140,7 @@ describe("ECM.Runtime layout system", function()
         "UnitIsDead",
         "UnitCanAttack",
         "UnitCanAssist",
+        "IsDelveInProgress",
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
@@ -208,6 +209,9 @@ describe("ECM.Runtime layout system", function()
             return false
         end
         _G.UnitCanAssist = function()
+            return false
+        end
+        _G.IsDelveInProgress = function()
             return false
         end
         _G.IsInInstance = function()
@@ -373,6 +377,21 @@ describe("ECM.Runtime layout system", function()
             ns.Runtime.ScheduleLayoutUpdate(0, "fade")
 
             assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
+        end)
+
+        it("does not fade in a delve when instance exceptions are enabled", function()
+            local mod = makeRegisteredModule()
+            local fadeConfig = makeFadeConfig(50)
+
+            fadeConfig.exceptInInstance = true
+            _G._testDB.profile.global.outOfCombatFade = fadeConfig
+            _G.IsDelveInProgress = function()
+                return true
+            end
+
+            ns.Runtime.ScheduleLayoutUpdate(0, "delve-fade-skip")
+
+            assert.are.equal(1, mod.InnerFrame:GetAlpha())
         end)
 
         it("re-shows module frames after dismounting", function()

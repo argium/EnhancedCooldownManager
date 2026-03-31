@@ -59,7 +59,7 @@ read_globals = {
     "GetInventoryItemCooldown", "GetInventoryItemID", "GetInventoryItemTexture", "GetRuneCooldown",
     "GetShapeshiftForm", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationRole",
     "hooksecurefunc",
-    "InCombatLockdown", "IsControlKeyDown", "IsInInstance", "IsMounted", "IsResting",
+    "InCombatLockdown", "IsControlKeyDown", "IsDelveInProgress", "IsInInstance", "IsMounted", "IsResting",
     "issecrettable", "issecretvalue",
     "LibStub",
     "NO",

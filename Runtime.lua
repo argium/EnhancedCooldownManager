@@ -138,6 +138,13 @@ local function setAlpha(alpha)
     end
 end
 
+--- Checks whether the player is in instance-like content for fade exceptions.
+--- Delves are treated as instances for this purpose.
+---@return boolean
+local function isInInstanceContext()
+    return IsInInstance() or IsDelveInProgress()
+end
+
 --- Checks all fade and hide conditions and updates global state.
 local function updateFadeAndHiddenStates()
     local globalConfig = ns.GetGlobalConfig()
@@ -166,7 +173,7 @@ local function updateFadeAndHiddenStates()
         local fadeConfig = globalConfig.outOfCombatFade
         if not _inCombat and fadeConfig and fadeConfig.enabled then
             local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
-            local skipFade = (fadeConfig.exceptInInstance and IsInInstance())
+            local skipFade = (fadeConfig.exceptInInstance and isInInstanceContext())
                 or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target"))
                 or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeHelped and UnitCanAssist("player", "target"))
 

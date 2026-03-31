@@ -809,6 +809,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "canaccessvalue",
     "canaccesstable",
     "time",
+    "IsDelveInProgress",
     "IsInInstance",
 }
 
@@ -846,6 +847,9 @@ function TestHelpers.SetupOptionsGlobals()
     _G.GameFontNormal = "GameFontNormal"
     _G.SETTINGS_DEFAULTS = "Defaults"
     _G.InCombatLockdown = function()
+        return false
+    end
+    _G.IsDelveInProgress = function()
         return false
     end
     _G.IsInInstance = function()
