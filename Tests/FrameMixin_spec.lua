@@ -64,7 +64,7 @@ describe("FrameMixin", function()
         end
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
         FrameUtil = assert(ns.FrameUtil, "FrameUtil module did not initialize")
     end)
 
@@ -294,9 +294,9 @@ describe("FrameMixin real source", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEditModeStub()
         ns.Addon = {}
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("Migration.lua", "Unable to load Migration.lua")(nil, ns)
         BarMixin = assert(ns.BarMixin, "BarMixin did not initialize")
         FrameProto = BarMixin.FrameProto
         Migration = assert(ns.Migration, "Migration did not initialize")

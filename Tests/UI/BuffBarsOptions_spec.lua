@@ -141,7 +141,7 @@ describe("BuffBarsOptions", function()
             end,
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, ns)
+        TestHelpers.LoadChunk("SpellColors.lua", "Unable to load SpellColors.lua")(nil, ns)
         SpellColors = ns.SpellColors
 
         -- Load Options (includes SettingsBuilder adapter)

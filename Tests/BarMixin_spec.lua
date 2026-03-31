@@ -96,8 +96,8 @@ describe("BarMixin", function()
         ns.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEditModeStub()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
 
         BarMixin = assert(ns.BarMixin, "BarMixin module did not initialize")
     end)

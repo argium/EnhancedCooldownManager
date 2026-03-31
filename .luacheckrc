@@ -19,7 +19,6 @@ ignore = {
 }
 
 globals = {
-    "ECM",
     "LSB_DEBUG",
     "LibLSMSettingsWidgets_FontPickerMixin",
     "LibLSMSettingsWidgets_TexturePickerMixin",

@@ -27,14 +27,14 @@ ECM_Constants.lua
 Locales\en.lua
 ECM_Defaults.lua
 
-Helpers\ClassUtil.lua
-Helpers\ColorUtil.lua
-Helpers\FrameUtil.lua
-Helpers\SpellColors.lua
-Helpers\Migration.lua
-Helpers\ImportExport.lua
+ClassUtil.lua
+ColorUtil.lua
+FrameUtil.lua
+SpellColors.lua
+Migration.lua
+ImportExport.lua
 
-Helpers\BarMixin.lua
+BarMixin.lua
 
 ECM.lua
 ECM_Runtime.lua

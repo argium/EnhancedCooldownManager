@@ -53,7 +53,7 @@ describe("ClassUtil", function()
         CUnitAurasStub.Install()
         CSpellBookStub.Install()
 
-        TestHelpers.LoadChunk("Helpers/ClassUtil.lua", "Unable to load Helpers/ClassUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("ClassUtil.lua", "Unable to load ClassUtil.lua")(nil, ns)
     end)
 
     teardown(function()

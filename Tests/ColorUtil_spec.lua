@@ -21,7 +21,7 @@ describe("ColorUtil", function()
     before_each(function()
         ns = {}
 
-        TestHelpers.LoadChunk("Helpers/ColorUtil.lua", "Unable to load Helpers/ColorUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("ColorUtil.lua", "Unable to load ColorUtil.lua")(nil, ns)
         ColorUtil = assert(ns.ColorUtil, "ColorUtil did not initialize")
     end)
 

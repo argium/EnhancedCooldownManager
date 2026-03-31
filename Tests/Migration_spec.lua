@@ -107,8 +107,8 @@ describe("Migration", function()
 
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
-        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("Migration.lua", "Unable to load Migration.lua")(nil, ns)
 
         Migration = assert(ns.Migration, "Migration module did not initialize")
     end)

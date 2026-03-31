@@ -119,7 +119,7 @@ describe("ImportExport", function()
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/ImportExport.lua", "Unable to load Helpers/ImportExport.lua")(nil, ns)
+        TestHelpers.LoadChunk("ImportExport.lua", "Unable to load ImportExport.lua")(nil, ns)
         ImportExport = assert(ns.ImportExport, "ImportExport did not initialize")
     end)
 

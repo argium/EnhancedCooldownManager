@@ -7,7 +7,7 @@ local BarMixin = ns.BarMixin
 local ItemIcons = ns.Addon:NewModule("ItemIcons")
 ns.Addon.ItemIcons = ItemIcons
 
----@class ECM_ItemIconsModule : ModuleMixin
+---@class ECM_ItemIconsModule : ECM_FrameProto
 
 ---@class ECM_IconData
 ---@field itemId number Item ID.

@@ -33,7 +33,7 @@ describe("FrameMixin.GetModuleConfig", function()
         TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
-        -- ns.GetGlobalConfig is defined in ECM.lua; stub it here since we only load ModuleMixin.lua
+        -- ns.GetGlobalConfig is defined in ECM.lua; stub it here since we only load BarMixin.lua
         ns.GetGlobalConfig = function()
             local db = ns.Addon and ns.Addon.db
             local profile = db and db.profile
@@ -55,7 +55,7 @@ describe("FrameMixin.GetModuleConfig", function()
         ns.DebugAssert = function() end
         ns.EditMode = nil
 
-        TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
         FrameMixin = assert(ns.BarMixin, "BarMixin did not initialize")
     end)
 

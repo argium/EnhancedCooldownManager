@@ -116,7 +116,7 @@ local function tryCompleteWatchdogSetup()
     _watchdogSetupComplete = true
 end
 
---- Sets the globally hidden state for all frames (ModuleMixins + Blizzard frames).
+--- Sets the globally hidden state for all frames (FrameProto + Blizzard frames).
 --- @param hidden boolean Whether to hide all frames
 local function setGloballyHidden(hidden)
     if _globallyHidden == hidden then return end

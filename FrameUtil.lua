@@ -67,7 +67,7 @@ function FrameUtil.GetBarBackground(statusBar)
 end
 
 --------------------------------------------------------------------------------
--- Anchor Geometry — shared anchor math used by FrameMixin, Migration, Runtime
+-- Anchor Geometry — shared anchor math used by BarMixin, Migration, Runtime
 --------------------------------------------------------------------------------
 
 local C = ns.Constants

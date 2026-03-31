@@ -159,7 +159,7 @@ describe("SpellColors", function()
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors.lua", "Unable to load Helpers/SpellColors.lua")(nil, ns)
+        TestHelpers.LoadChunk("SpellColors.lua", "Unable to load SpellColors.lua")(nil, ns)
 
         SpellColors = assert(ns.SpellColors, "SpellColors module did not initialize")
     end)

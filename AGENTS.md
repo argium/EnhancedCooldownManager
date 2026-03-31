@@ -34,7 +34,7 @@ luacheck . -q
 </CopyrightHeader>
 
 - Keep all constants in `ECM_Constants.lua`.
-- New features and regression fixes in `Modules/`, `Helpers/`, `UI/`, and `ECM.lua` must include tests.
+- New features and regression fixes in `Modules/`, `UI/`, and root infrastructure files must include tests.
 - All Lua files must include the standard copyright header.
 
 ## Lua / WoW Runtime
