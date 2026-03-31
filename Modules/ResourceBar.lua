@@ -5,6 +5,7 @@
 local _, ns = ...
 local ResourceBar = ns.Addon:NewModule("ResourceBar")
 local ClassUtil = ns.ClassUtil
+local C = ns.Constants
 ns.Addon.ResourceBar = ResourceBar
 
 function ResourceBar:ShouldShow()
@@ -31,35 +32,28 @@ function ResourceBar:GetStatusBarColor()
     local resourceType = ClassUtil.GetPlayerResourceType()
 
     if
-        ns.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
+        C.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
         and cfg.maxColorsEnabled
         and cfg.maxColorsEnabled[resourceType]
     then
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
         if safeMax and current == safeMax then
-            return cfg.maxColors and cfg.maxColors[resourceType] or ns.Constants.COLOR_WHITE
+            return cfg.maxColors and cfg.maxColors[resourceType] or C.COLOR_WHITE
         end
     end
 
     local color = cfg.colors and cfg.colors[resourceType]
-    return color or ns.Constants.COLOR_WHITE
+    return color or C.COLOR_WHITE
 end
 
-function ResourceBar:_OnBarRefreshed(why)
-    -- Use the safe discrete count (3rd return) for tick layout to avoid
-    -- secret value comparison/arithmetic.
+--- Returns a tick spec for BarProto to lay out resource divider ticks.
+--- Returns nil when safeMax is unavailable or too small for dividers.
+---@return table|nil spec { maxResources, color, width }
+function ResourceBar:GetTickSpec()
     local resourceType = ClassUtil.GetPlayerResourceType()
     local _, _, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
-    if safeMax and safeMax > 1 then
-        local frame = self.InnerFrame
-        local tickCount = safeMax - 1
-        self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
-        self:LayoutResourceTicks(safeMax, ns.Constants.COLOR_BLACK, 1, "tickPool")
-    else
-        self:HideAllTicks("tickPool")
-    end
-
-    ns.Log(self.Name, "Refresh complete.")
+    if not safeMax or safeMax <= 1 then return nil end
+    return { maxResources = safeMax, color = C.COLOR_BLACK, width = 1 }
 end
 
 function ResourceBar:OnEventUpdate(event, ...)

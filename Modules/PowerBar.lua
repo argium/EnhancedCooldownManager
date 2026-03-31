@@ -4,49 +4,35 @@
 
 local _, ns = ...
 local PowerBar = ns.Addon:NewModule("PowerBar")
+local C = ns.Constants
 ns.Addon.PowerBar = PowerBar
 
---- Returns the tick marks configured for the current class and spec.
----@return ECM_TickMark[]|nil
-function PowerBar:GetCurrentTicks()
+--- Returns a tick spec for BarProto to lay out value-based tick marks.
+--- Returns nil when the power max is a secret value or no ticks are configured.
+---@return table|nil spec { ticks, maxValue, defaultColor, defaultWidth }
+function PowerBar:GetTickSpec()
+    local powerType = ns.ClassUtil.GetCurrentPowerType()
+    local max = UnitPowerMax("player", powerType)
+    if issecretvalue(max) then return nil end
+
     local config = self:GetModuleConfig()
     local ticksCfg = config and config.ticks
-    if not ticksCfg or not ticksCfg.mappings then
-        return nil
-    end
+    if not ticksCfg or not ticksCfg.mappings then return nil end
 
     local classID = select(3, UnitClass("player"))
     local specIndex = GetSpecialization()
-    if not classID or not specIndex then
-        return nil
-    end
+    if not classID or not specIndex then return nil end
 
     local classMappings = ticksCfg.mappings[classID]
-    if not classMappings then
-        return nil
-    end
+    local ticks = classMappings and classMappings[specIndex]
+    if not ticks or #ticks == 0 then return nil end
 
-    return classMappings[specIndex]
-end
-
---- Updates tick markers on the power bar based on per-class/spec configuration.
----@param frame Frame The inner frame containing StatusBar and TicksFrame
----@param max number Maximum power value
-function PowerBar:UpdateTicks(frame, max)
-    local ticks = self:GetCurrentTicks()
-    if not ticks or #ticks == 0 then
-        self:HideAllTicks("tickPool")
-        return
-    end
-
-    local config = self:GetModuleConfig()
-    local ticksCfg = config and config.ticks
-    local defaultColor = ticksCfg and ticksCfg.defaultColor or ns.Constants.DEFAULT_POWERBAR_TICK_COLOR
-    local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
-
-    -- Create tick textures on TicksFrame, but position them relative to StatusBar
-    self:EnsureTicks(#ticks, frame.TicksFrame, "tickPool")
-    self:LayoutValueTicks(frame.StatusBar, ticks, max, defaultColor, defaultWidth, "tickPool")
+    return {
+        ticks = ticks,
+        maxValue = max,
+        defaultColor = ticksCfg.defaultColor or C.DEFAULT_POWERBAR_TICK_COLOR,
+        defaultWidth = ticksCfg.defaultWidth or 1,
+    }
 end
 
 function PowerBar:GetStatusBarValues()
@@ -69,21 +55,7 @@ function PowerBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
     local powerType = ns.ClassUtil.GetCurrentPowerType()
     local color = cfg and cfg.colors and cfg.colors[powerType]
-    return color or ns.Constants.COLOR_WHITE
-end
-
-function PowerBar:_OnBarRefreshed(why)
-    -- Update ticks specific to PowerBar (skip when max is a secret value)
-    local frame = self.InnerFrame
-    local powerType = ns.ClassUtil.GetCurrentPowerType()
-    local max = UnitPowerMax("player", powerType)
-    if not issecretvalue(max) then
-        self:UpdateTicks(frame, max)
-    else
-        self:HideAllTicks("tickPool")
-    end
-
-    ns.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
+    return color or C.COLOR_WHITE
 end
 
 function PowerBar:ShouldShow()
@@ -99,7 +71,7 @@ function PowerBar:ShouldShow()
 
     local role = GetSpecializationRole(GetSpecialization())
     if role == "TANK" then return false end
-    if role == "DAMAGER" then return ns.Constants.POWERBAR_SHOW_MANABAR[class] or false end
+    if role == "DAMAGER" then return C.POWERBAR_SHOW_MANABAR[class] or false end
     return true
 end
 

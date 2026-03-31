@@ -110,7 +110,7 @@ describe("PowerBar real source", function()
         PowerBar = assert(ns.Addon.PowerBar, "PowerBar module did not initialize")
     end)
 
-    it("returns the current class and spec tick mapping", function()
+    it("GetTickSpec returns tick spec with configured defaults", function()
         local expectedTicks = {
             { value = 35 },
             { value = 70 },
@@ -123,11 +123,18 @@ describe("PowerBar real source", function()
                             [2] = expectedTicks,
                         },
                     },
+                    defaultColor = { r = 0.3, g = 0.4, b = 0.5, a = 0.6 },
+                    defaultWidth = 3,
                 },
             }
         end
 
-        assert.are.equal(expectedTicks, PowerBar:GetCurrentTicks())
+        local spec = PowerBar:GetTickSpec()
+        assert.is_not_nil(spec)
+        assert.are.equal(expectedTicks, spec.ticks)
+        assert.are.equal(unitPowerMaxValue, spec.maxValue)
+        assert.same({ r = 0.3, g = 0.4, b = 0.5, a = 0.6 }, spec.defaultColor)
+        assert.are.equal(3, spec.defaultWidth)
     end)
 
     it("hides mana bars for tank specs in ShouldShow", function()
@@ -248,11 +255,11 @@ describe("PowerBar real source", function()
         assert.are.equal(1, unregisterFrameCalls)
     end)
 
-    it("returns nil tick mappings when config, class, or spec data is missing", function()
+    it("GetTickSpec returns nil when config, class, or spec data is missing", function()
         PowerBar.GetModuleConfig = function()
             return nil
         end
-        assert.is_nil(PowerBar:GetCurrentTicks())
+        assert.is_nil(PowerBar:GetTickSpec())
 
         PowerBar.GetModuleConfig = function()
             return { ticks = { mappings = {} } }
@@ -260,7 +267,7 @@ describe("PowerBar real source", function()
         _G.UnitClass = function()
             return "Mage", "MAGE", nil
         end
-        assert.is_nil(PowerBar:GetCurrentTicks())
+        assert.is_nil(PowerBar:GetTickSpec())
 
         _G.UnitClass = function()
             return "Mage", "MAGE", 8
@@ -268,98 +275,20 @@ describe("PowerBar real source", function()
         _G.GetSpecialization = function()
             return nil
         end
-        assert.is_nil(PowerBar:GetCurrentTicks())
+        assert.is_nil(PowerBar:GetTickSpec())
     end)
 
-    it("UpdateTicks hides ticks when no mappings are configured", function()
-        local hiddenPoolKey
-        PowerBar.GetCurrentTicks = function()
-            return nil
-        end
-        function PowerBar:HideAllTicks(poolKey)
-            hiddenPoolKey = poolKey
-        end
-
-        PowerBar:UpdateTicks({ TicksFrame = {}, StatusBar = {} }, 100)
-
-        assert.are.equal("tickPool", hiddenPoolKey)
-    end)
-
-    it("UpdateTicks ensures and lays out ticks using configured defaults", function()
-        local ensured
-        local layoutArgs
-        local ticks = {
-            { value = 25 },
-            { value = 75, color = { r = 1, g = 0, b = 0, a = 1 }, width = 2 },
-        }
-        PowerBar.GetCurrentTicks = function()
-            return ticks
-        end
+    it("GetTickSpec returns nil when max power is secret", function()
+        local ticks = { { value = 35 } }
         PowerBar.GetModuleConfig = function()
             return {
                 ticks = {
-                    defaultColor = { r = 0.3, g = 0.4, b = 0.5, a = 0.6 },
-                    defaultWidth = 3,
+                    mappings = { [8] = { [2] = ticks } },
                 },
             }
         end
-        function PowerBar:EnsureTicks(count, parent, poolKey)
-            ensured = { count = count, parent = parent, poolKey = poolKey }
-        end
-        function PowerBar:LayoutValueTicks(statusBar, mappedTicks, max, defaultColor, defaultWidth, poolKey)
-            layoutArgs = {
-                statusBar = statusBar,
-                mappedTicks = mappedTicks,
-                max = max,
-                defaultColor = defaultColor,
-                defaultWidth = defaultWidth,
-                poolKey = poolKey,
-            }
-        end
-
-        local frame = { TicksFrame = {}, StatusBar = {} }
-        PowerBar:UpdateTicks(frame, 125)
-
-        assert.same({ count = 2, parent = frame.TicksFrame, poolKey = "tickPool" }, ensured)
-        assert.are.equal(frame.StatusBar, layoutArgs.statusBar)
-        assert.are.equal(ticks, layoutArgs.mappedTicks)
-        assert.are.equal(125, layoutArgs.max)
-        assert.same({ r = 0.3, g = 0.4, b = 0.5, a = 0.6 }, layoutArgs.defaultColor)
-        assert.are.equal(3, layoutArgs.defaultWidth)
-        assert.are.equal("tickPool", layoutArgs.poolKey)
-    end)
-
-    it("_OnBarRefreshed updates ticks when max power is visible", function()
-        local updatedMax
-        local hiddenPoolKey
-        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
-        function PowerBar:UpdateTicks(_, max)
-            updatedMax = max
-        end
-        function PowerBar:HideAllTicks(poolKey)
-            hiddenPoolKey = poolKey
-        end
-
-        PowerBar:_OnBarRefreshed("test")
-        assert.are.equal(unitPowerMaxValue, updatedMax)
-        assert.is_nil(hiddenPoolKey)
-    end)
-
-    it("_OnBarRefreshed hides ticks when max power is secret", function()
-        local updatedMax
-        local hiddenPoolKey
         isSecretValue = true
-        PowerBar.InnerFrame = { TicksFrame = {}, StatusBar = {} }
-        function PowerBar:UpdateTicks(_, max)
-            updatedMax = max
-        end
-        function PowerBar:HideAllTicks(poolKey)
-            hiddenPoolKey = poolKey
-        end
-
-        PowerBar:_OnBarRefreshed("test")
-        assert.is_nil(updatedMax)
-        assert.are.equal("tickPool", hiddenPoolKey)
+        assert.is_nil(PowerBar:GetTickSpec())
     end)
 
     it("shows non-mana power bars and respects the outer frame visibility guard", function()

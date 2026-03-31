@@ -83,65 +83,29 @@ describe("ResourceBar real source", function()
         assert.is_false(ResourceBar:ShouldShow())
     end)
 
-    it("Refresh lays out ticks for safe discrete resources", function()
-        local ensureCount
-        local layoutCount
-        local hidePoolKey
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks(count)
-            ensureCount = count
-        end
-        function ResourceBar:LayoutResourceTicks(maxResources)
-            layoutCount = maxResources
-        end
-        function ResourceBar:HideAllTicks(poolKey)
-            hidePoolKey = poolKey
-        end
-
-        assert.is_nil(rawget(ResourceBar, 'Refresh'))
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal(4, ensureCount)
-        assert.are.equal(5, layoutCount)
-        assert.is_nil(hidePoolKey)
+    it("GetTickSpec returns resource spec for safe discrete resources", function()
+        local spec = ResourceBar:GetTickSpec()
+        assert.is_not_nil(spec)
+        assert.are.equal(5, spec.maxResources)
+        assert.are.equal(ns.Constants.COLOR_BLACK, spec.color)
+        assert.are.equal(1, spec.width)
     end)
 
-    it("Refresh creates ticks for devourer resources based on safeMax", function()
-        local ensureCount
-        local layoutCount
+    it("GetTickSpec returns resource spec for devourer resources based on safeMax", function()
         currentResourceType = ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
         currentValues = { 10, 2, 10 }
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks(count)
-            ensureCount = count
-        end
-        function ResourceBar:LayoutResourceTicks(maxResources)
-            layoutCount = maxResources
-        end
-        function ResourceBar:HideAllTicks()
-            error("HideAllTicks should not be called when safeMax > 1")
-        end
 
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal(9, ensureCount)
-        assert.are.equal(10, layoutCount)
+        local spec = ResourceBar:GetTickSpec()
+        assert.is_not_nil(spec)
+        assert.are.equal(10, spec.maxResources)
     end)
 
-    it("_OnBarRefreshed hides ticks when safeMax is nil or too small", function()
-        local hidePoolKey
+    it("GetTickSpec returns nil when safeMax is nil or too small", function()
         currentValues = { 1, 1, nil }
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks()
-            error("EnsureTicks should not be called when safeMax is nil")
-        end
-        function ResourceBar:LayoutResourceTicks()
-            error("LayoutResourceTicks should not be called when safeMax is nil")
-        end
-        function ResourceBar:HideAllTicks(poolKey)
-            hidePoolKey = poolKey
-        end
+        assert.is_nil(ResourceBar:GetTickSpec())
 
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal("tickPool", hidePoolKey)
+        currentValues = { 1, 1, 1 }
+        assert.is_nil(ResourceBar:GetTickSpec())
     end)
 
     it("only updates for player UNIT_AURA events and always updates for other events", function()
@@ -229,7 +193,7 @@ describe("ResourceBar real source", function()
         assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
     end)
 
-    it("does not define its own Refresh (uses _OnBarRefreshed hook instead)", function()
+    it("does not define its own Refresh (uses base BarProto.Refresh with GetTickSpec)", function()
         assert.is_nil(rawget(ResourceBar, 'Refresh'))
     end)
 end)

@@ -714,14 +714,22 @@ function BarProto:Refresh(why, force)
 
     frame:Show()
 
-    if ns.IsDebugEnabled() then
-        ns.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
+    -- Tick layout: modules return a tick spec, BarProto applies it.
+    if self.GetTickSpec then
+        local spec = self:GetTickSpec()
+        if spec and spec.ticks then
+            self:EnsureTicks(#spec.ticks, frame.TicksFrame, "tickPool")
+            self:LayoutValueTicks(frame.StatusBar, spec.ticks, spec.maxValue, spec.defaultColor, spec.defaultWidth, "tickPool")
+        elseif spec and spec.maxResources then
+            self:EnsureTicks(spec.maxResources - 1, frame.TicksFrame, "tickPool")
+            self:LayoutResourceTicks(spec.maxResources, spec.color, spec.width, "tickPool")
+        else
+            self:HideAllTicks("tickPool")
+        end
     end
 
-    -- Hook: modules override _OnBarRefreshed for post-refresh logic
-    -- (e.g. tick layout) without needing to manually call super.
-    if self._OnBarRefreshed then
-        self:_OnBarRefreshed(why)
+    if ns.IsDebugEnabled() then
+        ns.Log(self.Name, "Bar frame refresh complete (" .. (why or "") .. ").")
     end
 
     return true
