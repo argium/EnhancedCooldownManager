@@ -350,6 +350,7 @@ describe("ECM.Runtime layout system", function()
         ns.Addon = fakeAddon
         TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
 
         local profile = TestHelpers.deepClone(ns.defaults.profile)
         _G._testDB = { profile = profile, RegisterCallback = function() end }

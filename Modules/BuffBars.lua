@@ -156,7 +156,11 @@ local function styleBarColor(module, frame, bar, globalConfig, retryCount)
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
-            C_Timer.After(1, function()
+            if frame._ecmColorRetryTimer then
+                frame._ecmColorRetryTimer:Cancel()
+            end
+            frame._ecmColorRetryTimer = C_Timer.NewTimer(1, function()
+                frame._ecmColorRetryTimer = nil
                 styleBarColor(module, frame, bar, globalConfig, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
@@ -167,6 +171,11 @@ local function styleBarColor(module, frame, bar, globalConfig, retryCount)
             ns.Log(ns.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             module._warned = true
         end
+    end
+
+    if frame._ecmColorRetryTimer then
+        frame._ecmColorRetryTimer:Cancel()
+        frame._ecmColorRetryTimer = nil
     end
 
     if barColor == nil and not allSecret then
@@ -387,7 +396,7 @@ function BuffBars:UpdateLayout(why)
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
 
-    if why == "PLAYER_SPECIALIZATION_CHANGED" then
+    if why == "PLAYER_SPECIALIZATION_CHANGED" or why == "ProfileChanged" then
         ns.SpellColors.ClearDiscoveredKeys()
     end
 
@@ -449,7 +458,6 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
-    self._warned = false
     self._editLocked = false
     local ok, err = pcall(function()
         for _, entry in ipairs(visibleChildren) do
@@ -461,6 +469,9 @@ function BuffBars:UpdateLayout(why)
     end)
 
     self._layoutRunning = nil
+    if not self._editLocked then
+        self._warned = false
+    end
     ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
 
     viewer:Show()
@@ -544,6 +555,8 @@ function BuffBars:OnInitialize()
 end
 
 function BuffBars:OnEnable()
+    self._warned = false
+
     ns.SpellColors.SetConfigAccessor(function()
         return self:GetModuleConfig()
     end)

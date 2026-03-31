@@ -91,8 +91,9 @@ local function createSpellColorCanvas(SB, subcatName)
         if ns.Addon.BuffBars:IsEditLocked() then
             return
         end
-        StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"].OnAccept = resetAllSpellColors
-        StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS")
+        StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS", nil, nil, {
+            onAccept = resetAllSpellColors,
+        })
     end)
 
     layout:AddSpacer(2)

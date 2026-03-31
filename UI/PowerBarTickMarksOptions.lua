@@ -206,10 +206,11 @@ local function attachSliderValueEditor(slider, textLabel, editBoxWidth)
     end)
 end
 
-local function configureSlider(slider, textLabel, minValue, maxValue, step, editBoxWidth, onValueChanged)
+local function configureSlider(slider, textLabel, minValue, maxValue, step, editBoxWidth, onValueChanged, rescale)
     slider._ecmMinValue = minValue
     slider._ecmMaxValue = maxValue
     slider._ecmStep = step
+    slider._ecmRescale = rescale or nil
 
     if slider.MinText then
         slider.MinText:Hide()
@@ -322,8 +323,7 @@ local function createTickRowWidgets(rowFrame, SB)
         end
         store.UpdateTick(rowFrame._rowIndex, "value", rounded)
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    end)
-    valueSlider._ecmRescale = rescaleValueSlider
+    end, rescaleValueSlider)
 
     configureSlider(widthSlider, widthText, 1, 5, 1, 34, function(rounded)
         if rowFrame._isRefreshing then
@@ -348,8 +348,9 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
     local defaultsBtn = headerRow._defaultsButton
     defaultsBtn:SetText(SETTINGS_DEFAULTS)
     defaultsBtn:SetScript("OnClick", function()
-        StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"].OnAccept = clearAllTicks
-        StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS")
+        StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS", nil, nil, {
+            onAccept = clearAllTicks,
+        })
     end)
 
     layout:AddSpacer(2)

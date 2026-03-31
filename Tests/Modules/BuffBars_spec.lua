@@ -238,6 +238,10 @@ describe("BuffBars real source", function()
             After = function(_, callback)
                 timerCallbacks[#timerCallbacks + 1] = callback
             end,
+            NewTimer = function(_, callback)
+                timerCallbacks[#timerCallbacks + 1] = callback
+                return { Cancel = function() end }
+            end,
         }
         _G.InCombatLockdown = function()
             return false

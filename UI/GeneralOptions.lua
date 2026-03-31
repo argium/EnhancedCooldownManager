@@ -189,7 +189,7 @@ function AdvancedOptions.RegisterSettings(SB)
                 desc = L["UPDATE_FREQUENCY_DESC"],
                 min = 0.04,
                 max = 0.5,
-                step = 0.04, -- TODO: this step doesn't work correctly with the slider widget.
+                step = 0.02,
                 order = 31,
             },
         },

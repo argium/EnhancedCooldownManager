@@ -9,7 +9,6 @@ assert(ns.EditMode, "BarMixin.lua must initialize EditMode before Runtime.lua")
 assert(ns.Addon, "ECM.lua must be loaded before Runtime.lua")
 
 local C = ns.Constants
-local L = ns.L
 local EditMode = ns.EditMode
 local LibEditMode = EditMode.Lib
 local Runtime = {}
@@ -254,66 +253,10 @@ local function ensureDetachedAnchor()
             EditMode.SavePosition(gc, "detachedAnchorPositions", layoutName, normalizedPoint, normalizedX, normalizedY)
             Runtime.UpdateLayoutImmediately("DetachedAnchorDrag")
         end,
-        settings = {
-            {
-                kind = LibEditMode.SettingType.Slider,
-                name = L["WIDTH"],
-                get = function()
-                    local gc = ns.GetGlobalConfig()
-                    return gc and gc.detachedBarWidth or C.DEFAULT_BAR_WIDTH
-                end,
-                set = function(_, value)
-                    local gc = ns.GetGlobalConfig()
-                    ns.DebugAssert(gc, "Detached anchor width requires global config")
-                    gc.detachedBarWidth = value
-                    invalidateDetachedAnchorMetrics()
-                    Runtime.UpdateLayoutImmediately("DetachedAnchorWidth")
-                end,
-                default = C.DEFAULT_BAR_WIDTH,
-                minValue = 100,
-                maxValue = 600,
-                valueStep = 1,
-                allowInput = true,
-            },
-            {
-                kind = LibEditMode.SettingType.Slider,
-                name = L["SPACING"],
-                get = function()
-                    local gc = ns.GetGlobalConfig()
-                    return gc and gc.detachedModuleSpacing or 0
-                end,
-                set = function(_, value)
-                    local gc = ns.GetGlobalConfig()
-                    ns.DebugAssert(gc, "Detached anchor spacing requires global config")
-                    gc.detachedModuleSpacing = value
-                    invalidateDetachedAnchorMetrics()
-                    Runtime.UpdateLayoutImmediately("DetachedAnchorSpacing")
-                end,
-                default = 0,
-                minValue = 0,
-                maxValue = 20,
-                valueStep = 1,
-                allowInput = true,
-            },
-            {
-                kind = LibEditMode.SettingType.Dropdown,
-                name = L["GROW_DIRECTION"],
-                get = function()
-                    local gc = ns.GetGlobalConfig()
-                    return gc and gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN
-                end,
-                set = function(_, value)
-                    local gc = ns.GetGlobalConfig()
-                    ns.DebugAssert(gc, "Detached anchor grow direction requires global config")
-                    gc.detachedGrowDirection = value
-                    Runtime.UpdateLayoutImmediately("DetachedAnchorGrowDirection")
-                end,
-                values = {
-                    { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
-                    { text = L["UP"], value = C.GROW_DIRECTION_UP },
-                },
-            },
-        },
+        settings = ns.OptionUtil.CreateDetachedAnchorEditModeSettings(ns.GetGlobalConfig, function(reason)
+            invalidateDetachedAnchorMetrics()
+            Runtime.UpdateLayoutImmediately(reason)
+        end),
     })
 
     ns.Log(nil, "Detached anchor created and registered with edit mode")

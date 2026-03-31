@@ -69,10 +69,9 @@ function ImportExport.DecodeData(importString)
     end
 
     -- Parse format: "AddonName:Version:EncodedData"
-    -- Using more strict pattern that requires non-empty encoded portion
     local prefix, versionStr, encoded = importString:match("^([^:]+):(%d+):(.+)$")
 
-    if not prefix or not versionStr or not encoded or encoded == "" then
+    if not prefix or not versionStr or not encoded then
         return nil, L["DECODE_INVALID_FORMAT"]
     end
 

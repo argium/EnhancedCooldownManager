@@ -1301,7 +1301,9 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
                 text = text,
                 button1 = _G.YES,
                 button2 = _G.NO,
-                OnAccept = function() end,
+                OnAccept = function(self, data)
+                    if data and data.onAccept then data.onAccept() end
+                end,
                 timeout = 0,
                 whileDead = true,
                 hideOnEscape = true,

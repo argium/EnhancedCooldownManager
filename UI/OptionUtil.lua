@@ -446,7 +446,9 @@ function OptionUtil.MakeConfirmDialog(text)
         text = text,
         button1 = YES,
         button2 = NO,
-        OnAccept = function() end,
+        OnAccept = function(self, data)
+            if data and data.onAccept then data.onAccept() end
+        end,
         timeout = 0,
         whileDead = true,
         hideOnEscape = true,
