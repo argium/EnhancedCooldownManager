@@ -68,7 +68,7 @@ describe("PowerBar real source", function()
             },
             Log = function() end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadStub("Enums.lua")
 
         _G.UnitClass = function()

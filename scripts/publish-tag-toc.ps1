@@ -113,7 +113,7 @@ function Set-ReleasePopupVersion {
     param(
         [Parameter(Mandatory)]
         [string]$Version,
-        [string]$ConstantsPath = "ECM_Constants.lua"
+        [string]$ConstantsPath = "Constants.lua"
     )
 
     if (-not (Test-Path -LiteralPath $ConstantsPath)) {
@@ -140,7 +140,7 @@ function Set-ReleasePopupVersion {
 if ($ShowReleasePopup) {
     $releasePopupVersionChanged = Set-ReleasePopupVersion -Version $version
     if ($releasePopupVersionChanged) {
-        Invoke-Git -Arguments @("add", "ECM_Constants.lua")
+        Invoke-Git -Arguments @("add", "Constants.lua")
         Invoke-Git -Arguments @("commit", "-m", "Set release popup version to $version")
     }
 }

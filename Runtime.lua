@@ -3,10 +3,10 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-assert(ns.Constants, "ECM_Constants.lua must be loaded before ECM_Runtime.lua")
-assert(ns.BarMixin, "BarMixin.lua must be loaded before ECM_Runtime.lua")
-assert(ns.EditMode, "ECM.EditMode must be initialized before ECM_Runtime.lua")
-assert(ns.Addon, "ECM.lua must be loaded before ECM_Runtime.lua")
+assert(ns.Constants, "Constants.lua must be loaded before Runtime.lua")
+assert(ns.BarMixin, "BarMixin.lua must be loaded before Runtime.lua")
+assert(ns.EditMode, "BarMixin.lua must initialize EditMode before Runtime.lua")
+assert(ns.Addon, "ECM.lua must be loaded before Runtime.lua")
 
 local C = ns.Constants
 local L = ns.L

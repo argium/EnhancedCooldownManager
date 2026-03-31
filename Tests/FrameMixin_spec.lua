@@ -63,7 +63,7 @@ describe("FrameMixin", function()
             return false
         end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
         FrameUtil = assert(ns.FrameUtil, "FrameUtil module did not initialize")
     end)
@@ -289,7 +289,7 @@ describe("FrameMixin real source", function()
             end,
         }
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         ns.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEditModeStub()

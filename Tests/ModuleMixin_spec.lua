@@ -30,7 +30,7 @@ describe("FrameMixin.GetModuleConfig", function()
             },
         }
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
         -- ns.GetGlobalConfig is defined in ECM.lua; stub it here since we only load BarMixin.lua

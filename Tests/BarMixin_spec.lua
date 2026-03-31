@@ -91,7 +91,7 @@ describe("BarMixin", function()
             return f
         end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         ns.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()

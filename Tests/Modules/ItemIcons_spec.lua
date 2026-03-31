@@ -223,7 +223,7 @@ describe("ItemIcons real source", function()
                 RequestLayout = function() end,
             },
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         EditModeManagerFrame = makeHookableFrame(false)

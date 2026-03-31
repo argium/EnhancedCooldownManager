@@ -332,9 +332,9 @@ describe("ECM layout system", function()
                 return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
             end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
-        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")(nil, ns)
+        TestHelpers.LoadChunk("Defaults.lua", "Unable to load Defaults.lua")(nil, ns)
         ns.Migration = {
             PrepareDatabase = function() end,
             Run = function() end,
@@ -351,7 +351,7 @@ describe("ECM layout system", function()
         fakeAddon.db = _G._testDB
 
         TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", ns)
-        TestHelpers.LoadChunk("ECM_Runtime.lua", "Unable to load ECM_Runtime.lua")("EnhancedCooldownManager", ns)
+        TestHelpers.LoadChunk("Runtime.lua", "Unable to load Runtime.lua")("EnhancedCooldownManager", ns)
         TestHelpers.LoadChunk("UI/Dialogs.lua", "Unable to load UI/Dialogs.lua")(nil, ns)
     end)
 

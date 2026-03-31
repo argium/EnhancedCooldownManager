@@ -11,11 +11,11 @@ local ADDON_NAME, ns = ...
 local mod = LibStub("AceAddon-3.0"):NewAddon(ADDON_NAME, "LibEvent-1.0")
 mod:SetDefaultModuleLibraries("LibEvent-1.0")
 ns.Addon = mod
-assert(ns.defaults, "ECM_Defaults.lua must be loaded before ECM.lua")
-assert(ns.Constants, "ECM_Constants.lua must be loaded before ECM.lua")
+assert(ns.Constants, "Constants.lua must be loaded before ECM.lua")
+assert(ns.defaults, "Defaults.lua must be loaded before ECM.lua")
 assert(ns.Migration, "Migration.lua must be loaded before ECM.lua")
 assert(ns.BarMixin, "BarMixin.lua must be loaded before ECM.lua")
-assert(ns.EditMode, "ECM.EditMode must be initialized before ECM.lua")
+assert(ns.EditMode, "BarMixin.lua must initialize EditMode before ECM.lua")
 
 local LibConsole = LibStub("LibConsole-1.0")
 local LSM = LibStub("LibSharedMedia-3.0", true)

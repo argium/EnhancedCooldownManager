@@ -23,9 +23,9 @@ Libs\LibSharedMedia-3.0\lib.xml
 Libs\LibSettingsBuilder\LibSettingsBuilder.lua
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
-ECM_Constants.lua
+Constants.lua
 Locales\en.lua
-ECM_Defaults.lua
+Defaults.lua
 
 ClassUtil.lua
 ColorUtil.lua
@@ -37,7 +37,7 @@ ImportExport.lua
 BarMixin.lua
 
 ECM.lua
-ECM_Runtime.lua
+Runtime.lua
 UI\Dialogs.lua
 
 Modules\BuffBars.lua

@@ -190,10 +190,10 @@ describe("ChatCommand migration", function()
             scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
         end }
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
-        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")(nil, ns)
+        TestHelpers.LoadChunk("Defaults.lua", "Unable to load Defaults.lua")(nil, ns)
 
         ns.Migration = {
             PrepareDatabase = function() end,

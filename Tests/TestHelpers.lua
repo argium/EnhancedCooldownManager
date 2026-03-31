@@ -812,21 +812,21 @@ TestHelpers.OPTIONS_GLOBALS = {
     "IsInInstance",
 }
 
---- Load the live ECM_Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
+--- Load the live Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
 function TestHelpers.LoadLiveConstants(ns)
     if not ns.Constants then
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
     end
     if not ns.L then
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
     end
 end
 
---- Load the live ECM_Defaults.lua to populate ECM.defaults.
+--- Load the live Defaults.lua to populate ECM.defaults.
 --- Requires ECM.Constants and Enum to be set up first.
 function TestHelpers.LoadLiveDefaults(ns)
     TestHelpers.LoadLiveConstants(ns)
-    TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")(nil, ns)
+    TestHelpers.LoadChunk("Defaults.lua", "Unable to load Defaults.lua")(nil, ns)
 end
 
 --- Create a full default profile for option tests using the live defaults file.
