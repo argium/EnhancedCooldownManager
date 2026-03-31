@@ -1,8 +1,9 @@
 -- Schema migration for Enhanced Cooldown Manager
 -- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
 
+local _, ns = ...
 local Migration = {}
-ECM.Migration = Migration
+ns.Migration = Migration
 
 -- Legacy free-mode bars used implicit default positions when offset fields were
 -- absent from SavedVariables. Keep these migration-local so the historical
@@ -24,7 +25,7 @@ local migrationLog = {}
 ---@param message string
 local function log(message)
     migrationLog[#migrationLog + 1] = date("%Y-%m-%d %H:%M:%S") .. "  " .. message
-    ECM.Log("Migration", message)
+    ns.Log("Migration", message)
 end
 
 --------------------------------------------------------------------------------
@@ -119,8 +120,8 @@ end
 -- Migration loads before ECM.lua during normal addon startup, so the canonical
 -- clone helper may not exist yet when PrepareDatabase reseeds versioned slots.
 local function cloneValue(value)
-    if ECM.CloneValue then
-        return ECM.CloneValue(value)
+    if ns.CloneValue then
+        return ns.CloneValue(value)
     end
 
     if type(value) ~= "table" then
@@ -185,7 +186,7 @@ local function normalizeBuffBarsCache(cfg)
     end
 end
 
-local FrameUtil = ECM.FrameUtil
+local FrameUtil = ns.FrameUtil
 
 -- Built-in Edit Mode layout indices (frozen for migration stability).
 local EDIT_MODE_BUILTIN_NAMES = { "Modern", "Classic" }
@@ -833,9 +834,9 @@ _migrations[4] = function(profile)
 
     local resourceCfg = profile.resourceBar
     local colors = resourceCfg and resourceCfg.colors
-    local soulsColor = colors and colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
+    local soulsColor = colors and colors[ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
     if isColorMatch(soulsColor, 0.46, 0.98, 1.00, nil) then
-        colors[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
+        colors[ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS] = { r = 0.259, g = 0.6, b = 0.91, a = 1 }
     end
 
     if profile.powerBarTicks then
@@ -1063,8 +1064,8 @@ _migrations[11] = function(profile)
             local oy = cfg.offsetY
             local ap = cfg.anchorPoint
             local rp = cfg.relativePoint
-            local isLegacyFreeMode = cfg.anchorMode == ECM.Constants.ANCHORMODE_FREE
-            local sourcePoint = ap or (legacyPosition and legacyPosition.point) or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+            local isLegacyFreeMode = cfg.anchorMode == ns.Constants.ANCHORMODE_FREE
+            local sourcePoint = ap or (legacyPosition and legacyPosition.point) or ns.Constants.EDIT_MODE_DEFAULT_POINT
             local sourceRelativePoint = rp or ap or (legacyPosition and legacyPosition.point) or sourcePoint
             local sourceX = ox ~= nil and ox or (legacyPosition and legacyPosition.x) or 0
             local sourceY = oy ~= nil and oy or (legacyPosition and legacyPosition.y) or 0
@@ -1161,13 +1162,13 @@ function Migration.Run(profile)
     end
 
     local startVersion = profile.schemaVersion
-    if startVersion >= ECM.Constants.CURRENT_SCHEMA_VERSION then
+    if startVersion >= ns.Constants.CURRENT_SCHEMA_VERSION then
         return
     end
 
-    log("Starting migration from V" .. startVersion .. " to V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
+    log("Starting migration from V" .. startVersion .. " to V" .. ns.Constants.CURRENT_SCHEMA_VERSION)
 
-    for version = startVersion + 1, ECM.Constants.CURRENT_SCHEMA_VERSION do
+    for version = startVersion + 1, ns.Constants.CURRENT_SCHEMA_VERSION do
         local step = _migrations[version]
         if step then
             step(profile)
@@ -1217,12 +1218,12 @@ end
 ---
 --- Must be called BEFORE AceDB:New().
 function Migration.PrepareDatabase()
-    local sv = _G[ECM.Constants.SV_NAME] or {}
-    _G[ECM.Constants.SV_NAME] = sv
+    local sv = _G[ns.Constants.SV_NAME] or {}
+    _G[ns.Constants.SV_NAME] = sv
 
     sv._versions = sv._versions or {}
     local versions = sv._versions
-    local version = ECM.Constants.CURRENT_SCHEMA_VERSION
+    local version = ns.Constants.CURRENT_SCHEMA_VERSION
 
     -- Seed the current version's slot if it doesn't exist yet
     if not versions[version] then
@@ -1254,7 +1255,7 @@ function Migration.PrepareDatabase()
     -- Point the temporary global at the current version's sub-table.
     -- AceDB modifies this table in place, so changes are persisted when WoW
     -- serializes SV_NAME on logout.
-    rawset(_G, ECM.Constants.ACTIVE_SV_KEY, versions[version])
+    rawset(_G, ns.Constants.ACTIVE_SV_KEY, versions[version])
 end
 
 --- Persists collected migration log entries into the current version's SV slot.
@@ -1264,9 +1265,9 @@ function Migration.FlushLog()
         return
     end
 
-    local sv = _G[ECM.Constants.SV_NAME]
+    local sv = _G[ns.Constants.SV_NAME]
     local versions = sv and sv._versions
-    local slot = versions and versions[ECM.Constants.CURRENT_SCHEMA_VERSION]
+    local slot = versions and versions[ns.Constants.CURRENT_SCHEMA_VERSION]
     if not slot then
         return
     end
@@ -1283,9 +1284,9 @@ end
 --- Returns the migration log as a single string, or nil if empty/missing.
 ---@return string|nil
 function Migration.GetLogText()
-    local sv = _G[ECM.Constants.SV_NAME]
+    local sv = _G[ns.Constants.SV_NAME]
     local versions = sv and sv._versions
-    local slot = versions and versions[ECM.Constants.CURRENT_SCHEMA_VERSION]
+    local slot = versions and versions[ns.Constants.CURRENT_SCHEMA_VERSION]
     local entries = slot and slot._migrationLog
     if not entries or #entries == 0 then
         return nil
@@ -1295,9 +1296,9 @@ function Migration.GetLogText()
 end
 
 function Migration.PrintInfo()
-    ECM.Print("Current schema version: V" .. ECM.Constants.CURRENT_SCHEMA_VERSION)
+    ns.Print("Current schema version: V" .. ns.Constants.CURRENT_SCHEMA_VERSION)
 
-    local sv = _G[ECM.Constants.SV_NAME]
+    local sv = _G[ns.Constants.SV_NAME]
     local versions = sv and sv._versions
     local keys = {}
     if versions then
@@ -1310,19 +1311,19 @@ function Migration.PrintInfo()
     end
 
     if #keys == 0 then
-        ECM.Print("No versioned settings found.")
+        ns.Print("No versioned settings found.")
     else
         local labels = {}
         for i, k in ipairs(keys) do
             labels[i] = "V" .. k
         end
-        ECM.Print("Available versions: " .. table.concat(labels, ", "))
+        ns.Print("Available versions: " .. table.concat(labels, ", "))
     end
 
-    ECM.Print("Commands:")
-    ECM.Print("  /ecm migration - show migration info")
-    ECM.Print("  /ecm migration log - show the settings migration log")
-    ECM.Print("  /ecm migration rollback <n> - rollback to version n (-1 = delete current only)")
+    ns.Print("Commands:")
+    ns.Print("  /ecm migration - show migration info")
+    ns.Print("  /ecm migration log - show the settings migration log")
+    ns.Print("  /ecm migration rollback <n> - rollback to version n (-1 = delete current only)")
 end
 
 --- Validates whether a rollback to the given target version is possible.
@@ -1330,7 +1331,7 @@ end
 ---@return boolean valid
 ---@return string message
 function Migration.ValidateRollback(targetVersion)
-    local sv = _G[ECM.Constants.SV_NAME]
+    local sv = _G[ns.Constants.SV_NAME]
     local versions = sv and sv._versions
     if not versions then
         return false, "No versioned settings found."
@@ -1340,7 +1341,7 @@ function Migration.ValidateRollback(targetVersion)
         return false, "Target version must be a whole number."
     end
 
-    local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+    local current = ns.Constants.CURRENT_SCHEMA_VERSION
     local floor = targetVersion or (current - 1)
 
     if floor >= current then
@@ -1382,7 +1383,7 @@ end
 --- Call ValidateRollback first to check feasibility.
 ---@param targetVersion number|nil  Lowest version to keep. Must be < CURRENT_SCHEMA_VERSION.
 function Migration.Rollback(targetVersion)
-    local sv = _G[ECM.Constants.SV_NAME]
+    local sv = _G[ns.Constants.SV_NAME]
     local versions = sv and sv._versions
     if not versions then
         return
@@ -1392,7 +1393,7 @@ function Migration.Rollback(targetVersion)
         return
     end
 
-    local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+    local current = ns.Constants.CURRENT_SCHEMA_VERSION
     local floor = targetVersion or (current - 1)
 
     for v = floor + 1, current do

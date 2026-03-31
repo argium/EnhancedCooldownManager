@@ -4,8 +4,9 @@
 
 local _, ns = ...
 local RuneBar = ns.Addon:NewModule("RuneBar")
-local ClassUtil = ECM.ClassUtil
-local C, FrameMixin = ECM.Constants, ECM.FrameMixin
+local ClassUtil = ns.ClassUtil
+local C = ns.Constants
+local FrameUtil = ns.FrameUtil
 ns.Addon.RuneBar = RuneBar
 
 local SPEC_COLOR_KEY_BY_SPEC = {
@@ -170,7 +171,7 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
         end
 
         local texKey = (moduleConfig and moduleConfig.texture) or (globalConfig and globalConfig.texture)
-        local tex = ECM.GetTexture(texKey)
+        local tex = FrameUtil.GetTexture(texKey)
 
         -- Use same positioning logic as BarMixin tick layout to avoid sub-pixel gaps
         local step = barWidth / maxRunes
@@ -179,8 +180,8 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
             if frag then
                 frag:SetStatusBarTexture(tex)
                 frag:ClearAllPoints()
-                local leftX = ECM.PixelSnap((pos - 1) * step)
-                local rightX = ECM.PixelSnap(pos * step)
+                local leftX = FrameUtil.PixelSnap((pos - 1) * step)
+                local rightX = FrameUtil.PixelSnap(pos * step)
                 local w = rightX - leftX
                 frag:SetSize(w, barHeight)
                 frag:SetPoint("LEFT", bar, "LEFT", leftX, 0)
@@ -237,7 +238,7 @@ local function updateRuneValues(self, frame)
     -- Detect state transitions to trigger full reorder/reposition
     if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
         -- A rune just finished or started CD — trigger full refresh for reorder/reposition
-        self:ThrottledUpdateLayout("RuneStateChange")
+        ns.Runtime.RequestLayout("RuneBar:RuneStateChange")
         return
     end
 
@@ -256,8 +257,8 @@ local function updateRuneValues(self, frame)
 end
 
 function RuneBar:CreateFrame()
-    -- Create base frame using FrameMixin (not BarMixin, since we manage StatusBar ourselves)
-    local frame = ECM.FrameMixin.Proto.CreateFrame(self)
+    -- Create base frame using FrameProto (not BarProto, since we manage StatusBar ourselves)
+    local frame = ns.BarMixin.FrameProto.CreateFrame(self)
 
     -- Add StatusBar for value display (but we'll use fragmented bars)
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -272,16 +273,16 @@ function RuneBar:CreateFrame()
     -- FragmentedBars for individual rune display
     frame.FragmentedBars = {}
 
-    ECM.Log(self.Name, "Frame created.")
+    ns.Log(self.Name, "Frame created.")
     return frame
 end
 
 function RuneBar:ShouldShow()
-    return ClassUtil.IsDeathKnight() and ECM.FrameMixin.Proto.ShouldShow(self)
+    return ClassUtil.IsDeathKnight() and ns.BarMixin.FrameProto.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
-    if not FrameMixin.Proto.Refresh(self, why, force) then
+    if not ns.BarMixin.FrameProto.Refresh(self, why, force) then
         return false
     end
 
@@ -299,7 +300,7 @@ function RuneBar:Refresh(why, force)
     frame.StatusBar:SetMinMaxValues(0, maxRunes)
 
     local texKey = (cfg and cfg.texture) or (globalConfig and globalConfig.texture)
-    local tex = ECM.GetTexture(texKey)
+    local tex = FrameUtil.GetTexture(texKey)
     ensureFragmentedBars(frame, maxRunes, tex)
 
     local tickCount = math.max(0, maxRunes - 1)
@@ -314,7 +315,7 @@ function RuneBar:Refresh(why, force)
     end
 
     frame:Show()
-    ECM.Log(self.Name, "Refresh complete.")
+    ns.Log(self.Name, "Refresh complete.")
     return true
 end
 
@@ -339,7 +340,7 @@ function RuneBar:_StopAnimationTicker()
 end
 
 function RuneBar:OnInitialize()
-    ECM.BarMixin.AddMixin(self, "RuneBar")
+    ns.BarMixin.AddBarMixin(self, "RuneBar")
 end
 
 function RuneBar:OnEnable()
@@ -348,21 +349,21 @@ function RuneBar:OnEnable()
     end
 
     self:EnsureFrame()
-    ECM.Runtime.RegisterFrame(self)
+    ns.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("RUNE_POWER_UPDATE", function(_, ...) self:OnRunePowerUpdate(...) end)
 end
 
 function RuneBar:OnRunePowerUpdate()
     self:_StartAnimationTicker()
-    self:ThrottledUpdateLayout("RUNE_POWER_UPDATE")
+    ns.Runtime.RequestLayout("RuneBar:RUNE_POWER_UPDATE")
 end
 
 function RuneBar:OnDisable()
     self:UnregisterAllEvents()
 
     if self.InnerFrame then
-        ECM.Runtime.UnregisterFrame(self)
+        ns.Runtime.UnregisterFrame(self)
     end
 
     self:_StopAnimationTicker()

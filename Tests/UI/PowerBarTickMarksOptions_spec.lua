@@ -9,6 +9,7 @@ local TestHelpers = assert(
 
 describe("PowerBarTickMarksOptions", function()
     local originalGlobals
+    local ns
 
     local function makeFontString()
         local text = ""
@@ -233,14 +234,13 @@ describe("PowerBarTickMarksOptions", function()
             end,
         }
 
-        ECM.PowerBarTickMarksOptions.RegisterSettings(SB, {})
+        ns.PowerBarTickMarksOptions.RegisterSettings(SB, {})
 
         return defaultWidthSlider, defaultWidthText, viewInitializer
     end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "MinimalSliderWithSteppersMixin",
             "StaticPopupDialogs", "YES", "NO", "SETTINGS_DEFAULTS",
         })
@@ -251,40 +251,40 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     it("module loads and exposes RegisterSettings and Store", function()
-        TestHelpers.SetupPowerBarTickMarksEnv()
+        ns = TestHelpers.SetupPowerBarTickMarksEnv()
 
-        assert.is_table(ECM.PowerBarTickMarksOptions)
-        assert.is_function(ECM.PowerBarTickMarksOptions.RegisterSettings)
+        assert.is_table(ns.PowerBarTickMarksOptions)
+        assert.is_function(ns.PowerBarTickMarksOptions.RegisterSettings)
 
-        assert.is_table(ECM.PowerBarTickMarksStore)
-        assert.is_function(ECM.PowerBarTickMarksStore.GetCurrentTicks)
-        assert.is_function(ECM.PowerBarTickMarksStore.AddTick)
+        assert.is_table(ns.PowerBarTickMarksStore)
+        assert.is_function(ns.PowerBarTickMarksStore.GetCurrentTicks)
+        assert.is_function(ns.PowerBarTickMarksStore.AddTick)
     end)
 
     it("supports drag and manual entry for default and per-tick sliders", function()
-        TestHelpers.SetupPowerBarTickMarksEnv()
-        ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns = TestHelpers.SetupPowerBarTickMarksEnv()
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
 
         local defaultWidthSlider, defaultWidthText, viewInitializer = registerSettingsWithHarness()
 
         defaultWidthSlider:SetValue(4)
-        assert.are.equal(4, ECM.PowerBarTickMarksStore.GetDefaultWidth())
+        assert.are.equal(4, ns.PowerBarTickMarksStore.GetDefaultWidth())
         assert.are.equal("4", defaultWidthText:GetText())
 
         defaultWidthSlider._ecmValueButton:GetScript("OnClick")()
         assert.is_true(defaultWidthSlider._ecmEditBox:IsShown())
         defaultWidthSlider._ecmEditBox:SetText("5")
         defaultWidthSlider._ecmEditBox:GetScript("OnEnterPressed")()
-        assert.are.equal(5, ECM.PowerBarTickMarksStore.GetDefaultWidth())
+        assert.are.equal(5, ns.PowerBarTickMarksStore.GetDefaultWidth())
         assert.are.equal("5", defaultWidthText:GetText())
         assert.is_false(defaultWidthSlider._ecmEditBox:IsShown())
 
-        ECM.PowerBarTickMarksStore.SetCurrentTicks({
+        ns.PowerBarTickMarksStore.SetCurrentTicks({
             { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
         })
 
         local rowFrame = makeFrame()
-        local tick = ECM.PowerBarTickMarksStore.GetCurrentTicks()[1]
+        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
         viewInitializer(rowFrame, { index = 1, tick = tick })
 
         rowFrame._valueSlider:SetValue(75)
@@ -293,7 +293,7 @@ describe("PowerBarTickMarksOptions", function()
         rowFrame._widthSlider._ecmEditBox:SetText("4")
         rowFrame._widthSlider._ecmEditBox:GetScript("OnEnterPressed")()
 
-        tick = ECM.PowerBarTickMarksStore.GetCurrentTicks()[1]
+        tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
         assert.are.equal(75, tick.value)
         assert.are.equal(4, tick.width)
         assert.are.equal("75", rowFrame._valueText:GetText())
@@ -302,17 +302,17 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     it("rescales value slider for large resource values", function()
-        TestHelpers.SetupPowerBarTickMarksEnv()
-        ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns = TestHelpers.SetupPowerBarTickMarksEnv()
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
 
         local _, _, viewInitializer = registerSettingsWithHarness()
 
-        ECM.PowerBarTickMarksStore.SetCurrentTicks({
+        ns.PowerBarTickMarksStore.SetCurrentTicks({
             { value = 50000, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
         })
 
         local rowFrame = makeFrame()
-        local tick = ECM.PowerBarTickMarksStore.GetCurrentTicks()[1]
+        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
         viewInitializer(rowFrame, { index = 1, tick = tick })
 
         -- Slider should have rescaled to accommodate 50000
@@ -330,17 +330,17 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     it("keeps small values in the default 1-200 tier", function()
-        TestHelpers.SetupPowerBarTickMarksEnv()
-        ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns = TestHelpers.SetupPowerBarTickMarksEnv()
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
 
         local _, _, viewInitializer = registerSettingsWithHarness()
 
-        ECM.PowerBarTickMarksStore.SetCurrentTicks({
+        ns.PowerBarTickMarksStore.SetCurrentTicks({
             { value = 30, width = 1, color = { r = 1, g = 1, b = 1, a = 1 } },
         })
 
         local rowFrame = makeFrame()
-        local tick = ECM.PowerBarTickMarksStore.GetCurrentTicks()[1]
+        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
         viewInitializer(rowFrame, { index = 1, tick = tick })
 
         assert.are.equal("30", rowFrame._valueText:GetText())

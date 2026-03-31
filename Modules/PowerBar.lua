@@ -41,7 +41,7 @@ function PowerBar:UpdateTicks(frame, max)
 
     local config = self:GetModuleConfig()
     local ticksCfg = config and config.ticks
-    local defaultColor = ticksCfg and ticksCfg.defaultColor or ECM.Constants.DEFAULT_POWERBAR_TICK_COLOR
+    local defaultColor = ticksCfg and ticksCfg.defaultColor or ns.Constants.DEFAULT_POWERBAR_TICK_COLOR
     local defaultWidth = ticksCfg and ticksCfg.defaultWidth or 1
 
     -- Create tick textures on TicksFrame, but position them relative to StatusBar
@@ -50,7 +50,7 @@ function PowerBar:UpdateTicks(frame, max)
 end
 
 function PowerBar:GetStatusBarValues()
-    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    local powerType = ns.ClassUtil.GetCurrentPowerType()
     local current = UnitPower("player", powerType)
     local max = UnitPowerMax("player", powerType)
     local cfg = self:GetModuleConfig()
@@ -67,15 +67,15 @@ end
 
 function PowerBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
-    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    local powerType = ns.ClassUtil.GetCurrentPowerType()
     local color = cfg and cfg.colors and cfg.colors[powerType]
-    return color or ECM.Constants.COLOR_WHITE
+    return color or ns.Constants.COLOR_WHITE
 end
 
 function PowerBar:_OnBarRefreshed(why)
     -- Update ticks specific to PowerBar (skip when max is a secret value)
     local frame = self.InnerFrame
-    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    local powerType = ns.ClassUtil.GetCurrentPowerType()
     local max = UnitPowerMax("player", powerType)
     if not issecretvalue(max) then
         self:UpdateTicks(frame, max)
@@ -83,23 +83,23 @@ function PowerBar:_OnBarRefreshed(why)
         self:HideAllTicks("tickPool")
     end
 
-    ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ns.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
 end
 
 function PowerBar:ShouldShow()
-    if not ECM.FrameMixin.Proto.ShouldShow(self) then
+    if not ns.BarMixin.FrameProto.ShouldShow(self) then
         return false
     end
 
     local _, class = UnitClass("player")
-    local powerType = ECM.ClassUtil.GetCurrentPowerType()
+    local powerType = ns.ClassUtil.GetCurrentPowerType()
     if powerType ~= Enum.PowerType.Mana then
         return true
     end
 
     local role = GetSpecializationRole(GetSpecialization())
     if role == "TANK" then return false end
-    if role == "DAMAGER" then return ECM.Constants.POWERBAR_SHOW_MANABAR[class] or false end
+    if role == "DAMAGER" then return ns.Constants.POWERBAR_SHOW_MANABAR[class] or false end
     return true
 end
 
@@ -108,20 +108,20 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
         return
     end
 
-    self:ThrottledUpdateLayout(event or "OnUnitPowerUpdate")
+    ns.Runtime.RequestLayout(event or "PowerBar:OnUnitPowerUpdate")
 end
 
 function PowerBar:OnInitialize()
-    ECM.BarMixin.AddMixin(self, "PowerBar")
+    ns.BarMixin.AddBarMixin(self, "PowerBar")
 end
 
 function PowerBar:OnEnable()
     self:EnsureFrame()
-    ECM.Runtime.RegisterFrame(self)
+    ns.Runtime.RegisterFrame(self)
     self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnUnitPowerUpdate(...) end)
 end
 
 function PowerBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.Runtime.UnregisterFrame(self)
+    ns.Runtime.UnregisterFrame(self)
 end

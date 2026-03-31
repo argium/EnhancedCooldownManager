@@ -189,7 +189,6 @@ function TestHelpers.SetupSettingsStubs()
         "StaticPopup_Show",
         "YES",
         "NO",
-        "ECM",
         "ECM_DeepEquals",
         "CreateFromMixins",
         "SettingsListElementInitializer",
@@ -382,8 +381,6 @@ function TestHelpers.SetupSettingsStubs()
     _G.CANCEL = "Cancel"
     _G.strtrim = function(s) return (s:match("^%s*(.-)%s*$")) end
 
-    _G.ECM = _G.ECM or {}
-    _G.ECM.CloneValue = deepClone
     _G.ECM_DeepEquals = deepEquals
 
     _G.CreateFromMixins = function(...)
@@ -737,24 +734,31 @@ function TestHelpers.assertAnchor(frame, index, point, relativeTo, relativePoint
 end
 
 --- Resolve a parent-relative anchor position into absolute coordinates on UIParent.
-function TestHelpers.getAbsoluteAnchorPosition(point, x, y, defaultPoint)
-    local frameUtil = assert(_G.ECM and ECM.FrameUtil, "ECM.FrameUtil must be initialized")
+function TestHelpers.getAbsoluteAnchorPosition(ns, point, x, y, defaultPoint)
+    local frameUtil = assert(ns and ns.FrameUtil, "ns.FrameUtil must be initialized")
     local parentFrame = assert(_G.UIParent, "UIParent must be initialized")
-    local anchorPoint = point or defaultPoint or ECM.Constants.EDIT_MODE_DEFAULT_POINT
+    local anchorPoint = point or defaultPoint or ns.Constants.EDIT_MODE_DEFAULT_POINT
     local parentWidth, parentHeight = frameUtil.GetParentSize(parentFrame)
     local anchorX, anchorY = frameUtil.GetParentAnchorPosition(anchorPoint, parentWidth, parentHeight)
     return anchorX + (x or 0), anchorY + (y or 0)
 end
 
 --- Assert that a migrated edit-mode position preserves the same absolute placement.
-function TestHelpers.assertAbsolutePositionPreserved(beforePoint, beforeRelativePoint, beforeX, beforeY, migrated, defaultPoint)
+function TestHelpers.assertAbsolutePositionPreserved(ns, beforePoint, beforeRelativePoint, beforeX, beforeY, migrated, defaultPoint)
     local beforeAbsX, beforeAbsY = TestHelpers.getAbsoluteAnchorPosition(
+        ns,
         beforeRelativePoint or beforePoint,
         beforeX,
         beforeY,
         defaultPoint
     )
-    local afterAbsX, afterAbsY = TestHelpers.getAbsoluteAnchorPosition(migrated.point, migrated.x, migrated.y, defaultPoint)
+    local afterAbsX, afterAbsY = TestHelpers.getAbsoluteAnchorPosition(
+        ns,
+        migrated.point,
+        migrated.x,
+        migrated.y,
+        defaultPoint
+    )
     assertEqual(beforeAbsX, afterAbsX, "absolute x")
     assertEqual(beforeAbsY, afterAbsY, "absolute y")
 end
@@ -765,7 +769,6 @@ end
 
 --- Standard list of globals captured/restored by option tests.
 TestHelpers.OPTIONS_GLOBALS = {
-    "ECM",
     "ECM_DeepEquals",
     "Settings",
     "CreateSettingsListSectionHeaderInitializer",
@@ -810,27 +813,27 @@ TestHelpers.OPTIONS_GLOBALS = {
 }
 
 --- Load the live ECM_Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
-function TestHelpers.LoadLiveConstants()
-    _G.ECM = _G.ECM or {}
-    if not ECM.Constants then
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+function TestHelpers.LoadLiveConstants(ns)
+    if not ns.Constants then
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
     end
-    if not ECM.L then
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+    if not ns.L then
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
     end
 end
 
 --- Load the live ECM_Defaults.lua to populate ECM.defaults.
 --- Requires ECM.Constants and Enum to be set up first.
-function TestHelpers.LoadLiveDefaults()
-    TestHelpers.LoadLiveConstants()
-    TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
+function TestHelpers.LoadLiveDefaults(ns)
+    TestHelpers.LoadLiveConstants(ns)
+    TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")(nil, ns)
 end
 
 --- Create a full default profile for option tests using the live defaults file.
 function TestHelpers.MakeOptionsProfile()
-    TestHelpers.LoadLiveDefaults()
-    return deepClone(ECM.defaults.profile), deepClone(ECM.defaults.profile)
+    local ns = {}
+    TestHelpers.LoadLiveDefaults(ns)
+    return deepClone(ns.defaults.profile), deepClone(ns.defaults.profile)
 end
 
 --- Install common WoW globals for option tests.
@@ -1106,16 +1109,6 @@ end
 function TestHelpers.SetupOptionsEnv(profile, defaults)
     TestHelpers.SetupLibSettingsBuilder()
 
-    TestHelpers.LoadLiveConstants()
-    ECM.CloneValue = deepClone
-    ECM.Runtime = ECM.Runtime or {}
-    ECM.Runtime.ScheduleLayoutUpdate = function() end
-    ECM.ClassUtil = {
-        IsDeathKnight = function()
-            return false
-        end,
-    }
-
     local mod = {
         db = {
             profile = profile,
@@ -1140,11 +1133,20 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     }
 
     local ns = { Addon = mod, OptionsSections = {} }
+    TestHelpers.LoadLiveConstants(ns)
+    ns.CloneValue = deepClone
+    ns.Runtime = ns.Runtime or {}
+    ns.Runtime.ScheduleLayoutUpdate = function() end
+    ns.ClassUtil = {
+        IsDeathKnight = function()
+            return false
+        end,
+    }
 
     TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
-    local SB = ECM.SettingsBuilder
+    local SB = ns.SettingsBuilder
     SB.CreateRootCategory("Test")
 
     return SB, ns
@@ -1261,45 +1263,7 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
     _G.NO = "No"
     _G.SETTINGS_DEFAULTS = "Defaults"
 
-    _G.ECM = {
-        Constants = opts.constants or {
-            DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
-            CLASS_COLORS = { WARRIOR = "C79C6E" },
-            COLOR_WHITE_HEX = "FFFFFF",
-            VALUE_SLIDER_TIERS = {
-                { ceiling = 200,    step = 1 },
-                { ceiling = 1000,   step = 5 },
-                { ceiling = 5000,   step = 25 },
-                { ceiling = 10000,  step = 50 },
-                { ceiling = 50000,  step = 250 },
-                { ceiling = 100000, step = 500 },
-                { ceiling = 500000, step = 2500 },
-            },
-        },
-        L = setmetatable({}, { __index = function(_, k)
-            return k
-        end }),
-        CloneValue = TestHelpers.deepClone,
-        OptionUtil = {
-            GetCurrentClassSpec = opts.getCurrentClassSpec or function()
-                return 1, 2, "Warrior", "Fury", "WARRIOR"
-            end,
-            MakeConfirmDialog = function(text)
-                return {
-                    text = text,
-                    button1 = _G.YES,
-                    button2 = _G.NO,
-                    OnAccept = function() end,
-                    timeout = 0,
-                    whileDead = true,
-                    hideOnEscape = true,
-                }
-            end,
-        },
-        ScheduleLayoutUpdate = function() end,
-    }
-
-    local addonNS = opts.addonNS or {
+    local ns = opts.addonNS or {
         Addon = {
             db = {
                 profile = opts.profile or {},
@@ -1307,8 +1271,44 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
         },
     }
 
-    TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, addonNS)
-    return addonNS
+    ns.Constants = opts.constants or {
+        DEFAULT_POWERBAR_TICK_COLOR = { r = 1, g = 1, b = 1, a = 1 },
+        CLASS_COLORS = { WARRIOR = "C79C6E" },
+        COLOR_WHITE_HEX = "FFFFFF",
+        VALUE_SLIDER_TIERS = {
+            { ceiling = 200,    step = 1 },
+            { ceiling = 1000,   step = 5 },
+            { ceiling = 5000,   step = 25 },
+            { ceiling = 10000,  step = 50 },
+            { ceiling = 50000,  step = 250 },
+            { ceiling = 100000, step = 500 },
+            { ceiling = 500000, step = 2500 },
+        },
+    }
+    ns.L = setmetatable({}, { __index = function(_, k)
+        return k
+    end })
+    ns.CloneValue = TestHelpers.deepClone
+    ns.OptionUtil = {
+        GetCurrentClassSpec = opts.getCurrentClassSpec or function()
+            return 1, 2, "Warrior", "Fury", "WARRIOR"
+        end,
+        MakeConfirmDialog = function(text)
+            return {
+                text = text,
+                button1 = _G.YES,
+                button2 = _G.NO,
+                OnAccept = function() end,
+                timeout = 0,
+                whileDead = true,
+                hideOnEscape = true,
+            }
+        end,
+    }
+    ns.ScheduleLayoutUpdate = function() end
+
+    TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "Unable to load UI/PowerBarTickMarksOptions.lua")(nil, ns)
+    return ns
 end
 
 return TestHelpers

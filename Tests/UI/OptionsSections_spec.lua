@@ -10,7 +10,6 @@ describe("Options sections and root assembly", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "ECM_DeepEquals",
             "Settings",
             "CreateSettingsListSectionHeaderInitializer",
@@ -48,7 +47,7 @@ describe("Options sections and root assembly", function()
         local registerSettingsCalls = {}
         local dbCallbacks = {}
 
-        _G.ECM = {
+        local ns = {
             Constants = {
                 ANCHORMODE_CHAIN = 1,
                 ANCHORMODE_FREE = 2,
@@ -56,10 +55,11 @@ describe("Options sections and root assembly", function()
             },
             L = setmetatable({}, { __index = function(_, k) return k end }),
             ScheduleLayoutUpdate = function() end,
+            OptionsSections = {},
         }
 
         _G.ECM_DeepEquals = TestHelpers.deepEquals
-        _G.ECM.CloneValue = function(v)
+        ns.CloneValue = function(v)
             return v
         end
 
@@ -88,7 +88,7 @@ describe("Options sections and root assembly", function()
             end,
         }
 
-        local ns = { Addon = mod, OptionsSections = {} }
+        ns.Addon = mod
 
         for _, key in ipairs({
             "About",
@@ -112,6 +112,12 @@ describe("Options sections and root assembly", function()
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
+        ns.OptionsSections["About"] = {
+            RegisterSettings = function()
+                registerSettingsCalls[#registerSettingsCalls + 1] = "About"
+            end,
+        }
+
         assert.is_table(createdModule)
         createdModule:OnInitialize()
 
@@ -128,7 +134,7 @@ describe("Options sections and root assembly", function()
             "Advanced Options",
         }, registerSettingsCalls)
         assert.are.equal(0, #dbCallbacks)
-        assert.is_not_nil(ECM.SettingsBuilder.GetRootCategoryID())
+        assert.is_not_nil(ns.SettingsBuilder.GetRootCategoryID())
     end)
 
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
@@ -162,13 +168,26 @@ describe("Options sections and root assembly", function()
             },
         }
 
-        TestHelpers.LoadLiveConstants()
+        local ns = {
+            Addon = {
+                db = {
+                    profile = {},
+                    defaults = { profile = {} },
+                },
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
+            },
+            OptionsSections = {},
+        }
+
+        TestHelpers.LoadLiveConstants(ns)
         -- Test-specific sentinel values
-        ECM.Constants.ANCHORMODE_CHAIN = 1
-        ECM.Constants.ANCHORMODE_FREE = 2
-        ECM.Constants.DEFAULT_BAR_WIDTH = 300
-        ECM.Runtime = ECM.Runtime or {}
-        ECM.Runtime.ScheduleLayoutUpdate = function() end
+        ns.Constants.ANCHORMODE_CHAIN = 1
+        ns.Constants.ANCHORMODE_FREE = 2
+        ns.Constants.DEFAULT_BAR_WIDTH = 300
+        ns.Runtime = ns.Runtime or {}
+        ns.Runtime.ScheduleLayoutUpdate = function() end
 
         local border = { enabled = false, thickness = 1, color = { r = 0, g = 0, b = 0, a = 1 } }
         local profileData = {
@@ -185,22 +204,12 @@ describe("Options sections and root assembly", function()
             },
         }
 
-        local ns = {
-            Addon = {
-                db = {
-                    profile = profileData,
-                    defaults = { profile = TestHelpers.deepClone(profileData) },
-                },
-                NewModule = function(_, name)
-                    return { moduleName = name }
-                end,
-            },
-            OptionsSections = {},
-        }
+        ns.Addon.db.profile = profileData
+        ns.Addon.db.defaults = { profile = TestHelpers.deepClone(profileData) }
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Options")(nil, ns)
-        ECM.SettingsBuilder.CreateRootCategory("Test")
+        ns.SettingsBuilder.CreateRootCategory("Test")
 
         TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
         TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)

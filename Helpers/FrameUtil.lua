@@ -2,8 +2,9 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local _, ns = ...
 local FrameUtil = {}
-ECM.FrameUtil = FrameUtil
+ns.FrameUtil = FrameUtil
 
 --- Returns the region at the given index if it exists and matches the expected type.
 ---@param frame Frame
@@ -23,14 +24,14 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconOverlay(frame)
-    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ns.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconTexture(frame)
-    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ns.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
@@ -72,7 +73,7 @@ end
 -- Anchor Geometry — shared anchor math used by FrameMixin, Migration, Runtime
 --------------------------------------------------------------------------------
 
-local C = ECM.Constants
+local C = ns.Constants
 
 --- Splits an anchor name like TOPLEFT into its vertical and horizontal parts.
 ---@param point string|nil
@@ -508,7 +509,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
         if
             liveEnabled == true
             and liveThickness == thickness
-            and ECM.ColorUtil.AreEqual(borderConfig.color, liveColor)
+            and ns.ColorUtil.AreEqual(borderConfig.color, liveColor)
         then
             return false
         end
@@ -520,7 +521,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
 
     if borderConfig.enabled then
         border:Show()
-        ECM.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
+        ns.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
         if liveThickness ~= thickness then
             border:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -553,4 +554,59 @@ function FrameUtil.LazySetText(fontString, text)
     end
     fontString:SetText(text)
     return true
+end
+
+--------------------------------------------------------------------------------
+-- Texture, font, and pixel utilities
+--------------------------------------------------------------------------------
+
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+
+local function getLsmMedia(mediaType, key)
+    if LSM and key then
+        return LSM:Fetch(mediaType, key, true)
+    end
+end
+
+function FrameUtil.GetTexture(texture)
+    local fetched = texture and getLsmMedia("statusbar", texture)
+    if fetched then return fetched end
+    if texture and texture:find("\\") then return texture end
+    return getLsmMedia("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
+end
+
+function FrameUtil.ApplyFont(fontString, globalConfig, moduleConfig)
+    local config = globalConfig or ns.GetGlobalConfig()
+    local useModuleOverride = moduleConfig and moduleConfig.overrideFont
+    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font))
+        or C.DEFAULT_FONT
+    local fontSize = (useModuleOverride and moduleConfig.fontSize)
+        or (config and config.fontSize)
+        or C.DEFAULT_FONT_SIZE
+    local fontOutline = (config and config.fontOutline)
+
+    if fontOutline == "NONE" then
+        fontOutline = ""
+    end
+
+    local hasShadow = config and config.fontShadow
+
+    ns.DebugAssert(fontPath, "Font path cannot be nil")
+    ns.DebugAssert(fontSize, "Font size cannot be nil")
+    ns.DebugAssert(fontOutline, "Font outline cannot be nil")
+
+    fontString:SetFont(fontPath, fontSize, fontOutline)
+
+    if hasShadow then
+        fontString:SetShadowColor(0, 0, 0, 1)
+        fontString:SetShadowOffset(1, -1)
+    else
+        fontString:SetShadowOffset(0, 0)
+    end
+end
+
+function FrameUtil.PixelSnap(v)
+    local scale = UIParent:GetEffectiveScale()
+    local snapped = math.floor(((tonumber(v) or 0) * scale) + 0.5)
+    return snapped / scale
 end

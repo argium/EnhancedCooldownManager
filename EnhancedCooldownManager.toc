@@ -30,18 +30,15 @@ ECM_Defaults.lua
 Helpers\ClassUtil.lua
 Helpers\ColorUtil.lua
 Helpers\FrameUtil.lua
-Helpers\SpellColors\KeyType.lua
-Helpers\SpellColors\Store.lua
+Helpers\SpellColors.lua
 Helpers\Migration.lua
 Helpers\ImportExport.lua
 
-Helpers\MixinUtil.lua
-Helpers\ModuleMixin.lua
-Helpers\FrameMixin.lua
 Helpers\BarMixin.lua
 
 ECM.lua
 ECM_Runtime.lua
+UI\Dialogs.lua
 
 Modules\BuffBars.lua
 Modules\PowerBar.lua
@@ -49,7 +46,6 @@ Modules\ResourceBar.lua
 Modules\RuneBar.lua
 Modules\ItemIcons.lua
 
-UI\About.lua
 UI\OptionUtil.lua
 UI\Options.lua
 UI\PowerBarTickMarksOptions.lua
@@ -59,6 +55,5 @@ UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
-UI\AdvancedOptions.lua
 UI\ItemIconsOptions.lua
 UI\BuffBarsOptions.lua

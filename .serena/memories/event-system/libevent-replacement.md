@@ -1,5 +1,0 @@
-- `AceEvent-3.0` was removed from the addon and replaced with `LibEvent-1.0` in `Libs/LibEvent/LibEvent.lua`.
-- `LibEvent-1.0` is an events-only LibStub library: `RegisterEvent`, `UnregisterEvent`, `UnregisterAllEvents`, `Embed`, `OnEmbedDisable`.
-- No message/pub-sub API is implemented because the addon had zero `RegisterMessage`/`SendMessage` usage.
-- Addon entrypoint and all five modules now embed `LibEvent-1.0` instead of `AceEvent-3.0`.
-- Focused coverage lives in `Tests/Libs/LibEvent_spec.lua`.

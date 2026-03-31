@@ -3,10 +3,10 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 
 local ItemIconsOptions = {}
-local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("itemIcons")
+local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("itemIcons")
 
 function ItemIconsOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
@@ -19,7 +19,7 @@ function ItemIconsOptions.RegisterSettings(SB)
                 name = L["ENABLE_ITEM_ICONS"],
                 desc = L["ENABLE_ITEM_ICONS_DESC"],
                 order = 0,
-                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ItemIcons"),
+                onSet = ns.OptionUtil.CreateModuleEnabledHandler("ItemIcons"),
             },
             equipmentHeader = {
                 type = "header",
@@ -73,4 +73,4 @@ function ItemIconsOptions.RegisterSettings(SB)
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "ItemIcons", ItemIconsOptions)
+ns.SettingsBuilder.RegisterSection(ns, "ItemIcons", ItemIconsOptions)

@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 
 StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     text = L["NEW_PROFILE_PROMPT"],
@@ -32,8 +32,8 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     hideOnEscape = true,
 }
 
-StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
-StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
+StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ns.OptionUtil.MakeConfirmDialog("")
+StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ns.OptionUtil.MakeConfirmDialog("")
 
 local ProfileOptions = {}
 
@@ -215,7 +215,7 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = L["IMPORT_DESC"],
         onClick = function()
             if InCombatLockdown() then
-                ECM.Print(L["CANNOT_IMPORT_IN_COMBAT"])
+                ns.Print(L["CANNOT_IMPORT_IN_COMBAT"])
                 return
             end
             ns.Addon:ShowImportDialog()
@@ -227,9 +227,9 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = L["EXPORT"],
         tooltip = L["EXPORT_DESC"],
         onClick = function()
-            local exportString, err = ECM.ImportExport.ExportCurrentProfile()
+            local exportString, err = ns.ImportExport.ExportCurrentProfile()
             if not exportString then
-                ECM.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
+                ns.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
                 return
             end
             ns.Addon:ShowExportDialog(exportString)
@@ -237,4 +237,4 @@ function ProfileOptions.RegisterSettings(SB)
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)
+ns.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)

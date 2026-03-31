@@ -21,8 +21,8 @@ describe("LibSettingsBuilder", function()
                 getDefaults = function()
                     return addonNS.Addon.db.defaults.profile
                 end,
-                getNestedValue = ECM.OptionUtil.GetNestedValue,
-                setNestedValue = ECM.OptionUtil.SetNestedValue,
+                getNestedValue = addonNS.OptionUtil.GetNestedValue,
+                setNestedValue = addonNS.OptionUtil.SetNestedValue,
             }),
             varPrefix = varPrefix,
             onChanged = function() end,
@@ -141,7 +141,6 @@ describe("LibSettingsBuilder", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "ECM_DeepEquals",
             "Settings",
             "SettingsPanel",
@@ -208,20 +207,6 @@ describe("LibSettingsBuilder", function()
         lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
         lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
 
-        _G.ECM = {
-            Constants = {
-                ANCHORMODE_CHAIN = 1,
-                ANCHORMODE_FREE = 2,
-                DEFAULT_BAR_WIDTH = 300,
-            },
-            CloneValue = TestHelpers.deepClone,
-            Runtime = {
-                ScheduleLayoutUpdate = function()
-                    layoutUpdateCalls = layoutUpdateCalls + 1
-                end,
-            },
-        }
-
         local profileData = {
             global = {
                 hideWhenMounted = true,
@@ -256,12 +241,23 @@ describe("LibSettingsBuilder", function()
                     return { moduleName = name }
                 end,
             },
+            Constants = {
+                ANCHORMODE_CHAIN = 1,
+                ANCHORMODE_FREE = 2,
+                DEFAULT_BAR_WIDTH = 300,
+            },
+            CloneValue = TestHelpers.deepClone,
+            Runtime = {
+                ScheduleLayoutUpdate = function()
+                    layoutUpdateCalls = layoutUpdateCalls + 1
+                end,
+            },
         }
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, addonNS)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
-        SB = ECM.SettingsBuilder
+        SB = addonNS.SettingsBuilder
         SB.CreateRootCategory("TestAddon")
         SB.CreateSubcategory("TestSection")
     end)
@@ -1856,8 +1852,8 @@ describe("LibSettingsBuilder", function()
                 pathAdapter = LSB.PathAdapter({
                     getStore = function() return addonNS.Addon.db.profile end,
                     getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-                    getNestedValue = ECM.OptionUtil.GetNestedValue,
-                    setNestedValue = ECM.OptionUtil.SetNestedValue,
+                    getNestedValue = addonNS.OptionUtil.GetNestedValue,
+                    setNestedValue = addonNS.OptionUtil.SetNestedValue,
                 }),
                 varPrefix = prefix or "T",
                 onChanged = function() end,
@@ -2007,8 +2003,8 @@ describe("LibSettingsBuilder", function()
                 pathAdapter = lsb.PathAdapter({
                     getStore = function() return addonNS.Addon.db.profile end,
                     getDefaults = function() return addonNS.Addon.db.defaults.profile end,
-                    getNestedValue = ECM.OptionUtil.GetNestedValue,
-                    setNestedValue = ECM.OptionUtil.SetNestedValue,
+                    getNestedValue = addonNS.OptionUtil.GetNestedValue,
+                    setNestedValue = addonNS.OptionUtil.SetNestedValue,
                 }),
                 varPrefix = "D",
                 onChanged = function() end,

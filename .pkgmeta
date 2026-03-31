@@ -3,10 +3,10 @@ ignore:
   - README.md
   - Tests
   - TODO.md
-  - docs
   - '**/Tests'
   - '*.code-workspace'
   - '*.rockspec'
   - package
   - scripts
+  - media/images
   - media/icon-full.tga

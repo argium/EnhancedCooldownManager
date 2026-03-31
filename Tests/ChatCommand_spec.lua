@@ -16,10 +16,10 @@ describe("ChatCommand migration", function()
     local shownMigrationLog
     local openOptionsCalls
     local scheduleLayoutCalls
+    local ns
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "LibStub",
             "InCombatLockdown",
             "StaticPopupDialogs",
@@ -63,6 +63,7 @@ describe("ChatCommand migration", function()
     end)
 
     before_each(function()
+        ns = {}
         printedMessages = {}
         confirmReloadCalls = {}
         printInfoCalled = false
@@ -179,23 +180,22 @@ describe("ChatCommand migration", function()
             return frame
         end
 
-        _G.ECM = {}
-        _G.ECM.Log = function() end
-        _G.ECM.ColorUtil = {
+        ns.Log = function() end
+        ns.ColorUtil = {
             Sparkle = function(s)
                 return s
             end,
         }
-        _G.ECM.Runtime = { ScheduleLayoutUpdate = function(delay, reason)
+        ns.Runtime = { ScheduleLayoutUpdate = function(delay, reason)
             scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
         end }
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
-        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
+        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")(nil, ns)
 
-        _G.ECM.Migration = {
+        ns.Migration = {
             PrepareDatabase = function() end,
             Run = function() end,
             FlushLog = function() end,
@@ -210,7 +210,7 @@ describe("ChatCommand migration", function()
             end,
             Rollback = function() end,
         }
-        _G.ECM.EditMode = {
+        ns.EditMode = {
             Lib = {
                 IsInEditMode = function()
                     return false
@@ -233,9 +233,8 @@ describe("ChatCommand migration", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEditModeStub()
         TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")(nil, ns)
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         -- Minimal AceAddon mock
@@ -265,17 +264,18 @@ describe("ChatCommand migration", function()
             return fakeAddon
         end
 
-        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
+        ns.Addon = fakeAddon
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", ns)
 
         fakeAddon.ConfirmReloadUI = function(_, text, onAccept)
             confirmReloadCalls[#confirmReloadCalls + 1] = { text = text, onAccept = onAccept }
         end
-        _G.ECM.Runtime.ScheduleLayoutUpdate = function(delay, reason)
+        ns.Runtime.ScheduleLayoutUpdate = function(delay, reason)
             scheduleLayoutCalls[#scheduleLayoutCalls + 1] = { delay = delay, reason = reason }
         end
 
-        local originalPrint = _G.ECM.Print
-        _G.ECM.Print = function(...)
+        local originalPrint = ns.Print
+        ns.Print = function(...)
             local args = { ... }
             for i = 1, #args do
                 args[i] = tostring(args[i])
@@ -316,7 +316,7 @@ describe("ChatCommand migration", function()
 
     it("/ecm migration rollback with valid version calls ValidateRollback and ConfirmReloadUI", function()
         local validatedVersion
-        ECM.Migration.ValidateRollback = function(n)
+        ns.Migration.ValidateRollback = function(n)
             validatedVersion = n
             return true, "Will delete V10 and re-migrate from V8."
         end
@@ -330,14 +330,14 @@ describe("ChatCommand migration", function()
 
     it("/ecm migration rollback -1 translates to CURRENT - 1", function()
         local validatedVersion
-        ECM.Migration.ValidateRollback = function(n)
+        ns.Migration.ValidateRollback = function(n)
             validatedVersion = n
             return true, "Will delete V10 and re-migrate from V9."
         end
 
         mod:ChatCommand("migration rollback -1")
 
-        assert.are.equal(ECM.Constants.CURRENT_SCHEMA_VERSION - 1, validatedVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION - 1, validatedVersion)
         assert.are.equal(1, #confirmReloadCalls)
     end)
 
@@ -364,7 +364,7 @@ describe("ChatCommand migration", function()
     end)
 
     it("/ecm migration rollback with failed validation prints error", function()
-        ECM.Migration.ValidateRollback = function()
+        ns.Migration.ValidateRollback = function()
             return false, "No prior version exists."
         end
 
@@ -376,10 +376,10 @@ describe("ChatCommand migration", function()
 
     it("ConfirmReloadUI onAccept calls Migration.Rollback with correct version", function()
         local rolledBackVersion
-        ECM.Migration.ValidateRollback = function(_)
+        ns.Migration.ValidateRollback = function(_)
             return true, "Will delete V10."
         end
-        ECM.Migration.Rollback = function(n)
+        ns.Migration.Rollback = function(n)
             rolledBackVersion = n
         end
 
@@ -393,17 +393,17 @@ describe("ChatCommand migration", function()
 
     it("ConfirmReloadUI onAccept after -1 calls Rollback with translated version", function()
         local rolledBackVersion
-        ECM.Migration.ValidateRollback = function(_)
+        ns.Migration.ValidateRollback = function(_)
             return true, "Will delete."
         end
-        ECM.Migration.Rollback = function(n)
+        ns.Migration.Rollback = function(n)
             rolledBackVersion = n
         end
 
         mod:ChatCommand("migration rollback -1")
 
         confirmReloadCalls[1].onAccept()
-        assert.are.equal(ECM.Constants.CURRENT_SCHEMA_VERSION - 1, rolledBackVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION - 1, rolledBackVersion)
     end)
 
     it("/ecm help includes migration command", function()

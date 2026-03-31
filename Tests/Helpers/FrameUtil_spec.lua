@@ -13,6 +13,7 @@ describe("FrameUtil", function()
     local scheduledTimers
     local fakeTime
     local secretValues
+    local ns
 
     local incCalls = TestHelpers.incCalls
     local getCalls = TestHelpers.getCalls
@@ -26,7 +27,6 @@ describe("FrameUtil", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "C_Timer",
             "GetTime",
             "UIParent",
@@ -43,9 +43,9 @@ describe("FrameUtil", function()
         fakeTime = 0
         secretValues = {}
 
-        _G.ECM = {}
-        _G.ECM.ColorUtil = {}
-        _G.ECM.ColorUtil.AreEqual = function(a, b)
+        ns = {}
+        ns.ColorUtil = {}
+        ns.ColorUtil.AreEqual = function(a, b)
             if a == nil and b == nil then
                 return true
             end
@@ -54,7 +54,7 @@ describe("FrameUtil", function()
             end
             return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
         end
-        _G.ECM.DebugAssert = function(condition, message)
+        ns.DebugAssert = function(condition, message)
             if not condition then
                 error(message or "ECM.DebugAssert failed")
             end
@@ -75,11 +75,11 @@ describe("FrameUtil", function()
             return secretValues[value] == true
         end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")(nil, ns)
 
-        FrameUtil = assert(ECM.FrameUtil, "FrameUtil module did not initialize")
+        FrameUtil = assert(ns.FrameUtil, "FrameUtil module did not initialize")
     end)
 
     describe("buff bar inspection helpers", function()

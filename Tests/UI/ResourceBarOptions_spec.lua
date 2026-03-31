@@ -63,7 +63,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("adds a breadcrumb to the Layout page", function()
             assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
         end)
     end)
 
@@ -153,15 +153,15 @@ describe("ResourceBarOptions getters/setters/defaults", function()
                 defsByKey[def.key] = def.name
             end
 
-            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DH"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS])
-            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL])
-            assert.are.equal("|A:classicon-mage:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MAGE .. ECM.L["RESOURCE_ICICLES"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_ICICLES])
-            assert.are.equal("|A:classicon-monk:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MONK .. ECM.L["RESOURCE_CHI"] .. "|r", defsByKey[Enum.PowerType.Chi])
-            assert.are.equal("|A:classicon-rogue:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.ROGUE .. ECM.L["RESOURCE_COMBO_POINTS"] .. "|r", defsByKey[Enum.PowerType.ComboPoints])
-            assert.are.equal("|A:classicon-evoker:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.EVOKER .. ECM.L["RESOURCE_ESSENCE"] .. "|r", defsByKey[Enum.PowerType.Essence])
-            assert.are.equal("|A:classicon-paladin:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.PALADIN .. ECM.L["RESOURCE_HOLY_POWER"] .. "|r", defsByKey[Enum.PowerType.HolyPower])
-            assert.are.equal("|A:classicon-shaman:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.SHAMAN .. ECM.L["RESOURCE_MAELSTROM_WEAPON"] .. "|r", defsByKey[ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON])
-            assert.are.equal("|A:classicon-warlock:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.WARLOCK .. ECM.L["RESOURCE_SOUL_SHARDS"] .. "|r", defsByKey[Enum.PowerType.SoulShards])
+            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DH"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS])
+            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL])
+            assert.are.equal("|A:classicon-mage:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MAGE .. ns.L["RESOURCE_ICICLES"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_ICICLES])
+            assert.are.equal("|A:classicon-monk:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MONK .. ns.L["RESOURCE_CHI"] .. "|r", defsByKey[Enum.PowerType.Chi])
+            assert.are.equal("|A:classicon-rogue:14:14|a |cff" .. ns.Constants.CLASS_COLORS.ROGUE .. ns.L["RESOURCE_COMBO_POINTS"] .. "|r", defsByKey[Enum.PowerType.ComboPoints])
+            assert.are.equal("|A:classicon-evoker:14:14|a |cff" .. ns.Constants.CLASS_COLORS.EVOKER .. ns.L["RESOURCE_ESSENCE"] .. "|r", defsByKey[Enum.PowerType.Essence])
+            assert.are.equal("|A:classicon-paladin:14:14|a |cff" .. ns.Constants.CLASS_COLORS.PALADIN .. ns.L["RESOURCE_HOLY_POWER"] .. "|r", defsByKey[Enum.PowerType.HolyPower])
+            assert.are.equal("|A:classicon-shaman:14:14|a |cff" .. ns.Constants.CLASS_COLORS.SHAMAN .. ns.L["RESOURCE_MAELSTROM_WEAPON"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON])
+            assert.are.equal("|A:classicon-warlock:14:14|a |cff" .. ns.Constants.CLASS_COLORS.WARLOCK .. ns.L["RESOURCE_SOUL_SHARDS"] .. "|r", defsByKey[Enum.PowerType.SoulShards])
             assert.is_nil(defsByKey[Enum.PowerType.ArcaneCharges])
         end)
     end)
@@ -206,16 +206,16 @@ describe("ResourceBarOptions getters/setters/defaults", function()
             end
 
             assert.are.equal(
-                "|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r",
-                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL]
+                "|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r",
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL]
             )
             assert.are.equal(
-                "|A:classicon-demonhunter:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.DEMONHUNTER .. ECM.L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] .. "|r",
-                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META]
+                "|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] .. "|r",
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META]
             )
             assert.are.equal(
-                "|A:classicon-mage:14:14|a |cff" .. ECM.Constants.CLASS_COLORS.MAGE .. ECM.L["RESOURCE_ICICLES"] .. "|r",
-                defsByKey[ECM.Constants.RESOURCEBAR_TYPE_ICICLES]
+                "|A:classicon-mage:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MAGE .. ns.L["RESOURCE_ICICLES"] .. "|r",
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_ICICLES]
             )
         end)
     end)

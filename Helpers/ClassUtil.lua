@@ -2,9 +2,11 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-local C = ECM.Constants
+local _, ns = ...
+
+local C = ns.Constants
 local ClassUtil = {}
-ECM.ClassUtil = ClassUtil
+ns.ClassUtil = ClassUtil
 
 --- Power types that have discrete values and should be displayed using the resource bar.
 local discreteResourceTypes = {
@@ -129,7 +131,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return mwMax, stacks, mwMax
     end
 
-    ECM.DebugAssert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
+    ns.DebugAssert(type(resourceType) == "number", "Expected resourceType to be a power type enum value")
     if resourceType then
         local max = UnitPowerMax("player", resourceType)
         local current = UnitPower("player", resourceType)

@@ -2,7 +2,7 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-ECM = ECM or {}
+local _, ns = ...
 
 -- Locale table with fallback: missing keys return the key name itself.
 local L = setmetatable({}, {
@@ -10,7 +10,7 @@ local L = setmetatable({}, {
         return k
     end,
 })
-ECM.L = L
+ns.L = L
 
 --------------------------------------------------------------------------------
 -- General

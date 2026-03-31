@@ -24,7 +24,7 @@ describe("PowerBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        ECM.PowerBarTickMarksOptions = { RegisterSettings = function() end }
+        ns.PowerBarTickMarksOptions = { RegisterSettings = function() end }
 
         local originalRegisterFromTable = SB.RegisterFromTable
         SB.RegisterFromTable = function(tbl)
@@ -78,8 +78,8 @@ describe("PowerBarOptions getters/setters/defaults", function()
         end)
         it("adds a breadcrumb to the Layout page", function()
             assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
-            assert.are.equal(ECM.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedTable.args.layoutMovedButton.buttonText)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedTable.args.layoutMovedButton.buttonText)
         end)
     end)
 
@@ -167,7 +167,7 @@ describe("PowerBarOptions getters/setters/defaults", function()
 
             ns.OptionsSections.PowerBar.RegisterSettings(SB)
 
-            local powerBarCategory = SB._subcategories[ECM.L["POWER_BAR"]]
+            local powerBarCategory = SB._subcategories[ns.L["POWER_BAR"]]
             local tickMarksCategory = SB._subcategories["Tick Marks"]
 
             assert.is_not_nil(powerBarCategory)

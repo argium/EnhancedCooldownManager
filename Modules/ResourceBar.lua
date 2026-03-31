@@ -4,11 +4,11 @@
 
 local _, ns = ...
 local ResourceBar = ns.Addon:NewModule("ResourceBar")
-local ClassUtil = ECM.ClassUtil
+local ClassUtil = ns.ClassUtil
 ns.Addon.ResourceBar = ResourceBar
 
 function ResourceBar:ShouldShow()
-    return ECM.FrameMixin.Proto.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
+    return ns.BarMixin.FrameProto.ShouldShow(self) and ClassUtil.GetPlayerResourceType() ~= nil
 end
 
 function ResourceBar:GetStatusBarValues()
@@ -31,18 +31,18 @@ function ResourceBar:GetStatusBarColor()
     local resourceType = ClassUtil.GetPlayerResourceType()
 
     if
-        ECM.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
+        ns.Constants.RESOURCEBAR_MAX_COLOR_TYPES[resourceType]
         and cfg.maxColorsEnabled
         and cfg.maxColorsEnabled[resourceType]
     then
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
         if safeMax and current == safeMax then
-            return cfg.maxColors and cfg.maxColors[resourceType] or ECM.Constants.COLOR_WHITE
+            return cfg.maxColors and cfg.maxColors[resourceType] or ns.Constants.COLOR_WHITE
         end
     end
 
     local color = cfg.colors and cfg.colors[resourceType]
-    return color or ECM.Constants.COLOR_WHITE
+    return color or ns.Constants.COLOR_WHITE
 end
 
 function ResourceBar:_OnBarRefreshed(why)
@@ -54,12 +54,12 @@ function ResourceBar:_OnBarRefreshed(why)
         local frame = self.InnerFrame
         local tickCount = safeMax - 1
         self:EnsureTicks(tickCount, frame.TicksFrame, "tickPool")
-        self:LayoutResourceTicks(safeMax, ECM.Constants.COLOR_BLACK, 1, "tickPool")
+        self:LayoutResourceTicks(safeMax, ns.Constants.COLOR_BLACK, 1, "tickPool")
     else
         self:HideAllTicks("tickPool")
     end
 
-    ECM.Log(self.Name, "Refresh complete.")
+    ns.Log(self.Name, "Refresh complete.")
 end
 
 function ResourceBar:OnEventUpdate(event, ...)
@@ -70,16 +70,16 @@ function ResourceBar:OnEventUpdate(event, ...)
         end
     end
 
-    self:ThrottledUpdateLayout(event or "OnEventUpdate")
+    ns.Runtime.RequestLayout(event or "ResourceBar:OnEventUpdate")
 end
 
 function ResourceBar:OnInitialize()
-    ECM.BarMixin.AddMixin(self, "ResourceBar")
+    ns.BarMixin.AddBarMixin(self, "ResourceBar")
 end
 
 function ResourceBar:OnEnable()
     self:EnsureFrame()
-    ECM.Runtime.RegisterFrame(self)
+    ns.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("UNIT_AURA", function(_, ...) self:OnEventUpdate(...) end)
     self:RegisterEvent("UNIT_POWER_UPDATE", function(_, ...) self:OnEventUpdate(...) end)
@@ -87,5 +87,5 @@ end
 
 function ResourceBar:OnDisable()
     self:UnregisterAllEvents()
-    ECM.Runtime.UnregisterFrame(self)
+    ns.Runtime.UnregisterFrame(self)
 end

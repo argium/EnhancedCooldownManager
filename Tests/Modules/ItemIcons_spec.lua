@@ -10,9 +10,9 @@ local makeHookableFrame = TestHelpers.makeHookableFrame
 
 describe("ItemIcons", function()
     local originalGlobals
+    local ns
 
     local CAPTURED_GLOBALS = {
-        "ECM",
         "EditModeManagerFrame",
         "UtilityCooldownViewer",
     }
@@ -40,8 +40,6 @@ describe("ItemIcons", function()
             return true
         end
 
-        function mod:ThrottledUpdateLayout() end
-
         function mod:UnregisterAllEvents() end
 
         function mod:UpdateLayout() end
@@ -61,14 +59,14 @@ describe("ItemIcons", function()
                     self.InnerFrame:Hide()
                 end
                 if self:IsEnabled() then
-                    self:ThrottledUpdateLayout("EnterEditMode")
+                    ns.Runtime.RequestLayout("ItemIcons:EnterEditMode")
                 end
             end)
 
             editModeManager:HookScript("OnHide", function()
                 self._isEditModeActive = false
                 if self:IsEnabled() then
-                    self:ThrottledUpdateLayout("ExitEditMode")
+                    ns.Runtime.RequestLayout("ItemIcons:ExitEditMode")
                 end
             end)
         end
@@ -82,7 +80,7 @@ describe("ItemIcons", function()
             self._viewerHooked = true
 
             utilityViewer:HookScript("OnShow", function()
-                self:ThrottledUpdateLayout("OnShow")
+                ns.Runtime.RequestLayout("ItemIcons:OnShow")
             end)
 
             utilityViewer:HookScript("OnHide", function()
@@ -90,12 +88,12 @@ describe("ItemIcons", function()
                     self.InnerFrame:Hide()
                 end
                 if self:IsEnabled() then
-                    self:ThrottledUpdateLayout("OnHide")
+                    ns.Runtime.RequestLayout("ItemIcons:OnHide")
                 end
             end)
 
             utilityViewer:HookScript("OnSizeChanged", function()
-                self:ThrottledUpdateLayout("OnSizeChanged")
+                ns.Runtime.RequestLayout("ItemIcons:OnSizeChanged")
             end)
         end
 
@@ -103,7 +101,7 @@ describe("ItemIcons", function()
             self:UnregisterAllEvents()
             self:UpdateLayout("OnDisable")
 
-            ECM.Runtime.UnregisterFrame(self)
+            ns.Runtime.UnregisterFrame(self)
 
             self._viewerOriginalPoint = nil
             self._isEditModeActive = nil
@@ -115,9 +113,10 @@ describe("ItemIcons", function()
     end
 
     before_each(function()
-        _G.ECM = {
+        ns = {
             Runtime = {
                 UnregisterFrame = function() end,
+                RequestLayout = function() end,
             },
         }
         EditModeManagerFrame = makeHookableFrame(false)
@@ -172,7 +171,6 @@ describe("ItemIcons real source", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "EditModeManagerFrame",
             "UtilityCooldownViewer",
             "UIParent",
@@ -201,10 +199,10 @@ describe("ItemIcons real source", function()
         itemCounts = {}
         itemIconsByID = {}
         itemCooldownByID = {}
-        _G.ECM = {
+        ns = {
             Log = function() end,
-            FrameMixin = {
-                Proto = {
+            BarMixin = {
+                FrameProto = {
                     ShouldShow = function()
                         return true
                     end,
@@ -212,7 +210,7 @@ describe("ItemIcons real source", function()
                         return true
                     end,
                 },
-                AddMixin = function(target)
+                AddFrameMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
@@ -222,10 +220,11 @@ describe("ItemIcons real source", function()
                     registerFrameCalls = registerFrameCalls + 1
                 end,
                 UnregisterFrame = function() end,
+                RequestLayout = function() end,
             },
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         EditModeManagerFrame = makeHookableFrame(false)
         UtilityCooldownViewer = makeHookableFrame(true)
@@ -323,14 +322,12 @@ describe("ItemIcons real source", function()
             return frame
         end
 
-        ns = {
-            Addon = {
-                NewModule = function(self, name)
-                    local module = { Name = name }
-                    self[name] = module
-                    return module
-                end,
-            },
+        ns.Addon = {
+            NewModule = function(self, name)
+                local module = { Name = name }
+                self[name] = module
+                return module
+            end,
         }
 
         TestHelpers.LoadChunk("Modules/ItemIcons.lua", "Unable to load Modules/ItemIcons.lua")(nil, ns)
@@ -350,15 +347,15 @@ describe("ItemIcons real source", function()
 
     it("only triggers layout updates for trinket slot equipment changes", function()
         local reasons = {}
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
         ItemIcons:OnPlayerEquipmentChanged(nil, 1)
-        ItemIcons:OnPlayerEquipmentChanged(nil, ECM.Constants.TRINKET_SLOT_1)
-        ItemIcons:OnPlayerEquipmentChanged(nil, ECM.Constants.TRINKET_SLOT_2)
+        ItemIcons:OnPlayerEquipmentChanged(nil, ns.Constants.TRINKET_SLOT_1)
+        ItemIcons:OnPlayerEquipmentChanged(nil, ns.Constants.TRINKET_SLOT_2)
 
-        assert.same({ "OnPlayerEquipmentChanged", "OnPlayerEquipmentChanged" }, reasons)
+        assert.same({ "ItemIcons:OnPlayerEquipmentChanged", "ItemIcons:OnPlayerEquipmentChanged" }, reasons)
     end)
 
     it("registered equipment callback drops LibEvent target and forwards slotId", function()
@@ -369,22 +366,22 @@ describe("ItemIcons real source", function()
         function ItemIcons:UnregisterAllEvents() end
         function ItemIcons:EnsureFrame() end
 
-        local origRegister = ECM.Runtime.RegisterFrame
-        ECM.Runtime.RegisterFrame = function() end
+        local origRegister = ns.Runtime.RegisterFrame
+        ns.Runtime.RegisterFrame = function() end
 
         ItemIcons:OnEnable()
 
-        ECM.Runtime.RegisterFrame = origRegister
+        ns.Runtime.RegisterFrame = origRegister
 
         local reasons = {}
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
         -- LibEvent dispatches cb(target, event, ...wowArgs)
         local cb = assert(captured["PLAYER_EQUIPMENT_CHANGED"], "expected PLAYER_EQUIPMENT_CHANGED registration")
-        cb(ItemIcons, "PLAYER_EQUIPMENT_CHANGED", ECM.Constants.TRINKET_SLOT_1)
-        assert.same({ "OnPlayerEquipmentChanged" }, reasons)
+        cb(ItemIcons, "PLAYER_EQUIPMENT_CHANGED", ns.Constants.TRINKET_SLOT_1)
+        assert.same({ "ItemIcons:OnPlayerEquipmentChanged" }, reasons)
     end)
 
     it("hooks edit mode only once", function()
@@ -409,9 +406,9 @@ describe("ItemIcons real source", function()
     it("preallocates the icon pool in CreateFrame", function()
         local frame = ItemIcons:CreateFrame()
 
-        assert.are.equal(ECM.Constants.ITEM_ICONS_MAX, #frame._iconPool)
-        assert.are.equal(ECM.Constants.DEFAULT_ITEM_ICON_SIZE, frame._iconPool[1]:GetWidth())
-        assert.are.equal(ECM.Constants.ITEM_ICONS_MAX, #createdCooldowns)
+        assert.are.equal(ns.Constants.ITEM_ICONS_MAX, #frame._iconPool)
+        assert.are.equal(ns.Constants.DEFAULT_ITEM_ICON_SIZE, frame._iconPool[1]:GetWidth())
+        assert.are.equal(ns.Constants.ITEM_ICONS_MAX, #createdCooldowns)
     end)
 
     it("only refreshes bag cooldowns when the frame exists", function()
@@ -430,7 +427,7 @@ describe("ItemIcons real source", function()
     it("edit mode callbacks toggle state and defer layout", function()
         local reasons = {}
         ItemIcons.InnerFrame = TestHelpers.makeFrame({ shown = true })
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -440,13 +437,13 @@ describe("ItemIcons real source", function()
 
         assert.is_false(ItemIcons.InnerFrame:IsShown())
         assert.is_false(ItemIcons._isEditModeActive)
-        assert.same({ "EnterEditMode", "ExitEditMode" }, reasons)
+        assert.same({ "ItemIcons:EnterEditMode", "ItemIcons:ExitEditMode" }, reasons)
     end)
 
     it("utility viewer callbacks hide the frame and defer layout", function()
         local reasons = {}
         ItemIcons.InnerFrame = TestHelpers.makeFrame({ shown = true })
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -456,7 +453,7 @@ describe("ItemIcons real source", function()
         UtilityCooldownViewer._hooks.OnSizeChanged[1]()
 
         assert.is_false(ItemIcons.InnerFrame:IsShown())
-        assert.same({ "OnShow", "OnHide", "OnSizeChanged" }, reasons)
+        assert.same({ "ItemIcons:OnShow", "ItemIcons:OnHide", "ItemIcons:OnSizeChanged" }, reasons)
     end)
 
     it("returns false from UpdateLayout when the frame is missing or config is unavailable", function()
@@ -494,20 +491,20 @@ describe("ItemIcons real source", function()
 
     it("defers layout for delayed bag and world events", function()
         local reasons = {}
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
         ItemIcons:OnBagUpdateDelayed()
         ItemIcons:OnPlayerEnteringWorld()
 
-        assert.same({ "OnBagUpdateDelayed", "OnPlayerEnteringWorld" }, reasons)
+        assert.same({ "ItemIcons:OnBagUpdateDelayed", "ItemIcons:OnPlayerEnteringWorld" }, reasons)
     end)
 
     it("registers with the frame system and schedules initial hooks on enable", function()
         local reasons = {}
         function ItemIcons:RegisterEvent() end
-        function ItemIcons:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -519,7 +516,7 @@ describe("ItemIcons real source", function()
 
         timerCallbacks[1]()
 
-        assert.same({ "OnEnable" }, reasons)
+        assert.same({ "ItemIcons:OnEnable" }, reasons)
         assert.is_true(ItemIcons._editModeHooked)
         assert.is_true(ItemIcons._viewerHooked)
     end)
@@ -549,16 +546,16 @@ describe("ItemIcons real source", function()
         UtilityCooldownViewer._children = { utilityFontChild, utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 50)
 
-        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_1] = 101
-        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_1] = "trinket-1"
+        inventoryItemBySlot[ns.Constants.TRINKET_SLOT_1] = 101
+        inventoryTextureBySlot[ns.Constants.TRINKET_SLOT_1] = "trinket-1"
         inventorySpellByItem[101] = 9001
-        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_2] = 102
-        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_2] = "trinket-2"
+        inventoryItemBySlot[ns.Constants.TRINKET_SLOT_2] = 102
+        inventoryTextureBySlot[ns.Constants.TRINKET_SLOT_2] = "trinket-2"
         inventorySpellByItem[102] = 9002
-        itemCounts[ECM.Constants.COMBAT_POTIONS[1].itemID] = 3
-        itemIconsByID[ECM.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
-        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[ns.Constants.COMBAT_POTIONS[1].itemID] = 3
+        itemIconsByID[ns.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
 
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()
         ItemIcons.GetModuleConfig = function()
@@ -577,11 +574,11 @@ describe("ItemIcons real source", function()
         assert.are.equal((4 * 18) + (3 * 6), ItemIcons.InnerFrame:GetWidth())
         assert.are.equal(18, ItemIcons.InnerFrame:GetHeight())
         assert.are.equal(101, ItemIcons.InnerFrame._iconPool[1].itemId)
-        assert.are.equal(ECM.Constants.TRINKET_SLOT_1, ItemIcons.InnerFrame._iconPool[1].slotId)
+        assert.are.equal(ns.Constants.TRINKET_SLOT_1, ItemIcons.InnerFrame._iconPool[1].slotId)
         assert.are.equal(102, ItemIcons.InnerFrame._iconPool[2].itemId)
-        assert.are.equal(ECM.Constants.TRINKET_SLOT_2, ItemIcons.InnerFrame._iconPool[2].slotId)
-        assert.are.equal(ECM.Constants.COMBAT_POTIONS[1].itemID, ItemIcons.InnerFrame._iconPool[3].itemId)
-        assert.are.equal(ECM.Constants.HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[4].itemId)
+        assert.are.equal(ns.Constants.TRINKET_SLOT_2, ItemIcons.InnerFrame._iconPool[2].slotId)
+        assert.are.equal(ns.Constants.COMBAT_POTIONS[1].itemID, ItemIcons.InnerFrame._iconPool[3].itemId)
+        assert.are.equal(ns.Constants.HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[4].itemId)
         assert.same(
             { "Fonts\\FRIZQT__.TTF", 17, "OUTLINE" },
             ItemIcons.InnerFrame._iconPool[1].Cooldown.__fontRegion.__font
@@ -608,8 +605,8 @@ describe("ItemIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
 
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()
         ItemIcons.GetModuleConfig = function()
@@ -637,10 +634,10 @@ describe("ItemIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = "demonic-healthstone"
-        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = "demonic-healthstone"
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
 
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()
         ItemIcons.GetModuleConfig = function()
@@ -654,7 +651,7 @@ describe("ItemIcons real source", function()
         end
 
         assert.is_true(ItemIcons:UpdateLayout("test"))
-        assert.are.equal(ECM.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[1].itemId)
+        assert.are.equal(ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ItemIcons.InnerFrame._iconPool[1].itemId)
     end)
 
     it("anchors container to last active item frame when viewer layout is stale", function()
@@ -671,8 +668,8 @@ describe("ItemIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        inventoryItemBySlot[ECM.Constants.TRINKET_SLOT_1] = 101
-        inventoryTextureBySlot[ECM.Constants.TRINKET_SLOT_1] = "trinket-1"
+        inventoryItemBySlot[ns.Constants.TRINKET_SLOT_1] = 101
+        inventoryTextureBySlot[ns.Constants.TRINKET_SLOT_1] = "trinket-1"
         inventorySpellByItem[101] = 9001
 
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()
@@ -725,10 +722,10 @@ describe("ItemIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ECM.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
         -- Healthstone has an active shared cooldown (e.g. health potion just used)
-        itemCooldownByID[ECM.Constants.HEALTHSTONE_ITEM_ID] = { 100, 60, true }
+        itemCooldownByID[ns.Constants.HEALTHSTONE_ITEM_ID] = { 100, 60, true }
 
         ItemIcons.InnerFrame = ItemIcons:CreateFrame()
         ItemIcons.GetModuleConfig = function()
@@ -749,14 +746,14 @@ describe("ItemIcons real source", function()
     it("refreshes cooldowns for visible trinket and bag icons", function()
         local frame = ItemIcons:CreateFrame()
         frame._iconPool[1]:Show()
-        frame._iconPool[1].slotId = ECM.Constants.TRINKET_SLOT_1
+        frame._iconPool[1].slotId = ns.Constants.TRINKET_SLOT_1
         frame._iconPool[2]:Show()
         frame._iconPool[2].itemId = 5001
         frame._iconPool[3]:Show()
         frame._iconPool[3].itemId = 5002
         ItemIcons.InnerFrame = frame
 
-        inventoryCooldownBySlot[ECM.Constants.TRINKET_SLOT_1] = { 10, 30, 1 }
+        inventoryCooldownBySlot[ns.Constants.TRINKET_SLOT_1] = { 10, 30, 1 }
         itemCooldownByID[5001] = { 20, 40, true }
         itemCooldownByID[5002] = { 0, 0, false }
 

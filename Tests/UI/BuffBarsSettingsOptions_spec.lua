@@ -24,7 +24,7 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        ECM.SpellColors = {
+        ns.SpellColors = {
             NormalizeKey = function() end,
             GetAllColorEntries = function() return {} end,
             GetDefaultColor = function() return { r = 1, g = 1, b = 1, a = 1 } end,
@@ -76,7 +76,7 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         it("uses the updated labels and help text", function()
             local args = capturedTable.args
             assert.is_nil(args.layoutMovedInfo)
-            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
             assert.is_nil(args.positioning)
         end)
     end)

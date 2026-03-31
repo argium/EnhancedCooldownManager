@@ -19,7 +19,6 @@ describe("PowerBar real source", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "Enum",
             "UnitClass",
             "GetSpecialization",
@@ -45,16 +44,14 @@ describe("PowerBar real source", function()
         unitPowerPercentValue = 37
         isSecretValue = false
 
-        _G.ECM = {
-            FrameMixin = {
-                Proto = {
+        ns = {
+            BarMixin = {
+                FrameProto = {
                     ShouldShow = function()
                         return true
                     end,
                 },
-            },
-            BarMixin = {
-                AddMixin = function(target)
+                AddBarMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
@@ -71,10 +68,11 @@ describe("PowerBar real source", function()
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
+                RequestLayout = function() end,
             },
             Log = function() end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
         TestHelpers.LoadStub("Enums.lua")
 
         _G.UnitClass = function()
@@ -100,14 +98,12 @@ describe("PowerBar real source", function()
             return isSecretValue
         end
 
-        ns = {
-            Addon = {
-                NewModule = function(self, name)
-                    local module = { Name = name }
-                    self[name] = module
-                    return module
-                end,
-            },
+        ns.Addon = {
+            NewModule = function(self, name)
+                local module = { Name = name }
+                self[name] = module
+                return module
+            end,
         }
 
         TestHelpers.LoadChunk("Modules/PowerBar.lua", "Unable to load Modules/PowerBar.lua")(nil, ns)
@@ -203,12 +199,12 @@ describe("PowerBar real source", function()
         PowerBar.GetModuleConfig = function()
             return { colors = {} }
         end
-        assert.are.equal(ECM.Constants.COLOR_WHITE, PowerBar:GetStatusBarColor())
+        assert.are.equal(ns.Constants.COLOR_WHITE, PowerBar:GetStatusBarColor())
     end)
 
     it("only responds to UNIT_POWER_UPDATE for the player", function()
         local reasons = {}
-        function PowerBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -229,7 +225,7 @@ describe("PowerBar real source", function()
         PowerBar:OnEnable()
 
         local reasons = {}
-        function PowerBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -367,15 +363,15 @@ describe("PowerBar real source", function()
     end)
 
     it("shows non-mana power bars and respects the outer frame visibility guard", function()
-        ECM.FrameMixin.Proto.ShouldShow = function()
+        ns.BarMixin.FrameProto.ShouldShow = function()
             return false
         end
         assert.is_false(PowerBar:ShouldShow())
 
-        ECM.FrameMixin.Proto.ShouldShow = function()
+        ns.BarMixin.FrameProto.ShouldShow = function()
             return true
         end
-        ECM.ClassUtil.GetCurrentPowerType = function()
+        ns.ClassUtil.GetCurrentPowerType = function()
             return Enum.PowerType.Energy
         end
         _G.GetSpecializationRole = function()

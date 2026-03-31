@@ -2,6 +2,8 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local _, ns = ...
+
 ---@class ECM_Color RGBA color definition.
 ---@field r number Red channel (0-1).
 ---@field g number Green channel (0-1).
@@ -24,7 +26,7 @@
 ---@field fontSize number|nil Font size override for bar text.
 ---@field showText boolean|nil Whether to show text.
 ---@field bgColor ECM_Color|nil Background color override.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
+---@field anchorMode ns.Constants.ANCHORMODE_CHAIN|ns.Constants.ANCHORMODE_DETACHED|ns.Constants.ANCHORMODE_FREE|nil Anchor mode for the bar.
 
 ---@class ECM_PowerBarConfig : ECM_BarConfigBase Power bar configuration.
 ---@field showManaAsPercent boolean Whether to show mana as a percent.
@@ -87,7 +89,7 @@
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
----@field anchorMode ECM.Constants.ANCHORMODE_CHAIN|ECM.Constants.ANCHORMODE_DETACHED|ECM.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
+---@field anchorMode ns.Constants.ANCHORMODE_CHAIN|ns.Constants.ANCHORMODE_DETACHED|ns.Constants.ANCHORMODE_FREE|nil Anchor behavior for buff bars.
 ---@field verticalSpacing number|nil Vertical gap between buff bars (pixels).
 ---@field showIcon boolean|nil Whether to show buff icons.
 ---@field showSpellName boolean|nil Whether to show spell names.
@@ -131,12 +133,12 @@
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
 ---@field itemIcons ECM_ItemIconsConfig Item icons configuration.
 
-local C = ECM.Constants
+local C = ns.Constants
 
 -- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
-powerBarTickMappings[ECM.Constants.DEMONHUNTER_CLASS_ID] = {
-    [ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX] = {
+powerBarTickMappings[C.DEMONHUNTER_CLASS_ID] = {
+    [C.DEMONHUNTER_DEVOURER_SPEC_INDEX] = {
         { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
         { value = 100 },
     },
@@ -176,7 +178,7 @@ local defaults = {
         },
         powerBar = {
             enabled = true,
-            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            anchorMode = C.ANCHORMODE_CHAIN,
             width = 300,
             editModePositions = {},
             showText = true,
@@ -283,4 +285,4 @@ local defaults = {
 }
 
 -- Export defaults for Options module to access
-ECM.defaults = defaults
+ns.defaults = defaults

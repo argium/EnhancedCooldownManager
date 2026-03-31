@@ -3,8 +3,8 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
-local L = ECM.L
+local C = ns.Constants
+local L = ns.L
 local COLOR_WHITE_HEX = C.COLOR_WHITE_HEX or "FFFFFF"
 
 local function createResourceColorName(className, label)
@@ -62,16 +62,16 @@ local RESOURCE_COLOR_DEFS = {
 }
 
 local ResourceBarOptions = {}
-local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("resourceBar")
+local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
 
 function ResourceBarOptions.RegisterSettings(SB)
-    local args = ECM.OptionUtil.CreateBarArgs(isDisabled)
+    local args = ns.OptionUtil.CreateBarArgs(isDisabled)
     args.enabled = {
         type = "toggle",
         path = "enabled",
         name = L["ENABLE_RESOURCE_BAR"],
         order = 0,
-        onSet = ECM.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+        onSet = ns.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
     }
     local maxColorDefs = {}
     for _, def in ipairs(RESOURCE_COLOR_DEFS) do
@@ -114,9 +114,9 @@ function ResourceBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = L["RESOURCE_BAR"],
         path = "resourceBar",
-        disabled = ECM.ClassUtil.IsDeathKnight,
+        disabled = ns.ClassUtil.IsDeathKnight,
         args = args,
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)
+    ns.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)

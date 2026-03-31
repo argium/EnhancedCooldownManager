@@ -2,8 +2,10 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local _, ns = ...
+
 local ColorUtil = {}
-ECM.ColorUtil = ColorUtil
+ns.ColorUtil = ColorUtil
 
 --- Compares two ECM_Color tables for equality.
 ---@param c1 ECM_Color|nil

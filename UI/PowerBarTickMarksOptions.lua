@@ -3,13 +3,13 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
-local L = ECM.L
-local store = ECM.PowerBarTickMarksStore or {}
-local PowerBarTickMarksOptions = ECM.PowerBarTickMarksOptions or {}
+local C = ns.Constants
+local L = ns.L
+local store = ns.PowerBarTickMarksStore or {}
+local PowerBarTickMarksOptions = ns.PowerBarTickMarksOptions or {}
 
-ECM.PowerBarTickMarksStore = store
-ECM.PowerBarTickMarksOptions = PowerBarTickMarksOptions
+ns.PowerBarTickMarksStore = store
+ns.PowerBarTickMarksOptions = PowerBarTickMarksOptions
 
 local function getPowerBarConfig()
     local profile = ns.Addon.db.profile
@@ -38,7 +38,7 @@ local function getTicksConfig()
 end
 
 function store.GetCurrentTicks()
-    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
+    local classID, specIndex = ns.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then
         return {}
     end
@@ -48,7 +48,7 @@ function store.GetCurrentTicks()
 end
 
 function store.SetCurrentTicks(ticks)
-    local classID, specIndex = ECM.OptionUtil.GetCurrentClassSpec()
+    local classID, specIndex = ns.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then
         return
     end
@@ -64,7 +64,7 @@ function store.AddTick(value, color, width)
     local ticksCfg = getTicksConfig()
     ticks[#ticks + 1] = {
         value = value,
-        color = color or ECM.CloneValue(ticksCfg.defaultColor),
+        color = color or ns.CloneValue(ticksCfg.defaultColor),
         width = width or ticksCfg.defaultWidth,
     }
     store.SetCurrentTicks(ticks)
@@ -104,7 +104,7 @@ function store.SetDefaultWidth(width)
     getTicksConfig().defaultWidth = width
 end
 
-StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ECM.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
+StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ns.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
 
 local function roundToStep(value)
     return math.floor(value + 0.5)
@@ -321,7 +321,7 @@ local function createTickRowWidgets(rowFrame, SB)
             return
         end
         store.UpdateTick(rowFrame._rowIndex, "value", rounded)
-        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end)
     valueSlider._ecmRescale = rescaleValueSlider
 
@@ -330,7 +330,7 @@ local function createTickRowWidgets(rowFrame, SB)
             return
         end
         store.UpdateTick(rowFrame._rowIndex, "width", rounded)
-        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end)
 end
 
@@ -341,7 +341,7 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
     local function clearAllTicks()
         store.SetCurrentTicks({})
         frame:RefreshTicks()
-        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
     local headerRow = layout:AddHeader(subcatName)
@@ -363,7 +363,7 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
     local _, defaultColorSwatch = layout:AddColorSwatch(L["DEFAULT_COLOR"])
     defaultColorSwatch:SetScript("OnClick", function()
         local c = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        ECM.OptionUtil.OpenColorPicker(c, true, function(color)
+        ns.OptionUtil.OpenColorPicker(c, true, function(color)
             store.SetDefaultColor(color)
             defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
         end)
@@ -411,17 +411,17 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
 
         rowFrame._swatch:SetScript("OnClick", function()
             local current = data.tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-            ECM.OptionUtil.OpenColorPicker(current, true, function(color)
+            ns.OptionUtil.OpenColorPicker(current, true, function(color)
                 store.UpdateTick(rowFrame._rowIndex, "color", color)
                 rowFrame._swatch:SetColorRGB(color.r, color.g, color.b)
-                ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
         end)
 
         rowFrame._removeBtn:SetScript("OnClick", function()
             store.RemoveTick(rowFrame._rowIndex)
             frame:RefreshTicks()
-            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 
@@ -436,7 +436,7 @@ local function createTickMarksCanvas(SB, subcatName, parentCategory)
             dataProvider:Insert({ index = i, tick = tick })
         end
 
-        local _, _, localisedClassName, specName, className = ECM.OptionUtil.GetCurrentClassSpec()
+        local _, _, localisedClassName, specName, className = ns.OptionUtil.GetCurrentClassSpec()
         local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
         local classSpecLabel = "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
         local count = #ticks

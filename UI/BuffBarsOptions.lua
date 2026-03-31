@@ -3,8 +3,8 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
-local L = ECM.L
+local C = ns.Constants
+local L = ns.L
 
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
@@ -13,7 +13,7 @@ local function buildSpellColorRows(entries)
     local rows = {}
 
     for _, entry in ipairs(entries or {}) do
-        local normalized = ECM.SpellColors.NormalizeKey(type(entry) == "table" and entry.key)
+        local normalized = ns.SpellColors.NormalizeKey(type(entry) == "table" and entry.key)
         if normalized then
             local merged = false
             for _, row in ipairs(rows) do
@@ -71,16 +71,16 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = ECM.OptionUtil.MakeConfirmDialog(L["SPELL_COLORS_RESET_CONFIRM"])
+StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = ns.OptionUtil.MakeConfirmDialog(L["SPELL_COLORS_RESET_CONFIRM"])
 
 local function createSpellColorCanvas(SB, subcatName)
     local layout = SB.CreateCanvasLayout(subcatName)
     local frame = layout.frame
 
     local function resetAllSpellColors()
-        ECM.SpellColors.ClearCurrentSpecColors()
+        ns.SpellColors.ClearCurrentSpecColors()
         frame:RefreshSpellList()
-        ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
     -- Header — uses SettingsListTemplate's built-in Title, divider, and DefaultsButton
@@ -117,11 +117,11 @@ local function createSpellColorCanvas(SB, subcatName)
         if ns.Addon.BuffBars:IsEditLocked() then
             return
         end
-        local c = ECM.SpellColors.GetDefaultColor()
-        ECM.OptionUtil.OpenColorPicker(c, false, function(color)
-            ECM.SpellColors.SetDefaultColor(color)
+        local c = ns.SpellColors.GetDefaultColor()
+        ns.OptionUtil.OpenColorPicker(c, false, function(color)
+            ns.SpellColors.SetDefaultColor(color)
             defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
-            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end)
     end)
 
@@ -184,18 +184,18 @@ local function createSpellColorCanvas(SB, subcatName)
         local label = data.textureFileID and ("|T" .. data.textureFileID .. ":14:14|t  " .. name) or name
         control.Text:SetText(label)
 
-        local c = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
+        local c = ns.SpellColors.GetColorByKey(data.key) or ns.SpellColors.GetDefaultColor()
         control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
 
         control.ColorSwatch:SetScript("OnClick", function()
             if ns.Addon.BuffBars:IsEditLocked() then
                 return
             end
-            local current = ECM.SpellColors.GetColorByKey(data.key) or ECM.SpellColors.GetDefaultColor()
-            ECM.OptionUtil.OpenColorPicker(current, false, function(color)
-                ECM.SpellColors.SetColorByKey(data.key, color)
+            local current = ns.SpellColors.GetColorByKey(data.key) or ns.SpellColors.GetDefaultColor()
+            ns.OptionUtil.OpenColorPicker(current, false, function(color)
+                ns.SpellColors.SetColorByKey(data.key, color)
                 control.ColorSwatch:SetColorRGB(color.r, color.g, color.b)
-                ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
             end)
         end)
     end)
@@ -204,7 +204,7 @@ local function createSpellColorCanvas(SB, subcatName)
     scrollBox:SetDataProvider(dataProvider)
 
     function frame:RefreshSpellList()
-        local rows = buildSpellColorRows(ECM.SpellColors.GetAllColorEntries())
+        local rows = buildSpellColorRows(ns.SpellColors.GetAllColorEntries())
         local secretNameFooterState = getSecretNameFooterState(rows)
 
         dataProvider:Flush()
@@ -231,7 +231,7 @@ local function createSpellColorCanvas(SB, subcatName)
         end
         secretNameReloadButton:SetEnabled(secretNameFooterState.enabled)
 
-        local dc = ECM.SpellColors.GetDefaultColor()
+        local dc = ns.SpellColors.GetDefaultColor()
         defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
 
         defaultsBtn:SetEnabled(not locked)
@@ -258,10 +258,10 @@ BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
 BuffBarsOptions._IsSpellColorsReloadRestricted = isSpellColorsReloadRestricted
 BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
 
-local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
+local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
-    local defaultZero = ECM.OptionUtil.CreateDefaultValueTransform(0)
+    local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
     SB.RegisterFromTable({
         name = L["AURA_BARS"],
         path = "buffBars",
@@ -272,10 +272,10 @@ function BuffBarsOptions.RegisterSettings(SB)
                 name = L["ENABLE_AURA_BARS"],
                 desc = L["ENABLE_AURA_BARS_DESC"],
                 order = 0,
-                onSet = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
+                onSet = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
             },
 
-            layoutMovedButton = ECM.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
+            layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
 
             -- Appearance
             appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = 20 },
@@ -339,4 +339,4 @@ function BuffBarsOptions.RegisterSettings(SB)
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)
+ns.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)

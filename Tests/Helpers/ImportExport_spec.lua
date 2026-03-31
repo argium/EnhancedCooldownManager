@@ -16,7 +16,6 @@ describe("ImportExport", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "LibStub",
             "C_AddOns",
             "time",
@@ -34,13 +33,13 @@ describe("ImportExport", function()
         deserializeValue = { profile = { imported = true } }
         migrationCalls = {}
 
-        _G.ECM = {
+        ns = {
             Log = function() end,
             CloneValue = TestHelpers.deepClone,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        ECM.Migration = {
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        ns.Migration = {
             Run = function(profile)
                 migrationCalls[#migrationCalls + 1] = profile
             end,
@@ -104,17 +103,15 @@ describe("ImportExport", function()
             end
         end
 
-        ns = {
-            Addon = {
-                db = {
-                    profile = {
-                        schemaVersion = 10,
-                        keepMe = true,
-                        buffBars = {
-                            colors = {
-                                cache = {
-                                    persisted = true,
-                                },
+        ns.Addon = {
+            db = {
+                profile = {
+                    schemaVersion = 10,
+                    keepMe = true,
+                    buffBars = {
+                        colors = {
+                            cache = {
+                                persisted = true,
                             },
                         },
                     },
@@ -123,7 +120,7 @@ describe("ImportExport", function()
         }
 
         TestHelpers.LoadChunk("Helpers/ImportExport.lua", "Unable to load Helpers/ImportExport.lua")(nil, ns)
-        ImportExport = assert(ECM.ImportExport, "ImportExport did not initialize")
+        ImportExport = assert(ns.ImportExport, "ImportExport did not initialize")
     end)
 
     it("EncodeData returns a shareable export string", function()

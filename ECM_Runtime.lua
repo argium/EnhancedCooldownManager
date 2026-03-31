@@ -3,18 +3,17 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-ECM = ECM or {}
-assert(ECM.Constants, "ECM_Constants.lua must be loaded before ECM_Runtime.lua")
-assert(ECM.FrameMixin, "FrameMixin.lua must be loaded before ECM_Runtime.lua")
-assert(ECM.EditMode, "ECM.EditMode must be initialized before ECM_Runtime.lua")
+assert(ns.Constants, "ECM_Constants.lua must be loaded before ECM_Runtime.lua")
+assert(ns.BarMixin, "BarMixin.lua must be loaded before ECM_Runtime.lua")
+assert(ns.EditMode, "ECM.EditMode must be initialized before ECM_Runtime.lua")
 assert(ns.Addon, "ECM.lua must be loaded before ECM_Runtime.lua")
 
-local C = ECM.Constants
-local L = ECM.L
-local EditMode = ECM.EditMode
+local C = ns.Constants
+local L = ns.L
+local EditMode = ns.EditMode
 local LibEditMode = EditMode.Lib
 local Runtime = {}
-ECM.Runtime = Runtime
+ns.Runtime = Runtime
 
 --------------------------------------------------------------------------------
 -- Layout — global visibility, fade, Blizzard frame enforcement, event dispatch
@@ -71,7 +70,7 @@ local function enforceBlizzardFrameState()
                 if frame:IsShown() then frame:Hide() end
             else
                 if not frame:IsShown() then frame:Show() end
-                ECM.FrameUtil.LazySetAlpha(frame, alpha)
+                ns.FrameUtil.LazySetAlpha(frame, alpha)
             end
         end
     end
@@ -90,7 +89,7 @@ local function hookBlizzardFrame(frame, name)
         if _globallyHidden then
             self:Hide()
         else
-            ECM.FrameUtil.LazySetAlpha(self, _desiredAlpha)
+            ns.FrameUtil.LazySetAlpha(self, _desiredAlpha)
         end
     end)
 
@@ -134,14 +133,14 @@ local function setAlpha(alpha)
     _desiredAlpha = alpha
     for _, module in pairs(_modules) do
         if module.InnerFrame then
-            ECM.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+            ns.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
         end
     end
 end
 
 --- Checks all fade and hide conditions and updates global state.
 local function updateFadeAndHiddenStates()
-    local globalConfig = ECM.GetGlobalConfig()
+    local globalConfig = ns.GetGlobalConfig()
     if not globalConfig then
         return
     end
@@ -181,7 +180,7 @@ local function updateFadeAndHiddenStates()
     enforceBlizzardFrameState()
 end
 
-local FU = ECM.FrameUtil
+local FU = ns.FrameUtil
 local splitAnchorName = FU.SplitAnchorName
 local buildAnchorName = FU.BuildAnchorName
 local convertOffsetToAnchor = FU.ConvertOffsetToAnchor
@@ -226,7 +225,7 @@ local function ensureDetachedAnchor()
     local frame = CreateFrame("Frame", "ECMDetachedAnchor", UIParent)
     frame:SetFrameStrata("MEDIUM")
     frame:SetSize(C.DEFAULT_BAR_WIDTH, 1)
-    ECM.FrameUtil.LazySetAnchors(frame, {
+    ns.FrameUtil.LazySetAnchors(frame, {
         { C.EDIT_MODE_DEFAULT_POINT, UIParent, C.EDIT_MODE_DEFAULT_POINT, 0, 0 },
     })
     frame:Hide()
@@ -236,8 +235,8 @@ local function ensureDetachedAnchor()
     EditMode.RegisterFrame(frame, {
         name = "ECM: Detached Anchor",
         onPositionChanged = function(layoutName, point, x, y)
-            local gc = ECM.GetGlobalConfig()
-            ECM.DebugAssert(gc, "Detached anchor drag requires global config")
+            local gc = ns.GetGlobalConfig()
+            ns.DebugAssert(gc, "Detached anchor drag requires global config")
             local growsUp = (gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
             -- Edit Mode reports the drop position using the detached box's
             -- current anchor. We immediately rewrite that position to the
@@ -253,12 +252,12 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Slider,
                 name = L["WIDTH"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
+                    local gc = ns.GetGlobalConfig()
                     return gc and gc.detachedBarWidth or C.DEFAULT_BAR_WIDTH
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    ECM.DebugAssert(gc, "Detached anchor width requires global config")
+                    local gc = ns.GetGlobalConfig()
+                    ns.DebugAssert(gc, "Detached anchor width requires global config")
                     gc.detachedBarWidth = value
                     invalidateDetachedAnchorMetrics()
                     Runtime.UpdateLayoutImmediately("DetachedAnchorWidth")
@@ -273,12 +272,12 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Slider,
                 name = L["SPACING"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
+                    local gc = ns.GetGlobalConfig()
                     return gc and gc.detachedModuleSpacing or 0
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    ECM.DebugAssert(gc, "Detached anchor spacing requires global config")
+                    local gc = ns.GetGlobalConfig()
+                    ns.DebugAssert(gc, "Detached anchor spacing requires global config")
                     gc.detachedModuleSpacing = value
                     invalidateDetachedAnchorMetrics()
                     Runtime.UpdateLayoutImmediately("DetachedAnchorSpacing")
@@ -293,12 +292,12 @@ local function ensureDetachedAnchor()
                 kind = LibEditMode.SettingType.Dropdown,
                 name = L["GROW_DIRECTION"],
                 get = function()
-                    local gc = ECM.GetGlobalConfig()
+                    local gc = ns.GetGlobalConfig()
                     return gc and gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN
                 end,
                 set = function(_, value)
-                    local gc = ECM.GetGlobalConfig()
-                    ECM.DebugAssert(gc, "Detached anchor grow direction requires global config")
+                    local gc = ns.GetGlobalConfig()
+                    ns.DebugAssert(gc, "Detached anchor grow direction requires global config")
                     gc.detachedGrowDirection = value
                     Runtime.UpdateLayoutImmediately("DetachedAnchorGrowDirection")
                 end,
@@ -310,7 +309,7 @@ local function ensureDetachedAnchor()
         },
     })
 
-    ECM.Log(nil, "Detached anchor created and registered with edit mode")
+    ns.Log(nil, "Detached anchor created and registered with edit mode")
     return frame
 end
 
@@ -339,7 +338,7 @@ local function getDetachedAnchorMetrics()
         end
     end
 
-    local gc = ECM.GetGlobalConfig()
+    local gc = ns.GetGlobalConfig()
     local spacing = gc and gc.detachedModuleSpacing or 0
     if count > 1 then
         totalHeight = totalHeight + (spacing * (count - 1))
@@ -365,7 +364,7 @@ local function applyDetachedAnchorPosition(anchor, layoutName, positions, growsU
     local pos = EditMode.GetPosition(positions, layoutName)
     local point, x, y =
         normalizeDetachedPositionToGrowEdge(pos.point, pos.x, pos.y, anchor:GetWidth(), anchor:GetHeight(), growsUp)
-    ECM.FrameUtil.LazySetAnchors(anchor, {
+    ns.FrameUtil.LazySetAnchors(anchor, {
         { point, UIParent, point, x, y },
     })
 end
@@ -383,12 +382,12 @@ local function updateDetachedAnchorLayout()
     end
 
     local anchor = ensureDetachedAnchor()
-    local gc = ECM.GetGlobalConfig()
+    local gc = ns.GetGlobalConfig()
     local barWidth = gc and gc.detachedBarWidth or C.DEFAULT_BAR_WIDTH
     local growsUp = (gc and gc.detachedGrowDirection or C.GROW_DIRECTION_DOWN) == C.GROW_DIRECTION_UP
 
-    ECM.FrameUtil.LazySetWidth(anchor, barWidth)
-    ECM.FrameUtil.LazySetHeight(anchor, math.max(metrics.totalHeight, 1))
+    ns.FrameUtil.LazySetWidth(anchor, barWidth)
+    ns.FrameUtil.LazySetHeight(anchor, math.max(metrics.totalHeight, 1))
 
     local layoutName = EditMode.GetActiveLayoutName()
     if layoutName then
@@ -402,26 +401,22 @@ local function updateDetachedAnchorLayout()
     return anchor
 end
 
-local function updateAllLayouts(reason, runImmediately)
+local function updateAllLayouts(reason)
     invalidateDetachedAnchorMetrics()
     updateDetachedAnchorLayout()
-
-    local layoutMethodName = runImmediately and "UpdateLayoutImmediately" or "ThrottledUpdateLayout"
 
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
         local module = _modules[moduleName]
-        if module then
-            local layoutMethod = module[layoutMethodName] or module.ThrottledUpdateLayout
-            layoutMethod(module, reason)
+        if module and module:IsReady() then
+            module:UpdateLayout(reason)
         end
     end
 
     for frameName, module in pairs(_modules) do
-        if not _chainSet[frameName] then
-            local layoutMethod = module[layoutMethodName] or module.ThrottledUpdateLayout
-            layoutMethod(module, reason)
+        if not _chainSet[frameName] and module:IsReady() then
+            module:UpdateLayout(reason)
         end
     end
 end
@@ -443,7 +438,7 @@ local function hookCooldownViewerSettings()
     end)
 
     _cooldownViewerSettingsHooked = true
-    ECM.Log(nil, "Hooked CooldownViewerSettings OnHide")
+    ns.Log(nil, "Hooked CooldownViewerSettings OnHide")
 end
 
 --------------------------------------------------------------------------------
@@ -459,19 +454,19 @@ function Runtime.SetLayoutPreview(active)
         return
     end
     _layoutPreviewActive = active
-    ECM.Log(nil, "Layout preview " .. (active and "ON" or "OFF"))
+    ns.Log(nil, "Layout preview " .. (active and "ON" or "OFF"))
     updateFadeAndHiddenStates()
     Runtime.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
 end
 
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
-local function executeLayout(reason, runModuleLayoutsImmediately)
+local function executeLayout(reason)
     _layoutPending = false
     _layoutPendingDelay = nil
     _layoutPendingTimer = nil
     hookCooldownViewerSettings()
     updateFadeAndHiddenStates()
-    updateAllLayouts(reason, runModuleLayoutsImmediately)
+    updateAllLayouts(reason)
 end
 
 --- Runs a layout update synchronously (no timer batching).
@@ -479,7 +474,51 @@ end
 --- @param reason string|nil The lifecycle reason.
 function Runtime.UpdateLayoutImmediately(reason)
     invalidateDetachedAnchorMetrics()
-    executeLayout(reason, true)
+    executeLayout(reason)
+end
+
+local _requestPending = false
+local _requestReason = nil
+local _requestSecondPass = false
+
+--- Requests a deferred layout pass for all registered modules.
+--- Coalesces multiple requests within the same frame into one pass.
+--- @param reason string Debug trace string identifying the caller.
+--- @param opts table|nil Optional parameters: { secondPass = boolean }
+function Runtime.RequestLayout(reason, opts)
+    if opts and opts.secondPass then
+        _requestSecondPass = true
+    end
+    if _requestPending then
+        return
+    end
+    _requestReason = reason
+    _requestPending = true
+    C_Timer.After(0, function()
+        local why = _requestReason
+        local needSecondPass = _requestSecondPass
+        _requestPending = false
+        _requestReason = nil
+        _requestSecondPass = false
+        executeLayout(why)
+        if needSecondPass then
+            C_Timer.After(C.LIFECYCLE_SECOND_PASS_DELAY, function()
+                if _requestPending or _layoutPending then
+                    return
+                end
+                executeLayout("SecondPass")
+            end)
+        end
+    end)
+end
+
+--- Requests a refresh (values only, no geometry) for a single module.
+--- @param module table The module to refresh.
+--- @param reason string Debug trace string.
+function Runtime.RequestRefresh(module, reason)
+    if module and module.ThrottledRefresh then
+        module:ThrottledRefresh(reason)
+    end
 end
 
 --- Schedules a layout update after a delay (debounced).
@@ -503,34 +542,34 @@ function Runtime.ScheduleLayoutUpdate(delay, reason)
     _layoutPending = true
     _layoutPendingDelay = waitTime
     _layoutPendingTimer = C_Timer.NewTimer(waitTime, function()
-        executeLayout(reason, true)
+        executeLayout(reason)
     end)
 end
 
---- Registers a FrameMixin to receive layout update events.
---- @param frame FrameMixin The frame to register
+--- Registers a module frame to receive layout update events.
+--- @param frame FrameProto The frame to register
 function Runtime.RegisterFrame(frame)
-    ECM.FrameMixin.AssertValid(frame)
+    ns.BarMixin.AssertValid(frame)
     assert(_modules[frame.Name] == nil, "RegisterFrame: frame with name '" .. frame.Name .. "' is already registered")
 
     invalidateDetachedAnchorMetrics()
     _modules[frame.Name] = frame
     frame:SetHidden(_globallyHidden)
-    ECM.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
-    ECM.Log(nil, "Frame registered: " .. frame.Name)
+    ns.FrameUtil.LazySetAlpha(frame.InnerFrame, _desiredAlpha)
+    ns.Log(nil, "Frame registered: " .. frame.Name)
 end
 
---- Unregisters a FrameMixin from layout update events.
---- @param frame FrameMixin The frame to unregister
+--- Unregisters a module frame from layout update events.
+--- @param frame FrameProto The frame to unregister
 function Runtime.UnregisterFrame(frame)
-    ECM.FrameMixin.AssertValid(frame)
+    ns.BarMixin.AssertValid(frame)
     assert(_modules[frame.Name] ~= nil, "UnregisterFrame: frame with name '" .. frame.Name .. "' is not registered")
 
     local name = frame.Name
     invalidateDetachedAnchorMetrics()
     _modules[name] = nil
     frame:SetHidden(true)
-    ECM.Log(nil, "Frame unregistered: " .. name)
+    ns.Log(nil, "Frame unregistered: " .. name)
 end
 
 --------------------------------------------------------------------------------
@@ -574,7 +613,7 @@ local function handleLayoutEvent(_addon, event, arg1)
 
     if config.delay > 0 then
         C_Timer.After(config.delay, function()
-            executeLayout(event, true)
+            executeLayout(event)
         end)
         return
     end
@@ -615,7 +654,7 @@ local function enableLayoutEvents(addon)
 
         for _, module in pairs(_modules) do
             if module.InnerFrame and not module.IsHidden then
-                ECM.FrameUtil.LazySetAlpha(module.InnerFrame, _desiredAlpha)
+                ns.FrameUtil.LazySetAlpha(module.InnerFrame, _desiredAlpha)
             end
         end
     end)

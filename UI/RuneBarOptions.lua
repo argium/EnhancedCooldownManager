@@ -3,17 +3,17 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 local RuneBarOptions = {}
-local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("runeBar")
+local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
 
 function RuneBarOptions.RegisterSettings(SB)
-    local args = ECM.OptionUtil.CreateBarArgs(isDisabled, { showText = false, border = false })
+    local args = ns.OptionUtil.CreateBarArgs(isDisabled, { showText = false, border = false })
     args.dkWarning = {
         type = "subheader",
         name = L["DK_ONLY_WARNING"],
         condition = function()
-            return not ECM.ClassUtil.IsDeathKnight()
+            return not ns.ClassUtil.IsDeathKnight()
         end,
         order = 0,
     }
@@ -22,7 +22,7 @@ function RuneBarOptions.RegisterSettings(SB)
         path = "enabled",
         name = L["ENABLE_RUNE_BAR"],
         order = 1,
-        onSet = ECM.OptionUtil.CreateModuleEnabledHandler("RuneBar"),
+        onSet = ns.OptionUtil.CreateModuleEnabledHandler("RuneBar"),
     }
     args.colorLabel = { type = "subheader", name = L["COLORS"], disabled = isDisabled, order = 30 }
     args.useSpecColor = {
@@ -75,10 +75,10 @@ function RuneBarOptions.RegisterSettings(SB)
         name = L["RUNE_BAR"],
         path = "runeBar",
         disabled = function()
-            return not ECM.ClassUtil.IsDeathKnight()
+            return not ns.ClassUtil.IsDeathKnight()
         end,
         args = args,
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "RuneBar", RuneBarOptions)
+ns.SettingsBuilder.RegisterSection(ns, "RuneBar", RuneBarOptions)

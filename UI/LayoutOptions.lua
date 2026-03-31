@@ -3,8 +3,8 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ECM.Constants
-local L = ECM.L
+local C = ns.Constants
+local L = ns.L
 
 local LayoutOptions = {}
 
@@ -25,17 +25,17 @@ local function createAnchorModeSpec(name, path, order, disabled)
 end
 
 function LayoutOptions.RegisterSettings(SB)
-    local defaultZero = ECM.OptionUtil.CreateDefaultValueTransform(0)
-    local defaultDetachedGrowDirection = ECM.OptionUtil.CreateDefaultValueTransform(C.GROW_DIRECTION_DOWN)
-    local powerBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("powerBar")
-    local resourceBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("resourceBar")
-    local runeBarDisabled = ECM.OptionUtil.GetIsDisabledDelegate("runeBar")
-    local buffBarsDisabled = ECM.OptionUtil.GetIsDisabledDelegate("buffBars")
+    local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
+    local defaultDetachedGrowDirection = ns.OptionUtil.CreateDefaultValueTransform(C.GROW_DIRECTION_DOWN)
+    local powerBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
+    local resourceBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
+    local runeBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
+    local buffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 
     local args = {
         positioningExamples = {
             type = "canvas",
-            canvas = ECM.OptionUtil.CreatePositioningExamplesCanvas(),
+            canvas = ns.OptionUtil.CreatePositioningExamplesCanvas(),
             height = C.POSITION_MODE_EXPLAINER_HEIGHT,
             order = 0,
         },
@@ -82,20 +82,20 @@ function LayoutOptions.RegisterSettings(SB)
         },
     }
 
-    for key, spec in pairs(ECM.OptionUtil.CreateDetachedStackArgs()) do
+    for key, spec in pairs(ns.OptionUtil.CreateDetachedStackArgs()) do
         args[key] = spec
     end
 
     SB.RegisterFromTable({
         name = L["LAYOUT_SUBCATEGORY"],
         onShow = function()
-            ECM.Runtime.SetLayoutPreview(true)
+            ns.Runtime.SetLayoutPreview(true)
         end,
         onHide = function()
-            ECM.Runtime.SetLayoutPreview(false)
+            ns.Runtime.SetLayoutPreview(false)
         end,
         args = args,
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "Layout", LayoutOptions)
+ns.SettingsBuilder.RegisterSection(ns, "Layout", LayoutOptions)

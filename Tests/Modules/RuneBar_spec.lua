@@ -22,7 +22,6 @@ describe("RuneBar real source", function()
     setup(function()
         originalGlobals =
             TestHelpers.CaptureGlobals({
-                "ECM",
                 "C_Timer",
                 "CreateFrame",
                 "GetSpecialization",
@@ -46,9 +45,9 @@ describe("RuneBar real source", function()
         frameRefreshResult = true
         now = 100
 
-        _G.ECM = {
-            FrameMixin = {
-                Proto = {
+        ns = {
+            BarMixin = {
+                FrameProto = {
                     ShouldShow = function()
                         return true
                     end,
@@ -64,9 +63,7 @@ describe("RuneBar real source", function()
                         return frame
                     end,
                 },
-            },
-            BarMixin = {
-                AddMixin = function(target)
+                AddBarMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
@@ -83,7 +80,9 @@ describe("RuneBar real source", function()
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
+                RequestLayout = function() end,
             },
+            FrameUtil = {},
             Log = function() end,
         }
         _G.C_Timer = {
@@ -127,17 +126,15 @@ describe("RuneBar real source", function()
             end
             return frame
         end
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
-        ns = {
-            Addon = {
-                NewModule = function(self, name)
-                    local module = { Name = name }
-                    self[name] = module
-                    return module
-                end,
-            },
+        ns.Addon = {
+            NewModule = function(self, name)
+                local module = { Name = name }
+                self[name] = module
+                return module
+            end,
         }
 
         TestHelpers.LoadChunk("Modules/RuneBar.lua", "Unable to load Modules/RuneBar.lua")(nil, ns)
@@ -181,7 +178,7 @@ describe("RuneBar real source", function()
         isDeathKnight = true
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
-        function RuneBar:ThrottledUpdateLayout() end
+        ns.Runtime.RequestLayout = function() end
 
         RuneBar:OnRunePowerUpdate()
 
@@ -191,13 +188,13 @@ describe("RuneBar real source", function()
 
     it("defers a layout refresh on rune power updates", function()
         local reasons = {}
-        function RuneBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
         RuneBar:OnRunePowerUpdate()
 
-        assert.same({ "RUNE_POWER_UPDATE" }, reasons)
+        assert.same({ "RuneBar:RUNE_POWER_UPDATE" }, reasons)
     end)
 
     it("unregisters the frame and cancels the ticker on disable when needed", function()
@@ -273,10 +270,10 @@ describe("RuneBar real source", function()
         RuneBar.LayoutResourceTicks = function(_, maxRunes)
             layoutTicksMax = maxRunes
         end
-        ECM.GetTexture = function()
+        ns.FrameUtil.GetTexture = function()
             return "Interface\\TargetingFrame\\UI-StatusBar"
         end
-        ECM.PixelSnap = function(v)
+        ns.FrameUtil.PixelSnap = function(v)
             return math.floor(v + 0.5)
         end
         _G.GetRuneCooldown = function()
@@ -284,8 +281,8 @@ describe("RuneBar real source", function()
         end
 
         assert.is_true(RuneBar:Refresh("test"))
-        assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES - 1, ensureTicksCount)
-        assert.are.equal(ECM.Constants.RUNEBAR_MAX_RUNES, layoutTicksMax)
+        assert.are.equal(ns.Constants.RUNEBAR_MAX_RUNES - 1, ensureTicksCount)
+        assert.are.equal(ns.Constants.RUNEBAR_MAX_RUNES, layoutTicksMax)
         assert.is_true(frame.__shown == true)
     end)
 
@@ -298,7 +295,7 @@ describe("RuneBar real source", function()
 
     it("ticker hot path updates fragment values without relayout when rune states are unchanged", function()
         local frags = {}
-        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
             frags[i] = {
                 SetValue = function(self, value)
                     self.__value = value
@@ -310,9 +307,9 @@ describe("RuneBar real source", function()
         end
         RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
         RuneBar.InnerFrame.FragmentedBars = frags
-        RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
         RuneBar.InnerFrame._lastReadySet = {}
-        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
             RuneBar.InnerFrame._lastReadySet[i] = true
         end
         RuneBar.GetModuleConfig = function()
@@ -328,7 +325,7 @@ describe("RuneBar real source", function()
 
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
-        function RuneBar:ThrottledUpdateLayout() end
+        ns.Runtime.RequestLayout = function() end
         RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
@@ -341,7 +338,7 @@ describe("RuneBar real source", function()
     it("ticker hot path requests relayout when rune ready states change", function()
         local reasons = {}
         local frags = {}
-        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
             frags[i] = {
                 SetValue = function() end,
                 SetStatusBarColor = function() end,
@@ -349,9 +346,9 @@ describe("RuneBar real source", function()
         end
         RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
         RuneBar.InnerFrame.FragmentedBars = frags
-        RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
         RuneBar.InnerFrame._lastReadySet = {}
-        for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
             RuneBar.InnerFrame._lastReadySet[i] = true
         end
         RuneBar.GetModuleConfig = function()
@@ -360,7 +357,7 @@ describe("RuneBar real source", function()
         RuneBar.GetGlobalConfig = function()
             return { updateFrequency = 0.04, texture = "Solid" }
         end
-        function RuneBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
         _G.GetRuneCooldown = function(index)
@@ -376,14 +373,14 @@ describe("RuneBar real source", function()
         RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
-        assert.same({ "RUNE_POWER_UPDATE", "RuneStateChange" }, reasons)
+        assert.same({ "RuneBar:RUNE_POWER_UPDATE", "RuneBar:RuneStateChange" }, reasons)
     end)
 
     it("ticker hot path uses specialization colors when enabled", function()
         local specId = 0
         local colorCases = {
-            { specId = ECM.Constants.DEATHKNIGHT_FROST_SPEC_INDEX, expected = { 0.1, 0.2, 0.3 } },
-            { specId = ECM.Constants.DEATHKNIGHT_UNHOLY_SPEC_INDEX, expected = { 0.4, 0.5, 0.6 } },
+            { specId = ns.Constants.DEATHKNIGHT_FROST_SPEC_INDEX, expected = { 0.1, 0.2, 0.3 } },
+            { specId = ns.Constants.DEATHKNIGHT_UNHOLY_SPEC_INDEX, expected = { 0.4, 0.5, 0.6 } },
             { specId = 99, expected = { 0.7, 0.8, 0.9 } },
         }
         _G.GetSpecialization = function()
@@ -409,11 +406,11 @@ describe("RuneBar real source", function()
 
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
-        function RuneBar:ThrottledUpdateLayout() end
+        ns.Runtime.RequestLayout = function() end
 
         for _, case in ipairs(colorCases) do
             local frags = {}
-            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
                 frags[i] = {
                     SetValue = function() end,
                     SetStatusBarColor = function(self, r, g, b)
@@ -423,9 +420,9 @@ describe("RuneBar real source", function()
             end
             RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
             RuneBar.InnerFrame.FragmentedBars = frags
-            RuneBar.InnerFrame._maxResources = ECM.Constants.RUNEBAR_MAX_RUNES
+            RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
             RuneBar.InnerFrame._lastReadySet = {}
-            for i = 1, ECM.Constants.RUNEBAR_MAX_RUNES do
+            for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
                 RuneBar.InnerFrame._lastReadySet[i] = true
             end
 

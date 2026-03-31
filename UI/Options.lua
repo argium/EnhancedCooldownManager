@@ -3,15 +3,22 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 
-local OU = ECM.OptionUtil
-local getGlobalConfig = ECM.GetGlobalConfig or function()
+local OU = ns.OptionUtil
+local getGlobalConfig = ns.GetGlobalConfig or function()
     local db = ns.Addon and ns.Addon.db
     local profile = db and db.profile
     return profile and profile.global
 end
+
+local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
+local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
+
+local BUTTON_X = 37 -- matches the settings info-row title anchor
+local BUTTON_HEIGHT = 26
+local BUTTON_WIDTH = 200
 
 --------------------------------------------------------------------------------
 -- SettingsBuilder instance
@@ -19,7 +26,7 @@ end
 
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
-ECM.SettingsBuilder = LSB:New({
+ns.SettingsBuilder = LSB:New({
     pathAdapter = LSB.PathAdapter({
         getStore = function()
             return ns.Addon.db and ns.Addon.db.profile
@@ -33,7 +40,7 @@ ECM.SettingsBuilder = LSB:New({
     varPrefix = "ECM",
     onChanged = function(spec)
         if spec.layout ~= false then
-            ECM.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
     end,
     compositeDefaults = {
@@ -53,15 +60,91 @@ ECM.SettingsBuilder = LSB:New({
 })
 
 --------------------------------------------------------------------------------
+-- About section
+--------------------------------------------------------------------------------
+
+local About = {}
+
+local function createLinksCanvas()
+    local frame = CreateFrame("Frame")
+    frame:SetHeight(BUTTON_HEIGHT * 2)
+
+    local curseforge = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    curseforge:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
+    curseforge:SetPoint("TOPLEFT", BUTTON_X, 0)
+    curseforge:SetText(L["CURSEFORGE"])
+    curseforge:SetScript("OnClick", function()
+        ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
+    end)
+
+    local github = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    github:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
+    github:SetPoint("TOPLEFT", BUTTON_X, -BUTTON_HEIGHT)
+    github:SetText(L["GITHUB"])
+    github:SetScript("OnClick", function()
+        ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
+    end)
+
+    frame._curseforge = curseforge
+    frame._github = github
+
+    return frame
+end
+
+function About.RegisterSettings(SB)
+    local version = (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
+    local authorText = ns.ColorUtil.Sparkle("Argi")
+
+    local linksCanvas = createLinksCanvas()
+
+    SB.RegisterFromTable({
+        name = L["ADDON_NAME"],
+        rootCategory = true,
+        args = {
+            author = {
+                type = "info",
+                name = L["AUTHOR"],
+                value = authorText,
+                order = 1,
+            },
+            contributors = {
+                type = "info",
+                name = L["CONTRIBUTORS"],
+                value = "kayti-wow",
+                order = 2,
+            },
+            version = {
+                type = "info",
+                name = L["VERSION"],
+                value = version,
+                order = 3,
+            },
+            linksHeader = {
+                type = "description",
+                name = L["LINKS"],
+                order = 9,
+            },
+            links = {
+                type = "canvas",
+                canvas = linksCanvas,
+                height = BUTTON_HEIGHT * 2,
+                order = 10,
+            },
+        },
+    })
+end
+
+--------------------------------------------------------------------------------
 -- Options module
 --------------------------------------------------------------------------------
 
 ns.OptionsSections = ns.OptionsSections or {}
+ns.OptionsSections["About"] = About
 
 local Options = ns.Addon:NewModule("Options")
 
 local function isTrackedECMCategory(category)
-    local SB = ECM.SettingsBuilder
+    local SB = ns.SettingsBuilder
     return SB ~= nil and SB.HasCategory(category)
 end
 
@@ -83,7 +166,7 @@ local function rememberTrackedCategory(module, category)
 end
 
 local function getDefaultOptionsCategoryToken()
-    local SB = ECM.SettingsBuilder
+    local SB = ns.SettingsBuilder
     local category = SB.GetSubcategory(L["GENERAL"]) or SB.GetRootCategory()
     return getCategoryOpenToken(category)
 end
@@ -121,7 +204,7 @@ function Options:InstallCategoryTracking()
 end
 
 function Options:OnInitialize()
-    local SB = ECM.SettingsBuilder
+    local SB = ns.SettingsBuilder
     SB.CreateRootCategory(L["ADDON_NAME"])
 
     -- About section renders on the root category (no subcategory entry)
