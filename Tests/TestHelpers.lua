@@ -1137,11 +1137,10 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     ns.CloneValue = deepClone
     ns.Runtime = ns.Runtime or {}
     ns.Runtime.ScheduleLayoutUpdate = function() end
-    ns.ClassUtil = {
-        IsDeathKnight = function()
-            return false
-        end,
-    }
+    ns.IsDeathKnight = function()
+        return false
+    end
+    ns.ClassUtil = {}
 
     TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)

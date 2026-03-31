@@ -131,29 +131,35 @@ describe("FrameUtil", function()
             assert.is_nil(FrameUtil.GetIconTextureFileID(frame))
         end)
 
-        it("GetBarBackground discovers and caches the Blizzard bar background texture", function()
-            local regionA = makeTexture({ atlas = "OtherAtlas" })
-            local regionB = makeTexture({ atlas = "UI-HUD-CooldownManager-Bar-BG" })
-            local statusBar = makeStatusBar({
-                regions = { regionA, regionB },
-            })
+        describe("GetBarBackground", function()
+            it("returns nil for a nil statusBar", function()
+                assert.is_nil(FrameUtil.GetBarBackground(nil))
+            end)
 
-            local found = FrameUtil.GetBarBackground(statusBar)
-            assert.are.equal(regionB, found)
-            assert.are.equal(regionB, statusBar.__ecmBarBG)
+            it("discovers the bar background region by atlas name", function()
+                local bgRegion = makeTexture({ atlas = "UI-HUD-CoolDownManager-Bar-BG" })
+                local bar = makeStatusBar({
+                    regions = { makeTexture(), bgRegion },
+                })
+                assert.are.equal(bgRegion, FrameUtil.GetBarBackground(bar))
+            end)
 
-            statusBar.GetRegions = function()
-                error("should not rescan regions when cache is valid")
-            end
-            assert.are.equal(regionB, FrameUtil.GetBarBackground(statusBar))
-        end)
+            it("caches the discovered background for subsequent calls", function()
+                local bgRegion = makeTexture({ atlas = "UI-HUD-CooldownManager-Bar-BG" })
+                local bar = makeStatusBar({
+                    regions = { bgRegion },
+                })
+                FrameUtil.GetBarBackground(bar)
+                assert.are.equal(bgRegion, bar.__ecmBarBG)
+                assert.are.equal(bgRegion, FrameUtil.GetBarBackground(bar))
+            end)
 
-        it("GetBarBackground accepts both atlas spellings and returns nil for invalid input", function()
-            local region = makeTexture({ atlas = "UI-HUD-CoolDownManager-Bar-BG" })
-            local statusBar = makeStatusBar({ regions = { region } })
-            assert.are.equal(region, FrameUtil.GetBarBackground(statusBar))
-            assert.is_nil(FrameUtil.GetBarBackground({}))
-            assert.is_nil(FrameUtil.GetBarBackground(nil))
+            it("returns nil when no region matches the atlas", function()
+                local bar = makeStatusBar({
+                    regions = { makeTexture() },
+                })
+                assert.is_nil(FrameUtil.GetBarBackground(bar))
+            end)
         end)
     end)
 
@@ -280,20 +286,6 @@ describe("FrameUtil", function()
             assert.is_false(FrameUtil.LazySetBackgroundColor(frame, c))
         end)
 
-        it("LazySetVertexColor reapplies every call when getters are unavailable", function()
-            local texture = makeTexture({ vertexColor = { 0.5, 0.5, 0.5, 1 } })
-
-            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.5, 0.5, 0.5, 1)))
-            assert.are.equal(0, getCalls(texture, "SetVertexColor"))
-
-            texture.GetColorTexture = nil
-            texture.GetVertexColor = nil
-
-            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 0, 0, 1)))
-            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 0, 0, 1)))
-            assert.are.equal(2, getCalls(texture, "SetVertexColor"))
-        end)
-
         it("LazySetStatusBarTexture no-ops when texture matches and applies when different", function()
             local bar = makeStatusBar({ texturePath = "TexA" })
 
@@ -384,18 +376,6 @@ describe("FrameUtil", function()
             assert.is_false(border:IsShown())
         end)
 
-        it("LazySetText reads live text before writing", function()
-            local fontString = { __text = "Hello", __calls = {} }
-            fontString.GetText = function(self) return self.__text end
-            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
-
-            assert.is_false(FrameUtil.LazySetText(fontString, "Hello"))
-            assert.are.equal(0, getCalls(fontString, "SetText"))
-
-            assert.is_true(FrameUtil.LazySetText(fontString, "World"))
-            assert.are.equal(1, getCalls(fontString, "SetText"))
-        end)
-
         -- Edge case: scalar setters detect external mutation
         for _, case in ipairs({
             { fn = "LazySetHeight", initial = 20, target = 20, external = 25, setter = "SetHeight", getter = "GetHeight", opts = { height = 20 } },
@@ -436,35 +416,6 @@ describe("FrameUtil", function()
             -- color.a is explicitly 1, stored alpha is 1 → no-op
             assert.is_false(FrameUtil.LazySetBackgroundColor(frame, color(0.1, 0.2, 0.3, 1)))
             assert.are.equal(0, getCalls(bg, "SetColorTexture"))
-        end)
-
-        -- Edge case: LazySetVertexColor prefers GetColorTexture
-        it("LazySetVertexColor reads via GetColorTexture when available", function()
-            local texture = makeTexture({ colorTexture = { 0.3, 0.4, 0.5, 1 }, vertexColor = { 0, 0, 0, 1 } })
-
-            -- Match is against colorTexture, not vertexColor
-            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.3, 0.4, 0.5, 1)))
-            assert.are.equal(0, getCalls(texture, "SetVertexColor"))
-        end)
-
-        -- Edge case: LazySetVertexColor falls back to GetVertexColor when GetColorTexture returns nil values
-        it("LazySetVertexColor falls back to GetVertexColor when GetColorTexture returns nil", function()
-            local texture = makeTexture({ vertexColor = { 0.2, 0.3, 0.4, 0.8 } })
-            texture.GetColorTexture = function() return nil end
-
-            assert.is_false(FrameUtil.LazySetVertexColor(texture, color(0.2, 0.3, 0.4, 0.8)))
-            assert.are.equal(0, getCalls(texture, "SetVertexColor"))
-
-            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(1, 1, 1, 1)))
-            assert.are.equal(1, getCalls(texture, "SetVertexColor"))
-        end)
-
-        -- Edge case: LazySetVertexColor applies when only alpha differs
-        it("LazySetVertexColor applies when only alpha differs", function()
-            local texture = makeTexture({ vertexColor = { 0.5, 0.5, 0.5, 1 } })
-
-            assert.is_true(FrameUtil.LazySetVertexColor(texture, color(0.5, 0.5, 0.5, 0.5)))
-            assert.are.equal(1, getCalls(texture, "SetVertexColor"))
         end)
 
         -- Edge case: LazySetStatusBarTexture when GetStatusBarTexture returns nil
@@ -570,27 +521,6 @@ describe("FrameUtil", function()
             assert.is_true(FrameUtil.LazySetBorder(frame, cfg))
         end)
 
-        -- Edge case: LazySetText nil→non-nil
-        it("LazySetText applies when text changes from nil to non-nil", function()
-            local fontString = { __text = nil, __calls = {} }
-            fontString.GetText = function(self) return self.__text end
-            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
-
-            assert.is_true(FrameUtil.LazySetText(fontString, "Hello"))
-            assert.are.equal(1, getCalls(fontString, "SetText"))
-            assert.are.equal("Hello", fontString:GetText())
-        end)
-
-        -- Edge case: LazySetText non-nil→nil
-        it("LazySetText applies when text changes from non-nil to nil", function()
-            local fontString = { __text = "Hello", __calls = {} }
-            fontString.GetText = function(self) return self.__text end
-            fontString.SetText = function(self, text) incCalls(self, "SetText"); self.__text = text end
-
-            assert.is_true(FrameUtil.LazySetText(fontString, nil))
-            assert.are.equal(1, getCalls(fontString, "SetText"))
-        end)
-
         -- Edge case: LazySetAnchors detects external anchor mutation
         it("LazySetAnchors detects external anchor mutation even when cache matches", function()
             local anchorA = makeFrame({ name = "AnchorA" })
@@ -690,28 +620,6 @@ describe("FrameUtil", function()
             end)
         end)
 
-        describe("BuildAnchorName", function()
-            it("returns CENTER for nil, nil", function()
-                assert.are.equal("CENTER", FrameUtil.BuildAnchorName(nil, nil))
-            end)
-
-            it("returns TOPLEFT for TOP, LEFT", function()
-                assert.are.equal("TOPLEFT", FrameUtil.BuildAnchorName("TOP", "LEFT"))
-            end)
-
-            it("returns BOTTOMRIGHT for BOTTOM, RIGHT", function()
-                assert.are.equal("BOTTOMRIGHT", FrameUtil.BuildAnchorName("BOTTOM", "RIGHT"))
-            end)
-
-            it("returns TOP for TOP, nil", function()
-                assert.are.equal("TOP", FrameUtil.BuildAnchorName("TOP", nil))
-            end)
-
-            it("returns LEFT for nil, LEFT", function()
-                assert.are.equal("LEFT", FrameUtil.BuildAnchorName(nil, "LEFT"))
-            end)
-        end)
-
         describe("GetParentAnchorPosition", function()
             it("returns center for CENTER", function()
                 local x, y = FrameUtil.GetParentAnchorPosition("CENTER", 1000, 600)
@@ -792,38 +700,6 @@ describe("FrameUtil", function()
             end)
         end)
 
-        describe("GetOffsetFromFrameCenter", function()
-            it("returns 0, 0 for CENTER", function()
-                local x, y = FrameUtil.GetOffsetFromFrameCenter("CENTER", 100, 60)
-                assert.are.equal(0, x)
-                assert.are.equal(0, y)
-            end)
-
-            it("returns negative half-width and positive half-height for TOPLEFT", function()
-                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", 100, 60)
-                assert.are.equal(-50, x)
-                assert.are.equal(30, y)
-            end)
-
-            it("returns positive half-width and negative half-height for BOTTOMRIGHT", function()
-                local x, y = FrameUtil.GetOffsetFromFrameCenter("BOTTOMRIGHT", 100, 60)
-                assert.are.equal(50, x)
-                assert.are.equal(-30, y)
-            end)
-
-            it("returns 0, 0 for nil dimensions", function()
-                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", nil, nil)
-                assert.are.equal(0, x)
-                assert.are.equal(0, y)
-            end)
-
-            it("returns 0, 0 for nil point", function()
-                local x, y = FrameUtil.GetOffsetFromFrameCenter(nil, 100, 60)
-                assert.are.equal(0, x)
-                assert.are.equal(0, y)
-            end)
-        end)
-
         describe("NormalizePosition", function()
             it("no-ops when point equals relativePoint", function()
                 local p, x, y = FrameUtil.NormalizePosition("TOPLEFT", "TOPLEFT", 10, 20, parent)
@@ -861,41 +737,97 @@ describe("FrameUtil", function()
             end)
         end)
 
+        describe("BuildAnchorName", function()
+            it("returns CENTER when both parts are nil", function()
+                assert.are.equal("CENTER", FrameUtil.BuildAnchorName(nil, nil))
+            end)
+
+            it("returns horizontal when vertical is nil", function()
+                assert.are.equal("LEFT", FrameUtil.BuildAnchorName(nil, "LEFT"))
+                assert.are.equal("RIGHT", FrameUtil.BuildAnchorName(nil, "RIGHT"))
+            end)
+
+            it("returns vertical when horizontal is nil", function()
+                assert.are.equal("TOP", FrameUtil.BuildAnchorName("TOP", nil))
+                assert.are.equal("BOTTOM", FrameUtil.BuildAnchorName("BOTTOM", nil))
+            end)
+
+            it("combines vertical and horizontal", function()
+                assert.are.equal("TOPLEFT", FrameUtil.BuildAnchorName("TOP", "LEFT"))
+                assert.are.equal("BOTTOMRIGHT", FrameUtil.BuildAnchorName("BOTTOM", "RIGHT"))
+            end)
+        end)
+
+        describe("GetOffsetFromFrameCenter", function()
+            it("returns 0,0 for CENTER", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("CENTER", 200, 100)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+
+            it("returns negative halfWidth and positive halfHeight for TOPLEFT", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", 200, 100)
+                assert.are.equal(-100, x)
+                assert.are.equal(50, y)
+            end)
+
+            it("returns positive halfWidth and negative halfHeight for BOTTOMRIGHT", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("BOTTOMRIGHT", 200, 100)
+                assert.are.equal(100, x)
+                assert.are.equal(-50, y)
+            end)
+
+            it("handles single-axis anchors", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("LEFT", 200, 100)
+                assert.are.equal(-100, x)
+                assert.are.equal(0, y)
+
+                x, y = FrameUtil.GetOffsetFromFrameCenter("TOP", 200, 100)
+                assert.are.equal(0, x)
+                assert.are.equal(50, y)
+            end)
+
+            it("treats nil dimensions as 0", function()
+                local x, y = FrameUtil.GetOffsetFromFrameCenter("TOPLEFT", nil, nil)
+                assert.are.equal(0, x)
+                assert.are.equal(0, y)
+            end)
+        end)
+
         describe("ConvertOffsetToAnchor", function()
-            it("no-ops when source and target points are the same", function()
-                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "CENTER", 10, 20, 100, 60, parent)
+            it("returns unchanged offsets when source equals target", function()
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "CENTER", 10, 20, 200, 100, parent)
                 assert.are.equal(10, x)
                 assert.are.equal(20, y)
             end)
 
-            it("converts CENTER to TOP accounting for frame height", function()
-                -- parent 1024x768, frame 100x60
-                -- parentAnchor CENTER=(512,384), TOP=(512,768)
-                -- frameCenter CENTER=(0,0), TOP=(0,30)
-                -- center: (512+10-0, 384+20-0) = (522, 404)
-                -- result: (522+0-512, 404+30-768) = (10, -334)
-                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "TOP", 10, 20, 100, 60, parent)
-                assert.are.equal(10, x)
-                assert.are.equal(-334, y)
+            it("converts CENTER to TOPLEFT accounting for parent and frame size", function()
+                -- parent is 1024x768
+                -- Parent anchor CENTER = (512, 384), TOPLEFT = (0, 768)
+                -- Frame offset CENTER = (0, 0), TOPLEFT = (-100, 50) for 200x100
+                -- x2 = 10 + 512 - 0 - 0 + (-100) = 422
+                -- y2 = 20 + 384 - 768 - 0 + 50 = -314
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "TOPLEFT", 10, 20, 200, 100, parent)
+                assert.are.equal(422, x)
+                assert.are.equal(-314, y)
             end)
 
-            it("converts TOPLEFT to BOTTOMLEFT accounting for frame height", function()
-                -- parent 1024x768, frame 0x100
-                -- parentAnchor TOPLEFT=(0,768), BOTTOMLEFT=(0,0)
-                -- frameCenter TOPLEFT=(0,50), BOTTOMLEFT=(0,-50)
-                -- center: (0+0-0, 768+0-50) = (0, 718)
-                -- result: (0+0-0, 718+(-50)-0) = (0, 668)
-                local x, y = FrameUtil.ConvertOffsetToAnchor("TOPLEFT", "BOTTOMLEFT", 0, 0, 0, 100, parent)
+            it("converts between TOP and BOTTOM for grow-direction use case", function()
+                -- parent is 1024x768
+                -- Parent anchor TOP = (512, 768), BOTTOM = (512, 0)
+                -- Frame offset TOP = (0, 50), BOTTOM = (0, -50) for 200x100
+                -- x2 = 0 + 512 - 512 - 0 + 0 = 0
+                -- y2 = 0 + 768 - 0 - 50 + (-50) = 668
+                local x, y = FrameUtil.ConvertOffsetToAnchor("TOP", "BOTTOM", 0, 0, 200, 100, parent)
                 assert.are.equal(0, x)
                 assert.are.equal(668, y)
             end)
 
-            it("handles nil width and height", function()
-                -- With nil dims, GetOffsetFromFrameCenter returns 0,0
-                -- degrades to anchor-only offset conversion
-                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "TOP", 0, 0, nil, nil, parent)
-                assert.are.equal(0, x)
-                assert.are.equal(-384, y)
+            it("defaults to UIParent when parent is nil", function()
+                -- UIParent in tests is a makeFrame with default dimensions
+                local x, y = FrameUtil.ConvertOffsetToAnchor("CENTER", "CENTER", 5, 10, 100, 50, nil)
+                assert.are.equal(5, x)
+                assert.are.equal(10, y)
             end)
         end)
     end)

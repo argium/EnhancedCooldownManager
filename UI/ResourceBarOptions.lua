@@ -114,7 +114,7 @@ function ResourceBarOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = L["RESOURCE_BAR"],
         path = "resourceBar",
-        disabled = ns.ClassUtil.IsDeathKnight,
+        disabled = ns.IsDeathKnight,
         args = args,
     })
 end

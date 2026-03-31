@@ -4,7 +4,6 @@
 
 local _, ns = ...
 local RuneBar = ns.Addon:NewModule("RuneBar")
-local ClassUtil = ns.ClassUtil
 local C = ns.Constants
 local FrameUtil = ns.FrameUtil
 ns.Addon.RuneBar = RuneBar
@@ -278,7 +277,7 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    return ClassUtil.IsDeathKnight() and ns.BarMixin.FrameProto.ShouldShow(self)
+    return ns.IsDeathKnight() and ns.BarMixin.FrameProto.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
@@ -344,7 +343,7 @@ function RuneBar:OnInitialize()
 end
 
 function RuneBar:OnEnable()
-    if not ClassUtil.IsDeathKnight() then
+    if not ns.IsDeathKnight() then
         return
     end
 

@@ -26,6 +26,7 @@ describe("PowerBar real source", function()
             "UnitPower",
             "UnitPowerMax",
             "UnitPowerPercent",
+            "UnitPowerType",
             "CurveConstants",
             "issecretvalue",
         })
@@ -54,11 +55,6 @@ describe("PowerBar real source", function()
                 AddBarMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
-                end,
-            },
-            ClassUtil = {
-                GetCurrentPowerType = function()
-                    return Enum.PowerType.Mana
                 end,
             },
             Runtime = {
@@ -92,6 +88,9 @@ describe("PowerBar real source", function()
         end
         _G.UnitPowerPercent = function()
             return unitPowerPercentValue
+        end
+        _G.UnitPowerType = function()
+            return Enum.PowerType.Mana
         end
         _G.CurveConstants = { ScaleTo100 = 1 }
         _G.issecretvalue = function()
@@ -300,7 +299,7 @@ describe("PowerBar real source", function()
         ns.BarMixin.FrameProto.ShouldShow = function()
             return true
         end
-        ns.ClassUtil.GetCurrentPowerType = function()
+        _G.UnitPowerType = function()
             return Enum.PowerType.Energy
         end
         _G.GetSpecializationRole = function()

@@ -142,27 +142,3 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
         return max, current, safeMax
     end
 end
-
-function ClassUtil.IsDeathKnight()
-    local _, class = UnitClass("player")
-    return class == "DEATHKNIGHT"
-end
-
---- Resolves the effective resource used by PowerBar.
---- Elemental Shamans use Maelstrom while other Shaman specs use Mana.
----@return Enum.PowerType
-function ClassUtil.GetCurrentPowerType()
-    local _, class = UnitClass("player")
-    local specIndex = GetSpecialization()
-
-    if class == "SHAMAN" and specIndex then
-        if specIndex == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
-            return Enum.PowerType.Maelstrom
-        end
-
-        return Enum.PowerType.Mana
-    end
-
-    local powerType = UnitPowerType("player")
-    return powerType
-end

@@ -7,11 +7,25 @@ local PowerBar = ns.Addon:NewModule("PowerBar")
 local C = ns.Constants
 ns.Addon.PowerBar = PowerBar
 
+--- Resolves the effective power type for PowerBar.
+--- Elemental Shamans use Maelstrom while other Shaman specs use Mana.
+local function getCurrentPowerType()
+    local _, class = UnitClass("player")
+    local specIndex = GetSpecialization()
+    if class == "SHAMAN" and specIndex then
+        if specIndex == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
+            return Enum.PowerType.Maelstrom
+        end
+        return Enum.PowerType.Mana
+    end
+    return UnitPowerType("player")
+end
+
 --- Returns a tick spec for BarProto to lay out value-based tick marks.
 --- Returns nil when the power max is a secret value or no ticks are configured.
 ---@return table|nil spec { ticks, maxValue, defaultColor, defaultWidth }
 function PowerBar:GetTickSpec()
-    local powerType = ns.ClassUtil.GetCurrentPowerType()
+    local powerType = getCurrentPowerType()
     local max = UnitPowerMax("player", powerType)
     if issecretvalue(max) then return nil end
 
@@ -36,7 +50,7 @@ function PowerBar:GetTickSpec()
 end
 
 function PowerBar:GetStatusBarValues()
-    local powerType = ns.ClassUtil.GetCurrentPowerType()
+    local powerType = getCurrentPowerType()
     local current = UnitPower("player", powerType)
     local max = UnitPowerMax("player", powerType)
     local cfg = self:GetModuleConfig()
@@ -53,7 +67,7 @@ end
 
 function PowerBar:GetStatusBarColor()
     local cfg = self:GetModuleConfig()
-    local powerType = ns.ClassUtil.GetCurrentPowerType()
+    local powerType = getCurrentPowerType()
     local color = cfg and cfg.colors and cfg.colors[powerType]
     return color or C.COLOR_WHITE
 end
@@ -64,7 +78,7 @@ function PowerBar:ShouldShow()
     end
 
     local _, class = UnitClass("player")
-    local powerType = ns.ClassUtil.GetCurrentPowerType()
+    local powerType = getCurrentPowerType()
     if powerType ~= Enum.PowerType.Mana then
         return true
     end

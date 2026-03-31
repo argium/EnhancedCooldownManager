@@ -36,6 +36,12 @@ function ns.IsDebugEnabled()
     return gc and gc.debug
 end
 
+--- Returns whether the player is a Death Knight.
+function ns.IsDeathKnight()
+    local _, class = UnitClass("player")
+    return class == "DEATHKNIGHT"
+end
+
 local function getAddonVersion()
     if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
         return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)

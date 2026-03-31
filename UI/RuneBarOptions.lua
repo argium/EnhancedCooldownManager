@@ -13,7 +13,7 @@ function RuneBarOptions.RegisterSettings(SB)
         type = "subheader",
         name = L["DK_ONLY_WARNING"],
         condition = function()
-            return not ns.ClassUtil.IsDeathKnight()
+            return not ns.IsDeathKnight()
         end,
         order = 0,
     }
@@ -75,7 +75,7 @@ function RuneBarOptions.RegisterSettings(SB)
         name = L["RUNE_BAR"],
         path = "runeBar",
         disabled = function()
-            return not ns.ClassUtil.IsDeathKnight()
+            return not ns.IsDeathKnight()
         end,
         args = args,
     })
