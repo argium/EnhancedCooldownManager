@@ -809,7 +809,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "canaccessvalue",
     "canaccesstable",
     "time",
-    "IsDelveInProgress",
+    "C_PartyInfo",
     "IsInInstance",
 }
 
@@ -849,9 +849,11 @@ function TestHelpers.SetupOptionsGlobals()
     _G.InCombatLockdown = function()
         return false
     end
-    _G.IsDelveInProgress = function()
-        return false
-    end
+    _G.C_PartyInfo = {
+        IsDelveInProgress = function()
+            return false
+        end,
+    }
     _G.IsInInstance = function()
         return false
     end

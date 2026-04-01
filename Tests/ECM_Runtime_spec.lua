@@ -140,7 +140,7 @@ describe("ECM.Runtime layout system", function()
         "UnitIsDead",
         "UnitCanAttack",
         "UnitCanAssist",
-        "IsDelveInProgress",
+        "C_PartyInfo",
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
@@ -211,9 +211,11 @@ describe("ECM.Runtime layout system", function()
         _G.UnitCanAssist = function()
             return false
         end
-        _G.IsDelveInProgress = function()
-            return false
-        end
+        _G.C_PartyInfo = {
+            IsDelveInProgress = function()
+                return false
+            end,
+        }
         _G.IsInInstance = function()
             return false
         end
@@ -386,9 +388,11 @@ describe("ECM.Runtime layout system", function()
 
             fadeConfig.exceptInInstance = true
             _G._testDB.profile.global.outOfCombatFade = fadeConfig
-            _G.IsDelveInProgress = function()
-                return true
-            end
+            _G.C_PartyInfo = {
+                IsDelveInProgress = function()
+                    return true
+                end,
+            }
 
             ns.Runtime.ScheduleLayoutUpdate(0, "delve-fade-skip")
 

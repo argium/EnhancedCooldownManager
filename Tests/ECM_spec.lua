@@ -37,7 +37,7 @@ describe("ECM layout system", function()
         "UnitIsDead",
         "UnitCanAttack",
         "UnitCanAssist",
-        "IsDelveInProgress",
+        "C_PartyInfo",
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
@@ -110,9 +110,11 @@ describe("ECM layout system", function()
         _G.UnitCanAssist = function()
             return false
         end
-        _G.IsDelveInProgress = function()
-            return false
-        end
+        _G.C_PartyInfo = {
+            IsDelveInProgress = function()
+                return false
+            end,
+        }
         _G.IsInInstance = function()
             return false
         end

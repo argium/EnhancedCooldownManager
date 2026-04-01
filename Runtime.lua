@@ -141,7 +141,7 @@ end
 --- Delves are treated as instances for this purpose.
 ---@return boolean
 local function isInInstanceContext()
-    return IsInInstance() or IsDelveInProgress()
+    return IsInInstance() or (C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress())
 end
 
 --- Checks all fade and hide conditions and updates global state.

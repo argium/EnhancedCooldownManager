@@ -40,7 +40,7 @@ read_globals = {
 
     -- Externals
     "AddonCompartmentFrame",
-    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
+    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
     "CANCEL",
     "ColorPickerFrame",
     "CLOSE",
@@ -59,7 +59,7 @@ read_globals = {
     "GetInventoryItemCooldown", "GetInventoryItemID", "GetInventoryItemTexture", "GetRuneCooldown",
     "GetShapeshiftForm", "GetSpecialization", "GetSpecializationInfo", "GetSpecializationRole",
     "hooksecurefunc",
-    "InCombatLockdown", "IsControlKeyDown", "IsDelveInProgress", "IsInInstance", "IsMounted", "IsResting",
+    "InCombatLockdown", "IsControlKeyDown", "IsInInstance", "IsMounted", "IsResting",
     "issecrettable", "issecretvalue",
     "LibStub",
     "NO",
