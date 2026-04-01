@@ -1,9 +1,3 @@
-- Be concise, professional, and honest.
-- Use tables or Mermaid only when they materially improve clarity.
-- Do not commit changes; the user commits manually.
-
----
-
 # Validation
 
 ```sh
@@ -33,9 +27,9 @@ luacheck . -q
 -- Licensed under the GNU General Public License v3.0
 </CopyrightHeader>
 
-- Keep all constants in `Constants.lua`.
-- New features and regression fixes in `Modules/`, `UI/`, and root infrastructure files must include tests.
 - All Lua files must include the standard copyright header.
+- Keep [ARCHITECTURE.MD](ARCHITECTURE.MD) up to date.
+
 
 ## Lua / WoW Runtime
 
