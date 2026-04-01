@@ -57,11 +57,9 @@ function ResourceBar:GetTickSpec()
 end
 
 function ResourceBar:OnEventUpdate(event, ...)
-    if event == "UNIT_AURA" then
-        local unit = ...
-        if unit ~= "player" then
-            return
-        end
+    local unit = ...
+    if unit ~= "player" then
+        return
     end
 
     ns.Runtime.RequestLayout(event or "ResourceBar:OnEventUpdate")

@@ -333,8 +333,7 @@ local function getViewerPosition(module)
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
-local function layoutBars(viewer, growsUp, verticalSpacing)
-    local children = getChildrenOrdered(viewer)
+local function layoutBars(children, viewer, growsUp, verticalSpacing)
     local prev
 
     local function anchorChild(child)
@@ -465,7 +464,7 @@ function BuffBars:UpdateLayout(why)
             styleChildFrame(self, entry.frame, cfg, globalConfig)
         end
 
-        layoutBars(viewer, growsUp, verticalSpacing)
+        layoutBars(visibleChildren, viewer, growsUp, verticalSpacing)
     end)
 
     self._layoutRunning = nil

@@ -78,17 +78,19 @@ local DISPLAY_ITEM_SOURCES = {
 --- Returns all display items in display order: Trinkets > Combat Potion > Health Potion > Healthstone.
 ---@param moduleConfig table Module configuration.
 ---@return ECM_IconData[] items Array of icon data.
+local _displayItems = {}
+
 local function getDisplayItems(moduleConfig)
-    local items = {}
+    wipe(_displayItems)
     for _, source in ipairs(DISPLAY_ITEM_SOURCES) do
         if moduleConfig[source.flag] then
             local item = source.getter(source.arg)
             if item then
-                items[#items + 1] = item
+                _displayItems[#_displayItems + 1] = item
             end
         end
     end
-    return items
+    return _displayItems
 end
 
 --- Creates a single item icon frame styled like cooldown viewer icons.

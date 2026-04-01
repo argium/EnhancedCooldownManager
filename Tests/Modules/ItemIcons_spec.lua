@@ -330,6 +330,8 @@ describe("ItemIcons real source", function()
             end,
         }
 
+        _G.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
+
         TestHelpers.LoadChunk("Modules/ItemIcons.lua", "Unable to load Modules/ItemIcons.lua")(nil, ns)
         ItemIcons = assert(ns.Addon.ItemIcons, "ItemIcons module did not initialize")
         function ItemIcons:IsEnabled()

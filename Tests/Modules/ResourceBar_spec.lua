@@ -108,7 +108,7 @@ describe("ResourceBar real source", function()
         assert.is_nil(ResourceBar:GetTickSpec())
     end)
 
-    it("only updates for player UNIT_AURA events and always updates for other events", function()
+    it("only updates for player events", function()
         local reasons = {}
         ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
@@ -116,7 +116,8 @@ describe("ResourceBar real source", function()
 
         ResourceBar:OnEventUpdate("UNIT_AURA", "target")
         ResourceBar:OnEventUpdate("UNIT_AURA", "player")
-        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE")
+        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE", "target")
+        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE", "player")
 
         assert.same({ "UNIT_AURA", "UNIT_POWER_UPDATE" }, reasons)
     end)

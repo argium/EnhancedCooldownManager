@@ -562,9 +562,7 @@ local function handleLayoutEvent(_addon, event, arg1)
     end
 
     if config.delay > 0 then
-        C_Timer.After(config.delay, function()
-            executeLayout(event)
-        end)
+        Runtime.ScheduleLayoutUpdate(config.delay, event)
         return
     end
 
