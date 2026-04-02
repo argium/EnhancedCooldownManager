@@ -237,7 +237,7 @@ local function updateRuneValues(self, frame)
     -- Detect state transitions to trigger full reorder/reposition
     if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
         -- A rune just finished or started CD — trigger full refresh for reorder/reposition
-        ns.Runtime.RequestLayout("RuneBar:RuneStateChange")
+        ns.Runtime.RequestRefresh(self, "RuneBar:RuneStateChange")
         return
     end
 
@@ -355,7 +355,7 @@ end
 
 function RuneBar:OnRunePowerUpdate()
     self:_StartAnimationTicker()
-    ns.Runtime.RequestLayout("RuneBar:RUNE_POWER_UPDATE")
+    ns.Runtime.RequestRefresh(self, "RuneBar:RUNE_POWER_UPDATE")
 end
 
 function RuneBar:OnDisable()

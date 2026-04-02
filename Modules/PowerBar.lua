@@ -94,7 +94,7 @@ function PowerBar:OnUnitPowerUpdate(event, unitID, ...)
         return
     end
 
-    ns.Runtime.RequestLayout(event or "PowerBar:OnUnitPowerUpdate")
+    ns.Runtime.RequestRefresh(self, event or "PowerBar:OnUnitPowerUpdate")
 end
 
 function PowerBar:OnInitialize()

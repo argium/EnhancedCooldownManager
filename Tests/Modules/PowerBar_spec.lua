@@ -65,6 +65,7 @@ describe("PowerBar real source", function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
                 RequestLayout = function() end,
+                RequestRefresh = function() end,
             },
             Log = function() end,
         }
@@ -210,7 +211,7 @@ describe("PowerBar real source", function()
 
     it("only responds to UNIT_POWER_UPDATE for the player", function()
         local reasons = {}
-        ns.Runtime.RequestLayout = function(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -231,7 +232,7 @@ describe("PowerBar real source", function()
         PowerBar:OnEnable()
 
         local reasons = {}
-        ns.Runtime.RequestLayout = function(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 

@@ -119,6 +119,11 @@ describe("FrameUtil", function()
             assert.are.equal(777, FrameUtil.GetIconTextureFileID(frame))
         end)
 
+        it("returns nil when Icon is nil", function()
+            local frame = { Icon = nil }
+            assert.is_nil(FrameUtil.GetIconTextureFileID(frame))
+        end)
+
         it("GetIconTextureFileID returns nil when texture or getter is missing", function()
             local texture = makeTexture()
             texture.GetTextureFileID = nil

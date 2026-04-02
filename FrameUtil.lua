@@ -12,6 +12,10 @@ ns.FrameUtil = FrameUtil
 ---@param regionType string
 ---@return Region|nil
 local function tryGetRegion(frame, index, regionType)
+    if not frame then
+        return nil
+    end
+
     local region = select(index, frame:GetRegions())
     if region and region.IsObjectType and region:IsObjectType(regionType) then
         return region

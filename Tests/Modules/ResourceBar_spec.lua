@@ -58,6 +58,7 @@ describe("ResourceBar real source", function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
                 RequestLayout = function() end,
+                RequestRefresh = function() end,
             },
             Log = function() end,
         }
@@ -110,7 +111,7 @@ describe("ResourceBar real source", function()
 
     it("only updates for player events", function()
         local reasons = {}
-        ns.Runtime.RequestLayout = function(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -133,7 +134,7 @@ describe("ResourceBar real source", function()
         ResourceBar:OnEnable()
 
         local reasons = {}
-        ns.Runtime.RequestLayout = function(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 

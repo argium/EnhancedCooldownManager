@@ -9,5 +9,5 @@ ignore:
   - '*.rockspec'
   - package
   - scripts
-  - media/images
-  - media/icon-full.tga
+  - Media/images
+  - Media/icon-full.tga

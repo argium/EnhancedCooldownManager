@@ -62,7 +62,7 @@ function ResourceBar:OnEventUpdate(event, ...)
         return
     end
 
-    ns.Runtime.RequestLayout(event or "ResourceBar:OnEventUpdate")
+    ns.Runtime.RequestRefresh(self, event or "ResourceBar:OnEventUpdate")
 end
 
 function ResourceBar:OnInitialize()

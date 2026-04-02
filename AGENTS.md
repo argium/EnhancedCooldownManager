@@ -28,7 +28,7 @@ luacheck . -q
 </CopyrightHeader>
 
 - All Lua files must include the standard copyright header.
-- Keep [ARCHITECTURE.MD](ARCHITECTURE.MD) up to date.
+- Keep [ARCHITECTURE.md](ARCHITECTURE.md) up to date.
 
 
 ## Lua / WoW Runtime

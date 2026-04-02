@@ -176,7 +176,7 @@ describe("RuneBar real source", function()
         isDeathKnight = true
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
-        ns.Runtime.RequestLayout = function() end
+        ns.Runtime.RequestRefresh = function() end
 
         RuneBar:OnRunePowerUpdate()
 
@@ -187,6 +187,9 @@ describe("RuneBar real source", function()
     it("defers a layout refresh on rune power updates", function()
         local reasons = {}
         ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -323,7 +326,7 @@ describe("RuneBar real source", function()
 
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
-        ns.Runtime.RequestLayout = function() end
+        ns.Runtime.RequestRefresh = function() end
         RuneBar:OnRunePowerUpdate()
         RuneBar._valueTicker.callback()
 
@@ -356,6 +359,9 @@ describe("RuneBar real source", function()
             return { updateFrequency = 0.04, texture = "Solid" }
         end
         ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
         _G.GetRuneCooldown = function(index)
@@ -405,6 +411,7 @@ describe("RuneBar real source", function()
         RuneBar:OnInitialize()
         RuneBar:OnEnable()
         ns.Runtime.RequestLayout = function() end
+        ns.Runtime.RequestRefresh = function() end
 
         for _, case in ipairs(colorCases) do
             local frags = {}
