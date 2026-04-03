@@ -289,7 +289,7 @@ describe("ClassUtil", function()
         end)
 
         it("returns devourer meta max as safeMax", function()
-            _G.C_UnitAuras = { GetUnitAuraBySpellID = function(_, spellID)
+            _G.C_UnitAuras = { GetPlayerAuraBySpellID = function(spellID)
                 if spellID == ns.Constants.SPELLID_COLLAPSING_STAR then
                     return { applications = 10 }
                 end

@@ -37,7 +37,7 @@ function ResourceBar:GetStatusBarColor()
         and cfg.maxColorsEnabled[resourceType]
     then
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
-        if safeMax and current == safeMax then
+        if safeMax and not issecretvalue(current) and current == safeMax then
             return cfg.maxColors and cfg.maxColors[resourceType] or C.COLOR_WHITE
         end
     end

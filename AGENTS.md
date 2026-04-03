@@ -72,6 +72,7 @@ luacheck . -q
 - Test files mirror source paths; library tests stay under `Libs/<Name>/Tests/`.
 - `StaticPopup_Show` stubs must forward `(name, text1, text2, data)` and call `OnAccept(self, data)`.
 - Libraries must stay self-contained: no ECM internals; tests and docs live with the library; public API changes should be intentional and documented.
+- Do not use global hooks on Blizzard UI functions (like `Settings.CreateElementInitializer`) to simulate XML templates in pure Lua. Library frame templates must use `.xml` files to prevent widespread execution taint.
 - Shared confirm dialogs use `ECM.OptionUtil.MakeConfirmDialog(text)` with `data.onAccept`.
 - Migrations in `Helpers/Migration.lua` are frozen snapshots and must not depend on live production code.
 

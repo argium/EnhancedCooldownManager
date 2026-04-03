@@ -222,39 +222,3 @@ function LibLSMSettingsWidgets_TexturePickerMixin:UpdatePreview()
         end
     end
 end
-
---------------------------------------------------------------------------------
--- Settings Initializer Injection
---------------------------------------------------------------------------------
-
-if not lib._initializerHooked and Settings and Settings.CreateElementInitializer then
-    local origCreateElementInitializer = Settings.CreateElementInitializer
-    -- luacheck: push ignore Settings Mixin
-    function Settings.CreateElementInitializer(template, data)
-        if template == lib.FONT_PICKER_TEMPLATE or template == lib.TEXTURE_PICKER_TEMPLATE then
-            local initializer = origCreateElementInitializer("SettingsListElementTemplate", data)
-            local targetMixin = template == lib.FONT_PICKER_TEMPLATE and LibLSMSettingsWidgets_FontPickerMixin or LibLSMSettingsWidgets_TexturePickerMixin
-
-            local origInitFrame = initializer.InitFrame
-            initializer.InitFrame = function(self, frame)
-                if not frame._lsmMixinInjected then
-                    Mixin(frame, targetMixin)
-                    if frame.OnLoad then
-                        frame:OnLoad()
-                    end
-                    frame._lsmMixinInjected = true
-                end
-
-                if origInitFrame then
-                    origInitFrame(self, frame)
-                end
-            end
-
-            return initializer
-        end
-
-        return origCreateElementInitializer(template, data)
-    end
-    -- luacheck: pop
-    lib._initializerHooked = true
-end

@@ -16,7 +16,8 @@ describe("ResourceBar real source", function()
     local unregisterFrameCalls
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({})
+        originalGlobals = TestHelpers.CaptureGlobals({ "issecretvalue" })
+        _G.issecretvalue = function() return false end
     end)
 
     teardown(function()

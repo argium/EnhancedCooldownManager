@@ -8,22 +8,12 @@ local C = ns.Constants
 local ClassUtil = {}
 ns.ClassUtil = ClassUtil
 
---- Power types that have discrete values and should be displayed using the resource bar.
-local discreteResourceTypes = {
-    [Enum.PowerType.ArcaneCharges] = true,
-    [Enum.PowerType.Chi] = true,
-    [Enum.PowerType.ComboPoints] = true,
-    [Enum.PowerType.HolyPower] = true,
-    [Enum.PowerType.SoulShards] = true,
-    [Enum.PowerType.Essence] = true,
-}
-
 --- Gets the resource type for the class, spec and current shapeshift form (if applicable).
 --- @return string|number|nil resourceType - returns a string for special tracked resources (souls, devourer normal/meta, maelstrom weapon), or a power type enum value for standard resources. Returns nil if no relevant resource type is found for the player's class/spec.
 function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
-            local voidMeta = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_VOID_META)
+            local voidMeta = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_VOID_META)
             if voidMeta then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
@@ -50,16 +40,17 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
             return Enum.PowerType.Chi
         end
     else
-        for powerType in pairs(discreteResourceTypes) do
-            local max = UnitPowerMax("player", powerType)
-            if max and max > 0 then
-                if class == "DRUID" then
-                    if shapeshiftForm == C.DRUID_CAT_FORM_INDEX then
-                        return powerType
-                    end
-                else
-                    return powerType
-                end
+        if class == "EVOKER" then
+            return Enum.PowerType.Essence
+        elseif class == "PALADIN" then
+            return Enum.PowerType.HolyPower
+        elseif class == "ROGUE" then
+            return Enum.PowerType.ComboPoints
+        elseif class == "WARLOCK" then
+            return Enum.PowerType.SoulShards
+        elseif class == "DRUID" then
+            if shapeshiftForm == C.DRUID_CAT_FORM_INDEX then
+                return Enum.PowerType.ComboPoints
             end
         end
     end
@@ -107,25 +98,25 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_ICICLES then
-        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.RESOURCEBAR_ICICLES_SPELLID)
+        local aura = C_UnitAuras.GetPlayerAuraBySpellID(C.RESOURCEBAR_ICICLES_SPELLID)
         return C.RESOURCEBAR_ICICLES_MAX, aura and aura.applications or 0, C.RESOURCEBAR_ICICLES_MAX
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_META then
-        local collapsingStar = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_COLLAPSING_STAR)
+        local collapsingStar = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_COLLAPSING_STAR)
         local max = C.RESOURCEBAR_COLLAPSING_STAR_MAX / 5
         return max, collapsingStar and collapsingStar.applications / 5 or 0, max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL then
-        local soulFragments = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
+        local soulFragments = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
         local max = getDevourerSoulFragmentsMax() / 5
         return max, soulFragments and soulFragments.applications / 5 or 0, max
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON then
         -- The max can be 5 or 10 depending on talent choices
-        local aura = C_UnitAuras.GetUnitAuraBySpellID("player", C.SPELLID_MAELSTROM_WEAPON)
+        local aura = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_MAELSTROM_WEAPON)
         local stacks = aura and aura.applications or 0
         local mwMax = getMaelstromWeaponMax()
         return mwMax, stacks, mwMax
