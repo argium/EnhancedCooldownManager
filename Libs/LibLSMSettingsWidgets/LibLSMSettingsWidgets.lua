@@ -222,3 +222,10 @@ function LibLSMSettingsWidgets_TexturePickerMixin:UpdatePreview()
         end
     end
 end
+
+local SB = LibStub("LibSettingsBuilder-1.0", true)
+if SB and SB.RegisterTemplateAlias then
+    SB:RegisterTemplateAlias(lib.FONT_PICKER_TEMPLATE, "SettingsListElementTemplate", LibLSMSettingsWidgets_FontPickerMixin)
+    SB:RegisterTemplateAlias(lib.TEXTURE_PICKER_TEMPLATE, "SettingsListElementTemplate", LibLSMSettingsWidgets_TexturePickerMixin)
+end
+

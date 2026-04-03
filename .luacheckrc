@@ -28,7 +28,7 @@ globals = {
     "UISpecialFrames"
 }
 
-read_globals = {
+read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 'WorldFrame', 'GameTooltip_OnLoad', 'GetScreenWidth', 'GetScreenHeight', 'HideUIPanel', 'ChatFontNormal', 'GameFontNormalSmall', 'GameFontHighlightSmall', 'EnumUtil', 'TooltipDataProcessor', 'C_EventUtils', 'ItemRefTooltip', 'ShowUIPanel', 'GetPlayerInfoByGUID', 'C_FriendList', 'NUM_CHAT_WINDOWS', 'COMBATLOG', 'WHO_LIST_FORMAT', 'WHO_LIST_GUILD_FORMAT', 'ERR_FRIEND_ONLINE_SS', 'GetNumGroupMembers', 'IsInRaid', 'C_RestrictedActions',
     "bit",
     "ceil", "floor",
     "mod",
@@ -74,7 +74,7 @@ read_globals = {
     "SETTINGS_DEFAULTS",
     "StaticPopup_Show",
     "UIParent",
-    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName",
+    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitIsPlayer", "UnitName",  "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName",
     "UnitPower", "UnitPowerMax", "UnitPowerPercent", "UnitPowerType",
     "YES",
     "MinimalSliderWithSteppersMixin",

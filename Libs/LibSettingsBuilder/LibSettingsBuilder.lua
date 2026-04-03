@@ -821,6 +821,14 @@ end
 ---     pathAdapter    table  PathAdapter instance for path-based controls
 ---     compositeDefaults table keyed by composite function name
 ---@return table builder instance with the full SB API
+lib._templateAliases = lib._templateAliases or {}
+lib._templateMixins = lib._templateMixins or {}
+
+function lib:RegisterTemplateAlias(alias, template, mixin)
+    self._templateAliases[alias] = template
+    self._templateMixins[alias] = mixin
+end
+
 function lib:New(config)
     assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
     assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
@@ -1383,8 +1391,24 @@ function lib:New(config)
         assert(spec.template, "Custom: spec.template is required")
         local setting, cat = makeProxySetting(spec, spec.varType or Settings.VarType.String, "")
 
+        local actualTemplate = lib._templateAliases[spec.template] or spec.template
+        local mixinToInject = lib._templateMixins[spec.template]
+
         local initializer =
-            Settings.CreateElementInitializer(spec.template, { name = spec.name, tooltip = spec.tooltip })
+            Settings.CreateElementInitializer(actualTemplate, { name = spec.name, tooltip = spec.tooltip })
+
+        if mixinToInject then
+            local origInit = initializer.InitFrame
+            initializer.InitFrame = function(self, frame)
+                if not frame._lsbMixinInjected then
+                    Mixin(frame, mixinToInject)
+                    if frame.OnLoad then frame:OnLoad() end
+                    frame._lsbMixinInjected = true
+                end
+                if origInit then origInit(self, frame) end
+            end
+        end
+
         if initializer.SetSetting then
             initializer:SetSetting(setting)
         end
