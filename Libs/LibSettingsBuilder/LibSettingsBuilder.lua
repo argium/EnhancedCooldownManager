@@ -84,7 +84,6 @@ local function installPageLifecycleHooks()
     end)
 end
 
-local confirmDialogName = MAJOR .. "_SettingsConfirm"
 local listElementKeysToHide = { "_lsbSubheaderTitle", "_lsbInfoTitle", "_lsbInfoValue", "_lsbCanvas" }
 
 local function copyMixin(target, source)
@@ -1670,7 +1669,8 @@ function lib:New(config)
         return initializer
     end
 
-    local CONFIRM_DIALOG_NAME = confirmDialogName
+    -- Make CONFIRM_DIALOG_NAME unique per instance to prevent single-pop collisions
+    local CONFIRM_DIALOG_NAME = config.varPrefix .. "_" .. MAJOR:gsub("[%-%.]", "_") .. "_SettingsConfirm"
     StaticPopupDialogs[CONFIRM_DIALOG_NAME] = {
         text = "%s",
         button1 = YES,

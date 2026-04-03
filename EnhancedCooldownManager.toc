@@ -21,7 +21,7 @@ Libs\LibDeflate\lib.xml
 Libs\LibEditMode\embed.xml
 Libs\LibSharedMedia-3.0\lib.xml
 Libs\LibSettingsBuilder\LibSettingsBuilder.lua
-Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
+Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.lua
 
 Constants.lua
 Locales\en.lua

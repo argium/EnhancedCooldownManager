@@ -625,7 +625,7 @@ describe("LibSettingsBuilder", function()
         })
 
         -- The shared confirm dialog should exist
-        local dialogName = "LibSettingsBuilder-1.0_SettingsConfirm"
+        local dialogName = "ECM_LibSettingsBuilder_1_0_SettingsConfirm"
         local dialog = StaticPopupDialogs[dialogName]
         assert.is_table(dialog)
 
