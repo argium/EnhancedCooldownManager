@@ -3,14 +3,23 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 
 StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     text = L["NEW_PROFILE_PROMPT"],
     button1 = OKAY,
     button2 = CANCEL,
     hasEditBox = true,
-    OnAccept = function() end,
+    OnAccept = function(self, data)
+        local editBox = self and (self.EditBox or self.editBox)
+        if not editBox then
+            return
+        end
+        local name = strtrim(editBox:GetText())
+        if name ~= "" and data and data.onAccept then
+            data.onAccept(name)
+        end
+    end,
     OnShow = function(self)
         local editBox = self.EditBox or self.editBox
         if not editBox then
@@ -24,7 +33,10 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
         local button1 = parent and (parent.button1 or (parent.Buttons and parent.Buttons[1]))
         if not button1 or button1:IsEnabled() then
             parent:Hide()
-            StaticPopupDialogs["ECM_NEW_PROFILE"].OnAccept(parent)
+            local dialog = StaticPopupDialogs["ECM_NEW_PROFILE"]
+            if dialog.OnAccept then
+                dialog.OnAccept(parent, parent.data)
+            end
         end
     end,
     timeout = 0,
@@ -32,8 +44,8 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     hideOnEscape = true,
 }
 
-StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
-StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ECM.OptionUtil.MakeConfirmDialog("")
+StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(L["COPY_PROFILE_CONFIRM"])
+StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(L["DELETE_PROFILE_CONFIRM"])
 
 local ProfileOptions = {}
 
@@ -115,18 +127,11 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = L["NEW_PROFILE"],
         tooltip = L["NEW_PROFILE_DESC"],
         onClick = function()
-            local dialog = StaticPopupDialogs["ECM_NEW_PROFILE"]
-            dialog.OnAccept = function(self)
-                local editBox = self and (self.EditBox or self.editBox)
-                if not editBox then
-                    return
-                end
-                local name = strtrim(editBox:GetText())
-                if name ~= "" then
+            StaticPopup_Show("ECM_NEW_PROFILE", nil, nil, {
+                onAccept = function(name)
                     switchSetting:SetValue(name)
-                end
-            end
-            StaticPopup_Show("ECM_NEW_PROFILE")
+                end,
+            })
         end,
     })
 
@@ -156,13 +161,12 @@ function ProfileOptions.RegisterSettings(SB)
             if not profile or profile == "" then
                 return
             end
-            local dialog = StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"]
-            dialog.text = string.format(L["COPY_PROFILE_CONFIRM"], profile)
-            dialog.OnAccept = function()
-                ns.Addon.db:CopyProfile(profile)
-                clearCopyProfile()
-            end
-            StaticPopup_Show("ECM_CONFIRM_COPY_PROFILE")
+            StaticPopup_Show("ECM_CONFIRM_COPY_PROFILE", profile, nil, {
+                onAccept = function()
+                    ns.Addon.db:CopyProfile(profile)
+                    clearCopyProfile()
+                end,
+            })
         end,
     })
 
@@ -183,13 +187,12 @@ function ProfileOptions.RegisterSettings(SB)
             if not profile or profile == "" then
                 return
             end
-            local dialog = StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"]
-            dialog.text = string.format(L["DELETE_PROFILE_CONFIRM"], profile)
-            dialog.OnAccept = function()
-                ns.Addon.db:DeleteProfile(profile)
-                clearDeleteProfile()
-            end
-            StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE")
+            StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE", profile, nil, {
+                onAccept = function()
+                    ns.Addon.db:DeleteProfile(profile)
+                    clearDeleteProfile()
+                end,
+            })
         end,
     })
 
@@ -215,7 +218,7 @@ function ProfileOptions.RegisterSettings(SB)
         tooltip = L["IMPORT_DESC"],
         onClick = function()
             if InCombatLockdown() then
-                ECM.Print(L["CANNOT_IMPORT_IN_COMBAT"])
+                ns.Print(L["CANNOT_IMPORT_IN_COMBAT"])
                 return
             end
             ns.Addon:ShowImportDialog()
@@ -227,9 +230,9 @@ function ProfileOptions.RegisterSettings(SB)
         buttonText = L["EXPORT"],
         tooltip = L["EXPORT_DESC"],
         onClick = function()
-            local exportString, err = ECM.ImportExport.ExportCurrentProfile()
+            local exportString, err = ns.ImportExport.ExportCurrentProfile()
             if not exportString then
-                ECM.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
+                ns.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
                 return
             end
             ns.Addon:ShowExportDialog(exportString)
@@ -237,4 +240,4 @@ function ProfileOptions.RegisterSettings(SB)
     })
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)
+ns.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)

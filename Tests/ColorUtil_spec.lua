@@ -8,9 +8,10 @@ local TestHelpers =
 describe("ColorUtil", function()
     local originalGlobals
     local ColorUtil
+    local ns
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
+        originalGlobals = TestHelpers.CaptureGlobals({})
     end)
 
     teardown(function()
@@ -18,10 +19,10 @@ describe("ColorUtil", function()
     end)
 
     before_each(function()
-        _G.ECM = {}
+        ns = {}
 
-        TestHelpers.LoadChunk("Helpers/ColorUtil.lua", "Unable to load Helpers/ColorUtil.lua")()
-        ColorUtil = assert(ECM.ColorUtil, "ColorUtil did not initialize")
+        TestHelpers.LoadChunk("ColorUtil.lua", "Unable to load ColorUtil.lua")(nil, ns)
+        ColorUtil = assert(ns.ColorUtil, "ColorUtil did not initialize")
     end)
 
     it("AreEqual handles identical, nil, and distinct colors", function()

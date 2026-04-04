@@ -8,13 +8,13 @@ local TestHelpers =
 describe("BarMixin", function()
     local originalGlobals
     local BarMixin
+    local ns
 
     local makeFrame = TestHelpers.makeFrame
     local makeTexture = TestHelpers.makeTexture
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "C_Timer",
             "GetTime",
             "UIParent",
@@ -29,8 +29,8 @@ describe("BarMixin", function()
     end)
 
     before_each(function()
-        _G.ECM = {}
-        _G.ECM.ColorUtil = {
+        ns = {}
+        ns.ColorUtil = {
             AreEqual = function(a, b)
                 if a == nil and b == nil then
                     return true
@@ -41,13 +41,14 @@ describe("BarMixin", function()
                 return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
             end,
         }
-        _G.ECM.DebugAssert = function(condition, message)
+        ns.DebugAssert = function(condition, message)
             if not condition then
                 error(message or "ECM.DebugAssert failed")
             end
         end
-        _G.ECM.Log = function() end
-        _G.ECM.PixelSnap = function(v)
+        ns.Log = function() end
+        ns.FrameUtil = {}
+        ns.FrameUtil.PixelSnap = function(v)
             return math.floor(v + 0.5)
         end
         _G.C_Timer = {
@@ -90,18 +91,15 @@ describe("BarMixin", function()
             return f
         end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
         TestHelpers.SetupLibStub()
         TestHelpers.SetupLibEditModeStub()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/MixinUtil.lua", "Unable to load Helpers/MixinUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")()
-        TestHelpers.LoadChunk("Helpers/BarMixin.lua", "Unable to load Helpers/BarMixin.lua")()
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
 
-        BarMixin = assert(ECM.BarMixin, "BarMixin module did not initialize")
+        BarMixin = assert(ns.BarMixin, "BarMixin module did not initialize")
     end)
 
     describe("AddMixin", function()
@@ -127,7 +125,7 @@ describe("BarMixin", function()
 
         it("resolves BarMixin methods on the target module via metatable", function()
             local mod = makeModule()
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
 
             local expectedMethods = {
                 "EnsureTicks",
@@ -149,7 +147,7 @@ describe("BarMixin", function()
                 return "custom"
             end
             local mod = makeModule({ Refresh = customRefresh })
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
 
             assert.are.equal(customRefresh, mod.Refresh)
         end)
@@ -159,14 +157,14 @@ describe("BarMixin", function()
                 return 42
             end
             local mod = makeModule()
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
 
             assert.are.equal(42, mod._lastUpdate)
         end)
 
         it("creates InnerFrame with StatusBar for modules without custom CreateFrame", function()
             local mod = makeModule()
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
             mod:EnsureFrame()
 
             assert.is_not_nil(mod.InnerFrame, "InnerFrame should exist")
@@ -179,7 +177,7 @@ describe("BarMixin", function()
             local mod = setmetatable(makeModule({ IsEnabled = nil }), aceMt)
             mod.IsEnabled = nil
 
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
 
             assert.are.equal(aceEnabled, mod.IsEnabled)
             assert.is_function(mod.EnsureTicks)
@@ -189,10 +187,10 @@ describe("BarMixin", function()
 
         it("is idempotent — second call is a no-op", function()
             local mod = makeModule()
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
             local mt1 = getmetatable(mod)
 
-            BarMixin.AddMixin(mod, "TestBar")
+            BarMixin.AddBarMixin(mod, "TestBar")
             local mt2 = getmetatable(mod)
 
             assert.are.equal(mt1, mt2)

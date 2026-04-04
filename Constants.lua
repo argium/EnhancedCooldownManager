@@ -2,7 +2,7 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
-ECM = ECM or {} -- this file is probably loaded before everything else so this initializes the global table.
+local _, ns = ...
 
 local constants = {
     -- Addon metadata
@@ -254,4 +254,4 @@ constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpe
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes
 
-ECM.Constants = constants
+ns.Constants = constants

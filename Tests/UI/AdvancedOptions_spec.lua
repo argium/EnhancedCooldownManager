@@ -25,10 +25,10 @@ describe("AdvancedOptions getters/setters/defaults", function()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         settings = TestHelpers.CollectSettings(function()
-            TestHelpers.LoadChunk("UI/AdvancedOptions.lua", "AdvancedOptions")(nil, ns)
+            TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
             ns.OptionsSections["Advanced Options"].RegisterSettings(SB)
         end)
-        advancedCategory = SB._subcategories[ECM.L["ADVANCED_OPTIONS"]]
+        advancedCategory = SB._subcategories[ns.L["ADVANCED_OPTIONS"]]
         initializers = SB._layouts[advancedCategory]._initializers
     end)
 
@@ -66,7 +66,7 @@ describe("AdvancedOptions getters/setters/defaults", function()
 
     describe("Show What's New button", function()
         it("uses a placeholder label for the button row", function()
-            local button = assert(TestHelpers.FindButtonInitializer(initializers, ECM.L["SHOW_WHATS_NEW"]))
+            local button = assert(TestHelpers.FindButtonInitializer(initializers, ns.L["SHOW_WHATS_NEW"]))
             assert.are.equal(" ", button._name)
         end)
 
@@ -76,7 +76,7 @@ describe("AdvancedOptions getters/setters/defaults", function()
                 forced = force
             end
 
-            TestHelpers.FindButtonInitializer(initializers, ECM.L["SHOW_WHATS_NEW"])._onClick()
+            TestHelpers.FindButtonInitializer(initializers, ns.L["SHOW_WHATS_NEW"])._onClick()
 
             assert.is_true(forced)
         end)

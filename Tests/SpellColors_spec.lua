@@ -17,6 +17,7 @@ describe("SpellColors", function()
     local currentSpecID
     local fakeNow
     local secretValues
+    local ns
 
     local function markSecret(value)
         secretValues[value] = true
@@ -80,7 +81,6 @@ describe("SpellColors", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "UnitClass",
             "GetSpecialization",
             "issecretvalue",
@@ -102,7 +102,7 @@ describe("SpellColors", function()
         currentClassID = 12
         currentSpecID = 2
 
-        _G.ECM = {
+        ns = {
             IsDebugEnabled = function() return false end,
             FrameUtil = {
                 GetIconTextureFileID = function(frame)
@@ -137,9 +137,9 @@ describe("SpellColors", function()
             return fakeNow
         end
 
-        _G.ECM.DebugAssert = function() end
-        _G.ECM.Log = function() end
-        _G.ECM.ToString = function(value)
+        ns.DebugAssert = function() end
+        ns.Log = function() end
+        ns.ToString = function(value)
             return tostring(value)
         end
 
@@ -147,24 +147,21 @@ describe("SpellColors", function()
             for k in pairs(t) do t[k] = nil end
         end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
         buffBarsConfig = {}
-        local addonNS = {
-            Addon = {
-                db = {
-                    profile = {
-                        buffBars = buffBarsConfig,
-                    },
+        ns.Addon = {
+            db = {
+                profile = {
+                    buffBars = buffBarsConfig,
                 },
             },
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors/KeyType.lua", "Unable to load Helpers/SpellColors/KeyType.lua")()
-        TestHelpers.LoadChunk("Helpers/SpellColors/Store.lua", "Unable to load Helpers/SpellColors/Store.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("SpellColors.lua", "Unable to load SpellColors.lua")(nil, ns)
 
-        SpellColors = assert(ECM.SpellColors, "SpellColors module did not initialize")
+        SpellColors = assert(ns.SpellColors, "SpellColors module did not initialize")
     end)
 
     it("MakeKey returns nil when no valid key is available", function()
@@ -356,7 +353,7 @@ describe("SpellColors", function()
 
     it("GetDefaultColor initializes missing profile color storage", function()
         local defaultColor = SpellColors.GetDefaultColor()
-        assert.are.same(ECM.Constants.BUFFBARS_DEFAULT_COLOR, defaultColor)
+        assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, defaultColor)
 
         assert.is_table(buffBarsConfig.colors)
         assert.is_table(buffBarsConfig.colors.byName)
@@ -378,7 +375,7 @@ describe("SpellColors", function()
 
         local defaultColor = SpellColors.GetDefaultColor()
 
-        assert.are.same(ECM.Constants.BUFFBARS_DEFAULT_COLOR, defaultColor)
+        assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, defaultColor)
         assert.is_table(buffBarsConfig.colors.byName)
         assert.is_table(buffBarsConfig.colors.bySpellID)
         assert.is_table(buffBarsConfig.colors.byCooldownID)

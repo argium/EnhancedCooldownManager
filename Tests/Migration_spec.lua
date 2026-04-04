@@ -10,6 +10,7 @@ describe("Migration", function()
     local Migration
     local logMessages
     local assertAbsolutePositionPreserved = TestHelpers.assertAbsolutePositionPreserved
+    local ns
 
     local function searchLogMessages(needle)
         local matches, firstIndex = {}, nil
@@ -60,7 +61,6 @@ describe("Migration", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "C_EditMode",
             "date",
             "strtrim",
@@ -76,13 +76,13 @@ describe("Migration", function()
 
     before_each(function()
         logMessages = {}
-        _G.ECM = {}
+        ns = {}
         _G.C_EditMode = {
             GetLayouts = function()
                 return { activeLayout = 1, layouts = {} }
             end,
         }
-        _G.ECM.Log = function(_, message)
+        ns.Log = function(_, message)
             logMessages[#logMessages + 1] = message
         end
         _G.date = function()
@@ -105,12 +105,12 @@ describe("Migration", function()
             end,
         }
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/Migration.lua", "Unable to load Helpers/Migration.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("Migration.lua", "Unable to load Migration.lua")(nil, ns)
 
-        Migration = assert(ECM.Migration, "Migration module did not initialize")
+        Migration = assert(ns.Migration, "Migration module did not initialize")
     end)
 
     it("migrates schema 8 to 10, backfills fallback tiers, and stores metadata on wrappers", function()
@@ -731,10 +731,10 @@ describe("Migration", function()
     it("V11 seeds legacy free-mode defaults when offsets were never persisted", function()
         local profile = {
             schemaVersion = 10,
-            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            resourceBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            runeBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            buffBars = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            powerBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            resourceBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            runeBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            buffBars = { anchorMode = ns.Constants.ANCHORMODE_FREE },
         }
 
         Migration.Run(profile)
@@ -754,44 +754,44 @@ describe("Migration", function()
     it("V11 preserves absolute free-position coordinates for all modules when seeding legacy defaults", function()
         local profile = {
             schemaVersion = 10,
-            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            resourceBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            runeBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
-            buffBars = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            powerBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            resourceBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            runeBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
+            buffBars = { anchorMode = ns.Constants.ANCHORMODE_FREE },
         }
 
         Migration.Run(profile)
 
-        assertAbsolutePositionPreserved(nil, nil, 0, -275, profile.powerBar.editModePositions.Modern)
-        assertAbsolutePositionPreserved(nil, nil, 0, -300, profile.resourceBar.editModePositions.Modern)
-        assertAbsolutePositionPreserved(nil, nil, 0, -325, profile.runeBar.editModePositions.Modern)
-        assertAbsolutePositionPreserved(nil, nil, 0, -350, profile.buffBars.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, nil, nil, 0, -275, profile.powerBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, nil, nil, 0, -300, profile.resourceBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, nil, nil, 0, -325, profile.runeBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, nil, nil, 0, -350, profile.buffBars.editModePositions.Modern)
     end)
 
     it("V11 preserves absolute free-position coordinates for all explicitly positioned free-mode modules", function()
         local profile = {
             schemaVersion = 10,
             powerBar = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 offsetX = 5,
                 offsetY = -275,
             },
             resourceBar = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 anchorPoint = "TOP",
                 relativePoint = "BOTTOM",
                 offsetX = 0,
                 offsetY = -300,
             },
             runeBar = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 anchorPoint = "BOTTOMRIGHT",
                 relativePoint = "TOPLEFT",
                 offsetX = 15,
                 offsetY = -25,
             },
             buffBars = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 anchorPoint = "TOPLEFT",
                 relativePoint = "BOTTOMLEFT",
                 offsetX = 10,
@@ -801,9 +801,10 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assertAbsolutePositionPreserved(nil, nil, 5, -275, profile.powerBar.editModePositions.Modern)
-        assertAbsolutePositionPreserved("TOP", "BOTTOM", 0, -300, profile.resourceBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, nil, nil, 5, -275, profile.powerBar.editModePositions.Modern)
+        assertAbsolutePositionPreserved(ns, "TOP", "BOTTOM", 0, -300, profile.resourceBar.editModePositions.Modern)
         assertAbsolutePositionPreserved(
+            ns,
             "BOTTOMRIGHT",
             "TOPLEFT",
             15,
@@ -811,6 +812,7 @@ describe("Migration", function()
             profile.runeBar.editModePositions.Modern
         )
         assertAbsolutePositionPreserved(
+            ns,
             "TOPLEFT",
             "BOTTOMLEFT",
             10,
@@ -823,7 +825,7 @@ describe("Migration", function()
         local profile = {
             schemaVersion = 10,
             buffBars = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 anchorPoint = "TOPLEFT",
                 relativePoint = "BOTTOMLEFT",
                 offsetX = 10,
@@ -840,17 +842,17 @@ describe("Migration", function()
         assert.are.equal("TOPLEFT", migrated.point)
         assert.are.equal(10, migrated.x)
         assert.are.equal(-1430, migrated.y)
-        assertAbsolutePositionPreserved("TOPLEFT", "BOTTOMLEFT", 10, -350, migrated)
+        assertAbsolutePositionPreserved(ns, "TOPLEFT", "BOTTOMLEFT", 10, -350, migrated)
     end)
 
     it("V11 logs migration source and normalization details", function()
         local profile = {
             schemaVersion = 10,
-            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            powerBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
             resourceBar = {},
             runeBar = {},
             buffBars = {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 anchorPoint = "TOPLEFT",
                 relativePoint = "BOTTOMLEFT",
                 offsetX = 10,
@@ -891,7 +893,7 @@ describe("Migration", function()
     it("V11 seeds all layouts from C_EditMode.GetLayouts()", function()
         local profile = {
             schemaVersion = 10,
-            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            powerBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
             resourceBar = {},
             runeBar = {},
             buffBars = {},
@@ -917,7 +919,7 @@ describe("Migration", function()
 
         local profile = {
             schemaVersion = 10,
-            powerBar = { anchorMode = ECM.Constants.ANCHORMODE_FREE },
+            powerBar = { anchorMode = ns.Constants.ANCHORMODE_FREE },
             resourceBar = {},
             runeBar = {},
             buffBars = {},
@@ -952,8 +954,8 @@ describe("Migration", function()
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()
-        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
-        _G[ECM.Constants.SV_NAME] = {
+        local current = ns.Constants.CURRENT_SCHEMA_VERSION
+        _G[ns.Constants.SV_NAME] = {
             _versions = {
                 [current - 1] = {},
                 [current] = {},
@@ -966,10 +968,10 @@ describe("Migration", function()
     end)
 
     it("PrepareDatabase reseeds from the prior slot version even when copied profiles drifted forward", function()
-        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local current = ns.Constants.CURRENT_SCHEMA_VERSION
         local prior = current - 1
 
-        _G[ECM.Constants.SV_NAME] = {
+        _G[ns.Constants.SV_NAME] = {
             _versions = {
                 [prior] = {
                     profiles = {
@@ -987,17 +989,17 @@ describe("Migration", function()
 
         Migration.PrepareDatabase()
 
-        local active = _G[ECM.Constants.ACTIVE_SV_KEY]
+        local active = _G[ns.Constants.ACTIVE_SV_KEY]
         assert.is_not_nil(active)
         assert.are.equal(prior, active.profiles.Default.schemaVersion)
-        assert.are.equal(current, _G[ECM.Constants.SV_NAME]._versions[prior].profiles.Default.schemaVersion)
+        assert.are.equal(current, _G[ns.Constants.SV_NAME]._versions[prior].profiles.Default.schemaVersion)
     end)
 
     it("PrepareDatabase preserves non-profile slot data while aligning copied profile schema versions", function()
-        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local current = ns.Constants.CURRENT_SCHEMA_VERSION
         local prior = current - 1
 
-        _G[ECM.Constants.SV_NAME] = {
+        _G[ns.Constants.SV_NAME] = {
             _versions = {
                 [prior] = {
                     profiles = {
@@ -1012,15 +1014,15 @@ describe("Migration", function()
 
         Migration.PrepareDatabase()
 
-        local active = _G[ECM.Constants.ACTIVE_SV_KEY]
+        local active = _G[ns.Constants.ACTIVE_SV_KEY]
         assert.are.same({ "old entry" }, active._migrationLog)
         assert.are.equal(prior, active.profiles.Default.schemaVersion)
     end)
 
     it("ValidateRollback accepts integer targets and reports deleted versions", function()
-        local current = ECM.Constants.CURRENT_SCHEMA_VERSION
+        local current = ns.Constants.CURRENT_SCHEMA_VERSION
         local floor = current - 2
-        _G[ECM.Constants.SV_NAME] = {
+        _G[ns.Constants.SV_NAME] = {
             _versions = {
                 [floor - 1] = {},
                 [floor] = {},
@@ -1047,7 +1049,7 @@ describe("Migration", function()
 
         before_each(function()
             printedMessages = {}
-            ECM.Print = function(...)
+            ns.Print = function(...)
                 local args = { ... }
                 for i = 1, #args do
                     args[i] = tostring(args[i])
@@ -1057,15 +1059,15 @@ describe("Migration", function()
         end)
 
         it("prints current schema version", function()
-            _G[ECM.Constants.SV_NAME] = { _versions = { [10] = {} } }
+            _G[ns.Constants.SV_NAME] = { _versions = { [10] = {} } }
 
             Migration.PrintInfo()
 
-            assert.are.equal("Current schema version: V" .. ECM.Constants.CURRENT_SCHEMA_VERSION, printedMessages[1])
+            assert.are.equal("Current schema version: V" .. ns.Constants.CURRENT_SCHEMA_VERSION, printedMessages[1])
         end)
 
         it("lists available version slots sorted", function()
-            _G[ECM.Constants.SV_NAME] = {
+            _G[ns.Constants.SV_NAME] = {
                 _versions = {
                     [7] = {},
                     [10] = {},
@@ -1080,7 +1082,7 @@ describe("Migration", function()
         end)
 
         it("prints no versioned settings when versions table is nil", function()
-            _G[ECM.Constants.SV_NAME] = {}
+            _G[ns.Constants.SV_NAME] = {}
 
             Migration.PrintInfo()
 
@@ -1088,7 +1090,7 @@ describe("Migration", function()
         end)
 
         it("prints no versioned settings when versions table has no numeric keys", function()
-            _G[ECM.Constants.SV_NAME] = { _versions = { foo = {} } }
+            _G[ns.Constants.SV_NAME] = { _versions = { foo = {} } }
 
             Migration.PrintInfo()
 
@@ -1096,7 +1098,7 @@ describe("Migration", function()
         end)
 
         it("prints subcommand help lines", function()
-            _G[ECM.Constants.SV_NAME] = { _versions = { [10] = {} } }
+            _G[ns.Constants.SV_NAME] = { _versions = { [10] = {} } }
 
             Migration.PrintInfo()
 
@@ -1115,7 +1117,7 @@ describe("Migration", function()
         end)
 
         it("prints no versioned settings when SV_NAME global is nil", function()
-            _G[ECM.Constants.SV_NAME] = nil
+            _G[ns.Constants.SV_NAME] = nil
 
             Migration.PrintInfo()
 
@@ -1125,31 +1127,31 @@ describe("Migration", function()
 
     describe("GetLogText", function()
         it("returns nil when SV_NAME global is nil", function()
-            _G[ECM.Constants.SV_NAME] = nil
+            _G[ns.Constants.SV_NAME] = nil
             assert.is_nil(Migration.GetLogText())
         end)
 
         it("returns nil when versions table is missing", function()
-            _G[ECM.Constants.SV_NAME] = {}
+            _G[ns.Constants.SV_NAME] = {}
             assert.is_nil(Migration.GetLogText())
         end)
 
         it("returns nil when current version slot is missing", function()
-            _G[ECM.Constants.SV_NAME] = { _versions = {} }
+            _G[ns.Constants.SV_NAME] = { _versions = {} }
             assert.is_nil(Migration.GetLogText())
         end)
 
         it("returns nil when migration log is empty", function()
-            _G[ECM.Constants.SV_NAME] = {
-                _versions = { [ECM.Constants.CURRENT_SCHEMA_VERSION] = { _migrationLog = {} } },
+            _G[ns.Constants.SV_NAME] = {
+                _versions = { [ns.Constants.CURRENT_SCHEMA_VERSION] = { _migrationLog = {} } },
             }
             assert.is_nil(Migration.GetLogText())
         end)
 
         it("returns newline-joined log entries", function()
-            _G[ECM.Constants.SV_NAME] = {
+            _G[ns.Constants.SV_NAME] = {
                 _versions = {
-                    [ECM.Constants.CURRENT_SCHEMA_VERSION] = {
+                    [ns.Constants.CURRENT_SCHEMA_VERSION] = {
                         _migrationLog = {
                             "2024-01-01 00:00:00  migrated V2 to V3",
                             "2024-01-01 00:00:01  migrated V3 to V4",

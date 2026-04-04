@@ -1,12 +1,13 @@
 ignore:
   - AGENTS.md
+  - ARCHITECTURE.md
   - README.md
   - Tests
   - TODO.md
-  - docs
   - '**/Tests'
   - '*.code-workspace'
   - '*.rockspec'
   - package
   - scripts
-  - media/icon-full.tga
+  - Media/images
+  - Media/icon-full.tga

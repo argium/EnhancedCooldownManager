@@ -3,11 +3,11 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local FrameMixin = ECM.FrameMixin
+local BarMixin = ns.BarMixin
 local ItemIcons = ns.Addon:NewModule("ItemIcons")
 ns.Addon.ItemIcons = ItemIcons
 
----@class ECM_ItemIconsModule : ModuleMixin
+---@class ECM_ItemIconsModule : ECM_FrameProto
 
 ---@class ECM_IconData
 ---@field itemId number Item ID.
@@ -65,30 +65,32 @@ local function getBestConsumable(priorityList)
     return nil
 end
 
-local HEALTHSTONE_PRIORITY = ECM.Constants.HEALTHSTONES
+local HEALTHSTONE_PRIORITY = ns.Constants.HEALTHSTONES
 
 local DISPLAY_ITEM_SOURCES = {
-    { flag = "showTrinket1",      getter = getTrinketData,   arg = ECM.Constants.TRINKET_SLOT_1 },
-    { flag = "showTrinket2",      getter = getTrinketData,   arg = ECM.Constants.TRINKET_SLOT_2 },
-    { flag = "showCombatPotion",  getter = getBestConsumable, arg = ECM.Constants.COMBAT_POTIONS },
-    { flag = "showHealthPotion",  getter = getBestConsumable, arg = ECM.Constants.HEALTH_POTIONS },
+    { flag = "showTrinket1",      getter = getTrinketData,   arg = ns.Constants.TRINKET_SLOT_1 },
+    { flag = "showTrinket2",      getter = getTrinketData,   arg = ns.Constants.TRINKET_SLOT_2 },
+    { flag = "showCombatPotion",  getter = getBestConsumable, arg = ns.Constants.COMBAT_POTIONS },
+    { flag = "showHealthPotion",  getter = getBestConsumable, arg = ns.Constants.HEALTH_POTIONS },
     { flag = "showHealthstone",   getter = getBestConsumable, arg = HEALTHSTONE_PRIORITY },
 }
 
 --- Returns all display items in display order: Trinkets > Combat Potion > Health Potion > Healthstone.
 ---@param moduleConfig table Module configuration.
 ---@return ECM_IconData[] items Array of icon data.
+local _displayItems = {}
+
 local function getDisplayItems(moduleConfig)
-    local items = {}
+    wipe(_displayItems)
     for _, source in ipairs(DISPLAY_ITEM_SOURCES) do
         if moduleConfig[source.flag] then
             local item = source.getter(source.arg)
             if item then
-                items[#items + 1] = item
+                _displayItems[#_displayItems + 1] = item
             end
         end
     end
-    return items
+    return _displayItems
 end
 
 --- Creates a single item icon frame styled like cooldown viewer icons.
@@ -124,7 +126,7 @@ local function createItemIcon(parent, size)
     icon.Border = icon:CreateTexture(nil, "OVERLAY")
     icon.Border:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
     icon.Border:SetPoint("CENTER")
-    icon.Border:SetSize(size * ECM.Constants.ITEM_ICON_BORDER_SCALE, size * ECM.Constants.ITEM_ICON_BORDER_SCALE)
+    icon.Border:SetSize(size * ns.Constants.ITEM_ICON_BORDER_SCALE, size * ns.Constants.ITEM_ICON_BORDER_SCALE)
 
     -- Shadow overlay
     icon.Shadow = icon:CreateTexture(nil, "OVERLAY")
@@ -204,8 +206,8 @@ function ItemIcons:CreateFrame()
 
     -- Pool of icon frames (pre-allocate for max items)
     frame._iconPool = {}
-    local initialSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
-    for i = 1, ECM.Constants.ITEM_ICONS_MAX do
+    local initialSize = ns.Constants.DEFAULT_ITEM_ICON_SIZE
+    for i = 1, ns.Constants.ITEM_ICONS_MAX do
         frame._iconPool[i] = createItemIcon(frame, initialSize)
     end
 
@@ -215,7 +217,7 @@ end
 --- Override ShouldShow to check module enabled state and item availability.
 ---@return boolean shouldShow Whether the frame should be shown.
 function ItemIcons:ShouldShow()
-    if not ECM.FrameMixin.Proto.ShouldShow(self) then
+    if not BarMixin.FrameProto.ShouldShow(self) then
         return false
     end
     local utilityViewer = _G["UtilityCooldownViewer"]
@@ -259,7 +261,7 @@ function ItemIcons:UpdateLayout(why)
     end
 
     local siblingFontPath, siblingFontSize, siblingFontFlags = getSiblingCooldownNumberFont(utilityViewer)
-    local iconSize = ECM.Constants.DEFAULT_ITEM_ICON_SIZE
+    local iconSize = ns.Constants.DEFAULT_ITEM_ICON_SIZE
     local spacing = 0
     local viewerScale = 1.0
     local lastActiveItemFrame = nil
@@ -315,7 +317,7 @@ function ItemIcons:UpdateLayout(why)
     utilityViewer:SetPoint(p[1], p[2], p[3], p[4] + viewerOffsetX, p[5])
 
     -- Position and configure each icon
-    local borderScale = ECM.Constants.ITEM_ICON_BORDER_SCALE
+    local borderScale = ns.Constants.ITEM_ICON_BORDER_SCALE
     local xOffset = 0
     for i, iconData in ipairs(items) do
         local icon = frame._iconPool[i]
@@ -348,7 +350,7 @@ function ItemIcons:UpdateLayout(why)
     frame:SetPoint("LEFT", lastActiveItemFrame or utilityViewer, "RIGHT", spacing, 0)
     frame:Show()
 
-    ECM.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")")
+    ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")")
     self:ThrottledRefresh("UpdateLayout")
 
     return true
@@ -357,7 +359,7 @@ end
 --- Override Refresh to update cooldown states.
 function ItemIcons:Refresh(why, force)
     -- call the frame mixin to check pre-conditions
-    if not FrameMixin.Proto.Refresh(self, why, force) then
+    if not BarMixin.FrameProto.Refresh(self, why, force) then
         return false
     end
 
@@ -373,7 +375,7 @@ function ItemIcons:Refresh(why, force)
         end
     end
 
-    ECM.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
+    ns.Log(self.Name, "Refresh complete (" .. (why or "") .. ")")
     return true
 end
 
@@ -385,18 +387,18 @@ end
 
 function ItemIcons:OnBagUpdateDelayed()
     -- Bag contents changed, which consumables to show may have changed
-    self:ThrottledUpdateLayout("OnBagUpdateDelayed")
+    ns.Runtime.RequestLayout("ItemIcons:OnBagUpdateDelayed")
 end
 
 function ItemIcons:OnPlayerEquipmentChanged(_, slotId)
     -- Only update if a trinket slot changed
-    if slotId == ECM.Constants.TRINKET_SLOT_1 or slotId == ECM.Constants.TRINKET_SLOT_2 then
-        self:ThrottledUpdateLayout("OnPlayerEquipmentChanged")
+    if slotId == ns.Constants.TRINKET_SLOT_1 or slotId == ns.Constants.TRINKET_SLOT_2 then
+        ns.Runtime.RequestLayout("ItemIcons:OnPlayerEquipmentChanged")
     end
 end
 
 function ItemIcons:OnPlayerEnteringWorld()
-    self:ThrottledUpdateLayout("OnPlayerEnteringWorld")
+    ns.Runtime.RequestLayout("ItemIcons:OnPlayerEnteringWorld")
 end
 
 --- Hook EditModeManagerFrame to pause ItemIcons layout while edit mode is active.
@@ -415,14 +417,14 @@ function ItemIcons:HookEditMode()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ThrottledUpdateLayout("EnterEditMode")
+            ns.Runtime.RequestLayout("ItemIcons:EnterEditMode")
         end
     end)
 
     editModeManager:HookScript("OnHide", function()
         self._isEditModeActive = false
         if self:IsEnabled() then
-            self:ThrottledUpdateLayout("ExitEditMode")
+            ns.Runtime.RequestLayout("ItemIcons:ExitEditMode")
         end
     end)
 end
@@ -437,7 +439,7 @@ function ItemIcons:HookUtilityViewer()
     self._viewerHooked = true
 
     utilityViewer:HookScript("OnShow", function()
-        self:ThrottledUpdateLayout("OnShow")
+        ns.Runtime.RequestLayout("ItemIcons:OnShow")
     end)
 
     utilityViewer:HookScript("OnHide", function()
@@ -445,24 +447,24 @@ function ItemIcons:HookUtilityViewer()
             self.InnerFrame:Hide()
         end
         if self:IsEnabled() then
-            self:ThrottledUpdateLayout("OnHide")
+            ns.Runtime.RequestLayout("ItemIcons:OnHide")
         end
     end)
 
     utilityViewer:HookScript("OnSizeChanged", function()
-        self:ThrottledUpdateLayout("OnSizeChanged")
+        ns.Runtime.RequestLayout("ItemIcons:OnSizeChanged")
     end)
 
-    ECM.Log(self.Name, "Hooked UtilityCooldownViewer")
+    ns.Log(self.Name, "Hooked UtilityCooldownViewer")
 end
 
 function ItemIcons:OnInitialize()
-    ECM.FrameMixin.AddMixin(self, "ItemIcons")
+    BarMixin.AddFrameMixin(self, "ItemIcons")
 end
 
 function ItemIcons:OnEnable()
     self:EnsureFrame()
-    ECM.Runtime.RegisterFrame(self)
+    ns.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("BAG_UPDATE_COOLDOWN", function(_, ...) self:OnBagUpdateCooldown(...) end) -- very noisy but required for cooldown updates on bag items
     self:RegisterEvent("BAG_UPDATE_DELAYED", function(_, ...) self:OnBagUpdateDelayed(...) end)
@@ -473,7 +475,7 @@ function ItemIcons:OnEnable()
     C_Timer.After(0.1, function()
         self:HookEditMode()
         self:HookUtilityViewer()
-        self:ThrottledUpdateLayout("OnEnable")
+        ns.Runtime.RequestLayout("ItemIcons:OnEnable")
     end)
 end
 
@@ -481,7 +483,7 @@ function ItemIcons:OnDisable()
     self:UnregisterAllEvents()
     self:UpdateLayout("OnDisable")
 
-    ECM.Runtime.UnregisterFrame(self)
+    ns.Runtime.UnregisterFrame(self)
 
     self._viewerOriginalPoint = nil
     self._isEditModeActive = nil

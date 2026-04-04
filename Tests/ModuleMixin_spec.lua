@@ -5,13 +5,13 @@
 local TestHelpers =
     assert(loadfile("Tests/TestHelpers.lua") or loadfile("TestHelpers.lua"), "Unable to load Tests/TestHelpers.lua")()
 
-describe("ModuleMixin", function()
+describe("FrameMixin.GetModuleConfig", function()
     local originalGlobals
-    local ModuleMixin
+    local FrameMixin
     local ns
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
+        originalGlobals = TestHelpers.CaptureGlobals({})
     end)
 
     teardown(function()
@@ -19,10 +19,6 @@ describe("ModuleMixin", function()
     end)
 
     before_each(function()
-        _G.ECM = {}
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-
         ns = {
             Addon = {
                 db = {
@@ -34,24 +30,42 @@ describe("ModuleMixin", function()
             },
         }
 
-        -- ECM.GetGlobalConfig is defined in ECM.lua; stub it here since we only load ModuleMixin.lua
-        ECM.GetGlobalConfig = function()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+
+        -- ns.GetGlobalConfig is defined in ECM.lua; stub it here since we only load BarMixin.lua
+        ns.GetGlobalConfig = function()
             local db = ns.Addon and ns.Addon.db
             local profile = db and db.profile
-            return profile and profile[ECM.Constants.CONFIG_SECTION_GLOBAL]
+            return profile and profile[ns.Constants.CONFIG_SECTION_GLOBAL]
         end
 
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, ns)
-        ModuleMixin = assert(ECM.ModuleMixin, "ModuleMixin did not initialize")
+        ns.FrameUtil = {}
+        _G.LibStub = function()
+            return {
+                AddFrame = function() end,
+                AddFrameSettings = function() end,
+                GetActiveLayoutName = function()
+                    return "Default"
+                end,
+                RegisterCallback = function() end,
+            }
+        end
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns.DebugAssert = function() end
+        ns.EditMode = nil
+
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        FrameMixin = assert(ns.BarMixin, "BarMixin did not initialize")
     end)
 
     it("Proto exposes GetModuleConfig", function()
-        assert.is_function(ModuleMixin.Proto.GetModuleConfig)
+        assert.is_function(FrameMixin.FrameProto.GetModuleConfig)
     end)
 
     it("GetModuleConfig returns live profile tables", function()
         local target = { _configKey = "powerBar" }
-        setmetatable(target, { __index = ModuleMixin.Proto })
+        setmetatable(target, { __index = FrameMixin.FrameProto })
 
         assert.are.equal(ns.Addon.db.profile.powerBar, target:GetModuleConfig())
 
@@ -61,7 +75,7 @@ describe("ModuleMixin", function()
 
     it("GetModuleConfig returns nil when profile is missing", function()
         local target = { _configKey = "missing" }
-        setmetatable(target, { __index = ModuleMixin.Proto })
+        setmetatable(target, { __index = FrameMixin.FrameProto })
 
         assert.is_nil(target:GetModuleConfig())
     end)

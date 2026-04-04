@@ -6,11 +6,11 @@
 -- Loaded before Options.lua and all *Options.lua files.
 
 local _, ns = ...
-local C = ECM.Constants
-local L = ECM.L
-local OptionUtil = ECM.OptionUtil or {}
+local C = ns.Constants
+local L = ns.L
+local OptionUtil = ns.OptionUtil or {}
 
-ECM.OptionUtil = OptionUtil
+ns.OptionUtil = OptionUtil
 
 function OptionUtil.IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
@@ -125,7 +125,7 @@ function OptionUtil.CreatePositioningExamplesCanvas()
 end
 
 function OptionUtil.OpenLayoutPage()
-    local categoryID = ECM.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
+    local categoryID = ns.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
@@ -404,7 +404,7 @@ function OptionUtil.CreateDetachedStackArgs()
 end
 
 function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
-    local settingType = ECM.EditMode.Lib.SettingType
+    local settingType = ns.EditMode.Lib.SettingType
     local settings = {}
 
     for _, spec in ipairs(createDetachedSettingSpecs()) do
@@ -446,7 +446,9 @@ function OptionUtil.MakeConfirmDialog(text)
         text = text,
         button1 = YES,
         button2 = NO,
-        OnAccept = function() end,
+        OnAccept = function(self, data)
+            if data and data.onAccept then data.onAccept() end
+        end,
         timeout = 0,
         whileDead = true,
         hideOnEscape = true,

@@ -1,9 +1,3 @@
-- Be concise, professional, and honest.
-- Use tables or Mermaid only when they materially improve clarity.
-- Do not commit changes; the user commits manually.
-
----
-
 # Validation
 
 ```sh
@@ -33,9 +27,9 @@ luacheck . -q
 -- Licensed under the GNU General Public License v3.0
 </CopyrightHeader>
 
-- Keep all constants in `ECM_Constants.lua`.
-- New features and regression fixes in `Modules/`, `Helpers/`, `UI/`, and `ECM.lua` must include tests.
 - All Lua files must include the standard copyright header.
+- Keep [ARCHITECTURE.md](ARCHITECTURE.md) up to date.
+
 
 ## Lua / WoW Runtime
 
@@ -78,6 +72,7 @@ luacheck . -q
 - Test files mirror source paths; library tests stay under `Libs/<Name>/Tests/`.
 - `StaticPopup_Show` stubs must forward `(name, text1, text2, data)` and call `OnAccept(self, data)`.
 - Libraries must stay self-contained: no ECM internals; tests and docs live with the library; public API changes should be intentional and documented.
+- Do not use global hooks on Blizzard UI functions (like `Settings.CreateElementInitializer`) to simulate XML templates in pure Lua. Library frame templates must use `.xml` files to prevent widespread execution taint.
 - Shared confirm dialogs use `ECM.OptionUtil.MakeConfirmDialog(text)` with `data.onAccept`.
 - Migrations in `Helpers/Migration.lua` are frozen snapshots and must not depend on live production code.
 

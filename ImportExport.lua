@@ -4,10 +4,10 @@
 
 local _, ns = ...
 local ImportExport = {}
-ECM.ImportExport = ImportExport
+ns.ImportExport = ImportExport
 
-local C = ECM.Constants
-local L = ECM.L
+local C = ns.Constants
+local L = ns.L
 
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
@@ -69,10 +69,9 @@ function ImportExport.DecodeData(importString)
     end
 
     -- Parse format: "AddonName:Version:EncodedData"
-    -- Using more strict pattern that requires non-empty encoded portion
     local prefix, versionStr, encoded = importString:match("^([^:]+):(%d+):(.+)$")
 
-    if not prefix or not versionStr or not encoded or encoded == "" then
+    if not prefix or not versionStr or not encoded then
         return nil, L["DECODE_INVALID_FORMAT"]
     end
 
@@ -116,7 +115,7 @@ end
 local function prepareProfileForExport(profile)
     assert(profile, "profile is nil")
 
-    local cleanedProfile = ECM.CloneValue(profile)
+    local cleanedProfile = ns.CloneValue(profile)
     -- Strip runtime cache data from the export
     if cleanedProfile.buffBars and cleanedProfile.buffBars.colors then
         cleanedProfile.buffBars.colors.cache = nil
@@ -178,7 +177,7 @@ function ImportExport.ApplyImportData(data)
     -- Preserve the cache if it exists (deep copy to avoid shared references)
     local existingCache = db.profile.buffBars and db.profile.buffBars.colors and db.profile.buffBars.colors.cache
     if existingCache then
-        existingCache = ECM.CloneValue(existingCache)
+        existingCache = ns.CloneValue(existingCache)
     end
 
     -- Clear and replace profile
@@ -196,8 +195,8 @@ function ImportExport.ApplyImportData(data)
     end
 
     -- Run migrations on imported data (it may be from an older schema)
-    if db.profile.schemaVersion and db.profile.schemaVersion < ECM.Constants.CURRENT_SCHEMA_VERSION then
-        ECM.Migration.Run(db.profile)
+    if db.profile.schemaVersion and db.profile.schemaVersion < ns.Constants.CURRENT_SCHEMA_VERSION then
+        ns.Migration.Run(db.profile)
     end
 
     return true

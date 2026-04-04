@@ -18,7 +18,6 @@ describe("BuffBars real source", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "UIParent",
             "BuffBarCooldownViewer",
             "hooksecurefunc",
@@ -35,51 +34,51 @@ describe("BuffBars real source", function()
     local makeHookableFrame = TestHelpers.makeHookableFrame
 
     local function stubChildLayoutEnvironment()
-        ECM.SpellColors.GetColorForBar = function()
+        ns.SpellColors.GetColorForBar = function()
             return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
         end
-        ECM.SpellColors.GetDefaultColor = function()
+        ns.SpellColors.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
-        ECM.ColorUtil = {
+        ns.ColorUtil = {
             ColorToHex = function()
                 return "abcdef"
             end,
         }
-        ECM.ToString = tostring
-        ECM.GetTexture = function()
+        ns.ToString = tostring
+        ns.FrameUtil.GetTexture = function()
             return "Interface\\TargetingFrame\\UI-StatusBar"
         end
-        ECM.ApplyFont = function() end
-        ECM.DebugAssert = function(condition)
+        ns.FrameUtil.ApplyFont = function() end
+        ns.DebugAssert = function(condition)
             assert.is_true(condition)
         end
-        ECM.FrameUtil.GetBarBackground = function()
+        ns.FrameUtil.GetBarBackground = function()
             return nil
         end
-        ECM.FrameUtil.GetIconTexture = function()
+        ns.FrameUtil.GetIconTexture = function()
             return nil
         end
-        ECM.FrameUtil.GetIconOverlay = function()
+        ns.FrameUtil.GetIconOverlay = function()
             return nil
         end
-        ECM.FrameUtil.LazySetHeight = function(frame, value)
+        ns.FrameUtil.LazySetHeight = function(frame, value)
             frame.__height = value
         end
-        ECM.FrameUtil.LazySetWidth = function(frame, value)
+        ns.FrameUtil.LazySetWidth = function(frame, value)
             frame.__width = value
         end
-        ECM.FrameUtil.LazySetStatusBarTexture = function(bar, texture)
+        ns.FrameUtil.LazySetStatusBarTexture = function(bar, texture)
             bar.__texture = texture
         end
-        ECM.FrameUtil.LazySetStatusBarColor = function(bar, r, g, b, a)
+        ns.FrameUtil.LazySetStatusBarColor = function(bar, r, g, b, a)
             bar.__color = { r, g, b, a }
         end
-        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+        ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
         end
-        ECM.FrameUtil.LazySetAlpha = function(frame, value)
+        ns.FrameUtil.LazySetAlpha = function(frame, value)
             frame.__alpha = value
         end
     end
@@ -129,7 +128,7 @@ describe("BuffBars real source", function()
         unregisterFrameCalls = 0
         addMixinCalls = 0
         timerCallbacks = {}
-        _G.ECM = {
+        ns = {
             Log = function() end,
             DebugAssert = function() end,
             IsDebugEnabled = function() return false end,
@@ -170,8 +169,8 @@ describe("BuffBars real source", function()
                     return frame.iconTextureFileID
                 end,
             },
-            FrameMixin = {
-                Proto = {
+            BarMixin = {
+                FrameProto = {
                     ChainRightPoint = function(point, fallback)
                         if point == "TOPLEFT" then
                             return "TOPRIGHT"
@@ -191,7 +190,7 @@ describe("BuffBars real source", function()
                         return true
                     end,
                 },
-                AddMixin = function(target)
+                AddFrameMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
@@ -219,10 +218,11 @@ describe("BuffBars real source", function()
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
+                RequestLayout = function() end,
             },
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
         _G.UIParent = makeFrame({ name = "UIParent", width = 1920, height = 1080 })
         _G.hooksecurefunc = function(object, methodName, callback)
@@ -238,6 +238,10 @@ describe("BuffBars real source", function()
             After = function(_, callback)
                 timerCallbacks[#timerCallbacks + 1] = callback
             end,
+            NewTimer = function(_, callback)
+                timerCallbacks[#timerCallbacks + 1] = callback
+                return { Cancel = function() end }
+            end,
         }
         _G.InCombatLockdown = function()
             return false
@@ -246,14 +250,12 @@ describe("BuffBars real source", function()
             return false
         end
 
-        ns = {
-            Addon = {
-                NewModule = function(self, name)
-                    local module = { Name = name }
-                    self[name] = module
-                    return module
-                end,
-            },
+        ns.Addon = {
+            NewModule = function(self, name)
+                local module = { Name = name }
+                self[name] = module
+                return module
+            end,
         }
 
         BuffBarCooldownViewer = makeHookableFrame({ name = "BuffBarCooldownViewer", shown = true })
@@ -350,7 +352,7 @@ describe("BuffBars real source", function()
             return { texture = "Solid" }
         end
         function BuffBars:GetModuleConfig()
-            return { anchorMode = ECM.Constants.ANCHORMODE_CHAIN }
+            return { anchorMode = ns.Constants.ANCHORMODE_CHAIN }
         end
         function BuffBars:ShouldShow()
             return false
@@ -377,15 +379,15 @@ describe("BuffBars real source", function()
 
     it("uses FrameMixin positioning for detached mode", function()
         local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
-        ECM.Runtime.DetachedAnchor = detachedAnchor
-        local originalCalculateLayoutParams = ECM.FrameMixin.Proto.CalculateLayoutParams
-        local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+        ns.Runtime.DetachedAnchor = detachedAnchor
+        local originalCalculateLayoutParams = ns.BarMixin.FrameProto.CalculateLayoutParams
+        local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
 
-        ECM.FrameMixin.Proto.CalculateLayoutParams = function(self)
+        ns.BarMixin.FrameProto.CalculateLayoutParams = function(self)
             local gc = self:GetGlobalConfig()
             return {
-                mode = ECM.Constants.ANCHORMODE_DETACHED,
-                anchor = ECM.Runtime.DetachedAnchor,
+                mode = ns.Constants.ANCHORMODE_DETACHED,
+                anchor = ns.Runtime.DetachedAnchor,
                 anchorPoint = "TOPLEFT",
                 anchorRelativePoint = "BOTTOMLEFT",
                 offsetX = 0,
@@ -393,20 +395,20 @@ describe("BuffBars real source", function()
                 height = (gc and gc.barHeight) or 22,
             }
         end
-        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+        ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
         end
 
         BuffBars.GetModuleConfig = function()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_DETACHED,
+                anchorMode = ns.Constants.ANCHORMODE_DETACHED,
             }
         end
         BuffBars.GetGlobalConfig = function()
             return {
                 barHeight = 22,
-                detachedGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN,
+                detachedGrowDirection = ns.Constants.GROW_DIRECTION_DOWN,
                 detachedModuleSpacing = 2,
             }
         end
@@ -425,19 +427,19 @@ describe("BuffBars real source", function()
         assert.are.equal("BOTTOMLEFT", BuffBarCooldownViewer.__anchors[1][3])
         assert.are.equal(-2, BuffBarCooldownViewer.__anchors[1][5])
 
-        ECM.Runtime.DetachedAnchor = nil
-        ECM.FrameMixin.Proto.CalculateLayoutParams = originalCalculateLayoutParams
-        ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        ns.Runtime.DetachedAnchor = nil
+        ns.BarMixin.FrameProto.CalculateLayoutParams = originalCalculateLayoutParams
+        ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 
     it("free mode sets width from baseBarWidth*barWidthScale without touching viewer anchors", function()
         local appliedWidths = {}
         local anchorCalls = {}
-        ECM.FrameUtil.LazySetWidth = function(frame, value)
+        ns.FrameUtil.LazySetWidth = function(frame, value)
             appliedWidths[#appliedWidths + 1] = { frame = frame, value = value }
         end
-        local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
-        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+        local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
+        ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             anchorCalls[#anchorCalls + 1] = frame
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
@@ -451,7 +453,7 @@ describe("BuffBars real source", function()
         end
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
             }
         end
         function BuffBars:GetGlobalConfig()
@@ -474,7 +476,7 @@ describe("BuffBars real source", function()
                 "Free mode must not set anchors on the viewer")
         end
 
-        ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
     end)
 
     it("free mode does not clobber Blizzard-managed viewer position across edit mode cycles", function()
@@ -491,7 +493,7 @@ describe("BuffBars real source", function()
 
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -529,7 +531,7 @@ describe("BuffBars real source", function()
 
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_FREE,
+                anchorMode = ns.Constants.ANCHORMODE_FREE,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -552,7 +554,7 @@ describe("BuffBars real source", function()
 
     it("viewer hooks defer layout and respect the layout-running guard", function()
         local reasons = {}
-        function BuffBars:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -563,7 +565,7 @@ describe("BuffBars real source", function()
         BuffBars._layoutRunning = nil
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
 
-        assert.same({ "viewer:OnShow", "viewer:OnSizeChanged" }, reasons)
+        assert.same({ "BuffBars:viewer:OnShow", "BuffBars:viewer:OnSizeChanged" }, reasons)
     end)
 
     it("child SetPoint hooks restore cached anchors and respect the layout-running guard", function()
@@ -579,7 +581,7 @@ describe("BuffBars real source", function()
         end
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                anchorMode = ns.Constants.ANCHORMODE_CHAIN,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -588,7 +590,7 @@ describe("BuffBars real source", function()
         function BuffBars:ShouldShow()
             return true
         end
-        function BuffBars:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -603,7 +605,7 @@ describe("BuffBars real source", function()
         BuffBars._layoutRunning = nil
         child:SetPoint("CENTER", nil, "CENTER", 99, 99)
 
-        assert.same({ "SetPoint:hook" }, reasons)
+        assert.same({ "BuffBars:SetPoint:hook" }, reasons)
         assert.are.equal(child.__ecmAnchorCache, child.__anchors)
     end)
 
@@ -620,7 +622,7 @@ describe("BuffBars real source", function()
         end
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                anchorMode = ns.Constants.ANCHORMODE_CHAIN,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -629,7 +631,7 @@ describe("BuffBars real source", function()
         function BuffBars:ShouldShow()
             return true
         end
-        function BuffBars:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -645,7 +647,7 @@ describe("BuffBars real source", function()
         child._hooks.OnShow[1]()
         child._hooks.OnHide[1]()
 
-        assert.same({ "OnShow:child", "OnHide:child" }, reasons)
+        assert.same({ "BuffBars:OnShow:child", "BuffBars:OnHide:child" }, reasons)
     end)
 
     it("reports edit lock reasons for combat and secret values", function()
@@ -658,39 +660,39 @@ describe("BuffBars real source", function()
             return false
         end
         local secretColorRequested = false
-        ECM.SpellColors.GetColorForBar = function()
+        ns.SpellColors.GetColorForBar = function()
             secretColorRequested = true
             return nil
         end
-        ECM.SpellColors.GetDefaultColor = function()
+        ns.SpellColors.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
-        ECM.ColorUtil = {
+        ns.ColorUtil = {
             ColorToHex = function()
                 return "ffffff"
             end,
         }
-        ECM.ToString = tostring
-        ECM.GetTexture = function()
+        ns.ToString = tostring
+        ns.FrameUtil.GetTexture = function()
             return "Solid"
         end
-        ECM.ApplyFont = function() end
-        ECM.DebugAssert = function() end
-        ECM.FrameUtil.GetBarBackground = function()
+        ns.FrameUtil.ApplyFont = function() end
+        ns.DebugAssert = function() end
+        ns.FrameUtil.GetBarBackground = function()
             return nil
         end
-        ECM.FrameUtil.GetIconTexture = function()
+        ns.FrameUtil.GetIconTexture = function()
             return nil
         end
-        ECM.FrameUtil.GetIconOverlay = function()
+        ns.FrameUtil.GetIconOverlay = function()
             return nil
         end
-        ECM.FrameUtil.LazySetHeight = function() end
-        ECM.FrameUtil.LazySetWidth = function() end
-        ECM.FrameUtil.LazySetStatusBarTexture = function() end
-        ECM.FrameUtil.LazySetStatusBarColor = function() end
-        ECM.FrameUtil.LazySetAnchors = function() end
-        ECM.FrameUtil.LazySetAlpha = function() end
+        ns.FrameUtil.LazySetHeight = function() end
+        ns.FrameUtil.LazySetWidth = function() end
+        ns.FrameUtil.LazySetStatusBarTexture = function() end
+        ns.FrameUtil.LazySetStatusBarColor = function() end
+        ns.FrameUtil.LazySetAnchors = function() end
+        ns.FrameUtil.LazySetAlpha = function() end
         _G.issecretvalue = function()
             return true
         end
@@ -733,7 +735,7 @@ describe("BuffBars real source", function()
     it("registers immediately and schedules initial hooks on enable", function()
         local reasons = {}
         function BuffBars:RegisterEvent() end
-        function BuffBars:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
         function BuffBars:GetModuleConfig()
@@ -749,7 +751,7 @@ describe("BuffBars real source", function()
 
         timerCallbacks[1]()
 
-        assert.same({ "ModuleInit" }, reasons)
+        assert.same({ "BuffBars:ModuleInit" }, reasons)
         assert.is_true(BuffBars._viewerHooked)
     end)
 
@@ -766,57 +768,57 @@ describe("BuffBars real source", function()
         local cleared = 0
         local appliedTextures = {}
         local appliedColors = {}
-        ECM.SpellColors.ClearDiscoveredKeys = function()
+        ns.SpellColors.ClearDiscoveredKeys = function()
             cleared = cleared + 1
         end
-        ECM.SpellColors.DiscoverBar = function(frame)
+        ns.SpellColors.DiscoverBar = function(frame)
             discovered[#discovered + 1] = frame
         end
-        ECM.SpellColors.GetColorForBar = function()
+        ns.SpellColors.GetColorForBar = function()
             return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
         end
-        ECM.SpellColors.GetDefaultColor = function()
+        ns.SpellColors.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
-        ECM.ColorUtil = {
+        ns.ColorUtil = {
             ColorToHex = function()
                 return "abcdef"
             end,
         }
-        ECM.ToString = tostring
-        ECM.GetTexture = function()
+        ns.ToString = tostring
+        ns.FrameUtil.GetTexture = function()
             return "Interface\\TargetingFrame\\UI-StatusBar"
         end
-        ECM.ApplyFont = function() end
-        ECM.DebugAssert = function(condition)
+        ns.FrameUtil.ApplyFont = function() end
+        ns.DebugAssert = function(condition)
             assert.is_true(condition)
         end
-        ECM.FrameUtil.GetBarBackground = function()
+        ns.FrameUtil.GetBarBackground = function()
             return nil
         end
-        ECM.FrameUtil.GetIconTexture = function()
+        ns.FrameUtil.GetIconTexture = function()
             return nil
         end
-        ECM.FrameUtil.GetIconOverlay = function()
+        ns.FrameUtil.GetIconOverlay = function()
             return nil
         end
-        ECM.FrameUtil.LazySetHeight = function(frame, value)
+        ns.FrameUtil.LazySetHeight = function(frame, value)
             frame.__height = value
         end
-        ECM.FrameUtil.LazySetWidth = function(frame, value)
+        ns.FrameUtil.LazySetWidth = function(frame, value)
             frame.__width = value
         end
-        ECM.FrameUtil.LazySetStatusBarTexture = function(bar, texture)
+        ns.FrameUtil.LazySetStatusBarTexture = function(bar, texture)
             appliedTextures[#appliedTextures + 1] = { bar = bar, texture = texture }
         end
-        ECM.FrameUtil.LazySetStatusBarColor = function(bar, r, g, b, a)
+        ns.FrameUtil.LazySetStatusBarColor = function(bar, r, g, b, a)
             appliedColors[#appliedColors + 1] = { bar = bar, color = { r, g, b, a } }
         end
-        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+        ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
         end
-        ECM.FrameUtil.LazySetAlpha = function(frame, value)
+        ns.FrameUtil.LazySetAlpha = function(frame, value)
             frame.__alpha = value
         end
 
@@ -832,7 +834,7 @@ describe("BuffBars real source", function()
         end
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                anchorMode = ns.Constants.ANCHORMODE_CHAIN,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -855,30 +857,30 @@ describe("BuffBars real source", function()
     end)
 
     it("clears _layoutRunning even when styleChildFrame throws", function()
-        ECM.SpellColors.DiscoverBar = function() end
-        ECM.SpellColors.GetColorForBar = function()
+        ns.SpellColors.DiscoverBar = function() end
+        ns.SpellColors.GetColorForBar = function()
             error("simulated style error")
         end
-        ECM.SpellColors.GetDefaultColor = function()
+        ns.SpellColors.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
-        ECM.ColorUtil = { ColorToHex = function() return "ffffff" end }
-        ECM.ToString = tostring
-        ECM.GetTexture = function() return "Solid" end
-        ECM.ApplyFont = function() end
+        ns.ColorUtil = { ColorToHex = function() return "ffffff" end }
+        ns.ToString = tostring
+        ns.FrameUtil.GetTexture = function() return "Solid" end
+        ns.FrameUtil.ApplyFont = function() end
         local assertedCondition
-        ECM.DebugAssert = function(cond) assertedCondition = cond end
-        ECM.FrameUtil.GetBarBackground = function() return nil end
-        ECM.FrameUtil.GetIconTexture = function() return nil end
-        ECM.FrameUtil.GetIconOverlay = function() return nil end
-        ECM.FrameUtil.LazySetHeight = function() end
-        ECM.FrameUtil.LazySetWidth = function() end
-        ECM.FrameUtil.LazySetStatusBarTexture = function() end
-        ECM.FrameUtil.LazySetStatusBarColor = function() end
-        ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+        ns.DebugAssert = function(cond) assertedCondition = cond end
+        ns.FrameUtil.GetBarBackground = function() return nil end
+        ns.FrameUtil.GetIconTexture = function() return nil end
+        ns.FrameUtil.GetIconOverlay = function() return nil end
+        ns.FrameUtil.LazySetHeight = function() end
+        ns.FrameUtil.LazySetWidth = function() end
+        ns.FrameUtil.LazySetStatusBarTexture = function() end
+        ns.FrameUtil.LazySetStatusBarColor = function() end
+        ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             frame.__ecmAnchorCache = anchors
         end
-        ECM.FrameUtil.LazySetAlpha = function() end
+        ns.FrameUtil.LazySetAlpha = function() end
 
         local child = makeStyledChild("Boom", true, 1)
         function BuffBarCooldownViewer:GetChildren() return child end
@@ -887,7 +889,7 @@ describe("BuffBars real source", function()
         end
         function BuffBars:GetModuleConfig()
             return {
-                anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+                anchorMode = ns.Constants.ANCHORMODE_CHAIN,
                 showIcon = false, showSpellName = true, showDuration = true,
             }
         end
@@ -907,7 +909,7 @@ describe("BuffBars real source", function()
     -- Helper: runs a single child through UpdateLayout and returns it styled.
     local function layoutSingleChild(child, moduleConfig, globalConfig)
         stubChildLayoutEnvironment()
-        ECM.SpellColors.DiscoverBar = function() end
+        ns.SpellColors.DiscoverBar = function() end
         function BuffBarCooldownViewer:GetChildren() return child end
         function BuffBars:ShouldShow() return true end
         function BuffBars:GetGlobalConfig() return globalConfig end
@@ -923,7 +925,7 @@ describe("BuffBars real source", function()
 
     local function defaultModule(overrides)
         local m = {
-            anchorMode = ECM.Constants.ANCHORMODE_CHAIN,
+            anchorMode = ns.Constants.ANCHORMODE_CHAIN,
             showIcon = true, showSpellName = true, showDuration = true,
         }
         if overrides then for k, v in pairs(overrides) do m[k] = v end end
@@ -964,15 +966,15 @@ describe("BuffBars real source", function()
             local child = makeStyledChild("BG", true, 1)
             local bgColor = { r = 0.1, g = 0.2, b = 0.3, a = 0.5 }
             stubChildLayoutEnvironment()
-            ECM.SpellColors.DiscoverBar = function() end
-            ECM.FrameUtil.GetBarBackground = function() return bgRegion end
+            ns.SpellColors.DiscoverBar = function() end
+            ns.FrameUtil.GetBarBackground = function() return bgRegion end
             function BuffBarCooldownViewer:GetChildren() return child end
             function BuffBars:ShouldShow() return true end
             function BuffBars:GetGlobalConfig() return defaultGlobal() end
             function BuffBars:GetModuleConfig() return defaultModule({ bgColor = bgColor }) end
             BuffBars:UpdateLayout("test")
 
-            assert.are.equal(ECM.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
+            assert.are.equal(ns.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
             assert.same({ 0.1, 0.2, 0.3, 0.5 }, bgRegion.__vcolor)
             assert.same({ "BACKGROUND", 0 }, bgRegion.__drawLayer)
         end)
@@ -983,8 +985,8 @@ describe("BuffBars real source", function()
             local appliedColor
             local child = makeStyledChild("C", true, 1)
             stubChildLayoutEnvironment()
-            ECM.SpellColors.DiscoverBar = function() end
-            ECM.FrameUtil.LazySetStatusBarColor = function(_, r, g, b, a)
+            ns.SpellColors.DiscoverBar = function() end
+            ns.FrameUtil.LazySetStatusBarColor = function(_, r, g, b, a)
                 appliedColor = { r, g, b, a }
             end
             function BuffBarCooldownViewer:GetChildren() return child end

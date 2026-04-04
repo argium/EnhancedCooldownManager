@@ -15,6 +15,7 @@ describe("ECM.Runtime layout system", function()
     local fakeAddon
     local createdFrames
     local createdTickers
+    local ns
     local makeFrame = TestHelpers.makeFrame
 
     local function makeModule(name)
@@ -27,7 +28,7 @@ describe("ECM.Runtime layout system", function()
             InnerFrame = innerFrame,
             IsHidden = false,
             _lastUpdate = 0,
-            _configKey = ECM.Constants.ConfigKeyForModule(name),
+            _configKey = ns.Constants.ConfigKeyForModule(name),
         }
 
         function mod:SetHidden(hide)
@@ -59,7 +60,7 @@ describe("ECM.Runtime layout system", function()
                 offsetX = 0,
                 offsetY = -((gc and gc.offsetY) or 0),
                 height = (mc and mc.height) or (gc and gc.barHeight),
-                width = mc.anchorMode == ECM.Constants.ANCHORMODE_FREE and ((mc and mc.width) or (gc and gc.barWidth))
+                width = mc.anchorMode == ns.Constants.ANCHORMODE_FREE and ((mc and mc.width) or (gc and gc.barWidth))
                     or nil,
             }
         end
@@ -76,10 +77,10 @@ describe("ECM.Runtime layout system", function()
             end
             local params = self:CalculateLayoutParams()
             if params.height then
-                ECM.FrameUtil.LazySetHeight(self.InnerFrame, params.height)
+                ns.FrameUtil.LazySetHeight(self.InnerFrame, params.height)
             end
             if params.width then
-                ECM.FrameUtil.LazySetWidth(self.InnerFrame, params.width)
+                ns.FrameUtil.LazySetWidth(self.InnerFrame, params.width)
             end
             self:ThrottledRefresh("UpdateLayout(" .. (why or "") .. ")")
             return true
@@ -89,7 +90,7 @@ describe("ECM.Runtime layout system", function()
         end
         function mod:ThrottledRefresh(why)
             local gc = self:GetGlobalConfig()
-            local freq = (gc and gc.updateFrequency) or ECM.Constants.DEFAULT_REFRESH_FREQUENCY
+            local freq = (gc and gc.updateFrequency) or ns.Constants.DEFAULT_REFRESH_FREQUENCY
             if GetTime() - (self._lastUpdate or 0) < freq then
                 return false
             end
@@ -97,10 +98,10 @@ describe("ECM.Runtime layout system", function()
             self._lastUpdate = GetTime()
             return true
         end
-        function mod:ThrottledUpdateLayout(reason)
-            if self:IsEnabled() then
-                self:UpdateLayout(reason)
-            end
+        function mod:IsReady()
+            return self.InnerFrame ~= nil
+                and self:GetGlobalConfig() ~= nil
+                and self:GetModuleConfig() ~= nil
         end
 
         return mod
@@ -108,7 +109,7 @@ describe("ECM.Runtime layout system", function()
 
     local function makeRegisteredModule(name)
         local mod = makeModule(name or "PowerBar")
-        ECM.Runtime.RegisterFrame(mod)
+        ns.Runtime.RegisterFrame(mod)
         return mod
     end
 
@@ -123,7 +124,6 @@ describe("ECM.Runtime layout system", function()
     end
 
     local CAPTURED_GLOBALS = {
-        "ECM",
         "LibStub",
         "C_Timer",
         "C_AddOns",
@@ -140,6 +140,7 @@ describe("ECM.Runtime layout system", function()
         "UnitIsDead",
         "UnitCanAttack",
         "UnitCanAssist",
+        "C_PartyInfo",
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
@@ -171,6 +172,7 @@ describe("ECM.Runtime layout system", function()
     end)
 
     before_each(function()
+        ns = {}
         fakeTime = 100
         isMounted = false
         inCombat = false
@@ -209,6 +211,11 @@ describe("ECM.Runtime layout system", function()
         _G.UnitCanAssist = function()
             return false
         end
+        _G.C_PartyInfo = {
+            IsDelveInProgress = function()
+                return false
+            end,
+        }
         _G.IsInInstance = function()
             return false
         end
@@ -318,8 +325,7 @@ describe("ECM.Runtime layout system", function()
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
-        _G.ECM = {}
-        _G.ECM.ColorUtil = {
+        ns.ColorUtil = {
             Sparkle = function(text)
                 return text
             end,
@@ -333,35 +339,27 @@ describe("ECM.Runtime layout system", function()
                 return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
             end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
-        _G.ECM.Migration = {
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        TestHelpers.LoadChunk("Defaults.lua", "Unable to load Defaults.lua")(nil, ns)
+        ns.Migration = {
             PrepareDatabase = function() end,
             Run = function() end,
             FlushLog = function() end,
             PrintLog = function() end,
         }
-        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(
-            nil,
-            { Addon = fakeAddon }
-        )
-        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(
-            nil,
-            { Addon = fakeAddon }
-        )
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns.Addon = fakeAddon
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
 
-        local profile = TestHelpers.deepClone(ECM.defaults.profile)
+        local profile = TestHelpers.deepClone(ns.defaults.profile)
         _G._testDB = { profile = profile, RegisterCallback = function() end }
         fakeAddon.db = _G._testDB
 
-        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
-        TestHelpers.LoadChunk("ECM_Runtime.lua", "Unable to load ECM_Runtime.lua")(
-            "EnhancedCooldownManager",
-            { Addon = fakeAddon }
-        )
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", ns)
+        TestHelpers.LoadChunk("Runtime.lua", "Unable to load Runtime.lua")("EnhancedCooldownManager", ns)
     end)
 
     describe("automatic layout enforcement", function()
@@ -369,7 +367,7 @@ describe("ECM.Runtime layout system", function()
             local mod = makeRegisteredModule()
             isMounted = true
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
+            ns.Runtime.ScheduleLayoutUpdate(0, "mount")
 
             assert.is_true(mod.IsHidden)
             assert.is_false(mod.InnerFrame:IsShown())
@@ -379,33 +377,50 @@ describe("ECM.Runtime layout system", function()
             local mod = makeRegisteredModule()
             _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(50)
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "fade")
+            ns.Runtime.ScheduleLayoutUpdate(0, "fade")
 
             assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
+        end)
+
+        it("does not fade in a delve when instance exceptions are enabled", function()
+            local mod = makeRegisteredModule()
+            local fadeConfig = makeFadeConfig(50)
+
+            fadeConfig.exceptInInstance = true
+            _G._testDB.profile.global.outOfCombatFade = fadeConfig
+            _G.C_PartyInfo = {
+                IsDelveInProgress = function()
+                    return true
+                end,
+            }
+
+            ns.Runtime.ScheduleLayoutUpdate(0, "delve-fade-skip")
+
+            assert.are.equal(1, mod.InnerFrame:GetAlpha())
         end)
 
         it("re-shows module frames after dismounting", function()
             local mod = makeRegisteredModule()
 
             isMounted = true
-            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
+            ns.Runtime.ScheduleLayoutUpdate(0, "mount")
             assert.is_false(mod.InnerFrame:IsShown())
 
             fakeTime = fakeTime + 1
             isMounted = false
-            ECM.Runtime.ScheduleLayoutUpdate(0, "dismount")
+            ns.Runtime.ScheduleLayoutUpdate(0, "dismount")
             assert.is_true(mod.InnerFrame:IsShown())
         end)
 
         it("restores full alpha when combat fade is disabled", function()
             local mod = makeRegisteredModule()
             _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(30)
-            ECM.Runtime.ScheduleLayoutUpdate(0, "fade-on")
+            ns.Runtime.ScheduleLayoutUpdate(0, "fade-on")
             assert.are.equal(0.3, mod.InnerFrame:GetAlpha())
 
             fakeTime = fakeTime + 1
             _G._testDB.profile.global.outOfCombatFade.enabled = false
-            ECM.Runtime.ScheduleLayoutUpdate(0, "fade-off")
+            ns.Runtime.ScheduleLayoutUpdate(0, "fade-off")
             assert.are.equal(1, mod.InnerFrame:GetAlpha())
         end)
 
@@ -414,7 +429,7 @@ describe("ECM.Runtime layout system", function()
             local mod2 = makeRegisteredModule("ResourceBar")
 
             cvarEnabled = false
-            ECM.Runtime.ScheduleLayoutUpdate(0, "cvar-off")
+            ns.Runtime.ScheduleLayoutUpdate(0, "cvar-off")
 
             assert.is_true(mod1.IsHidden)
             assert.is_true(mod2.IsHidden)
@@ -423,12 +438,12 @@ describe("ECM.Runtime layout system", function()
         it("re-hides a module frame that was externally shown while hidden", function()
             local mod = makeRegisteredModule()
             isMounted = true
-            ECM.Runtime.ScheduleLayoutUpdate(0, "mount")
+            ns.Runtime.ScheduleLayoutUpdate(0, "mount")
 
             mod.InnerFrame:Show()
 
             fakeTime = fakeTime + 1
-            ECM.Runtime.ScheduleLayoutUpdate(0, "re-enforce")
+            ns.Runtime.ScheduleLayoutUpdate(0, "re-enforce")
             assert.is_false(mod.InnerFrame:IsShown())
         end)
 
@@ -436,11 +451,11 @@ describe("ECM.Runtime layout system", function()
             local mod = makeRegisteredModule()
             local reasons = {}
 
-            mod.ThrottledUpdateLayout = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
 
-            ECM.Runtime.SetLayoutPreview(true)
+            ns.Runtime.SetLayoutPreview(true)
 
             assert.same({ "LayoutPreviewOn" }, reasons)
         end)
@@ -481,15 +496,12 @@ describe("ECM.Runtime layout system", function()
         it("ScheduleLayoutUpdate keeps the first reason and flushes modules in the batch callback", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.UpdateLayoutImmediately = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
-            mod.ThrottledUpdateLayout = function()
-                error("ScheduleLayoutUpdate should flush through UpdateLayoutImmediately when available")
-            end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "First")
-            ECM.Runtime.ScheduleLayoutUpdate(0, "Second")
+            ns.Runtime.ScheduleLayoutUpdate(0, "First")
+            ns.Runtime.ScheduleLayoutUpdate(0, "Second")
 
             assert.are.equal(1, #timerQueue)
             assert.are.equal(0, #reasons)
@@ -504,11 +516,11 @@ describe("ECM.Runtime layout system", function()
             local reasons = {}
             local libEvent = LibStub("LibEvent-1.0")
 
-            mod.ThrottledUpdateLayout = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
@@ -526,11 +538,11 @@ describe("ECM.Runtime layout system", function()
             local reasons = {}
             local libEvent = LibStub("LibEvent-1.0")
 
-            mod.ThrottledUpdateLayout = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
@@ -547,14 +559,11 @@ describe("ECM.Runtime layout system", function()
             local reasons = {}
             local libEvent = LibStub("LibEvent-1.0")
 
-            mod.UpdateLayoutImmediately = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
-            mod.ThrottledUpdateLayout = function()
-                error("Delayed runtime batches should not add another zero-delay module hop")
-            end
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
@@ -562,7 +571,7 @@ describe("ECM.Runtime layout system", function()
             handler(addonFrame, "ZONE_CHANGED")
 
             assert.are.equal(1, #timerQueue)
-            assert.are.equal(ECM.Constants.LAYOUT_ZONE_CHANGE_DELAY, timerQueue[1].delay)
+            assert.are.equal(ns.Constants.LAYOUT_ZONE_CHANGE_DELAY, timerQueue[1].delay)
             assert.same({}, reasons)
 
             timerQueue[1].callback()
@@ -573,15 +582,15 @@ describe("ECM.Runtime layout system", function()
         it("ScheduleLayoutUpdate with a shorter delay supersedes a pending longer-delay timer", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.UpdateLayoutImmediately = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
             end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0.5, "Slow")
+            ns.Runtime.ScheduleLayoutUpdate(0.5, "Slow")
             assert.are.equal(1, #timerQueue)
             assert.is_false(timerQueue[1].cancelled)
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "Urgent")
+            ns.Runtime.ScheduleLayoutUpdate(0, "Urgent")
             assert.are.equal(2, #timerQueue)
             -- The first timer should have been cancelled
             assert.is_true(timerQueue[1].cancelled)
@@ -596,11 +605,8 @@ describe("ECM.Runtime layout system", function()
         it("UpdateLayoutImmediately runs layout without C_Timer", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.UpdateLayoutImmediately = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
-            end
-            mod.ThrottledUpdateLayout = function()
-                error("Runtime.UpdateLayoutImmediately should bypass the throttled path")
             end
 
             local timerCalled = false
@@ -610,7 +616,7 @@ describe("ECM.Runtime layout system", function()
                 cb()
             end
 
-            ECM.Runtime.UpdateLayoutImmediately("SyncTest")
+            ns.Runtime.UpdateLayoutImmediately("SyncTest")
 
             assert.same({ "SyncTest" }, reasons)
             assert.is_false(timerCalled)
@@ -620,20 +626,17 @@ describe("ECM.Runtime layout system", function()
         it("UpdateLayoutImmediately clears pending flag so ScheduleLayoutUpdate is not blocked", function()
             local mod = makeRegisteredModule()
             local reasons = {}
-            mod.UpdateLayoutImmediately = function(_, reason)
+            mod.UpdateLayout = function(_, reason)
                 reasons[#reasons + 1] = reason
-            end
-            mod.ThrottledUpdateLayout = function()
-                error("Runtime-scheduled batches should use the synchronous module path when available")
             end
 
             -- Schedule a deferred update (fires immediately in test due to stub)
-            ECM.Runtime.ScheduleLayoutUpdate(0, "Deferred")
+            ns.Runtime.ScheduleLayoutUpdate(0, "Deferred")
             -- Now do synchronous
-            ECM.Runtime.UpdateLayoutImmediately("Sync")
+            ns.Runtime.UpdateLayoutImmediately("Sync")
             -- Schedule again — should not be blocked
             fakeTime = fakeTime + 1
-            ECM.Runtime.ScheduleLayoutUpdate(0, "AfterSync")
+            ns.Runtime.ScheduleLayoutUpdate(0, "AfterSync")
 
             assert.same({ "Deferred", "Sync", "AfterSync" }, reasons)
         end)
@@ -643,10 +646,10 @@ describe("ECM.Runtime layout system", function()
         it("normalizes legacy center-saved detached positions to a stable top anchor", function()
             local mod = makeRegisteredModule("PowerBar")
             local lib = LibStub("LibEditMode")
-            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+            local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
 
-            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
-            _G._testDB.profile.global.detachedGrowDirection = ECM.Constants.GROW_DIRECTION_DOWN
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.global.detachedGrowDirection = ns.Constants.GROW_DIRECTION_DOWN
             _G._testDB.profile.global.detachedAnchorPositions = {
                 Modern = { point = "CENTER", x = 0, y = -265 },
             }
@@ -655,7 +658,7 @@ describe("ECM.Runtime layout system", function()
                 return name == mod.Name and mod
             end
 
-            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            ns.FrameUtil.LazySetAnchors = function(frame, anchors)
                 frame.__ecmAnchorCache = anchors
                 frame.__anchors = anchors
             end
@@ -664,21 +667,21 @@ describe("ECM.Runtime layout system", function()
                 return "Modern"
             end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-center-normalize")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-center-normalize")
 
-            local anchor = ECM.Runtime.DetachedAnchor
+            local anchor = ns.Runtime.DetachedAnchor
             assert.same({ "TOP", UIParent, "TOP", 0, -653 }, anchor.__anchors[1])
 
-            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+            ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
 
         it("positions the detached anchor before detached modules update", function()
             local mod = makeRegisteredModule("PowerBar")
             local lib = LibStub("LibEditMode")
-            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+            local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
             local anchorDuringLayout
 
-            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_DETACHED
             _G._testDB.profile.global.detachedBarWidth = 321
             _G._testDB.profile.global.detachedAnchorPositions = {
                 Modern = { point = "TOPLEFT", x = 10, y = 20 },
@@ -688,7 +691,7 @@ describe("ECM.Runtime layout system", function()
                 return name == mod.Name and mod
             end
 
-            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            ns.FrameUtil.LazySetAnchors = function(frame, anchors)
                 frame.__ecmAnchorCache = anchors
                 frame.__anchors = anchors
             end
@@ -697,8 +700,8 @@ describe("ECM.Runtime layout system", function()
                 return "Modern"
             end
 
-            mod.ThrottledUpdateLayout = function(_, reason)
-                local anchor = ECM.Runtime.DetachedAnchor
+            mod.UpdateLayout = function(_, reason)
+                local anchor = ns.Runtime.DetachedAnchor
                 anchorDuringLayout = {
                     anchors = anchor and anchor.__anchors and anchor.__anchors[1] or nil,
                     width = anchor and anchor:GetWidth() or nil,
@@ -706,32 +709,32 @@ describe("ECM.Runtime layout system", function()
                 }
             end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-order")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-order")
 
             assert.are.equal("detached-order", anchorDuringLayout.reason)
             assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchorDuringLayout.anchors)
             assert.are.equal(321, anchorDuringLayout.width)
 
-            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+            ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
 
         it("registers grow direction dropdown values with text labels", function()
             local mod = makeRegisteredModule("PowerBar")
             local lib = LibStub("LibEditMode")
 
-            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_DETACHED
             fakeAddon.GetECMModule = function(_, name)
                 return name == mod.Name and mod
             end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-settings-shape")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-settings-shape")
 
-            local settings = assert(lib.addFrameSettingsCalls[ECM.Runtime.DetachedAnchor])
+            local settings = assert(lib.addFrameSettingsCalls[ns.Runtime.DetachedAnchor])
             local growDirection = assert(settings[3])
 
             assert.same({
-                { text = ECM.L["DOWN"], value = ECM.Constants.GROW_DIRECTION_DOWN },
-                { text = ECM.L["UP"], value = ECM.Constants.GROW_DIRECTION_UP },
+                { text = ns.L["DOWN"], value = ns.Constants.GROW_DIRECTION_DOWN },
+                { text = ns.L["UP"], value = ns.Constants.GROW_DIRECTION_UP },
             }, growDirection.values)
         end)
 
@@ -739,25 +742,24 @@ describe("ECM.Runtime layout system", function()
             local mod = makeRegisteredModule("PowerBar")
             local metricsScans = 0
 
-            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_DETACHED
             mod.InnerFrame:SetHeight(24)
-            mod.ThrottledUpdateLayout = function() end
             fakeAddon.GetECMModule = function(_, name)
                 metricsScans = metricsScans + 1
                 return name == mod.Name and mod or nil
             end
 
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-metrics")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-metrics")
 
-            assert.are.equal(#ECM.Constants.CHAIN_ORDER, metricsScans)
+            assert.are.equal(#ns.Constants.CHAIN_ORDER, metricsScans)
         end)
 
         it("keeps the detached anchor position when the active layout name is temporarily unavailable", function()
             local mod = makeRegisteredModule("PowerBar")
             local lib = LibStub("LibEditMode")
-            local originalLazySetAnchors = ECM.FrameUtil.LazySetAnchors
+            local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
 
-            _G._testDB.profile.powerBar.anchorMode = ECM.Constants.ANCHORMODE_DETACHED
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_DETACHED
             _G._testDB.profile.global.detachedAnchorPositions = {
                 Modern = { point = "TOPLEFT", x = 10, y = 20 },
                 Raid = { point = "TOPRIGHT", x = 30, y = 40 },
@@ -767,7 +769,7 @@ describe("ECM.Runtime layout system", function()
                 return name == mod.Name and mod
             end
 
-            ECM.FrameUtil.LazySetAnchors = function(frame, anchors)
+            ns.FrameUtil.LazySetAnchors = function(frame, anchors)
                 frame.__ecmAnchorCache = anchors
                 frame.__anchors = anchors
             end
@@ -775,24 +777,24 @@ describe("ECM.Runtime layout system", function()
             lib.GetActiveLayoutName = function()
                 return "Modern"
             end
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-initial")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-initial")
 
-            local anchor = ECM.Runtime.DetachedAnchor
+            local anchor = ns.Runtime.DetachedAnchor
             assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
 
             lib.GetActiveLayoutName = function()
                 return nil
             end
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-transition")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-transition")
             assert.same({ "TOPLEFT", UIParent, "TOPLEFT", 10, 20 }, anchor.__anchors[1])
 
             lib.GetActiveLayoutName = function()
                 return "Raid"
             end
-            ECM.Runtime.ScheduleLayoutUpdate(0, "detached-layout-switch")
+            ns.Runtime.ScheduleLayoutUpdate(0, "detached-layout-switch")
             assert.same({ "TOPRIGHT", UIParent, "TOPRIGHT", 30, 40 }, anchor.__anchors[1])
 
-            ECM.FrameUtil.LazySetAnchors = originalLazySetAnchors
+            ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
         end)
     end)
 
@@ -800,7 +802,7 @@ describe("ECM.Runtime layout system", function()
         it("registers layout events on enable", function()
             local libEvent = LibStub("LibEvent-1.0")
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             assert.is_true(addonFrame.__registeredEvents.ZONE_CHANGED)
@@ -810,12 +812,12 @@ describe("ECM.Runtime layout system", function()
         it("cleans up layout events on disable", function()
             local libEvent = LibStub("LibEvent-1.0")
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
             assert.is_false(createdTickers[1].cancelled)
 
-            ECM.Runtime.Disable(fakeAddon)
+            ns.Runtime.Disable(fakeAddon)
 
             assert.is_nil(addonFrame.__registeredEvents.ZONE_CHANGED)
             assert.is_nil(addonFrame.__registeredEvents.PLAYER_REGEN_ENABLED)
@@ -826,11 +828,11 @@ describe("ECM.Runtime layout system", function()
 
         it("calls OnCombatEnd callback on PLAYER_REGEN_ENABLED", function()
             local called = false
-            ECM.Runtime.OnCombatEnd = function()
+            ns.Runtime.OnCombatEnd = function()
                 called = true
             end
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local libEvent = LibStub("LibEvent-1.0")
             local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
@@ -862,7 +864,7 @@ describe("ECM.Runtime layout system", function()
         --- Places all 4 Blizzard frames + CooldownViewerSettings in _G.
         local function createAllBlizzardFrames()
             local frames = {}
-            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
                 frames[name] = makeBlizzardFrame(name)
             end
             local settings = makeFrame({ name = "CooldownViewerSettings" })
@@ -879,13 +881,13 @@ describe("ECM.Runtime layout system", function()
 
         it("skips setup calls once all frames hooked and settings bound", function()
             local frames = createAllBlizzardFrames()
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local ticker = createdTickers[1]
 
             -- First tick: hooks all frames + settings
             ticker.callback()
-            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should be hooked exactly once after first tick")
             end
@@ -894,7 +896,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Second tick: setup should be skipped
             ticker.callback()
-            for _, name in ipairs(ECM.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should still be hooked exactly once after second tick")
             end
@@ -904,18 +906,18 @@ describe("ECM.Runtime layout system", function()
 
         it("still enforces Blizzard frame state after setup is complete", function()
             local frames = createAllBlizzardFrames()
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
 
             local ticker = createdTickers[1]
             ticker.callback() -- complete all setup
 
             -- Simulate a Blizzard frame being externally hidden
-            frames[ECM.Constants.BLIZZARD_FRAMES[1]]:Hide()
-            assert.is_false(frames[ECM.Constants.BLIZZARD_FRAMES[1]]:IsShown())
+            frames[ns.Constants.BLIZZARD_FRAMES[1]]:Hide()
+            assert.is_false(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown())
 
             -- Enforcement tick should re-show it
             ticker.callback()
-            assert.is_true(frames[ECM.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
+            assert.is_true(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
                 "Enforcement should re-show externally hidden Blizzard frame")
         end)
 
@@ -923,16 +925,16 @@ describe("ECM.Runtime layout system", function()
             -- Start with only 2 of 4 Blizzard frames
             local firstTwo = {}
             for i = 1, 2 do
-                local name = ECM.Constants.BLIZZARD_FRAMES[i]
+                local name = ns.Constants.BLIZZARD_FRAMES[i]
                 firstTwo[name] = makeBlizzardFrame(name)
             end
 
-            ECM.Runtime.Enable(fakeAddon)
+            ns.Runtime.Enable(fakeAddon)
             local ticker = createdTickers[1]
 
             -- First tick: hooks 2 frames, but no CooldownViewerSettings yet
             ticker.callback()
-            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[1], ECM.Constants.BLIZZARD_FRAMES[2] }) do
+            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[1], ns.Constants.BLIZZARD_FRAMES[2] }) do
                 assert.are.equal(1, firstTwo[name]._hookScriptCalls)
             end
 
@@ -942,7 +944,7 @@ describe("ECM.Runtime layout system", function()
             -- Now add remaining frames + settings
             local laterFrames = {}
             for i = 3, 4 do
-                local name = ECM.Constants.BLIZZARD_FRAMES[i]
+                local name = ns.Constants.BLIZZARD_FRAMES[i]
                 laterFrames[name] = makeBlizzardFrame(name)
             end
             local settings = makeFrame({ name = "CooldownViewerSettings" })
@@ -956,7 +958,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Third tick: hooks remaining frames + settings, setup completes
             ticker.callback()
-            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[3], ECM.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should be hooked on third tick")
             end
@@ -964,7 +966,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Fourth tick: setup skipped, no additional hooks
             ticker.callback()
-            for _, name in ipairs({ ECM.Constants.BLIZZARD_FRAMES[3], ECM.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should not be re-hooked after setup complete")
             end

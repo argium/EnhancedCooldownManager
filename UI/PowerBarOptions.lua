@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local L = ECM.L
+local L = ns.L
 
 local POWER_COLOR_DEFS = {
     { key = Enum.PowerType.Mana, name = L["POWER_MANA"] },
@@ -18,16 +18,16 @@ local POWER_COLOR_DEFS = {
 }
 
 local PowerBarOptions = {}
-local isDisabled = ECM.OptionUtil.GetIsDisabledDelegate("powerBar")
+local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
 
 function PowerBarOptions.RegisterSettings(SB)
-    local args = ECM.OptionUtil.CreateBarArgs(isDisabled)
+    local args = ns.OptionUtil.CreateBarArgs(isDisabled)
     args.enabled = {
         type = "toggle",
         path = "enabled",
         name = L["ENABLE_POWER_BAR"],
         order = 0,
-        onSet = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
+        onSet = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
     }
     args.showManaAsPercent = {
         type = "toggle",
@@ -47,7 +47,7 @@ function PowerBarOptions.RegisterSettings(SB)
     }
 
     SB.RegisterFromTable({ name = L["POWER_BAR"], path = "powerBar", args = args })
-    ECM.PowerBarTickMarksOptions.RegisterSettings(SB, SB._currentSubcategory)
+    ns.PowerBarTickMarksOptions.RegisterSettings(SB, SB._currentSubcategory)
 end
 
-ECM.SettingsBuilder.RegisterSection(ns, "PowerBar", PowerBarOptions)
+ns.SettingsBuilder.RegisterSection(ns, "PowerBar", PowerBarOptions)

@@ -12,7 +12,6 @@ describe("OptionUtil", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "ECM_DeepEquals",
             "Settings",
             "CreateSettingsListSectionHeaderInitializer",
@@ -39,19 +38,6 @@ describe("OptionUtil", function()
     before_each(function()
         TestHelpers.SetupOptionsGlobals()
 
-        TestHelpers.LoadLiveConstants()
-        -- Test-specific sentinel values for anchor modes
-        ECM.Constants.ANCHORMODE_CHAIN = 1
-        ECM.Constants.ANCHORMODE_DETACHED = 3
-        ECM.Constants.ANCHORMODE_FREE = 2
-        ECM.Runtime = ECM.Runtime or {}
-        ECM.Runtime.ScheduleLayoutUpdate = function() end
-
-        local lsmw = TestHelpers.SetupLibSettingsBuilder()
-        lsmw.GetFontValues = function()
-            return {}
-        end
-
         ns = {
             Addon = {
                 db = {
@@ -71,6 +57,19 @@ describe("OptionUtil", function()
             OptionsSections = {},
         }
 
+        TestHelpers.LoadLiveConstants(ns)
+        -- Test-specific sentinel values for anchor modes
+        ns.Constants.ANCHORMODE_CHAIN = 1
+        ns.Constants.ANCHORMODE_DETACHED = 3
+        ns.Constants.ANCHORMODE_FREE = 2
+        ns.Runtime = ns.Runtime or {}
+        ns.Runtime.ScheduleLayoutUpdate = function() end
+
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
         optionsModule = ns.Addon._modules.Options
@@ -78,11 +77,11 @@ describe("OptionUtil", function()
 
     describe("CreateModuleEnabledHandler", function()
         it("is exposed on ECM.OptionUtil", function()
-            assert.is_function(ECM.OptionUtil.CreateModuleEnabledHandler)
+            assert.is_function(ns.OptionUtil.CreateModuleEnabledHandler)
         end)
 
         it("returns a function", function()
-            local handler = ECM.OptionUtil.CreateModuleEnabledHandler("TestModule")
+            local handler = ns.OptionUtil.CreateModuleEnabledHandler("TestModule")
             assert.is_function(handler)
         end)
 
@@ -92,7 +91,7 @@ describe("OptionUtil", function()
                 enabledModule = name
             end
 
-            local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
+            local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(true)
 
             assert.are.equal("PowerBar", enabledModule)
@@ -104,7 +103,7 @@ describe("OptionUtil", function()
                 disabledModule = name
             end
 
-            local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
+            local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(false)
 
             assert.are.equal("PowerBar", disabledModule)
@@ -116,7 +115,7 @@ describe("OptionUtil", function()
                 reloadCalled = true
             end
 
-            local handler = ECM.OptionUtil.CreateModuleEnabledHandler("PowerBar")
+            local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
             handler(false)
 
             assert.is_false(reloadCalled)
@@ -129,7 +128,7 @@ describe("OptionUtil", function()
                     enabledModule = name
                 end
 
-                local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload?")
+                local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload?")
                 handler(true)
 
                 assert.are.equal("BuffBars", enabledModule)
@@ -147,7 +146,7 @@ describe("OptionUtil", function()
                     end,
                 }
 
-                local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
+                local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
                 handler(false, setting)
 
                 assert.is_true(revertedValue)
@@ -158,7 +157,7 @@ describe("OptionUtil", function()
                 ns.Addon.db.profile.buffBars = { enabled = false }
                 ns.Addon.ConfirmReloadUI = function() end
 
-                local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
+                local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
                 handler(false)
 
                 assert.is_true(ns.Addon.db.profile.buffBars.enabled)
@@ -175,7 +174,7 @@ describe("OptionUtil", function()
 
                 local setting = { SetValueNoCallback = function() end }
 
-                local handler = ECM.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
+                local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
                 handler(false, setting)
 
                 assert.is_function(capturedCallback)
@@ -187,20 +186,20 @@ describe("OptionUtil", function()
 
     describe("CreateBarArgs", function()
         it("is exposed on ECM.OptionUtil", function()
-            assert.is_function(ECM.OptionUtil.CreateBarArgs)
+            assert.is_function(ns.OptionUtil.CreateBarArgs)
         end)
 
         it("returns layout and appearance args with defaults", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled)
+            local args = ns.OptionUtil.CreateBarArgs(disabled)
 
             assert.is_nil(args.layoutMovedInfo)
 
             assert.is_table(args.layoutMovedButton)
             assert.are.equal("button", args.layoutMovedButton.type)
-            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
             assert.are.equal("Open", args.layoutMovedButton.buttonText)
             assert.are.equal(10, args.layoutMovedButton.order)
 
@@ -214,7 +213,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled)
+            local args = ns.OptionUtil.CreateBarArgs(disabled)
 
             assert.is_table(args.showText)
             assert.are.equal("toggle", args.showText.type)
@@ -229,7 +228,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled)
+            local args = ns.OptionUtil.CreateBarArgs(disabled)
 
             assert.are.equal(21, args.showText.order)
             assert.are.equal(22, args.heightOverride.order)
@@ -241,7 +240,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled, { showText = false })
+            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false })
 
             assert.is_nil(args.showText)
             assert.are.equal(21, args.heightOverride.order)
@@ -252,7 +251,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled, { border = false })
+            local args = ns.OptionUtil.CreateBarArgs(disabled, { border = false })
 
             assert.is_nil(args.border)
         end)
@@ -261,7 +260,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled, { showText = false, border = false })
+            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false, border = false })
 
             assert.is_nil(args.showText)
             assert.is_nil(args.border)
@@ -273,7 +272,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return false
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
+            local args = ns.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
 
             assert.are.equal(1, args.layoutMovedButton.order)
             assert.are.equal(5, args.appearanceHeader.order)
@@ -287,7 +286,7 @@ describe("OptionUtil", function()
             local disabled = function()
                 return true
             end
-            local args = ECM.OptionUtil.CreateBarArgs(disabled)
+            local args = ns.OptionUtil.CreateBarArgs(disabled)
 
             assert.are.equal(disabled, args.appearanceHeader.disabled)
             assert.are.equal(disabled, args.showText.disabled)
@@ -299,24 +298,24 @@ describe("OptionUtil", function()
 
     describe("SetNestedValue export", function()
         it("is exposed on ECM.OptionUtil", function()
-            assert.is_function(ECM.OptionUtil.SetNestedValue)
+            assert.is_function(ns.OptionUtil.SetNestedValue)
         end)
 
         it("sets a simple key", function()
             local tbl = {}
-            ECM.OptionUtil.SetNestedValue(tbl, "foo", 42)
+            ns.OptionUtil.SetNestedValue(tbl, "foo", 42)
             assert.are.equal(42, tbl.foo)
         end)
 
         it("sets a nested key", function()
             local tbl = { a = { b = {} } }
-            ECM.OptionUtil.SetNestedValue(tbl, "a.b.c", "hello")
+            ns.OptionUtil.SetNestedValue(tbl, "a.b.c", "hello")
             assert.are.equal("hello", tbl.a.b.c)
         end)
 
         it("creates intermediate tables", function()
             local tbl = {}
-            ECM.OptionUtil.SetNestedValue(tbl, "x.y.z", true)
+            ns.OptionUtil.SetNestedValue(tbl, "x.y.z", true)
             assert.is_true(tbl.x.y.z)
         end)
     end)
@@ -340,12 +339,12 @@ describe("OptionUtil", function()
             }
             ns.OptionsSections["General"] = {
                 RegisterSettings = function(SB)
-                    generalCategory = SB.CreateSubcategory(ECM.L["GENERAL"])
+                    generalCategory = SB.CreateSubcategory(ns.L["GENERAL"])
                 end,
             }
             ns.OptionsSections["Profile"] = {
                 RegisterSettings = function(SB)
-                    profileCategory = SB.CreateSubcategory(ECM.L["PROFILES"])
+                    profileCategory = SB.CreateSubcategory(ns.L["PROFILES"])
                 end,
             }
 

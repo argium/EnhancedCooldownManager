@@ -18,7 +18,7 @@ end
 
 function CUnitAuras.Install()
     _G.C_UnitAuras = {
-        GetUnitAuraBySpellID = function(_, spellID)
+        GetPlayerAuraBySpellID = function(spellID)
             return state.auraBySpellID[spellID]
         end,
     }

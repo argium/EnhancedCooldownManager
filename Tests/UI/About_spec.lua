@@ -30,13 +30,13 @@ describe("About section", function()
             end,
         }
 
-        ECM.ColorUtil = {
+        ns.ColorUtil = {
             Sparkle = function(text)
                 return "<<sparkle:" .. text .. ">>"
             end,
         }
 
-        TestHelpers.LoadChunk("UI/About.lua", "Unable to load UI/About.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
     end)
 
     local function findInitializer(layout, predicate)

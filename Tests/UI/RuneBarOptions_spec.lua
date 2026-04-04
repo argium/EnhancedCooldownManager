@@ -109,7 +109,7 @@ describe("RuneBarOptions getters/setters/defaults", function()
         end)
         it("adds a breadcrumb to the Layout page", function()
             assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ECM.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
         end)
     end)
 

@@ -17,10 +17,10 @@ describe("ECM layout system", function()
     local defaultModuleLibraries
     local createdFrames
     local createdTickers
+    local ns
     local makeFrame = TestHelpers.makeFrame
 
     local CAPTURED_GLOBALS = {
-        "ECM",
         "LibStub",
         "C_Timer",
         "C_AddOns",
@@ -37,6 +37,7 @@ describe("ECM layout system", function()
         "UnitIsDead",
         "UnitCanAttack",
         "UnitCanAssist",
+        "C_PartyInfo",
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
@@ -68,6 +69,7 @@ describe("ECM layout system", function()
     end)
 
     before_each(function()
+        ns = {}
         fakeTime = 100
         isMounted = false
         inCombat = false
@@ -108,6 +110,11 @@ describe("ECM layout system", function()
         _G.UnitCanAssist = function()
             return false
         end
+        _G.C_PartyInfo = {
+            IsDelveInProgress = function()
+                return false
+            end,
+        }
         _G.IsInInstance = function()
             return false
         end
@@ -317,8 +324,7 @@ describe("ECM layout system", function()
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
 
         TestHelpers.LoadChunk("Tests/stubs/Enums.lua", "Unable to load Enums.lua")()
-        _G.ECM = {}
-        _G.ECM.ColorUtil = {
+        ns.ColorUtil = {
             Sparkle = function(text)
                 return text
             end,
@@ -332,35 +338,27 @@ describe("ECM layout system", function()
                 return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
             end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        TestHelpers.LoadChunk("ECM_Defaults.lua", "Unable to load ECM_Defaults.lua")()
-        _G.ECM.Migration = {
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        TestHelpers.LoadChunk("Defaults.lua", "Unable to load Defaults.lua")(nil, ns)
+        ns.Migration = {
             PrepareDatabase = function() end,
             Run = function() end,
             FlushLog = function() end,
             PrintLog = function() end,
         }
-        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(
-            nil,
-            { Addon = fakeAddon }
-        )
-        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(
-            nil,
-            { Addon = fakeAddon }
-        )
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns.Addon = fakeAddon
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
 
-        local profile = TestHelpers.deepClone(ECM.defaults.profile)
+        local profile = TestHelpers.deepClone(ns.defaults.profile)
         _G._testDB = { profile = profile, RegisterCallback = function() end }
         fakeAddon.db = _G._testDB
 
-        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", { Addon = fakeAddon })
-        TestHelpers.LoadChunk("ECM_Runtime.lua", "Unable to load ECM_Runtime.lua")(
-            "EnhancedCooldownManager",
-            { Addon = fakeAddon }
-        )
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", ns)
+        TestHelpers.LoadChunk("Runtime.lua", "Unable to load Runtime.lua")("EnhancedCooldownManager", ns)
+        TestHelpers.LoadChunk("UI/Dialogs.lua", "Unable to load UI/Dialogs.lua")(nil, ns)
     end)
 
     describe("beta login warning", function()
@@ -370,7 +368,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             assert.is_truthy(printedMessages[#printedMessages])
-            assert.is_truthy(printedMessages[#printedMessages]:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
+            assert.is_truthy(printedMessages[#printedMessages]:find(ns.L["BETA_LOGIN_MESSAGE"], 1, true))
         end)
 
         it("does not print the pre-release warning on stable versions", function()
@@ -379,7 +377,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             for _, message in ipairs(printedMessages) do
-                assert.is_nil(message:find(ECM.L["BETA_LOGIN_MESSAGE"], 1, true))
+                assert.is_nil(message:find(ns.L["BETA_LOGIN_MESSAGE"], 1, true))
             end
         end)
     end)
@@ -387,7 +385,7 @@ describe("ECM layout system", function()
     describe("release popup", function()
         local function getWhatsNewFrame()
             for _, frame in ipairs(createdFrames) do
-                if frame:GetName() == ECM.Constants.WHATS_NEW_FRAME_NAME then
+                if frame:GetName() == ns.Constants.WHATS_NEW_FRAME_NAME then
                     return frame
                 end
             end
@@ -395,8 +393,8 @@ describe("ECM layout system", function()
 
         before_each(function()
             addonVersion = "v1.2.3"
-            ECM.Constants.RELEASE_POPUP_VERSION = addonVersion
-            ECM.L["WHATS_NEW_BODY"] = "New version notes"
+            ns.Constants.RELEASE_POPUP_VERSION = addonVersion
+            ns.L["WHATS_NEW_BODY"] = "New version notes"
             _G._testDB.profile.global.releasePopupSeenVersion = ""
         end)
 
@@ -423,7 +421,7 @@ describe("ECM layout system", function()
         end)
 
         it("does not show the popup when RELEASE_POPUP_VERSION is nil", function()
-            ECM.Constants.RELEASE_POPUP_VERSION = nil
+            ns.Constants.RELEASE_POPUP_VERSION = nil
 
             fakeAddon:OnEnable()
 
@@ -431,7 +429,7 @@ describe("ECM layout system", function()
         end)
 
         it("does not show the popup when RELEASE_POPUP_VERSION is empty", function()
-            ECM.Constants.RELEASE_POPUP_VERSION = ""
+            ns.Constants.RELEASE_POPUP_VERSION = ""
 
             assert.is_false(fakeAddon:ShowReleasePopup(true))
             assert.is_nil(getWhatsNewFrame())
@@ -473,15 +471,15 @@ describe("ECM layout system", function()
         end)
 
         it("formats markdown headings and list items for the popup body", function()
-            ECM.L["WHATS_NEW_BODY"] = "### Header\nBody line\n- First item\n- Second item"
+            ns.L["WHATS_NEW_BODY"] = "### Header\nBody line\n- First item\n- Second item"
 
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
             assert.are.equal(
-                "|cff" .. ECM.Constants.WHATS_NEW_HEADER_COLOR .. "Header|r\n"
+                "|cff" .. ns.Constants.WHATS_NEW_HEADER_COLOR .. "Header|r\n"
                     .. "Body line\n"
-                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " First item\n"
-                    .. ECM.Constants.WHATS_NEW_LIST_BULLET .. " Second item",
+                    .. ns.Constants.WHATS_NEW_LIST_BULLET .. " First item\n"
+                    .. ns.Constants.WHATS_NEW_LIST_BULLET .. " Second item",
                 frame.Body:GetText()
             )
         end)
@@ -497,41 +495,41 @@ describe("ECM layout system", function()
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
 
-            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
-            assert.are.equal(ECM.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
-            assert.are.equal(ECM.L["ADDON_NAME"], frame.Title:GetText())
-            assert.are.equal(string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
+            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
+            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
+            assert.are.equal(ns.L["ADDON_NAME"], frame.Title:GetText())
+            assert.are.equal(string.format(ns.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
             assert.are.equal("LEFT", frame.Title._justifyH)
             assert.are.equal("LEFT", frame.Subtitle._justifyH)
             assert.are.equal("LEFT", frame.Body._justifyH)
             assert.are.equal("TOP", frame.Body._justifyV)
             assert.same(
                 {
-                    { "TOPLEFT", frame, "TOPLEFT", ECM.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
-                    { "TOPRIGHT", frame, "TOPRIGHT", -ECM.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ECM.Constants.WHATS_NEW_FRAME_PADDING },
+                    { "TOPLEFT", frame, "TOPLEFT", ns.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
+                    { "TOPRIGHT", frame, "TOPRIGHT", -ns.Constants.WHATS_NEW_FRAME_PADDING,
+                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
                 },
                 frame.Title._anchors
             )
             assert.same(
                 {
-                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
-                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
+                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
                 },
                 frame.Subtitle._anchors
             )
             assert.same(
                 {
-                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
-                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ECM.Constants.WHATS_NEW_BODY_SPACING },
+                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
+                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
                 },
                 frame.Body._anchors
             )
         end)
 
         it("does not show an empty popup when release notes are unavailable", function()
-            ECM.L["WHATS_NEW_BODY"] = ""
+            ns.L["WHATS_NEW_BODY"] = ""
 
             assert.is_false(fakeAddon:ShowReleasePopup(true))
             assert.is_nil(getWhatsNewFrame())
@@ -543,7 +541,7 @@ describe("ECM layout system", function()
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
             assert.are.equal(
-                string.format(ECM.L["WHATS_NEW_TITLE_FORMAT"], addonVersion),
+                string.format(ns.L["WHATS_NEW_TITLE_FORMAT"], addonVersion),
                 frame.Subtitle:GetText()
             )
             assert.are.equal("New version notes", frame.Body:GetText())
@@ -579,8 +577,8 @@ describe("ECM layout system", function()
             fakeAddon.EnableModule = function(_, name) enableCalls[#enableCalls + 1] = { "enable", name } end
             fakeAddon.DisableModule = function(_, name) enableCalls[#enableCalls + 1] = { "disable", name } end
 
-            local origSchedule = ECM.Runtime.ScheduleLayoutUpdate
-            ECM.Runtime.ScheduleLayoutUpdate = function(_, reason)
+            local origSchedule = ns.Runtime.ScheduleLayoutUpdate
+            ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
                 layoutReasons[#layoutReasons + 1] = reason
             end
 
@@ -601,20 +599,20 @@ describe("ECM layout system", function()
             assert.is_true(disabledPowerBar)
             assert.is_truthy(layoutReasons[#layoutReasons] == "ProfileChanged")
 
-            ECM.Runtime.ScheduleLayoutUpdate = origSchedule
+            ns.Runtime.ScheduleLayoutUpdate = origSchedule
         end)
 
         it("OnInitialize runs migration for older schema profiles", function()
             local migrationProfiles = {}
             local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
-            local profile = TestHelpers.deepClone(ECM.defaults.profile)
+            local profile = TestHelpers.deepClone(ns.defaults.profile)
             profile.schemaVersion = 10
             aceDB.New = function()
                 return { profile = profile, RegisterCallback = function() end }
             end
 
-            local origRun = ECM.Migration.Run
-            ECM.Migration.Run = function(activeProfile)
+            local origRun = ns.Migration.Run
+            ns.Migration.Run = function(activeProfile)
                 migrationProfiles[#migrationProfiles + 1] = activeProfile
             end
 
@@ -622,7 +620,7 @@ describe("ECM layout system", function()
 
             assert.same({ profile }, migrationProfiles)
 
-            ECM.Migration.Run = origRun
+            ns.Migration.Run = origRun
         end)
     end)
 
@@ -634,10 +632,10 @@ describe("ECM layout system", function()
 
             local shownNames = getShownNames()
 
-            assert.are.equal("ECM_CONFIRM_RELOAD_UI", ECM.Constants.POPUP_CONFIRM_RELOAD_UI)
-            assert.are.equal(ECM.Constants.POPUP_CONFIRM_RELOAD_UI, shownNames[1])
-            assert.is_table(StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI])
-            assert.are.equal("Reload now?", StaticPopupDialogs[ECM.Constants.POPUP_CONFIRM_RELOAD_UI].text)
+            assert.are.equal("ECM_CONFIRM_RELOAD_UI", ns.Constants.POPUP_CONFIRM_RELOAD_UI)
+            assert.are.equal(ns.Constants.POPUP_CONFIRM_RELOAD_UI, shownNames[1])
+            assert.is_table(StaticPopupDialogs[ns.Constants.POPUP_CONFIRM_RELOAD_UI])
+            assert.are.equal("Reload now?", StaticPopupDialogs[ns.Constants.POPUP_CONFIRM_RELOAD_UI].text)
         end)
 
         it("sets LibEvent as the default module library on addon creation", function()
@@ -692,7 +690,7 @@ describe("ECM layout system", function()
             fakeAddon:OnEnable()
 
             assert.are.equal(1, registrationCount)
-            assert.are.equal(ECM.Constants.ADDON_ICON_TEXTURE, registeredEntry.icon)
+            assert.are.equal(ns.Constants.ADDON_ICON_TEXTURE, registeredEntry.icon)
             assert.is_true(registeredEntry.notCheckable)
             registeredEntry.func()
             assert.same({ "options" }, chatInputs)
@@ -717,7 +715,7 @@ describe("ECM layout system", function()
             local chatInputs = {}
             local aceDB = _G.LibStub:NewLibrary("AceDB-3.0", 1)
             aceDB.New = function()
-                return { profile = TestHelpers.deepClone(ECM.defaults.profile) }
+                return { profile = TestHelpers.deepClone(ns.defaults.profile) }
             end
 
             function fakeAddon:ChatCommand(input)

@@ -3,9 +3,9 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local FrameMixin = ECM.FrameMixin
-local FrameUtil = ECM.FrameUtil
-local ChainRightPoint = FrameMixin.Proto.ChainRightPoint
+local BarMixin = ns.BarMixin
+local FrameUtil = ns.FrameUtil
+local ChainRightPoint = BarMixin.FrameProto.ChainRightPoint
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
 
@@ -124,8 +124,8 @@ local function styleBarBackground(frame, barBG, config, globalConfig)
 
     local bgColor = (config and config.bgColor)
         or (globalConfig and globalConfig.barBgColor)
-        or ECM.Constants.COLOR_BLACK
-    barBG:SetTexture(ECM.Constants.FALLBACK_TEXTURE)
+        or ns.Constants.COLOR_BLACK
+    barBG:SetTexture(ns.Constants.FALLBACK_TEXTURE)
     barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
     barBG:ClearAllPoints()
     barBG:SetAllPoints(frame)
@@ -136,9 +136,9 @@ end
 --- Returns true if the module's _editLocked flag was set by this call.
 local function styleBarColor(module, frame, bar, globalConfig, retryCount)
     local textureName = globalConfig and globalConfig.texture
-    FrameUtil.LazySetStatusBarTexture(bar, ECM.GetTexture(textureName))
+    FrameUtil.LazySetStatusBarTexture(bar, FrameUtil.GetTexture(textureName))
 
-    local barColor = ECM.SpellColors.GetColorForBar(frame)
+    local barColor = ns.SpellColors.GetColorForBar(frame)
     local spellName = bar.Name and bar.Name.GetText and bar.Name:GetText()
     local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
     local cooldownID = frame.cooldownID
@@ -156,21 +156,30 @@ local function styleBarColor(module, frame, bar, globalConfig, retryCount)
 
     if allSecret and not InCombatLockdown() then
         if retryCount < 3 then
-            C_Timer.After(1, function()
+            if frame._ecmColorRetryTimer then
+                frame._ecmColorRetryTimer:Cancel()
+            end
+            frame._ecmColorRetryTimer = C_Timer.NewTimer(1, function()
+                frame._ecmColorRetryTimer = nil
                 styleBarColor(module, frame, bar, globalConfig, retryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
             return
-        elseif ECM.IsDebugEnabled() and not module._warned then
-            ECM.Log(ECM.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
+        elseif ns.IsDebugEnabled() and not module._warned then
+            ns.Log(ns.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
             module._warned = true
         end
     end
 
+    if frame._ecmColorRetryTimer then
+        frame._ecmColorRetryTimer:Cancel()
+        frame._ecmColorRetryTimer = nil
+    end
+
     if barColor == nil and not allSecret then
-        barColor = ECM.SpellColors.GetDefaultColor()
+        barColor = ns.SpellColors.GetDefaultColor()
     end
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
@@ -221,13 +230,13 @@ local function styleBarAnchors(frame, bar, iconFrame, config)
     })
 
     FrameUtil.LazySetAnchors(bar.Name, {
-        { "LEFT", bar, "LEFT", ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
-        { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+        { "LEFT", bar, "LEFT", ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
+        { "RIGHT", bar, "RIGHT", -ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
     })
 
     if bar.Duration then
         FrameUtil.LazySetAnchors(bar.Duration, {
-            { "RIGHT", bar, "RIGHT", -ECM.Constants.BUFFBARS_TEXT_PADDING, 0 },
+            { "RIGHT", bar, "RIGHT", -ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
         })
     end
 end
@@ -236,7 +245,7 @@ end
 --- child frame. Lazy setters ensure no-ops when values haven't changed.
 local function styleChildFrame(module, frame, config, globalConfig)
     if not (frame and frame.__ecmHooked) then
-        ECM.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
+        ns.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
         return
     end
 
@@ -251,8 +260,8 @@ local function styleChildFrame(module, frame, config, globalConfig)
     styleBarBackground(frame, FrameUtil.GetBarBackground(bar), config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, 0)
 
-    ECM.ApplyFont(bar.Name, globalConfig, config)
-    ECM.ApplyFont(bar.Duration, globalConfig, config)
+    FrameUtil.ApplyFont(bar.Name, globalConfig, config)
+    FrameUtil.ApplyFont(bar.Duration, globalConfig, config)
 
     styleBarIcon(frame, iconFrame, config)
     styleBarAnchors(frame, bar, iconFrame, config)
@@ -279,7 +288,7 @@ local function hookChildFrame(child, module)
         end
         styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
-        module:ThrottledUpdateLayout("SetPoint:hook", { secondPass = true })
+        ns.Runtime.RequestLayout("BuffBars:SetPoint:hook", { secondPass = true })
     end)
 
     child:HookScript("OnShow", function()
@@ -289,14 +298,14 @@ local function hookChildFrame(child, module)
         module._layoutRunning = true
         styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
         module._layoutRunning = nil
-        module:ThrottledUpdateLayout("OnShow:child", { secondPass = true })
+        ns.Runtime.RequestLayout("BuffBars:OnShow:child", { secondPass = true })
     end)
 
     child:HookScript("OnHide", function()
         if module._layoutRunning then
             return
         end
-        module:ThrottledUpdateLayout("OnHide:child", { secondPass = true })
+        ns.Runtime.RequestLayout("BuffBars:OnHide:child", { secondPass = true })
     end)
 
     child.__ecmHooked = true
@@ -304,15 +313,15 @@ end
 
 local function getViewerPosition(module)
     local cfg = module:GetModuleConfig()
-    local mode = cfg and cfg.anchorMode or ECM.Constants.ANCHORMODE_CHAIN
+    local mode = cfg and cfg.anchorMode or ns.Constants.ANCHORMODE_CHAIN
 
     -- In free mode Blizzard owns the viewer position entirely — return nil
     -- so UpdateLayout knows not to reposition.
-    if mode == ECM.Constants.ANCHORMODE_FREE then
+    if mode == ns.Constants.ANCHORMODE_FREE then
         return nil
     end
 
-    local params = FrameMixin.Proto.CalculateLayoutParams(module)
+    local params = BarMixin.FrameProto.CalculateLayoutParams(module)
     return {
         mode = params.mode,
         anchor = params.anchor,
@@ -324,8 +333,7 @@ local function getViewerPosition(module)
 end
 
 --- Positions all bar children in a vertical stack, preserving edit mode order.
-local function layoutBars(viewer, growsUp, verticalSpacing)
-    local children = getChildrenOrdered(viewer)
+local function layoutBars(children, viewer, growsUp, verticalSpacing)
     local prev
 
     local function anchorChild(child)
@@ -369,7 +377,7 @@ function BuffBars:CreateFrame()
 end
 
 function BuffBars:IsReady()
-    if not ECM.FrameMixin.Proto.IsReady(self) then
+    if not BarMixin.FrameProto.IsReady(self) then
         return false
     end
 
@@ -387,15 +395,15 @@ function BuffBars:UpdateLayout(why)
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
 
-    if why == "PLAYER_SPECIALIZATION_CHANGED" then
-        ECM.SpellColors.ClearDiscoveredKeys()
+    if why == "PLAYER_SPECIALIZATION_CHANGED" or why == "ProfileChanged" then
+        ns.SpellColors.ClearDiscoveredKeys()
     end
 
     -- Discover bars regardless of visibility so the spell colours options
     -- panel has the full list even when hidden (e.g. resting).
     local visibleChildren = getChildrenOrdered(viewer)
     for _, entry in ipairs(visibleChildren) do
-        ECM.SpellColors.DiscoverBar(entry.frame)
+        ns.SpellColors.DiscoverBar(entry.frame)
     end
 
     if not self:ShouldShow() then
@@ -449,7 +457,6 @@ function BuffBars:UpdateLayout(why)
     self._layoutRunning = true
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
-    self._warned = false
     self._editLocked = false
     local ok, err = pcall(function()
         for _, entry in ipairs(visibleChildren) do
@@ -457,14 +464,17 @@ function BuffBars:UpdateLayout(why)
             styleChildFrame(self, entry.frame, cfg, globalConfig)
         end
 
-        layoutBars(viewer, growsUp, verticalSpacing)
+        layoutBars(visibleChildren, viewer, growsUp, verticalSpacing)
     end)
 
     self._layoutRunning = nil
-    ECM.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
+    if not self._editLocked then
+        self._warned = false
+    end
+    ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
 
     viewer:Show()
-    ECM.Log(ECM.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
+    ns.Log(ns.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
         mode = position and position.mode or "free",
         childCount = #visibleChildren,
         anchor = position and position.anchor and position.anchor:GetName() or "(blizzard)",
@@ -495,7 +505,7 @@ function BuffBars:GetActiveSpellData()
             local sid = frame.cooldownInfo and frame.cooldownInfo.spellID
             local cid = frame.cooldownID
             local tex = FrameUtil.GetIconTextureFileID(frame)
-            local key = ECM.SpellColors.MakeKey(name, sid, cid, tex)
+            local key = ns.SpellColors.MakeKey(name, sid, cid, tex)
             if key then
                 result[#result + 1] = key
             end
@@ -513,7 +523,7 @@ function BuffBars:HookViewer()
     self._viewerHooked = true
 
     viewer:HookScript("OnShow", function()
-        self:ThrottledUpdateLayout("viewer:OnShow")
+        ns.Runtime.RequestLayout("BuffBars:viewer:OnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
@@ -521,14 +531,14 @@ function BuffBars:HookViewer()
         if self._layoutRunning then
             return
         end
-        self:ThrottledUpdateLayout("viewer:OnSizeChanged", { secondPass = true })
+        ns.Runtime.RequestLayout("BuffBars:viewer:OnSizeChanged", { secondPass = true })
     end)
 
-    ECM.Log(self.Name, "Hooked BuffBarCooldownViewer")
+    ns.Log(self.Name, "Hooked BuffBarCooldownViewer")
 end
 
 function BuffBars:OnZoneChanged()
-    self:ThrottledUpdateLayout("OnZoneChanged")
+    ns.Runtime.RequestLayout("BuffBars:OnZoneChanged")
 end
 
 --- Gets a boolean indicating if editing is allowed.
@@ -540,16 +550,18 @@ function BuffBars:IsEditLocked()
 end
 
 function BuffBars:OnInitialize()
-    ECM.FrameMixin.AddMixin(self, "BuffBars")
+    BarMixin.AddFrameMixin(self, "BuffBars")
 end
 
 function BuffBars:OnEnable()
-    ECM.SpellColors.SetConfigAccessor(function()
+    self._warned = false
+
+    ns.SpellColors.SetConfigAccessor(function()
         return self:GetModuleConfig()
     end)
 
     self:EnsureFrame()
-    ECM.Runtime.RegisterFrame(self)
+    ns.Runtime.RegisterFrame(self)
 
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA", function(_, ...) self:OnZoneChanged(...) end)
     self:RegisterEvent("ZONE_CHANGED", function(_, ...) self:OnZoneChanged(...) end)
@@ -558,12 +570,12 @@ function BuffBars:OnEnable()
 
     C_Timer.After(0.1, function()
         self:HookViewer()
-        self:ThrottledUpdateLayout("ModuleInit")
+        ns.Runtime.RequestLayout("BuffBars:ModuleInit")
     end)
 end
 
 function BuffBars:OnDisable()
-    ECM.SpellColors.SetConfigAccessor(nil)
+    ns.SpellColors.SetConfigAccessor(nil)
     self:UnregisterAllEvents()
-    ECM.Runtime.UnregisterFrame(self)
+    ns.Runtime.UnregisterFrame(self)
 end

@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("Utilities", function()
     local originalGlobals
-    local addonNS
+    local ns
 
     local function newFontStringSpy()
         local spy = {
@@ -43,7 +43,6 @@ describe("Utilities", function()
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "LibStub",
             "SlashCmdList",
             "hash_SlashCmdList",
@@ -59,21 +58,19 @@ describe("Utilities", function()
     end)
 
     before_each(function()
-        _G.ECM = {
+        ns = {
             defaults = {},
             Migration = {},
         }
-        addonNS = {
-            Addon = {
-                SetDefaultModuleLibraries = function() end,
-                db = {
-                    profile = {
-                        global = {
-                            font = "Global Font",
-                            fontSize = 11,
-                            fontOutline = "OUTLINE",
-                            fontShadow = false,
-                        },
+        ns.Addon = {
+            SetDefaultModuleLibraries = function() end,
+            db = {
+                profile = {
+                    global = {
+                        font = "Global Font",
+                        fontSize = 11,
+                        fontOutline = "OUTLINE",
+                        fontShadow = false,
                     },
                 },
             },
@@ -84,7 +81,7 @@ describe("Utilities", function()
         _G.hash_SlashCmdList = {}
         local aceAddon = _G.LibStub:NewLibrary("AceAddon-3.0", 1)
         aceAddon.NewAddon = function()
-            return addonNS.Addon
+            return ns.Addon
         end
         local sharedMedia = _G.LibStub:NewLibrary("LibSharedMedia-3.0", 1)
         sharedMedia.Fetch = function(_, mediaType, key)
@@ -94,13 +91,13 @@ describe("Utilities", function()
             return nil
         end
         TestHelpers.SetupLibEditModeStub()
-        _G.ECM.ColorUtil = {
+        ns.ColorUtil = {
             Sparkle = function(text)
                 return text
             end,
         }
-        _G.ECM.DebugAssert = function() end
-        _G.ECM.Runtime = { ScheduleLayoutUpdate = function() end }
+        ns.DebugAssert = function() end
+        ns.Runtime = { ScheduleLayoutUpdate = function() end }
         _G.CreateFrame = function()
             return {
                 SetScript = function() end,
@@ -114,17 +111,16 @@ describe("Utilities", function()
 
         TestHelpers.LoadChunk("Libs/LibConsole/LibConsole.lua", "Unable to load LibConsole.lua")()
         TestHelpers.LoadChunk("Libs/LibEvent/LibEvent.lua", "Unable to load LibEvent.lua")()
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
-        TestHelpers.LoadChunk("Helpers/FrameUtil.lua", "Unable to load Helpers/FrameUtil.lua")()
-        TestHelpers.LoadChunk("Helpers/ModuleMixin.lua", "Unable to load Helpers/ModuleMixin.lua")(nil, addonNS)
-        TestHelpers.LoadChunk("Helpers/FrameMixin.lua", "Unable to load Helpers/FrameMixin.lua")(nil, addonNS)
-        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", addonNS)
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("ECM.lua", "Unable to load ECM.lua")("EnhancedCooldownManager", ns)
     end)
 
     it("ECM.ApplyFont uses global font settings by default", function()
         local fontString = newFontStringSpy()
-        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ns.FrameUtil.ApplyFont(fontString, ns.Addon.db.profile.global, {
             overrideFont = false,
             font = "Module Font",
             fontSize = 20,
@@ -143,7 +139,7 @@ describe("Utilities", function()
 
     it("ECM.ApplyFont applies module font and size when overrideFont is enabled", function()
         local fontString = newFontStringSpy()
-        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ns.FrameUtil.ApplyFont(fontString, ns.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = 18,
@@ -157,8 +153,8 @@ describe("Utilities", function()
 
     it("ECM.ApplyFont falls back to global values for missing module fields", function()
         local fontString = newFontStringSpy()
-        addonNS.Addon.db.profile.global.fontSize = 13
-        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ns.Addon.db.profile.global.fontSize = 13
+        ns.FrameUtil.ApplyFont(fontString, ns.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = nil,
@@ -171,10 +167,10 @@ describe("Utilities", function()
 
     it("ECM.ApplyFont keeps outline and shadow sourced from global config", function()
         local fontString = newFontStringSpy()
-        addonNS.Addon.db.profile.global.fontOutline = "NONE"
-        addonNS.Addon.db.profile.global.fontShadow = true
+        ns.Addon.db.profile.global.fontOutline = "NONE"
+        ns.Addon.db.profile.global.fontShadow = true
 
-        ECM.ApplyFont(fontString, addonNS.Addon.db.profile.global, {
+        ns.FrameUtil.ApplyFont(fontString, ns.Addon.db.profile.global, {
             overrideFont = true,
             font = "Module Font",
             fontSize = 17,
@@ -190,10 +186,10 @@ describe("Utilities", function()
 
     it("ECM.ApplyFont falls back to addon global config when globalConfig is omitted", function()
         local fontString = newFontStringSpy()
-        addonNS.Addon.db.profile.global.font = "DB Global Font"
-        addonNS.Addon.db.profile.global.fontSize = 15
+        ns.Addon.db.profile.global.font = "DB Global Font"
+        ns.Addon.db.profile.global.fontSize = 15
 
-        ECM.ApplyFont(fontString)
+        ns.FrameUtil.ApplyFont(fontString)
 
         local call = fontString.setFontCalls[1]
         assert.are.equal("FONT:DB Global Font", call.path)

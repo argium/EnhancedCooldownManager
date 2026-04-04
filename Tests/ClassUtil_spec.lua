@@ -9,6 +9,7 @@ local TestHelpers = assert(
 
 describe("ClassUtil", function()
     local originalGlobals
+    local ns
 
     local UnitStub
     local CSpellStub
@@ -18,7 +19,6 @@ describe("ClassUtil", function()
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ClassUtil",
-            "ECM",
             "Enum",
             "UnitClass",
             "UnitPowerMax",
@@ -31,16 +31,16 @@ describe("ClassUtil", function()
             "issecretvalue",
         })
 
-        _G.ECM = {}
-        _G.ECM.DebugAssert = function() end
+        ns = {}
+        ns.DebugAssert = function() end
         _G.GetShapeshiftForm = function()
             return 0
         end
         _G.CurveConstants = { ScaleTo100 = 1 }
         _G.issecretvalue = function() return false end
 
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         TestHelpers.LoadStub("Enums.lua")
 
         UnitStub = TestHelpers.LoadStub("Unit.lua")
@@ -53,8 +53,7 @@ describe("ClassUtil", function()
         CUnitAurasStub.Install()
         CSpellBookStub.Install()
 
-        local chunk = assert(loadfile("Helpers/ClassUtil.lua"))
-        chunk()
+        TestHelpers.LoadChunk("ClassUtil.lua", "Unable to load ClassUtil.lua")(nil, ns)
     end)
 
     teardown(function()
@@ -81,7 +80,7 @@ describe("ClassUtil", function()
         end
 
         local function assertResourceType(classToken, specIndex, expectedResourceType, shapeshiftForm)
-            local resourceType = ECM.ClassUtil.GetResourceType(classToken, specIndex, shapeshiftForm or 0)
+            local resourceType = ns.ClassUtil.GetResourceType(classToken, specIndex, shapeshiftForm or 0)
             if expectedResourceType == nil then
                 assert.is_nil(resourceType)
             else
@@ -110,31 +109,31 @@ describe("ClassUtil", function()
         it("returns souls for vengeance demon hunters", function()
             assertResourceType(
                 "DEMONHUNTER",
-                ECM.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX,
-                ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS
+                ns.Constants.DEMONHUNTER_VENGEANCE_SPEC_INDEX,
+                ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS
             )
         end)
 
         it("returns devourerNormal for devourer demon hunters when void meta aura is absent", function()
             assertResourceType(
                 "DEMONHUNTER",
-                ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
-                ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
+                ns.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
             )
         end)
 
         it("returns devourerMeta for devourer demon hunters when void meta aura is present", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_VOID_META, { applications = 1 })
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_VOID_META, { applications = 1 })
             assertResourceType(
                 "DEMONHUNTER",
-                ECM.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
-                ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META
+                ns.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META
             )
         end)
 
         it("returns combo points for feral druids in cat form", function()
             setAvailablePowerType(Enum.PowerType.ComboPoints)
-            assertResourceType("DRUID", 2, Enum.PowerType.ComboPoints, ECM.Constants.DRUID_CAT_FORM_INDEX)
+            assertResourceType("DRUID", 2, Enum.PowerType.ComboPoints, ns.Constants.DRUID_CAT_FORM_INDEX)
         end)
 
         it("returns essence for all evoker specs", function()
@@ -149,14 +148,14 @@ describe("ClassUtil", function()
         it("returns arcane charges for arcane mages, nil for fire, and icicles for frost", function()
             assertResourceType("MAGE", 1, Enum.PowerType.ArcaneCharges)
             assertResourceType("MAGE", 2, nil)
-            assertResourceType("MAGE", 3, ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
+            assertResourceType("MAGE", 3, ns.Constants.RESOURCEBAR_TYPE_ICICLES)
         end)
 
         it("returns chi for windwalker monks, nil for brewmaster and mistweaver", function()
             setAvailablePowerType(Enum.PowerType.Chi)
-            assertResourceType("MONK", ECM.Constants.MONK_WINDWALKER_SPEC_INDEX, Enum.PowerType.Chi)
-            assertResourceType("MONK", ECM.Constants.MONK_BREWMASTER_SPEC_INDEX, nil)
-            assertResourceType("MONK", ECM.Constants.MONK_MISTWEAVER_SPEC_INDEX, nil)
+            assertResourceType("MONK", ns.Constants.MONK_WINDWALKER_SPEC_INDEX, Enum.PowerType.Chi)
+            assertResourceType("MONK", ns.Constants.MONK_BREWMASTER_SPEC_INDEX, nil)
+            assertResourceType("MONK", ns.Constants.MONK_MISTWEAVER_SPEC_INDEX, nil)
         end)
 
         it("returns holy power for all paladin specs", function()
@@ -177,11 +176,11 @@ describe("ClassUtil", function()
             setAvailablePowerType(Enum.PowerType.Maelstrom)
             assertResourceType(
                 "SHAMAN",
-                ECM.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX,
-                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
+                ns.Constants.SHAMAN_ENHANCEMENT_SPEC_INDEX,
+                ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON
             )
-            assertResourceType("SHAMAN", ECM.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX, nil)
-            assertResourceType("SHAMAN", ECM.Constants.SHAMAN_RESTORATION_SPEC_INDEX, nil)
+            assertResourceType("SHAMAN", ns.Constants.SHAMAN_ELEMENTAL_SPEC_INDEX, nil)
+            assertResourceType("SHAMAN", ns.Constants.SHAMAN_RESTORATION_SPEC_INDEX, nil)
         end)
 
         it("returns soul shards for all warlock specs", function()
@@ -196,60 +195,60 @@ describe("ClassUtil", function()
 
     describe("GetCurrentMaxResourceValues", function()
         local function assertValues(resourceType, expectedMax, expectedCurrent)
-            local maxValue, currentValue = ECM.ClassUtil.GetCurrentMaxResourceValues(resourceType)
+            local maxValue, currentValue = ns.ClassUtil.GetCurrentMaxResourceValues(resourceType)
             assert.are.equal(expectedMax, maxValue)
             assert.are.equal(expectedCurrent, currentValue)
         end
 
         it("returns souls values from spell cast count", function()
-            CSpellStub.SetSpellCastCount(ECM.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID, 4)
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 4)
+            CSpellStub.SetSpellCastCount(ns.Constants.RESOURCEBAR_SPIRIT_BOMB_SPELLID, 4)
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ns.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 4)
         end)
 
         it("returns souls current value as zero when spell cast count is unavailable", function()
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 0)
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS, ns.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, 0)
         end)
 
         it("returns icicles values from aura stacks for frost mage", function()
-            CUnitAurasStub.SetAura(ECM.Constants.RESOURCEBAR_ICICLES_SPELLID, { applications = 3 })
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 3)
+            CUnitAurasStub.SetAura(ns.Constants.RESOURCEBAR_ICICLES_SPELLID, { applications = 3 })
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_ICICLES, ns.Constants.RESOURCEBAR_ICICLES_MAX, 3)
         end)
 
         it("returns icicles zero stacks when no aura is present", function()
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES, ECM.Constants.RESOURCEBAR_ICICLES_MAX, 0)
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_ICICLES, ns.Constants.RESOURCEBAR_ICICLES_MAX, 0)
         end)
 
         it("returns devourer meta values when collapsing star aura is active", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 11 })
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_COLLAPSING_STAR, { applications = 15 })
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META, ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, 3)
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 11 })
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_COLLAPSING_STAR, { applications = 15 })
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META, ns.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, 3)
         end)
 
         it("returns devourer normal values from void fragments divided by 5", function()
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 10 })
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 2)
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS, { applications = 10 })
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 2)
         end)
 
         it("returns devourer normal zero stacks when no aura is present", function()
-            assertValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 0)
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 0)
         end)
 
         it("returns base maelstrom max when raging maelstrom talent is unknown", function()
-            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 3 })
+            CSpellBookStub.SetSpellKnown(ns.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 3 })
             assertValues(
-                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
-                ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE,
+                ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
+                ns.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE,
                 3
             )
         end)
 
         it("returns talented maelstrom max when raging maelstrom is known", function()
-            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
-            CUnitAurasStub.SetAura(ECM.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 6 })
+            CSpellBookStub.SetSpellKnown(ns.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_MAELSTROM_WEAPON, { applications = 6 })
             assertValues(
-                ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
-                ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED,
+                ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
+                ns.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED,
                 6
             )
         end)
@@ -267,7 +266,7 @@ describe("ClassUtil", function()
         end)
 
         it("returns nil values when no resource type is provided", function()
-            local maxValue, currentValue = ECM.ClassUtil.GetCurrentMaxResourceValues(nil)
+            local maxValue, currentValue = ns.ClassUtil.GetCurrentMaxResourceValues(nil)
             assert.is_nil(maxValue)
             assert.is_nil(currentValue)
         end)
@@ -275,58 +274,58 @@ describe("ClassUtil", function()
 
     describe("GetCurrentMaxResourceValues safeMax (3rd return)", function()
         it("returns vengeance souls max as safeMax", function()
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, safeMax)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS)
+            assert.are.equal(ns.Constants.RESOURCEBAR_VENGEANCE_SOULS_MAX, safeMax)
         end)
 
         it("returns icicles max as safeMax", function()
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_ICICLES)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_ICICLES_MAX, safeMax)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_ICICLES)
+            assert.are.equal(ns.Constants.RESOURCEBAR_ICICLES_MAX, safeMax)
         end)
 
         it("returns devourer normal max as safeMax", function()
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, safeMax)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
+            assert.are.equal(ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, safeMax)
         end)
 
         it("returns devourer meta max as safeMax", function()
-            _G.C_UnitAuras = { GetUnitAuraBySpellID = function(_, spellID)
-                if spellID == ECM.Constants.SPELLID_COLLAPSING_STAR then
+            _G.C_UnitAuras = { GetPlayerAuraBySpellID = function(spellID)
+                if spellID == ns.Constants.SPELLID_COLLAPSING_STAR then
                     return { applications = 10 }
                 end
             end }
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_META)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, safeMax)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META)
+            assert.are.equal(ns.Constants.RESOURCEBAR_COLLAPSING_STAR_MAX / 5, safeMax)
         end)
 
         it("returns base maelstrom max when talent is unknown", function()
-            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE, safeMax)
+            CSpellBookStub.SetSpellKnown(ns.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, false)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
+            assert.are.equal(ns.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE, safeMax)
         end)
 
         it("returns talented maelstrom max when raging maelstrom is known", function()
-            CSpellBookStub.SetSpellKnown(ECM.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(ECM.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
-            assert.are.equal(ECM.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED, safeMax)
+            CSpellBookStub.SetSpellKnown(ns.Constants.RESOURCEBAR_RAGING_MAELSTROM_SPELLID, true)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON)
+            assert.are.equal(ns.Constants.RESOURCEBAR_MAELSTROM_WEAPON_MAX_TALENTED, safeMax)
         end)
 
         it("returns UnitPowerMax as safeMax for standard types when not secret", function()
             UnitStub.SetPowerMax(Enum.PowerType.HolyPower, 5)
             _G.issecretvalue = function() return false end
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
             assert.are.equal(5, safeMax)
         end)
 
         it("returns nil safeMax for standard types when value is secret", function()
             UnitStub.SetPowerMax(Enum.PowerType.HolyPower, 5)
             _G.issecretvalue = function() return true end
-            local _, _, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(Enum.PowerType.HolyPower)
             assert.is_nil(safeMax)
         end)
 
         it("returns nil for nil resource type", function()
-            local max, current, safeMax = ECM.ClassUtil.GetCurrentMaxResourceValues(nil)
+            local max, current, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(nil)
             assert.is_nil(max)
             assert.is_nil(current)
             assert.is_nil(safeMax)

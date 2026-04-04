@@ -2,8 +2,9 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+local _, ns = ...
 local FrameUtil = {}
-ECM.FrameUtil = FrameUtil
+ns.FrameUtil = FrameUtil
 
 --- Returns the region at the given index if it exists and matches the expected type.
 ---@param frame Frame
@@ -11,6 +12,10 @@ ECM.FrameUtil = FrameUtil
 ---@param regionType string
 ---@return Region|nil
 local function tryGetRegion(frame, index, regionType)
+    if not frame then
+        return nil
+    end
+
     local region = select(index, frame:GetRegions())
     if region and region.IsObjectType and region:IsObjectType(regionType) then
         return region
@@ -23,14 +28,14 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconOverlay(frame)
-    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ns.Constants.BUFFBARS_ICON_OVERLAY_REGION_INDEX, "Texture")
 end
 
 --- Returns the icon texture region, or nil.
 ---@param frame ECM_BuffBarMixin
 ---@return Texture|nil
 function FrameUtil.GetIconTexture(frame)
-    return tryGetRegion(frame.Icon, ECM.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
+    return tryGetRegion(frame.Icon, ns.Constants.BUFFBARS_ICON_TEXTURE_REGION_INDEX, "Texture")
 end
 
 --- Returns the texture file ID of the icon, or nil.
@@ -43,18 +48,16 @@ end
 
 --- Discovers the bar background texture by scanning regions for the known atlas.
 --- Caches result on statusBar.__ecmBarBG for subsequent calls.
----@param statusBar any
----@return any barBG The background texture region, or nil
+---@param statusBar StatusBar|nil
+---@return Texture|nil
 function FrameUtil.GetBarBackground(statusBar)
     if not statusBar or not statusBar.GetRegions then
         return nil
     end
-
     local cached = statusBar.__ecmBarBG
     if cached and cached.IsObjectType and cached:IsObjectType("Texture") then
         return cached
     end
-
     for _, region in ipairs({ statusBar:GetRegions() }) do
         if region and region.IsObjectType and region:IsObjectType("Texture") then
             local atlas = region.GetAtlas and region:GetAtlas()
@@ -64,15 +67,14 @@ function FrameUtil.GetBarBackground(statusBar)
             end
         end
     end
-
     return nil
 end
 
 --------------------------------------------------------------------------------
--- Anchor Geometry — shared anchor math used by FrameMixin, Migration, Runtime
+-- Anchor Geometry — shared anchor math used by BarMixin, Migration, Runtime
 --------------------------------------------------------------------------------
 
-local C = ECM.Constants
+local C = ns.Constants
 
 --- Splits an anchor name like TOPLEFT into its vertical and horizontal parts.
 ---@param point string|nil
@@ -88,7 +90,6 @@ function FrameUtil.SplitAnchorName(point)
 end
 
 --- Builds an anchor name from separate vertical and horizontal parts.
---- Example: TOP + LEFT becomes TOPLEFT.
 ---@param vertical string|nil
 ---@param horizontal string|nil
 ---@return string
@@ -140,8 +141,8 @@ function FrameUtil.GetParentSize(parent)
     return width, height
 end
 
---- Gets the offset from the frame's centre to one of its anchor points.
---- For example, on a 100px tall frame, TOP is +50 and BOTTOM is -50 on the y axis.
+--- Returns the offset from the frame's center to the specified anchor point,
+--- given the frame's full width and height.
 ---@param point string|nil
 ---@param width number|nil
 ---@param height number|nil
@@ -199,32 +200,29 @@ function FrameUtil.NormalizePosition(point, relativePoint, x, y, parent)
         normalizedY + sourceAnchorY - targetAnchorY
 end
 
---- Converts offsets from one anchor reference to another while keeping the
---- frame in the same visual position on its parent. Unlike NormalizePosition,
---- this accounts for frame dimensions via GetOffsetFromFrameCenter.
----@param point string
+--- Converts offsets from one anchor reference to another, accounting for both
+--- the parent anchor difference and the frame's own dimensions.
+---@param sourcePoint string
 ---@param targetPoint string
 ---@param x number
 ---@param y number
 ---@param width number|nil
 ---@param height number|nil
 ---@param parent Frame|nil
----@return number x
----@return number y
-function FrameUtil.ConvertOffsetToAnchor(point, targetPoint, x, y, width, height, parent)
-    if point == targetPoint then
+---@return number, number
+function FrameUtil.ConvertOffsetToAnchor(sourcePoint, targetPoint, x, y, width, height, parent)
+    if sourcePoint == targetPoint then
         return x, y
     end
 
     local parentWidth, parentHeight = FrameUtil.GetParentSize(parent or UIParent)
-    local sourceAnchorX, sourceAnchorY = FrameUtil.GetParentAnchorPosition(point, parentWidth, parentHeight)
-    local sourcePointX, sourcePointY = FrameUtil.GetOffsetFromFrameCenter(point, width, height)
-    local centerX = sourceAnchorX + (x or 0) - sourcePointX
-    local centerY = sourceAnchorY + (y or 0) - sourcePointY
-    local targetAnchorX, targetAnchorY = FrameUtil.GetParentAnchorPosition(targetPoint, parentWidth, parentHeight)
-    local targetPointX, targetPointY = FrameUtil.GetOffsetFromFrameCenter(targetPoint, width, height)
+    local srcAnchorX, srcAnchorY = FrameUtil.GetParentAnchorPosition(sourcePoint, parentWidth, parentHeight)
+    local tgtAnchorX, tgtAnchorY = FrameUtil.GetParentAnchorPosition(targetPoint, parentWidth, parentHeight)
+    local srcOffsetX, srcOffsetY = FrameUtil.GetOffsetFromFrameCenter(sourcePoint, width, height)
+    local tgtOffsetX, tgtOffsetY = FrameUtil.GetOffsetFromFrameCenter(targetPoint, width, height)
 
-    return centerX + targetPointX - targetAnchorX, centerY + targetPointY - targetAnchorY
+    return x + srcAnchorX - tgtAnchorX - srcOffsetX + tgtOffsetX,
+        y + srcAnchorY - tgtAnchorY - srcOffsetY + tgtOffsetY
 end
 
 --------------------------------------------------------------------------------
@@ -433,19 +431,6 @@ function FrameUtil.LazySetBackgroundColor(frame, color)
     return true
 end
 
---- Sets vertex color on a texture only if the color has changed.
----@param texture Texture The texture object
----@param color ECM_Color Table with r, g, b, a fields
----@return boolean changed
-function FrameUtil.LazySetVertexColor(texture, color)
-    local r, g, b, a = getTextureColor(texture)
-    if colorEqualsRgba(color, r, g, b, a) then
-        return false
-    end
-    texture:SetVertexColor(color.r, color.g, color.b, color.a)
-    return true
-end
-
 --- Sets the status bar texture only if it differs from the current value.
 ---@param bar StatusBar The status bar frame
 ---@param texturePath string Texture path or LSM key
@@ -508,7 +493,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
         if
             liveEnabled == true
             and liveThickness == thickness
-            and ECM.ColorUtil.AreEqual(borderConfig.color, liveColor)
+            and ns.ColorUtil.AreEqual(borderConfig.color, liveColor)
         then
             return false
         end
@@ -520,7 +505,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
 
     if borderConfig.enabled then
         border:Show()
-        ECM.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
+        ns.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
         if liveThickness ~= thickness then
             border:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -543,14 +528,57 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     return true
 end
 
---- Sets text on a FontString only if it differs from the current value.
----@param fontString FontString The font string to update
----@param text string|nil The text to set
----@return boolean changed
-function FrameUtil.LazySetText(fontString, text)
-    if fontString:GetText() == text then
-        return false
+--------------------------------------------------------------------------------
+-- Texture, font, and pixel utilities
+--------------------------------------------------------------------------------
+
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+
+local function getLsmMedia(mediaType, key)
+    if LSM and key then
+        return LSM:Fetch(mediaType, key, true)
     end
-    fontString:SetText(text)
-    return true
+end
+
+function FrameUtil.GetTexture(texture)
+    local fetched = texture and getLsmMedia("statusbar", texture)
+    if fetched then return fetched end
+    if texture and texture:find("\\") then return texture end
+    return getLsmMedia("statusbar", "Blizzard") or C.DEFAULT_STATUSBAR_TEXTURE
+end
+
+function FrameUtil.ApplyFont(fontString, globalConfig, moduleConfig)
+    local config = globalConfig or ns.GetGlobalConfig()
+    local useModuleOverride = moduleConfig and moduleConfig.overrideFont
+    local fontPath = getLsmMedia("font", (useModuleOverride and moduleConfig.font) or (config and config.font))
+        or C.DEFAULT_FONT
+    local fontSize = (useModuleOverride and moduleConfig.fontSize)
+        or (config and config.fontSize)
+        or C.DEFAULT_FONT_SIZE
+    local fontOutline = (config and config.fontOutline)
+
+    if fontOutline == "NONE" then
+        fontOutline = ""
+    end
+
+    local hasShadow = config and config.fontShadow
+
+    ns.DebugAssert(fontPath, "Font path cannot be nil")
+    ns.DebugAssert(fontSize, "Font size cannot be nil")
+    ns.DebugAssert(fontOutline, "Font outline cannot be nil")
+
+    fontString:SetFont(fontPath, fontSize, fontOutline)
+
+    if hasShadow then
+        fontString:SetShadowColor(0, 0, 0, 1)
+        fontString:SetShadowOffset(1, -1)
+    else
+        fontString:SetShadowOffset(0, 0)
+    end
+end
+
+function FrameUtil.PixelSnap(v)
+    local scale = UIParent:GetEffectiveScale()
+    local snapped = math.floor(((tonumber(v) or 0) * scale) + 0.5)
+    return snapped / scale
 end

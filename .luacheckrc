@@ -19,7 +19,6 @@ ignore = {
 }
 
 globals = {
-    "ECM",
     "LSB_DEBUG",
     "LibLSMSettingsWidgets_FontPickerMixin",
     "LibLSMSettingsWidgets_TexturePickerMixin",
@@ -29,7 +28,7 @@ globals = {
     "UISpecialFrames"
 }
 
-read_globals = {
+read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 'WorldFrame', 'GameTooltip_OnLoad', 'GetScreenWidth', 'GetScreenHeight', 'HideUIPanel', 'ChatFontNormal', 'GameFontNormalSmall', 'GameFontHighlightSmall', 'EnumUtil', 'TooltipDataProcessor', 'C_EventUtils', 'ItemRefTooltip', 'ShowUIPanel', 'GetPlayerInfoByGUID', 'C_FriendList', 'NUM_CHAT_WINDOWS', 'COMBATLOG', 'WHO_LIST_FORMAT', 'WHO_LIST_GUILD_FORMAT', 'ERR_FRIEND_ONLINE_SS', 'GetNumGroupMembers', 'IsInRaid', 'C_RestrictedActions',
     "bit",
     "ceil", "floor",
     "mod",
@@ -41,7 +40,7 @@ read_globals = {
 
     -- Externals
     "AddonCompartmentFrame",
-    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
+    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
     "CANCEL",
     "ColorPickerFrame",
     "CLOSE",
@@ -75,7 +74,7 @@ read_globals = {
     "SETTINGS_DEFAULTS",
     "StaticPopup_Show",
     "UIParent",
-    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName",
+    "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitIsPlayer", "UnitName",  "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName",
     "UnitPower", "UnitPowerMax", "UnitPowerPercent", "UnitPowerType",
     "YES",
     "MinimalSliderWithSteppersMixin",

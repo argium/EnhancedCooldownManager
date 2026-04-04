@@ -16,7 +16,8 @@ describe("ResourceBar real source", function()
     local unregisterFrameCalls
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({ "ECM" })
+        originalGlobals = TestHelpers.CaptureGlobals({ "issecretvalue" })
+        _G.issecretvalue = function() return false end
     end)
 
     teardown(function()
@@ -30,16 +31,14 @@ describe("ResourceBar real source", function()
         registerFrameCalls = 0
         unregisterFrameCalls = 0
 
-        _G.ECM = {
-            FrameMixin = {
-                Proto = {
+        ns = {
+            BarMixin = {
+                FrameProto = {
                     ShouldShow = function()
                         return true
                     end,
                 },
-            },
-            BarMixin = {
-                AddMixin = function(target)
+                AddBarMixin = function(target)
                     addMixinCalls = addMixinCalls + 1
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
@@ -59,20 +58,20 @@ describe("ResourceBar real source", function()
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
+                RequestLayout = function() end,
+                RequestRefresh = function() end,
             },
             Log = function() end,
         }
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
-        ns = {
-            Addon = {
-                NewModule = function(self, name)
-                    local module = { Name = name }
-                    self[name] = module
-                    return module
-                end,
-            },
+        ns.Addon = {
+            NewModule = function(self, name)
+                local module = { Name = name }
+                self[name] = module
+                return module
+            end,
         }
 
         TestHelpers.LoadChunk("Modules/ResourceBar.lua", "Unable to load Modules/ResourceBar.lua")(nil, ns)
@@ -86,76 +85,41 @@ describe("ResourceBar real source", function()
         assert.is_false(ResourceBar:ShouldShow())
     end)
 
-    it("Refresh lays out ticks for safe discrete resources", function()
-        local ensureCount
-        local layoutCount
-        local hidePoolKey
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks(count)
-            ensureCount = count
-        end
-        function ResourceBar:LayoutResourceTicks(maxResources)
-            layoutCount = maxResources
-        end
-        function ResourceBar:HideAllTicks(poolKey)
-            hidePoolKey = poolKey
-        end
-
-        assert.is_nil(rawget(ResourceBar, 'Refresh'))
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal(4, ensureCount)
-        assert.are.equal(5, layoutCount)
-        assert.is_nil(hidePoolKey)
+    it("GetTickSpec returns resource spec for safe discrete resources", function()
+        local spec = ResourceBar:GetTickSpec()
+        assert.is_not_nil(spec)
+        assert.are.equal(5, spec.maxResources)
+        assert.are.equal(ns.Constants.COLOR_BLACK, spec.color)
+        assert.are.equal(1, spec.width)
     end)
 
-    it("Refresh creates ticks for devourer resources based on safeMax", function()
-        local ensureCount
-        local layoutCount
-        currentResourceType = ECM.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
+    it("GetTickSpec returns resource spec for devourer resources based on safeMax", function()
+        currentResourceType = ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL
         currentValues = { 10, 2, 10 }
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks(count)
-            ensureCount = count
-        end
-        function ResourceBar:LayoutResourceTicks(maxResources)
-            layoutCount = maxResources
-        end
-        function ResourceBar:HideAllTicks()
-            error("HideAllTicks should not be called when safeMax > 1")
-        end
 
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal(9, ensureCount)
-        assert.are.equal(10, layoutCount)
+        local spec = ResourceBar:GetTickSpec()
+        assert.is_not_nil(spec)
+        assert.are.equal(10, spec.maxResources)
     end)
 
-    it("_OnBarRefreshed hides ticks when safeMax is nil or too small", function()
-        local hidePoolKey
+    it("GetTickSpec returns nil when safeMax is nil or too small", function()
         currentValues = { 1, 1, nil }
-        ResourceBar.InnerFrame = { TicksFrame = {} }
-        function ResourceBar:EnsureTicks()
-            error("EnsureTicks should not be called when safeMax is nil")
-        end
-        function ResourceBar:LayoutResourceTicks()
-            error("LayoutResourceTicks should not be called when safeMax is nil")
-        end
-        function ResourceBar:HideAllTicks(poolKey)
-            hidePoolKey = poolKey
-        end
+        assert.is_nil(ResourceBar:GetTickSpec())
 
-        ResourceBar:_OnBarRefreshed("test")
-        assert.are.equal("tickPool", hidePoolKey)
+        currentValues = { 1, 1, 1 }
+        assert.is_nil(ResourceBar:GetTickSpec())
     end)
 
-    it("only updates for player UNIT_AURA events and always updates for other events", function()
+    it("only updates for player events", function()
         local reasons = {}
-        function ResourceBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
         ResourceBar:OnEventUpdate("UNIT_AURA", "target")
         ResourceBar:OnEventUpdate("UNIT_AURA", "player")
-        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE")
+        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE", "target")
+        ResourceBar:OnEventUpdate("UNIT_POWER_UPDATE", "player")
 
         assert.same({ "UNIT_AURA", "UNIT_POWER_UPDATE" }, reasons)
     end)
@@ -171,7 +135,7 @@ describe("ResourceBar real source", function()
         ResourceBar:OnEnable()
 
         local reasons = {}
-        function ResourceBar:ThrottledUpdateLayout(reason)
+        ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
@@ -211,18 +175,18 @@ describe("ResourceBar real source", function()
     end)
 
     it("returns max colors and normal colors through the real module API", function()
-        currentResourceType = ECM.Constants.RESOURCEBAR_TYPE_ICICLES
+        currentResourceType = ns.Constants.RESOURCEBAR_TYPE_ICICLES
         currentValues = { 5, 5, 5 }
         function ResourceBar:GetModuleConfig()
             return {
                 colors = {
-                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 0.2, g = 0.3, b = 0.4, a = 1 },
+                    [ns.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 0.2, g = 0.3, b = 0.4, a = 1 },
                 },
                 maxColorsEnabled = {
-                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = true,
+                    [ns.Constants.RESOURCEBAR_TYPE_ICICLES] = true,
                 },
                 maxColors = {
-                    [ECM.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
+                    [ns.Constants.RESOURCEBAR_TYPE_ICICLES] = { r = 1, g = 1, b = 1, a = 1 },
                 },
             }
         end
@@ -232,7 +196,7 @@ describe("ResourceBar real source", function()
         assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
     end)
 
-    it("does not define its own Refresh (uses _OnBarRefreshed hook instead)", function()
+    it("does not define its own Refresh (uses base BarProto.Refresh with GetTickSpec)", function()
         assert.is_nil(rawget(ResourceBar, 'Refresh'))
     end)
 end)

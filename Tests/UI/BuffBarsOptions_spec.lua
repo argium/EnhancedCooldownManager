@@ -9,10 +9,11 @@ describe("BuffBarsOptions", function()
     local originalGlobals
     local BuffBarsOptions
     local SpellColors
+    local SB
+    local ns
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "ECM",
             "ECM_DeepEquals",
             "Settings",
             "CreateSettingsListSectionHeaderInitializer",
@@ -46,6 +47,9 @@ describe("BuffBarsOptions", function()
     before_each(function()
         TestHelpers.SetupOptionsGlobals()
 
+        local profile, defaults = TestHelpers.MakeOptionsProfile()
+        SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+
         _G.UnitClass = function()
             return "Demon Hunter", "DEMONHUNTER", 12
         end
@@ -78,37 +82,35 @@ describe("BuffBarsOptions", function()
             return false
         end
 
-        _G.ECM = {
-            Constants = {},
-            FrameUtil = {
-                GetIconTextureFileID = function()
-                    return nil
-                end,
-            },
-            ScheduleLayoutUpdate = function() end,
-            ToString = function(v)
-                return tostring(v)
+        ns.Constants = {}
+        ns.FrameUtil = {
+            GetIconTextureFileID = function()
+                return nil
             end,
-            OptionUtil = {
-                GetCurrentClassSpec = function()
-                    return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER"
-                end,
-                IsAnchorModeFree = function()
-                    return false
-                end,
-                POSITION_MODE_TEXT = {},
-                ApplyPositionModeToBar = function() end,
-                IsValueChanged = function()
-                    return false
-                end,
-            },
-
-            DebugAssert = function() end,
-            Log = function() end,
+        }
+        ns.ScheduleLayoutUpdate = function() end
+        ns.ToString = function(v)
+            return tostring(v)
+        end
+        ns.OptionUtil = {
+            GetCurrentClassSpec = function()
+                return 12, 2, "Demon Hunter", "Havoc", "DEMONHUNTER"
+            end,
+            IsAnchorModeFree = function()
+                return false
+            end,
+            POSITION_MODE_TEXT = {},
+            ApplyPositionModeToBar = function() end,
+            IsValueChanged = function()
+                return false
+            end,
         }
 
+        ns.DebugAssert = function() end
+        ns.Log = function() end
+
         -- Load library
-        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        local lsmw = LibStub("LibLSMSettingsWidgets-1.0", true) or TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end
@@ -117,48 +119,41 @@ describe("BuffBarsOptions", function()
         end
 
         -- Load Constants
-        TestHelpers.LoadChunk("ECM_Constants.lua", "Unable to load ECM_Constants.lua")()
-        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")()
+        TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
+        TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
 
         -- Load SpellColors
-        local addonNS = {
-            Addon = {
-                db = {
-                    profile = { buffBars = {} },
-                    defaults = { profile = { buffBars = {} } },
-                },
-                BuffBars = {
-                    IsEditLocked = function()
-                        return false, nil
-                    end,
-                    GetActiveSpellData = function()
-                        return {}
-                    end,
-                },
-                NewModule = function(_, name)
-                    return { moduleName = name }
+        ns.Addon = {
+            db = {
+                profile = { buffBars = {} },
+                defaults = { profile = { buffBars = {} } },
+            },
+            BuffBars = {
+                IsEditLocked = function()
+                    return false, nil
+                end,
+                GetActiveSpellData = function()
+                    return {}
                 end,
             },
+            NewModule = function(_, name)
+                return { moduleName = name }
+            end,
         }
 
-        TestHelpers.LoadChunk("Helpers/SpellColors/KeyType.lua", "Unable to load SpellColors/KeyType.lua")()
-        TestHelpers.LoadChunk("Helpers/SpellColors/Store.lua", "Unable to load SpellColors/Store.lua")(nil, addonNS)
-        SpellColors = ECM.SpellColors
+        TestHelpers.LoadChunk("SpellColors.lua", "Unable to load SpellColors.lua")(nil, ns)
+        SpellColors = ns.SpellColors
 
         -- Load Options (includes SettingsBuilder adapter)
-        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, addonNS)
-        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
         -- Create root category so subcategory calls work
-        ECM.SettingsBuilder.CreateRootCategory("Test")
+        SB.CreateRootCategory("Test")
 
         -- Load BuffBarsOptions
-        local optionsNS = {
-            Addon = addonNS.Addon,
-            OptionsSections = {},
-        }
-        TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, optionsNS)
-        BuffBarsOptions = optionsNS.BuffBarsOptions
+        TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, ns)
+        BuffBarsOptions = ns.BuffBarsOptions
     end)
 
     -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
