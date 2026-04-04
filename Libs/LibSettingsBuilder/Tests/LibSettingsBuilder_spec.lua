@@ -2035,4 +2035,132 @@ describe("LibSettingsBuilder", function()
             assert.are.equal(1, showCount)
         end)
     end)
+
+    ---------------------------------------------------------------------------
+    -- SB.Custom integration: template, setting, and InitFrame pipeline
+    ---------------------------------------------------------------------------
+    describe("Custom control integration", function()
+        it("passes the actual template name to CreateElementInitializer", function()
+            local capturedTemplate
+            local settings = Settings
+            local origCEI = settings.CreateElementInitializer
+            rawset(settings, "CreateElementInitializer", function(template, data)
+                capturedTemplate = template
+                return origCEI(template, data)
+            end)
+
+            SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            rawset(settings, "CreateElementInitializer", origCEI)
+            assert.are.equal("LibLSMSettingsWidgets_FontPickerTemplate", capturedTemplate)
+        end)
+
+        it("attaches the setting so InitFrame can retrieve it via GetSetting", function()
+            local init, setting = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            assert.is_not_nil(init:GetSetting())
+            assert.are.equal(setting, init:GetSetting())
+        end)
+
+        it("setting reads the current profile value", function()
+            local _, setting = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            assert.are.equal("Global Font", setting:GetValue())
+        end)
+
+        it("setting writes back to the profile", function()
+            local _, setting = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            setting:SetValue("NewFont")
+            assert.are.equal("NewFont", addonNS.Addon.db.profile.global.font)
+        end)
+
+        it("initializer data contains name and tooltip", function()
+            local init = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+                tooltip = "Choose a font",
+            })
+
+            local data = init:GetData()
+            assert.are.equal("Font Picker", data.name)
+            assert.are.equal("Choose a font", data.tooltip)
+        end)
+
+        it("setting is retrievable so XML mixin Init can access it", function()
+            local init, setting = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            -- In the real WoW path, the settings framework creates a frame
+            -- from the XML template (which applies the mixin and fires OnLoad),
+            -- then calls frame:Init(initializer). The mixin's Init calls
+            -- initializer:GetSetting() to bind the dropdown. This test verifies
+            -- that the setting is attached and accessible on the initializer —
+            -- the critical contract that the XML mixin relies on.
+            assert.is_not_nil(init:GetSetting())
+            assert.are.equal(setting, init:GetSetting())
+            assert.are.equal("Global Font", setting:GetValue())
+        end)
+
+        it("RegisterFromTable dispatches custom type through SB.Custom", function()
+            local capturedTemplate
+            local settings = Settings
+            local origCEI = settings.CreateElementInitializer
+            rawset(settings, "CreateElementInitializer", function(template, data)
+                capturedTemplate = template
+                return origCEI(template, data)
+            end)
+
+            SB.RegisterFromTable({
+                name = "Test Custom Section",
+                path = "global",
+                args = {
+                    testHeader = { type = "header", name = "Appearance", order = 1 },
+                    fontPicker = {
+                        type = "custom",
+                        path = "font",
+                        name = "Font",
+                        template = "LibLSMSettingsWidgets_FontPickerTemplate",
+                        order = 2,
+                    },
+                },
+            })
+
+            rawset(settings, "CreateElementInitializer", origCEI)
+            assert.are.equal("LibLSMSettingsWidgets_FontPickerTemplate", capturedTemplate)
+        end)
+
+        it("does not wrap or replace InitFrame on the initializer", function()
+            local init = SB.Custom({
+                path = "global.font",
+                name = "Font Picker",
+                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+            })
+
+            -- A stock SettingsListElementInitializer from the stub has no
+            -- InitFrame. If SB.Custom starts injecting one (e.g. for mixin
+            -- injection), that's a regression — XML templates handle this.
+            assert.is_nil(init.InitFrame)
+        end)
+    end)
 end)
