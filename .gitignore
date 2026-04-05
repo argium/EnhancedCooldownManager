@@ -1,9 +1,20 @@
 /.vscode
 TODO.md
 PLAN-*.md
+plan-*.md
 CHAT-*.json
 /Annotations
 /wt
 luacov.report.html
 luacov.report.out
 luacov.stats.out
+
+# External libraries managed via .pkgmeta externals
+/Libs/AceAddon-3.0/
+/Libs/AceDB-3.0/
+/Libs/CallbackHandler-1.0/
+/Libs/LibStub/
+/Libs/LibDeflate/
+/Libs/LibEditMode/
+/Libs/LibSerialize/
+/Libs/LibSharedMedia-3.0/
