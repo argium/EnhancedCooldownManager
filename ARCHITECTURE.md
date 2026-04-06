@@ -191,7 +191,7 @@ LibEditMode detects WoW's Edit Mode enter/exit. On enter, all modules are forced
 
 ### Options UI
 
-Setting changes flow through LibSettingsBuilder's `onChange` → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`.
+Setting changes flow through LibSettingsBuilder's `onChange` → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`. Resource bar color rows prepend a fixed two-icon prefix so shared resources like Combo Points can show multiple class icons while keeping the icon column right-aligned.
 
 ### Watchdog Ticker
 
