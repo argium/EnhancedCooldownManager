@@ -6,29 +6,46 @@ local _, ns = ...
 local C = ns.Constants
 local L = ns.L
 local COLOR_WHITE_HEX = C.COLOR_WHITE_HEX or "FFFFFF"
+local RESOURCE_ICON_SIZE = 14
+local RESOURCE_ICON_SLOTS = 2
+local EMPTY_RESOURCE_ICON = "|TInterface\\Buttons\\WHITE8X8:14:14:0:0:8:8:0:0:0:0|t"
 
-local function createResourceColorName(className, label)
-    local color = (C.CLASS_COLORS and C.CLASS_COLORS[className]) or COLOR_WHITE_HEX
-    local icon = className and ("|A:classicon-" .. string.lower(className) .. ":14:14|a ") or ""
-    return icon .. "|cff" .. color .. label .. "|r"
+local function createResourceClassIcon(className)
+    return "|A:classicon-" .. string.lower(className) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
+end
+
+local function createResourceColorName(colorClassName, label, iconClasses)
+    local color = (C.CLASS_COLORS and C.CLASS_COLORS[colorClassName]) or COLOR_WHITE_HEX
+    local prefix = ""
+    local padding = RESOURCE_ICON_SLOTS - #iconClasses
+
+    for _ = 1, padding do
+        prefix = prefix .. EMPTY_RESOURCE_ICON
+    end
+
+    for _, className in ipairs(iconClasses) do
+        prefix = prefix .. createResourceClassIcon(className)
+    end
+
+    return prefix .. " |cff" .. color .. label .. "|r"
 end
 
 local RESOURCE_COLOR_DEFS = {
     {
         key = C.RESOURCEBAR_TYPE_VENGEANCE_SOULS,
-        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DH"]),
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DH"], { "DEMONHUNTER" }),
     },
     {
         key = C.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
-        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"]),
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"], { "DEMONHUNTER" }),
     },
     {
         key = C.RESOURCEBAR_TYPE_DEVOURER_META,
-        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_VOID_FRAGMENTS_DEVOURER"]),
+        name = createResourceColorName("DEMONHUNTER", L["RESOURCE_VOID_FRAGMENTS_DEVOURER"], { "DEMONHUNTER" }),
     },
     {
         key = C.RESOURCEBAR_TYPE_ICICLES,
-        name = createResourceColorName("MAGE", L["RESOURCE_ICICLES"]),
+        name = createResourceColorName("MAGE", L["RESOURCE_ICICLES"], { "MAGE" }),
     },
     -- {
     --     -- Secret 2026/03
@@ -37,27 +54,27 @@ local RESOURCE_COLOR_DEFS = {
     -- },
     {
         key = Enum.PowerType.Chi,
-        name = createResourceColorName("MONK", L["RESOURCE_CHI"]),
+        name = createResourceColorName("MONK", L["RESOURCE_CHI"], { "MONK" }),
     },
     {
         key = Enum.PowerType.ComboPoints,
-        name = createResourceColorName("ROGUE", L["RESOURCE_COMBO_POINTS"]),
+        name = createResourceColorName("ROGUE", L["RESOURCE_COMBO_POINTS"], { "DRUID", "ROGUE" }),
     },
     {
         key = Enum.PowerType.Essence,
-        name = createResourceColorName("EVOKER", L["RESOURCE_ESSENCE"]),
+        name = createResourceColorName("EVOKER", L["RESOURCE_ESSENCE"], { "EVOKER" }),
     },
     {
         key = Enum.PowerType.HolyPower,
-        name = createResourceColorName("PALADIN", L["RESOURCE_HOLY_POWER"]),
+        name = createResourceColorName("PALADIN", L["RESOURCE_HOLY_POWER"], { "PALADIN" }),
     },
     {
         key = C.RESOURCEBAR_TYPE_MAELSTROM_WEAPON,
-        name = createResourceColorName("SHAMAN", L["RESOURCE_MAELSTROM_WEAPON"]),
+        name = createResourceColorName("SHAMAN", L["RESOURCE_MAELSTROM_WEAPON"], { "SHAMAN" }),
     },
     {
         key = Enum.PowerType.SoulShards,
-        name = createResourceColorName("WARLOCK", L["RESOURCE_SOUL_SHARDS"]),
+        name = createResourceColorName("WARLOCK", L["RESOURCE_SOUL_SHARDS"], { "WARLOCK" }),
     },
 }
 
