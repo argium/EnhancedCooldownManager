@@ -1,17 +1,11 @@
 <#
 .SYNOPSIS
     Fetches external libraries defined in .pkgmeta into the working tree.
-.DESCRIPTION
-    Parses the .pkgmeta externals block and clones/exports each library
-    into the Libs/ folder for local development. Git repos use
-    git clone --depth 1; SVN repos use svn export.
 .PARAMETER Force
     Remove and re-fetch libraries that already exist.
 #>
 
-param(
-    [switch]$Force
-)
+param([switch]$Force)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -20,140 +14,83 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 # --- Parse .pkgmeta externals ---
 
-$pkgmeta = Get-Content -Path (Join-Path $repoRoot ".pkgmeta") -Raw
-
-# Extract the externals block: everything between "externals:" and the next
-# top-level key (a line starting with a non-space, non-comment character) or EOF.
+$pkgmeta = Get-Content (Join-Path $repoRoot ".pkgmeta") -Raw
 if ($pkgmeta -notmatch '(?ms)^externals:\s*\n(.*?)(?=^\S|\z)') {
     Write-Host "No externals block found in .pkgmeta" -ForegroundColor Yellow
-    exit 0
+    return
 }
-$externalsBlock = $Matches[1]
 
-# Parse each external entry. Supports both short form (path: url) and
-# expanded form (path: \n  url: ... \n  tag: ...).
 $externals = @()
-$currentPath = $null
-$currentUrl = $null
-$currentTag = $null
+$curPath = $null; $curUrl = $null; $curTag = $null
 
-foreach ($line in $externalsBlock -split '\r?\n') {
-    # Skip blank/comment lines
+foreach ($line in $Matches[1] -split '\r?\n') {
     if ($line -match '^\s*$' -or $line -match '^\s*#') { continue }
 
-    if ($line -match '^  (\S.+?):\s*$') {
-        # Start of expanded entry (path only, url/tag on following lines)
-        if ($currentPath -and $currentUrl) {
-            $externals += [PSCustomObject]@{ Path = $currentPath; Url = $currentUrl; Tag = $currentTag }
-        }
-        $currentPath = $Matches[1].Trim()
-        $currentUrl = $null
-        $currentTag = $null
+    if ($line -match '^  (\S.+?):\s+(\S.+)$') {
+        if ($curPath -and $curUrl) { $externals += [PSCustomObject]@{ Path = $curPath; Url = $curUrl; Tag = $curTag } }
+        $curPath = $Matches[1].Trim(); $curUrl = $Matches[2].Trim(); $curTag = $null
     }
-    elseif ($line -match '^  (\S.+?):\s+(\S.+)$') {
-        # Short form: "  path: url" on one line
-        if ($currentPath -and $currentUrl) {
-            $externals += [PSCustomObject]@{ Path = $currentPath; Url = $currentUrl; Tag = $currentTag }
-        }
-        $currentPath = $Matches[1].Trim()
-        $currentUrl = $Matches[2].Trim()
-        $currentTag = $null
+    elseif ($line -match '^  (\S.+?):\s*$') {
+        if ($curPath -and $curUrl) { $externals += [PSCustomObject]@{ Path = $curPath; Url = $curUrl; Tag = $curTag } }
+        $curPath = $Matches[1].Trim(); $curUrl = $null; $curTag = $null
     }
-    elseif ($line -match '^\s+url:\s+(.+)$') {
-        $currentUrl = $Matches[1].Trim()
-    }
-    elseif ($line -match '^\s+tag:\s+(.+)$') {
-        $currentTag = $Matches[1].Trim()
-    }
+    elseif ($line -match '^\s+url:\s+(.+)$') { $curUrl = $Matches[1].Trim() }
+    elseif ($line -match '^\s+tag:\s+(.+)$') { $curTag = $Matches[1].Trim() }
 }
-# Flush last entry
-if ($currentPath -and $currentUrl) {
-    $externals += [PSCustomObject]@{ Path = $currentPath; Url = $currentUrl; Tag = $currentTag }
-}
+if ($curPath -and $curUrl) { $externals += [PSCustomObject]@{ Path = $curPath; Url = $curUrl; Tag = $curTag } }
 
 if ($externals.Count -eq 0) {
     Write-Host "No externals found in .pkgmeta" -ForegroundColor Yellow
-    exit 0
+    return
 }
 
-Write-Host "Found $($externals.Count) externals in .pkgmeta" -ForegroundColor Cyan
+# --- Verify SVN ---
 
-# --- Detect repo type ---
-
-function Get-RepoType([string]$url) {
-    if ($url -match '\.git$' -or $url -match 'github\.com') { return 'git' }
-    if ($url -match 'repos\.(wowace|curseforge)') { return 'svn' }
-    return 'unknown'
+$hasSvn = $externals | Where-Object { $_.Url -match 'repos\.(wowace|curseforge)' }
+if ($hasSvn -and -not (Get-Command svn -ErrorAction SilentlyContinue)) {
+    Write-Error "SVN required for WoWAce externals. Install via: scoop install sliksvn"
 }
 
-# --- Verify tools ---
-
-$needsSvn = $externals | Where-Object { (Get-RepoType $_.Url) -eq 'svn' }
-if ($needsSvn) {
-    $svnCmd = Get-Command svn -ErrorAction SilentlyContinue
-    if (-not $svnCmd) {
-        Write-Host "`nSVN is required for WoWAce/CurseForge externals but was not found." -ForegroundColor Red
-        Write-Host "Install via:  scoop install sliksvn" -ForegroundColor Yellow
-        exit 1
-    }
-}
+Write-Host "Fetching $($externals.Count) externals..." -ForegroundColor Cyan
 
 # --- Fetch each external ---
 
 foreach ($ext in $externals) {
-    $targetDir = Join-Path $repoRoot $ext.Path
-    $exists = Test-Path $targetDir
+    $target = Join-Path $repoRoot $ext.Path
 
-    if ($exists -and -not $Force) {
-        Write-Host "  SKIP  $($ext.Path) (already exists; use -Force to re-fetch)" -ForegroundColor DarkGray
+    if ((Test-Path $target) -and -not $Force) {
+        Write-Host "  SKIP  $($ext.Path)" -ForegroundColor DarkGray
         continue
     }
+    if (Test-Path $target) { Remove-Item $target -Recurse -Force }
 
-    if ($exists -and $Force) {
-        Write-Host "  DEL   $($ext.Path)" -ForegroundColor DarkYellow
-        Remove-Item -Path $targetDir -Recurse -Force
+    $label = $ext.Tag ?? 'HEAD'
+
+    if ($ext.Url -match 'github\.com/([^/]+)/([^/]+?)(?:\.git)?$') {
+        # GitHub: download source archive for the pinned tag.
+        # Extra repo files (tests, CI) are inert — WoW only loads what
+        # XML/TOC references. The packager strips them for releases.
+        $owner = $Matches[1]; $repo = $Matches[2]
+        $ref = $ext.Tag ?? 'HEAD'
+        $zipUrl = "https://github.com/$owner/$repo/archive/refs/tags/$ref.zip"
+        $zipFile = Join-Path ([IO.Path]::GetTempPath()) "$repo.zip"
+
+        Write-Host "  GET   $($ext.Path)  @ $label" -ForegroundColor Green
+        Invoke-WebRequest $zipUrl -OutFile $zipFile -UseBasicParsing
+
+        $extractDir = Join-Path ([IO.Path]::GetTempPath()) "ecm-extract"
+        Expand-Archive $zipFile -DestinationPath $extractDir -Force
+        $inner = Get-ChildItem $extractDir | Select-Object -First 1
+        Move-Item $inner.FullName $target
+
+        Remove-Item $zipFile, $extractDir -Recurse -Force
     }
-
-    $type = Get-RepoType $ext.Url
-
-    switch ($type) {
-        'git' {
-            $cloneArgs = @('clone', '--depth', '1')
-            if ($ext.Tag) {
-                $cloneArgs += '--branch'
-                $cloneArgs += $ext.Tag
-            }
-            $cloneArgs += $ext.Url
-            $cloneArgs += $targetDir
-
-            Write-Host "  GIT   $($ext.Path)  @ $($ext.Tag ?? 'HEAD')" -ForegroundColor Green
-            & git @cloneArgs 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error "git clone failed for $($ext.Path)"
-            }
-            # Remove .git directory — we don't need nested repos
-            $dotGit = Join-Path $targetDir ".git"
-            if (Test-Path $dotGit) {
-                Remove-Item -Path $dotGit -Recurse -Force
-            }
-        }
-        'svn' {
-            $svnUrl = $ext.Url
-            if ($ext.Tag -and $ext.Tag -ne 'latest') {
-                # For SVN, convert trunk URL to tags URL
-                # e.g. .../wow/libstub/trunk -> .../wow/libstub/tags/1.0
-                $svnUrl = $svnUrl -replace '/trunk(/.*)?$', "/tags/$($ext.Tag)"
-            }
-            Write-Host "  SVN   $($ext.Path)  @ $($ext.Tag ?? 'trunk')" -ForegroundColor Green
-            & svn export --force $svnUrl $targetDir 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error "svn export failed for $($ext.Path)"
-            }
-        }
-        default {
-            Write-Warning "Unknown repo type for $($ext.Url) — skipping $($ext.Path)"
-        }
+    else {
+        # SVN: URL already points to the distributable subdirectory.
+        Write-Host "  SVN   $($ext.Path)  @ $label" -ForegroundColor Green
+        & svn export --force $ext.Url $target 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Error "svn export failed for $($ext.Path)" }
     }
 }
 
-Write-Host "`nDone." -ForegroundColor Cyan
+Write-Host "Done." -ForegroundColor Cyan
