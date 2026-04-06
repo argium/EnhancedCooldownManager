@@ -1,7 +1,7 @@
 # ECM Architecture
 
 EnhancedCooldownManager is an event-driven WoW addon built on AceAddon-3.0 / AceDB-3.0.
-`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, and iterates modules. Each module (PowerBar, ResourceBar, RuneBar, BuffBars, ItemIcons) inherits from `BarMixin` and implements its own `UpdateLayout()`.
+`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, and iterates modules. Each module (PowerBar, ResourceBar, RuneBar, BuffBars, ExtraIcons) inherits from `BarMixin` and implements its own `UpdateLayout()`.
 
 ## Initialization Chain
 
@@ -27,7 +27,7 @@ flowchart TD
         RB_INIT["ResourceBar:OnInitialize()<br/>BarMixin.AddBarMixin(self)"]
         RUNE_INIT["RuneBar:OnInitialize()<br/>BarMixin.AddBarMixin(self)"]
         BB_INIT["BuffBars:OnInitialize()<br/>BarMixin.AddFrameMixin(self)"]
-        II_INIT["ItemIcons:OnInitialize()"]
+        II_INIT["ExtraIcons:OnInitialize()"]
     end
 
     subgraph ENABLE["Phase 4 · OnEnable → Runtime.Enable"]
@@ -143,7 +143,7 @@ flowchart TD
     subgraph UPDATE_ALL["updateAllLayouts(reason)"]
         INV_DET["invalidateDetachedAnchorMetrics()"]
         UPD_DET["updateDetachedAnchorLayout()"]
-        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ItemIcons"]
+        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ExtraIcons"]
         MOD_UPD["module:UpdateLayout(reason)"]
 
         INV_DET --> UPD_DET --> CHAIN_LOOP --> MOD_UPD
@@ -267,7 +267,7 @@ Runtime registers the shared layout events; modules register their own data-driv
 | Event | Registrant(s) | Purpose |
 |-------|---------------|---------|
 | CVAR_UPDATE | Runtime | Schedules layout when `cooldownViewerEnabled` changes |
-| PLAYER_ENTERING_WORLD | Runtime, BuffBars, ItemIcons | Runtime: full layout; BuffBars: refresh zone buffs; ItemIcons: full refresh |
+| PLAYER_ENTERING_WORLD | Runtime, BuffBars, ExtraIcons | Runtime: full layout; BuffBars: refresh zone buffs; ExtraIcons: full refresh |
 | PLAYER_MOUNT_DISPLAY_CHANGED | Runtime | Immediate layout for mounted-state visibility |
 | PLAYER_REGEN_DISABLED | Runtime | Immediate layout; sets `_inCombat` flag |
 | PLAYER_REGEN_ENABLED | Runtime | Delayed layout (combat-end delay); clears `_inCombat` |
@@ -281,9 +281,11 @@ Runtime registers the shared layout events; modules register their own data-driv
 | ZONE_CHANGED | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh zone-specific buffs |
 | ZONE_CHANGED_INDOORS | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh buff data |
 | ZONE_CHANGED_NEW_AREA | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh area-specific buffs |
-| BAG_UPDATE_COOLDOWN | ItemIcons | Throttled cooldown-state refresh |
-| BAG_UPDATE_DELAYED | ItemIcons | Layout update after bag contents finalize |
-| PLAYER_EQUIPMENT_CHANGED | ItemIcons | Refresh equipped trinket cooldowns on gear swap |
+| BAG_UPDATE_COOLDOWN | ExtraIcons | Throttled cooldown-state refresh |
+| BAG_UPDATE_DELAYED | ExtraIcons | Layout update after bag contents finalize |
+| PLAYER_EQUIPMENT_CHANGED | ExtraIcons | Refresh tracked equipment slot cooldowns on gear swap |
+| SPELLS_CHANGED | ExtraIcons | Layout update when known spells change (talent/level) |
+| SPELL_UPDATE_COOLDOWN | ExtraIcons | Throttled spell cooldown-state refresh |
 | RUNE_POWER_UPDATE | RuneBar | Start rune animation ticker; request layout |
 | UNIT_AURA | ResourceBar | Layout update when player auras change |
 | UNIT_POWER_UPDATE | PowerBar, ResourceBar | PowerBar: primary power bar update; ResourceBar: resource tracking |
@@ -315,7 +317,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 
 | Method | Description |
 |--------|-------------|
-| `AddFrameMixin(target, name)` | Apply frame-only mixin (used by BuffBars, ItemIcons) |
+| `AddFrameMixin(target, name)` | Apply frame-only mixin (used by BuffBars, ExtraIcons) |
 | `AddBarMixin(module, name)` | Apply bar mixin: frame + StatusBar + ticks (used by PowerBar, ResourceBar, RuneBar) |
 
 **FrameProto (mixed into every module):**
@@ -346,6 +348,41 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | `HideAllTicks(poolKey?)` | Hide all ticks in pool |
 | `LayoutResourceTicks(maxResources, color?, tickWidth?, poolKey?)` | Position ticks as resource dividers |
 | `LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey?)` | Position ticks at specific values |
+
+### ExtraIcons (`Modules/ExtraIcons.lua`)
+
+Displays cooldown-tracked icons alongside Blizzard's cooldown viewer frames. Uses a dual-viewer architecture with a stack-aware resolver.
+
+**Viewer Registry:** Maps abstract viewer keys to Blizzard frame globals. Current keys: `"utility"` → `UtilityCooldownViewer`, `"main"` → `EssentialCooldownViewer`. Each viewer has its own container frame, on-demand icon pool, centering offset, and hook set.
+
+**Entry Kinds and Resolution:**
+
+| Kind | Config Fields | Resolution | Cooldown Source |
+|------|--------------|------------|-----------------|
+| `equipSlot` | `slotId` | `GetInventoryItemID` + `C_Item.GetItemSpell` on-use check | `GetInventoryItemCooldown` |
+| `item` | `ids[]` (priority stack) | First with `C_Item.GetItemCount > 0` | `C_Item.GetItemCooldown` |
+| `spell` | `ids[]` (priority stack) | First with `IsPlayerSpell` → `C_Spell.GetSpellTexture` | `C_Spell.GetSpellCooldown` (pass-through, no inspection) |
+
+Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`ids`/`slotId` from the constant at runtime. Custom and racial entries store fields directly in saved config.
+
+**Config Structure (`profile.extraIcons`):**
+
+```lua
+{
+    enabled = true,
+    viewers = {
+        utility = {                      -- ordered array
+            { stackKey = "trinket1" },   -- resolved from BUILTIN_STACKS
+            { stackKey = "trinket2" },
+            { stackKey = "combatPotions" },
+            { kind = "spell", ids = { 59752 } },  -- racial (self-contained)
+        },
+        main = {},
+    },
+}
+```
+
+**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and embeds a canvas frame for viewer management. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Add buttons for absent predefined stacks and racials; per-row controls for reorder (↑↓), move between viewers (→←), and delete (✕); custom entry form with ID parsing.
 
 ### FrameUtil (`ns.FrameUtil`)
 

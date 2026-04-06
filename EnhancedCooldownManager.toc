@@ -44,7 +44,7 @@ Modules\BuffBars.lua
 Modules\PowerBar.lua
 Modules\ResourceBar.lua
 Modules\RuneBar.lua
-Modules\ItemIcons.lua
+Modules\ExtraIcons.lua
 
 UI\OptionUtil.lua
 UI\Options.lua
@@ -55,5 +55,5 @@ UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
-UI\ItemIconsOptions.lua
+UI\ExtraIconsOptions.lua
 UI\BuffBarsOptions.lua

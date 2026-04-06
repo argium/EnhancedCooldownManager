@@ -1154,6 +1154,70 @@ _migrations[11] = function(profile)
     end
 end
 
+-- V11 → V12: convert itemIcons boolean flags to extraIcons.viewers structure.
+-- Old format: itemIcons = { enabled, showTrinket1, showTrinket2, showCombatPotion, showHealthPotion, showHealthstone }
+-- New format: extraIcons = { enabled, viewers = { utility = { {stackKey=...}, ... }, main = {} } }
+-- Frozen snapshot: flag names and stackKey values are inlined constants.
+_migrations[12] = function(profile)
+    local old = profile.itemIcons
+    if type(old) ~= "table" then
+        log("V12 no itemIcons section found; seeding default extraIcons")
+        profile.extraIcons = profile.extraIcons or {
+            enabled = true,
+            viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "trinket2" },
+                    { stackKey = "combatPotions" },
+                    { stackKey = "healthPotions" },
+                    { stackKey = "healthstones" },
+                },
+                main = {},
+            },
+        }
+        profile.itemIcons = nil
+        return
+    end
+
+    local enabled = old.enabled
+    if enabled == nil then
+        enabled = true
+    end
+
+    -- Map old boolean flags to stackKey entries in display order
+    local FLAG_TO_STACK = {
+        { flag = "showTrinket1",     stackKey = "trinket1" },
+        { flag = "showTrinket2",     stackKey = "trinket2" },
+        { flag = "showCombatPotion", stackKey = "combatPotions" },
+        { flag = "showHealthPotion", stackKey = "healthPotions" },
+        { flag = "showHealthstone",  stackKey = "healthstones" },
+    }
+
+    local utilityEntries = {}
+    for _, mapping in ipairs(FLAG_TO_STACK) do
+        local flagValue = old[mapping.flag]
+        if flagValue == nil or flagValue == true then
+            utilityEntries[#utilityEntries + 1] = { stackKey = mapping.stackKey }
+        end
+    end
+
+    profile.extraIcons = {
+        enabled = enabled,
+        viewers = {
+            utility = utilityEntries,
+            main = {},
+        },
+    }
+
+    local migrated = {}
+    for _, entry in ipairs(utilityEntries) do
+        migrated[#migrated + 1] = entry.stackKey
+    end
+    log("V12 migrated itemIcons -> extraIcons.viewers.utility: [" .. table.concat(migrated, ", ") .. "]")
+
+    profile.itemIcons = nil
+end
+
 --- Runs all schema migrations on a profile from its current version to CURRENT_SCHEMA_VERSION.
 ---@param profile table The profile to migrate
 function Migration.Run(profile)

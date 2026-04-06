@@ -98,7 +98,7 @@ describe("Options sections and root assembly", function()
             "ResourceBar",
             "RuneBar",
             "BuffBars",
-            "ItemIcons",
+            "ExtraIcons",
             "Profile",
             "Advanced Options",
         }) do
@@ -129,7 +129,7 @@ describe("Options sections and root assembly", function()
             "ResourceBar",
             "RuneBar",
             "BuffBars",
-            "ItemIcons",
+            "ExtraIcons",
             "Profile",
             "Advanced Options",
         }, registerSettingsCalls)

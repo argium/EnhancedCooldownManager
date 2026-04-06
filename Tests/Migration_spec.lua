@@ -137,7 +137,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_nil(persistedColor.keyType)
         assert.is_nil(persistedColor.spellID)
         assert.is_nil(persistedColor.cooldownID)
@@ -171,7 +171,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.are.equal("spellID", spellIDEntry.meta.keyType)
         assert.are.equal(2468, spellIDEntry.meta.spellID)
         assert.are.equal("cooldownID", cooldownEntry.meta.keyType)
@@ -205,7 +205,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.are.same(byNameEntry, profile.buffBars.colors.byName[12][2]["Do Not Replace"])
         assert.are.same(byNameEntry, profile.buffBars.colors.bySpellID[12][2][1001])
         assert.are.same(byNameEntry, profile.buffBars.colors.byCooldownID[12][2][1002])
@@ -219,7 +219,7 @@ describe("Migration", function()
             schemaVersion = 8,
         }
         Migration.Run(noBuffBars)
-        assert.are.equal(11, noBuffBars.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, noBuffBars.schemaVersion)
 
         local invalidColors = {
             schemaVersion = 8,
@@ -228,7 +228,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidColors)
-        assert.are.equal(11, invalidColors.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, invalidColors.schemaVersion)
         assert.are.equal("invalid", invalidColors.buffBars.colors)
 
         local invalidByName = {
@@ -243,7 +243,7 @@ describe("Migration", function()
             },
         }
         Migration.Run(invalidByName)
-        assert.are.equal(11, invalidByName.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, invalidByName.schemaVersion)
         assert.is_table(invalidByName.buffBars.colors.byName)
     end)
 
@@ -283,7 +283,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local created = assert(searchLogMessages("V10 created missing tier stores: byCooldownID, byTexture"))
@@ -373,7 +373,7 @@ describe("Migration", function()
         local noBuffBars = { schemaVersion = 9 }
         Migration.Run(noBuffBars)
 
-        assert.are.equal(11, noBuffBars.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, noBuffBars.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -386,7 +386,7 @@ describe("Migration", function()
         }
         Migration.Run(invalidColors)
 
-        assert.are.equal(11, invalidColors.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, invalidColors.schemaVersion)
         assert.is_not_nil(searchLogMessages("V10 spell color normalization skipped: buffBars.colors missing"))
         assert.is_nil(searchLogMessages("V10 spell color normalization summary:"))
         assert.is_nil(searchLogMessages("V10 tier breakdown:"))
@@ -415,7 +415,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         local summary = assert(searchLogMessages("V10 spell color normalization summary:"))
         local tierBreakdown = assert(searchLogMessages("V10 tier breakdown:"))
         local specAnomalies = select(2, searchLogMessages("V10 anomaly: class=12 spec="))
@@ -462,7 +462,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID)
         assert.is_table(profile.buffBars.colors.byCooldownID)
         assert.is_table(profile.buffBars.colors.byTexture)
@@ -498,7 +498,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal("KeepNameMetadata", byNameEntry.meta.spellName)
         assert.are.equal("spellID", bySpellIDEntry.meta.keyType)
@@ -546,7 +546,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_table(profile.buffBars.colors.bySpellID[12][2])
         assert.is_table(profile.buffBars.colors.byCooldownID[12][2])
         assert.is_table(profile.buffBars.colors.byTexture[12][2])
@@ -577,7 +577,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.are.equal("spellName", byNameEntry.meta.keyType)
         assert.are.equal(9001, byNameEntry.meta.spellID)
         assert.are.equal(9002, byNameEntry.meta.cooldownID)
@@ -604,7 +604,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_nil(spellIDEntry.value.keyType)
         assert.is_nil(spellIDEntry.value.spellID)
         assert.is_nil(profile.buffBars.colors.byCooldownID)
@@ -629,7 +629,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         local winner = profile.buffBars.colors.bySpellID[12][2][203720]
         assert.are.same(bySpellEntry, winner)
         assert.are.same(winner, profile.buffBars.colors.byName[12][2]["Demon Spikes"])
@@ -658,7 +658,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
 
         -- powerBar: both offsets migrated, cleared
         assert.is_nil(profile.powerBar.offsetX)
@@ -706,7 +706,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_nil(profile.powerBar.editModePositions)
         assert.is_nil(profile.resourceBar.editModePositions)
         assert.is_nil(profile.runeBar.editModePositions)
@@ -901,7 +901,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         local expected = { point = "CENTER", x = 0, y = -275 }
         assert.same(expected, profile.powerBar.editModePositions.Modern)
         assert.same(expected, profile.powerBar.editModePositions.Classic)
@@ -927,7 +927,7 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         local expected = { point = "CENTER", x = 0, y = -275 }
         assert.same(expected, profile.powerBar.editModePositions.Modern)
         assert.same(expected, profile.powerBar.editModePositions.Classic)
@@ -947,10 +947,153 @@ describe("Migration", function()
 
         Migration.Run(profile)
 
-        assert.are.equal(11, profile.schemaVersion)
+        assert.are.equal(ns.Constants.CURRENT_SCHEMA_VERSION, profile.schemaVersion)
         assert.is_nil(profile.powerBar.editModePositions)
         assert.are.equal(-275, profile.powerBar.offsetY)
         assert.is_not_nil(searchLogMessages("V11 no layouts available; skipping position migration"))
+    end)
+
+    -- V12: itemIcons boolean flags → extraIcons.viewers structure
+
+    it("V12 migrates all-true itemIcons flags to extraIcons.viewers.utility", function()
+        local profile = {
+            schemaVersion = 11,
+            itemIcons = {
+                enabled = true,
+                showTrinket1 = true,
+                showTrinket2 = true,
+                showCombatPotion = true,
+                showHealthPotion = true,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(12, profile.schemaVersion)
+        assert.is_nil(profile.itemIcons)
+        assert.is_true(profile.extraIcons.enabled)
+        assert.same({
+            { stackKey = "trinket1" },
+            { stackKey = "trinket2" },
+            { stackKey = "combatPotions" },
+            { stackKey = "healthPotions" },
+            { stackKey = "healthstones" },
+        }, profile.extraIcons.viewers.utility)
+        assert.same({}, profile.extraIcons.viewers.main)
+    end)
+
+    it("V12 omits disabled flags from the viewer list", function()
+        local profile = {
+            schemaVersion = 11,
+            itemIcons = {
+                enabled = true,
+                showTrinket1 = true,
+                showTrinket2 = false,
+                showCombatPotion = false,
+                showHealthPotion = true,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(12, profile.schemaVersion)
+        assert.same({
+            { stackKey = "trinket1" },
+            { stackKey = "healthPotions" },
+            { stackKey = "healthstones" },
+        }, profile.extraIcons.viewers.utility)
+    end)
+
+    it("V12 preserves enabled=false", function()
+        local profile = {
+            schemaVersion = 11,
+            itemIcons = {
+                enabled = false,
+                showTrinket1 = true,
+                showTrinket2 = true,
+                showCombatPotion = true,
+                showHealthPotion = true,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        assert.is_false(profile.extraIcons.enabled)
+    end)
+
+    it("V12 treats nil flags as true (default on)", function()
+        local profile = {
+            schemaVersion = 11,
+            itemIcons = { enabled = true },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(12, profile.schemaVersion)
+        assert.same({
+            { stackKey = "trinket1" },
+            { stackKey = "trinket2" },
+            { stackKey = "combatPotions" },
+            { stackKey = "healthPotions" },
+            { stackKey = "healthstones" },
+        }, profile.extraIcons.viewers.utility)
+    end)
+
+    it("V12 seeds default extraIcons when itemIcons section is missing", function()
+        local profile = {
+            schemaVersion = 11,
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(12, profile.schemaVersion)
+        assert.is_nil(profile.itemIcons)
+        assert.is_true(profile.extraIcons.enabled)
+        assert.are.equal(5, #profile.extraIcons.viewers.utility)
+        assert.same({}, profile.extraIcons.viewers.main)
+    end)
+
+    it("V12 does not overwrite existing extraIcons when itemIcons is missing", function()
+        local profile = {
+            schemaVersion = 11,
+            extraIcons = {
+                enabled = false,
+                viewers = { utility = { { stackKey = "trinket1" } }, main = {} },
+            },
+        }
+
+        Migration.Run(profile)
+
+        assert.are.equal(12, profile.schemaVersion)
+        assert.is_false(profile.extraIcons.enabled)
+        assert.are.equal(1, #profile.extraIcons.viewers.utility)
+    end)
+
+    it("V12 logs the migrated stack keys", function()
+        local profile = {
+            schemaVersion = 11,
+            itemIcons = {
+                enabled = true,
+                showTrinket1 = true,
+                showTrinket2 = false,
+                showCombatPotion = true,
+                showHealthPotion = false,
+                showHealthstone = true,
+            },
+        }
+
+        Migration.Run(profile)
+
+        local logMsg = searchLogMessages("V12 migrated itemIcons")
+        assert.is_not_nil(logMsg)
+        assert.is_not_nil(string.find(logMsg, "trinket1", 1, true))
+        assert.is_not_nil(string.find(logMsg, "combatPotions", 1, true))
+        assert.is_not_nil(string.find(logMsg, "healthstones", 1, true))
+        assert.is_nil(string.find(logMsg, "trinket2", 1, true))
+        assert.is_nil(string.find(logMsg, "healthPotions", 1, true))
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

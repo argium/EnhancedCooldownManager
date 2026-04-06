@@ -99,13 +99,9 @@ local _, ns = ...
 ---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
----@class ECM_ItemIconsConfig Item icons configuration.
----@field enabled boolean Whether item icons are enabled.
----@field showTrinket1 boolean Whether to show trinket slot 1 (if on-use).
----@field showTrinket2 boolean Whether to show trinket slot 2 (if on-use).
----@field showCombatPotion boolean Whether to show combat potions.
----@field showHealthPotion boolean Whether to show health potions.
----@field showHealthstone boolean Whether to show healthstone.
+---@class ECM_ExtraIconsConfig Extra icons configuration.
+---@field enabled boolean Whether extra icons are enabled.
+---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -131,7 +127,7 @@ local _, ns = ...
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
----@field itemIcons ECM_ItemIconsConfig Item icons configuration.
+---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
 
 local C = ns.Constants
 
@@ -273,13 +269,18 @@ local defaults = {
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
             },
         },
-        itemIcons = {
+        extraIcons = {
             enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
+            viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "trinket2" },
+                    { stackKey = "combatPotions" },
+                    { stackKey = "healthPotions" },
+                    { stackKey = "healthstones" },
+                },
+                main = {},
+            },
         },
     },
 }

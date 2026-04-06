@@ -218,7 +218,7 @@ function Options:OnInitialize()
         "ResourceBar",
         "RuneBar",
         "BuffBars",
-        "ItemIcons",
+        "ExtraIcons",
         "Profile",
         "Advanced Options",
     }

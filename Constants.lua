@@ -14,7 +14,7 @@ local constants = {
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
-    ITEMICONS = "ItemIcons",
+    EXTRAICONS = "ExtraIcons",
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
     RUNEBAR = "RuneBar",
@@ -100,10 +100,9 @@ local constants = {
     SHAMAN_ENHANCEMENT_SPEC_INDEX = 2,
     SHAMAN_RESTORATION_SPEC_INDEX = 3,
 
-    -- Item icons
-    DEFAULT_ITEM_ICON_SIZE = 32,
-    ITEM_ICON_BORDER_SCALE = 1.35,
-    ITEM_ICONS_MAX = 5,
+    -- Extra icons
+    DEFAULT_EXTRA_ICON_SIZE = 32,
+    EXTRA_ICON_BORDER_SCALE = 1.35,
 
     -- Consumables and equipment slots
     COMBAT_POTIONS = {
@@ -123,12 +122,10 @@ local constants = {
         { itemID = 224464 }, -- Demonic Healthstone
         { itemID = 5512 }, -- Healthstone
     },
-    TRINKET_SLOT_1 = 13,
-    TRINKET_SLOT_2 = 14,
 
     -- Saved variables and migration
     ACTIVE_SV_KEY = "_ECM_DB",
-    CURRENT_SCHEMA_VERSION = 11,
+    CURRENT_SCHEMA_VERSION = 12,
     SV_NAME = "EnhancedCooldownManagerDB",
 
     -- Import and export
@@ -194,6 +191,49 @@ local constants = {
     },
 }
 
+--- Predefined icon stacks resolved at runtime by stackKey.
+--- Each entry defines an icon kind and its candidate sources.
+local BUILTIN_STACKS = {
+    trinket1      = { kind = "equipSlot", slotId = 13, label = "Trinket 1" },
+    trinket2      = { kind = "equipSlot", slotId = 14, label = "Trinket 2" },
+    combatPotions = { kind = "item", ids = constants.COMBAT_POTIONS, label = "Combat Potions" },
+    healthPotions = { kind = "item", ids = constants.HEALTH_POTIONS, label = "Health Potions" },
+    healthstones  = { kind = "item", ids = constants.HEALTHSTONES, label = "Healthstones" },
+}
+
+--- Default display order for builtin stack keys (matches default viewers.utility order).
+local BUILTIN_STACK_ORDER = { "trinket1", "trinket2", "combatPotions", "healthPotions", "healthstones" }
+
+--- Racial ability lookup keyed by UnitRace("player") raceFileName.
+--- One primary active racial per race.
+local RACIAL_ABILITIES = {
+    Human              = { spellId = 59752  }, -- Every Man for Himself
+    Orc                = { spellId = 33697  }, -- Blood Fury
+    Dwarf              = { spellId = 20594  }, -- Stoneform
+    NightElf           = { spellId = 58984  }, -- Shadowmeld
+    Scourge            = { spellId = 7744   }, -- Will of the Forsaken
+    Tauren             = { spellId = 20549  }, -- War Stomp
+    Gnome              = { spellId = 20589  }, -- Escape Artist
+    Troll              = { spellId = 26297  }, -- Berserking
+    Goblin             = { spellId = 69070  }, -- Rocket Barrage
+    BloodElf           = { spellId = 28730  }, -- Arcane Torrent
+    Draenei            = { spellId = 59542  }, -- Gift of the Naaru
+    Worgen             = { spellId = 68992  }, -- Darkflight
+    Pandaren           = { spellId = 107079 }, -- Quaking Palm
+    Nightborne         = { spellId = 260364 }, -- Arcane Pulse
+    HighmountainTauren = { spellId = 255654 }, -- Bull Rush
+    VoidElf            = { spellId = 256948 }, -- Spatial Rift
+    LightforgedDraenei = { spellId = 255647 }, -- Light's Judgment
+    ZandalariTroll     = { spellId = 291944 }, -- Regeneratin'
+    KulTiran           = { spellId = 287712 }, -- Haymaker
+    DarkIronDwarf      = { spellId = 265221 }, -- Fireblood
+    Vulpera            = { spellId = 312411 }, -- Bag of Tricks
+    MagharOrc          = { spellId = 274738 }, -- Ancestral Call
+    Mechagnome         = { spellId = 312924 }, -- Hyper Organic Light Originator
+    Dracthyr           = { spellId = 368970 }, -- Tail Swipe
+    EarthenDwarf       = { spellId = 436717 }, -- Azerite Surge
+}
+
 local BLIZZARD_FRAMES = {
     "EssentialCooldownViewer",
     "UtilityCooldownViewer",
@@ -236,7 +276,7 @@ local moduleConfigKeys = {
     [constants.RESOURCEBAR] = "resourceBar",
     [constants.RUNEBAR] = "runeBar",
     [constants.BUFFBARS] = "buffBars",
-    [constants.ITEMICONS] = "itemIcons",
+    [constants.EXTRAICONS] = "extraIcons",
 }
 
 --- Returns the profile config key for a module name.
@@ -247,9 +287,12 @@ end
 
 local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
 constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
+constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.EXTRAICONS }
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
+constants.BUILTIN_STACKS = BUILTIN_STACKS
+constants.BUILTIN_STACK_ORDER = BUILTIN_STACK_ORDER
+constants.RACIAL_ABILITIES = RACIAL_ABILITIES
 constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes

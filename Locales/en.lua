@@ -70,7 +70,7 @@ L["POWER_BAR"] = "Power Bar"
 L["RESOURCE_BAR"] = "Resource Bar"
 L["RUNE_BAR"] = "Rune Bar"
 L["AURA_BARS"] = "Aura Bars"
-L["ITEM_ICONS"] = "Item Icons"
+L["EXTRA_ICONS"] = "Extra Icons"
 
 --------------------------------------------------------------------------------
 -- Module Shared
@@ -219,20 +219,25 @@ L["NO_TICK_MARKS"] = "%s - no tick marks configured."
 L["TICK_COUNT"] = "%s - %d tick mark(s) configured."
 
 --------------------------------------------------------------------------------
--- Item Icons Options
+-- Extra Icons Options
 --------------------------------------------------------------------------------
 
-L["ENABLE_ITEM_ICONS"] = "Enable item icons"
-L["ENABLE_ITEM_ICONS_DESC"] =
-    "Display icons for equipped on-use trinkets and select consumables to the right of utility cooldowns."
-L["EQUIPMENT"] = "Equipment"
-L["CONSUMABLES"] = "Consumables"
-L["SHOW_FIRST_TRINKET"] = "Show first trinket"
-L["SHOW_FIRST_TRINKET_DESC"] = "Display icons for usable equipment. Trinkets without an on-use effect are never shown."
-L["SHOW_SECOND_TRINKET"] = "Show second trinket"
-L["SHOW_HEALTH_POTIONS"] = "Show health potions"
-L["SHOW_COMBAT_POTIONS"] = "Show combat potions"
-L["SHOW_HEALTHSTONE"] = "Show healthstone"
+L["ENABLE_EXTRA_ICONS"] = "Enable extra icons"
+L["ENABLE_EXTRA_ICONS_DESC"] =
+    "Display icons for equipped on-use trinkets, select consumables, and custom spells or items to the right of cooldown viewers."
+L["UTILITY_VIEWER_ICONS"] = "Utility Viewer Icons"
+L["MAIN_VIEWER_ICONS"] = "Main Viewer Icons"
+L["ADD_RACIAL"] = "Add %s"
+L["ADD_ITEM"] = "Add Item"
+L["ADD_SPELL"] = "Add Spell"
+L["EXTRA_ICONS_RESET_CONFIRM"] = "Reset extra icons to defaults?"
+L["ADD_CUSTOM_IDS"] = "Spell or Item IDs (comma-separated)"
+L["EXTRA_ICONS_NO_ENTRIES"] = "No icons configured for this viewer."
+L["REMOVE_ENTRY_CONFIRM"] = "Remove %s?"
+L["MOVE_UP_TOOLTIP"] = "Move up"
+L["MOVE_DOWN_TOOLTIP"] = "Move down"
+L["MOVE_TO_VIEWER_TOOLTIP"] = "Move to %s viewer"
+L["REMOVE_TOOLTIP"] = "Remove"
 
 --------------------------------------------------------------------------------
 -- About

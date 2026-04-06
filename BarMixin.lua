@@ -788,7 +788,7 @@ function BarMixin.AssertValid(target)
 end
 
 --- Applies frame-only mixin (positioning, visibility, edit mode, config access).
---- Used by modules that manage their own inner content (e.g. BuffBars, ItemIcons).
+--- Used by modules that manage their own inner content (e.g. BuffBars, ExtraIcons).
 --- Idempotent — safe to call more than once (no-op after first application).
 --- @param target table table to apply the mixin to.
 --- @param name string the module name. must be unique.
