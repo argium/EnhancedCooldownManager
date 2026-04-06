@@ -27,6 +27,9 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: Fetch external libraries
+              run: pwsh scripts/fetch-libs.ps1
+
             - name: Install Lua 5.1 and LuaRocks
               run: |
                   sudo apt-get update

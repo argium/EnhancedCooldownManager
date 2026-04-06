@@ -67,14 +67,19 @@ foreach ($ext in $externals) {
     $label = $ext.Tag ?? 'HEAD'
 
     if ($ext.Url -match 'github\.com/([^/]+)/([^/]+?)(?:\.git)?$') {
-        # GitHub: download source archive for the pinned tag.
-        # Extra repo files (tests, CI) are inert — WoW only loads what
-        # XML/TOC references. The packager strips them for releases.
         $owner = $Matches[1]; $repo = $Matches[2]
         $ref = $ext.Tag ?? 'HEAD'
-        $zipUrl = "https://github.com/$owner/$repo/archive/refs/tags/$ref.zip"
-        $zipFile = Join-Path ([IO.Path]::GetTempPath()) "$repo.zip"
 
+        # Try packager-built release zip first, fall back to source archive.
+        $zipUrl = $null
+        try {
+            $release = Invoke-RestMethod "https://api.github.com/repos/$owner/$repo/releases/tags/$ref" -UseBasicParsing
+            $asset = $release.assets | Where-Object { $_.name -like '*.zip' -and $_.name -notlike '*.sig' } | Select-Object -First 1
+            if ($asset) { $zipUrl = $asset.browser_download_url }
+        } catch {}
+        if (-not $zipUrl) { $zipUrl = "https://github.com/$owner/$repo/archive/refs/tags/$ref.zip" }
+
+        $zipFile = Join-Path ([IO.Path]::GetTempPath()) "$repo.zip"
         Write-Host "  GET   $($ext.Path)  @ $label" -ForegroundColor Green
         Invoke-WebRequest $zipUrl -OutFile $zipFile -UseBasicParsing
 
