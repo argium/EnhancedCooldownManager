@@ -440,6 +440,10 @@ describe("ExtraIconsOptions settings page", function()
             assert.is_table(vc._viewerRowPools)
             assert.is_table(vc._viewerHeaders)
             assert.is_table(vc._viewerEmptyLabels)
+            assert.is_not_nil(vc._viewerHeaders.utility._title)
+            assert.is_not_nil(vc._viewerHeaders.main._title)
+            assert.are.equal(ns.L["UTILITY_VIEWER_ICONS"], vc._viewerHeaders.utility._title:GetText())
+            assert.are.equal(ns.L["MAIN_VIEWER_ICONS"], vc._viewerHeaders.main._title:GetText())
         end)
 
         it("registers native quick-add buttons and no custom add form fields", function()
@@ -453,10 +457,55 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal("button", capturedTable.args.quickAdd_trinket1.type)
             assert.are.equal("button", capturedTable.args.quickAddRacial.type)
             assert.are.equal("canvas", capturedTable.args.viewers.type)
+            assert.is_true(capturedTable.args.viewers.order < capturedTable.args.presetsHeader.order)
+            assert.is_true(capturedTable.args.viewers.order < capturedTable.args.quickAdd_trinket1.order)
+            assert.is_true(capturedTable.args.viewers.order < capturedTable.args.quickAddRacial.order)
+        end)
+
+        it("hides the quick-add heading when no quick-add entries are visible", function()
+            local viewers = profile.extraIcons.viewers
+            local racial = ns.Constants.RACIAL_ABILITIES.Human
+            viewers.utility = {}
+
+            for _, stackKey in ipairs(ns.Constants.BUILTIN_STACK_ORDER) do
+                viewers.utility[#viewers.utility + 1] = { stackKey = stackKey }
+            end
+            viewers.utility[#viewers.utility + 1] = { kind = "spell", ids = { racial.spellId } }
+
+            assert.is_true(capturedTable.args.presetsHeader.hidden())
+
+            ns.ExtraIconsOptions._removeEntry(profile, "utility", 1)
+
+            assert.is_false(capturedTable.args.presetsHeader.hidden())
+            assert.is_false(capturedTable.args.quickAdd_trinket1.hidden())
         end)
 
         it("exposes a refresh function", function()
             assert.is_function(ns.ExtraIconsOptions._refresh)
+        end)
+
+        it("redisplays the active category so removed quick-add entries can reappear", function()
+            local category = SB.GetSubcategory(ns.L["EXTRA_ICONS"])
+            local redisplayedCategory = nil
+
+            rawset(SettingsPanel, "IsShown", function()
+                return true
+            end)
+            rawset(SettingsPanel, "GetCurrentCategory", function()
+                return category
+            end)
+            rawset(SettingsPanel, "DisplayCategory", function(_, cat)
+                redisplayedCategory = cat
+            end)
+
+            profile.extraIcons.viewers.utility = { { stackKey = "trinket1" } }
+            assert.is_true(capturedTable.args.quickAdd_trinket1.hidden())
+
+            ns.ExtraIconsOptions._removeEntry(profile, "utility", 1)
+            ns.ExtraIconsOptions._refresh()
+
+            assert.is_false(capturedTable.args.quickAdd_trinket1.hidden())
+            assert.are.equal(category, redisplayedCategory)
         end)
 
         it("rebinds whole-row mouseover handlers on refresh", function()

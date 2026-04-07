@@ -289,11 +289,18 @@ local function createEntryRow(parent)
     return row
 end
 
+local function createViewerHeaderRow(parent, SB, text, headerHeight)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetHeight(headerHeight)
+    row._title = SB.CreateHeaderTitle(row, text)
+    return row
+end
+
 --------------------------------------------------------------------------------
 -- Embedded Content: Viewer lists
 --------------------------------------------------------------------------------
 
-local function createViewerListCanvas()
+local function createViewerListCanvas(SB, headerHeight)
     local frame = CreateFrame("Frame")
     frame:SetHeight(400)
 
@@ -302,9 +309,7 @@ local function createViewerListCanvas()
     frame._viewerEmptyLabels = {}
 
     for _, vk in ipairs(VIEWER_ORDER) do
-        frame._viewerHeaders[vk] = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        frame._viewerHeaders[vk]:SetJustifyH("LEFT")
-        frame._viewerHeaders[vk]:SetText(L[VIEWER_LABELS[vk]])
+        frame._viewerHeaders[vk] = createViewerHeaderRow(frame, SB, L[VIEWER_LABELS[vk]], headerHeight)
 
         frame._viewerEmptyLabels[vk] = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
         frame._viewerEmptyLabels[vk]:SetJustifyH("LEFT")
@@ -323,7 +328,9 @@ StaticPopupDialogs["ECM_CONFIRM_REMOVE_EXTRA_ICON"] =
 
 function ExtraIconsOptions.RegisterSettings(SB)
     local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("extraIcons")
-    local viewerCanvas = createViewerListCanvas()
+    local viewerHeaderHeight = (SB.SetCanvasLayoutDefaults and SB.SetCanvasLayoutDefaults().headerHeight) or 50
+    local viewerCanvas = createViewerListCanvas(SB, viewerHeaderHeight)
+    local pageCategory = nil
     ExtraIconsOptions._viewerCanvas = viewerCanvas
     ExtraIconsOptions._addFormCanvas = nil
     ExtraIconsOptions._presetsCanvas = nil
@@ -340,9 +347,33 @@ function ExtraIconsOptions.RegisterSettings(SB)
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
+    local function getPlayerRacialSpellId()
+        local _, raceFile = UnitRace("player")
+        local racial = raceFile and RACIAL_ABILITIES[raceFile]
+        return racial and racial.spellId or nil
+    end
+
+    local function hasVisibleQuickAddEntries()
+        local viewers = getViewers()
+        for _, stackKey in ipairs(BUILTIN_STACK_ORDER) do
+            if not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then
+                return true
+            end
+        end
+
+        local racialSpellId = getPlayerRacialSpellId()
+        return racialSpellId ~= nil and not ExtraIconsOptions._isRacialPresent(viewers, racialSpellId)
+    end
+
     local function refreshVisibleSettingsControls()
         local panel = SettingsPanel
         if not panel or not panel.IsShown or not panel:IsShown() then
+            return
+        end
+
+        local currentCategory = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        if pageCategory and currentCategory == pageCategory and panel.DisplayCategory then
+            panel:DisplayCategory(currentCategory)
             return
         end
 
@@ -357,12 +388,6 @@ function ExtraIconsOptions.RegisterSettings(SB)
         end
     end
 
-    local function getPlayerRacialSpellId()
-        local _, raceFile = UnitRace("player")
-        local racial = raceFile and RACIAL_ABILITIES[raceFile]
-        return racial and racial.spellId or nil
-    end
-
     --------------------------------------------------------------------
     -- Refresh: viewer lists canvas
     --------------------------------------------------------------------
@@ -371,9 +396,12 @@ function ExtraIconsOptions.RegisterSettings(SB)
         local y = 0
 
         for _, viewerKey in ipairs(VIEWER_ORDER) do
-            viewerCanvas._viewerHeaders[viewerKey]:ClearAllPoints()
-            viewerCanvas._viewerHeaders[viewerKey]:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", CONTENT_MARGIN, y)
-            y = y - 18
+            local headerRow = viewerCanvas._viewerHeaders[viewerKey]
+            headerRow:ClearAllPoints()
+            headerRow:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", 0, y)
+            headerRow:SetPoint("RIGHT", viewerCanvas, "RIGHT", 0, 0)
+            headerRow:Show()
+            y = y - viewerHeaderHeight
 
             local pool = viewerCanvas._viewerRowPools[viewerKey]
             local entries = viewers[viewerKey] or {}
@@ -506,12 +534,6 @@ function ExtraIconsOptions.RegisterSettings(SB)
                 handler(value)
             end,
         },
-        presetsHeader = {
-            type = "header",
-            name = L["PRESETS_HEADER"],
-            order = 10,
-            disabled = isDisabled,
-        },
     }
 
     -- Custom spell/item entry form intentionally omitted here.
@@ -527,7 +549,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
                 return ExtraIconsOptions._isStackKeyPresent(getViewers(), stackKey)
             end,
             disabled = isDisabled,
-            order = 10 + i,
+            order = 41 + i,
             onClick = function()
                 addStackPreset(stackKey)
             end,
@@ -545,7 +567,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
             return spellId == nil or ExtraIconsOptions._isRacialPresent(getViewers(), spellId)
         end,
         disabled = isDisabled,
-        order = 11 + #BUILTIN_STACK_ORDER,
+        order = 42 + #BUILTIN_STACK_ORDER,
         onClick = addRacialPreset,
     }
 
@@ -557,6 +579,16 @@ function ExtraIconsOptions.RegisterSettings(SB)
         order = 30,
     }
 
+    args.presetsHeader = {
+        type = "header",
+        name = L["PRESETS_HEADER"],
+        order = 40,
+        disabled = isDisabled,
+        hidden = function()
+            return not hasVisibleQuickAddEntries()
+        end,
+    }
+
     SB.RegisterFromTable({
         name = L["EXTRA_ICONS"],
         path = "extraIcons",
@@ -565,6 +597,9 @@ function ExtraIconsOptions.RegisterSettings(SB)
         end,
         args = args,
     })
+
+    pageCategory = SB.GetSubcategory(L["EXTRA_ICONS"])
+    ExtraIconsOptions._category = pageCategory
 end
 
 ns.SettingsBuilder.RegisterSection(ns, "ExtraIcons", ExtraIconsOptions)

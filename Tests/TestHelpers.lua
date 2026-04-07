@@ -929,6 +929,9 @@ function TestHelpers.SetupOptionsGlobals()
         local value, minValue, maxValue, stepValue = nil, 0, 0, 1
         local shown = false
         local mouseEnabled = false
+        local text = ""
+        local fontObject = nil
+        local anchors = {}
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
@@ -945,9 +948,22 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetHeight = noop
         f.SetWidth = noop
         f.SetSize = noop
-        f.SetPoint = noop
+        f.SetPoint = function(_, point, relativeTo, relativePoint, x, y)
+            anchors[#anchors + 1] = { point, relativeTo, relativePoint, x, y }
+        end
         f.SetAllPoints = noop
-        f.ClearAllPoints = noop
+        f.ClearAllPoints = function()
+            anchors = {}
+        end
+        f.GetPoint = function(_, index)
+            local anchor = anchors[index or 1]
+            if anchor then
+                return anchor[1], anchor[2], anchor[3], anchor[4], anchor[5]
+            end
+        end
+        f.GetNumPoints = function()
+            return #anchors
+        end
         f.Show = function()
             shown = true
         end
@@ -971,15 +987,24 @@ function TestHelpers.SetupOptionsGlobals()
         f.RegisterForClicks = noop
         f.SetAutoFocus = noop
         f.SetNumeric = noop
-        f.SetText = noop
+        f.SetText = function(_, newText)
+            text = newText
+        end
         f.GetText = function()
-            return ""
+            return text
         end
         f.SetWordWrap = noop
         f.SetJustifyH = noop
+        f.SetJustifyV = noop
         f.SetColorRGB = noop
         f.SetColorTexture = noop
         f.SetTexture = noop
+        f.SetFontObject = function(_, newFontObject)
+            fontObject = newFontObject
+        end
+        f.GetFontObject = function()
+            return fontObject
+        end
         f.SetFocus = noop
         f.ClearFocus = noop
         f.HighlightText = noop

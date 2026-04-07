@@ -189,15 +189,40 @@ local function resetPlainListElementFrame(frame)
     resetListElement(frame)
 end
 
+local function createSubheaderTitle(parent, text)
+    local title = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("TOPLEFT", parent, "TOPLEFT", 35, -8)
+    title:SetJustifyH("LEFT")
+    title:SetJustifyV("TOP")
+    title:SetFontObject(GameFontHighlight)
+    if text ~= nil then
+        title:SetText(text)
+    end
+    title:Show()
+    return title
+end
+
+local function createHeaderTitle(parent, text)
+    local title = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    title:SetPoint("TOPLEFT", parent, "TOPLEFT", 7, -16)
+    title:SetJustifyH("LEFT")
+    title:SetJustifyV("TOP")
+    if text ~= nil then
+        title:SetText(text)
+    end
+    title:Show()
+    return title
+end
+
+lib.CreateHeaderTitle = createHeaderTitle
+lib.CreateSubheaderTitle = createSubheaderTitle
+
 local function ensureSubheaderTitle(frame)
     if frame._lsbSubheaderTitle then
         return frame._lsbSubheaderTitle
     end
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    title:SetPoint("TOPLEFT", 35, -8)
-    title:SetJustifyH("LEFT")
-    title:SetJustifyV("TOP")
+    local title = createSubheaderTitle(frame)
     frame._lsbSubheaderTitle = title
     frame.Title = title
     return title
@@ -227,7 +252,6 @@ end
 
 local function applySubheaderFrame(frame, data)
     local title = ensureSubheaderTitle(frame)
-    title:SetFontObject(GameFontHighlight)
     title:SetText(data.name)
     title:Show()
 end
@@ -874,6 +898,8 @@ function lib:New(config)
     SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
     SB.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
     SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
+    SB.CreateHeaderTitle = lib.CreateHeaderTitle
+    SB.CreateSubheaderTitle = lib.CreateSubheaderTitle
 
     ----------------------------------------------------------------------------
     -- Internal helpers

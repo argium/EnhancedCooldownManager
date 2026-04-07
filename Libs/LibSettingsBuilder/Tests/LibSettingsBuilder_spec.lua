@@ -164,6 +164,7 @@ describe("LibSettingsBuilder", function()
             "SettingsListElementMixin",
             "SettingsDropdownControlMixin",
             "SettingsSliderControlMixin",
+            "GameFontHighlight",
             "GameFontHighlightSmall",
             "GameFontNormal",
         })
@@ -180,6 +181,7 @@ describe("LibSettingsBuilder", function()
         TestHelpers.SetupSettingsStubs()
 
         _G.ECM_DeepEquals = TestHelpers.deepEquals
+        _G.GameFontHighlight = "GameFontHighlight"
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
         _G.GameFontNormal = "GameFontNormal"
 
@@ -480,6 +482,68 @@ describe("LibSettingsBuilder", function()
         local init = SB.Header("Test Header")
         assert.are.equal("header", init._type)
         assert.are.equal("Test Header", init._text)
+    end)
+
+    it("CreateSubheaderTitle applies the standard subheader styling", function()
+        local parent = createScriptableFrame()
+        parent.CreateFontString = function(_, _, _, fontTemplate)
+            local fontString = createScriptableFrame()
+            fontString._fontTemplate = fontTemplate
+            fontString.SetFontObject = function(self, value)
+                self._fontObject = value
+            end
+            fontString.SetJustifyH = function(self, value)
+                self._justifyH = value
+            end
+            fontString.SetJustifyV = function(self, value)
+                self._justifyV = value
+            end
+            return fontString
+        end
+
+        local title = SB.CreateSubheaderTitle(parent, "Viewer Icons")
+        local point, relativeTo, relativePoint, x, y = title:GetPoint(1)
+
+        assert.are.equal("GameFontHighlightSmall", title._fontTemplate)
+        assert.are.equal("TOPLEFT", point)
+        assert.are.equal(parent, relativeTo)
+        assert.are.equal("TOPLEFT", relativePoint)
+        assert.are.equal(35, x)
+        assert.are.equal(-8, y)
+        assert.are.equal("LEFT", title._justifyH)
+        assert.are.equal("TOP", title._justifyV)
+        assert.are.equal("GameFontHighlight", title._fontObject)
+        assert.are.equal("Viewer Icons", title:GetText())
+        assert.is_true(title:IsShown())
+    end)
+
+    it("CreateHeaderTitle applies the standard header styling", function()
+        local parent = createScriptableFrame()
+        parent.CreateFontString = function(_, _, _, fontTemplate)
+            local fontString = createScriptableFrame()
+            fontString._fontTemplate = fontTemplate
+            fontString.SetJustifyH = function(self, value)
+                self._justifyH = value
+            end
+            fontString.SetJustifyV = function(self, value)
+                self._justifyV = value
+            end
+            return fontString
+        end
+
+        local title = SB.CreateHeaderTitle(parent, "Viewer Icons")
+        local point, relativeTo, relativePoint, x, y = title:GetPoint(1)
+
+        assert.are.equal("GameFontHighlightLarge", title._fontTemplate)
+        assert.are.equal("TOPLEFT", point)
+        assert.are.equal(parent, relativeTo)
+        assert.are.equal("TOPLEFT", relativePoint)
+        assert.are.equal(7, x)
+        assert.are.equal(-16, y)
+        assert.are.equal("LEFT", title._justifyH)
+        assert.are.equal("TOP", title._justifyV)
+        assert.are.equal("Viewer Icons", title:GetText())
+        assert.is_true(title:IsShown())
     end)
 
     -- Subheader
