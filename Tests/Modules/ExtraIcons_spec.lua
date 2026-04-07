@@ -771,6 +771,91 @@ describe("ExtraIcons real source", function()
         assert.are.equal(87, x)
     end)
 
+    it("publishes a combined main-viewer anchor when main extra icons are shown", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        activeFrame.isActive = true
+        EssentialCooldownViewer.childXPadding = 4
+        EssentialCooldownViewer.iconScale = 1.0
+        EssentialCooldownViewer:SetWidth(46)
+        EssentialCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        EssentialCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        inventoryItemBySlot[13] = 101
+        inventoryTextureBySlot[13] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({}, { { stackKey = "trinket1" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+
+        local vs = ExtraIcons._viewers.main
+        local anchor = ExtraIcons:GetMainViewerAnchor()
+        assert.are.equal(vs.anchorFrame, anchor)
+        assert.is_true(anchor:IsShown())
+        assert.same({
+            { "LEFT", EssentialCooldownViewer, "LEFT", 0, 0 },
+            { "RIGHT", vs.container, "RIGHT", 0, 0 },
+            { "TOP", EssentialCooldownViewer, "TOP", 0, 0 },
+            { "BOTTOM", EssentialCooldownViewer, "BOTTOM", 0, 0 },
+        }, anchor.__anchors)
+    end)
+
+    it("keeps utility aligned to the shared midpoint when an icon moves to main", function()
+        local utilityActiveFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        utilityActiveFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { utilityActiveFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        local mainActiveFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        mainActiveFrame.isActive = true
+        EssentialCooldownViewer.childXPadding = 4
+        EssentialCooldownViewer.iconScale = 1.0
+        EssentialCooldownViewer:SetWidth(22)
+        EssentialCooldownViewer.GetItemFrames = function()
+            return { mainActiveFrame }
+        end
+        EssentialCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        inventoryItemBySlot[13] = 101
+        inventoryTextureBySlot[13] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+
+        local config = makeViewersConfig({ { stackKey = "trinket1" } }, {})
+        ExtraIcons.GetModuleConfig = function()
+            return config
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("utility"))
+
+        local _, _, _, utilityBeforeX = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal(-13, utilityBeforeX)
+
+        config.viewers.utility = {}
+        config.viewers.main = { { stackKey = "trinket1" } }
+
+        assert.is_true(ExtraIcons:UpdateLayout("main"))
+
+        local _, _, _, utilityAfterX = UtilityCooldownViewer:GetPoint(1)
+        local _, _, _, mainAfterX = EssentialCooldownViewer:GetPoint(1)
+
+        assert.are.equal(-13, utilityAfterX)
+        assert.are.equal(87, mainAfterX)
+        assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
+        assert.is_true(ExtraIcons._viewers.main.container:IsShown())
+    end)
+
     it("prefers demonic healthstone over the legacy healthstone", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end

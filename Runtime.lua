@@ -355,6 +355,14 @@ local function updateAllLayouts(reason)
     invalidateDetachedAnchorMetrics()
     updateDetachedAnchorLayout()
 
+    -- ExtraIcons can widen the main viewer's effective footprint. Update it
+    -- before chained modules so attached bars compute width-dependent layout
+    -- (ticks, fragments, etc.) against the final combined anchor.
+    local extraIcons = _modules[C.EXTRAICONS]
+    if extraIcons and extraIcons:IsReady() then
+        extraIcons:UpdateLayout(reason)
+    end
+
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
@@ -365,7 +373,7 @@ local function updateAllLayouts(reason)
     end
 
     for frameName, module in pairs(_modules) do
-        if not _chainSet[frameName] and module:IsReady() then
+        if frameName ~= C.EXTRAICONS and not _chainSet[frameName] and module:IsReady() then
             module:UpdateLayout(reason)
         end
     end

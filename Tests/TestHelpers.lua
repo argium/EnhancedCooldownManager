@@ -811,6 +811,9 @@ TestHelpers.OPTIONS_GLOBALS = {
     "time",
     "C_PartyInfo",
     "IsInInstance",
+    "GetInventoryItemTexture",
+    "C_Item",
+    "C_Spell",
 }
 
 --- Load the live Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
@@ -857,6 +860,22 @@ function TestHelpers.SetupOptionsGlobals()
     _G.IsInInstance = function()
         return false
     end
+    _G.GetInventoryItemTexture = function()
+        return nil
+    end
+    _G.C_Item = {
+        GetItemIconByID = function()
+            return nil
+        end,
+    }
+    _G.C_Spell = {
+        GetSpellName = function()
+            return nil
+        end,
+        GetSpellTexture = function()
+            return nil
+        end,
+    }
     _G.UnitName = function()
         return "TestPlayer"
     end
@@ -908,6 +927,8 @@ function TestHelpers.SetupOptionsGlobals()
         local f = { scripts = {}, hooks = {}, callbacks = {}, _children = {} }
         local noop = function() end
         local value, minValue, maxValue, stepValue = nil, 0, 0, 1
+        local shown = false
+        local mouseEnabled = false
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
@@ -927,13 +948,22 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetPoint = noop
         f.SetAllPoints = noop
         f.ClearAllPoints = noop
-        f.Show = noop
-        f.Hide = noop
+        f.Show = function()
+            shown = true
+        end
+        f.Hide = function()
+            shown = false
+        end
         f.IsShown = function()
-            return false
+            return shown
         end
         f.SetAlpha = noop
-        f.EnableMouse = noop
+        f.EnableMouse = function(_, enabled)
+            mouseEnabled = not not enabled
+        end
+        f.IsMouseEnabled = function()
+            return mouseEnabled
+        end
         f.GetChildren = function()
             return
         end
@@ -948,6 +978,8 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetWordWrap = noop
         f.SetJustifyH = noop
         f.SetColorRGB = noop
+        f.SetColorTexture = noop
+        f.SetTexture = noop
         f.SetFocus = noop
         f.ClearFocus = noop
         f.HighlightText = noop

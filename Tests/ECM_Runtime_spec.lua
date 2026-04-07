@@ -511,6 +511,29 @@ describe("ECM.Runtime layout system", function()
             assert.same({ "First" }, reasons)
         end)
 
+        it("updates ExtraIcons before the chain so attached bars see the final viewer footprint", function()
+            local callOrder = {}
+            local extraIcons = makeRegisteredModule(ns.Constants.EXTRAICONS)
+            local powerBar = makeRegisteredModule(ns.Constants.POWERBAR)
+
+            _G._testDB.profile.extraIcons = { enabled = true }
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_CHAIN
+
+            extraIcons.UpdateLayout = function(_, reason)
+                callOrder[#callOrder + 1] = "ExtraIcons:" .. reason
+            end
+            powerBar.UpdateLayout = function(_, reason)
+                callOrder[#callOrder + 1] = "PowerBar:" .. reason
+            end
+
+            ns.Runtime.ScheduleLayoutUpdate(0, "Order")
+
+            assert.are.equal(1, #timerQueue)
+            timerQueue[1].callback()
+
+            assert.same({ "ExtraIcons:Order", "PowerBar:Order" }, callOrder)
+        end)
+
         it("zero-delay layout events update visibility immediately without adding a runtime timer hop", function()
             local mod = makeRegisteredModule()
             local reasons = {}

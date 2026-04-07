@@ -353,7 +353,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 
 Displays cooldown-tracked icons alongside Blizzard's cooldown viewer frames. Uses a dual-viewer architecture with a stack-aware resolver.
 
-**Viewer Registry:** Maps abstract viewer keys to Blizzard frame globals. Current keys: `"utility"` → `UtilityCooldownViewer`, `"main"` → `EssentialCooldownViewer`. Each viewer has its own container frame, on-demand icon pool, centering offset, and hook set.
+**Viewer Registry:** Maps abstract viewer keys to Blizzard frame globals. Current keys: `"utility"` → `UtilityCooldownViewer`, `"main"` → `EssentialCooldownViewer`. Each viewer has its own container frame, on-demand icon pool, and hook set. The main viewer's expanded footprint also drives a shared midpoint offset for the two-viewer layout; utility applies that pair offset first, then layers its own local centering so moving icons between viewers preserves the combined layout.
 
 **Entry Kinds and Resolution:**
 
@@ -382,7 +382,7 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
 }
 ```
 
-**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and embeds a canvas frame for viewer management. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Add buttons for absent predefined stacks and racials; per-row controls for reorder (↑↓), move between viewers (→←), and delete (✕); custom entry form with ID parsing.
+**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Quick-add buttons register absent predefined stacks and the current racial; per-row controls handle reorder (↑↓), move between viewers (→←), and delete (✕).
 
 ### FrameUtil (`ns.FrameUtil`)
 

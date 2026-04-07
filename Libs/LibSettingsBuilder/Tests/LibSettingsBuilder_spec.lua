@@ -598,6 +598,66 @@ describe("LibSettingsBuilder", function()
         assert.are.equal(120, canvas:GetHeight())
     end)
 
+    it("plain list rows hide recycled custom children and preview regions", function()
+        local function makeListElementFrame()
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                return fontString
+            end
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+            return frame
+        end
+
+        local subheaderFrame = makeListElementFrame()
+        local subheaderForeignChild = createScriptableFrame()
+        local subheaderForeignRegion = createScriptableFrame()
+        subheaderFrame.GetChildren = function()
+            return subheaderForeignChild
+        end
+        subheaderFrame.GetRegions = function()
+            return subheaderForeignRegion
+        end
+
+        local subheader = SB.Subheader({ name = "Item Quality" })
+        subheader:InitFrame(subheaderFrame)
+
+        assert.is_false(subheaderForeignChild:IsShown())
+        assert.is_false(subheaderForeignRegion:IsShown())
+
+        local canvas = createScriptableFrame()
+        canvas.SetParent = function(self, parent)
+            self._parent = parent
+        end
+        canvas.GetParent = function(self)
+            return self._parent
+        end
+
+        local embedFrame = makeListElementFrame()
+        local embedForeignChild = createScriptableFrame()
+        local embedForeignRegion = createScriptableFrame()
+        embedFrame.GetChildren = function()
+            return embedForeignChild
+        end
+        embedFrame.GetRegions = function()
+            return embedForeignRegion
+        end
+
+        local embed = SB.EmbedCanvas(canvas, 120)
+        embed:InitFrame(embedFrame)
+
+        assert.is_false(embedForeignChild:IsShown())
+        assert.is_false(embedForeignRegion:IsShown())
+        assert.are.equal(embedFrame, canvas:GetParent())
+    end)
+
     -- Button
     it("Button creates button initializer with onClick", function()
         local clicked = false

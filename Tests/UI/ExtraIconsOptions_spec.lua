@@ -397,7 +397,7 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns
+    local profile, defaults, SB, ns, capturedTable
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -413,36 +413,85 @@ describe("ExtraIconsOptions settings page", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
+        local originalRegisterFromTable = SB.RegisterFromTable
+        SB.RegisterFromTable = function(tbl)
+            capturedTable = tbl
+            return originalRegisterFromTable(tbl)
+        end
+
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ns.OptionsSections.ExtraIcons.RegisterSettings(SB)
     end)
 
-    describe("canvas creation", function()
-        it("canvas is stored on ExtraIconsOptions", function()
-            local canvas = ns.ExtraIconsOptions._canvas
-            assert.is_not_nil(canvas)
-        end)
-
-        it("canvas exposes viewer state", function()
-            local canvas = ns.ExtraIconsOptions._canvas
-            assert.is_table(canvas._viewerRowPools)
-            assert.is_table(canvas._customForm)
-            assert.is_table(canvas._viewerHeaders)
-            assert.is_table(canvas._viewerEmptyLabels)
-        end)
-
-        it("canvas has enabled checkbox", function()
-            local canvas = ns.ExtraIconsOptions._canvas
-            assert.is_not_nil(canvas._enabledCheck)
-        end)
-
-        it("canvas has content region", function()
-            local canvas = ns.ExtraIconsOptions._canvas
-            assert.is_not_nil(canvas._contentRegion)
-        end)
-
-        it("creates a canvas subcategory", function()
+    describe("settings registration", function()
+        it("creates a subcategory", function()
             assert.is_not_nil(SB.GetSubcategory(ns.L["EXTRA_ICONS"]))
+        end)
+
+        it("only exposes the viewer canvas for testing", function()
+            local opts = ns.ExtraIconsOptions
+            assert.is_not_nil(opts._viewerCanvas)
+            assert.is_nil(opts._addFormCanvas)
+            assert.is_nil(opts._presetsCanvas)
+        end)
+
+        it("viewer canvas exposes row pools and headers", function()
+            local vc = ns.ExtraIconsOptions._viewerCanvas
+            assert.is_table(vc._viewerRowPools)
+            assert.is_table(vc._viewerHeaders)
+            assert.is_table(vc._viewerEmptyLabels)
+        end)
+
+        it("registers native quick-add buttons and no custom add form fields", function()
+            assert.is_not_nil(capturedTable)
+            assert.is_nil(capturedTable.args.addHeader)
+            assert.is_nil(capturedTable.args.addType)
+            assert.is_nil(capturedTable.args.addViewer)
+            assert.is_nil(capturedTable.args.addForm)
+            assert.is_nil(capturedTable.args.defaults)
+            assert.is_not_nil(capturedTable.args.quickAdd_trinket1)
+            assert.are.equal("button", capturedTable.args.quickAdd_trinket1.type)
+            assert.are.equal("button", capturedTable.args.quickAddRacial.type)
+            assert.are.equal("canvas", capturedTable.args.viewers.type)
+        end)
+
+        it("exposes a refresh function", function()
+            assert.is_function(ns.ExtraIconsOptions._refresh)
+        end)
+
+        it("rebinds whole-row mouseover handlers on refresh", function()
+            ns.ExtraIconsOptions._refresh()
+
+            local row = ns.ExtraIconsOptions._viewerCanvas._viewerRowPools.utility[1]
+            assert.is_not_nil(row)
+            assert.is_not_nil(row._highlight)
+            assert.is_true(row:IsMouseEnabled())
+            assert.is_function(row:GetScript("OnEnter"))
+            assert.is_function(row:GetScript("OnLeave"))
+            assert.is_false(row._highlight:IsShown())
+
+            row:GetScript("OnEnter")(row)
+            assert.is_true(row._highlight:IsShown())
+
+            row:GetScript("OnLeave")(row)
+            assert.is_false(row._highlight:IsShown())
+        end)
+
+        it("resets and rebinds pooled row mouseover on subsequent refreshes", function()
+            ns.ExtraIconsOptions._refresh()
+
+            local row = ns.ExtraIconsOptions._viewerCanvas._viewerRowPools.utility[1]
+            assert.is_not_nil(row)
+
+            row:GetScript("OnEnter")(row)
+            assert.is_true(row._highlight:IsShown())
+
+            ns.ExtraIconsOptions._refresh()
+
+            assert.is_true(row:IsMouseEnabled())
+            assert.is_function(row:GetScript("OnEnter"))
+            assert.is_function(row:GetScript("OnLeave"))
+            assert.is_false(row._highlight:IsShown())
         end)
     end)
 end)

@@ -155,6 +155,40 @@ local function resetListElement(frame)
     end
 end
 
+local function hideListElementChildren(frame)
+    if not frame or not frame.GetChildren then
+        return
+    end
+
+    local children = { frame:GetChildren() }
+    for i = 1, #children do
+        local child = children[i]
+        if child and child.Hide then
+            child:Hide()
+        end
+    end
+end
+
+local function hideListElementRegions(frame)
+    if not frame or not frame.GetRegions then
+        return
+    end
+
+    local regions = { frame:GetRegions() }
+    for i = 1, #regions do
+        local region = regions[i]
+        if region and region.Hide then
+            region:Hide()
+        end
+    end
+end
+
+local function resetPlainListElementFrame(frame)
+    hideListElementChildren(frame)
+    hideListElementRegions(frame)
+    resetListElement(frame)
+end
+
 local function ensureSubheaderTitle(frame)
     if frame._lsbSubheaderTitle then
         return frame._lsbSubheaderTitle
@@ -260,7 +294,7 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
             frame.NewFeature:Hide()
         end
 
-        resetListElement(frame)
+        resetPlainListElementFrame(frame)
         initFrame(frame, self.data, self)
 
         if not frame._lsbHasCustomEvaluateState then
@@ -288,9 +322,10 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
         end
         if frame._lsbCanvas then
             frame._lsbCanvas:Hide()
+            frame._lsbCanvas = nil
         end
 
-        resetListElement(frame)
+        resetPlainListElementFrame(frame)
         frame.data = nil
         frame._lsbInitializer = nil
     end

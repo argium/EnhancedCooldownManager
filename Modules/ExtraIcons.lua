@@ -30,6 +30,27 @@ local VIEWER_REGISTRY = {
     main    = { blizzFrameKey = "EssentialCooldownViewer" },
 }
 
+local VIEWER_ORDER = { "main", "utility" }
+
+local function cacheOriginalPoint(viewerState, blizzFrame)
+    if viewerState.originalPoint or not blizzFrame then
+        return
+    end
+
+    local point, relativeTo, relativePoint, x, y = blizzFrame:GetPoint()
+    viewerState.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
+end
+
+local function applyViewerPoint(viewerState, blizzFrame, offsetX)
+    local point = viewerState and viewerState.originalPoint
+    if not point or not blizzFrame then
+        return
+    end
+
+    blizzFrame:ClearAllPoints()
+    blizzFrame:SetPoint(point[1], point[2], point[3], point[4] + (offsetX or 0), point[5])
+end
+
 --------------------------------------------------------------------------------
 -- Resolver Functions
 --------------------------------------------------------------------------------
@@ -295,7 +316,14 @@ function ExtraIcons:CreateFrame()
         local container = CreateFrame("Frame", "ECMExtraIcons_" .. viewerKey, parent)
         container:SetFrameStrata("MEDIUM")
         container:SetSize(1, 1)
+
+        local anchorFrame = CreateFrame("Frame", "ECMExtraIcons_" .. viewerKey .. "Anchor", parent)
+        anchorFrame:SetFrameStrata("MEDIUM")
+        anchorFrame:SetSize(1, 1)
+        anchorFrame:Hide()
+
         self._viewers[viewerKey] = {
+            anchorFrame = anchorFrame,
             container = container,
             iconPool = {},
             originalPoint = nil,
@@ -321,19 +349,63 @@ function ExtraIcons:ShouldShow()
     return false
 end
 
+--- Updates a viewer's logical anchor frame.
+--- The main viewer uses this so chained ECM modules can inherit the combined
+--- width of Blizzard icons plus any appended extra icons.
+---@param viewerKey string
+---@param blizzFrame Frame|nil
+---@param rightFrame Frame|nil
+function ExtraIcons:_updateViewerAnchor(viewerKey, blizzFrame, rightFrame)
+    local vs = self._viewers and self._viewers[viewerKey]
+    local anchorFrame = vs and vs.anchorFrame
+    if not anchorFrame then
+        return
+    end
+
+    if not blizzFrame or not blizzFrame:IsShown() then
+        anchorFrame:Hide()
+        return
+    end
+
+    local rightAnchor = rightFrame and rightFrame:IsShown() and rightFrame or blizzFrame
+
+    anchorFrame:ClearAllPoints()
+    anchorFrame:SetPoint("LEFT", blizzFrame, "LEFT", 0, 0)
+    anchorFrame:SetPoint("RIGHT", rightAnchor, "RIGHT", 0, 0)
+    anchorFrame:SetPoint("TOP", blizzFrame, "TOP", 0, 0)
+    anchorFrame:SetPoint("BOTTOM", blizzFrame, "BOTTOM", 0, 0)
+    anchorFrame:Show()
+end
+
+--- Gets the effective chain anchor for the main viewer.
+---@return Frame|nil
+function ExtraIcons:GetMainViewerAnchor()
+    local vs = self._viewers and self._viewers.main
+    local anchorFrame = vs and vs.anchorFrame
+    if anchorFrame and anchorFrame:IsShown() then
+        return anchorFrame
+    end
+
+    return _G[VIEWER_REGISTRY.main.blizzFrameKey]
+end
+
 --- Lays out icons for a single viewer.
 ---@param viewerKey string The viewer key ("utility" or "main").
 ---@param entries table[] The config entries for this viewer.
 ---@param isEditing boolean Whether edit mode is active.
+---@param sharedOffsetX number|nil Pair-wide midpoint offset inherited from the main viewer.
 ---@return boolean changed Whether any icons were placed.
-function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
+---@return number offsetX Local centering offset contributed by this viewer's own footprint.
+function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX)
     local reg = VIEWER_REGISTRY[viewerKey]
     local blizzFrame = _G[reg.blizzFrameKey]
     local vs = self._viewers[viewerKey]
     if not vs then
-        return false
+        return false, 0
     end
     local container = vs.container
+    sharedOffsetX = sharedOffsetX or 0
+    cacheOriginalPoint(vs, blizzFrame)
 
     -- Resolve entries to displayable items
     local items
@@ -345,16 +417,15 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
 
     if #items == 0 then
         -- Restore viewer position and hide container
-        local p = vs.originalPoint
-        if p and blizzFrame then
-            blizzFrame:ClearAllPoints()
-            blizzFrame:SetPoint(p[1], p[2], p[3], p[4], p[5])
-        end
+        applyViewerPoint(vs, blizzFrame, sharedOffsetX)
         if isEditing then
             vs.originalPoint = nil
         end
         container:Hide()
-        return false
+        if viewerKey == "main" then
+            self:_updateViewerAnchor(viewerKey, blizzFrame, nil)
+        end
+        return false, 0
     end
 
     -- Hide all existing pool icons
@@ -409,10 +480,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
     local activeContentWidth = numActiveViewerIcons * iconSize + math.max(0, numActiveViewerIcons - 1) * spacing
     local viewerWidth = numActiveViewerIcons > 0 and blizzFrame:GetWidth() or 0
     local viewerOffsetX = (viewerWidth - activeContentWidth - spacing - totalWidth * viewerScale) / 2
-
-    local p = vs.originalPoint
-    blizzFrame:ClearAllPoints()
-    blizzFrame:SetPoint(p[1], p[2], p[3], p[4] + viewerOffsetX, p[5])
+    applyViewerPoint(vs, blizzFrame, viewerOffsetX + sharedOffsetX)
 
     -- Position and configure each icon
     local borderScale = ns.Constants.EXTRA_ICON_BORDER_SCALE
@@ -445,7 +513,11 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
     container:SetPoint("LEFT", lastActiveItemFrame or blizzFrame, "RIGHT", spacing, 0)
     container:Show()
 
-    return true
+    if viewerKey == "main" then
+        self:_updateViewerAnchor(viewerKey, blizzFrame, container)
+    end
+
+    return true, viewerOffsetX
 end
 
 --- Override UpdateLayout to position icons for all viewers.
@@ -469,11 +541,17 @@ function ExtraIcons:UpdateLayout(why)
     -- the extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
     local anyPlaced = false
+    local sharedOffsetX = 0
 
-    for viewerKey in pairs(VIEWER_REGISTRY) do
+    for i = 1, #VIEWER_ORDER do
+        local viewerKey = VIEWER_ORDER[i]
         local entries = viewers and viewers[viewerKey] or {}
-        if self:_updateSingleViewer(viewerKey, entries, isEditing) then
+        local changed, localOffsetX = self:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX)
+        if changed then
             anyPlaced = true
+        end
+        if viewerKey == "main" then
+            sharedOffsetX = localOffsetX or 0
         end
     end
 
@@ -624,6 +702,9 @@ function ExtraIcons:_hookViewer(viewerKey)
     blizzFrame:HookScript("OnHide", function()
         if vs.container then
             vs.container:Hide()
+        end
+        if vs.anchorFrame then
+            vs.anchorFrame:Hide()
         end
         if self:IsEnabled() then
             ns.Runtime.RequestLayout("ExtraIcons:OnHide")
