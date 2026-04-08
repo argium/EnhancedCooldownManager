@@ -99,6 +99,13 @@ local _, ns = ...
 ---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
+---@class ECM_ExtraIconEntry
+---@field stackKey string|nil Built-in stack key resolved via `BUILTIN_STACKS`.
+---@field kind string|nil Entry kind for custom or racial rows.
+---@field ids table|nil Entry spell/item priority list.
+---@field slotId number|nil Slot ID for equip-slot entries.
+---@field disabled boolean|nil When true, the entry stays in settings but is skipped at runtime.
+
 ---@class ECM_ExtraIconsConfig Extra icons configuration.
 ---@field enabled boolean Whether extra icons are enabled.
 ---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.

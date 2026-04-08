@@ -200,6 +200,7 @@ describe("ExtraIcons real source", function()
     local spellCooldowns
     local spellCooldownInfos
     local spellCharges
+    local ratedMap
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -215,6 +216,7 @@ describe("ExtraIcons real source", function()
             "GetInventoryItemCooldown",
             "C_Item",
             "IsPlayerSpell",
+            "C_PvP",
         })
     end)
 
@@ -239,6 +241,7 @@ describe("ExtraIcons real source", function()
         spellCooldowns = {}
         spellCooldownInfos = {}
         spellCharges = {}
+        ratedMap = false
         ns = {
             Log = function() end,
             BarMixin = {
@@ -320,6 +323,11 @@ describe("ExtraIcons real source", function()
             end,
             GetSpellChargeDuration = function(spellId)
                 return spellCooldowns[spellId]
+            end,
+        }
+        _G.C_PvP = {
+            IsRatedMap = function()
+                return ratedMap
             end,
         }
         _G.CreateFrame = function(frameType)
@@ -452,6 +460,20 @@ describe("ExtraIcons real source", function()
         assert.is_true(ExtraIcons._trackedEquipSlots[13])
         assert.is_true(ExtraIcons._trackedEquipSlots[14])
         assert.is_nil(ExtraIcons._trackedEquipSlots[1])
+    end)
+
+    it("ignores disabled entries when rebuilding tracked equipment slots", function()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig(
+                { { stackKey = "trinket1", disabled = true } },
+                { { stackKey = "trinket2" } }
+            )
+        end
+
+        ExtraIcons:_rebuildTrackedSlots()
+
+        assert.is_nil(ExtraIcons._trackedEquipSlots[13])
+        assert.is_true(ExtraIcons._trackedEquipSlots[14])
     end)
 
     it("hooks edit mode only once", function()
@@ -771,6 +793,34 @@ describe("ExtraIcons real source", function()
         assert.are.equal(87, x)
     end)
 
+    it("skips disabled entries during layout resolution", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        inventoryItemBySlot[13] = 101
+        inventoryTextureBySlot[13] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+        inventoryItemBySlot[14] = 102
+        inventoryTextureBySlot[14] = "trinket-2"
+        inventorySpellByItem[102] = 9002
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { stackKey = "trinket1", disabled = true },
+                { stackKey = "trinket2" },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        assert.are.equal(14, ExtraIcons._viewers.utility.iconPool[1].slotId)
+        assert.are.equal(18, ExtraIcons._viewers.utility.container:GetWidth())
+    end)
+
     it("publishes a combined main-viewer anchor when main extra icons are shown", function()
         local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
         activeFrame.isActive = true
@@ -805,7 +855,7 @@ describe("ExtraIcons real source", function()
         }, anchor.__anchors)
     end)
 
-    it("keeps utility aligned to the shared midpoint when an icon moves to main", function()
+    it("restores the utility viewer when an icon moves to main", function()
         local utilityActiveFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
         utilityActiveFrame.isActive = true
         UtilityCooldownViewer.childXPadding = 4
@@ -850,7 +900,7 @@ describe("ExtraIcons real source", function()
         local _, _, _, utilityAfterX = UtilityCooldownViewer:GetPoint(1)
         local _, _, _, mainAfterX = EssentialCooldownViewer:GetPoint(1)
 
-        assert.are.equal(-13, utilityAfterX)
+        assert.are.equal(0, utilityAfterX)
         assert.are.equal(87, mainAfterX)
         assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
         assert.is_true(ExtraIcons._viewers.main.container:IsShown())
@@ -876,6 +926,36 @@ describe("ExtraIcons real source", function()
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
         assert.are.equal(ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+    end)
+
+    it("suppresses combat and health potions on rated maps while still showing healthstones", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        ratedMap = true
+        itemCounts[ns.Constants.COMBAT_POTIONS[1].itemID] = 1
+        itemIconsByID[ns.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
+        itemCounts[ns.Constants.HEALTH_POTIONS[1].itemID] = 1
+        itemIconsByID[ns.Constants.HEALTH_POTIONS[1].itemID] = "health-potion"
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { stackKey = "combatPotions" },
+                { stackKey = "healthPotions" },
+                { stackKey = "healthstones" },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        assert.are.equal(ns.Constants.HEALTHSTONE_ITEM_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+        assert.are.equal(18, ExtraIcons._viewers.utility.container:GetWidth())
     end)
 
     it("anchors container to last active item frame when viewer layout is stale", function()

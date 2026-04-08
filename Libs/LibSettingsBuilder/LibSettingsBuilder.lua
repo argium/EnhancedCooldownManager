@@ -2025,8 +2025,19 @@ function lib:New(config)
     -- Utility helpers
     ----------------------------------------------------------------------------
 
-    function SB.Header(text, category)
-        local cat = category or SB._currentSubcategory or SB._rootCategory
+    function SB.Header(textOrSpec, category)
+        local spec
+        if type(textOrSpec) == "table" then
+            spec = textOrSpec
+        else
+            spec = {
+                name = textOrSpec,
+                category = category,
+            }
+        end
+
+        local cat = resolveCategory(spec)
+        local text = spec.name
 
         if not SB._firstHeaderAdded[cat] then
             SB._firstHeaderAdded[cat] = true
@@ -2039,6 +2050,7 @@ function lib:New(config)
         local layout = SB._layouts[cat]
         local initializer = CreateSettingsListSectionHeaderInitializer(text)
         layout:AddInitializer(initializer)
+        applyModifiers(initializer, spec)
         return initializer
     end
 
@@ -2257,7 +2269,7 @@ function lib:New(config)
                 local init, setting
 
                 if entryType == "header" then
-                    init = SB.Header(spec.name)
+                    init = SB.Header(spec)
                 elseif entryType == "subheader" then
                     init = SB.Subheader(spec)
                 elseif entryType == "info" then

@@ -363,7 +363,7 @@ Displays cooldown-tracked icons alongside Blizzard's cooldown viewer frames. Use
 | `item` | `ids[]` (priority stack) | First with `C_Item.GetItemCount > 0` | `C_Item.GetItemCooldown` |
 | `spell` | `ids[]` (priority stack) | First with `IsPlayerSpell` → `C_Spell.GetSpellTexture` | `C_Spell.GetSpellCooldown` (pass-through, no inspection) |
 
-Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`ids`/`slotId` from the constant at runtime. Custom and racial entries store fields directly in saved config.
+Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`ids`/`slotId` from the constant at runtime. Built-in entries may also persist `disabled = true`, which keeps them in the settings list but skips them during runtime resolution. Custom and racial entries store fields directly in saved config.
 
 **Config Structure (`profile.extraIcons`):**
 
@@ -373,7 +373,7 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
     viewers = {
         utility = {                      -- ordered array
             { stackKey = "trinket1" },   -- resolved from BUILTIN_STACKS
-            { stackKey = "trinket2" },
+            { stackKey = "trinket2", disabled = true },
             { stackKey = "combatPotions" },
             { kind = "spell", ids = { 59752 } },  -- racial (self-contained)
         },
@@ -382,7 +382,7 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
 }
 ```
 
-**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Quick-add buttons register absent predefined stacks and the current racial; per-row controls handle reorder (↑↓), move between viewers (→←), and delete (✕).
+**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Built-in rows use the trailing button as an enable/disable toggle instead of removal, and missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section. The current-player racial is also synthesized as a disabled placeholder when absent; adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables.
 
 ### FrameUtil (`ns.FrameUtil`)
 

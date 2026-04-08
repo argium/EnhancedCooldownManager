@@ -363,7 +363,10 @@ function TestHelpers.SetupSettingsStubs()
     }
 
     _G.CreateSettingsListSectionHeaderInitializer = function(text)
-        return { _type = "header", _text = text }
+        local init = makeInitializer(nil)
+        init._type = "header"
+        init._text = text
+        return init
     end
 
     _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
@@ -825,6 +828,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "SettingsListElementInitializer",
     "GameFontHighlightSmall",
     "GameFontNormal",
+    "GameFontDisable",
     "SETTINGS_DEFAULTS",
     "InCombatLockdown",
     "UnitName",
@@ -845,9 +849,14 @@ TestHelpers.OPTIONS_GLOBALS = {
     "C_Timer",
     "C_PartyInfo",
     "IsInInstance",
+    "GetInventoryItemID",
     "GetInventoryItemTexture",
     "C_Item",
     "C_Spell",
+    "CreateTextureMarkup",
+    "CreateAtlasMarkup",
+    "GameTooltip",
+    "GameTooltip_Hide",
 }
 
 --- Load the live Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
@@ -882,6 +891,7 @@ function TestHelpers.SetupOptionsGlobals()
     _G.ECM_DeepEquals = deepEquals
     _G.GameFontHighlightSmall = "GameFontHighlightSmall"
     _G.GameFontNormal = "GameFontNormal"
+    _G.GameFontDisable = "GameFontDisable"
     _G.SETTINGS_DEFAULTS = "Defaults"
     _G.InCombatLockdown = function()
         return false
@@ -893,6 +903,9 @@ function TestHelpers.SetupOptionsGlobals()
     }
     _G.IsInInstance = function()
         return false
+    end
+    _G.GetInventoryItemID = function()
+        return nil
     end
     _G.GetInventoryItemTexture = function()
         return nil
@@ -917,6 +930,45 @@ function TestHelpers.SetupOptionsGlobals()
             return nil
         end,
     }
+    _G.CreateTextureMarkup = function(texture)
+        return "|T" .. tostring(texture) .. "|t"
+    end
+    _G.CreateAtlasMarkup = function(atlas)
+        return "|A" .. tostring(atlas) .. "|a"
+    end
+    _G.GameTooltip = {
+        _title = nil,
+        _lines = {},
+        _owner = nil,
+        _anchor = nil,
+        _shown = false,
+        SetOwner = function(self, owner, anchor)
+            self._owner = owner
+            self._anchor = anchor
+        end,
+        ClearLines = function(self)
+            self._title = nil
+            self._lines = {}
+        end,
+        SetText = function(self, text)
+            self._title = text
+            self._lines = {}
+        end,
+        AddLine = function(self, text)
+            self._lines[#self._lines + 1] = text
+        end,
+        Show = function(self)
+            self._shown = true
+        end,
+        Hide = function(self)
+            self._shown = false
+        end,
+    }
+    _G.GameTooltip_Hide = function()
+        if _G.GameTooltip and _G.GameTooltip.Hide then
+            _G.GameTooltip:Hide()
+        end
+    end
     _G.UnitName = function()
         return "TestPlayer"
     end

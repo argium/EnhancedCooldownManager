@@ -1248,6 +1248,19 @@ describe("LibSettingsBuilder", function()
         assert.is_not_nil(init2)
     end)
 
+    it("Header accepts hidden predicates through spec tables", function()
+        local init = SB.Header({
+            name = "Quick Add",
+            hidden = function()
+                return true
+            end,
+        })
+
+        assert.are.equal("header", init._type)
+        assert.are.equal(1, #(init._shownPredicates or {}))
+        assert.is_false(init._shownPredicates[1]())
+    end)
+
     -- Custom with varType override
     it("Custom respects varType override", function()
         local capturedVarType
@@ -1649,6 +1662,37 @@ describe("LibSettingsBuilder", function()
 
         _G.CreateSettingsListSectionHeaderInitializer = origHeader
         assert.is_true(headerCreated)
+    end)
+
+    it("RegisterFromTable passes hidden predicates to header initializers", function()
+        local capturedHeader
+        local origHeader = CreateSettingsListSectionHeaderInitializer
+        _G.CreateSettingsListSectionHeaderInitializer = function(text)
+            capturedHeader = origHeader(text)
+            return capturedHeader
+        end
+
+        local SB2 = createSB2("COND3", "CondTest3")
+
+        SB2.RegisterFromTable({
+            name = "Cond Section 3",
+            path = "global",
+            args = {
+                shown = {
+                    type = "header",
+                    name = "Conditional Header",
+                    hidden = function()
+                        return true
+                    end,
+                    order = 1,
+                },
+            },
+        })
+
+        _G.CreateSettingsListSectionHeaderInitializer = origHeader
+        assert.is_not_nil(capturedHeader)
+        assert.are.equal(1, #(capturedHeader._shownPredicates or {}))
+        assert.is_false(capturedHeader._shownPredicates[1]())
     end)
 
     it("RegisterFromTable rootCategory=true uses root instead of subcategory", function()

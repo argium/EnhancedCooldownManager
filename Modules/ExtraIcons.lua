@@ -23,6 +23,10 @@ ns.Addon.ExtraIcons = ExtraIcons
 ---@field Cooldown Cooldown The cooldown overlay frame.
 
 local BUILTIN_STACKS = ns.Constants.BUILTIN_STACKS
+local SUPPRESS_IN_RATED_PVP = {
+    combatPotions = true,
+    healthPotions = true,
+}
 
 --- Viewer registry mapping viewer keys to their Blizzard frame globals.
 local VIEWER_REGISTRY = {
@@ -54,6 +58,11 @@ end
 --------------------------------------------------------------------------------
 -- Resolver Functions
 --------------------------------------------------------------------------------
+
+local function isRatedPvPMap()
+    local pvp = C_PvP
+    return pvp and type(pvp.IsRatedMap) == "function" and pvp.IsRatedMap() or false
+end
 
 --- Checks if an equipment slot has an on-use effect.
 ---@param slotId number Inventory slot ID.
@@ -130,6 +139,9 @@ local function resolveEntry(entry)
         if not stack then
             return nil
         end
+        if SUPPRESS_IN_RATED_PVP[entry.stackKey] and isRatedPvPMap() then
+            return nil
+        end
         kind = stack.kind
         slotId = stack.slotId
         ids = stack.ids
@@ -157,7 +169,7 @@ local _resolvedItems = {}
 local function resolveViewerEntries(entries)
     wipe(_resolvedItems)
     for _, entry in ipairs(entries) do
-        local data = resolveEntry(entry)
+        local data = not entry.disabled and resolveEntry(entry) or nil
         if data then
             _resolvedItems[#_resolvedItems + 1] = data
         end
@@ -393,18 +405,15 @@ end
 ---@param viewerKey string The viewer key ("utility" or "main").
 ---@param entries table[] The config entries for this viewer.
 ---@param isEditing boolean Whether edit mode is active.
----@param sharedOffsetX number|nil Pair-wide midpoint offset inherited from the main viewer.
 ---@return boolean changed Whether any icons were placed.
----@return number offsetX Local centering offset contributed by this viewer's own footprint.
-function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX)
+function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
     local reg = VIEWER_REGISTRY[viewerKey]
     local blizzFrame = _G[reg.blizzFrameKey]
     local vs = self._viewers[viewerKey]
     if not vs then
-        return false, 0
+        return false
     end
     local container = vs.container
-    sharedOffsetX = sharedOffsetX or 0
     cacheOriginalPoint(vs, blizzFrame)
 
     -- Resolve entries to displayable items
@@ -417,7 +426,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
 
     if #items == 0 then
         -- Restore viewer position and hide container
-        applyViewerPoint(vs, blizzFrame, sharedOffsetX)
+        applyViewerPoint(vs, blizzFrame)
         if isEditing then
             vs.originalPoint = nil
         end
@@ -425,7 +434,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         if viewerKey == "main" then
             self:_updateViewerAnchor(viewerKey, blizzFrame, nil)
         end
-        return false, 0
+        return false
     end
 
     -- Hide all existing pool icons
@@ -480,7 +489,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     local activeContentWidth = numActiveViewerIcons * iconSize + math.max(0, numActiveViewerIcons - 1) * spacing
     local viewerWidth = numActiveViewerIcons > 0 and blizzFrame:GetWidth() or 0
     local viewerOffsetX = (viewerWidth - activeContentWidth - spacing - totalWidth * viewerScale) / 2
-    applyViewerPoint(vs, blizzFrame, viewerOffsetX + sharedOffsetX)
+    applyViewerPoint(vs, blizzFrame, viewerOffsetX)
 
     -- Position and configure each icon
     local borderScale = ns.Constants.EXTRA_ICON_BORDER_SCALE
@@ -517,7 +526,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         self:_updateViewerAnchor(viewerKey, blizzFrame, container)
     end
 
-    return true, viewerOffsetX
+    return true
 end
 
 --- Override UpdateLayout to position icons for all viewers.
@@ -541,17 +550,13 @@ function ExtraIcons:UpdateLayout(why)
     -- the extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
     local anyPlaced = false
-    local sharedOffsetX = 0
 
     for i = 1, #VIEWER_ORDER do
         local viewerKey = VIEWER_ORDER[i]
         local entries = viewers and viewers[viewerKey] or {}
-        local changed, localOffsetX = self:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX)
+        local changed = self:_updateSingleViewer(viewerKey, entries, isEditing)
         if changed then
             anyPlaced = true
-        end
-        if viewerKey == "main" then
-            sharedOffsetX = localOffsetX or 0
         end
     end
 
@@ -637,11 +642,13 @@ function ExtraIcons:_rebuildTrackedSlots()
     if config and config.viewers then
         for _, entries in pairs(config.viewers) do
             for _, entry in ipairs(entries) do
-                local stack = entry.stackKey and BUILTIN_STACKS[entry.stackKey]
-                local kind = stack and stack.kind or entry.kind
-                local sid = stack and stack.slotId or entry.slotId
-                if kind == "equipSlot" and sid then
-                    tracked[sid] = true
+                if not entry.disabled then
+                    local stack = entry.stackKey and BUILTIN_STACKS[entry.stackKey]
+                    local kind = stack and stack.kind or entry.kind
+                    local sid = stack and stack.slotId or entry.slotId
+                    if kind == "equipSlot" and sid then
+                        tracked[sid] = true
+                    end
                 end
             end
         end
