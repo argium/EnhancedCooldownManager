@@ -6,7 +6,10 @@ It supports:
 
 - path-based bindings for AceDB-style profile tables,
 - handler-mode bindings for arbitrary storage,
+- built-in text input rows with optional debounced preview resolution,
 - composite builders for common settings groups,
+- layout-only rows such as headers, subheaders, info rows, buttons, and embedded canvases,
+- XML/template-backed custom controls when a built-in row is not enough,
 - canvas layout helpers for more complex pages,
 - deterministic dropdown ordering,
 - clickable slider value editing.
@@ -18,10 +21,12 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 | Need | LibSettingsBuilder |
 |---|---|
 | Standard settings pages | `RegisterFromTable(...)` |
-| Fine-grained control | imperative `SB.Checkbox(...)`, `SB.Slider(...)`, etc. |
+| Fine-grained control | imperative `SB.Checkbox(...)`, `SB.Slider(...)`, `SB.Input(...)`, etc. |
 | Existing AceDB profiles | `PathAdapter(...)` |
 | Custom storage | handler mode with `get` / `set` / `key` |
+| Text entry / numeric ID fields | `SB.Input(...)` or `type = "input"` |
 | Reusable settings groups | border, font override, positioning composites |
+| XML-backed bespoke widgets | `SB.Custom(...)` |
 | Custom settings pages | `CreateCanvasLayout(...)` |
 
 ## Quick start
@@ -70,6 +75,87 @@ SB.RegisterFromTable({
 
 SB.RegisterCategories()
 ```
+
+## Supported `RegisterFromTable` types
+
+The table API understands both AceConfig-style aliases and library-specific row types.
+
+| Type | Meaning |
+|---|---|
+| `toggle` | Alias for a checkbox proxy setting |
+| `range` | Alias for a slider proxy setting |
+| `select` | Alias for a dropdown proxy setting |
+| `input` | Built-in text input row with optional preview / debounce support |
+| `color` | Color swatch proxy setting |
+| `execute` | Alias for a button row |
+| `header` | Blizzard-style section header |
+| `description` | Alias for a subheader row |
+| `info` | Left-label / right-value informational row |
+| `canvas` | Embedded frame row for canvas content |
+| `custom` | Proxy setting backed by a custom XML template |
+| `colorList` | Expands `defs` into multiple color swatches |
+| `toggleList` | Expands `defs` into multiple checkboxes |
+| `border` | Composite group for border enable / width / color |
+| `fontOverride` | Composite group for override toggle, font picker, and size slider |
+| `heightOverride` | Composite slider with nil/zero transforms |
+
+## Input rows
+
+`input` is the newest built-in control type. It is intended for cases where you want a normal settings row layout, but need text entry instead of a dropdown or slider.
+
+Supported `input` spec fields include the standard binding/modifier fields plus:
+
+- `numeric = true` — sets the edit box to numeric-only mode.
+- `maxLetters` — limits input length.
+- `width` — overrides the edit box width (default `140`).
+- `debounce` — delays preview refresh by N seconds.
+- `resolveText(value, setting, frame)` — returns the preview text shown under the edit box.
+- `watch = { ... }` — names/paths of sibling settings that should force the preview to refresh.
+- `watchVariables = { ... }` — direct proxy-setting variable names to watch.
+- `onTextChanged(text, setting, frame)` — optional hook fired after the new text is written.
+
+Example:
+
+```lua
+spellId = {
+    type = "input",
+    name = "Spell ID",
+    key = "draftSpellId",
+    numeric = true,
+    maxLetters = 10,
+    debounce = 1,
+    get = function()
+        return draft.spellIdText
+    end,
+    set = function(value)
+        draft.spellIdText = value or ""
+    end,
+    resolveText = function(value)
+        local id = tonumber(value)
+        return id and C_Spell.GetSpellName(id) or nil
+    end,
+}
+```
+
+## Implementation notes
+
+The library has three main implementation paths:
+
+- **Proxy controls** — `checkbox`, `slider`, `dropdown`, `color`, `input`, and `custom` all go through the same proxy-setting pipeline. That means path mode and handler mode work consistently across them.
+- **Layout rows** — `header`, `subheader`, `info`, `button`, and `canvas` are initializer/layout helpers rather than persisted settings.
+- **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `toggleList` expand into multiple child controls.
+
+`input` specifically is implemented as a built-in custom list row using `SettingsListElementTemplate`, with an `InputBoxTemplate` edit box anchored in the standard left-label / right-control layout. It does **not** need a separate XML template the way `custom` controls do.
+
+Under the hood, an input row:
+
+1. creates a normal proxy setting via `Settings.RegisterProxySetting`,
+2. writes the current edit-box text back through that setting on `OnTextChanged`,
+3. optionally debounces preview work through `C_Timer.NewTimer`,
+4. refreshes the preview immediately when watched settings change via callback handles, and
+5. reuses the same enabled / hidden / parent modifier system as the other built-in controls.
+
+That keeps `input` aligned with the rest of the builder instead of turning it into a one-off control with different binding behavior.
 
 ## Documentation
 

@@ -48,7 +48,25 @@ The library integrates with Blizzard's Settings UI and installs a few global hoo
 - scrollable dropdowns,
 - clickable slider value editing.
 
+When you use `input` rows with `debounce` / `resolveText`, the library also uses callback handles and `C_Timer.NewTimer` to keep previews in sync.
+
 Those hooks are part of the library's behavior and should be considered when debugging conflicts with heavily customized Settings UI code.
+
+## Built-in controls vs custom templates
+
+Most library features are available with no extra XML:
+
+- proxy controls like `checkbox`, `slider`, `dropdown`, `color`, and `input`,
+- layout rows like `header`, `subheader`, `info`, `button`, and `canvas`,
+- composite builders like `border`, `fontOverride`, and `heightOverride`.
+
+`input` is a built-in row type implemented entirely in Lua on top of `SettingsListElementTemplate` plus a runtime-created `InputBoxTemplate` edit box.
+
+Only `SB.Custom(...)` requires you to supply your own template. In that case:
+
+1. define the template in XML,
+2. load that XML from your TOC before registering categories, and
+3. pass the template name through `spec.template`.
 
 ## Canvas layout compatibility
 

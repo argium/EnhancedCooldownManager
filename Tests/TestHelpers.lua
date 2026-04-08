@@ -100,17 +100,30 @@ local function makeInitializer(setting)
 end
 
 --- Create a minimal stub setting returned by Settings.RegisterProxySetting.
-local function makeSetting(getter, setter, default, name)
-    return {
-        GetValue = function()
-            return getter()
-        end,
-        SetValue = function(_, value)
-            setter(value)
-        end,
+local function makeSetting(getter, setter, default, name, variable)
+    local setting = {
         _default = default,
+        _lsbCallbacks = {},
+        _lsbVariable = variable,
         _name = name,
     }
+
+    function setting:GetValue()
+        return getter()
+    end
+
+    function setting:_lsbNotifyValueChanged(value)
+        for _, handle in ipairs(self._lsbCallbacks) do
+            handle.callback(handle.owner or self, value, self)
+        end
+    end
+
+    function setting:SetValue(value)
+        setter(value)
+        self:_lsbNotifyValueChanged(self:GetValue())
+    end
+
+    return setting
 end
 
 --- Setup a minimal LibStub stub for tests.
@@ -202,6 +215,8 @@ function TestHelpers.SetupSettingsStubs()
         return layout
     end
 
+    local proxySettingsByVariable = {}
+
     _G.Settings = {
         VarType = { Boolean = "boolean", Number = "number", String = "string" },
 
@@ -267,8 +282,10 @@ function TestHelpers.SetupSettingsStubs()
             return init
         end,
 
-        RegisterProxySetting = function(_, _, _, name, default, getter, setter)
-            return makeSetting(getter, setter, default, name)
+        RegisterProxySetting = function(_, variable, _, name, default, getter, setter)
+            local setting = makeSetting(getter, setter, default, name, variable)
+            proxySettingsByVariable[variable] = setting
+            return setting
         end,
 
         CreateCheckbox = function(cat, setting)
@@ -307,9 +324,25 @@ function TestHelpers.SetupSettingsStubs()
                     self._handles[#self._handles + 1] = handle
                 end,
                 SetOnValueChangedCallback = function(self, variable, callback, owner)
-                    self:AddHandle({ variable = variable, callback = callback, owner = owner })
+                    local handle = { variable = variable, callback = callback, owner = owner }
+                    self:AddHandle(handle)
+                    local setting = proxySettingsByVariable[variable]
+                    if setting then
+                        handle.setting = setting
+                        setting._lsbCallbacks[#setting._lsbCallbacks + 1] = handle
+                    end
                 end,
                 Unregister = function(self)
+                    for _, handle in ipairs(self._handles) do
+                        local setting = handle.setting
+                        if setting and setting._lsbCallbacks then
+                            for i = #setting._lsbCallbacks, 1, -1 do
+                                if setting._lsbCallbacks[i] == handle then
+                                    table.remove(setting._lsbCallbacks, i)
+                                end
+                            end
+                        end
+                    end
                     self._handles = {}
                     self._unregistered = true
                 end,
@@ -809,6 +842,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "canaccessvalue",
     "canaccesstable",
     "time",
+    "C_Timer",
     "C_PartyInfo",
     "IsInInstance",
     "GetInventoryItemTexture",
@@ -867,6 +901,13 @@ function TestHelpers.SetupOptionsGlobals()
         GetItemIconByID = function()
             return nil
         end,
+        GetItemNameByID = function()
+            return nil
+        end,
+        DoesItemExistByID = function()
+            return true
+        end,
+        RequestLoadItemDataByID = function() end,
     }
     _G.C_Spell = {
         GetSpellName = function()
@@ -885,6 +926,21 @@ function TestHelpers.SetupOptionsGlobals()
     _G.time = function()
         return 1000
     end
+    local pendingTimers = {}
+    TestHelpers._pendingCTimers = pendingTimers
+    _G.C_Timer = {
+        After = function(delay, callback)
+            pendingTimers[#pendingTimers + 1] = { delay = delay, callback = callback }
+        end,
+        NewTimer = function(delay, callback)
+            local timer = { delay = delay, callback = callback, cancelled = false }
+            function timer:Cancel()
+                self.cancelled = true
+            end
+            pendingTimers[#pendingTimers + 1] = timer
+            return timer
+        end,
+    }
     _G.C_AddOns = {
         GetAddOnMetadata = function()
             return nil
@@ -1145,6 +1201,23 @@ function TestHelpers.SetupOptionsGlobals()
             SoulShards = 7,
         },
     }
+end
+
+function TestHelpers.RunNextTimer()
+    local pending = TestHelpers._pendingCTimers or {}
+    while #pending > 0 do
+        local timer = table.remove(pending, 1)
+        if not timer.cancelled and timer.callback then
+            timer.callback()
+            return true
+        end
+    end
+    return false
+end
+
+function TestHelpers.RunAllTimers()
+    while TestHelpers.RunNextTimer() do
+    end
 end
 
 --- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.

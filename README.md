@@ -1,8 +1,8 @@
 # Enhanced Cooldown Manager by Argium
 
-Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.**
+Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.** It adds a mana/power bar and resource bar, extra icons for potions, and supports per-spell color and customisation for aura bars. Modular design allow each part to be attached to the CDM or detached and freely placed.
 
-Made with ❤️, with little features you didn't know you needed and won't want to live without.
+Made with ❤️, with little features you won't want to live without.
 
 ##  Features
 
@@ -67,30 +67,6 @@ Use the layout mode that fits your setup.
 
 - Use `/ecm` in game to open options.
 - You can also open it from the AddOn compartment menu near the minimap.
-
-## Module support by class
-
-Legend: 🟢 supported
-
-| Class | Power Bar | Resource Bar |
-| --- | --- | --- |
-| <span style="color:#C41E3A;">Death Knight</span> | 🟢 | 🟢 Runes |
-| <span style="color:#A330C9;">Demon Hunter</span> | 🟢 | 🟢 Vengeance (Soul Fragments) <br>🟢 Devourer (Void Fragments) |
-| <span style="color:#FF7C0A;">Druid</span> | 🟢 Balance/Restoration (Mana) <br>🟢 Feral (Energy) <br>🟢 Guardian (Rage) | 🟢 Feral (Combo Points) |
-| <span style="color:#33937F;">Evoker</span> | 🟢 Preservation (Mana) | 🟢 Essence |
-| <span style="color:#AAD372;">Hunter</span> | 🟢 | |
-| <span style="color:#3FC7EB;">Mage</span> | 🟢 | 🟢 Arcane (Charges), Frost (Icicles) |
-| <span style="color:#00FF98;">Monk</span> | 🟢 Mistweaver (Mana) <br>🟢 Brewmaster (Energy)<br>🟢 Windwalker (Energy) | 🟢 Windwalker (Chi) |
-| <span style="color:#F48CBA;">Paladin</span> | 🟢 Holy (Mana) | 🟢 Holy Power|
-| <span style="color:#FFFFFF;">Priest</span> | 🟢 | |
-| <span style="color:#FFF468;">Rogue</span> | 🟢 | 🟢 Combo points|
-| <span style="color:#0070DD;">Shaman</span> | 🟢 | 🟢 Enhancement (Maelstrom Weap.) |
-| <span style="color:#8788EE;">Warlock</span> | 🟢 | 🟢 Soul shards |
-| <span style="color:#C69B6D;">Warrior</span> | 🟢 | |
-
-## Troubleshooting
-
-If you run into a problem, enable debug tracing with the command `/ecm debug on` and reload your UI. Include any output when reporting an issue.
 
 ## License
 

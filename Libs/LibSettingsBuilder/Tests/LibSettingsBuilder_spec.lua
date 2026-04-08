@@ -9,7 +9,17 @@ describe("LibSettingsBuilder", function()
     local originalGlobals
     local addonNS
     local layoutUpdateCalls
+    local pendingTimers
     local SB
+
+    local function runPendingTimers()
+        while #pendingTimers > 0 do
+            local timer = table.remove(pendingTimers, 1)
+            if not timer.cancelled and timer.callback then
+                timer.callback()
+            end
+        end
+    end
 
     local function createSB2(varPrefix, categoryName)
         local LSB2 = LibStub("LibSettingsBuilder-1.0")
@@ -90,8 +100,20 @@ describe("LibSettingsBuilder", function()
             return self._scripts[event]
         end
         frame.SetAutoFocus = function() end
+        frame.SetEnabled = function(self, enabled)
+            self._enabled = enabled
+        end
+        frame.EnableMouse = function(self, enabled)
+            self._mouseEnabled = enabled
+        end
+        frame.SetMaxLetters = function(self, value)
+            self._maxLetters = value
+        end
         frame.SetNumeric = function() end
         frame.SetJustifyH = function() end
+        frame.SetJustifyV = function() end
+        frame.SetWordWrap = function() end
+        frame.SetTextInsets = function() end
         frame.SetSize = function(self, width, height)
             self:SetWidth(width)
             self:SetHeight(height)
@@ -164,6 +186,7 @@ describe("LibSettingsBuilder", function()
             "SettingsListElementMixin",
             "SettingsDropdownControlMixin",
             "SettingsSliderControlMixin",
+            "C_Timer",
             "GameFontHighlight",
             "GameFontHighlightSmall",
             "GameFontNormal",
@@ -176,14 +199,30 @@ describe("LibSettingsBuilder", function()
 
     before_each(function()
         layoutUpdateCalls = 0
+        pendingTimers = {}
 
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
+        _G.CreateFrame = function(_, _, _, template)
+            local frame = createScriptableFrame()
+            frame._template = template
+            return frame
+        end
 
         _G.ECM_DeepEquals = TestHelpers.deepEquals
         _G.GameFontHighlight = "GameFontHighlight"
         _G.GameFontHighlightSmall = "GameFontHighlightSmall"
         _G.GameFontNormal = "GameFontNormal"
+        _G.C_Timer = {
+            NewTimer = function(_, callback)
+                local timer = { callback = callback, cancelled = false }
+                function timer:Cancel()
+                    self.cancelled = true
+                end
+                pendingTimers[#pendingTimers + 1] = timer
+                return timer
+            end,
+        }
 
         _G.UnitClass = function()
             return "Warrior", "WARRIOR", 1
@@ -613,6 +652,88 @@ describe("LibSettingsBuilder", function()
         })
         assert.is_not_nil(init._shownPredicates)
         assert.are.equal(1, #init._shownPredicates)
+    end)
+
+    it("Input creates an input row initializer and writes string values", function()
+        local init, setting = SB.Input({
+            path = "global.font",
+            name = "Entry ID",
+            layout = false,
+        })
+
+        assert.are.equal(SB.INPUTROW_TEMPLATE, init._template)
+        assert.are.equal("Global Font", setting:GetValue())
+
+        setting:SetValue("12345")
+        assert.are.equal("12345", addonNS.Addon.db.profile.global.font)
+    end)
+
+    it("Input rows debounce preview text and refresh when watched settings change", function()
+        local currentKind = "spell"
+        local draftId = ""
+        local _, kindSetting = SB.Dropdown({
+            get = function()
+                return currentKind
+            end,
+            set = function(value)
+                currentKind = value
+            end,
+            key = "kind",
+            default = "spell",
+            name = "Kind",
+            values = { spell = "Spell", item = "Item" },
+            layout = false,
+        })
+
+        local inputInit = SB.Input({
+            get = function()
+                return draftId
+            end,
+            set = function(value)
+                draftId = value
+            end,
+            key = "draftId",
+            default = "",
+            name = "Entry ID",
+            debounce = 1,
+            layout = false,
+            resolveText = function(text)
+                if not text or text == "" then
+                    return nil
+                end
+                return currentKind .. ":" .. text
+            end,
+            watch = { "kind" },
+        })
+
+        local frame = createScriptableFrame()
+        frame.Text = createScriptableFrame()
+        frame.NewFeature = createScriptableFrame()
+        frame.CreateFontString = function()
+            local fontString = createScriptableFrame()
+            fontString.SetJustifyH = function() end
+            fontString.SetJustifyV = function() end
+            fontString.SetWordWrap = function() end
+            return fontString
+        end
+        frame.SetShown = function(self, shown)
+            self._shown = shown
+        end
+
+        inputInit:InitFrame(frame)
+
+        local editBox = frame._lsbInputEditBox
+        editBox:SetText("123")
+        editBox:GetScript("OnTextChanged")(editBox)
+
+        assert.are.equal("123", draftId)
+        assert.are.equal("", frame._lsbInputPreview:GetText())
+
+        runPendingTimers()
+        assert.are.equal("spell:123", frame._lsbInputPreview:GetText())
+
+        kindSetting:SetValue("item")
+        assert.are.equal("item:123", frame._lsbInputPreview:GetText())
     end)
 
     it("custom list rows initialize safely without preexisting cbrHandles", function()

@@ -269,6 +269,63 @@ describe("ExtraIconsOptions data helpers", function()
         end)
     end)
 
+    describe("_parseSingleId", function()
+        it("parses a single integer ID", function()
+            assert.are.equal(12345, ExtraIconsOptions._parseSingleId("12345"))
+        end)
+
+        it("returns nil for empty or invalid input", function()
+            assert.is_nil(ExtraIconsOptions._parseSingleId(""))
+            assert.is_nil(ExtraIconsOptions._parseSingleId("abc"))
+            assert.is_nil(ExtraIconsOptions._parseSingleId("1.5"))
+            assert.is_nil(ExtraIconsOptions._parseSingleId("-4"))
+        end)
+    end)
+
+    describe("_resolveDraftEntryName", function()
+        local savedCSpell, savedCItem
+
+        before_each(function()
+            savedCSpell = _G.C_Spell
+            savedCItem = _G.C_Item
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+            }
+            _G.C_Item = {
+                DoesItemExistByID = function(itemId)
+                    return itemId ~= 99999
+                end,
+                GetItemNameByID = function(itemId)
+                    return itemId == 777 and "Test Item" or nil
+                end,
+                RequestLoadItemDataByID = function() end,
+            }
+        end)
+
+        after_each(function()
+            _G.C_Spell = savedCSpell
+            _G.C_Item = savedCItem
+        end)
+
+        it("resolves spell names for valid spell IDs", function()
+            assert.are.equal("Test Spell", ExtraIconsOptions._resolveDraftEntryName("spell", "12345"))
+        end)
+
+        it("returns nil for invalid spell IDs", function()
+            assert.is_nil(ExtraIconsOptions._resolveDraftEntryName("spell", "99999"))
+        end)
+
+        it("returns loading text for valid uncached items", function()
+            assert.are.equal(ns.L["EXTRA_ICONS_ITEM_LOADING"], ExtraIconsOptions._resolveDraftEntryName("item", "12345"))
+        end)
+
+        it("returns nil for invalid items", function()
+            assert.is_nil(ExtraIconsOptions._resolveDraftEntryName("item", "99999"))
+        end)
+    end)
+
     describe("_otherViewer", function()
         it("utility returns main", function()
             assert.are.equal("main", ExtraIconsOptions._otherViewer("utility"))
@@ -446,20 +503,72 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal(ns.L["MAIN_VIEWER_ICONS"], vc._viewerHeaders.main._title:GetText())
         end)
 
-        it("registers native quick-add buttons and no custom add form fields", function()
+        it("registers the native add form above the viewer canvas", function()
             assert.is_not_nil(capturedTable)
-            assert.is_nil(capturedTable.args.addHeader)
-            assert.is_nil(capturedTable.args.addType)
-            assert.is_nil(capturedTable.args.addViewer)
-            assert.is_nil(capturedTable.args.addForm)
-            assert.is_nil(capturedTable.args.defaults)
+            assert.are.equal("header", capturedTable.args.addHeader.type)
+            assert.are.equal("select", capturedTable.args.addType.type)
+            assert.are.equal("select", capturedTable.args.addViewer.type)
+            assert.are.equal("input", capturedTable.args.addId.type)
+            assert.are.equal("button", capturedTable.args.addEntry.type)
             assert.is_not_nil(capturedTable.args.quickAdd_trinket1)
             assert.are.equal("button", capturedTable.args.quickAdd_trinket1.type)
             assert.are.equal("button", capturedTable.args.quickAddRacial.type)
             assert.are.equal("canvas", capturedTable.args.viewers.type)
+            assert.is_true(capturedTable.args.addHeader.order < capturedTable.args.viewers.order)
+            assert.is_true(capturedTable.args.addType.order < capturedTable.args.viewers.order)
+            assert.is_true(capturedTable.args.addViewer.order < capturedTable.args.viewers.order)
+            assert.is_true(capturedTable.args.addId.order < capturedTable.args.viewers.order)
+            assert.is_true(capturedTable.args.addEntry.order < capturedTable.args.viewers.order)
             assert.is_true(capturedTable.args.viewers.order < capturedTable.args.presetsHeader.order)
             assert.is_true(capturedTable.args.viewers.order < capturedTable.args.quickAdd_trinket1.order)
             assert.is_true(capturedTable.args.viewers.order < capturedTable.args.quickAddRacial.order)
+        end)
+
+        it("wires the add form to ephemeral draft state and single-ID preview resolution", function()
+            local opts = ns.ExtraIconsOptions
+
+            assert.are.equal("spell", capturedTable.args.addType.get())
+            assert.are.equal("utility", capturedTable.args.addViewer.get())
+            assert.are.equal("", capturedTable.args.addId.get())
+            assert.is_true(capturedTable.args.addEntry.disabled())
+
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+
+            capturedTable.args.addId.set("12345")
+
+            assert.are.equal("12345", opts._formState.idText)
+            assert.are.equal("Test Spell", capturedTable.args.addId.resolveText("12345"))
+            assert.is_false(capturedTable.args.addEntry.disabled())
+        end)
+
+        it("adds a custom spell entry and clears the draft ID", function()
+            local opts = ns.ExtraIconsOptions
+
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+
+            capturedTable.args.addType.set("spell")
+            capturedTable.args.addViewer.set("main")
+            capturedTable.args.addId.set("12345")
+            capturedTable.args.addEntry.onClick()
+
+            assert.are.equal("", opts._formState.idText)
+            assert.are.equal(1, #profile.extraIcons.viewers.main)
+            assert.are.equal("spell", profile.extraIcons.viewers.main[1].kind)
+            assert.are.same({ 12345 }, profile.extraIcons.viewers.main[1].ids)
         end)
 
         it("hides the quick-add heading when no quick-add entries are visible", function()

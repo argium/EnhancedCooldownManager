@@ -15,6 +15,7 @@ end
 lib.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
 lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
 lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
+lib.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
 lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
@@ -84,7 +85,15 @@ local function installPageLifecycleHooks()
     end)
 end
 
-local listElementKeysToHide = { "_lsbSubheaderTitle", "_lsbInfoTitle", "_lsbInfoValue", "_lsbCanvas" }
+local listElementKeysToHide = {
+    "_lsbSubheaderTitle",
+    "_lsbInfoTitle",
+    "_lsbInfoValue",
+    "_lsbCanvas",
+    "_lsbInputTitle",
+    "_lsbInputEditBox",
+    "_lsbInputPreview",
+}
 
 local function copyMixin(target, source)
     for key, value in pairs(source) do
@@ -107,6 +116,21 @@ end
 local function getInitializerData(initializer)
     if initializer and initializer.GetData then
         return initializer:GetData()
+    end
+end
+
+local function getSettingVariable(setting)
+    return setting and (setting._lsbVariable or setting._variable)
+end
+
+local function registerValueChangedCallback(frame, variable, callback, owner)
+    if not variable then
+        return
+    end
+
+    local handles = frame and frame.cbrHandles
+    if handles and handles.SetOnValueChangedCallback then
+        handles:SetOnValueChangedCallback(variable, callback, owner or frame)
     end
 end
 
@@ -264,6 +288,230 @@ local function applyInfoRowFrame(frame, data)
     value:Show()
 end
 
+local function ensureInputRowWidgets(frame)
+    if frame._lsbInputTitle and frame._lsbInputEditBox and frame._lsbInputPreview then
+        return frame._lsbInputTitle, frame._lsbInputEditBox, frame._lsbInputPreview
+    end
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetJustifyH("LEFT")
+    title:SetWordWrap(false)
+
+    local editBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+    editBox:SetAutoFocus(false)
+
+    local preview = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    preview:SetJustifyH("LEFT")
+    preview:SetJustifyV("TOP")
+    preview:SetWordWrap(false)
+    preview:Hide()
+
+    frame._lsbInputTitle = title
+    frame._lsbInputEditBox = editBox
+    frame._lsbInputPreview = preview
+    frame.Title = title
+    frame.EditBox = editBox
+    frame.Preview = preview
+
+    return title, editBox, preview
+end
+
+local function setInputPreviewText(frame, text)
+    local preview = frame._lsbInputPreview
+    if not preview then
+        return
+    end
+
+    text = text and tostring(text) or ""
+    preview:SetText(text)
+    if text ~= "" then
+        preview:Show()
+    else
+        preview:Hide()
+    end
+end
+
+local function cancelInputPreviewTimer(frame)
+    local timer = frame and frame._lsbInputPreviewTimer
+    if timer and timer.Cancel then
+        timer:Cancel()
+    end
+    if frame then
+        frame._lsbInputPreviewTimer = nil
+    end
+end
+
+local function syncInputRowText(frame, value)
+    local editBox = frame and frame._lsbInputEditBox
+    if not editBox then
+        return
+    end
+
+    value = value == nil and "" or tostring(value)
+    if editBox.GetText and editBox:GetText() == value then
+        return
+    end
+
+    frame._lsbUpdatingInputText = true
+    editBox:SetText(value)
+    frame._lsbUpdatingInputText = nil
+end
+
+local function resolveInputPreview(frame)
+    local data = frame and frame._lsbInputData
+    local setting = frame and frame._lsbInputSetting
+    if not data or not data.resolveText then
+        setInputPreviewText(frame, nil)
+        return
+    end
+
+    local value = setting and setting.GetValue and setting:GetValue() or nil
+    setInputPreviewText(frame, data.resolveText(value, setting, frame))
+end
+
+local function scheduleInputPreview(frame, immediate)
+    cancelInputPreviewTimer(frame)
+
+    local data = frame and frame._lsbInputData
+    if not data or not data.resolveText then
+        setInputPreviewText(frame, nil)
+        return
+    end
+
+    local delay = immediate and 0 or (data.debounce or 0)
+    if delay > 0 and C_Timer and C_Timer.NewTimer then
+        frame._lsbInputPreviewTimer = C_Timer.NewTimer(delay, function()
+            frame._lsbInputPreviewTimer = nil
+            resolveInputPreview(frame)
+        end)
+        return
+    end
+
+    resolveInputPreview(frame)
+end
+
+local function applyInputRowEnabledState(frame, enabled)
+    if not frame then
+        return
+    end
+
+    if frame.SetAlpha then
+        frame:SetAlpha(enabled and 1 or 0.5)
+    end
+
+    local editBox = frame._lsbInputEditBox
+    if not editBox then
+        return
+    end
+
+    if editBox.SetEnabled then
+        editBox:SetEnabled(enabled)
+    end
+    if editBox.EnableMouse then
+        editBox:EnableMouse(enabled)
+    end
+end
+
+local function applyInputRowFrame(frame, data)
+    local title, editBox, preview = ensureInputRowWidgets(frame)
+    local hasPreview = data.resolveText ~= nil
+
+    title:ClearAllPoints()
+    title:SetPoint(hasPreview and "TOPLEFT" or "LEFT", frame, hasPreview and "TOPLEFT" or "LEFT", 37, hasPreview and -6 or 0)
+    title:SetPoint("RIGHT", frame, "CENTER", -85, 0)
+    title:SetJustifyV(hasPreview and "TOP" or "MIDDLE")
+    title:SetText(data.name)
+    title:Show()
+
+    editBox:ClearAllPoints()
+    editBox:SetPoint(hasPreview and "TOPLEFT" or "LEFT", frame, "CENTER", -80, hasPreview and -2 or 0)
+    editBox:SetSize(data.width or 140, 20)
+    if editBox.SetNumeric then
+        editBox:SetNumeric(data.numeric == true)
+    end
+    if editBox.SetMaxLetters and data.maxLetters then
+        editBox:SetMaxLetters(data.maxLetters)
+    end
+    if editBox.SetTextInsets then
+        editBox:SetTextInsets(6, 6, 0, 0)
+    end
+    editBox:Show()
+
+    preview:ClearAllPoints()
+    preview:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -3)
+    preview:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    if hasPreview then
+        preview:Show()
+    else
+        preview:Hide()
+    end
+
+    frame._lsbInputData = data
+    frame._lsbInputSetting = data.setting
+    editBox._lsbOwnerFrame = frame
+
+    if not editBox._lsbInputScriptsBound then
+        editBox:SetScript("OnTextChanged", function(self)
+            local owner = self._lsbOwnerFrame
+            if not owner or owner._lsbUpdatingInputText then
+                return
+            end
+
+            local setting = owner._lsbInputSetting
+            local text = self:GetText() or ""
+            if setting and setting.SetValue then
+                setting:SetValue(text)
+            end
+
+            local inputData = owner._lsbInputData
+            if inputData and inputData.onTextChanged then
+                inputData.onTextChanged(text, setting, owner)
+            end
+
+            scheduleInputPreview(owner, false)
+        end)
+        editBox:SetScript("OnEnterPressed", function(self)
+            if self.ClearFocus then
+                self:ClearFocus()
+            end
+        end)
+        editBox:SetScript("OnEscapePressed", function(self)
+            local owner = self._lsbOwnerFrame
+            if owner then
+                local setting = owner._lsbInputSetting
+                local value = setting and setting.GetValue and setting:GetValue() or ""
+                syncInputRowText(owner, value)
+                scheduleInputPreview(owner, true)
+            end
+            if self.ClearFocus then
+                self:ClearFocus()
+            end
+        end)
+        editBox._lsbInputScriptsBound = true
+    end
+
+    syncInputRowText(frame, data.setting and data.setting.GetValue and data.setting:GetValue() or "")
+
+    local ownVariable = data.settingVariable
+    registerValueChangedCallback(frame, ownVariable, function()
+        local currentSetting = frame._lsbInputSetting
+        local value = currentSetting and currentSetting.GetValue and currentSetting:GetValue() or ""
+        syncInputRowText(frame, value)
+    end, frame)
+
+    if data.watchVariables then
+        for _, variable in ipairs(data.watchVariables) do
+            if variable ~= ownVariable then
+                registerValueChangedCallback(frame, variable, function()
+                    scheduleInputPreview(frame, true)
+                end, frame)
+            end
+        end
+    end
+
+    scheduleInputPreview(frame, true)
+end
+
 local function applyEmbedCanvasFrame(frame, data, initializer)
     local canvas = data.canvas
     if not canvas then
@@ -303,6 +551,22 @@ local function initializerShouldShow(initializer)
     return true
 end
 
+local function initializerIsEnabled(initializer)
+    if initializer and initializer.EvaluateModifyPredicates then
+        return initializer:EvaluateModifyPredicates()
+    end
+
+    if initializer and initializer._modifyPredicates then
+        for _, predicate in ipairs(initializer._modifyPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
+    return true
+end
+
 local function createCustomListRowInitializer(template, data, extent, initFrame)
     local initializer = Settings.CreateElementInitializer(template, data)
     setInitializerExtent(initializer, extent)
@@ -325,6 +589,9 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
             frame.EvaluateState = function(control)
                 local currentInitializer = control.GetElementData and control:GetElementData()
                     or control._lsbInitializer
+                if currentInitializer and currentInitializer.SetEnabled then
+                    currentInitializer:SetEnabled(initializerIsEnabled(currentInitializer))
+                end
                 control:SetShown(initializerShouldShow(currentInitializer))
             end
             frame._lsbHasCustomEvaluateState = true
@@ -897,6 +1164,7 @@ function lib:New(config)
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
     SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
     SB.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
+    SB.INPUTROW_TEMPLATE = lib.INPUTROW_TEMPLATE
     SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
     SB.CreateHeaderTitle = lib.CreateHeaderTitle
     SB.CreateSubheaderTitle = lib.CreateSubheaderTitle
@@ -911,9 +1179,13 @@ function lib:New(config)
 
     local adapter = config.pathAdapter
 
+    local function makeVarNameFromIdentifier(identifier)
+        return config.varPrefix .. "_" .. tostring(identifier):gsub("%.", "_")
+    end
+
     local function makeVarName(spec)
         local id = spec.key or spec.path
-        return config.varPrefix .. "_" .. id:gsub("%.", "_")
+        return makeVarNameFromIdentifier(id)
     end
 
     local function resolveCategory(spec)
@@ -1011,6 +1283,7 @@ function lib:New(config)
             setter
         )
         setting.SetValueNoCallback = setValueNoCallback
+        setting._lsbVariable = variable
 
         return setting, cat
     end
@@ -1075,6 +1348,16 @@ function lib:New(config)
         slider = { min = true, max = true, step = true, formatter = true },
         dropdown = { values = true, scrollHeight = true },
         color = {},
+        input = {
+            debounce = true,
+            maxLetters = true,
+            numeric = true,
+            onTextChanged = true,
+            resolveText = true,
+            watch = true,
+            watchVariables = true,
+            width = true,
+        },
         custom = { template = true, varType = true },
     }
 
@@ -1437,6 +1720,79 @@ function lib:New(config)
         return initializer, setting
     end
 
+    function SB.Input(spec)
+        validateSpecFields("input", spec)
+
+        local setting, cat = makeProxySetting(spec, Settings.VarType.String, "")
+        local data = {
+            debounce = spec.debounce,
+            maxLetters = spec.maxLetters,
+            name = spec.name,
+            numeric = spec.numeric,
+            onTextChanged = spec.onTextChanged,
+            resolveText = spec.resolveText,
+            setting = setting,
+            settingVariable = getSettingVariable(setting),
+            tooltip = spec.tooltip,
+            width = spec.width,
+        }
+
+        local watchVariables = {}
+        if spec.watch then
+            for _, identifier in ipairs(spec.watch) do
+                watchVariables[#watchVariables + 1] = makeVarNameFromIdentifier(identifier)
+            end
+        end
+        if spec.watchVariables then
+            for _, variable in ipairs(spec.watchVariables) do
+                watchVariables[#watchVariables + 1] = variable
+            end
+        end
+        if #watchVariables > 0 then
+            data.watchVariables = watchVariables
+        end
+
+        local extent = spec.resolveText and 46 or 26
+        local initializer = createCustomListRowInitializer(lib.INPUTROW_TEMPLATE, data, extent, applyInputRowFrame)
+        local originalInitFrame = initializer.InitFrame
+        local originalResetter = initializer.Resetter
+
+        initializer._lsbEnabled = true
+        initializer.SetEnabled = function(controlInitializer, enabled)
+            controlInitializer._lsbEnabled = enabled
+            if controlInitializer._lsbActiveFrame then
+                applyInputRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+            end
+        end
+
+        initializer.InitFrame = function(controlInitializer, frame)
+            controlInitializer._lsbActiveFrame = frame
+            originalInitFrame(controlInitializer, frame)
+            applyInputRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+        end
+
+        initializer.Resetter = function(controlInitializer, frame)
+            cancelInputPreviewTimer(frame)
+            if frame and frame._lsbInputEditBox then
+                if frame._lsbInputEditBox.ClearFocus then
+                    frame._lsbInputEditBox:ClearFocus()
+                end
+                frame._lsbInputEditBox._lsbOwnerFrame = nil
+            end
+            frame._lsbInputData = nil
+            frame._lsbInputSetting = nil
+            if controlInitializer._lsbActiveFrame == frame then
+                controlInitializer._lsbActiveFrame = nil
+            end
+            originalResetter(controlInitializer, frame)
+        end
+
+        Settings.RegisterInitializer(cat, initializer)
+        applyModifiers(initializer, spec)
+
+        return initializer, setting
+    end
+
     --- Creates a proxy setting backed by a custom frame template.
     --- The template's Init receives initializer data containing {setting, name, tooltip}.
     function SB.Custom(spec)
@@ -1463,6 +1819,7 @@ function lib:New(config)
         slider = "Slider",
         dropdown = "Dropdown",
         color = "Color",
+        input = "Input",
         custom = "Custom",
     }
 

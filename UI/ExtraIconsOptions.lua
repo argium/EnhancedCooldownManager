@@ -175,6 +175,54 @@ function ExtraIconsOptions._parseIds(text)
     return #ids > 0 and ids or nil
 end
 
+--- Parse a single positive integer ID from a string.
+---@param text string|nil
+---@return number|nil
+function ExtraIconsOptions._parseSingleId(text)
+    if not text or text == "" then
+        return nil
+    end
+
+    local num = tonumber(text)
+    if not num or num <= 0 or num ~= math.floor(num) then
+        return nil
+    end
+
+    return num
+end
+
+--- Resolve a draft spell or item ID to a display name.
+---@param kind string
+---@param text string|nil
+---@return string|nil
+function ExtraIconsOptions._resolveDraftEntryName(kind, text)
+    local id = ExtraIconsOptions._parseSingleId(text)
+    if not id then
+        return nil
+    end
+
+    if kind == "spell" then
+        return C_Spell.GetSpellName(id)
+    end
+
+    if kind == "item" then
+        if not C_Item.DoesItemExistByID(id) then
+            return nil
+        end
+
+        local name = C_Item.GetItemNameByID(id)
+        if name then
+            return name
+        end
+
+        C_Item.RequestLoadItemDataByID(id)
+
+        return L["EXTRA_ICONS_ITEM_LOADING"]
+    end
+
+    return nil
+end
+
 --- Get the opposite viewer key.
 function ExtraIconsOptions._otherViewer(viewerKey)
     return viewerKey == "utility" and "main" or "utility"
@@ -343,8 +391,44 @@ function ExtraIconsOptions.RegisterSettings(SB)
         return getProfile().extraIcons.viewers
     end
 
+    ExtraIconsOptions._formState = ExtraIconsOptions._formState or {
+        kind = "spell",
+        viewer = "utility",
+        idText = "",
+    }
+    local formState = ExtraIconsOptions._formState
+
     local function scheduleUpdate()
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+    end
+
+    local function getResolvedDraftName()
+        return ExtraIconsOptions._resolveDraftEntryName(formState.kind, formState.idText)
+    end
+
+    local function canAddDraftEntry()
+        local id = ExtraIconsOptions._parseSingleId(formState.idText)
+        if not id then
+            return false
+        end
+
+        if formState.kind == "spell" then
+            return getResolvedDraftName() ~= nil
+        end
+
+        return true
+    end
+
+    local function addDraftEntry()
+        local id = ExtraIconsOptions._parseSingleId(formState.idText)
+        if not id or not canAddDraftEntry() then
+            return
+        end
+
+        ExtraIconsOptions._addCustomEntry(getProfile(), formState.viewer, formState.kind, { id })
+        formState.idText = ""
+        scheduleUpdate()
+        ExtraIconsOptions._refresh()
     end
 
     local function getPlayerRacialSpellId()
@@ -522,6 +606,15 @@ function ExtraIconsOptions.RegisterSettings(SB)
     --------------------------------------------------------------------
     -- Register via table
     --------------------------------------------------------------------
+    local addTypeValues = {
+        spell = L["ADD_SPELL"],
+        item = L["ADD_ITEM"],
+    }
+    local addViewerValues = {
+        utility = L["UTILITY_VIEWER"],
+        main = L["MAIN_VIEWER"],
+    }
+
     local args = {
         enabled = {
             type = "toggle",
@@ -534,11 +627,78 @@ function ExtraIconsOptions.RegisterSettings(SB)
                 handler(value)
             end,
         },
+        addHeader = {
+            type = "header",
+            name = L["ADD_NEW_HEADER"],
+            order = 10,
+        },
+        addType = {
+            type = "select",
+            name = L["ENTRY_TYPE"],
+            values = addTypeValues,
+            key = "addType",
+            default = formState.kind,
+            layout = false,
+            order = 11,
+            disabled = isDisabled,
+            get = function()
+                return formState.kind
+            end,
+            set = function(value)
+                formState.kind = value
+            end,
+        },
+        addViewer = {
+            type = "select",
+            name = L["ENTRY_VIEWER"],
+            values = addViewerValues,
+            key = "addViewer",
+            default = formState.viewer,
+            layout = false,
+            order = 12,
+            disabled = isDisabled,
+            get = function()
+                return formState.viewer
+            end,
+            set = function(value)
+                formState.viewer = value
+            end,
+        },
+        addId = {
+            type = "input",
+            name = L["ENTRY_ID"],
+            key = "addId",
+            default = formState.idText,
+            debounce = 1,
+            disabled = isDisabled,
+            layout = false,
+            maxLetters = 10,
+            numeric = true,
+            order = 13,
+            watch = { "addType" },
+            get = function()
+                return formState.idText
+            end,
+            set = function(value)
+                formState.idText = value or ""
+            end,
+            resolveText = function(text)
+                return ExtraIconsOptions._resolveDraftEntryName(formState.kind, text)
+            end,
+        },
+        addEntry = {
+            type = "button",
+            name = L["ADD_ENTRY"],
+            buttonText = L["ADD_ENTRY"],
+            disabled = function()
+                return isDisabled() or not canAddDraftEntry()
+            end,
+            layout = false,
+            onClick = addDraftEntry,
+            order = 14,
+        },
     }
 
-    -- Custom spell/item entry form intentionally omitted here.
-    -- LibSettingsBuilder does not provide a native text input control, and this
-    -- page must not recreate one with a canvas embed.
     for i, stackKey in ipairs(BUILTIN_STACK_ORDER) do
         local stack = BUILTIN_STACKS[stackKey]
         args["quickAdd_" .. stackKey] = {
@@ -557,7 +717,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
     end
 
     local racialSpellId = getPlayerRacialSpellId()
-    local racialName = racialSpellId and C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(racialSpellId) or nil
+    local racialName = racialSpellId and C_Spell.GetSpellName(racialSpellId) or nil
     args.quickAddRacial = {
         type = "button",
         name = racialName or "Racial",

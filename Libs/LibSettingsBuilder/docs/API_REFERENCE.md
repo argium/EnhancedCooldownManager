@@ -75,6 +75,7 @@ Common spec fields:
 - `getTransform`
 - `setTransform`
 - `onSet`
+- `layout`
 
 ### `SB.Checkbox(spec)`
 
@@ -104,12 +105,41 @@ Dropdown values are emitted in deterministic order to keep menus stable between 
 
 Reads and writes `{ r, g, b, a }` tables through a hex proxy value.
 
+### `SB.Input(spec)`
+
+Creates a text input row using the standard settings-row layout.
+
+Additional fields:
+
+- `numeric`
+- `maxLetters`
+- `width`
+- `debounce`
+- `resolveText(value, setting, frame)`
+- `watch`
+- `watchVariables`
+- `onTextChanged(text, setting, frame)`
+
+Notes:
+
+- the edit box writes through the same proxy-setting pipeline as the other built-in controls,
+- `resolveText` enables an optional preview line below the edit box,
+- `debounce` delays preview recomputation through `C_Timer.NewTimer`,
+- `watch` accepts sibling spec identifiers and resolves them to this builder's proxy-setting variables,
+- `watchVariables` accepts already-resolved proxy-setting variable names.
+
 ### `SB.Custom(spec)`
 
 Additional fields:
 
 - `template`
 - `varType`
+
+Notes:
+
+- use this for XML-backed widgets that are not covered by the built-in controls,
+- the template must already be loaded by the time you register settings,
+- unlike `input`, `custom` does not create its frame structure in Lua.
 
 ### `SB.Control(spec)`
 
@@ -122,7 +152,6 @@ Dispatches to the correct control factory using `spec.type`.
 - `SB.BorderGroup(borderPath[, spec])`
 - `SB.ColorPickerList(basePath, defs[, spec])`
 - `SB.CheckboxList(basePath, defs[, spec])`
-- `SB.PositioningGroup(configPath, spec)`
 
 ## Utility helpers
 
@@ -144,6 +173,7 @@ Supported standard types:
 - `checkbox` / `toggle`
 - `slider` / `range`
 - `dropdown` / `select`
+- `input`
 - `color`
 - `custom`
 - `button` / `execute`
@@ -154,12 +184,21 @@ Supported standard types:
 
 Supported composite types:
 
-- `positioning`
 - `border`
 - `fontOverride`
 - `heightOverride`
 - `colorList`
 - `toggleList`
+
+## Implementation model
+
+The library has three main families of row builders:
+
+- **proxy controls** — persisted values backed by `Settings.RegisterProxySetting` (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
+- **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`),
+- **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `toggleList`).
+
+`input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
 
 ## Canvas layout helpers
 
