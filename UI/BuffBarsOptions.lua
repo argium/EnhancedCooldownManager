@@ -6,6 +6,11 @@ local _, ns = ...
 local C = ns.Constants
 local L = ns.L
 
+local REMOVE_STALE_SPELL_COLORS_POPUP = "ECM_CONFIRM_REMOVE_STALE_SPELL_COLORS"
+local SPELL_COLORS_HEADER_BUTTON_WIDTH = 100
+local SPELL_COLORS_HEADER_BUTTON_HEIGHT = 22
+local SPELL_COLORS_HEADER_BUTTON_SPACING = 8
+
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
 ---@return { key: ECM_SpellColorKey, textureFileID: number|nil }[]
@@ -67,6 +72,124 @@ local function getSecretNameFooterState(rows)
     }
 end
 
+--- Returns true when the key is missing one or more identifying fields.
+---@param key ECM_SpellColorKey|table|nil
+---@return boolean
+local function isIncompleteSpellColorKey(key)
+    local normalized = ns.SpellColors.NormalizeKey(key)
+    return normalized ~= nil
+        and (normalized.spellName == nil
+            or normalized.spellID == nil
+            or normalized.cooldownID == nil
+            or normalized.textureFileID == nil)
+end
+
+--- Returns whether any row is missing one or more identifying fields.
+---@param rows { key: ECM_SpellColorKey }[]|nil
+---@return boolean
+local function hasRowsNeedingReconcile(rows)
+    for _, row in ipairs(rows or {}) do
+        if isIncompleteSpellColorKey(row and row.key) then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@param rows { key: ECM_SpellColorKey }[]|nil
+---@return { key: ECM_SpellColorKey }[]
+local function collectIncompleteSpellColorRows(rows)
+    local incompleteRows = {}
+
+    for _, row in ipairs(rows or {}) do
+        if isIncompleteSpellColorKey(row and row.key) then
+            incompleteRows[#incompleteRows + 1] = row
+        end
+    end
+
+    return incompleteRows
+end
+
+---@param owner Frame
+---@param text string
+local function setSimpleTooltip(owner, text)
+    owner:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if GameTooltip.ClearLines then
+            GameTooltip:ClearLines()
+        end
+        GameTooltip:SetText(text, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    owner:SetScript("OnLeave", function()
+        GameTooltip_Hide()
+    end)
+end
+
+---@param key ECM_SpellColorKey|table|nil
+---@return string
+local function getSpellColorRowName(key)
+    local normalized = ns.SpellColors.NormalizeKey(key)
+    local primaryKey = normalized and normalized.primaryKey or nil
+
+    if type(primaryKey) == "string" then
+        return primaryKey
+    end
+
+    return "Bar (" .. tostring(primaryKey) .. ")"
+end
+
+---@param key ECM_SpellColorKey|table|nil
+---@return string[]
+local function buildSpellColorKeyTooltipLines(key)
+    local normalized = ns.SpellColors.NormalizeKey(key)
+    if not normalized then
+        return {}
+    end
+
+    local lines = {}
+
+    local function addLine(formatString, value)
+        local valueType = type(value)
+        if valueType == "string" or valueType == "number" then
+            lines[#lines + 1] = string.format(formatString, value)
+        end
+    end
+
+    addLine(L["SPELL_COLORS_KEY_SPELL_NAME"], normalized.spellName)
+    addLine(L["SPELL_COLORS_KEY_SPELL_ID"], normalized.spellID)
+    addLine(L["SPELL_COLORS_KEY_COOLDOWN_ID"], normalized.cooldownID)
+    addLine(L["SPELL_COLORS_KEY_TEXTURE_FILE_ID"], normalized.textureFileID)
+
+    return lines
+end
+
+---@param owner Frame
+---@param data { key: ECM_SpellColorKey }|nil
+local function maybeShowSpellColorKeyTooltip(owner, data)
+    if not IsControlKeyDown() then
+        return
+    end
+
+    local lines = buildSpellColorKeyTooltipLines(type(data) == "table" and data.key)
+    if #lines == 0 then
+        return
+    end
+
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.ClearLines then
+        GameTooltip:ClearLines()
+    end
+    GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], 1, 1, 1)
+
+    for _, line in ipairs(lines) do
+        GameTooltip:AddLine(line, nil, nil, nil, true)
+    end
+
+    GameTooltip:Show()
+end
+
 --------------------------------------------------------------------------------
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
@@ -83,9 +206,67 @@ local function createSpellColorCanvas(SB, subcatName)
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
 
+    local function reconcileSpellColors()
+        ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
+    end
+
+    local function removeStaleSpellColors()
+        local staleRows = collectIncompleteSpellColorRows(buildSpellColorRows(ns.SpellColors.GetAllColorEntries()))
+        if #staleRows == 0 then
+            return
+        end
+
+        ns.Addon:ShowConfirmDialog(
+            REMOVE_STALE_SPELL_COLORS_POPUP,
+            L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
+            L["REMOVE"],
+            L["SPELL_COLORS_DONT_REMOVE"],
+            function()
+                local staleKeys = {}
+                for _, row in ipairs(staleRows) do
+                    staleKeys[#staleKeys + 1] = row.key
+                end
+
+                local removedKeys = ns.SpellColors.RemoveEntriesByKeys(staleKeys)
+                for _, key in ipairs(removedKeys) do
+                    ns.Print(L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format(getSpellColorRowName(key)))
+                end
+
+                frame:RefreshSpellList()
+                if #removedKeys > 0 then
+                    ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                end
+            end
+        )
+    end
+
     -- Header — uses SettingsListTemplate's built-in Title, divider, and DefaultsButton
     local headerRow = layout:AddHeader(subcatName)
     local defaultsBtn = headerRow._defaultsButton
+    local reconcileBtn = CreateFrame("Button", nil, headerRow, "UIPanelButtonTemplate")
+    local removeStaleBtn = CreateFrame("Button", nil, headerRow, "UIPanelButtonTemplate")
+
+    reconcileBtn:SetSize(SPELL_COLORS_HEADER_BUTTON_WIDTH, SPELL_COLORS_HEADER_BUTTON_HEIGHT)
+    reconcileBtn:SetPoint("RIGHT", defaultsBtn, "LEFT", -SPELL_COLORS_HEADER_BUTTON_SPACING, 0)
+    reconcileBtn:SetText(L["SPELL_COLORS_RECONCILE_BUTTON"])
+    reconcileBtn:SetScript("OnClick", function()
+        if not reconcileBtn:IsEnabled() then
+            return
+        end
+        reconcileSpellColors()
+    end)
+
+    removeStaleBtn:SetSize(SPELL_COLORS_HEADER_BUTTON_WIDTH, SPELL_COLORS_HEADER_BUTTON_HEIGHT)
+    removeStaleBtn:SetPoint("RIGHT", reconcileBtn, "LEFT", -SPELL_COLORS_HEADER_BUTTON_SPACING, 0)
+    removeStaleBtn:SetText(L["SPELL_COLORS_REMOVE_STALE_BUTTON"])
+    removeStaleBtn:SetScript("OnClick", function()
+        if not removeStaleBtn:IsEnabled() then
+            return
+        end
+        removeStaleSpellColors()
+    end)
+    setSimpleTooltip(removeStaleBtn, L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"])
+
     defaultsBtn:SetText(SETTINGS_DEFAULTS)
     defaultsBtn:SetScript("OnClick", function()
         if ns.Addon.BuffBars:IsEditLocked() then
@@ -169,6 +350,9 @@ local function createSpellColorCanvas(SB, subcatName)
     frame._secretNameDescRow = secretNameDescRow
     frame._secretNameReloadButtonRow = secretNameButtonRow
     frame._secretNameReloadButton = secretNameReloadButton
+    frame._reconcileButton = reconcileBtn
+    frame._removeStaleButton = removeStaleBtn
+    frame._spellColorListView = view
 
     view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
         -- Position label (matches SettingsListElementMixin:Init positioning)
@@ -180,8 +364,22 @@ local function createSpellColorCanvas(SB, subcatName)
             control._ecmPositioned = true
         end
 
-        local colorKey = data.key.primaryKey
-        local name = type(colorKey) == "string" and colorKey or ("Bar (" .. colorKey .. ")")
+        if not control._ecmSpellColorTooltipHooked then
+            if control.EnableMouse then
+                control:EnableMouse(true)
+            end
+            control:HookScript("OnEnter", function(self)
+                maybeShowSpellColorKeyTooltip(self, self._ecmSpellColorRowData)
+            end)
+            control:HookScript("OnLeave", function()
+                GameTooltip_Hide()
+            end)
+            control._ecmSpellColorTooltipHooked = true
+        end
+
+        control._ecmSpellColorRowData = data
+
+        local name = getSpellColorRowName(data.key)
         local label = data.textureFileID and ("|T" .. data.textureFileID .. ":14:14|t  " .. name) or name
         control.Text:SetText(label)
 
@@ -207,6 +405,9 @@ local function createSpellColorCanvas(SB, subcatName)
     function frame:RefreshSpellList()
         local rows = buildSpellColorRows(ns.SpellColors.GetAllColorEntries())
         local secretNameFooterState = getSecretNameFooterState(rows)
+        local hasIncompleteRows = hasRowsNeedingReconcile(rows)
+        local canReconcile = hasIncompleteRows and not isSpellColorsReloadRestricted()
+        local canRemoveStale = hasIncompleteRows and not isSpellColorsReloadRestricted()
 
         dataProvider:Flush()
         for _, row in ipairs(rows) do
@@ -236,6 +437,8 @@ local function createSpellColorCanvas(SB, subcatName)
         defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
 
         defaultsBtn:SetEnabled(not locked)
+        reconcileBtn:SetEnabled(canReconcile)
+        removeStaleBtn:SetEnabled(canRemoveStale)
     end
 
     -- Blizzard's panel calls OnDefault on canvas frames during global defaults
@@ -256,8 +459,11 @@ local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
 BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
+BuffBarsOptions._HasRowsNeedingReconcile = hasRowsNeedingReconcile
+BuffBarsOptions._CollectIncompleteSpellColorRows = collectIncompleteSpellColorRows
 BuffBarsOptions._IsSpellColorsReloadRestricted = isSpellColorsReloadRestricted
 BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
+BuffBarsOptions._BuildSpellColorKeyTooltipLines = buildSpellColorKeyTooltipLines
 
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 

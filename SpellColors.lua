@@ -704,6 +704,80 @@ local function repairCurrentSpecStoreMetadata()
     return changed
 end
 
+---@param storeTable table|nil
+---@param tierKeyType "spellName"|"spellID"|"cooldownID"|"textureFileID"
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingStoreEntries(storeTable, tierKeyType, target)
+    if type(storeTable) ~= "table" or not target then
+        return false
+    end
+
+    local keysToRemove = nil
+    for rawKey, entry in pairs(storeTable) do
+        local candidate = buildKeyFromEntry(entry, tierKeyType, rawKey)
+        if candidate and keysMatch(candidate, target) then
+            keysToRemove = keysToRemove or {}
+            keysToRemove[#keysToRemove + 1] = rawKey
+        end
+    end
+
+    if not keysToRemove then
+        return false
+    end
+
+    for _, rawKey in ipairs(keysToRemove) do
+        storeTable[rawKey] = nil
+    end
+
+    return true
+end
+
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingPersistedEntries(target)
+    local tables = scopeTables()
+    if not tables or not target then
+        return false
+    end
+
+    local removed = false
+    for _, scopeKey in ipairs(KEY_DEFS) do
+        if removeMatchingStoreEntries(tables[scopeKey], KEY_TYPE_TO_STORE[scopeKey], target) then
+            removed = true
+        end
+    end
+
+    return removed
+end
+
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingDiscoveredEntries(target)
+    if not target then
+        return false
+    end
+
+    local removed = false
+    local nextIndex = 1
+
+    for index = 1, #_discoveredKeys do
+        local key = _discoveredKeys[index]
+        if key and keysMatch(key, target) then
+            removed = true
+        else
+            _discoveredKeys[nextIndex] = key
+            nextIndex = nextIndex + 1
+        end
+    end
+
+    for index = nextIndex, #_discoveredKeys do
+        _discoveredKeys[index] = nil
+    end
+
+    return removed
+end
+
 ---------------------------------------------------------------------------
 -- Public store API
 ---------------------------------------------------------------------------
@@ -911,6 +985,30 @@ function SpellColors.ReconcileAllKeys(keys)
         changed = reconcileAll(keys_list)
     end
     return changed + repairCurrentSpecStoreMetadata()
+end
+
+--- Removes persisted and discovered entries matching the given keys.
+---@param keys (ECM_SpellColorKey|table)[]
+---@return ECM_SpellColorKey[] removedKeys
+function SpellColors.RemoveEntriesByKeys(keys)
+    local removedKeys = {}
+
+    if type(keys) ~= "table" then
+        return removedKeys
+    end
+
+    for _, key in ipairs(keys) do
+        local normalized = normalizeKey(key)
+        if normalized then
+            local removedPersisted = removeMatchingPersistedEntries(normalized)
+            local removedDiscovered = removeMatchingDiscoveredEntries(normalized)
+            if removedPersisted or removedDiscovered then
+                removedKeys[#removedKeys + 1] = normalized
+            end
+        end
+    end
+
+    return removedKeys
 end
 
 --- Registers a bar frame's identifying values in the runtime discovered cache.

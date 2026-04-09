@@ -21,6 +21,9 @@ local DRAFT_ADD_BUTTON_WIDTH = 44
 local TOOLTIP_ITEM_ICON_SIZE = 14
 local TOOLTIP_QUALITY_ICON_SIZE = 14
 local SETTINGS_LABEL_X = 37
+local SPECIAL_ROWS_LEGEND_HEIGHT = 24
+local VIEWER_ROW_SPACING = 4
+local VIEWER_CANVAS_HEIGHT = 448
 local DEFAULT_SPECIAL_VIEWER = "utility"
 local DRAFT_PENDING_TEXT = "..."
 local VIEWER_ORDER = { "utility", "main" }
@@ -28,9 +31,40 @@ local VIEWER_LABELS = {
     utility = "UTILITY_VIEWER_ICONS",
     main = "MAIN_VIEWER_ICONS",
 }
+local RACIAL_ALIASES = {
+    undead = "Scourge",
+    earthen = "EarthenDwarf",
+}
+
+local RACIAL_ABILITIES_BY_NORMALIZED_KEY = {}
+for raceKey, racialEntry in pairs(RACIAL_ABILITIES) do
+    if type(raceKey) == "string" then
+        local normalizedKey = raceKey:gsub("[^%a%d]", ""):lower()
+        RACIAL_ABILITIES_BY_NORMALIZED_KEY[normalizedKey] = racialEntry
+    end
+end
+
+local function getViewerShortLabel(viewerKey)
+    return viewerKey == "utility" and L["UTILITY_VIEWER_SHORT"] or L["MAIN_VIEWER_SHORT"]
+end
+
+local function getBuiltinOrderIndex(stackKey)
+    for index, builtinKey in ipairs(BUILTIN_STACK_ORDER) do
+        if builtinKey == stackKey then
+            return index
+        end
+    end
+
+    return nil
+end
+
+local function isDisabledBuiltinEntry(entry)
+    return entry and entry.stackKey and entry.disabled and getBuiltinOrderIndex(entry.stackKey) ~= nil
+end
 
 local ExtraIconsOptions = {}
 ns.ExtraIconsOptions = ExtraIconsOptions
+ExtraIconsOptions._pendingItemLoads = ExtraIconsOptions._pendingItemLoads or {}
 
 --------------------------------------------------------------------------------
 -- Data Helpers
@@ -48,9 +82,44 @@ function ExtraIconsOptions._isStackKeyPresent(viewers, stackKey)
     return false
 end
 
+local function lookupRacialEntryByRaceKey(raceKey)
+    if type(raceKey) ~= "string" or raceKey == "" then
+        return nil
+    end
+
+    local direct = RACIAL_ABILITIES[raceKey]
+    if direct then
+        return direct
+    end
+
+    local normalizedKey = raceKey:gsub("[^%a%d]", ""):lower()
+    local aliasKey = RACIAL_ALIASES[normalizedKey]
+    if aliasKey and RACIAL_ABILITIES[aliasKey] then
+        return RACIAL_ABILITIES[aliasKey]
+    end
+
+    return RACIAL_ABILITIES_BY_NORMALIZED_KEY[normalizedKey]
+end
+
+local function lookupKnownRacialEntry()
+    if type(IsPlayerSpell) ~= "function" then
+        return nil
+    end
+
+    for _, racialEntry in pairs(RACIAL_ABILITIES) do
+        if racialEntry and racialEntry.spellId and IsPlayerSpell(racialEntry.spellId) then
+            return racialEntry
+        end
+    end
+
+    return nil
+end
+
 local function getCurrentRacialEntry()
     local raceName, raceFile = UnitRace("player")
-    return (raceFile and RACIAL_ABILITIES[raceFile]) or (raceName and RACIAL_ABILITIES[raceName])
+    return lookupRacialEntryByRaceKey(raceFile)
+        or lookupRacialEntryByRaceKey(raceName)
+        or lookupKnownRacialEntry()
 end
 
 local function getCurrentRacialSpellId()
@@ -65,6 +134,12 @@ local function getEntrySpellId(entry)
 
     local first = entry.ids[1]
     return type(first) == "table" and first.spellId or first
+end
+
+local function markPendingItemLoad(itemId)
+    if itemId then
+        ExtraIconsOptions._pendingItemLoads[itemId] = true
+    end
 end
 
 --- Check if a racial spellId is present in any viewer's entries.
@@ -95,10 +170,12 @@ local function getItemDisplayName(itemId)
 
     local name = C_Item.GetItemNameByID(itemId)
     if name then
+        ExtraIconsOptions._pendingItemLoads[itemId] = nil
         return name
     end
 
     if C_Item.DoesItemExistByID(itemId) then
+        markPendingItemLoad(itemId)
         C_Item.RequestLoadItemDataByID(itemId)
         return L["EXTRA_ICONS_ITEM_LOADING"]
     end
@@ -151,17 +228,12 @@ local function buildTooltipLine(...)
     return table.concat(parts, " ")
 end
 
-local function setItemStackTooltip(owner, entry)
+local function addItemStackTooltipLines(entry)
     local stack = entry.stackKey and BUILTIN_STACKS[entry.stackKey]
     if not stack or stack.kind ~= "item" or not stack.ids or #stack.ids == 0 then
         return false
     end
 
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
-    GameTooltip:SetText(stack.label, 1, 1, 1)
     GameTooltip:AddLine(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"], nil, nil, nil, true)
 
     for _, itemEntry in ipairs(stack.ids) do
@@ -181,7 +253,6 @@ local function setItemStackTooltip(owner, entry)
         )
     end
 
-    GameTooltip:Show()
     return true
 end
 
@@ -205,7 +276,8 @@ function ExtraIconsOptions._getEntryName(entry)
     if entry.kind == "spell" and entry.ids then
         local first = entry.ids[1]
         local spellId = type(first) == "table" and first.spellId or first
-        local name = spellId and C_Spell.GetSpellName(spellId)
+        local spellAPI = type(C_Spell) == "table" and C_Spell or nil
+        local name = spellId and spellAPI and spellAPI.GetSpellName and spellAPI.GetSpellName(spellId)
         return name or ("Spell " .. tostring(spellId))
     end
     if entry.kind == "item" and entry.ids then
@@ -213,6 +285,27 @@ function ExtraIconsOptions._getEntryName(entry)
         return getItemDisplayName(getItemIdFromEntry(first))
     end
     return "Unknown"
+end
+
+local function getEntryTooltipTitle(entry)
+    local name = ExtraIconsOptions._getEntryName(entry)
+    if type(entry) ~= "table" then
+        return name
+    end
+
+    if entry.kind == "spell" then
+        local spellId = getEntrySpellId(entry)
+        if spellId then
+            return string.format("%s (spell ID %s)", name, spellId)
+        end
+    elseif entry.kind == "item" and entry.ids and entry.ids[1] then
+        local itemId = getItemIdFromEntry(entry.ids[1])
+        if itemId then
+            return string.format("%s (item ID %s)", name, itemId)
+        end
+    end
+
+    return name
 end
 
 --- Get display icon for a config entry.
@@ -233,7 +326,8 @@ function ExtraIconsOptions._getEntryIcon(entry)
     if entry.kind == "spell" and entry.ids then
         local first = entry.ids[1]
         local spellId = type(first) == "table" and first.spellId or first
-        return spellId and C_Spell.GetSpellTexture(spellId)
+        local spellAPI = type(C_Spell) == "table" and C_Spell or nil
+        return spellId and spellAPI and spellAPI.GetSpellTexture and spellAPI.GetSpellTexture(spellId)
     end
     if entry.kind == "item" and entry.ids then
         local first = entry.ids[1]
@@ -246,6 +340,9 @@ end
 --- Add a predefined stack entry to a viewer.
 function ExtraIconsOptions._addStackKey(profile, viewerKey, stackKey)
     local viewers = profile.extraIcons.viewers
+    if ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then
+        return
+    end
     viewers[viewerKey] = viewers[viewerKey] or {}
     viewers[viewerKey][#viewers[viewerKey] + 1] = { stackKey = stackKey }
 end
@@ -253,6 +350,9 @@ end
 --- Add a racial spell entry to a viewer.
 function ExtraIconsOptions._addRacial(profile, viewerKey, spellId)
     local viewers = profile.extraIcons.viewers
+    if ExtraIconsOptions._isRacialPresent(viewers, spellId) then
+        return
+    end
     viewers[viewerKey] = viewers[viewerKey] or {}
     viewers[viewerKey][#viewers[viewerKey] + 1] = { kind = "spell", ids = { spellId } }
 end
@@ -268,6 +368,9 @@ function ExtraIconsOptions._addCustomEntry(profile, viewerKey, kind, ids)
         else
             entry.ids[#entry.ids + 1] = id
         end
+    end
+    if ExtraIconsOptions._isDuplicateEntry(viewers, entry) then
+        return
     end
     viewers[viewerKey][#viewers[viewerKey] + 1] = entry
 end
@@ -321,6 +424,9 @@ function ExtraIconsOptions._reorderEntry(profile, viewerKey, index, direction)
     local entries = profile.extraIcons.viewers[viewerKey]
     if not entries then return end
     local target = index + direction
+    while target >= 1 and target <= #entries and isDisabledBuiltinEntry(entries[target]) do
+        target = target + direction
+    end
     if target < 1 or target > #entries then return end
     entries[index], entries[target] = entries[target], entries[index]
 end
@@ -329,6 +435,10 @@ end
 function ExtraIconsOptions._moveEntry(profile, fromViewer, toViewer, index)
     local from = profile.extraIcons.viewers[fromViewer]
     if not from or index < 1 or index > #from then return end
+    local candidateEntry = from[index]
+    if ExtraIconsOptions._findDuplicateEntry(profile.extraIcons.viewers, candidateEntry, fromViewer, index) == toViewer then
+        return
+    end
     local entry = table.remove(from, index)
     local to = profile.extraIcons.viewers[toViewer] or {}
     profile.extraIcons.viewers[toViewer] = to
@@ -380,12 +490,13 @@ function ExtraIconsOptions._resolveDraftEntryPreview(kind, text)
     end
 
     if kind == "spell" then
-        local name = C_Spell.GetSpellName(id)
+        local spellAPI = type(C_Spell) == "table" and C_Spell or nil
+        local name = spellAPI and spellAPI.GetSpellName and spellAPI.GetSpellName(id)
         if not name then
             return "invalid", nil, nil
         end
 
-        return "resolved", name, C_Spell.GetSpellTexture(id)
+        return "resolved", name, spellAPI.GetSpellTexture and spellAPI.GetSpellTexture(id)
     end
 
     if kind == "item" then
@@ -396,9 +507,11 @@ function ExtraIconsOptions._resolveDraftEntryPreview(kind, text)
         local name = C_Item.GetItemNameByID(id)
         local icon = C_Item.GetItemIconByID(id)
         if name then
+            ExtraIconsOptions._pendingItemLoads[id] = nil
             return "resolved", name, icon
         end
 
+        markPendingItemLoad(id)
         C_Item.RequestLoadItemDataByID(id)
 
         return "pending", nil, icon
@@ -419,13 +532,82 @@ function ExtraIconsOptions._resolveDraftEntryName(kind, text)
     return name
 end
 
+local function getEntryIdentityKey(entry)
+    if not entry then
+        return nil
+    end
+
+    if entry.stackKey then
+        return "stack:" .. tostring(entry.stackKey)
+    end
+
+    if entry.kind == "spell" and entry.ids and #entry.ids > 0 then
+        local parts = { "spell" }
+        for _, id in ipairs(entry.ids) do
+            local spellId = type(id) == "table" and id.spellId or id
+            parts[#parts + 1] = tostring(spellId)
+        end
+        return table.concat(parts, ":")
+    end
+
+    if entry.kind == "item" and entry.ids and #entry.ids > 0 then
+        local parts = { "item" }
+        for _, id in ipairs(entry.ids) do
+            parts[#parts + 1] = tostring(getItemIdFromEntry(id))
+        end
+        return table.concat(parts, ":")
+    end
+
+    return nil
+end
+
+function ExtraIconsOptions._findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
+    local candidateKey = getEntryIdentityKey(candidateEntry)
+    if not candidateKey then
+        return nil, nil
+    end
+
+    for viewerKey, entries in pairs(viewers) do
+        for index, entry in ipairs(entries) do
+            if not (viewerKey == ignoreViewerKey and index == ignoreIndex)
+                and getEntryIdentityKey(entry) == candidateKey then
+                return viewerKey, index
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+function ExtraIconsOptions._isDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
+    local viewerKey = ExtraIconsOptions._findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
+    return viewerKey ~= nil
+end
+
+local function buildDraftEntry(kind, id)
+    if not id then
+        return nil
+    end
+
+    if kind == "item" then
+        return { kind = "item", ids = { { itemID = id } } }
+    end
+
+    if kind == "spell" then
+        return { kind = "spell", ids = { id } }
+    end
+
+    return nil
+end
+
 function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
-    local rows = {}
+    local activeRows = {}
     local entries = viewers[viewerKey] or {}
+    local disabledBuiltinRows = {}
 
     for index, entry in ipairs(entries) do
         if ExtraIconsOptions._isRacialForCurrentPlayer(entry) then
-            rows[#rows + 1] = {
+            local rowData = {
                 rowType = "entry",
                 viewerKey = viewerKey,
                 index = index,
@@ -436,13 +618,31 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
                 isPlaceholder = false,
                 isDisabled = entry.disabled == true,
             }
+
+            if isDisabledBuiltinEntry(entry) then
+                disabledBuiltinRows[entry.stackKey] = disabledBuiltinRows[entry.stackKey] or {}
+                disabledBuiltinRows[entry.stackKey][#disabledBuiltinRows[entry.stackKey] + 1] = rowData
+            else
+                activeRows[#activeRows + 1] = rowData
+            end
         end
     end
 
-    if viewerKey == DEFAULT_SPECIAL_VIEWER then
-        for _, stackKey in ipairs(BUILTIN_STACK_ORDER) do
-            if not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then
-                rows[#rows + 1] = {
+    for activeIndex, rowData in ipairs(activeRows) do
+        rowData.activeIndex = activeIndex
+        rowData.activeCount = #activeRows
+    end
+
+    local rows = activeRows
+
+    for _, stackKey in ipairs(BUILTIN_STACK_ORDER) do
+        local bucket = disabledBuiltinRows[stackKey]
+        if bucket then
+            for _, rowData in ipairs(bucket) do
+                rows[#rows + 1] = rowData
+            end
+        elseif viewerKey == DEFAULT_SPECIAL_VIEWER and not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then
+            rows[#rows + 1] = {
                     rowType = "builtinPlaceholder",
                     viewerKey = viewerKey,
                     stackKey = stackKey,
@@ -451,10 +651,11 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
                     isCurrentRacial = false,
                     isPlaceholder = true,
                     isDisabled = true,
-                }
-            end
+            }
         end
+    end
 
+    if viewerKey == DEFAULT_SPECIAL_VIEWER then
         local racialSpellId = getCurrentRacialSpellId()
         if racialSpellId and not ExtraIconsOptions._isRacialPresent(viewers, racialSpellId) then
             rows[#rows + 1] = {
@@ -486,10 +687,47 @@ end
 local function setButtonTooltip(btn, text)
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if GameTooltip.ClearLines then
+            GameTooltip:ClearLines()
+        end
         GameTooltip:SetText(text, 1, 1, 1)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", GameTooltip_Hide)
+end
+
+local function addTooltipLine(text)
+    if text and text ~= "" then
+        GameTooltip:AddLine(text, nil, nil, nil, true)
+    end
+end
+
+local function showRowTooltip(owner, rowData)
+    if not rowData then
+        return
+    end
+
+    local displayEntry = rowData.displayEntry
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.ClearLines then
+        GameTooltip:ClearLines()
+    end
+    GameTooltip:SetText(getEntryTooltipTitle(displayEntry), 1, 1, 1)
+
+    if rowData.isBuiltin then
+        if rowData.isPlaceholder then
+            addTooltipLine(L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"])
+        end
+    elseif rowData.isCurrentRacial and rowData.isPlaceholder then
+        addTooltipLine(L["EXTRA_ICONS_RACIAL_PLACEHOLDER_TOOLTIP"])
+    end
+
+    if rowData.isBuiltin and rowData.isDisabled and not rowData.isPlaceholder then
+        addTooltipLine(L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"])
+    end
+
+    addItemStackTooltipLines(displayEntry)
+    GameTooltip:Show()
 end
 
 local function clearRowMouseover(row)
@@ -610,6 +848,12 @@ local function createDraftRow(parent)
         row._editBox:SetTextInsets(6, 6, 0, 0)
     end
 
+    row._editBoxPlaceholder = row._editBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    row._editBoxPlaceholder:SetPoint("LEFT", row._editBox, "LEFT", 6, 0)
+    row._editBoxPlaceholder:SetPoint("RIGHT", row._editBox, "RIGHT", -6, 0)
+    row._editBoxPlaceholder:SetJustifyH("LEFT")
+    row._editBoxPlaceholder:SetWordWrap(false)
+
     row._previewIcon = row:CreateTexture(nil, "ARTWORK")
     row._previewIcon:SetPoint("LEFT", row._editBox, "RIGHT", 8, 0)
     row._previewIcon:SetSize(DRAFT_ENTRY_PREVIEW_ICON_SIZE, DRAFT_ENTRY_PREVIEW_ICON_SIZE)
@@ -625,7 +869,6 @@ local function createDraftRow(parent)
     row._addBtn:SetSize(DRAFT_ADD_BUTTON_WIDTH, BTN_SIZE)
     row._addBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     row._addBtn:SetText(L["ADD_ENTRY"])
-    row._addBtn:Hide()
 
     row._previewLabel:SetPoint("RIGHT", row._addBtn, "LEFT", -6, 0)
 
@@ -635,7 +878,7 @@ end
 local function createViewerHeaderRow(parent, SB, text, headerHeight)
     local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(headerHeight)
-    row._title = SB.CreateHeaderTitle(row, text)
+    row._title = SB.CreateSubheaderTitle(row, text)
     return row
 end
 
@@ -645,12 +888,16 @@ end
 
 local function createViewerListCanvas(SB, headerHeight)
     local frame = CreateFrame("Frame")
-    frame:SetHeight(400)
+    frame:SetHeight(VIEWER_CANVAS_HEIGHT)
 
     frame._viewerRowPools = { utility = {}, main = {} }
     frame._viewerDraftRows = {}
     frame._viewerHeaders = {}
     frame._viewerEmptyLabels = {}
+    frame._legendLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    frame._legendLabel:SetJustifyH("LEFT")
+    frame._legendLabel:SetWordWrap(true)
+    frame._legendLabel:SetText(L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"])
 
     for _, vk in ipairs(VIEWER_ORDER) do
         frame._viewerHeaders[vk] = createViewerHeaderRow(frame, SB, L[VIEWER_LABELS[vk]], headerHeight)
@@ -697,6 +944,26 @@ function ExtraIconsOptions.RegisterSettings(SB)
         }
     end
 
+    local itemLoadFrame = ExtraIconsOptions._itemLoadFrame
+    if not itemLoadFrame then
+        itemLoadFrame = CreateFrame("Frame")
+        ExtraIconsOptions._itemLoadFrame = itemLoadFrame
+    end
+    if not itemLoadFrame._ecmHooked then
+        if itemLoadFrame.RegisterEvent then
+            itemLoadFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+        end
+        itemLoadFrame:SetScript("OnEvent", function(_, _, itemId)
+            if itemId and ExtraIconsOptions._pendingItemLoads[itemId] then
+                ExtraIconsOptions._pendingItemLoads[itemId] = nil
+                if ExtraIconsOptions._refresh then
+                    ExtraIconsOptions._refresh()
+                end
+            end
+        end)
+        itemLoadFrame._ecmHooked = true
+    end
+
     local function scheduleUpdate()
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
     end
@@ -730,12 +997,64 @@ function ExtraIconsOptions.RegisterSettings(SB)
         return ExtraIconsOptions._resolveDraftEntryPreview(draftState.kind, draftState.idText)
     end
 
-    local function canAddDraftEntry(viewerKey)
-        local status = getDraftResolution(viewerKey)
-        return status == "resolved"
+    local function getDraftPlaceholderText(draftState)
+        if draftState.kind == "spell" then
+            return L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"]
+        end
+
+        return L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"]
     end
 
-    local function addDraftEntry(viewerKey)
+    local function refreshDraftPlaceholder(row, viewerKey)
+        if not (row and row._editBoxPlaceholder) then
+            return
+        end
+
+        local draftState = draftStates[viewerKey]
+        local idText = draftState and draftState.idText or ""
+        row._editBoxPlaceholder:SetText(getDraftPlaceholderText(draftState))
+
+        if row._editBoxHasFocus or idText ~= "" then
+            row._editBoxPlaceholder:Hide()
+        else
+            row._editBoxPlaceholder:Show()
+        end
+    end
+
+    local function focusDraftEditBox(row)
+        if not (row and row._editBox) then
+            return
+        end
+
+        if row._editBox.SetFocus then
+            row._editBox:SetFocus()
+        end
+        row._editBoxHasFocus = true
+        refreshDraftPlaceholder(row, row._viewerKey)
+        if row._editBox.HighlightText then
+            row._editBox:HighlightText()
+        end
+    end
+
+    local function getDraftDuplicateInfo(viewerKey)
+        local draftState = draftStates[viewerKey]
+        local id = ExtraIconsOptions._parseSingleId(draftState.idText)
+        local entry = buildDraftEntry(draftState.kind, id)
+        local duplicateViewerKey = entry and ExtraIconsOptions._findDuplicateEntry(getViewers(), entry) or nil
+        return duplicateViewerKey ~= nil, duplicateViewerKey
+    end
+
+    local function canAddDraftEntry(viewerKey)
+        local status = getDraftResolution(viewerKey)
+        if status ~= "resolved" then
+            return false
+        end
+
+        local isDuplicate = getDraftDuplicateInfo(viewerKey)
+        return not isDuplicate
+    end
+
+    local function addDraftEntry(viewerKey, row)
         local draftState = draftStates[viewerKey]
         local id = ExtraIconsOptions._parseSingleId(draftState.idText)
         if not id or not canAddDraftEntry(viewerKey) then
@@ -746,6 +1065,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         draftState.idText = ""
         scheduleUpdate()
         ExtraIconsOptions._refresh()
+        focusDraftEditBox(row)
     end
 
     local function restoreDefaultExtraIcons()
@@ -804,7 +1124,8 @@ function ExtraIconsOptions.RegisterSettings(SB)
         viewerCanvas._viewerDraftRows[viewerKey] = row
         row._viewerKey = viewerKey
 
-        setButtonTooltip(row._typeBtn, L["ENTRY_TYPE"])
+        setButtonTooltip(row._typeBtn, L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"])
+        setButtonTooltip(row._addBtn, L["ADD_ENTRY"])
 
         row._typeBtn:SetScript("OnClick", function()
             if isDisabled() then
@@ -826,11 +1147,43 @@ function ExtraIconsOptions.RegisterSettings(SB)
         end)
 
         row._editBox:SetScript("OnEnterPressed", function()
-            addDraftEntry(viewerKey)
+            addDraftEntry(viewerKey, row)
+        end)
+
+        row._editBox:SetScript("OnTabPressed", function(self)
+            if isDisabled() then
+                return
+            end
+
+            local draftState = draftStates[viewerKey]
+            draftState.kind = draftState.kind == "spell" and "item" or "spell"
+            ExtraIconsOptions._refresh()
+            focusDraftEditBox(row)
+        end)
+
+        row._editBox:SetScript("OnEditFocusGained", function()
+            row._editBoxHasFocus = true
+            refreshDraftPlaceholder(row, viewerKey)
+            if row._editBox.HighlightText and (row._editBox:GetText() or "") ~= "" then
+                row._editBox:HighlightText()
+            end
+        end)
+
+        row._editBox:SetScript("OnEditFocusLost", function()
+            row._editBoxHasFocus = false
+            refreshDraftPlaceholder(row, viewerKey)
+        end)
+
+        row._editBox:SetScript("OnEscapePressed", function(self)
+            if self.ClearFocus then
+                self:ClearFocus()
+            end
+            row._editBoxHasFocus = false
+            refreshDraftPlaceholder(row, viewerKey)
         end)
 
         row._addBtn:SetScript("OnClick", function()
-            addDraftEntry(viewerKey)
+            addDraftEntry(viewerKey, row)
         end)
 
         return row
@@ -840,6 +1193,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         local draftState = draftStates[viewerKey]
         local controlsDisabled = isDisabled()
         local status, name, icon = getDraftResolution(viewerKey)
+        local isDuplicate, duplicateViewerKey = getDraftDuplicateInfo(viewerKey)
 
         row._typeBtn:SetText(draftState.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"])
         if row._typeBtn.SetEnabled then
@@ -854,6 +1208,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         if row._editBox.SetEnabled then
             row._editBox:SetEnabled(not controlsDisabled)
         end
+        refreshDraftPlaceholder(row, viewerKey)
 
         if icon then
             row._previewIcon:SetTexture(icon)
@@ -863,22 +1218,24 @@ function ExtraIconsOptions.RegisterSettings(SB)
             row._previewIcon:Hide()
         end
 
-        if status == "resolved" then
+        if status == "resolved" and isDuplicate then
+            row._previewLabel:SetText(
+                L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(getViewerShortLabel(duplicateViewerKey)))
+            row._previewLabel:Show()
+        elseif status == "resolved" then
             row._previewLabel:SetText(name or "")
             row._previewLabel:Show()
-            row._addBtn:Show()
         elseif status == "pending" then
             row._previewLabel:SetText(DRAFT_PENDING_TEXT)
             row._previewLabel:Show()
-            row._addBtn:Hide()
         else
             row._previewLabel:SetText("")
             row._previewLabel:Hide()
-            row._addBtn:Hide()
         end
 
+        row._addBtn:Show()
         if row._addBtn.SetEnabled then
-            row._addBtn:SetEnabled(not controlsDisabled and status == "resolved")
+            row._addBtn:SetEnabled(not controlsDisabled and status == "resolved" and not isDuplicate)
         end
     end
 
@@ -886,24 +1243,36 @@ function ExtraIconsOptions.RegisterSettings(SB)
         local controlsDisabled = isDisabled()
         local displayEntry = rowData.displayEntry
         local otherViewer = ExtraIconsOptions._otherViewer(rowData.viewerKey)
-        local entries = getViewers()[rowData.viewerKey] or {}
+        local duplicateViewerKey = rowData.index ~= nil
+            and ExtraIconsOptions._findDuplicateEntry(getViewers(), displayEntry, rowData.viewerKey, rowData.index)
+            or nil
+        local hasMoveDuplicate = duplicateViewerKey == otherViewer
+        local positionLocked = rowData.isBuiltin and rowData.isDisabled
+        local canReorder = not controlsDisabled and rowData.activeIndex ~= nil and not positionLocked
+        local canMove = not controlsDisabled and rowData.index ~= nil and not positionLocked and not hasMoveDuplicate
 
         row._label:SetText(ExtraIconsOptions._getEntryName(displayEntry))
         row._icon:SetTexture(ExtraIconsOptions._getEntryIcon(displayEntry) or 134400)
         setRowVisualState(row, rowData.isDisabled)
 
-        row._upBtn:SetEnabled(not controlsDisabled and rowData.index ~= nil and rowData.index > 1)
-        row._downBtn:SetEnabled(not controlsDisabled and rowData.index ~= nil and rowData.index < #entries)
-        row._moveBtn:SetEnabled(not controlsDisabled and rowData.index ~= nil)
+        row._upBtn:SetEnabled(canReorder and rowData.activeIndex > 1)
+        row._downBtn:SetEnabled(canReorder and rowData.activeIndex < rowData.activeCount)
+        row._moveBtn:SetEnabled(canMove)
         row._deleteBtn:SetEnabled(not controlsDisabled)
         row._moveBtn:SetText(rowData.viewerKey == "utility" and ">" or "<")
 
         setButtonTooltip(row._upBtn, L["MOVE_UP_TOOLTIP"])
         setButtonTooltip(row._downBtn, L["MOVE_DOWN_TOOLTIP"])
-        setButtonTooltip(row._moveBtn, L["MOVE_TO_VIEWER_TOOLTIP"]:format(otherViewer))
+        if hasMoveDuplicate then
+            setButtonTooltip(row._moveBtn, L["EXTRA_ICONS_DUPLICATE_MOVE_TOOLTIP"]:format(getViewerShortLabel(otherViewer)))
+        elseif positionLocked then
+            setButtonTooltip(row._moveBtn, L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"])
+        else
+            setButtonTooltip(row._moveBtn, L["MOVE_TO_VIEWER_TOOLTIP"]:format(otherViewer))
+        end
 
         row._upBtn:SetScript("OnClick", function()
-            if rowData.index == nil then
+            if rowData.index == nil or not canReorder then
                 return
             end
 
@@ -913,7 +1282,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         end)
 
         row._downBtn:SetScript("OnClick", function()
-            if rowData.index == nil then
+            if rowData.index == nil or not canReorder then
                 return
             end
 
@@ -923,7 +1292,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         end)
 
         row._moveBtn:SetScript("OnClick", function()
-            if rowData.index == nil then
+            if rowData.index == nil or not canMove then
                 return
             end
 
@@ -934,7 +1303,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
 
         if rowData.isBuiltin then
             row._deleteBtn:SetText(rowData.isDisabled and "+" or "x")
-            setButtonTooltip(row._deleteBtn, rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["DISABLE_TOOLTIP"])
+            setButtonTooltip(row._deleteBtn, rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"])
             row._deleteBtn:SetScript("OnClick", function()
                 ExtraIconsOptions._toggleBuiltinRow(
                     getProfile(),
@@ -970,7 +1339,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
 
         clearRowMouseover(row)
         setRowMouseover(row, function(self)
-            setItemStackTooltip(self, displayEntry)
+            showRowTooltip(self, rowData)
         end)
     end
 
@@ -982,6 +1351,12 @@ function ExtraIconsOptions.RegisterSettings(SB)
     local function refreshViewerLists()
         local viewers = getViewers()
         local y = 0
+
+        viewerCanvas._legendLabel:ClearAllPoints()
+        viewerCanvas._legendLabel:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
+        viewerCanvas._legendLabel:SetPoint("RIGHT", viewerCanvas, "RIGHT", -20, 0)
+        viewerCanvas._legendLabel:Show()
+        y = y - SPECIAL_ROWS_LEGEND_HEIGHT
 
         for _, viewerKey in ipairs(VIEWER_ORDER) do
             local headerRow = viewerCanvas._viewerHeaders[viewerKey]
@@ -1004,7 +1379,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
                 viewerCanvas._viewerEmptyLabels[viewerKey]:SetPoint(
                     "TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
                 viewerCanvas._viewerEmptyLabels[viewerKey]:Show()
-                y = y - ROW_HEIGHT
+                y = y - ROW_HEIGHT - VIEWER_ROW_SPACING
             else
                 viewerCanvas._viewerEmptyLabels[viewerKey]:Hide()
             end
@@ -1021,7 +1396,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
                 row:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
                 row:SetPoint("RIGHT", viewerCanvas, "RIGHT", -20, 0)
                 row:Show()
-                y = y - ROW_HEIGHT
+                y = y - ROW_HEIGHT - VIEWER_ROW_SPACING
             end
 
             local draftRow = ensureDraftRow(viewerKey)
@@ -1065,7 +1440,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
             viewers = {
                 type = "canvas",
                 canvas = viewerCanvas,
-                height = 400,
+                height = VIEWER_CANVAS_HEIGHT,
                 disabled = isDisabled,
                 order = 10,
             },

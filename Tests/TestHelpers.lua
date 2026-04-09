@@ -851,6 +851,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "IsInInstance",
     "GetInventoryItemID",
     "GetInventoryItemTexture",
+    "IsPlayerSpell",
     "C_Item",
     "C_Spell",
     "CreateTextureMarkup",
@@ -909,6 +910,9 @@ function TestHelpers.SetupOptionsGlobals()
     end
     _G.GetInventoryItemTexture = function()
         return nil
+    end
+    _G.IsPlayerSpell = function()
+        return false
     end
     _G.C_Item = {
         GetItemIconByID = function()
@@ -1031,15 +1035,25 @@ function TestHelpers.SetupOptionsGlobals()
     end
 
     -- Minimal CreateFrame stub for canvas layouts
+    local focusedFrame = nil
     local function makeFrameStub()
         local f = { scripts = {}, hooks = {}, callbacks = {}, _children = {} }
         local noop = function() end
         local value, minValue, maxValue, stepValue = nil, 0, 0, 1
         local shown = false
         local mouseEnabled = false
+        local enabled = true
         local text = ""
         local fontObject = nil
+        local highlighted = false
+        local hasFocus = false
         local anchors = {}
+        local registeredEvents = {}
+        local alpha = 1
+        local desaturated = false
+        local vertexColor = { 1, 1, 1, 1 }
+        local textColor = { 1, 1, 1, 1 }
+        local texture = nil
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
@@ -1081,9 +1095,14 @@ function TestHelpers.SetupOptionsGlobals()
         f.IsShown = function()
             return shown
         end
-        f.SetAlpha = noop
-        f.EnableMouse = function(_, enabled)
-            mouseEnabled = not not enabled
+        f.SetAlpha = function(_, newAlpha)
+            alpha = newAlpha
+        end
+        f.GetAlpha = function()
+            return alpha
+        end
+        f.EnableMouse = function(_, isEnabled)
+            mouseEnabled = not not isEnabled
         end
         f.IsMouseEnabled = function()
             return mouseEnabled
@@ -1091,12 +1110,27 @@ function TestHelpers.SetupOptionsGlobals()
         f.GetChildren = function()
             return
         end
-        f.SetEnabled = noop
+        f.SetEnabled = function(_, isEnabled)
+            enabled = not not isEnabled
+        end
+        f.IsEnabled = function()
+            return enabled
+        end
+        f.RegisterEvent = function(_, event)
+            registeredEvents[event] = true
+        end
+        f.UnregisterEvent = function(_, event)
+            registeredEvents[event] = nil
+        end
+        f.IsEventRegistered = function(_, event)
+            return registeredEvents[event] == true
+        end
         f.RegisterForClicks = noop
         f.SetAutoFocus = noop
         f.SetNumeric = noop
         f.SetText = function(_, newText)
             text = newText
+            highlighted = false
         end
         f.GetText = function()
             return text
@@ -1104,23 +1138,67 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetWordWrap = noop
         f.SetJustifyH = noop
         f.SetJustifyV = noop
-        f.SetColorRGB = noop
+        f.SetColorRGB = function(_, r, g, b, a)
+            textColor = { r, g, b, a or 1 }
+        end
         f.SetColorTexture = noop
-        f.SetTexture = noop
+        f.SetTexture = function(_, newTexture)
+            texture = newTexture
+        end
+        f.GetTexture = function()
+            return texture
+        end
+        f.SetDesaturated = function(_, isDesaturated)
+            desaturated = not not isDesaturated
+        end
+        f.IsDesaturated = function()
+            return desaturated
+        end
+        f.SetVertexColor = function(_, r, g, b, a)
+            vertexColor = { r, g, b, a or 1 }
+        end
+        f.GetVertexColor = function()
+            return vertexColor[1], vertexColor[2], vertexColor[3], vertexColor[4]
+        end
         f.SetFontObject = function(_, newFontObject)
             fontObject = newFontObject
         end
         f.GetFontObject = function()
             return fontObject
         end
-        f.SetFocus = noop
-        f.ClearFocus = noop
-        f.HighlightText = noop
+        f.SetFocus = function(self)
+            if focusedFrame and focusedFrame ~= self and focusedFrame.ClearFocus then
+                focusedFrame:ClearFocus()
+            end
+            focusedFrame = self
+            hasFocus = true
+        end
+        f.ClearFocus = function(self)
+            if focusedFrame == self then
+                focusedFrame = nil
+            end
+            hasFocus = false
+        end
+        f.HasFocus = function()
+            return hasFocus
+        end
+        f.HighlightText = function()
+            highlighted = true
+        end
+        f.IsTextHighlighted = function()
+            return highlighted
+        end
         f.SetBackdrop = noop
         f.SetBackdropBorderColor = noop
         f.SetMinMaxValues = noop
         f.SetValueStep = noop
         f.SetObeyStepOnDrag = noop
+        f.SetTextColor = function(_, r, g, b, a)
+            textColor = { r, g, b, a or 1 }
+        end
+        f.GetTextColor = function()
+            return textColor[1], textColor[2], textColor[3], textColor[4]
+        end
         f.RegisterCallback = function(self, event, fn, owner)
             self.callbacks[event] = self.callbacks[event] or {}
             self.callbacks[event][#self.callbacks[event] + 1] = { fn = fn, owner = owner }

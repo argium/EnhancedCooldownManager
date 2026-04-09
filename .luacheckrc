@@ -18,6 +18,18 @@ ignore = {
     "212/..."   -- unused variable length argument
 }
 
+files = {
+    ["**/Tests/**"] = {
+        std = "+busted",
+        read_globals = {
+            assert = { other_fields = true },
+            mock = { other_fields = true },
+            spy = { other_fields = true },
+            stub = { other_fields = true }
+        }
+    }
+}
+
 globals = {
     "LSB_DEBUG",
     "LibLSMSettingsWidgets_FontPickerMixin",
@@ -40,13 +52,15 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
 
     -- Externals
     "AddonCompartmentFrame",
-    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
+    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_PvP", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
     "CANCEL",
+    "CreateAtlasMarkup",
     "ColorPickerFrame",
     "CLOSE",
     "CreateColorFromHexString",
     "CreateDataProvider",
     "CreateFrame",
+    "CreateTextureMarkup",
     "CreateScrollBoxListLinearView",
     "CreateSettingsButtonInitializer",
     "CreateSettingsListSectionHeaderInitializer",

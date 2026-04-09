@@ -149,6 +149,22 @@ describe("ExtraIconsOptions data helpers", function()
             ExtraIconsOptions._addStackKey(profile, "main", "healthstones")
             assert.are.equal(1, #profile.extraIcons.viewers.main)
         end)
+
+        it("skips duplicate builtin entries across viewers", function()
+            local profile = {
+                extraIcons = {
+                    viewers = {
+                        utility = { { stackKey = "trinket1" } },
+                        main = {},
+                    },
+                },
+            }
+
+            ExtraIconsOptions._addStackKey(profile, "main", "trinket1")
+
+            assert.are.equal(1, #profile.extraIcons.viewers.utility)
+            assert.are.equal(0, #profile.extraIcons.viewers.main)
+        end)
     end)
 
     describe("_addRacial", function()
@@ -176,6 +192,22 @@ describe("ExtraIconsOptions data helpers", function()
             local entry = profile.extraIcons.viewers.main[1]
             assert.are.equal("spell", entry.kind)
             assert.are.same({ 100, 200 }, entry.ids)
+        end)
+
+        it("skips duplicate custom entries across viewers", function()
+            local profile = {
+                extraIcons = {
+                    viewers = {
+                        utility = { { kind = "spell", ids = { 12345 } } },
+                        main = {},
+                    },
+                },
+            }
+
+            ExtraIconsOptions._addCustomEntry(profile, "main", "spell", { 12345 })
+
+            assert.are.equal(1, #profile.extraIcons.viewers.utility)
+            assert.are.equal(0, #profile.extraIcons.viewers.main)
         end)
     end)
 
@@ -303,6 +335,22 @@ describe("ExtraIconsOptions data helpers", function()
             ExtraIconsOptions._moveEntry(profile, "utility", "main", 5)
             assert.are.equal(1, #profile.extraIcons.viewers.utility)
             assert.are.equal(0, #profile.extraIcons.viewers.main)
+        end)
+
+        it("is a no-op when the target viewer already has the same entry", function()
+            local profile = {
+                extraIcons = {
+                    viewers = {
+                        utility = { { kind = "spell", ids = { 12345 } } },
+                        main = { { kind = "spell", ids = { 12345 } } },
+                    },
+                },
+            }
+
+            ExtraIconsOptions._moveEntry(profile, "utility", "main", 1)
+
+            assert.are.equal(1, #profile.extraIcons.viewers.utility)
+            assert.are.equal(1, #profile.extraIcons.viewers.main)
         end)
     end)
 
@@ -615,14 +663,20 @@ describe("ExtraIconsOptions data helpers", function()
 
     describe("_buildViewerRows", function()
         local savedUnitRace
+        local savedIsPlayerSpell
 
         before_each(function()
             savedUnitRace = _G.UnitRace
+            savedIsPlayerSpell = _G.IsPlayerSpell
             _G.UnitRace = function() return "Human", "Human", 1 end
+            _G.IsPlayerSpell = function()
+                return false
+            end
         end)
 
         after_each(function()
             _G.UnitRace = savedUnitRace
+            _G.IsPlayerSpell = savedIsPlayerSpell
         end)
 
         it("adds builtin and current-racial placeholders to utility when absent", function()
@@ -653,6 +707,40 @@ describe("ExtraIconsOptions data helpers", function()
 
             assert.are.equal("entry", rows[1].rowType)
             assert.are.equal("trinket1", rows[1].displayEntry.stackKey)
+        end)
+
+        it("keeps disabled builtins in default order", function()
+            local viewers = {
+                utility = {},
+                main = {
+                    { stackKey = "healthstones", disabled = true },
+                    { kind = "spell", ids = { 59752 } },
+                    { stackKey = "trinket1", disabled = true },
+                },
+            }
+
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "main")
+
+            assert.are.equal("Spell 59752", ExtraIconsOptions._getEntryName(rows[1].displayEntry))
+            assert.are.equal("trinket1", rows[2].displayEntry.stackKey)
+            assert.are.equal("healthstones", rows[3].displayEntry.stackKey)
+        end)
+
+        it("falls back to known racial spells when UnitRace lookup misses", function()
+            local viewers = {
+                utility = {},
+                main = {},
+            }
+
+            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
+            _G.IsPlayerSpell = function(spellId)
+                return spellId == 59752
+            end
+
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+
+            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
+            assert.are.equal(59752, rows[#rows].spellId)
         end)
     end)
 end)
@@ -712,6 +800,14 @@ describe("ExtraIconsOptions settings page", function()
         return nil
     end
 
+    local function getVisibleRowLabels(viewerKey)
+        local labels = {}
+        for _, row in ipairs(getVisibleRows(viewerKey)) do
+            labels[#labels + 1] = row._label:GetText()
+        end
+        return labels
+    end
+
     local function getDraftRow(viewerKey)
         refresh()
         return ns.ExtraIconsOptions._viewerCanvas._viewerDraftRows[viewerKey]
@@ -744,8 +840,10 @@ describe("ExtraIconsOptions settings page", function()
             assert.is_table(vc._viewerDraftRows)
             assert.is_table(vc._viewerHeaders)
             assert.is_table(vc._viewerEmptyLabels)
+            assert.is_not_nil(vc._legendLabel)
             assert.is_not_nil(vc._viewerHeaders.utility._title)
             assert.is_not_nil(vc._viewerHeaders.main._title)
+            assert.are.equal(ns.L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"], vc._legendLabel:GetText())
             assert.are.equal(ns.L["UTILITY_VIEWER_ICONS"], vc._viewerHeaders.utility._title:GetText())
             assert.are.equal(ns.L["MAIN_VIEWER_ICONS"], vc._viewerHeaders.main._title:GetText())
         end)
@@ -775,6 +873,7 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal("Test Spell", draftRow._previewLabel:GetText())
             assert.is_true(draftRow._previewLabel:IsShown())
             assert.is_true(draftRow._addBtn:IsShown())
+            assert.is_true(draftRow._addBtn:IsEnabled())
 
             draftRow._addBtn:GetScript("OnClick")()
 
@@ -784,7 +883,7 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.same({ 12345 }, profile.extraIcons.viewers.main[1].ids)
         end)
 
-        it("shows pending draft resolution with ellipsis and no add button", function()
+        it("shows pending draft resolution with ellipsis and a disabled add button", function()
             _G.C_Item = {
                 DoesItemExistByID = function(itemId)
                     return itemId == 777
@@ -805,7 +904,45 @@ describe("ExtraIconsOptions settings page", function()
             draftRow = getDraftRow("utility")
             assert.are.equal("...", draftRow._previewLabel:GetText())
             assert.is_true(draftRow._previewLabel:IsShown())
-            assert.is_false(draftRow._addBtn:IsShown())
+            assert.is_true(draftRow._addBtn:IsShown())
+            assert.is_false(draftRow._addBtn:IsEnabled())
+        end)
+
+        it("auto-resolves pending item drafts when item data finishes loading", function()
+            local itemNames = {}
+
+            _G.C_Item = {
+                DoesItemExistByID = function(itemId)
+                    return itemId == 777
+                end,
+                GetItemNameByID = function(itemId)
+                    return itemNames[itemId]
+                end,
+                GetItemIconByID = function(itemId)
+                    return itemId == 777 and "item-tex" or nil
+                end,
+                RequestLoadItemDataByID = function() end,
+            }
+
+            local draftRow = getDraftRow("utility")
+            draftRow._typeBtn:GetScript("OnClick")()
+            setDraftText("utility", "777")
+
+            assert.is_true(ns.ExtraIconsOptions._itemLoadFrame:IsEventRegistered("GET_ITEM_INFO_RECEIVED"))
+            assert.are.equal("...", draftRow._previewLabel:GetText())
+
+            itemNames[777] = "Loaded Item"
+            ns.ExtraIconsOptions._itemLoadFrame:GetScript("OnEvent")(
+                ns.ExtraIconsOptions._itemLoadFrame,
+                "GET_ITEM_INFO_RECEIVED",
+                777,
+                true
+            )
+
+            draftRow = getDraftRow("utility")
+            assert.are.equal("Loaded Item", draftRow._previewLabel:GetText())
+            assert.is_true(draftRow._addBtn:IsShown())
+            assert.is_true(draftRow._addBtn:IsEnabled())
         end)
 
         it("disables builtin rows instead of removing them", function()
@@ -822,6 +959,33 @@ describe("ExtraIconsOptions settings page", function()
             assert.is_not_nil(row)
             assert.are.equal("+", row._deleteBtn:GetText())
             assert.are.equal("GameFontDisable", row._label:GetFontObject())
+        end)
+
+        it("keeps disabled builtins in default order and locks their movement", function()
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+            profile.extraIcons.viewers.utility = {}
+            profile.extraIcons.viewers.main = {
+                { stackKey = "healthstones", disabled = true },
+                { kind = "spell", ids = { 12345 } },
+                { stackKey = "trinket1", disabled = true },
+            }
+
+            refresh()
+
+            assert.are.same({ "Test Spell", "Trinket 1", "Healthstones" }, getVisibleRowLabels("main"))
+
+            local trinketRow = findVisibleRowByText("main", "Trinket 1")
+            assert.is_not_nil(trinketRow)
+            assert.is_false(trinketRow._upBtn:IsEnabled())
+            assert.is_false(trinketRow._downBtn:IsEnabled())
+            assert.is_false(trinketRow._moveBtn:IsEnabled())
         end)
 
         it("renders missing builtin rows as disabled placeholders in utility", function()
@@ -877,6 +1041,50 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal("+", row._deleteBtn:GetText())
         end)
 
+        it("shows the current racial placeholder when UnitRace lookup misses but the racial is known", function()
+            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
+            _G.IsPlayerSpell = function(spellId)
+                return spellId == 59752
+            end
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    if spellId == 59752 then return "Every Man for Himself" end
+                    return nil
+                end,
+                GetSpellTexture = function(spellId)
+                    return spellId == 59752 and "racial-tex" or nil
+                end,
+            }
+            profile.extraIcons.viewers.utility = {}
+            profile.extraIcons.viewers.main = {}
+
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Every Man for Himself")
+            assert.is_not_nil(row)
+            assert.are.equal("+", row._deleteBtn:GetText())
+        end)
+
+        it("blocks duplicate inline additions and shows where the entry already exists", function()
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+            profile.extraIcons.viewers.utility = { { kind = "spell", ids = { 12345 } } }
+            profile.extraIcons.viewers.main = {}
+
+            local draftRow = setDraftText("main", "12345")
+
+            assert.are.equal(ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["UTILITY_VIEWER_SHORT"]), draftRow._previewLabel:GetText())
+            assert.is_true(draftRow._addBtn:IsShown())
+            assert.is_false(draftRow._addBtn:IsEnabled())
+            assert.are.equal(0, #profile.extraIcons.viewers.main)
+        end)
+
         it("does not display racials from other races", function()
             _G.C_Spell = {
                 GetSpellName = function(spellId)
@@ -917,6 +1125,34 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal(1, #profile.extraIcons.viewers.main)
         end)
 
+        it("blocks moving an entry into a viewer that already has the same entry", function()
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+            profile.extraIcons.viewers.utility = { { kind = "spell", ids = { 12345 } } }
+            profile.extraIcons.viewers.main = { { kind = "spell", ids = { 12345 } } }
+
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Test Spell")
+            assert.is_false(row._moveBtn:IsEnabled())
+            row._moveBtn:GetScript("OnEnter")(row._moveBtn)
+            assert.are.equal(
+                ns.L["EXTRA_ICONS_DUPLICATE_MOVE_TOOLTIP"]:format(ns.L["MAIN_VIEWER_SHORT"]),
+                _G.GameTooltip._title
+            )
+
+            row._moveBtn:GetScript("OnClick")()
+
+            assert.are.equal(1, #profile.extraIcons.viewers.utility)
+            assert.are.equal(1, #profile.extraIcons.viewers.main)
+        end)
+
         it("rebinds whole-row mouseover handlers on refresh", function()
             refresh()
 
@@ -944,11 +1180,146 @@ describe("ExtraIconsOptions settings page", function()
             assert.are.equal(37, x)
         end)
 
+        it("adds extra spacing between viewer rows", function()
+            refresh()
+
+            local rows = getVisibleRows("utility")
+            local _, _, _, _, firstY = rows[1]:GetPoint(1)
+            local _, _, _, _, secondY = rows[2]:GetPoint(1)
+
+            assert.are.equal(-30, secondY - firstY)
+        end)
+
         it("creates inline draft rows at the same alignment", function()
             local row = getDraftRow("utility")
             local point, _, _, x = row:GetPoint(1)
             assert.are.equal("TOPLEFT", point)
             assert.are.equal(37, x)
+        end)
+
+        it("shows placeholder text that tracks draft type and focus", function()
+            local row = getDraftRow("utility")
+
+            assert.are.equal(ns.L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"], row._editBoxPlaceholder:GetText())
+            assert.is_true(row._editBoxPlaceholder:IsShown())
+            assert.is_false(row._addBtn:IsEnabled())
+
+            row._editBox:SetFocus()
+            row._editBox:GetScript("OnEditFocusGained")(row._editBox)
+            assert.is_false(row._editBoxPlaceholder:IsShown())
+
+            row._editBox:GetScript("OnEditFocusLost")(row._editBox)
+            assert.is_true(row._editBoxPlaceholder:IsShown())
+
+            row._typeBtn:GetScript("OnClick")()
+
+            row = getDraftRow("utility")
+            assert.are.equal(ns.L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"], row._editBoxPlaceholder:GetText())
+            assert.is_true(row._editBoxPlaceholder:IsShown())
+            assert.is_false(row._editBoxHasFocus)
+        end)
+
+        it("supports keyboard-friendly draft entry flow", function()
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+
+            local row = getDraftRow("main")
+            row._editBox:SetFocus()
+            row._editBox:SetText("12345")
+            row._editBox:GetScript("OnTextChanged")(row._editBox)
+            row._editBox:GetScript("OnEnterPressed")(row._editBox)
+
+            assert.are.equal(1, #profile.extraIcons.viewers.main)
+            assert.is_true(row._editBox:HasFocus())
+            assert.is_true(row._editBox:IsTextHighlighted())
+
+            row._editBox:GetScript("OnTabPressed")(row._editBox)
+
+            assert.are.equal("item", ns.ExtraIconsOptions._draftStates.main.kind)
+            assert.is_true(row._editBox:HasFocus())
+
+            row._editBox:GetScript("OnEscapePressed")(row._editBox)
+            assert.is_false(row._editBox:HasFocus())
+        end)
+
+        it("shows explanatory tooltips for special rows", function()
+            profile.extraIcons.viewers.utility = {}
+            profile.extraIcons.viewers.main = {}
+
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Trinket 1")
+            row:GetScript("OnEnter")(row)
+
+            assert.are.equal("Trinket 1", _G.GameTooltip._title)
+            assert.are.equal(ns.L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"], _G.GameTooltip._lines[1])
+        end)
+
+        it("appends spell IDs to spell-entry tooltip titles", function()
+            _G.C_Spell = {
+                GetSpellName = function(spellId)
+                    return spellId == 12345 and "Test Spell" or nil
+                end,
+                GetSpellTexture = function()
+                    return nil
+                end,
+            }
+            profile.extraIcons.viewers.utility = { { kind = "spell", ids = { 12345 } } }
+
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Test Spell")
+            row:GetScript("OnEnter")(row)
+
+            assert.are.equal("Test Spell (spell ID 12345)", _G.GameTooltip._title)
+        end)
+
+        it("appends item IDs to item-entry tooltip titles", function()
+            _G.C_Item = {
+                DoesItemExistByID = function(itemId)
+                    return itemId == 99999
+                end,
+                GetItemNameByID = function(itemId)
+                    return itemId == 99999 and "Test Item" or nil
+                end,
+                GetItemIconByID = function()
+                    return nil
+                end,
+                RequestLoadItemDataByID = function() end,
+            }
+            profile.extraIcons.viewers.utility = { { kind = "item", ids = { { itemID = 99999 } } } }
+
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Test Item")
+            row:GetScript("OnEnter")(row)
+
+            assert.are.equal("Test Item (item ID 99999)", _G.GameTooltip._title)
+        end)
+
+        it("uses Hide for active built-in row button tooltips", function()
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Trinket 1")
+            row._deleteBtn:GetScript("OnEnter")(row._deleteBtn)
+
+            assert.are.equal(ns.L["EXTRA_ICONS_HIDE_TOOLTIP"], _G.GameTooltip._title)
+        end)
+
+        it("does not add built-in enabled text to active built-in row tooltips", function()
+            refresh()
+
+            local row = findVisibleRowByText("utility", "Trinket 1")
+            row:GetScript("OnEnter")(row)
+
+            assert.are.equal("Trinket 1", _G.GameTooltip._title)
+            assert.are.same({}, _G.GameTooltip._lines)
         end)
     end)
 end)

@@ -452,6 +452,41 @@ describe("SpellColors", function()
         assert.are.same(newer, SpellColors.GetColorByKey({ spellName = "Fel Rush" }))
     end)
 
+    it("RemoveEntriesByKeys clears matching persisted and discovered entries", function()
+        SpellColors.ClearDiscoveredKeys()
+
+        local staleColor = color(0.4, 0.5, 0.6)
+        local keepColor = color(0.8, 0.2, 0.1)
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), staleColor)
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Keep Me", 12345, 67890, 13579), keepColor)
+
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Immolation Aura",
+            spellID = 258920,
+            cooldownID = 77,
+            textureFileID = 9001,
+        }))
+        SpellColors.DiscoverBar(makeFrame({
+            spellName = "Keep Me",
+            spellID = 12345,
+            cooldownID = 67890,
+            textureFileID = 13579,
+        }))
+
+        local removed = SpellColors.RemoveEntriesByKeys({
+            SpellColors.MakeKey("Immolation Aura", 258920, nil, nil),
+        })
+
+        assert.are.equal(1, #removed)
+        assert.is_nil(SpellColors.GetColorByKey({ spellName = "Immolation Aura" }))
+        assert.is_nil(SpellColors.GetColorByKey({ spellID = 258920 }))
+
+        local entries = SpellColors.GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Keep Me", entries[1].key.spellName)
+        assert.are.same(keepColor, entries[1].color)
+    end)
+
     it("GetAllColorEntries returns deduplicated entries for shared references", function()
         local c = color(0.2, 0.3, 0.4)
         SpellColors.SetColorByKey(SpellColors.MakeKey("Eye Beam", 198013, 55, 1111), c)

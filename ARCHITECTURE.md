@@ -382,7 +382,7 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
 }
 ```
 
-**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Built-in rows use the trailing button as an enable/disable toggle instead of removal, and missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section. The current-player racial is also synthesized as a disabled placeholder when absent; adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables.
+**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `RegisterFromTable` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the canvas as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows. Built-in rows use the trailing button as an enable/disable toggle instead of removal, and disabled built-ins are normalized to the bottom of their viewer in `BUILTIN_STACK_ORDER` so they stay visually stable. Missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section. The current-player racial is also synthesized as a disabled placeholder when absent; adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables. Special-row behavior is explained through a short legend plus row-specific tooltips.
 
 ### FrameUtil (`ns.FrameUtil`)
 
@@ -421,10 +421,13 @@ Multi-tier key system for per-spell color customization on buff bars. Keys match
 | `GetDefaultColor()` | Return default color for class/spec |
 | `SetDefaultColor(color)` | Set default color for class/spec |
 | `ReconcileAllKeys(keys)` | Batch-reconcile keys (propagate most-recent across tiers) |
+| `RemoveEntriesByKeys(keys)` | Remove matching persisted and discovered spell-color keys |
 | `DiscoverBar(frame)` | Register a discovered bar key |
 | `ClearDiscoveredKeys()` | Clear discovered key cache |
 | `ClearCurrentSpecColors()` | Clear all colors for current class/spec |
 | `SetConfigAccessor(accessor)` | Inject config accessor (decouples from AceDB) |
+
+The spell-color settings canvas (`UI/BuffBarsOptions.lua`) merges persisted and discovered keys into one list, enables `Reconcile` and `Remove Stale` only when a row is still missing one or more identifiers, and lets `Remove Stale` confirmed-delete incomplete entries from both the current-spec stores and the runtime discovered-key cache while echoing each removal to chat.
 
 ### ClassUtil (`ns.ClassUtil`)
 

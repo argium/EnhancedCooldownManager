@@ -119,4 +119,4 @@ function ResourceBarOptions.RegisterSettings(SB)
     })
 end
 
-    ns.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)
+ns.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)
