@@ -48,12 +48,12 @@ The built-in path helpers support numeric segments like `colors.0`.
 ## Category helpers
 
 - `SB.CreateRootCategory(name)`
-- `SB.CreateSubcategory(name)`
+- `SB.CreateSubcategory(name[, parentCategory])`
 - `SB.CreateCanvasSubcategory(frame, name[, parentCategory])`
-- `SB.CreateCanvasLayout(name[, parentCategory])`
 - `SB.RegisterCategories()`
 - `SB.GetRootCategoryID()`
 - `SB.GetSubcategoryID(name)`
+- `SB.RefreshCategory(categoryOrName)`
 
 ## Controls
 
@@ -145,6 +145,30 @@ Notes:
 
 Dispatches to the correct control factory using `spec.type`.
 
+### `SB.Collection(spec)`
+
+Creates a first-class dynamic collection row backed by the normal settings list.
+
+Required fields:
+
+- `height`
+
+Flat-list fields:
+
+- `preset = "swatch"` or `preset = "editor"`
+- `items(frame)` → item list
+
+Sectioned-list fields:
+
+- `sections(frame)` → section list
+
+Supported collection row presets:
+
+- `swatch` — label/icon plus color swatch rows
+- `editor` — label plus one or more slider fields, optional swatch, and remove button
+- section items use the built-in action-row layout (`up`, `down`, `move`, `delete`)
+- section trailers support `preset = "modeInput"` for toggle + input + preview + submit rows
+
 ## Composite builders
 
 - `SB.HeightOverrideSlider(sectionPath[, spec])`
@@ -163,6 +187,9 @@ Dispatches to the correct control factory using `spec.type`.
 - `SB.RegisterSection(nsTable, key, section)`
 
 `SB.Button` supports `confirm = true` or a custom confirm string. Confirm dialogs are registered per button to avoid cross-button collisions.
+`SB.Header` also accepts spec tables with `actions = { ... }` for right-aligned action buttons. When the first action header matches the current category title, LibSettingsBuilder treats it as a page action bar and suppresses the duplicate in-list title text.
+`SB.InfoRow` accepts function-backed `value` for dynamic text.
+`SB.RefreshCategory(...)` re-evaluates registered dynamic rows for a visible category.
 
 ## Table-driven registration
 
@@ -181,6 +208,7 @@ Supported standard types:
 - `subheader` / `description`
 - `info`
 - `canvas`
+- `collection`
 
 Supported composite types:
 
@@ -199,22 +227,11 @@ The library has three main families of row builders:
 - **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `toggleList`).
 
 `input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
+`collection` is the preferred way to build dynamic editors without dropping into a second "canvas" authoring API. `canvas` / `EmbedCanvas` remain available as escape hatches for truly bespoke frames.
 
-## Canvas layout helpers
+## Legacy canvas helpers
 
-`CreateCanvasLayout` returns a layout object with these methods:
-
-- `AddHeader(text)`
-- `AddSpacer(height)`
-- `AddDescription(text[, fontObject])`
-- `AddColorSwatch(label)`
-- `AddSlider(label, min, max[, step])`
-- `AddButton(label, buttonText)`
-- `AddScrollList(elementExtent)`
-
-### Canvas layout configuration
-
-Library defaults live on `LSB.CanvasLayoutDefaults` and can be adjusted globally or per layout.
+Canvas-layout helpers still exist for backwards compatibility, but new pages should prefer `RegisterFromTable(...)` plus `collection`, dynamic `info` rows, handler-mode `dropdown`, and `header.actions`.
 
 #### `SB.SetCanvasLayoutDefaults(overrides)`
 

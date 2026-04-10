@@ -14,6 +14,7 @@
 - Use the **imperative API** if you want precise control over layout and call order.
 - Use **handler mode** if your settings are not stored in a dot-path table.
 - Use `input` rows when you need text or numeric entry without building a custom template.
+- Use `collection` rows when you need ordered lists, grouped editors, or add/remove workflows without dropping into a bespoke frame API.
 
 ## Table-driven setup
 
@@ -110,7 +111,7 @@ SB.Input({
 SB.RegisterCategories()
 ```
 
-`RegisterFromTable(...)` can mix persisted controls and layout-only rows freely, so it is normal to combine `toggle`, `range`, `input`, `header`, `description`, `info`, `button`, and `canvas` entries on one page.
+`RegisterFromTable(...)` can mix persisted controls and layout-only rows freely, so it is normal to combine `toggle`, `range`, `input`, `header`, `description`, `info`, `button`, `collection`, and `canvas` entries on one page.
 
 ## Handler mode
 
@@ -159,4 +160,5 @@ SB.RegisterCategories()
 - Keep `onChanged` fast; use it to refresh UI, not rebuild the world.
 - Use composites for repeated patterns like borders, font overrides, and positioning.
 - Prefer table-driven registration for large standard settings pages.
-- Reach for `SB.Custom(...)` only when built-ins like `input` stop fitting.
+- Use `SB.RefreshCategory(...)` for async or transient state that needs the visible page to redraw.
+- Reach for `SB.Custom(...)` or `SB.EmbedCanvas(...)` only when built-ins like `input` and `collection` stop fitting.

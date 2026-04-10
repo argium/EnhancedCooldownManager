@@ -68,8 +68,8 @@ local function getPreferredProfileSelection(valuesGenerator)
     return first or ""
 end
 
---- Creates a proxy-backed dropdown for transient profile selection (not stored in SavedVars).
-local function createProfilePicker(cat, variable, name, tooltip, valuesGenerator)
+--- Creates a handler-backed dropdown for transient profile selection (not stored in SavedVars).
+local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGenerator)
     local selected = getPreferredProfileSelection(valuesGenerator)
 
     local function ensureSelection()
@@ -78,14 +78,32 @@ local function createProfilePicker(cat, variable, name, tooltip, valuesGenerator
         end
     end
 
-    local setting = Settings.RegisterProxySetting(cat, variable, Settings.VarType.String, name, selected, function()
-        ensureSelection()
-        return selected
-    end, function(value)
-        selected = value
-    end)
-    Settings.CreateDropdown(cat, setting, valuesGenerator, tooltip)
+    local function values()
+        local map = {}
+        for _, entry in ipairs(valuesGenerator()) do
+            map[entry.value] = entry.label
+        end
+        return map
+    end
+
+    local _, setting = SB.Dropdown({
+        category = cat,
+        key = variable,
+        name = name,
+        tooltip = tooltip,
+        default = selected,
+        scrollHeight = 240,
+        values = values,
+        get = function()
+            ensureSelection()
+            return selected
+        end,
+        set = function(value)
+            selected = value
+        end,
+    })
     ensureSelection()
+
     return setting, function()
         ensureSelection()
         return selected
@@ -96,31 +114,35 @@ end
 
 function ProfileOptions.RegisterSettings(SB)
     local cat = SB.CreateSubcategory(L["PROFILES"])
+    local function refreshCategory()
+        SB.RefreshCategory(cat)
+    end
 
     -- Switch Profile
     SB.Header(L["ACTIVE_PROFILE"])
 
-    local switchSetting = Settings.RegisterProxySetting(
-        cat,
-        "ECM_ProfileSwitch",
-        Settings.VarType.String,
-        L["SWITCH_PROFILE"],
-        ns.Addon.db:GetCurrentProfile(),
-        function()
+    local _, switchSetting = SB.Dropdown({
+        category = cat,
+        key = "ECM_ProfileSwitch",
+        name = L["SWITCH_PROFILE"],
+        tooltip = L["SWITCH_PROFILE_DESC"],
+        default = ns.Addon.db:GetCurrentProfile(),
+        scrollHeight = 240,
+        values = function()
+            local values = {}
+            for _, name in ipairs(ns.Addon.db:GetProfiles()) do
+                values[name] = name
+            end
+            return values
+        end,
+        get = function()
             return ns.Addon.db:GetCurrentProfile()
         end,
-        function(value)
+        set = function(value)
             ns.Addon.db:SetProfile(value)
-        end
-    )
-
-    Settings.CreateDropdown(cat, switchSetting, function()
-        local container = Settings.CreateControlTextContainer()
-        for _, name in ipairs(ns.Addon.db:GetProfiles()) do
-            container:Add(name, name)
-        end
-        return container:GetData()
-    end, L["SWITCH_PROFILE_DESC"])
+            refreshCategory()
+        end,
+    })
 
     SB.Button({
         name = L["NEW_PROFILE"],
@@ -130,6 +152,7 @@ function ProfileOptions.RegisterSettings(SB)
             StaticPopup_Show("ECM_NEW_PROFILE", nil, nil, {
                 onAccept = function(name)
                     switchSetting:SetValue(name)
+                    refreshCategory()
                 end,
             })
         end,
@@ -150,7 +173,7 @@ function ProfileOptions.RegisterSettings(SB)
     end
 
     local _, getCopyProfile, clearCopyProfile =
-        createProfilePicker(cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
+        createProfilePicker(SB, cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
 
     SB.Button({
         name = L["COPY"],
@@ -165,12 +188,14 @@ function ProfileOptions.RegisterSettings(SB)
                 onAccept = function()
                     ns.Addon.db:CopyProfile(profile)
                     clearCopyProfile()
+                    refreshCategory()
                 end,
             })
         end,
     })
 
     local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
+        SB,
         cat,
         "ECM_ProfileDelete",
         L["DELETE_PROFILE"],
@@ -191,6 +216,7 @@ function ProfileOptions.RegisterSettings(SB)
                 onAccept = function()
                     ns.Addon.db:DeleteProfile(profile)
                     clearDeleteProfile()
+                    refreshCategory()
                 end,
             })
         end,

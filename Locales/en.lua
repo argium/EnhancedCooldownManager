@@ -189,8 +189,6 @@ L["HEIGHT_OVERRIDE"] = "Height Override"
 L["HEIGHT_OVERRIDE_DESC"] = "Override the default bar height. Set to 0 to use the global default."
 L["AURA_VERTICAL_SPACING"] = "Vertical Spacing"
 L["AURA_VERTICAL_SPACING_DESC"] = "Vertical gap between aura bars. Set to 0 for no spacing."
-L["CONFIGURE_SPELL_COLORS"] = "Configure Spell Colors"
-L["OPEN"] = "Open"
 
 L["SPELL_COLORS_SUBCAT"] = "Spell Colors"
 L["SPELL_COLORS_DESC"] =
@@ -204,7 +202,6 @@ L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"] =
     "Remove partial or stale entries that were discovered while spell information was secret. Reconcile should be attempted before this."
 L["SPELL_COLORS_DONT_REMOVE"] = "Don't Remove"
 L["SPELL_COLORS_REMOVED_STALE_ENTRY"] = "Removed stale spell color entry: %s"
-L["SPELL_COLORS_RESET_CONFIRM"] = "Are you sure you want to reset all spell colors for this spec?"
 L["SPELL_COLORS_COMBAT_WARNING"] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
 L["SPELL_COLORS_SECRETS_WARNING"] =
     "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"

@@ -368,7 +368,7 @@ function mod:OnInitialize()
 
     ns.Migration.FlushLog()
 
-    -- Register bundled font with LibSharedMedia if present.
+    -- Register bundled fonts with LibSharedMedia
     if LSM then
         pcall(
             LSM.Register,
@@ -376,6 +376,13 @@ function mod:OnInitialize()
             "font",
             "Expressway",
             "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+        )
+        pcall(
+            LSM.Register,
+            LSM,
+            "font",
+            "Cabin",
+            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Cabin.ttf"
         )
     end
 

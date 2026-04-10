@@ -90,9 +90,9 @@ If debugging slider behavior:
 - confirm no other addon is replacing the slider frame structure,
 - test with other UI customizers disabled.
 
-## Canvas pages look slightly off after a WoW patch
+## Legacy canvas pages look slightly off after a WoW patch
 
-Canvas layout spacing is configurable.
+Canvas layout spacing is configurable for older `CreateCanvasLayout(...)` pages. New pages should prefer the standard settings DSL with `collection` rows instead of tuning canvas metrics by default.
 
 Use:
 

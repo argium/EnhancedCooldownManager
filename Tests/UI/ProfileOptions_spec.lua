@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("ProfileOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, profileCategory, initializers
+    local profile, defaults, SB, ns, settings, profileCategory, initializers, refreshCalls
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -23,6 +23,10 @@ describe("ProfileOptions getters/setters/defaults", function()
         TestHelpers.SetupOptionsGlobals()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+        refreshCalls = {}
+        SB.RefreshCategory = function(category)
+            refreshCalls[#refreshCalls + 1] = category
+        end
 
         -- Profile module needs import/export stubs
         ns.ImportExport = {
@@ -50,6 +54,10 @@ describe("ProfileOptions getters/setters/defaults", function()
             settings["ECM_ProfileSwitch"]:SetValue("Other")
             assert.are.equal("Other", called)
         end)
+        it("setter refreshes the category", function()
+            settings["ECM_ProfileSwitch"]:SetValue("Other")
+            assert.are.same({ profileCategory }, refreshCalls)
+        end)
         it("uses the localized New Profile row label", function()
             local newProfileButton = assert(TestHelpers.FindButtonInitializer(initializers, ns.L["NEW_PROFILE"]))
 
@@ -65,6 +73,7 @@ describe("ProfileOptions getters/setters/defaults", function()
 
             assert.are.equal("ECM_NEW_PROFILE", getShown())
             assert.are.equal("MyCustomProfile", switched)
+            assert.are.same({ profileCategory, profileCategory }, refreshCalls)
         end)
     end)
 
@@ -131,6 +140,7 @@ describe("ProfileOptions getters/setters/defaults", function()
 
             assert.are.equal("ECM_CONFIRM_COPY_PROFILE", getShown())
             assert.are.equal("Other", copied)
+            assert.are.same({ profileCategory }, refreshCalls)
         end)
 
         it("Copy does nothing when selection is empty", function()
@@ -157,6 +167,7 @@ describe("ProfileOptions getters/setters/defaults", function()
 
             assert.are.equal("ECM_CONFIRM_DELETE_PROFILE", getShown())
             assert.are.equal("Other", deleted)
+            assert.are.same({ profileCategory }, refreshCalls)
         end)
 
         it("Delete does nothing when selection is empty", function()

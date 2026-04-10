@@ -884,6 +884,59 @@ function TestHelpers.MakeOptionsProfile()
     return deepClone(ns.defaults.profile), deepClone(ns.defaults.profile)
 end
 
+function TestHelpers.SetupGameTooltipStub()
+    _G.GameTooltip = {
+        _title = nil,
+        _titleColor = nil,
+        _titleAlpha = nil,
+        _titleWrap = nil,
+        _lines = {},
+        _owner = nil,
+        _anchor = nil,
+        _shown = false,
+        SetOwner = function(self, owner, anchor)
+            self._owner = owner
+            self._anchor = anchor
+        end,
+        ClearLines = function(self)
+            self._title = nil
+            self._titleColor = nil
+            self._titleAlpha = nil
+            self._titleWrap = nil
+            self._lines = {}
+        end,
+        SetText = function(self, text, color, alpha, wrap, ...)
+            if type(color) == "number" or type(wrap) == "number" or select("#", ...) > 0 then
+                error("GameTooltip:SetText expects text, color, alpha, wrap", 2)
+            end
+            self._title = text
+            self._titleColor = color
+            self._titleAlpha = alpha
+            self._titleWrap = wrap
+            self._lines = {}
+        end,
+        AddLine = function(self, text, color, wrap, ...)
+            if type(color) == "number" or select("#", ...) > 0 then
+                error("GameTooltip:AddLine expects text, color, wrap", 2)
+            end
+            self._lines[#self._lines + 1] = text
+        end,
+        Show = function(self)
+            self._shown = true
+        end,
+        Hide = function(self)
+            self._shown = false
+        end,
+    }
+    _G.GameTooltip_Hide = function()
+        if _G.GameTooltip and _G.GameTooltip.Hide then
+            _G.GameTooltip:Hide()
+        end
+    end
+
+    return _G.GameTooltip
+end
+
 --- Install common WoW globals for option tests.
 function TestHelpers.SetupOptionsGlobals()
     TestHelpers.SetupLibStub()
@@ -940,39 +993,7 @@ function TestHelpers.SetupOptionsGlobals()
     _G.CreateAtlasMarkup = function(atlas)
         return "|A" .. tostring(atlas) .. "|a"
     end
-    _G.GameTooltip = {
-        _title = nil,
-        _lines = {},
-        _owner = nil,
-        _anchor = nil,
-        _shown = false,
-        SetOwner = function(self, owner, anchor)
-            self._owner = owner
-            self._anchor = anchor
-        end,
-        ClearLines = function(self)
-            self._title = nil
-            self._lines = {}
-        end,
-        SetText = function(self, text)
-            self._title = text
-            self._lines = {}
-        end,
-        AddLine = function(self, text)
-            self._lines[#self._lines + 1] = text
-        end,
-        Show = function(self)
-            self._shown = true
-        end,
-        Hide = function(self)
-            self._shown = false
-        end,
-    }
-    _G.GameTooltip_Hide = function()
-        if _G.GameTooltip and _G.GameTooltip.Hide then
-            _G.GameTooltip:Hide()
-        end
-    end
+    TestHelpers.SetupGameTooltipStub()
     _G.UnitName = function()
         return "TestPlayer"
     end

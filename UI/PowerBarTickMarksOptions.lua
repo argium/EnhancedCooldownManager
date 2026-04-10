@@ -106,10 +106,6 @@ end
 
 StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ns.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
 
-local function roundToStep(value)
-    return math.floor(value + 0.5)
-end
-
 local function getValueSliderRange(currentValue)
     for _, tier in ipairs(C.VALUE_SLIDER_TIERS) do
         if currentValue <= tier.ceiling then
@@ -120,350 +116,203 @@ local function getValueSliderRange(currentValue)
     return math.ceil(currentValue / last.step) * last.step, last.step
 end
 
-local function roundSliderValue(value, step, minValue, maxValue)
-    local actualStep = step or 1
-    local baseValue = minValue or 0
-    local rounded = math.floor(((value - baseValue) / actualStep) + 0.5) * actualStep + baseValue
-    if minValue then
-        rounded = math.max(minValue, rounded)
-    end
-    if maxValue then
-        rounded = math.min(maxValue, rounded)
-    end
-    return rounded
-end
+function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
+    local categoryName = "Tick Marks"
+    local category
 
-local function getSliderStepCount(minValue, maxValue, step)
-    return math.max(1, math.floor(((maxValue - minValue) / (step or 1)) + 0.5))
-end
-
-local function createSliderFormatters()
-    if not MinimalSliderWithSteppersMixin or not MinimalSliderWithSteppersMixin.Label then
-        return nil
-    end
-
-    return {
-        [MinimalSliderWithSteppersMixin.Label.Right] = function()
-            return ""
-        end,
-    }
-end
-
-local function attachSliderValueEditor(slider, textLabel, editBoxWidth)
-    if slider._ecmValueButton then
-        return
-    end
-
-    local function hideEditBox()
-        if slider._ecmEditBox and slider._ecmEditBox.ClearFocus then
-            slider._ecmEditBox:ClearFocus()
-        end
-        if slider._ecmEditBox then
-            slider._ecmEditBox:Hide()
-        end
-        textLabel:Show()
-    end
-
-    local function applyEditBoxValue()
-        local editBox = slider._ecmEditBox
-        local enteredValue = editBox and tonumber(editBox:GetText())
-        if enteredValue then
-            local clamped = math.max(slider._ecmMinValue or 1, math.floor(enteredValue + 0.5))
-            if slider._ecmRescale then
-                slider._ecmRescale(clamped)
-            end
-            slider:SetValue(roundSliderValue(clamped, slider._ecmStep, slider._ecmMinValue, slider._ecmMaxValue))
-        end
-        hideEditBox()
-    end
-
-    local valueButton = CreateFrame("Button", nil, slider)
-    valueButton:RegisterForClicks("LeftButtonDown")
-    valueButton:SetAllPoints(textLabel)
-    slider._ecmValueButton = valueButton
-
-    local editBox = CreateFrame("EditBox", nil, slider, "InputBoxTemplate")
-    editBox:SetAutoFocus(false)
-    editBox:SetNumeric(false)
-    editBox:SetSize(editBoxWidth, 20)
-    editBox:SetPoint("CENTER", textLabel, "CENTER")
-    editBox:SetJustifyH("CENTER")
-    editBox:Hide()
-    slider._ecmEditBox = editBox
-
-    editBox:SetScript("OnEnterPressed", applyEditBoxValue)
-    editBox:SetScript("OnEscapePressed", hideEditBox)
-    editBox:SetScript("OnEditFocusLost", hideEditBox)
-
-    valueButton:SetScript("OnClick", function()
-        valueButton:ClearAllPoints()
-        valueButton:SetAllPoints(textLabel)
-        editBox:SetText(textLabel:GetText())
-        textLabel:Hide()
-        editBox:Show()
-        editBox:SetFocus()
-        editBox:HighlightText()
-    end)
-end
-
-local function configureSlider(slider, textLabel, minValue, maxValue, step, editBoxWidth, onValueChanged, rescale)
-    slider._ecmMinValue = minValue
-    slider._ecmMaxValue = maxValue
-    slider._ecmStep = step
-    slider._ecmRescale = rescale or nil
-
-    if slider.MinText then
-        slider.MinText:Hide()
-    end
-    if slider.MaxText then
-        slider.MaxText:Hide()
-    end
-    if slider.RightText then
-        slider.RightText:Hide()
-    end
-
-    if slider.Init then
-        slider:Init(minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createSliderFormatters())
-        if slider.Slider and slider.Slider.SetValueStep then
-            slider.Slider:SetValueStep(step)
-        end
-    else
-        slider:SetMinMaxValues(minValue, maxValue)
-        slider:SetValueStep(step)
-        slider:SetObeyStepOnDrag(true)
-    end
-
-    attachSliderValueEditor(slider, textLabel, editBoxWidth)
-
-    local function handleValueChanged(_, value)
-        local rounded = roundSliderValue(value, slider._ecmStep, slider._ecmMinValue, slider._ecmMaxValue)
-        textLabel:SetText(tostring(roundToStep(rounded)))
-        onValueChanged(rounded)
-    end
-
-    if slider.RegisterCallback and MinimalSliderWithSteppersMixin and MinimalSliderWithSteppersMixin.Event then
-        slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, handleValueChanged, slider)
-    else
-        slider:HookScript("OnValueChanged", handleValueChanged)
-    end
-end
-
-local function createTickRowWidgets(rowFrame, SB)
-    rowFrame:SetHeight(34)
-
-    local highlight = rowFrame:CreateTexture(nil, "BACKGROUND")
-    highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.08)
-    highlight:Hide()
-    rowFrame._highlight = highlight
-
-    rowFrame:EnableMouse(true)
-    rowFrame:SetScript("OnEnter", function(self)
-        self._highlight:Show()
-    end)
-    rowFrame:SetScript("OnLeave", function(self)
-        self._highlight:Hide()
-    end)
-
-    local label = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    label:SetPoint("LEFT", 10, 0)
-    label:SetWidth(70)
-    label:SetJustifyH("LEFT")
-    rowFrame._label = label
-
-    local valueSlider = CreateFrame("Slider", nil, rowFrame, "MinimalSliderWithSteppersTemplate")
-    valueSlider:SetPoint("LEFT", label, "RIGHT", 8, 0)
-    valueSlider:SetWidth(150)
-    rowFrame._valueSlider = valueSlider
-
-    local valueText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    valueText:SetPoint("LEFT", valueSlider, "RIGHT", 6, 0)
-    valueText:SetWidth(50)
-    valueText:SetJustifyH("LEFT")
-    rowFrame._valueText = valueText
-
-    local widthSlider = CreateFrame("Slider", nil, rowFrame, "MinimalSliderWithSteppersTemplate")
-    widthSlider:SetPoint("LEFT", valueText, "RIGHT", 12, 0)
-    widthSlider:SetWidth(90)
-    rowFrame._widthSlider = widthSlider
-
-    local widthText = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    widthText:SetPoint("LEFT", widthSlider, "RIGHT", 6, 0)
-    widthText:SetWidth(18)
-    widthText:SetJustifyH("LEFT")
-    rowFrame._widthText = widthText
-
-    local swatch = SB.CreateColorSwatch(rowFrame)
-    swatch:SetPoint("LEFT", widthText, "RIGHT", 10, 0)
-    rowFrame._swatch = swatch
-
-    local removeBtn = CreateFrame("Button", nil, rowFrame, "UIPanelButtonTemplate")
-    removeBtn:SetSize(70, 22)
-    removeBtn:SetPoint("LEFT", swatch, "RIGHT", 8, 0)
-    removeBtn:SetText(L["REMOVE"])
-    rowFrame._removeBtn = removeBtn
-
-    local function rescaleValueSlider(targetValue)
-        local newMax, newStep = getValueSliderRange(math.max(1, targetValue))
-        if newMax ~= valueSlider._ecmMaxValue then
-            valueSlider._ecmMaxValue = newMax
-            valueSlider._ecmStep = newStep
-            if valueSlider.Init then
-                valueSlider:Init(targetValue, 1, newMax, getSliderStepCount(1, newMax, newStep), createSliderFormatters())
-                if valueSlider.Slider and valueSlider.Slider.SetValueStep then
-                    valueSlider.Slider:SetValueStep(newStep)
-                end
-            end
+    local function refreshCategory()
+        if category then
+            SB.RefreshCategory(category)
+        else
+            SB.RefreshCategory(categoryName)
         end
     end
 
-    configureSlider(valueSlider, valueText, 1, 200, 1, 60, function(rounded)
-        if rowFrame._isRefreshing then
-            return
-        end
-        store.UpdateTick(rowFrame._rowIndex, "value", rounded)
+    local function scheduleUpdate()
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    end, rescaleValueSlider)
-
-    configureSlider(widthSlider, widthText, 1, 5, 1, 34, function(rounded)
-        if rowFrame._isRefreshing then
-            return
-        end
-        store.UpdateTick(rowFrame._rowIndex, "width", rounded)
-        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    end)
-end
-
-local function createTickMarksCanvas(SB, subcatName, parentCategory)
-    local layout = SB.CreateCanvasLayout(subcatName, parentCategory)
-    local frame = layout.frame
+    end
 
     local function clearAllTicks()
         store.SetCurrentTicks({})
-        frame:RefreshTicks()
-        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        scheduleUpdate()
+        refreshCategory()
     end
 
-    local headerRow = layout:AddHeader(subcatName)
-    local defaultsBtn = headerRow._defaultsButton
-    defaultsBtn:SetText(SETTINGS_DEFAULTS)
-    defaultsBtn:SetScript("OnClick", function()
-        StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS", nil, nil, {
-            onAccept = clearAllTicks,
-        })
-    end)
-
-    layout:AddSpacer(2)
-
-    layout:AddDescription(L["TICK_MARKS_DESC"], "GameFontHighlight")._text:SetWordWrap(true)
-
-    local infoRow = layout:AddDescription("")
-    local infoText = infoRow._text
-    infoText:SetWordWrap(true)
-
-    local _, defaultColorSwatch = layout:AddColorSwatch(L["DEFAULT_COLOR"])
-    defaultColorSwatch:SetScript("OnClick", function()
-        local c = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        ns.OptionUtil.OpenColorPicker(c, true, function(color)
-            store.SetDefaultColor(color)
-            defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
-        end)
-    end)
-
-    local _, defaultWidthSlider, defaultWidthText = layout:AddSlider(L["DEFAULT_WIDTH"], 1, 5, 1)
-    configureSlider(defaultWidthSlider, defaultWidthText, 1, 5, 1, 44, function(rounded)
-        store.SetDefaultWidth(rounded)
-    end)
-
-    local _, addBtn = layout:AddButton(L["ADD_TICK_MARK"], L["ADD"])
-    addBtn:SetScript("OnClick", function()
-        store.AddTick(50, nil, nil)
-        frame:RefreshTicks()
-    end)
-
-    local scrollBox, _, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_WITH_CONTROLS)
-
-    view:SetElementInitializer("Frame", function(rowFrame, data)
-        if not rowFrame._initialized then
-            createTickRowWidgets(rowFrame, SB)
-            rowFrame._initialized = true
-        end
-
-        local index = data.index
-        rowFrame._rowIndex = index
-        rowFrame._highlight:Hide()
-        rowFrame._label:SetText(string.format(L["TICK_N"], index))
-
-        local tickValue = data.tick.value or 50
-        local tickWidth = data.tick.width or store.GetDefaultWidth()
-
-        rowFrame._isRefreshing = true
-        if rowFrame._valueSlider._ecmRescale then
-            rowFrame._valueSlider._ecmRescale(tickValue)
-        end
-        rowFrame._valueSlider:SetValue(tickValue)
-        rowFrame._valueText:SetText(tostring(roundToStep(tickValue)))
-        rowFrame._widthSlider:SetValue(tickWidth)
-        rowFrame._widthText:SetText(tostring(roundToStep(tickWidth)))
-        rowFrame._isRefreshing = false
-
-        local tc = data.tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        rowFrame._swatch:SetColorRGB(tc.r, tc.g, tc.b)
-
-        rowFrame._swatch:SetScript("OnClick", function()
-            local current = data.tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-            ns.OptionUtil.OpenColorPicker(current, true, function(color)
-                store.UpdateTick(rowFrame._rowIndex, "color", color)
-                rowFrame._swatch:SetColorRGB(color.r, color.g, color.b)
-                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end)
-        end)
-
-        rowFrame._removeBtn:SetScript("OnClick", function()
-            store.RemoveTick(rowFrame._rowIndex)
-            frame:RefreshTicks()
-            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-        end)
-    end)
-
-    local dataProvider = CreateDataProvider()
-    scrollBox:SetDataProvider(dataProvider)
-
-    function frame:RefreshTicks()
-        local ticks = store.GetCurrentTicks()
-
-        dataProvider:Flush()
-        for i, tick in ipairs(ticks) do
-            dataProvider:Insert({ index = i, tick = tick })
-        end
-
+    local function getTickSummary()
         local _, _, localisedClassName, specName, className = ns.OptionUtil.GetCurrentClassSpec()
         local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
         local classSpecLabel = "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
+        local ticks = store.GetCurrentTicks()
         local count = #ticks
         if count == 0 then
-            infoText:SetText(string.format(L["NO_TICK_MARKS"], classSpecLabel))
-        else
-            infoText:SetText(string.format(L["TICK_COUNT"], classSpecLabel, count))
+            return string.format(L["NO_TICK_MARKS"], classSpecLabel)
         end
-
-        defaultsBtn:SetEnabled(count > 0)
-
-        local dc = store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
-        defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
-
-        local dw = store.GetDefaultWidth() or 1
-        defaultWidthSlider:SetValue(dw)
-        defaultWidthText:SetText(tostring(roundToStep(dw)))
+        return string.format(L["TICK_COUNT"], classSpecLabel, count)
     end
 
-    frame.OnDefault = clearAllTicks
+    local function buildTickCollectionItems()
+        local ticks = store.GetCurrentTicks()
+        local items = {}
 
-    frame:SetScript("OnShow", function(self)
-        self:RefreshTicks()
-    end)
-end
+        for index, tick in ipairs(ticks) do
+            items[#items + 1] = {
+                label = string.format(L["TICK_N"], index),
+                fields = {
+                    {
+                        value = tick.value or 50,
+                        min = 1,
+                        max = 200,
+                        step = 1,
+                        sliderWidth = 150,
+                        valueWidth = 50,
+                        editWidth = 60,
+                        getRange = function(_, targetValue)
+                            local ceiling, step = getValueSliderRange(math.max(1, targetValue or tick.value or 50))
+                            return 1, ceiling, step
+                        end,
+                        onValueChanged = function(rounded)
+                            store.UpdateTick(index, "value", rounded)
+                            scheduleUpdate()
+                            refreshCategory()
+                        end,
+                    },
+                    {
+                        value = tick.width or store.GetDefaultWidth(),
+                        min = 1,
+                        max = 5,
+                        step = 1,
+                        sliderWidth = 90,
+                        valueWidth = 18,
+                        editWidth = 34,
+                        onValueChanged = function(rounded)
+                            store.UpdateTick(index, "width", rounded)
+                            scheduleUpdate()
+                            refreshCategory()
+                        end,
+                    },
+                },
+                color = {
+                    value = tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR,
+                    onClick = function()
+                        local current = tick.color or store.GetDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
+                        ns.OptionUtil.OpenColorPicker(current, true, function(color)
+                            store.UpdateTick(index, "color", color)
+                            scheduleUpdate()
+                            refreshCategory()
+                        end)
+                    end,
+                },
+                remove = {
+                    text = L["REMOVE"],
+                    onClick = function()
+                        store.RemoveTick(index)
+                        scheduleUpdate()
+                        refreshCategory()
+                    end,
+                },
+            }
+        end
 
-function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
-    createTickMarksCanvas(SB, "Tick Marks", parentCategory)
+        return items
+    end
+
+    SB.RegisterFromTable({
+        name = categoryName,
+        parentCategory = parentCategory,
+        args = {
+            tickMarksHeader = {
+                type = "header",
+                name = categoryName,
+                actions = {
+                    {
+                        text = SETTINGS_DEFAULTS,
+                        width = 100,
+                        enabled = function()
+                            return #store.GetCurrentTicks() > 0
+                        end,
+                        onClick = function()
+                            StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS", nil, nil, {
+                                onAccept = clearAllTicks,
+                            })
+                        end,
+                    },
+                },
+                order = 1,
+            },
+            description = {
+                type = "info",
+                name = "",
+                value = L["TICK_MARKS_DESC"],
+                wide = true,
+                multiline = true,
+                height = 36,
+                order = 2,
+            },
+            summary = {
+                type = "info",
+                name = "",
+                value = getTickSummary,
+                wide = true,
+                multiline = true,
+                height = 28,
+                order = 3,
+            },
+            defaultColor = {
+                type = "color",
+                key = "tickMarksDefaultColor",
+                name = L["DEFAULT_COLOR"],
+                default = C.DEFAULT_POWERBAR_TICK_COLOR,
+                get = function()
+                    return store.GetDefaultColor()
+                end,
+                set = function(color)
+                    store.SetDefaultColor(color)
+                end,
+                onSet = function()
+                    refreshCategory()
+                end,
+                order = 4,
+            },
+            defaultWidth = {
+                type = "range",
+                key = "tickMarksDefaultWidth",
+                name = L["DEFAULT_WIDTH"],
+                default = 1,
+                min = 1,
+                max = 5,
+                step = 1,
+                get = function()
+                    return store.GetDefaultWidth()
+                end,
+                set = function(width)
+                    store.SetDefaultWidth(width)
+                end,
+                onSet = function()
+                    refreshCategory()
+                end,
+                order = 5,
+            },
+            addTick = {
+                type = "button",
+                name = L["ADD_TICK_MARK"],
+                buttonText = L["ADD"],
+                onClick = function()
+                    store.AddTick(50, nil, nil)
+                    scheduleUpdate()
+                    refreshCategory()
+                end,
+                order = 6,
+            },
+            tickCollection = {
+                type = "collection",
+                preset = "editor",
+                height = 320,
+                rowHeight = C.SCROLL_ROW_HEIGHT_WITH_CONTROLS,
+                items = buildTickCollectionItems,
+                order = 7,
+            },
+        },
+    })
+
+    category = SB.GetSubcategory(categoryName)
 end

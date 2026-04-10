@@ -7,10 +7,11 @@ It supports:
 - path-based bindings for AceDB-style profile tables,
 - handler-mode bindings for arbitrary storage,
 - built-in text input rows with optional debounced preview resolution,
+- first-class dynamic collections for scrollable or sectioned list editors,
 - composite builders for common settings groups,
 - layout-only rows such as headers, subheaders, info rows, buttons, and embedded canvases,
 - XML/template-backed custom controls when a built-in row is not enough,
-- canvas layout helpers for more complex pages,
+- category refresh hooks for out-of-band state changes,
 - deterministic dropdown ordering,
 - clickable slider value editing.
 
@@ -25,9 +26,10 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 | Existing AceDB profiles | `PathAdapter(...)` |
 | Custom storage | handler mode with `get` / `set` / `key` |
 | Text entry / numeric ID fields | `SB.Input(...)` or `type = "input"` |
+| Dynamic editors / ordered lists | `SB.Collection(...)` or `type = "collection"` |
 | Reusable settings groups | border, font override, positioning composites |
 | XML-backed bespoke widgets | `SB.Custom(...)` |
-| Custom settings pages | `CreateCanvasLayout(...)` |
+| Force visible rows to refresh | `SB.RefreshCategory(...)` |
 
 ## Quick start
 
@@ -92,6 +94,7 @@ The table API understands both AceConfig-style aliases and library-specific row 
 | `description` | Alias for a subheader row |
 | `info` | Left-label / right-value informational row |
 | `canvas` | Embedded frame row for canvas content |
+| `collection` | First-class dynamic list/section widget |
 | `custom` | Proxy setting backed by a custom XML template |
 | `colorList` | Expands `defs` into multiple color swatches |
 | `toggleList` | Expands `defs` into multiple checkboxes |
@@ -142,8 +145,10 @@ spellId = {
 The library has three main implementation paths:
 
 - **Proxy controls** — `checkbox`, `slider`, `dropdown`, `color`, `input`, and `custom` all go through the same proxy-setting pipeline. That means path mode and handler mode work consistently across them.
-- **Layout rows** — `header`, `subheader`, `info`, `button`, and `canvas` are initializer/layout helpers rather than persisted settings.
+- **Layout rows** — `header`, `subheader`, `info`, `button`, `canvas`, and `collection` are initializer/layout helpers rather than persisted settings.
 - **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `toggleList` expand into multiple child controls.
+
+`header` supports optional `actions = { ... }` for right-aligned page or section buttons, and `collection` covers the common "custom canvas page" cases without making authors drop into a second authoring API. Use `canvas` and `custom` as escape hatches, not the default path.
 
 `input` specifically is implemented as a built-in custom list row using `SettingsListElementTemplate`, with an `InputBoxTemplate` edit box anchored in the standard left-label / right-control layout. It does **not** need a separate XML template the way `custom` controls do.
 
@@ -179,7 +184,8 @@ The `.busted` config defines the `libsettingsbuilder` task pointing at this libr
 
 - Embed the library inside your addon's `Libs/` folder.
 - Load `LibStub` before `LibSettingsBuilder`.
-- Canvas layout spacing can be tuned globally or per layout.
+- Prefer one `RegisterFromTable(...)` DSL for both simple rows and complex editors.
+- `SB.RefreshCategory(...)` is the intended way to refresh dynamic info rows, dropdown options, and collections after profile mutations, async item loads, or other out-of-band changes.
 - Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 
 ## License

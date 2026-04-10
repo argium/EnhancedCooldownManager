@@ -95,12 +95,12 @@ describe("About section", function()
             assert.is_not_nil(init, "expected Links subheader")
         end)
 
-        it("embeds a links canvas with two buttons", function()
-            local init = findInitializer(rootLayout, function(i)
-                return i.data and i.data.canvas and i.data.canvas._curseforge
-            end)
-            assert.is_not_nil(init, "expected links canvas")
-            assert.is_not_nil(init.data.canvas._github)
+        it("adds plain button rows for the links", function()
+            local curseforge = TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["CURSEFORGE"])
+            local github = TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["GITHUB"])
+
+            assert.is_not_nil(curseforge, "expected CurseForge button row")
+            assert.is_not_nil(github, "expected GitHub button row")
         end)
 
         it("CurseForge button calls ShowCopyTextDialog with correct URL", function()
@@ -109,10 +109,7 @@ describe("About section", function()
                 captured = { url = url, title = title }
             end
 
-            local init = findInitializer(rootLayout, function(i)
-                return i.data and i.data.canvas and i.data.canvas._curseforge
-            end)
-            init.data.canvas._curseforge:GetScript("OnClick")()
+            TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["CURSEFORGE"])._onClick()
 
             assert.is_not_nil(captured)
             assert.are.equal("https://www.curseforge.com/wow/addons/enhanced-cooldown-manager", captured.url)
@@ -125,10 +122,7 @@ describe("About section", function()
                 captured = { url = url, title = title }
             end
 
-            local init = findInitializer(rootLayout, function(i)
-                return i.data and i.data.canvas and i.data.canvas._github
-            end)
-            init.data.canvas._github:GetScript("OnClick")()
+            TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["GITHUB"])._onClick()
 
             assert.is_not_nil(captured)
             assert.are.equal("https://github.com/argium/EnhancedCooldownManager", captured.url)

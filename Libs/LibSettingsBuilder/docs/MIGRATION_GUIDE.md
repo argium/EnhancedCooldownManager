@@ -64,19 +64,20 @@ local SB = LSB:New({
 
 - native Blizzard Settings integration,
 - composite builders for common UI groups,
-- canvas layout helpers for complex pages,
+- first-class dynamic collection rows for complex editors,
 - built-in text input rows with optional debounced previews,
+- explicit category refresh hooks for async/transient state,
 - clickable slider value editing,
 - deterministic dropdown ordering.
 
 ## Features you still build yourself
 
 - specialized row templates,
-- bespoke canvas pages.
+- genuinely bespoke embedded frames.
 
 If you only need text or numeric entry, use the built-in `input` type first. Reach for `SB.Custom(...)` only when you need a genuinely different widget.
 
-Use `SB.Custom(...)` or `CreateCanvasLayout(...)` when the standard controls stop fitting.
+If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "collection"` before reaching for `SB.Custom(...)` or `SB.EmbedCanvas(...)`.
 
 ## Migrating AceConfig input fields
 

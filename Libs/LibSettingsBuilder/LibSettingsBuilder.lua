@@ -6,7 +6,7 @@
 -- World of Warcraft Settings API.  Provides proxy controls, composite groups
 -- and utility helpers.
 
-local MAJOR, MINOR = "LibSettingsBuilder-1.0", 1
+local MAJOR, MINOR = "LibSettingsBuilder-1.0", 2
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then
     return
@@ -17,6 +17,8 @@ lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
 lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
 lib.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
+
+local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
 
 lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
 lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
@@ -114,6 +116,10 @@ local function setInitializerExtent(initializer, extent)
 end
 
 local function getInitializerData(initializer)
+    if initializer and initializer._lsbData then
+        return initializer._lsbData
+    end
+
     if initializer and initializer.GetData then
         return initializer:GetData()
     end
@@ -213,6 +219,54 @@ local function resetPlainListElementFrame(frame)
     resetListElement(frame)
 end
 
+local function showFrame(frame)
+    if frame and frame.Show then
+        frame:Show()
+    end
+end
+
+local function setGameTooltipText(text, wrap)
+    GameTooltip:SetText(text, TOOLTIP_TITLE_COLOR, 1, wrap == true)
+end
+
+local function setSimpleTooltip(owner, text)
+    if not owner or not owner.SetScript then
+        return
+    end
+
+    owner:SetScript("OnEnter", nil)
+    owner:SetScript("OnLeave", nil)
+
+    if not text or text == "" then
+        return
+    end
+
+    owner:SetScript("OnEnter", function(self)
+        if not GameTooltip then
+            return
+        end
+
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if GameTooltip.ClearLines then
+            GameTooltip:ClearLines()
+        end
+        setGameTooltipText(text, true)
+        GameTooltip:Show()
+    end)
+    owner:SetScript("OnLeave", function()
+        if GameTooltip_Hide then
+            GameTooltip_Hide()
+        end
+    end)
+end
+
+local function evaluateStaticOrFunction(value, ...)
+    if type(value) == "function" then
+        return value(...)
+    end
+    return value
+end
+
 local function createSubheaderTitle(parent, text)
     local title = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     title:SetPoint("TOPLEFT", parent, "TOPLEFT", 35, -8)
@@ -274,17 +328,167 @@ local function ensureInfoRowWidgets(frame)
     return title, value
 end
 
+local function ensureHeaderRowWidgets(frame)
+    if frame._lsbHeaderTitle then
+        return frame
+    end
+
+    frame._lsbHeaderTitle = createHeaderTitle(frame)
+    frame._lsbHeaderActionButtons = frame._lsbHeaderActionButtons or {}
+
+    return frame
+end
+
+local function getSettingsListHeader()
+    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    return settingsList and settingsList.Header or nil
+end
+
+local function hideHeaderActionButtons(frame)
+    for _, button in ipairs(frame._lsbHeaderActionButtons or {}) do
+        button:SetScript("OnClick", nil)
+        button:SetScript("OnEnter", nil)
+        button:SetScript("OnLeave", nil)
+        button:Hide()
+    end
+end
+
+local function applyHeaderActionButtons(frame, actions, actionParent, rightAnchor)
+    ensureHeaderRowWidgets(frame)
+    local buttons = frame._lsbHeaderActionButtons
+    local anchor = nil
+    local visibleCount = 0
+
+    actionParent = actionParent or frame
+    hideHeaderActionButtons(frame)
+
+    for _, action in ipairs(actions or {}) do
+        if not evaluateStaticOrFunction(action.hidden, action, frame) then
+            visibleCount = visibleCount + 1
+
+            local button = buttons[visibleCount]
+            if button and button._lsbActionParent ~= actionParent then
+                button:Hide()
+                button = nil
+            end
+            if not button then
+                button = CreateFrame("Button", nil, actionParent, "UIPanelButtonTemplate")
+                button._lsbActionParent = actionParent
+                buttons[visibleCount] = button
+            end
+
+            button:ClearAllPoints()
+            if anchor then
+                button:SetPoint("RIGHT", anchor, "LEFT", -8, 0)
+            elseif rightAnchor then
+                button:SetPoint("RIGHT", rightAnchor, "LEFT", -8, 0)
+            else
+                button:SetPoint("RIGHT", actionParent, "RIGHT", -20, 0)
+            end
+            button:SetSize(action.width or 100, action.height or 22)
+            button:SetText(action.text or action.name or "")
+            if button.SetEnabled then
+                local enabled = evaluateStaticOrFunction(action.enabled, action, frame)
+                if enabled == nil then
+                    enabled = true
+                end
+                button:SetEnabled(enabled)
+            end
+            setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
+            button:SetScript("OnClick", function()
+                if action.onClick then
+                    action.onClick(action, frame)
+                end
+            end)
+            button:Show()
+            anchor = button
+        end
+    end
+end
+
 local function applySubheaderFrame(frame, data)
     local title = ensureSubheaderTitle(frame)
     title:SetText(data.name)
     title:Show()
 end
 
+local function applyHeaderFrame(frame, data)
+    ensureHeaderRowWidgets(frame)
+    local settingsHeader = data.attachToCategoryHeader and getSettingsListHeader() or nil
+    local actionParent = settingsHeader or frame
+    local rightAnchor = settingsHeader and settingsHeader.DefaultsButton or nil
+
+    if frame._lsbHeaderTitle then
+        frame._lsbHeaderTitle:ClearAllPoints()
+        frame._lsbHeaderTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -16)
+        frame._lsbHeaderTitle:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+        frame._lsbHeaderTitle:SetText(data.name or "")
+    end
+
+    applyHeaderActionButtons(frame, data.actions, actionParent, rightAnchor)
+
+    if frame._lsbHeaderTitle then
+        if data.hideTitle then
+            frame._lsbHeaderTitle:Hide()
+            return
+        end
+
+        local titleRight = -20
+        local buttons = frame._lsbHeaderActionButtons or {}
+        for i = 1, #buttons do
+            local button = buttons[i]
+            if button and button.IsShown and button:IsShown() then
+                frame._lsbHeaderTitle:ClearAllPoints()
+                frame._lsbHeaderTitle:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -16)
+                frame._lsbHeaderTitle:SetPoint("RIGHT", button, "LEFT", -12, 0)
+                titleRight = nil
+                break
+            end
+        end
+        if titleRight then
+            frame._lsbHeaderTitle:SetPoint("RIGHT", frame, "RIGHT", titleRight, 0)
+        end
+        frame._lsbHeaderTitle:Show()
+    end
+end
+
 local function applyInfoRowFrame(frame, data)
     local title, value = ensureInfoRowWidgets(frame)
-    title:SetText(data.name)
-    value:SetText(data.value)
-    title:Show()
+    local name = evaluateStaticOrFunction(data.name, frame, data)
+    local resolvedValue = evaluateStaticOrFunction(data.value, frame, data)
+    local isWide = data.wide == true or name == nil or name == ""
+    local isMultiline = data.multiline == true
+
+    title:ClearAllPoints()
+    value:ClearAllPoints()
+
+    if isWide then
+        title:SetText("")
+        title:Hide()
+        value:SetPoint("TOPLEFT", frame, "TOPLEFT", 37, isMultiline and -4 or 0)
+        value:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    else
+        title:SetText(name or "")
+        title:SetPoint("LEFT", 37, 0)
+        title:SetPoint("RIGHT", frame, "CENTER", -85, 0)
+        title:Show()
+        value:SetPoint("LEFT", frame, "CENTER", -80, 0)
+        value:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    end
+
+    if value.SetWordWrap then
+        value:SetWordWrap(isMultiline)
+    end
+    if value.SetJustifyV then
+        value:SetJustifyV(isMultiline and "TOP" or "MIDDLE")
+    end
+    if value.SetJustifyH then
+        value:SetJustifyH("LEFT")
+    end
+    value:SetText(resolvedValue or "")
+    if not isWide then
+        title:Show()
+    end
     value:Show()
 end
 
@@ -584,6 +788,7 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
 
         resetPlainListElementFrame(frame)
         initFrame(frame, self.data, self)
+        self._lsbActiveFrame = frame
 
         if not frame._lsbHasCustomEvaluateState then
             frame.EvaluateState = function(control)
@@ -614,6 +819,12 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
         if frame._lsbCanvas then
             frame._lsbCanvas:Hide()
             frame._lsbCanvas = nil
+        end
+        if self._lsbActiveFrame == frame then
+            self._lsbActiveFrame = nil
+        end
+        if self._lsbResetFrame then
+            self._lsbResetFrame(frame, self)
         end
 
         resetPlainListElementFrame(frame)
@@ -703,7 +914,8 @@ local function configureScrollDropdownFrame(frame, initializer)
 
     copyMixin(frame, ScrollDropdownMethods)
     frame.initializer = initializer
-    frame.lsbData = initializer:GetData() or {}
+    frame.lsbData = getInitializerData(initializer) or {}
+    initializer._lsbActiveFrame = frame
     frame:InitDropdown()
 end
 
@@ -723,6 +935,929 @@ if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownC
     end)
 
     lib._scrollDropdownHookInstalled = true
+end
+
+local function roundSliderValue(value, step, minValue, maxValue)
+    local actualStep = step or 1
+    local baseValue = minValue or 0
+    local rounded = math.floor(((value - baseValue) / actualStep) + 0.5) * actualStep + baseValue
+    if minValue then
+        rounded = math.max(minValue, rounded)
+    end
+    if maxValue then
+        rounded = math.min(maxValue, rounded)
+    end
+    return rounded
+end
+
+local function getSliderStepCount(minValue, maxValue, step)
+    return math.max(1, math.floor(((maxValue - minValue) / (step or 1)) + 0.5))
+end
+
+local function createInlineSliderFormatters()
+    if not MinimalSliderWithSteppersMixin or not MinimalSliderWithSteppersMixin.Label then
+        return nil
+    end
+
+    return {
+        [MinimalSliderWithSteppersMixin.Label.Right] = function()
+            return ""
+        end,
+    }
+end
+
+local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
+    if slider._lsbValueButton then
+        return
+    end
+
+    local function hideEditBox()
+        if slider._lsbEditBox and slider._lsbEditBox.ClearFocus then
+            slider._lsbEditBox:ClearFocus()
+        end
+        if slider._lsbEditBox then
+            slider._lsbEditBox:Hide()
+        end
+        if textLabel and textLabel.Show then
+            textLabel:Show()
+        end
+    end
+
+    local function applyEditBoxValue()
+        local editBox = slider._lsbEditBox
+        local enteredValue = editBox and tonumber(editBox:GetText())
+        if enteredValue then
+            local minValue = slider._lsbMinValue or 0
+            local maxValue = slider._lsbMaxValue
+            if slider._lsbRangeResolver then
+                local nextMin, nextMax, nextStep = slider._lsbRangeResolver(enteredValue)
+                if nextMin ~= nil then
+                    minValue = nextMin
+                end
+                if nextMax ~= nil then
+                    maxValue = nextMax
+                end
+                if nextStep ~= nil then
+                    slider._lsbStep = nextStep
+                end
+                if maxValue ~= nil then
+                    slider._lsbMaxValue = maxValue
+                end
+                slider._lsbMinValue = minValue
+            end
+
+            slider:SetValue(roundSliderValue(enteredValue, slider._lsbStep, minValue, maxValue))
+        end
+        hideEditBox()
+    end
+
+    local valueButton = CreateFrame("Button", nil, slider)
+    valueButton:RegisterForClicks("LeftButtonDown")
+    valueButton:SetAllPoints(textLabel)
+    slider._lsbValueButton = valueButton
+
+    local editBox = CreateFrame("EditBox", nil, slider, "InputBoxTemplate")
+    editBox:SetAutoFocus(false)
+    editBox:SetNumeric(false)
+    editBox:SetSize(editBoxWidth or 50, 20)
+    editBox:SetPoint("CENTER", textLabel, "CENTER")
+    editBox:SetJustifyH("CENTER")
+    editBox:Hide()
+    slider._lsbEditBox = editBox
+
+    editBox:SetScript("OnEnterPressed", applyEditBoxValue)
+    editBox:SetScript("OnEscapePressed", hideEditBox)
+    editBox:SetScript("OnEditFocusLost", hideEditBox)
+
+    valueButton:SetScript("OnClick", function()
+        editBox:SetText(textLabel and textLabel.GetText and textLabel:GetText() or "")
+        if textLabel and textLabel.Hide then
+            textLabel:Hide()
+        end
+        editBox:Show()
+        editBox:SetFocus()
+        editBox:HighlightText()
+    end)
+end
+
+local function configureInlineSlider(slider, textLabel, field, onValueChanged)
+    local minValue = field.min or 0
+    local maxValue = field.max or 1
+    local step = field.step or 1
+
+    slider._lsbMinValue = minValue
+    slider._lsbMaxValue = maxValue
+    slider._lsbStep = step
+    slider._lsbRangeResolver = field.getRange
+
+    if slider.MinText then
+        slider.MinText:Hide()
+    end
+    if slider.MaxText then
+        slider.MaxText:Hide()
+    end
+    if slider.RightText then
+        slider.RightText:Hide()
+    end
+
+    if slider.Init then
+        slider:Init(minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createInlineSliderFormatters())
+        if slider.Slider and slider.Slider.SetValueStep then
+            slider.Slider:SetValueStep(step)
+        end
+    else
+        slider:SetMinMaxValues(minValue, maxValue)
+        slider:SetValueStep(step)
+        slider:SetObeyStepOnDrag(true)
+    end
+
+    attachInlineSliderEditor(slider, textLabel, field.editWidth or 50)
+
+    if not slider._lsbValueChangedBound then
+        local function handleValueChanged(_, value)
+            local rounded = roundSliderValue(value, slider._lsbStep, slider._lsbMinValue, slider._lsbMaxValue)
+            if textLabel and textLabel.SetText then
+                textLabel:SetText(tostring(rounded))
+            end
+            if onValueChanged then
+                onValueChanged(rounded)
+            end
+        end
+
+        if slider.RegisterCallback and MinimalSliderWithSteppersMixin and MinimalSliderWithSteppersMixin.Event then
+            slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, handleValueChanged, slider)
+        else
+            slider:HookScript("OnValueChanged", handleValueChanged)
+        end
+        slider._lsbValueChangedBound = true
+    end
+end
+
+local function applyCollectionRowStyle(row, item)
+    local alpha = item and item.alpha or 1
+
+    if row._label and row._label.SetFontObject and item and item.labelFontObject then
+        row._label:SetFontObject(item.labelFontObject)
+    end
+    if row._label and row._label.SetTextColor and item and item.labelColor then
+        row._label:SetTextColor(
+            item.labelColor[1] or 1,
+            item.labelColor[2] or 1,
+            item.labelColor[3] or 1,
+            item.labelColor[4] or 1
+        )
+    end
+    if row._label and row._label.SetAlpha then
+        row._label:SetAlpha(alpha)
+    end
+    if row._icon and row._icon.SetAlpha then
+        row._icon:SetAlpha(alpha)
+    end
+    if row._icon and row._icon.SetDesaturated then
+        row._icon:SetDesaturated(item and item.iconDesaturated == true or false)
+    end
+    if row._icon and row._icon.SetVertexColor then
+        local color = item and item.iconVertexColor
+        if color then
+            row._icon:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
+        else
+            row._icon:SetVertexColor(1, 1, 1, 1)
+        end
+    end
+end
+
+local function bindCollectionRowTooltip(row, item)
+    if not row or not row.SetScript then
+        return
+    end
+
+    row:SetScript("OnEnter", nil)
+    row:SetScript("OnLeave", nil)
+
+    if not item then
+        return
+    end
+
+    row:SetScript("OnEnter", function(self)
+        if self._highlight and self._highlight.Show then
+            self._highlight:Show()
+        end
+        if item.onEnter then
+            item.onEnter(self, item)
+        elseif item.tooltip then
+            if GameTooltip then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                if GameTooltip.ClearLines then
+                    GameTooltip:ClearLines()
+                end
+                setGameTooltipText(item.tooltip, true)
+                GameTooltip:Show()
+            end
+        end
+    end)
+    row:SetScript("OnLeave", function(self)
+        if self._highlight and self._highlight.Hide then
+            self._highlight:Hide()
+        end
+        if item.onLeave then
+            item.onLeave(self, item)
+        elseif GameTooltip_Hide then
+            GameTooltip_Hide()
+        end
+    end)
+end
+
+local function ensureHighlight(row)
+    if row._highlight then
+        return row._highlight
+    end
+
+    local highlight = row:CreateTexture(nil, "BACKGROUND")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 1, 1, 0.08)
+    highlight:Hide()
+    row._highlight = highlight
+    return highlight
+end
+
+local function ensureSwatchCollectionRow(row)
+    if row._lsbSwatchRow then
+        return
+    end
+
+    row._lsbSwatchRow = true
+    row:SetHeight(26)
+    ensureHighlight(row)
+
+    row._icon = row:CreateTexture(nil, "ARTWORK")
+    row._icon:SetPoint("LEFT", 0, 0)
+    row._icon:SetSize(16, 16)
+    row._icon:Hide()
+
+    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row._label:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row._label:SetPoint("RIGHT", row, "RIGHT", -100, 0)
+    row._label:SetJustifyH("LEFT")
+    row._label:SetWordWrap(false)
+
+    row._swatch = lib.CreateColorSwatch(row)
+    row._swatch:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+end
+
+local function refreshSwatchCollectionRow(row, item)
+    ensureSwatchCollectionRow(row)
+
+    if item.icon then
+        row._icon:SetTexture(item.icon)
+        row._icon:Show()
+        row._label:ClearAllPoints()
+        row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
+        row._label:SetPoint("RIGHT", row, "RIGHT", -100, 0)
+    else
+        row._icon:SetTexture(nil)
+        row._icon:Hide()
+        row._label:ClearAllPoints()
+        row._label:SetPoint("LEFT", row, "LEFT", 0, 0)
+        row._label:SetPoint("RIGHT", row, "RIGHT", -100, 0)
+    end
+
+    row._label:SetText(item.label or "")
+    applyCollectionRowStyle(row, item)
+    bindCollectionRowTooltip(row, item)
+
+    local color = item.color or {}
+    local colorValue = color.value or color
+    row._swatch:SetColorRGB(colorValue.r or 1, colorValue.g or 1, colorValue.b or 1)
+    setSimpleTooltip(row._swatch, item.swatchTooltip or color.tooltip)
+    row._swatch:SetScript("OnClick", function()
+        local onClick = color.onClick or item.onColorClick
+        if onClick then
+            onClick(item, row)
+        end
+    end)
+    if row._swatch.SetEnabled then
+        row._swatch:SetEnabled(
+            evaluateStaticOrFunction(item.enabled, item, row) ~= false
+                and evaluateStaticOrFunction(color.enabled, item, row) ~= false
+        )
+    end
+end
+
+local function ensureEditorCollectionRow(row)
+    if row._lsbEditorRow then
+        return
+    end
+
+    row._lsbEditorRow = true
+    row:SetHeight(34)
+    ensureHighlight(row)
+
+    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row._label:SetPoint("LEFT", row, "LEFT", 10, 0)
+    row._label:SetWidth(70)
+    row._label:SetJustifyH("LEFT")
+
+    row._fieldWidgets = {}
+    row._swatch = lib.CreateColorSwatch(row)
+    row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row._removeButton:SetSize(70, 22)
+end
+
+local function ensureEditorFieldWidgets(row, index)
+    local widgets = row._fieldWidgets[index]
+    if widgets then
+        return widgets
+    end
+
+    local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
+    local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    valueText:SetJustifyH("LEFT")
+
+    widgets = {
+        slider = slider,
+        valueText = valueText,
+    }
+    row._fieldWidgets[index] = widgets
+    return widgets
+end
+
+local function refreshEditorCollectionRow(row, item)
+    ensureEditorCollectionRow(row)
+
+    row._label:SetText(item.label or "")
+    applyCollectionRowStyle(row, item)
+    bindCollectionRowTooltip(row, item)
+
+    local labelAnchor = row._label
+    local previousControl = labelAnchor
+    local previousValueText = nil
+    local fields = item.fields or {}
+
+    for i = 1, #fields do
+        local field = fields[i]
+        local widgets = ensureEditorFieldWidgets(row, i)
+        local slider = widgets.slider
+        local valueText = widgets.valueText
+        local minValue, maxValue, step = field.min or 0, field.max or 1, field.step or 1
+
+        if field.getRange then
+            local nextMin, nextMax, nextStep = field.getRange(item, field.value)
+            if nextMin ~= nil then
+                minValue = nextMin
+            end
+            if nextMax ~= nil then
+                maxValue = nextMax
+            end
+            if nextStep ~= nil then
+                step = nextStep
+            end
+        end
+
+        field.min = minValue
+        field.max = maxValue
+        field.step = step
+
+        slider:ClearAllPoints()
+        if previousValueText then
+            slider:SetPoint("LEFT", previousValueText, "RIGHT", field.gap or 12, 0)
+        else
+            slider:SetPoint("LEFT", row._label, "RIGHT", 8, 0)
+        end
+        slider:SetWidth(field.sliderWidth or 120)
+
+        valueText:ClearAllPoints()
+        valueText:SetPoint("LEFT", slider, "RIGHT", 6, 0)
+        valueText:SetWidth(field.valueWidth or 40)
+
+        configureInlineSlider(slider, valueText, field, function(rounded)
+            if row._lsbRefreshing then
+                return
+            end
+            if field.onValueChanged then
+                field.onValueChanged(rounded, item, row)
+            end
+        end)
+
+        previousControl = slider
+        previousValueText = valueText
+    end
+
+    local color = item.color or {}
+    row._swatch:ClearAllPoints()
+    if previousValueText then
+        row._swatch:SetPoint("LEFT", previousValueText, "RIGHT", 10, 0)
+    else
+        row._swatch:SetPoint("LEFT", row._label, "RIGHT", 10, 0)
+    end
+
+    row._removeButton:ClearAllPoints()
+    row._removeButton:SetPoint("LEFT", row._swatch, "RIGHT", 8, 0)
+    row._removeButton:SetSize((item.remove and item.remove.width) or 70, 22)
+    row._removeButton:SetText((item.remove and item.remove.text) or REMOVE or "Remove")
+    row._removeButton:SetScript("OnClick", function()
+        if item.remove and item.remove.onClick then
+            item.remove.onClick(item, row)
+        end
+    end)
+    if row._removeButton.SetEnabled then
+        row._removeButton:SetEnabled(item.remove == nil or item.remove.enabled ~= false)
+    end
+    setSimpleTooltip(row._removeButton, item.remove and item.remove.tooltip)
+
+    row._lsbRefreshing = true
+    for i = 1, #fields do
+        local field = fields[i]
+        local widgets = row._fieldWidgets[i]
+        widgets.slider._lsbMinValue = field.min or 0
+        widgets.slider._lsbMaxValue = field.max or 1
+        widgets.slider._lsbStep = field.step or 1
+        if widgets.slider.SetValue then
+            widgets.slider:SetValue(field.value or 0)
+        end
+        widgets.valueText:SetText(tostring(field.value or 0))
+    end
+    row._lsbRefreshing = nil
+
+    row._swatch:SetColorRGB((color.value and color.value.r) or 1, (color.value and color.value.g) or 1, (color.value and color.value.b) or 1)
+    row._swatch:SetScript("OnClick", function()
+        if color.onClick then
+            color.onClick(item, row)
+        end
+    end)
+    setSimpleTooltip(row._swatch, color.tooltip)
+    if row._swatch.SetEnabled then
+        row._swatch:SetEnabled(color.enabled ~= false)
+    end
+end
+
+local ACTION_BUTTON_ORDER = { "up", "down", "move", "delete" }
+
+local function ensureActionsCollectionRow(row)
+    if row._lsbActionsRow then
+        return
+    end
+
+    row._lsbActionsRow = true
+    row:SetHeight(26)
+    ensureHighlight(row)
+
+    row._icon = row:CreateTexture(nil, "ARTWORK")
+    row._icon:SetPoint("LEFT", 0, 0)
+    row._icon:SetSize(20, 20)
+
+    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
+    row._label:SetJustifyH("LEFT")
+    row._label:SetWordWrap(false)
+
+    row._buttons = {}
+    for _, key in ipairs(ACTION_BUTTON_ORDER) do
+        local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        row._buttons[key] = button
+    end
+end
+
+local function refreshActionsCollectionRow(row, item)
+    ensureActionsCollectionRow(row)
+
+    row._label:SetText(item.label or "")
+    row._icon:SetTexture(item.icon or 134400)
+    applyCollectionRowStyle(row, item)
+    bindCollectionRowTooltip(row, item)
+
+    local anchor = nil
+    for _, key in ipairs(ACTION_BUTTON_ORDER) do
+        local button = row._buttons[key]
+        local action = item.actions and item.actions[key] or nil
+
+        button:ClearAllPoints()
+        button:SetScript("OnClick", nil)
+        button:SetScript("OnEnter", nil)
+        button:SetScript("OnLeave", nil)
+
+        if action and not evaluateStaticOrFunction(action.hidden, action, row, item) then
+            if not anchor then
+                button:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            else
+                button:SetPoint("RIGHT", anchor, "LEFT", -2, 0)
+            end
+            button:SetSize(action.width or 26, action.height or 22)
+            button:SetText(action.text or "")
+            if button.SetEnabled then
+                local enabled = evaluateStaticOrFunction(action.enabled, action, row, item)
+                if enabled == nil then
+                    enabled = true
+                end
+                button:SetEnabled(enabled)
+            end
+            setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, row, item))
+            button:SetScript("OnClick", function()
+                if action.onClick then
+                    action.onClick(item, row, action)
+                end
+            end)
+            button:Show()
+            anchor = button
+        else
+            button:Hide()
+        end
+    end
+
+    if anchor then
+        row._label:ClearAllPoints()
+        row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
+        row._label:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
+    else
+        row._label:ClearAllPoints()
+        row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
+        row._label:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+    end
+end
+
+local function ensureModeInputRow(row)
+    if row._lsbModeInputRow then
+        return
+    end
+
+    row._lsbModeInputRow = true
+    row:SetHeight(28)
+
+    row._modeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row._modeButton:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row._modeButton:SetSize(58, 22)
+
+    row._editBox = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+    row._editBox:SetPoint("LEFT", row._modeButton, "RIGHT", 6, 0)
+    row._editBox:SetSize(120, 20)
+    row._editBox:SetAutoFocus(false)
+    if row._editBox.SetNumeric then
+        row._editBox:SetNumeric(true)
+    end
+    if row._editBox.SetMaxLetters then
+        row._editBox:SetMaxLetters(10)
+    end
+    if row._editBox.SetTextInsets then
+        row._editBox:SetTextInsets(6, 6, 0, 0)
+    end
+
+    row._placeholder = row._editBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    row._placeholder:SetPoint("LEFT", row._editBox, "LEFT", 6, 0)
+    row._placeholder:SetPoint("RIGHT", row._editBox, "RIGHT", -6, 0)
+    row._placeholder:SetJustifyH("LEFT")
+    row._placeholder:SetWordWrap(false)
+
+    row._previewIcon = row:CreateTexture(nil, "ARTWORK")
+    row._previewIcon:SetPoint("LEFT", row._editBox, "RIGHT", 8, 0)
+    row._previewIcon:SetSize(16, 16)
+    row._previewIcon:Hide()
+
+    row._previewLabel = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row._previewLabel:SetPoint("LEFT", row._previewIcon, "RIGHT", 4, 0)
+    row._previewLabel:SetJustifyH("LEFT")
+    row._previewLabel:SetWordWrap(false)
+    row._previewLabel:Hide()
+
+    row._submitButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row._submitButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row._submitButton:SetSize(44, 22)
+    row._submitButton:SetText(ADD or "Add")
+
+    row._previewLabel:SetPoint("RIGHT", row._submitButton, "LEFT", -6, 0)
+
+    row._editBox:SetScript("OnEditFocusGained", function()
+        row._lsbHasFocus = true
+        if row._lsbTrailerRefresh then
+            row._lsbTrailerRefresh(row)
+        end
+    end)
+    row._editBox:SetScript("OnEditFocusLost", function()
+        row._lsbHasFocus = false
+        if row._lsbTrailerRefresh then
+            row._lsbTrailerRefresh(row)
+        end
+    end)
+    row._editBox:SetScript("OnTextChanged", function(self)
+        if row._lsbSyncingText then
+            return
+        end
+        local trailer = row._lsbTrailerData
+        if trailer and trailer.onTextChanged then
+            trailer.onTextChanged(self:GetText() or "", trailer, row, row._lsbSectionData)
+        end
+    end)
+    row._editBox:SetScript("OnEnterPressed", function()
+        local trailer = row._lsbTrailerData
+        if trailer and trailer.onSubmit then
+            local keepFocus = trailer.onSubmit(trailer, row, row._lsbSectionData)
+            if keepFocus then
+                row._editBox:SetFocus()
+                row._editBox:HighlightText()
+            end
+        end
+    end)
+    row._editBox:SetScript("OnTabPressed", function()
+        local trailer = row._lsbTrailerData
+        if trailer and trailer.onTabPressed then
+            local keepFocus = trailer.onTabPressed(trailer, row, row._lsbSectionData)
+            if keepFocus then
+                row._editBox:SetFocus()
+                row._editBox:HighlightText()
+            end
+        end
+    end)
+    row._editBox:SetScript("OnEscapePressed", function(self)
+        local trailer = row._lsbTrailerData
+        if trailer and trailer.onEscapePressed then
+            trailer.onEscapePressed(trailer, row, row._lsbSectionData)
+        end
+        if self.ClearFocus then
+            self:ClearFocus()
+        end
+        row._lsbHasFocus = false
+        if row._lsbTrailerRefresh then
+            row._lsbTrailerRefresh(row)
+        end
+    end)
+end
+
+local function refreshModeInputRow(row, trailer, sectionData)
+    ensureModeInputRow(row)
+
+    row._lsbTrailerData = trailer
+    row._lsbSectionData = sectionData
+
+    row._lsbTrailerRefresh = function(activeRow)
+        local currentTrailer = activeRow._lsbTrailerData or {}
+        local text = currentTrailer.inputText or ""
+
+        activeRow._modeButton:SetText(currentTrailer.modeText or "")
+        setSimpleTooltip(activeRow._modeButton, currentTrailer.modeTooltip)
+        activeRow._modeButton:SetScript("OnClick", function()
+            if currentTrailer.onToggleMode then
+                currentTrailer.onToggleMode(currentTrailer, activeRow, activeRow._lsbSectionData)
+            end
+        end)
+        if activeRow._modeButton.SetEnabled then
+            activeRow._modeButton:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.modeEnabled ~= false)
+        end
+
+        if activeRow._editBox.GetText and activeRow._editBox:GetText() ~= text then
+            activeRow._lsbSyncingText = true
+            activeRow._editBox:SetText(text)
+            activeRow._lsbSyncingText = nil
+        end
+        if activeRow._editBox.SetEnabled then
+            activeRow._editBox:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.inputEnabled ~= false)
+        end
+
+        activeRow._placeholder:SetText(currentTrailer.placeholder or "")
+        if activeRow._lsbHasFocus or text ~= "" then
+            activeRow._placeholder:Hide()
+        else
+            activeRow._placeholder:Show()
+        end
+
+        if currentTrailer.previewIcon then
+            activeRow._previewIcon:SetTexture(currentTrailer.previewIcon)
+            activeRow._previewIcon:Show()
+        else
+            activeRow._previewIcon:SetTexture(nil)
+            activeRow._previewIcon:Hide()
+        end
+
+        if currentTrailer.previewText and currentTrailer.previewText ~= "" then
+            activeRow._previewLabel:SetText(currentTrailer.previewText)
+            activeRow._previewLabel:Show()
+        else
+            activeRow._previewLabel:SetText("")
+            activeRow._previewLabel:Hide()
+        end
+
+        activeRow._submitButton:SetText(currentTrailer.submitText or ADD or "Add")
+        setSimpleTooltip(activeRow._submitButton, currentTrailer.submitTooltip)
+        activeRow._submitButton:SetScript("OnClick", function()
+            if currentTrailer.onSubmit then
+                local keepFocus = currentTrailer.onSubmit(currentTrailer, activeRow, activeRow._lsbSectionData)
+                if keepFocus then
+                    activeRow._editBox:SetFocus()
+                    activeRow._editBox:HighlightText()
+                end
+            end
+        end)
+        if activeRow._submitButton.SetEnabled then
+            activeRow._submitButton:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.submitEnabled ~= false)
+        end
+    end
+
+    row._lsbTrailerRefresh(row)
+end
+
+local function ensureCollectionContent(frame)
+    if frame._lsbCollectionContent then
+        showFrame(frame._lsbCollectionContent)
+        return frame._lsbCollectionContent
+    end
+
+    local content = CreateFrame("Frame", nil, frame)
+    content:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    content:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    content:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    content:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    frame._lsbCollectionContent = content
+    return content
+end
+
+local function ensureFlatCollectionWidgets(frame, data)
+    if frame._lsbCollectionScrollBox then
+        showFrame(frame._lsbCollectionScrollBox)
+        showFrame(frame._lsbCollectionScrollBar)
+        return
+    end
+
+    local insetLeft = data.insetLeft or 37
+    local insetRight = data.insetRight or 20
+    local insetTop = data.insetTop or 0
+    local insetBottom = data.insetBottom or 10
+
+    local scrollBox = CreateFrame("Frame", nil, frame, "WowScrollBoxList")
+    scrollBox:SetPoint("TOPLEFT", frame, "TOPLEFT", insetLeft, insetTop)
+    scrollBox:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, insetBottom)
+
+    local scrollBar = CreateFrame("EventFrame", nil, frame, "MinimalScrollBar")
+    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
+
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(data.rowHeight or 26)
+    view:SetElementInitializer("Frame", function(rowFrame, rowData)
+        local preset = rowData.preset or data.preset
+        if preset == "swatch" then
+            refreshSwatchCollectionRow(rowFrame, rowData.item)
+        elseif preset == "editor" then
+            refreshEditorCollectionRow(rowFrame, rowData.item)
+        end
+    end)
+
+    local dataProvider = CreateDataProvider()
+    ScrollUtil.InitScrollBoxListWithScrollBar(scrollBox, scrollBar, view)
+    scrollBox:SetDataProvider(dataProvider)
+
+    frame._lsbCollectionScrollBox = scrollBox
+    frame._lsbCollectionScrollBar = scrollBar
+    frame._lsbCollectionView = view
+    frame._lsbCollectionDataProvider = dataProvider
+end
+
+local function refreshFlatCollection(frame, data)
+    ensureFlatCollectionWidgets(frame, data)
+
+    local scrollBox = frame._lsbCollectionScrollBox
+    local dataProvider = frame._lsbCollectionDataProvider
+    local items = data.items and data.items(frame) or {}
+
+    if dataProvider and dataProvider.Flush then
+        dataProvider:Flush()
+    end
+
+    for _, item in ipairs(items or {}) do
+        if dataProvider and dataProvider.Insert then
+            dataProvider:Insert({
+                preset = data.preset,
+                item = item,
+            })
+        end
+    end
+
+    if scrollBox and scrollBox.SetDataProvider then
+        scrollBox:SetDataProvider(dataProvider)
+    end
+end
+
+local function ensureSectionHeaderRow(content, headers, sectionKey, title)
+    local row = headers[sectionKey]
+    if row then
+        return row
+    end
+
+    row = CreateFrame("Frame", nil, content)
+    row:SetHeight(28)
+    row._title = createSubheaderTitle(row, title)
+    headers[sectionKey] = row
+    return row
+end
+
+local function ensureSectionEmptyLabel(content, labels, sectionKey)
+    local label = labels[sectionKey]
+    if label then
+        return label
+    end
+
+    label = content:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    label:SetJustifyH("LEFT")
+    labels[sectionKey] = label
+    return label
+end
+
+local function refreshSectionedCollection(frame, data)
+    local content = ensureCollectionContent(frame)
+    local sections = data.sections and data.sections(frame) or {}
+    local headers = frame._lsbSectionHeaders or {}
+    local rowPools = frame._lsbSectionRowPools or {}
+    local emptyLabels = frame._lsbSectionEmptyLabels or {}
+    local trailerRows = frame._lsbSectionTrailerRows or {}
+    local y = 0
+    local insetLeft = data.insetLeft or 37
+    local insetRight = data.insetRight or 20
+    local rowSpacing = data.rowSpacing or 4
+    local sectionSpacing = data.sectionSpacing or 12
+
+    frame._lsbSectionHeaders = headers
+    frame._lsbSectionRowPools = rowPools
+    frame._lsbSectionEmptyLabels = emptyLabels
+    frame._lsbSectionTrailerRows = trailerRows
+
+    for sectionKey, pool in pairs(rowPools) do
+        for _, row in ipairs(pool) do
+            row:Hide()
+        end
+    end
+    for _, row in pairs(headers) do
+        row:Hide()
+    end
+    for _, label in pairs(emptyLabels) do
+        label:Hide()
+    end
+    for _, trailer in pairs(trailerRows) do
+        trailer:Hide()
+    end
+
+    for _, section in ipairs(sections) do
+        local sectionKey = section.key or section.name or tostring(_)
+        local header = ensureSectionHeaderRow(content, headers, sectionKey, section.title or section.name or "")
+        header._title:SetText(section.title or section.name or "")
+        header:ClearAllPoints()
+        header:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+        header:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+        header:Show()
+        y = y - (section.headerHeight or 28)
+
+        local items = section.items or {}
+        local pool = rowPools[sectionKey] or {}
+        rowPools[sectionKey] = pool
+
+        if #items == 0 and section.emptyText then
+            local label = ensureSectionEmptyLabel(content, emptyLabels, sectionKey)
+            label:SetText(section.emptyText)
+            label:ClearAllPoints()
+            label:SetPoint("TOPLEFT", content, "TOPLEFT", insetLeft, y)
+            label:Show()
+            y = y - ((section.emptyHeight or 26) + rowSpacing)
+        end
+
+        for index, item in ipairs(items) do
+            local row = pool[index]
+            if not row then
+                row = CreateFrame("Frame", nil, content)
+                pool[index] = row
+            end
+
+            refreshActionsCollectionRow(row, item)
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", content, "TOPLEFT", insetLeft, y)
+            row:SetPoint("RIGHT", content, "RIGHT", -insetRight, 0)
+            row:Show()
+            y = y - ((section.rowHeight or 26) + rowSpacing)
+        end
+
+        if section.trailer and section.trailer.preset == "modeInput" then
+            local trailerRow = trailerRows[sectionKey]
+            if not trailerRow then
+                trailerRow = CreateFrame("Frame", nil, content)
+                trailerRows[sectionKey] = trailerRow
+            end
+
+            refreshModeInputRow(trailerRow, section.trailer, section)
+            trailerRow:ClearAllPoints()
+            trailerRow:SetPoint("TOPLEFT", content, "TOPLEFT", insetLeft, y)
+            trailerRow:SetPoint("RIGHT", content, "RIGHT", -insetRight, 0)
+            trailerRow:Show()
+            y = y - (section.trailerHeight or 28)
+        end
+
+        y = y - (section.spacingAfter or sectionSpacing)
+    end
+end
+
+local function applyCollectionFrame(frame, data, initializer)
+    frame.OnDefault = data.onDefault
+    frame._lsbCollectionData = data
+    frame._lsbCollectionInitializer = initializer
+
+    if data.sections then
+        refreshSectionedCollection(frame, data)
+    else
+        refreshFlatCollection(frame, data)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -1160,6 +2295,7 @@ function lib:New(config)
     SB._layouts = {}
     SB._firstHeaderAdded = {}
     SB._reactiveControls = {}
+    SB._categoryRefreshables = {}
 
     SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
     SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
@@ -1192,7 +2328,28 @@ function lib:New(config)
         return spec.category or SB._currentSubcategory or SB._rootCategory
     end
 
+    local function registerCategoryRefreshable(category, initializer)
+        if not category or not initializer then
+            return
+        end
+
+        local refreshables = SB._categoryRefreshables[category]
+        if not refreshables then
+            refreshables = {}
+            SB._categoryRefreshables[category] = refreshables
+        end
+
+        for _, existing in ipairs(refreshables) do
+            if existing == initializer then
+                return
+            end
+        end
+
+        refreshables[#refreshables + 1] = initializer
+    end
+
     local reevaluateReactiveControls
+    local setCanvasInteractive
 
     local function postSet(spec, value, setting)
         if spec.onSet then
@@ -1384,7 +2541,7 @@ function lib:New(config)
         end
     end
 
-    local function setCanvasInteractive(frame, enabled)
+    setCanvasInteractive = function(frame, enabled)
         if frame.SetEnabled then
             frame:SetEnabled(enabled)
         end
@@ -1523,8 +2680,9 @@ function lib:New(config)
         return category
     end
 
-    function SB.CreateSubcategory(name)
-        local subcategory, layout = Settings.RegisterVerticalLayoutSubcategory(SB._rootCategory, name)
+    function SB.CreateSubcategory(name, parentCategory)
+        local parent = parentCategory or SB._rootCategory
+        local subcategory, layout = Settings.RegisterVerticalLayoutSubcategory(parent, name)
         SB._subcategories[name] = subcategory
         SB._subcategoryNames[subcategory] = name
         SB._layouts[subcategory] = layout
@@ -1536,6 +2694,7 @@ function lib:New(config)
         local parent = parentCategory or SB._rootCategory
         local subcategory, layout = Settings.RegisterCanvasLayoutSubcategory(parent, frame, name)
         SB._subcategories[name] = subcategory
+        SB._subcategoryNames[subcategory] = name
         SB._layouts[subcategory] = layout
         return subcategory
     end
@@ -1652,24 +2811,6 @@ function lib:New(config)
             or Settings.VarType.String
 
         local setting = makeProxySetting(spec, varType, "", binding)
-
-        if spec.scrollHeight then
-            local initializer = Settings.CreateElementInitializer(lib.SCROLL_DROPDOWN_TEMPLATE, {
-                _lsbKind = "scrollDropdown",
-                setting = setting,
-                values = spec.values,
-                scrollHeight = spec.scrollHeight,
-                name = spec.name,
-                tooltip = spec.tooltip,
-            })
-            if initializer.SetSetting then
-                initializer:SetSetting(setting)
-            end
-            Settings.RegisterInitializer(cat, initializer)
-            applyModifiers(initializer, spec)
-            return initializer, setting
-        end
-
         local function optionsGenerator()
             local container = Settings.CreateControlTextContainer()
             local values = type(spec.values) == "function" and spec.values() or spec.values
@@ -1680,8 +2821,52 @@ function lib:New(config)
             end
             return container:GetData()
         end
+        setting._optionsGen = optionsGenerator
 
-        local initializer = Settings.CreateDropdown(cat, setting, optionsGenerator, spec.tooltip)
+        local initializer
+        if spec.scrollHeight then
+            initializer = Settings.CreateDropdown(cat, setting, optionsGenerator, spec.tooltip)
+            initializer._lsbData = {
+                _lsbKind = "scrollDropdown",
+                setting = setting,
+                values = spec.values,
+                scrollHeight = spec.scrollHeight,
+                name = spec.name,
+                tooltip = spec.tooltip,
+            }
+            if initializer.SetSetting then
+                initializer:SetSetting(setting)
+            end
+            initializer._lsbRefreshFrame = function(frame)
+                if frame and frame.RefreshDropdownText then
+                    frame:RefreshDropdownText()
+                end
+            end
+            registerCategoryRefreshable(cat, initializer)
+        else
+            initializer = Settings.CreateDropdown(cat, setting, optionsGenerator, spec.tooltip)
+        end
+
+        if initializer.SetSetting and (not initializer.GetSetting or not initializer:GetSetting()) then
+            initializer:SetSetting(setting)
+        end
+        if type(spec.values) == "function" and not initializer._lsbRefreshFrame then
+            initializer._lsbRefreshFrame = function(frame)
+                if frame and frame.InitDropdown then
+                    frame:InitDropdown(initializer)
+                elseif frame and frame.SetValue and setting.GetValue then
+                    frame:SetValue(setting:GetValue())
+                end
+            end
+            registerCategoryRefreshable(cat, initializer)
+        end
+
+        if not initializer.GetSetting then
+            initializer.GetSetting = function()
+                return setting
+            end
+        end
+
         applyModifiers(initializer, spec)
 
         return initializer, setting
@@ -1827,6 +3012,41 @@ function lib:New(config)
         local fn = SB[DISPATCH[spec.type]]
         assert(fn, "Control: unknown type '" .. tostring(spec.type) .. "'")
         return fn(spec)
+    end
+
+    function SB.Collection(spec)
+        assert(spec.height, "Collection: spec.height is required")
+
+        local cat = resolveCategory(spec)
+        local data = {}
+        for key, value in pairs(spec) do
+            data[key] = value
+        end
+
+        local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
+
+        initializer._lsbEnabled = true
+        initializer.SetEnabled = function(controlInitializer, enabled)
+            controlInitializer._lsbEnabled = enabled
+            local activeFrame = controlInitializer._lsbActiveFrame
+            if activeFrame then
+                if activeFrame.SetAlpha then
+                    activeFrame:SetAlpha(enabled and 1 or 0.5)
+                end
+                setCanvasInteractive(activeFrame, enabled)
+            end
+        end
+
+        initializer._lsbRefreshFrame = function(frame)
+            applyCollectionFrame(frame, data, initializer)
+            initializer.SetEnabled(initializer, initializer._lsbEnabled ~= false)
+        end
+
+        Settings.RegisterInitializer(cat, initializer)
+        registerCategoryRefreshable(cat, initializer)
+        applyModifiers(initializer, spec)
+
+        return initializer
     end
 
     ----------------------------------------------------------------------------
@@ -2038,16 +3258,45 @@ function lib:New(config)
 
         local cat = resolveCategory(spec)
         local text = spec.name
+        local catName = SB._subcategoryNames[cat] or (cat == SB._rootCategory and SB._rootCategoryName)
+        local matchesCategoryTitle = catName and text == catName
+        local isFirstHeader = not SB._firstHeaderAdded[cat]
+        local attachToCategoryHeader = isFirstHeader and matchesCategoryTitle and spec.actions
 
-        if not SB._firstHeaderAdded[cat] then
+        if isFirstHeader then
             SB._firstHeaderAdded[cat] = true
-            local catName = SB._subcategoryNames[cat] or (cat == SB._rootCategory and SB._rootCategoryName)
-            if catName and text == catName then
+            if matchesCategoryTitle and not spec.actions then
                 return nil
             end
         end
 
         local layout = SB._layouts[cat]
+        if spec.actions then
+            local height = spec.height
+                or (attachToCategoryHeader
+                    and 1
+                    or (
+                        (spec.hideTitle == true or (isFirstHeader and matchesCategoryTitle))
+                        and 34
+                        or 50
+                    ))
+            local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
+                _lsbKind = "header",
+                name = text,
+                actions = spec.actions,
+                hideTitle = spec.hideTitle == true or (isFirstHeader and matchesCategoryTitle),
+                attachToCategoryHeader = attachToCategoryHeader == true,
+            }, height, applyHeaderFrame)
+            initializer._lsbRefreshFrame = function(frame)
+                applyHeaderFrame(frame, initializer:GetData())
+            end
+            initializer._lsbResetFrame = hideHeaderActionButtons
+            layout:AddInitializer(initializer)
+            registerCategoryRefreshable(cat, initializer)
+            applyModifiers(initializer, spec)
+            return initializer
+        end
+
         local initializer = CreateSettingsListSectionHeaderInitializer(text)
         layout:AddInitializer(initializer)
         applyModifiers(initializer, spec)
@@ -2073,8 +3322,16 @@ function lib:New(config)
             _lsbKind = "infoRow",
             name = spec.name,
             value = spec.value,
-        }, 26, applyInfoRowFrame)
+            wide = spec.wide,
+            multiline = spec.multiline,
+        }, spec.height or 26, applyInfoRowFrame)
         layout:AddInitializer(initializer)
+        initializer._lsbRefreshFrame = function(frame)
+            applyInfoRowFrame(frame, initializer:GetData())
+        end
+        if type(spec.value) == "function" or type(spec.name) == "function" then
+            registerCategoryRefreshable(cat, initializer)
+        end
         applyModifiers(initializer, spec)
         return initializer
     end
@@ -2137,6 +3394,45 @@ function lib:New(config)
         return initializer
     end
 
+    function SB.RefreshCategory(categoryOrName)
+        local category = categoryOrName
+        if type(categoryOrName) == "string" then
+            category = SB._subcategories[categoryOrName]
+                or (categoryOrName == SB._rootCategoryName and SB._rootCategory)
+        end
+        if not category then
+            return
+        end
+
+        local currentCategory = SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
+        local isVisible = SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown() and currentCategory == category
+
+        local refreshables = SB._categoryRefreshables[category] or {}
+        for _, initializer in ipairs(refreshables) do
+            if initializer._lsbActiveFrame and initializer._lsbRefreshFrame then
+                initializer._lsbRefreshFrame(initializer._lsbActiveFrame, initializer)
+            end
+        end
+
+        if not isVisible then
+            return
+        end
+
+        local settingsList = SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+        local scrollBox = settingsList and settingsList.ScrollBox
+        if scrollBox and scrollBox.ForEachFrame then
+            scrollBox:ForEachFrame(function(frame)
+                local initializer = frame.GetElementData and frame:GetElementData() or frame._lsbInitializer
+                if frame.EvaluateState then
+                    frame:EvaluateState()
+                end
+                if initializer and initializer._lsbRefreshFrame then
+                    initializer._lsbRefreshFrame(frame, initializer)
+                end
+            end)
+        end
+    end
+
     ----------------------------------------------------------------------------
     -- Table-driven registration (AceConfig-inspired)
     ----------------------------------------------------------------------------
@@ -2175,7 +3471,7 @@ function lib:New(config)
         if tbl.rootCategory then
             SB._currentSubcategory = SB._rootCategory
         else
-            SB.CreateSubcategory(tbl.name)
+            SB.CreateSubcategory(tbl.name, tbl.parentCategory)
         end
 
         if tbl.onShow or tbl.onHide then
@@ -2276,6 +3572,8 @@ function lib:New(config)
                     init = SB.InfoRow(spec)
                 elseif entryType == "button" then
                     init = SB.Button(spec)
+                elseif entryType == "collection" then
+                    init = SB.Collection(spec)
                 elseif entryType == "canvas" then
                     init = SB.EmbedCanvas(entry.canvas, entry.height, spec)
                 elseif entryType == "colorList" then

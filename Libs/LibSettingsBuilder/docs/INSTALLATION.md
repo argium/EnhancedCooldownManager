@@ -68,9 +68,9 @@ Only `SB.Custom(...)` requires you to supply your own template. In that case:
 2. load that XML from your TOC before registering categories, and
 3. pass the template name through `spec.template`.
 
-## Canvas layout compatibility
+## Legacy canvas layout compatibility
 
-Canvas layout spacing defaults are modeled after Blizzard's retail Settings panel measurements and can be adjusted when needed:
+Canvas layout spacing defaults are still available for older `CreateCanvasLayout(...)` pages, but new work should prefer `RegisterFromTable(...)` plus `collection` / dynamic rows.
 
 - per-library via `SB.SetCanvasLayoutDefaults(overrides)`
 - per-layout via `SB.ConfigureCanvasLayout(layout, overrides)`

@@ -10,23 +10,13 @@ local BUILTIN_STACKS = C.BUILTIN_STACKS
 local BUILTIN_STACK_ORDER = C.BUILTIN_STACK_ORDER
 local RACIAL_ABILITIES = C.RACIAL_ABILITIES
 
-local ROW_HEIGHT = 26
-local ICON_SIZE = 20
-local BTN_SIZE = 22
-local DRAFT_ENTRY_ROW_HEIGHT = 28
-local DRAFT_ENTRY_PREVIEW_ICON_SIZE = 16
-local DRAFT_TYPE_BUTTON_WIDTH = 58
-local DRAFT_ID_BOX_WIDTH = 120
-local DRAFT_ADD_BUTTON_WIDTH = 44
 local TOOLTIP_ITEM_ICON_SIZE = 14
 local TOOLTIP_QUALITY_ICON_SIZE = 14
-local SETTINGS_LABEL_X = 37
-local SPECIAL_ROWS_LEGEND_HEIGHT = 24
-local VIEWER_ROW_SPACING = 4
-local VIEWER_CANVAS_HEIGHT = 448
+local VIEWER_COLLECTION_HEIGHT = 448
 local DEFAULT_SPECIAL_VIEWER = "utility"
 local DRAFT_PENDING_TEXT = "..."
 local VIEWER_ORDER = { "utility", "main" }
+local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
 local VIEWER_LABELS = {
     utility = "UTILITY_VIEWER_ICONS",
     main = "MAIN_VIEWER_ICONS",
@@ -234,7 +224,7 @@ local function addItemStackTooltipLines(entry)
         return false
     end
 
-    GameTooltip:AddLine(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"], nil, nil, nil, true)
+    GameTooltip:AddLine(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"], TOOLTIP_TITLE_COLOR, true)
 
     for _, itemEntry in ipairs(stack.ids) do
         local itemId = getItemIdFromEntry(itemEntry)
@@ -247,9 +237,7 @@ local function addItemStackTooltipLines(entry)
                 itemName or ("Item " .. tostring(itemId)),
                 getQualityMarkup(quality)
             ),
-            1,
-            1,
-            1
+            TOOLTIP_TITLE_COLOR
         )
     end
 
@@ -684,21 +672,9 @@ end
 --------------------------------------------------------------------------------
 
 --- Set a simple text tooltip on a button.
-local function setButtonTooltip(btn, text)
-    btn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if GameTooltip.ClearLines then
-            GameTooltip:ClearLines()
-        end
-        GameTooltip:SetText(text, 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", GameTooltip_Hide)
-end
-
 local function addTooltipLine(text)
     if text and text ~= "" then
-        GameTooltip:AddLine(text, nil, nil, nil, true)
+        GameTooltip:AddLine(text, TOOLTIP_TITLE_COLOR, true)
     end
 end
 
@@ -712,7 +688,7 @@ local function showRowTooltip(owner, rowData)
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
-    GameTooltip:SetText(getEntryTooltipTitle(displayEntry), 1, 1, 1)
+    GameTooltip:SetText(getEntryTooltipTitle(displayEntry), TOOLTIP_TITLE_COLOR, 1)
 
     if rowData.isBuiltin then
         if rowData.isPlaceholder then
@@ -730,40 +706,6 @@ local function showRowTooltip(owner, rowData)
     GameTooltip:Show()
 end
 
-local function clearRowMouseover(row)
-    row:SetScript("OnEnter", nil)
-    row:SetScript("OnLeave", nil)
-    if row._highlight then
-        row._highlight:Hide()
-    end
-    if row.EnableMouse then
-        row:EnableMouse(false)
-    end
-end
-
-local function setRowMouseover(row, tooltipBuilder)
-    if row._highlight then
-        row._highlight:Hide()
-    end
-    if row.EnableMouse then
-        row:EnableMouse(true)
-    end
-    row:SetScript("OnEnter", function(self)
-        if self._highlight then
-            self._highlight:Show()
-        end
-        if tooltipBuilder then
-            tooltipBuilder(self)
-        end
-    end)
-    row:SetScript("OnLeave", function(self)
-        if self._highlight then
-            self._highlight:Hide()
-        end
-        GameTooltip_Hide()
-    end)
-end
-
 --- Check if a racial entry belongs to the current player character.
 function ExtraIconsOptions._isRacialForCurrentPlayer(entry)
     local spellId = getEntrySpellId(entry)
@@ -771,143 +713,11 @@ function ExtraIconsOptions._isRacialForCurrentPlayer(entry)
     local racial = getCurrentRacialEntry()
     if not racial then return true end
     for _, racialEntry in pairs(RACIAL_ABILITIES) do
-        if racialEntry ~= racial then
-            if spellId == racialEntry.spellId then
-                return false
-            end
+        if racialEntry ~= racial and spellId == racialEntry.spellId then
+            return false
         end
     end
     return true
-end
-
---------------------------------------------------------------------------------
--- UI: Entry Row Factory
---------------------------------------------------------------------------------
-
-local function createEntryRow(parent)
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(ROW_HEIGHT)
-
-    row._highlight = row:CreateTexture(nil, "BACKGROUND")
-    row._highlight:SetAllPoints()
-    row._highlight:SetColorTexture(1, 1, 1, 0.08)
-    row._highlight:Hide()
-
-    row._icon = row:CreateTexture(nil, "ARTWORK")
-    row._icon:SetSize(ICON_SIZE, ICON_SIZE)
-    row._icon:SetPoint("LEFT", 0, 0)
-
-    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
-    row._label:SetJustifyH("LEFT")
-    row._label:SetWordWrap(false)
-
-    row._deleteBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._deleteBtn:SetSize(BTN_SIZE, BTN_SIZE)
-    row._deleteBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-    row._deleteBtn:SetText("x")
-
-    row._moveBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._moveBtn:SetSize(BTN_SIZE + 4, BTN_SIZE)
-    row._moveBtn:SetPoint("RIGHT", row._deleteBtn, "LEFT", -2, 0)
-
-    row._downBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._downBtn:SetSize(BTN_SIZE + 4, BTN_SIZE)
-    row._downBtn:SetPoint("RIGHT", row._moveBtn, "LEFT", -2, 0)
-    row._downBtn:SetText("v")
-
-    row._upBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._upBtn:SetSize(BTN_SIZE + 4, BTN_SIZE)
-    row._upBtn:SetPoint("RIGHT", row._downBtn, "LEFT", -2, 0)
-    row._upBtn:SetText("^")
-
-    row._label:SetPoint("RIGHT", row._upBtn, "LEFT", -6, 0)
-
-    return row
-end
-
-local function createDraftRow(parent)
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(DRAFT_ENTRY_ROW_HEIGHT)
-
-    row._typeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._typeBtn:SetSize(DRAFT_TYPE_BUTTON_WIDTH, BTN_SIZE)
-    row._typeBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
-
-    row._editBox = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
-    row._editBox:SetPoint("LEFT", row._typeBtn, "RIGHT", 6, 0)
-    row._editBox:SetSize(DRAFT_ID_BOX_WIDTH, 20)
-    row._editBox:SetAutoFocus(false)
-    if type(row._editBox.SetNumeric) == "function" then
-        row._editBox:SetNumeric(true)
-    end
-    if type(row._editBox.SetMaxLetters) == "function" then
-        row._editBox:SetMaxLetters(10)
-    end
-    if type(row._editBox.SetTextInsets) == "function" then
-        row._editBox:SetTextInsets(6, 6, 0, 0)
-    end
-
-    row._editBoxPlaceholder = row._editBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    row._editBoxPlaceholder:SetPoint("LEFT", row._editBox, "LEFT", 6, 0)
-    row._editBoxPlaceholder:SetPoint("RIGHT", row._editBox, "RIGHT", -6, 0)
-    row._editBoxPlaceholder:SetJustifyH("LEFT")
-    row._editBoxPlaceholder:SetWordWrap(false)
-
-    row._previewIcon = row:CreateTexture(nil, "ARTWORK")
-    row._previewIcon:SetPoint("LEFT", row._editBox, "RIGHT", 8, 0)
-    row._previewIcon:SetSize(DRAFT_ENTRY_PREVIEW_ICON_SIZE, DRAFT_ENTRY_PREVIEW_ICON_SIZE)
-    row._previewIcon:Hide()
-
-    row._previewLabel = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row._previewLabel:SetPoint("LEFT", row._previewIcon, "RIGHT", 4, 0)
-    row._previewLabel:SetJustifyH("LEFT")
-    row._previewLabel:SetWordWrap(false)
-    row._previewLabel:Hide()
-
-    row._addBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row._addBtn:SetSize(DRAFT_ADD_BUTTON_WIDTH, BTN_SIZE)
-    row._addBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-    row._addBtn:SetText(L["ADD_ENTRY"])
-
-    row._previewLabel:SetPoint("RIGHT", row._addBtn, "LEFT", -6, 0)
-
-    return row
-end
-
-local function createViewerHeaderRow(parent, SB, text, headerHeight)
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(headerHeight)
-    row._title = SB.CreateSubheaderTitle(row, text)
-    return row
-end
-
---------------------------------------------------------------------------------
--- Embedded Content: Viewer lists
---------------------------------------------------------------------------------
-
-local function createViewerListCanvas(SB, headerHeight)
-    local frame = CreateFrame("Frame")
-    frame:SetHeight(VIEWER_CANVAS_HEIGHT)
-
-    frame._viewerRowPools = { utility = {}, main = {} }
-    frame._viewerDraftRows = {}
-    frame._viewerHeaders = {}
-    frame._viewerEmptyLabels = {}
-    frame._legendLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    frame._legendLabel:SetJustifyH("LEFT")
-    frame._legendLabel:SetWordWrap(true)
-    frame._legendLabel:SetText(L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"])
-
-    for _, vk in ipairs(VIEWER_ORDER) do
-        frame._viewerHeaders[vk] = createViewerHeaderRow(frame, SB, L[VIEWER_LABELS[vk]], headerHeight)
-
-        frame._viewerEmptyLabels[vk] = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-        frame._viewerEmptyLabels[vk]:SetJustifyH("LEFT")
-        frame._viewerEmptyLabels[vk]:SetText(L["EXTRA_ICONS_NO_ENTRIES"])
-    end
-
-    return frame
 end
 
 --------------------------------------------------------------------------------
@@ -919,13 +729,8 @@ StaticPopupDialogs["ECM_CONFIRM_REMOVE_EXTRA_ICON"] =
 
 function ExtraIconsOptions.RegisterSettings(SB)
     local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("extraIcons")
-    local viewerHeaderHeight = (SB.SetCanvasLayoutDefaults and SB.SetCanvasLayoutDefaults().headerHeight) or 50
-    local viewerCanvas = createViewerListCanvas(SB, viewerHeaderHeight)
-
-    ExtraIconsOptions._viewerCanvas = viewerCanvas
-    ExtraIconsOptions._draftEntryCanvas = nil
-    ExtraIconsOptions._addFormCanvas = nil
-    ExtraIconsOptions._presetsCanvas = nil
+    local categoryName = L["EXTRA_ICONS"]
+    local category
 
     local function getProfile()
         return ns.Addon.db.profile
@@ -933,6 +738,14 @@ function ExtraIconsOptions.RegisterSettings(SB)
 
     local function getViewers()
         return getProfile().extraIcons.viewers
+    end
+
+    local function refreshCategory()
+        if category then
+            SB.RefreshCategory(category)
+        else
+            SB.RefreshCategory(categoryName)
+        end
     end
 
     ExtraIconsOptions._draftStates = ExtraIconsOptions._draftStates or {}
@@ -956,9 +769,7 @@ function ExtraIconsOptions.RegisterSettings(SB)
         itemLoadFrame:SetScript("OnEvent", function(_, _, itemId)
             if itemId and ExtraIconsOptions._pendingItemLoads[itemId] then
                 ExtraIconsOptions._pendingItemLoads[itemId] = nil
-                if ExtraIconsOptions._refresh then
-                    ExtraIconsOptions._refresh()
-                end
+                refreshCategory()
             end
         end)
         itemLoadFrame._ecmHooked = true
@@ -966,23 +777,6 @@ function ExtraIconsOptions.RegisterSettings(SB)
 
     local function scheduleUpdate()
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    end
-
-    local function refreshVisibleSettingsControls()
-        local panel = SettingsPanel
-        if not panel or not panel.IsShown or not panel:IsShown() then
-            return
-        end
-
-        local settingsList = panel.GetSettingsList and panel:GetSettingsList()
-        local scrollBox = settingsList and settingsList.ScrollBox
-        if scrollBox and scrollBox.ForEachFrame then
-            scrollBox:ForEachFrame(function(frame)
-                if frame.EvaluateState then
-                    frame:EvaluateState()
-                end
-            end)
-        end
     end
 
     local function resetDraftStates()
@@ -1005,37 +799,6 @@ function ExtraIconsOptions.RegisterSettings(SB)
         return L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"]
     end
 
-    local function refreshDraftPlaceholder(row, viewerKey)
-        if not (row and row._editBoxPlaceholder) then
-            return
-        end
-
-        local draftState = draftStates[viewerKey]
-        local idText = draftState and draftState.idText or ""
-        row._editBoxPlaceholder:SetText(getDraftPlaceholderText(draftState))
-
-        if row._editBoxHasFocus or idText ~= "" then
-            row._editBoxPlaceholder:Hide()
-        else
-            row._editBoxPlaceholder:Show()
-        end
-    end
-
-    local function focusDraftEditBox(row)
-        if not (row and row._editBox) then
-            return
-        end
-
-        if row._editBox.SetFocus then
-            row._editBox:SetFocus()
-        end
-        row._editBoxHasFocus = true
-        refreshDraftPlaceholder(row, row._viewerKey)
-        if row._editBox.HighlightText then
-            row._editBox:HighlightText()
-        end
-    end
-
     local function getDraftDuplicateInfo(viewerKey)
         local draftState = draftStates[viewerKey]
         local id = ExtraIconsOptions._parseSingleId(draftState.idText)
@@ -1054,18 +817,18 @@ function ExtraIconsOptions.RegisterSettings(SB)
         return not isDuplicate
     end
 
-    local function addDraftEntry(viewerKey, row)
+    local function addDraftEntry(viewerKey)
         local draftState = draftStates[viewerKey]
         local id = ExtraIconsOptions._parseSingleId(draftState.idText)
         if not id or not canAddDraftEntry(viewerKey) then
-            return
+            return false
         end
 
         ExtraIconsOptions._addCustomEntry(getProfile(), viewerKey, draftState.kind, { id })
         draftState.idText = ""
         scheduleUpdate()
-        ExtraIconsOptions._refresh()
-        focusDraftEditBox(row)
+        refreshCategory()
+        return true
     end
 
     local function restoreDefaultExtraIcons()
@@ -1078,168 +841,10 @@ function ExtraIconsOptions.RegisterSettings(SB)
         ns.Addon.db.profile.extraIcons = ns.CloneValue(defaultsConfig)
         resetDraftStates()
         scheduleUpdate()
-        ExtraIconsOptions._refresh()
+        refreshCategory()
     end
 
-    local function setRowVisualState(row, isDisabledRow)
-        local alpha = isDisabledRow and 0.55 or 1
-        if row._label and type(row._label.SetFontObject) == "function" then
-            local fontObject = isDisabledRow and (_G.GameFontDisable or _G.GameFontNormal) or _G.GameFontNormal
-            if fontObject then
-                row._label:SetFontObject(fontObject)
-            end
-        end
-        if row._label and type(row._label.SetAlpha) == "function" then
-            row._label:SetAlpha(alpha)
-        end
-        if row._icon and type(row._icon.SetAlpha) == "function" then
-            row._icon:SetAlpha(alpha)
-        end
-        if row._icon and type(row._icon.SetDesaturated) == "function" then
-            row._icon:SetDesaturated(isDisabledRow)
-        end
-        if row._icon and type(row._icon.SetVertexColor) == "function" then
-            if isDisabledRow then
-                row._icon:SetVertexColor(0.6, 0.6, 0.6, 1)
-            else
-                row._icon:SetVertexColor(1, 1, 1, 1)
-            end
-        end
-        if row._label and type(row._label.SetTextColor) == "function" then
-            if isDisabledRow then
-                row._label:SetTextColor(0.65, 0.65, 0.65, 1)
-            else
-                row._label:SetTextColor(1, 0.82, 0, 1)
-            end
-        end
-    end
-
-    local function ensureDraftRow(viewerKey)
-        local row = viewerCanvas._viewerDraftRows[viewerKey]
-        if row then
-            return row
-        end
-
-        row = createDraftRow(viewerCanvas)
-        viewerCanvas._viewerDraftRows[viewerKey] = row
-        row._viewerKey = viewerKey
-
-        setButtonTooltip(row._typeBtn, L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"])
-        setButtonTooltip(row._addBtn, L["ADD_ENTRY"])
-
-        row._typeBtn:SetScript("OnClick", function()
-            if isDisabled() then
-                return
-            end
-
-            local draftState = draftStates[viewerKey]
-            draftState.kind = draftState.kind == "spell" and "item" or "spell"
-            ExtraIconsOptions._refresh()
-        end)
-
-        row._editBox:SetScript("OnTextChanged", function(self)
-            if row._syncingText then
-                return
-            end
-
-            draftStates[viewerKey].idText = self:GetText() or ""
-            ExtraIconsOptions._refresh()
-        end)
-
-        row._editBox:SetScript("OnEnterPressed", function()
-            addDraftEntry(viewerKey, row)
-        end)
-
-        row._editBox:SetScript("OnTabPressed", function(self)
-            if isDisabled() then
-                return
-            end
-
-            local draftState = draftStates[viewerKey]
-            draftState.kind = draftState.kind == "spell" and "item" or "spell"
-            ExtraIconsOptions._refresh()
-            focusDraftEditBox(row)
-        end)
-
-        row._editBox:SetScript("OnEditFocusGained", function()
-            row._editBoxHasFocus = true
-            refreshDraftPlaceholder(row, viewerKey)
-            if row._editBox.HighlightText and (row._editBox:GetText() or "") ~= "" then
-                row._editBox:HighlightText()
-            end
-        end)
-
-        row._editBox:SetScript("OnEditFocusLost", function()
-            row._editBoxHasFocus = false
-            refreshDraftPlaceholder(row, viewerKey)
-        end)
-
-        row._editBox:SetScript("OnEscapePressed", function(self)
-            if self.ClearFocus then
-                self:ClearFocus()
-            end
-            row._editBoxHasFocus = false
-            refreshDraftPlaceholder(row, viewerKey)
-        end)
-
-        row._addBtn:SetScript("OnClick", function()
-            addDraftEntry(viewerKey, row)
-        end)
-
-        return row
-    end
-
-    local function refreshDraftRow(viewerKey, row)
-        local draftState = draftStates[viewerKey]
-        local controlsDisabled = isDisabled()
-        local status, name, icon = getDraftResolution(viewerKey)
-        local isDuplicate, duplicateViewerKey = getDraftDuplicateInfo(viewerKey)
-
-        row._typeBtn:SetText(draftState.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"])
-        if row._typeBtn.SetEnabled then
-            row._typeBtn:SetEnabled(not controlsDisabled)
-        end
-
-        if row._editBox.GetText and row._editBox:GetText() ~= draftState.idText then
-            row._syncingText = true
-            row._editBox:SetText(draftState.idText)
-            row._syncingText = nil
-        end
-        if row._editBox.SetEnabled then
-            row._editBox:SetEnabled(not controlsDisabled)
-        end
-        refreshDraftPlaceholder(row, viewerKey)
-
-        if icon then
-            row._previewIcon:SetTexture(icon)
-            row._previewIcon:Show()
-        else
-            row._previewIcon:SetTexture(nil)
-            row._previewIcon:Hide()
-        end
-
-        if status == "resolved" and isDuplicate then
-            row._previewLabel:SetText(
-                L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(getViewerShortLabel(duplicateViewerKey)))
-            row._previewLabel:Show()
-        elseif status == "resolved" then
-            row._previewLabel:SetText(name or "")
-            row._previewLabel:Show()
-        elseif status == "pending" then
-            row._previewLabel:SetText(DRAFT_PENDING_TEXT)
-            row._previewLabel:Show()
-        else
-            row._previewLabel:SetText("")
-            row._previewLabel:Hide()
-        end
-
-        row._addBtn:Show()
-        if row._addBtn.SetEnabled then
-            row._addBtn:SetEnabled(not controlsDisabled and status == "resolved" and not isDuplicate)
-        end
-    end
-
-    local function configureEntryRow(row, rowData)
+    local function buildActionItem(rowData)
         local controlsDisabled = isDisabled()
         local displayEntry = rowData.displayEntry
         local otherViewer = ExtraIconsOptions._otherViewer(rowData.viewerKey)
@@ -1250,61 +855,23 @@ function ExtraIconsOptions.RegisterSettings(SB)
         local positionLocked = rowData.isBuiltin and rowData.isDisabled
         local canReorder = not controlsDisabled and rowData.activeIndex ~= nil and not positionLocked
         local canMove = not controlsDisabled and rowData.index ~= nil and not positionLocked and not hasMoveDuplicate
-
-        row._label:SetText(ExtraIconsOptions._getEntryName(displayEntry))
-        row._icon:SetTexture(ExtraIconsOptions._getEntryIcon(displayEntry) or 134400)
-        setRowVisualState(row, rowData.isDisabled)
-
-        row._upBtn:SetEnabled(canReorder and rowData.activeIndex > 1)
-        row._downBtn:SetEnabled(canReorder and rowData.activeIndex < rowData.activeCount)
-        row._moveBtn:SetEnabled(canMove)
-        row._deleteBtn:SetEnabled(not controlsDisabled)
-        row._moveBtn:SetText(rowData.viewerKey == "utility" and ">" or "<")
-
-        setButtonTooltip(row._upBtn, L["MOVE_UP_TOOLTIP"])
-        setButtonTooltip(row._downBtn, L["MOVE_DOWN_TOOLTIP"])
-        if hasMoveDuplicate then
-            setButtonTooltip(row._moveBtn, L["EXTRA_ICONS_DUPLICATE_MOVE_TOOLTIP"]:format(getViewerShortLabel(otherViewer)))
-        elseif positionLocked then
-            setButtonTooltip(row._moveBtn, L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"])
-        else
-            setButtonTooltip(row._moveBtn, L["MOVE_TO_VIEWER_TOOLTIP"]:format(otherViewer))
+        local deleteText = "x"
+        local deleteTooltip = L["REMOVE_TOOLTIP"]
+        local deleteAction = function()
+            local entryName = ExtraIconsOptions._getEntryName(displayEntry)
+            StaticPopup_Show("ECM_CONFIRM_REMOVE_EXTRA_ICON", entryName, nil, {
+                onAccept = function()
+                    ExtraIconsOptions._removeEntry(getProfile(), rowData.viewerKey, rowData.index)
+                    scheduleUpdate()
+                    refreshCategory()
+                end,
+            })
         end
 
-        row._upBtn:SetScript("OnClick", function()
-            if rowData.index == nil or not canReorder then
-                return
-            end
-
-            ExtraIconsOptions._reorderEntry(getProfile(), rowData.viewerKey, rowData.index, -1)
-            scheduleUpdate()
-            ExtraIconsOptions._refresh()
-        end)
-
-        row._downBtn:SetScript("OnClick", function()
-            if rowData.index == nil or not canReorder then
-                return
-            end
-
-            ExtraIconsOptions._reorderEntry(getProfile(), rowData.viewerKey, rowData.index, 1)
-            scheduleUpdate()
-            ExtraIconsOptions._refresh()
-        end)
-
-        row._moveBtn:SetScript("OnClick", function()
-            if rowData.index == nil or not canMove then
-                return
-            end
-
-            ExtraIconsOptions._moveEntry(getProfile(), rowData.viewerKey, otherViewer, rowData.index)
-            scheduleUpdate()
-            ExtraIconsOptions._refresh()
-        end)
-
         if rowData.isBuiltin then
-            row._deleteBtn:SetText(rowData.isDisabled and "+" or "x")
-            setButtonTooltip(row._deleteBtn, rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"])
-            row._deleteBtn:SetScript("OnClick", function()
+            deleteText = rowData.isDisabled and "+" or "x"
+            deleteTooltip = rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"]
+            deleteAction = function()
                 ExtraIconsOptions._toggleBuiltinRow(
                     getProfile(),
                     rowData.viewerKey,
@@ -1312,119 +879,188 @@ function ExtraIconsOptions.RegisterSettings(SB)
                     rowData.stackKey or displayEntry.stackKey
                 )
                 scheduleUpdate()
-                ExtraIconsOptions._refresh()
-            end)
+                refreshCategory()
+            end
         elseif rowData.isCurrentRacial and rowData.isPlaceholder then
-            row._deleteBtn:SetText("+")
-            setButtonTooltip(row._deleteBtn, L["ADD_ENTRY"])
-            row._deleteBtn:SetScript("OnClick", function()
+            deleteText = "+"
+            deleteTooltip = L["ADD_ENTRY"]
+            deleteAction = function()
                 ExtraIconsOptions._toggleCurrentRacialRow(getProfile(), rowData.viewerKey, nil, rowData.spellId)
                 scheduleUpdate()
-                ExtraIconsOptions._refresh()
-            end)
-        else
-            row._deleteBtn:SetText("x")
-            setButtonTooltip(row._deleteBtn, L["REMOVE_TOOLTIP"])
-            row._deleteBtn:SetScript("OnClick", function()
-                local entryName = ExtraIconsOptions._getEntryName(displayEntry)
-                StaticPopup_Show("ECM_CONFIRM_REMOVE_EXTRA_ICON", entryName, nil, {
-                    onAccept = function()
-                        ExtraIconsOptions._removeEntry(getProfile(), rowData.viewerKey, rowData.index)
-                        scheduleUpdate()
-                        ExtraIconsOptions._refresh()
-                    end,
-                })
-            end)
+                refreshCategory()
+            end
         end
 
-        clearRowMouseover(row)
-        setRowMouseover(row, function(self)
-            showRowTooltip(self, rowData)
-        end)
+        return {
+            label = ExtraIconsOptions._getEntryName(displayEntry),
+            icon = ExtraIconsOptions._getEntryIcon(displayEntry) or 134400,
+            alpha = rowData.isDisabled and 0.55 or 1,
+            labelFontObject = rowData.isDisabled and (_G.GameFontDisable or _G.GameFontNormal) or _G.GameFontNormal,
+            labelColor = rowData.isDisabled and { 0.65, 0.65, 0.65, 1 } or { 1, 0.82, 0, 1 },
+            iconDesaturated = rowData.isDisabled == true,
+            iconVertexColor = rowData.isDisabled and { 0.6, 0.6, 0.6, 1 } or nil,
+            onEnter = function(owner)
+                showRowTooltip(owner, rowData)
+            end,
+            onLeave = function()
+                GameTooltip_Hide()
+            end,
+            actions = {
+                up = {
+                    text = "^",
+                    width = 30,
+                    enabled = canReorder and rowData.activeIndex > 1,
+                    tooltip = L["MOVE_UP_TOOLTIP"],
+                    onClick = function()
+                        if rowData.index == nil or not canReorder then
+                            return
+                        end
+
+                        ExtraIconsOptions._reorderEntry(getProfile(), rowData.viewerKey, rowData.index, -1)
+                        scheduleUpdate()
+                        refreshCategory()
+                    end,
+                },
+                down = {
+                    text = "v",
+                    width = 30,
+                    enabled = canReorder and rowData.activeIndex < rowData.activeCount,
+                    tooltip = L["MOVE_DOWN_TOOLTIP"],
+                    onClick = function()
+                        if rowData.index == nil or not canReorder then
+                            return
+                        end
+
+                        ExtraIconsOptions._reorderEntry(getProfile(), rowData.viewerKey, rowData.index, 1)
+                        scheduleUpdate()
+                        refreshCategory()
+                    end,
+                },
+                move = {
+                    text = rowData.viewerKey == "utility" and ">" or "<",
+                    width = 30,
+                    enabled = canMove,
+                    tooltip = function()
+                        if hasMoveDuplicate then
+                            return L["EXTRA_ICONS_DUPLICATE_MOVE_TOOLTIP"]:format(getViewerShortLabel(otherViewer))
+                        end
+                        if positionLocked then
+                            return L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"]
+                        end
+                        return L["MOVE_TO_VIEWER_TOOLTIP"]:format(getViewerShortLabel(otherViewer))
+                    end,
+                    onClick = function()
+                        if rowData.index == nil or not canMove then
+                            return
+                        end
+
+                        ExtraIconsOptions._moveEntry(getProfile(), rowData.viewerKey, otherViewer, rowData.index)
+                        scheduleUpdate()
+                        refreshCategory()
+                    end,
+                },
+                delete = {
+                    text = deleteText,
+                    width = 26,
+                    enabled = not controlsDisabled,
+                    tooltip = deleteTooltip,
+                    onClick = deleteAction,
+                },
+            },
+        }
     end
 
-    viewerCanvas.OnDefault = restoreDefaultExtraIcons
+    local function buildModeInputTrailer(viewerKey)
+        local draftState = draftStates[viewerKey]
+        local controlsDisabled = isDisabled()
+        local status, name, icon = getDraftResolution(viewerKey)
+        local isDuplicate, duplicateViewerKey = getDraftDuplicateInfo(viewerKey)
+        local previewText
 
-    --------------------------------------------------------------------
-    -- Refresh: viewer lists canvas
-    --------------------------------------------------------------------
-    local function refreshViewerLists()
-        local viewers = getViewers()
-        local y = 0
+        if status == "resolved" and isDuplicate then
+            previewText = L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(getViewerShortLabel(duplicateViewerKey))
+        elseif status == "resolved" then
+            previewText = name or ""
+        elseif status == "pending" then
+            previewText = DRAFT_PENDING_TEXT
+        end
 
-        viewerCanvas._legendLabel:ClearAllPoints()
-        viewerCanvas._legendLabel:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
-        viewerCanvas._legendLabel:SetPoint("RIGHT", viewerCanvas, "RIGHT", -20, 0)
-        viewerCanvas._legendLabel:Show()
-        y = y - SPECIAL_ROWS_LEGEND_HEIGHT
-
-        for _, viewerKey in ipairs(VIEWER_ORDER) do
-            local headerRow = viewerCanvas._viewerHeaders[viewerKey]
-            headerRow:ClearAllPoints()
-            headerRow:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", 0, y)
-            headerRow:SetPoint("RIGHT", viewerCanvas, "RIGHT", 0, 0)
-            headerRow:Show()
-            y = y - viewerHeaderHeight
-
-            local pool = viewerCanvas._viewerRowPools[viewerKey]
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
-
-            for _, row in ipairs(pool) do
-                clearRowMouseover(row)
-                row:Hide()
-            end
-
-            if #rows == 0 then
-                viewerCanvas._viewerEmptyLabels[viewerKey]:ClearAllPoints()
-                viewerCanvas._viewerEmptyLabels[viewerKey]:SetPoint(
-                    "TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
-                viewerCanvas._viewerEmptyLabels[viewerKey]:Show()
-                y = y - ROW_HEIGHT - VIEWER_ROW_SPACING
-            else
-                viewerCanvas._viewerEmptyLabels[viewerKey]:Hide()
-            end
-
-            for rowIndex, rowData in ipairs(rows) do
-                local row = pool[rowIndex]
-                if not row then
-                    row = createEntryRow(viewerCanvas)
-                    pool[rowIndex] = row
+        return {
+            preset = "modeInput",
+            disabled = controlsDisabled,
+            modeText = draftState.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"],
+            modeTooltip = L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"],
+            inputText = draftState.idText,
+            placeholder = getDraftPlaceholderText(draftState),
+            previewIcon = icon,
+            previewText = previewText,
+            submitText = L["ADD_ENTRY"],
+            submitTooltip = L["ADD_ENTRY"],
+            submitEnabled = status == "resolved" and not isDuplicate,
+            onToggleMode = function()
+                if controlsDisabled then
+                    return
                 end
 
-                configureEntryRow(row, rowData)
-                row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
-                row:SetPoint("RIGHT", viewerCanvas, "RIGHT", -20, 0)
-                row:Show()
-                y = y - ROW_HEIGHT - VIEWER_ROW_SPACING
+                draftState.kind = draftState.kind == "spell" and "item" or "spell"
+                refreshCategory()
+            end,
+            onTextChanged = function(text)
+                draftState.idText = text or ""
+                refreshCategory()
+            end,
+            onSubmit = function()
+                if controlsDisabled then
+                    return false
+                end
+
+                return addDraftEntry(viewerKey)
+            end,
+            onTabPressed = function()
+                if controlsDisabled then
+                    return false
+                end
+
+                draftState.kind = draftState.kind == "spell" and "item" or "spell"
+                refreshCategory()
+                return true
+            end,
+        }
+    end
+
+    local function buildViewerSections()
+        local viewers = getViewers()
+        local sections = {}
+
+        for _, viewerKey in ipairs(VIEWER_ORDER) do
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
+            local items = {}
+
+            for _, rowData in ipairs(rows) do
+                items[#items + 1] = buildActionItem(rowData)
             end
 
-            local draftRow = ensureDraftRow(viewerKey)
-            refreshDraftRow(viewerKey, draftRow)
-            draftRow:ClearAllPoints()
-            draftRow:SetPoint("TOPLEFT", viewerCanvas, "TOPLEFT", SETTINGS_LABEL_X, y)
-            draftRow:SetPoint("RIGHT", viewerCanvas, "RIGHT", -20, 0)
-            draftRow:Show()
-            y = y - DRAFT_ENTRY_ROW_HEIGHT
-
-            y = y - 12
+            sections[#sections + 1] = {
+                key = viewerKey,
+                title = L[VIEWER_LABELS[viewerKey]],
+                items = items,
+                emptyText = L["EXTRA_ICONS_NO_ENTRIES"],
+                trailer = buildModeInputTrailer(viewerKey),
+            }
         end
+
+        return sections
     end
 
-    --------------------------------------------------------------------
-    -- Combined refresh
-    --------------------------------------------------------------------
-    function ExtraIconsOptions._refresh()
-        refreshViewerLists()
-        refreshVisibleSettingsControls()
-    end
+    ExtraIconsOptions._viewerCanvas = nil
+    ExtraIconsOptions._draftEntryCanvas = nil
+    ExtraIconsOptions._addFormCanvas = nil
+    ExtraIconsOptions._presetsCanvas = nil
+    ExtraIconsOptions._refresh = refreshCategory
 
     SB.RegisterFromTable({
-        name = L["EXTRA_ICONS"],
+        name = categoryName,
         path = "extraIcons",
-        onShow = function()
-            ExtraIconsOptions._refresh()
-        end,
         args = {
             enabled = {
                 type = "toggle",
@@ -1437,17 +1073,28 @@ function ExtraIconsOptions.RegisterSettings(SB)
                     handler(value)
                 end,
             },
-            viewers = {
-                type = "canvas",
-                canvas = viewerCanvas,
-                height = VIEWER_CANVAS_HEIGHT,
-                disabled = isDisabled,
+            specialRowsLegend = {
+                type = "info",
+                name = "",
+                value = L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"],
+                wide = true,
+                multiline = true,
+                height = 24,
                 order = 10,
+            },
+            viewers = {
+                type = "collection",
+                height = VIEWER_COLLECTION_HEIGHT,
+                disabled = isDisabled,
+                sections = buildViewerSections,
+                onDefault = restoreDefaultExtraIcons,
+                order = 11,
             },
         },
     })
 
-    ExtraIconsOptions._category = SB.GetSubcategory(L["EXTRA_ICONS"])
+    category = SB.GetSubcategory(categoryName)
+    ExtraIconsOptions._category = category
 end
 
 ns.SettingsBuilder.RegisterSection(ns, "ExtraIcons", ExtraIconsOptions)

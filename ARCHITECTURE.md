@@ -193,6 +193,12 @@ LibEditMode detects WoW's Edit Mode enter/exit. On enter, all modules are forced
 
 Setting changes flow through LibSettingsBuilder's `onChange` → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`.
 
+Options pages now use one LibSettingsBuilder DSL for both simple and complex screens:
+
+- standard persisted controls (`toggle`, `range`, `select`, `color`, `input`) bind through path mode or handler mode,
+- layout rows (`header`, `subheader`, `info`, `button`) handle structure and copy,
+- dynamic editors use `collection` rows with library-owned list/section rendering plus `SB.RefreshCategory(...)` for async or transient state such as profile pickers and item-preview updates.
+
 ### Watchdog Ticker
 
 A 0.5s `C_Timer.NewTicker` handles deferred Blizzard frame hooking (stops retrying once setup completes), enforces hidden/alpha state against Blizzard re-shows, and syncs module alpha.

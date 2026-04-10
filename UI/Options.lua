@@ -16,10 +16,6 @@ end
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
 local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
 
-local BUTTON_X = 37 -- matches the settings info-row title anchor
-local BUTTON_HEIGHT = 26
-local BUTTON_WIDTH = 200
-
 --------------------------------------------------------------------------------
 -- SettingsBuilder instance
 --------------------------------------------------------------------------------
@@ -65,37 +61,9 @@ ns.SettingsBuilder = LSB:New({
 
 local About = {}
 
-local function createLinksCanvas()
-    local frame = CreateFrame("Frame")
-    frame:SetHeight(BUTTON_HEIGHT * 2)
-
-    local curseforge = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    curseforge:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-    curseforge:SetPoint("TOPLEFT", BUTTON_X, 0)
-    curseforge:SetText(L["CURSEFORGE"])
-    curseforge:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
-    end)
-
-    local github = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    github:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-    github:SetPoint("TOPLEFT", BUTTON_X, -BUTTON_HEIGHT)
-    github:SetText(L["GITHUB"])
-    github:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
-    end)
-
-    frame._curseforge = curseforge
-    frame._github = github
-
-    return frame
-end
-
 function About.RegisterSettings(SB)
     local version = (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
     local authorText = ns.ColorUtil.Sparkle("Argi")
-
-    local linksCanvas = createLinksCanvas()
 
     SB.RegisterFromTable({
         name = L["ADDON_NAME"],
@@ -124,11 +92,23 @@ function About.RegisterSettings(SB)
                 name = L["LINKS"],
                 order = 9,
             },
-            links = {
-                type = "canvas",
-                canvas = linksCanvas,
-                height = BUTTON_HEIGHT * 2,
+            curseforge = {
+                type = "button",
+                name = L["CURSEFORGE"],
+                buttonText = L["CURSEFORGE"],
+                onClick = function()
+                    ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
+                end,
                 order = 10,
+            },
+            github = {
+                type = "button",
+                name = L["GITHUB"],
+                buttonText = L["GITHUB"],
+                onClick = function()
+                    ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
+                end,
+                order = 11,
             },
         },
     })

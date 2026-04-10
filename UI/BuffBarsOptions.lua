@@ -8,8 +8,7 @@ local L = ns.L
 
 local REMOVE_STALE_SPELL_COLORS_POPUP = "ECM_CONFIRM_REMOVE_STALE_SPELL_COLORS"
 local SPELL_COLORS_HEADER_BUTTON_WIDTH = 100
-local SPELL_COLORS_HEADER_BUTTON_HEIGHT = 22
-local SPELL_COLORS_HEADER_BUTTON_SPACING = 8
+local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
 
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
@@ -111,22 +110,6 @@ local function collectIncompleteSpellColorRows(rows)
     return incompleteRows
 end
 
----@param owner Frame
----@param text string
-local function setSimpleTooltip(owner, text)
-    owner:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if GameTooltip.ClearLines then
-            GameTooltip:ClearLines()
-        end
-        GameTooltip:SetText(text, 1, 1, 1, true)
-        GameTooltip:Show()
-    end)
-    owner:SetScript("OnLeave", function()
-        GameTooltip_Hide()
-    end)
-end
-
 ---@param key ECM_SpellColorKey|table|nil
 ---@return string
 local function getSpellColorRowName(key)
@@ -181,10 +164,10 @@ local function maybeShowSpellColorKeyTooltip(owner, data)
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
-    GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], 1, 1, 1)
+    GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], TOOLTIP_TITLE_COLOR, 1)
 
     for _, line in ipairs(lines) do
-        GameTooltip:AddLine(line, nil, nil, nil, true)
+        GameTooltip:AddLine(line, TOOLTIP_TITLE_COLOR, true)
     end
 
     GameTooltip:Show()
@@ -194,16 +177,12 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-StaticPopupDialogs["ECM_CONFIRM_RESET_SPELL_COLORS"] = ns.OptionUtil.MakeConfirmDialog(L["SPELL_COLORS_RESET_CONFIRM"])
-
 local function createSpellColorCanvas(SB, subcatName)
-    local layout = SB.CreateCanvasLayout(subcatName)
-    local frame = layout.frame
-
     local function resetAllSpellColors()
         ns.SpellColors.ClearCurrentSpecColors()
-        frame:RefreshSpellList()
+        ns.SpellColors.SetDefaultColor(C.BUFFBARS_DEFAULT_COLOR)
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+        SB.RefreshCategory(subcatName)
     end
 
     local function reconcileSpellColors()
@@ -232,189 +211,19 @@ local function createSpellColorCanvas(SB, subcatName)
                     ns.Print(L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format(getSpellColorRowName(key)))
                 end
 
-                frame:RefreshSpellList()
                 if #removedKeys > 0 then
                     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                    SB.RefreshCategory(subcatName)
                 end
             end
         )
     end
 
-    -- Header — uses SettingsListTemplate's built-in Title, divider, and DefaultsButton
-    local headerRow = layout:AddHeader(subcatName)
-    local defaultsBtn = headerRow._defaultsButton
-    local reconcileBtn = CreateFrame("Button", nil, headerRow, "UIPanelButtonTemplate")
-    local removeStaleBtn = CreateFrame("Button", nil, headerRow, "UIPanelButtonTemplate")
+    local function getRows()
+        return buildSpellColorRows(ns.SpellColors.GetAllColorEntries())
+    end
 
-    reconcileBtn:SetSize(SPELL_COLORS_HEADER_BUTTON_WIDTH, SPELL_COLORS_HEADER_BUTTON_HEIGHT)
-    reconcileBtn:SetPoint("RIGHT", defaultsBtn, "LEFT", -SPELL_COLORS_HEADER_BUTTON_SPACING, 0)
-    reconcileBtn:SetText(L["SPELL_COLORS_RECONCILE_BUTTON"])
-    reconcileBtn:SetScript("OnClick", function()
-        if not reconcileBtn:IsEnabled() then
-            return
-        end
-        reconcileSpellColors()
-    end)
-
-    removeStaleBtn:SetSize(SPELL_COLORS_HEADER_BUTTON_WIDTH, SPELL_COLORS_HEADER_BUTTON_HEIGHT)
-    removeStaleBtn:SetPoint("RIGHT", reconcileBtn, "LEFT", -SPELL_COLORS_HEADER_BUTTON_SPACING, 0)
-    removeStaleBtn:SetText(L["SPELL_COLORS_REMOVE_STALE_BUTTON"])
-    removeStaleBtn:SetScript("OnClick", function()
-        if not removeStaleBtn:IsEnabled() then
-            return
-        end
-        removeStaleSpellColors()
-    end)
-    setSimpleTooltip(removeStaleBtn, L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"])
-
-    defaultsBtn:SetText(SETTINGS_DEFAULTS)
-    defaultsBtn:SetScript("OnClick", function()
-        if ns.Addon.BuffBars:IsEditLocked() then
-            return
-        end
-        StaticPopup_Show("ECM_CONFIRM_RESET_SPELL_COLORS", nil, nil, {
-            onAccept = resetAllSpellColors,
-        })
-    end)
-
-    layout:AddSpacer(2)
-
-    local descRow = layout:AddDescription(L["SPELL_COLORS_DESC"], "GameFontHighlight")
-    descRow._text:SetWordWrap(true)
-
-    local warningRow = layout:AddDescription("")
-    local warningText = warningRow._text
-    warningText:SetWordWrap(true)
-
-    -- Default color swatch (above the per-spell list)
-    local defaultColorRow, defaultColorSwatch = layout:AddColorSwatch("Default color")
-    -- Reposition the default color swatch to align with the scroll list rows below,
-    -- which are indented by the canvas label margin (37px from canvas edge).
-    defaultColorRow._label:ClearAllPoints()
-    defaultColorRow._label:SetPoint("LEFT", 74, 0)
-    defaultColorRow._label:SetPoint("RIGHT", defaultColorRow, "CENTER", -85, 0)
-    defaultColorSwatch:ClearAllPoints()
-    defaultColorSwatch:SetPoint("LEFT", defaultColorRow, "CENTER", -70, 0)
-    defaultColorSwatch:SetScript("OnClick", function()
-        if ns.Addon.BuffBars:IsEditLocked() then
-            return
-        end
-        local c = ns.SpellColors.GetDefaultColor()
-        ns.OptionUtil.OpenColorPicker(c, false, function(color)
-            ns.SpellColors.SetDefaultColor(color)
-            defaultColorSwatch:SetColorRGB(color.r, color.g, color.b)
-            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-        end)
-    end)
-
-    -- Scroll list using Blizzard's SettingsColorSwatchControlTemplate per element
-    local scrollTopY = layout.yPos
-    local scrollBox, scrollBar, view = layout:AddScrollList(C.SCROLL_ROW_HEIGHT_COMPACT)
-
-    scrollBox:ClearAllPoints()
-    scrollBox:SetPoint("TOPLEFT", 37, scrollTopY)
-    scrollBox:SetPoint("BOTTOMRIGHT", -30, C.SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES)
-    scrollBar:ClearAllPoints()
-    scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", 5, 0)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", 5, 0)
-
-    local secretNameDescRow = layout:_CreateRow(C.SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT)
-    local secretNameDescText = secretNameDescRow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    secretNameDescText:SetPoint("TOPLEFT", 37, 0)
-    secretNameDescText:SetPoint("TOPRIGHT", secretNameDescRow, "TOPRIGHT", -10, 0)
-    secretNameDescText:SetJustifyH("LEFT")
-    secretNameDescText:SetWordWrap(true)
-    secretNameDescText:SetText(L["SPELL_COLORS_SECRET_NAMES_DESC"])
-    secretNameDescRow._text = secretNameDescText
-    secretNameDescRow:ClearAllPoints()
-    secretNameDescRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
-    secretNameDescRow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, C.SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET)
-    secretNameDescRow:Hide()
-
-    local secretNameButtonRow, secretNameReloadButton = layout:AddButton("", L["SPELL_COLORS_RELOAD_BUTTON"])
-    secretNameButtonRow._label:SetText("")
-    secretNameButtonRow:ClearAllPoints()
-    secretNameButtonRow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, C.SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET)
-    secretNameButtonRow:SetPoint(
-        "BOTTOMRIGHT",
-        frame,
-        "BOTTOMRIGHT",
-        0,
-        C.SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET
-    )
-    secretNameButtonRow:Hide()
-    secretNameReloadButton:SetScript("OnClick", function()
-        ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
-    end)
-
-    frame._secretNameDescRow = secretNameDescRow
-    frame._secretNameReloadButtonRow = secretNameButtonRow
-    frame._secretNameReloadButton = secretNameReloadButton
-    frame._reconcileButton = reconcileBtn
-    frame._removeStaleButton = removeStaleBtn
-    frame._spellColorListView = view
-
-    view:SetElementInitializer("SettingsColorSwatchControlTemplate", function(control, data)
-        -- Position label (matches SettingsListElementMixin:Init positioning)
-        if not control._ecmPositioned then
-            control.Text:SetFontObject(GameFontNormal)
-            control.Text:ClearAllPoints()
-            control.Text:SetPoint("LEFT", 37, 0)
-            control.Text:SetPoint("RIGHT", control, "CENTER", -85, 0)
-            control._ecmPositioned = true
-        end
-
-        if not control._ecmSpellColorTooltipHooked then
-            if control.EnableMouse then
-                control:EnableMouse(true)
-            end
-            control:HookScript("OnEnter", function(self)
-                maybeShowSpellColorKeyTooltip(self, self._ecmSpellColorRowData)
-            end)
-            control:HookScript("OnLeave", function()
-                GameTooltip_Hide()
-            end)
-            control._ecmSpellColorTooltipHooked = true
-        end
-
-        control._ecmSpellColorRowData = data
-
-        local name = getSpellColorRowName(data.key)
-        local label = data.textureFileID and ("|T" .. data.textureFileID .. ":14:14|t  " .. name) or name
-        control.Text:SetText(label)
-
-        local c = ns.SpellColors.GetColorByKey(data.key) or ns.SpellColors.GetDefaultColor()
-        control.ColorSwatch:SetColorRGB(c.r, c.g, c.b)
-
-        control.ColorSwatch:SetScript("OnClick", function()
-            if ns.Addon.BuffBars:IsEditLocked() then
-                return
-            end
-            local current = ns.SpellColors.GetColorByKey(data.key) or ns.SpellColors.GetDefaultColor()
-            ns.OptionUtil.OpenColorPicker(current, false, function(color)
-                ns.SpellColors.SetColorByKey(data.key, color)
-                control.ColorSwatch:SetColorRGB(color.r, color.g, color.b)
-                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-            end)
-        end)
-    end)
-
-    local dataProvider = CreateDataProvider()
-    scrollBox:SetDataProvider(dataProvider)
-
-    function frame:RefreshSpellList()
-        local rows = buildSpellColorRows(ns.SpellColors.GetAllColorEntries())
-        local secretNameFooterState = getSecretNameFooterState(rows)
-        local hasIncompleteRows = hasRowsNeedingReconcile(rows)
-        local canReconcile = hasIncompleteRows and not isSpellColorsReloadRestricted()
-        local canRemoveStale = hasIncompleteRows and not isSpellColorsReloadRestricted()
-
-        dataProvider:Flush()
-        for _, row in ipairs(rows) do
-            dataProvider:Insert(row)
-        end
-
-        -- Build warning text
+    local function getWarningText()
         local parts = {}
         local locked, reason = ns.Addon.BuffBars:IsEditLocked()
         if locked and reason == "combat" then
@@ -422,33 +231,158 @@ local function createSpellColorCanvas(SB, subcatName)
         elseif locked and reason == "secrets" then
             parts[#parts + 1] = L["SPELL_COLORS_SECRETS_WARNING"]
         end
-        warningText:SetText(table.concat(parts, "\n"))
-
-        if secretNameFooterState.show then
-            secretNameDescRow:Show()
-            secretNameButtonRow:Show()
-        else
-            secretNameDescRow:Hide()
-            secretNameButtonRow:Hide()
-        end
-        secretNameReloadButton:SetEnabled(secretNameFooterState.enabled)
-
-        local dc = ns.SpellColors.GetDefaultColor()
-        defaultColorSwatch:SetColorRGB(dc.r, dc.g, dc.b)
-
-        defaultsBtn:SetEnabled(not locked)
-        reconcileBtn:SetEnabled(canReconcile)
-        removeStaleBtn:SetEnabled(canRemoveStale)
+        return table.concat(parts, "\n")
     end
 
-    -- Blizzard's panel calls OnDefault on canvas frames during global defaults
-    frame.OnDefault = resetAllSpellColors
+    local function buildSpellColorItems()
+        local items = {}
 
-    frame:SetScript("OnShow", function(self)
-        self:RefreshSpellList()
-    end)
+        items[#items + 1] = {
+            label = L["DEFAULT_COLOR"],
+            color = {
+                value = ns.SpellColors.GetDefaultColor(),
+                enabled = function()
+                    local locked = ns.Addon.BuffBars:IsEditLocked()
+                    return not locked
+                end,
+                onClick = function()
+                    if ns.Addon.BuffBars:IsEditLocked() then
+                        return
+                    end
+                    ns.OptionUtil.OpenColorPicker(ns.SpellColors.GetDefaultColor(), false, function(color)
+                        ns.SpellColors.SetDefaultColor(color)
+                        ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                        SB.RefreshCategory(subcatName)
+                    end)
+                end,
+            },
+        }
 
-    return frame
+        for _, row in ipairs(getRows()) do
+            items[#items + 1] = {
+                label = getSpellColorRowName(row.key),
+                icon = row.textureFileID,
+                color = {
+                    value = ns.SpellColors.GetColorByKey(row.key) or ns.SpellColors.GetDefaultColor(),
+                    onClick = function()
+                        if ns.Addon.BuffBars:IsEditLocked() then
+                            return
+                        end
+                        local current = ns.SpellColors.GetColorByKey(row.key) or ns.SpellColors.GetDefaultColor()
+                        ns.OptionUtil.OpenColorPicker(current, false, function(color)
+                            ns.SpellColors.SetColorByKey(row.key, color)
+                            ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                            SB.RefreshCategory(subcatName)
+                        end)
+                    end,
+                },
+                onEnter = function(owner)
+                    maybeShowSpellColorKeyTooltip(owner, row)
+                end,
+                onLeave = function()
+                    GameTooltip_Hide()
+                end,
+            }
+        end
+        return items
+    end
+
+    SB.RegisterFromTable({
+        name = subcatName,
+        args = {
+            spellColorsHeader = {
+                type = "header",
+                name = subcatName,
+                actions = {
+                    {
+                        text = L["SPELL_COLORS_RECONCILE_BUTTON"],
+                        width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
+                        enabled = function()
+                            local rows = getRows()
+                            return hasRowsNeedingReconcile(rows) and not isSpellColorsReloadRestricted()
+                        end,
+                        onClick = function()
+                            if hasRowsNeedingReconcile(getRows()) and not isSpellColorsReloadRestricted() then
+                                reconcileSpellColors()
+                            end
+                        end,
+                    },
+                    {
+                        text = L["SPELL_COLORS_REMOVE_STALE_BUTTON"],
+                        width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
+                        tooltip = L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
+                        enabled = function()
+                            local rows = getRows()
+                            return hasRowsNeedingReconcile(rows) and not isSpellColorsReloadRestricted()
+                        end,
+                        onClick = function()
+                            if hasRowsNeedingReconcile(getRows()) and not isSpellColorsReloadRestricted() then
+                                removeStaleSpellColors()
+                            end
+                        end,
+                    },
+                },
+                order = 1,
+            },
+            spellColorsDescription = {
+                type = "info",
+                name = "",
+                value = L["SPELL_COLORS_DESC"],
+                wide = true,
+                multiline = true,
+                height = 36,
+                order = 2,
+            },
+            spellColorsWarning = {
+                type = "info",
+                name = "",
+                value = getWarningText,
+                wide = true,
+                multiline = true,
+                height = 30,
+                hidden = function()
+                    return getWarningText() == ""
+                end,
+                order = 3,
+            },
+            spellColorCollection = {
+                type = "collection",
+                preset = "swatch",
+                height = 260,
+                rowHeight = C.SCROLL_ROW_HEIGHT_COMPACT,
+                items = buildSpellColorItems,
+                onDefault = resetAllSpellColors,
+                order = 4,
+            },
+            secretNameDescription = {
+                type = "info",
+                name = "",
+                value = L["SPELL_COLORS_SECRET_NAMES_DESC"],
+                wide = true,
+                multiline = true,
+                height = C.SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT,
+                hidden = function()
+                    return not getSecretNameFooterState(getRows()).show
+                end,
+                order = 5,
+            },
+            secretNameReload = {
+                type = "button",
+                name = " ",
+                buttonText = L["SPELL_COLORS_RELOAD_BUTTON"],
+                hidden = function()
+                    return not getSecretNameFooterState(getRows()).show
+                end,
+                disabled = function()
+                    return not getSecretNameFooterState(getRows()).enabled
+                end,
+                onClick = function()
+                    ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
+                end,
+                order = 6,
+            },
+        },
+    })
 end
 
 --------------------------------------------------------------------------------
@@ -533,17 +467,6 @@ function BuffBarsOptions.RegisterSettings(SB)
     })
 
     createSpellColorCanvas(SB, L["SPELL_COLORS_SUBCAT"])
-
-    SB.Button({
-        name = L["CONFIGURE_SPELL_COLORS"],
-        buttonText = L["OPEN"],
-        onClick = function()
-            local catID = SB.GetSubcategoryID(L["SPELL_COLORS_SUBCAT"])
-            if catID then
-                Settings.OpenToCategory(catID)
-            end
-        end,
-    })
 end
 
 ns.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)

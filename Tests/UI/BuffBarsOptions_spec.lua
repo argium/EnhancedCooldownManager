@@ -314,21 +314,56 @@ describe("BuffBarsOptions", function()
         }))
     end)
 
-    it("ctrl-hovering a spell color row shows all keys for that row", function()
-        local key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001)
+    local function registerSpellColorsSpec()
+        local spellColorsSpec
+        local buttonSpecs = {}
+        local refreshCalls = {}
+        local originalRegisterFromTable = SB.RegisterFromTable
+        local originalButton = SB.Button
+
+        SB.RegisterFromTable = function(tbl)
+            if tbl.name == ns.L["SPELL_COLORS_SUBCAT"] then
+                spellColorsSpec = tbl
+            end
+            return originalRegisterFromTable(tbl)
+        end
+        SB.Button = function(spec)
+            buttonSpecs[#buttonSpecs + 1] = spec
+            return originalButton(spec)
+        end
+        SB.RefreshCategory = function(category)
+            refreshCalls[#refreshCalls + 1] = category
+        end
 
         BuffBarsOptions.RegisterSettings(SB)
 
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-        local control = CreateFrame("Frame")
+        SB.RegisterFromTable = originalRegisterFromTable
+        SB.Button = originalButton
 
+        return assert(spellColorsSpec), refreshCalls, buttonSpecs
+    end
+
+    it("does not add the old configure spell colors shortcut to aura bars", function()
+        local _, _, buttonSpecs = registerSpellColorsSpec()
+
+        for _, spec in ipairs(buttonSpecs) do
+            assert.are_not.equal("Configure Spell Colors", spec.name)
+            assert.are_not.equal("Open", spec.buttonText)
+        end
+    end)
+
+    it("ctrl-hovering a spell color collection row shows all keys for that row", function()
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
         _G.IsControlKeyDown = function()
             return true
         end
 
-        frame._spellColorListView._initFn(control, { key = key, textureFileID = 9001 })
-        control.hooks.OnEnter[1](control)
+        local spellColorsSpec = registerSpellColorsSpec()
+        local item = spellColorsSpec.args.spellColorCollection.items()[2]
+
+        item.onEnter(CreateFrame("Frame"))
 
         assert.are.equal("Spell color keys", _G.GameTooltip._title)
         assert.are.same({
@@ -340,148 +375,147 @@ describe("BuffBarsOptions", function()
         assert.is_true(_G.GameTooltip._shown)
     end)
 
-    it("spell colors canvas disables reconcile when every row already has all identifying keys", function()
-        ns.SpellColors.GetAllColorEntries = function()
-            return {
-                { key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001) },
-            }
-        end
-
-        BuffBarsOptions.RegisterSettings(SB)
-
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-
-        frame:RefreshSpellList()
-
-        assert.is_false(frame._reconcileButton:IsEnabled())
-        assert.is_false(frame._removeStaleButton:IsEnabled())
-    end)
-
-    it("spell colors canvas enables reconcile and remove stale for incomplete rows", function()
-        ns.SpellColors.GetAllColorEntries = function()
-            return {
-                { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
-            }
-        end
-
-        BuffBarsOptions.RegisterSettings(SB)
-
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-
-        frame:RefreshSpellList()
-
-        assert.is_true(frame._reconcileButton:IsEnabled())
-        assert.is_true(frame._removeStaleButton:IsEnabled())
-    end)
-
-    it("spell colors canvas disables reconcile in restricted areas", function()
-        _G.IsInInstance = function()
-            return true, "party"
-        end
-        ns.SpellColors.GetAllColorEntries = function()
-            return {
-                { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
-            }
-        end
-
-        BuffBarsOptions.RegisterSettings(SB)
-
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-
-        frame:RefreshSpellList()
-
-        assert.is_false(frame._reconcileButton:IsEnabled())
-        assert.is_false(frame._removeStaleButton:IsEnabled())
-    end)
-
-    it("spell colors canvas reconcile button uses ConfirmReloadUI for unnamed rows", function()
-        local confirmText
-
-        ns.SpellColors.GetAllColorEntries = function()
-            return {
-                { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
-            }
-        end
-        ns.Addon.ConfirmReloadUI = function(_, text)
-            confirmText = text
-        end
-
-        BuffBarsOptions.RegisterSettings(SB)
-
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-        local onClick = assert(frame._reconcileButton:GetScript("OnClick"))
-
-        frame:RefreshSpellList()
-        assert.is_true(frame._reconcileButton:IsEnabled())
-
-        onClick(frame._reconcileButton)
-
-        assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
-    end)
-
-    it("spell colors canvas remove stale button shows the configured tooltip", function()
-        BuffBarsOptions.RegisterSettings(SB)
-
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-
-        frame._removeStaleButton:GetScript("OnEnter")(frame._removeStaleButton)
-
-        assert.are.equal(ns.L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"], _G.GameTooltip._title)
-        assert.is_true(_G.GameTooltip._shown)
-    end)
-
-    it("spell colors canvas remove stale button confirms, removes stale entries, prints, and refreshes", function()
-        local popupKey
-        local popupText
-        local acceptText
-        local cancelText
-        local onAccept
+    it("puts the default spell color at the top of the collection", function()
+        local selectedColor = { r = 0.7, g = 0.6, b = 0.5, a = 1 }
         local scheduledReason
 
+        ns.OptionUtil.OpenColorPicker = function(_, hasOpacity, onChange)
+            assert.is_false(hasOpacity)
+            onChange(selectedColor)
+        end
         ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
             scheduledReason = reason
         end
-        ns.Addon.ShowConfirmDialog = function(_, key, text, button1, button2, acceptFn)
-            popupKey = key
-            popupText = text
-            acceptText = button1
-            cancelText = button2
-            onAccept = acceptFn
+
+        local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
+        local defaultItem = spellColorsSpec.args.spellColorCollection.items()[1]
+
+        assert.are.equal(ns.L["DEFAULT_COLOR"], defaultItem.label)
+
+        defaultItem.color.onClick()
+
+        assert.are.same(selectedColor, ns.SpellColors.GetDefaultColor())
+        assert.are.equal("OptionsChanged", scheduledReason)
+        assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
+    end)
+
+    it("collection defaults reset the default color and custom spell rows", function()
+        local scheduledReason
+
+        SpellColors.SetDefaultColor({ r = 0.7, g = 0.6, b = 0.5, a = 1 })
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+        ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
+            scheduledReason = reason
         end
 
+        local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
+        spellColorsSpec.args.spellColorCollection.onDefault()
+
+        assert.are.same({}, SpellColors.GetAllColorEntries())
+        assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, SpellColors.GetDefaultColor())
+        assert.are.equal("OptionsChanged", scheduledReason)
+        assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
+    end)
+
+    it("header actions disable reconcile and remove stale when every row is complete", function()
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+
+        local spellColorsSpec = registerSpellColorsSpec()
+        local actions = spellColorsSpec.args.spellColorsHeader.actions
+
+        assert.is_false(actions[1].enabled())
+        assert.is_false(actions[2].enabled())
+    end)
+
+    it("header actions enable reconcile and remove stale for incomplete rows outside restricted areas", function()
         SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), {
             r = 0.2, g = 0.3, b = 0.4, a = 1,
         })
 
-        BuffBarsOptions.RegisterSettings(SB)
+        local spellColorsSpec = registerSpellColorsSpec()
+        local actions = spellColorsSpec.args.spellColorsHeader.actions
 
-        local spellColorsCategory = assert(SB.GetSubcategory(ns.L["SPELL_COLORS_SUBCAT"]))
-        local frame = assert(spellColorsCategory._frame)
-        local onClick = assert(frame._removeStaleButton:GetScript("OnClick"))
+        assert.is_true(actions[1].enabled())
+        assert.is_true(actions[2].enabled())
+    end)
 
-        frame:RefreshSpellList()
-        assert.is_true(frame._removeStaleButton:IsEnabled())
+    it("header actions disable reconcile and remove stale in restricted areas", function()
+        _G.IsInInstance = function()
+            return true, "party"
+        end
+        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 258920, 77, 9001), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
 
-        onClick(frame._removeStaleButton)
+        local spellColorsSpec = registerSpellColorsSpec()
+        local actions = spellColorsSpec.args.spellColorsHeader.actions
+
+        assert.is_false(actions[1].enabled())
+        assert.is_false(actions[2].enabled())
+    end)
+
+    it("reconcile action uses ConfirmReloadUI for incomplete rows", function()
+        local confirmText
+
+        SpellColors.SetColorByKey(SpellColors.MakeKey(nil, 258920, 77, 9001), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+        ns.Addon.ConfirmReloadUI = function(_, text)
+            confirmText = text
+        end
+
+        local spellColorsSpec = registerSpellColorsSpec()
+        spellColorsSpec.args.spellColorsHeader.actions[1].onClick()
+
+        assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
+    end)
+
+    it("remove stale action exposes the configured tooltip and confirm flow", function()
+        local popupKey
+        local popupText
+        local acceptText
+        local cancelText
+        local acceptFn
+        local scheduledReason
+
+        SpellColors.SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+        ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
+            scheduledReason = reason
+        end
+        ns.Addon.ShowConfirmDialog = function(_, key, text, button1, button2, onAccept)
+            popupKey = key
+            popupText = text
+            acceptText = button1
+            cancelText = button2
+            acceptFn = onAccept
+        end
+
+        local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
+        local removeStaleAction = spellColorsSpec.args.spellColorsHeader.actions[2]
+
+        assert.are.equal(ns.L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"], removeStaleAction.tooltip)
+
+        removeStaleAction.onClick()
 
         assert.are.equal("ECM_CONFIRM_REMOVE_STALE_SPELL_COLORS", popupKey)
         assert.are.equal(ns.L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"], popupText)
         assert.are.equal(ns.L["REMOVE"], acceptText)
         assert.are.equal(ns.L["SPELL_COLORS_DONT_REMOVE"], cancelText)
-        assert.is_function(onAccept)
+        assert.is_function(acceptFn)
 
-        onAccept()
+        acceptFn()
 
         assert.are.same({}, ns.SpellColors.GetAllColorEntries())
         assert.are.same({
             ns.L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format("Immolation Aura"),
         }, printedMessages)
         assert.are.equal("OptionsChanged", scheduledReason)
-        assert.is_false(frame._removeStaleButton:IsEnabled())
+        assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
     end)
 end)

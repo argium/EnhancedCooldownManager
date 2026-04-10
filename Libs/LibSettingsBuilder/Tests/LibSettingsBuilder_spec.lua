@@ -187,6 +187,8 @@ describe("LibSettingsBuilder", function()
             "SettingsDropdownControlMixin",
             "SettingsSliderControlMixin",
             "C_Timer",
+            "GameTooltip",
+            "GameTooltip_Hide",
             "GameFontHighlight",
             "GameFontHighlightSmall",
             "GameFontNormal",
@@ -1334,26 +1336,18 @@ describe("LibSettingsBuilder", function()
         assert.are.equal(0, #warnings)
     end)
 
-    -- Dropdown with scrollHeight
-    it("Dropdown with scrollHeight uses scroll template", function()
-        local capturedTemplate
-        local settings = Settings
-        local origCreateElementInitializer = settings.CreateElementInitializer
-        rawset(settings, "CreateElementInitializer", function(template, data)
-            capturedTemplate = template
-            return origCreateElementInitializer(template, data)
-        end)
-
-        local _, setting = SB.Dropdown({
+    it("Dropdown with scrollHeight keeps Blizzard's native dropdown options callback", function()
+        local init, setting = SB.Dropdown({
             path = "global.mode",
             name = "Scrollable Mode",
             values = { solid = "Solid", flat = "Flat" },
             scrollHeight = 300,
         })
 
-        rawset(settings, "CreateElementInitializer", origCreateElementInitializer)
-
-        assert.are.equal(SB.SCROLL_DROPDOWN_TEMPLATE, capturedTemplate)
+        assert.is_function(init._optionsGen)
+        assert.are.equal("scrollDropdown", init._lsbData._lsbKind)
+        assert.are.equal(300, init._lsbData.scrollHeight)
+        assert.are.equal(setting, init:GetSetting())
         assert.are.equal("solid", setting:GetValue())
 
         setting:SetValue("flat")
@@ -1433,18 +1427,16 @@ describe("LibSettingsBuilder", function()
             SetValue = function() end,
         }
         local initializer = {
-            GetData = function()
-                return {
-                    _lsbKind = "scrollDropdown",
-                    setting = setting,
-                    values = {
-                        gamma = "Gamma",
-                        alpha = "Alpha",
-                        beta = "Beta",
-                    },
-                    scrollHeight = 240,
-                }
-            end,
+            _lsbData = {
+                _lsbKind = "scrollDropdown",
+                setting = setting,
+                values = {
+                    gamma = "Gamma",
+                    alpha = "Alpha",
+                    beta = "Beta",
+                },
+                scrollHeight = 240,
+            },
             GetSetting = function()
                 return setting
             end,
@@ -2328,6 +2320,203 @@ describe("LibSettingsBuilder", function()
     ---------------------------------------------------------------------------
     -- SB.Custom integration: template, setting, and InitFrame pipeline
     ---------------------------------------------------------------------------
+    describe("Dynamic layout rows", function()
+        it("Header accepts action buttons through spec tables", function()
+            local init = SB.Header({
+                name = "TestSection",
+                actions = {
+                    { text = "Defaults", width = 100 },
+                },
+            })
+
+            assert.are.equal(SB.SUBHEADER_TEMPLATE, init._template)
+            assert.are.equal("TestSection", init.data.name)
+            assert.are.equal("Defaults", init.data.actions[1].text)
+        end)
+
+        it("Header action tooltips use the current GameTooltip SetText signature", function()
+            TestHelpers.SetupGameTooltipStub()
+
+            local init = SB.Header({
+                name = "TestSection",
+                actions = {
+                    { text = "Add", tooltip = "Create entry" },
+                },
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.CreateFontString = function()
+                return createScriptableFrame()
+            end
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            assert.has_no.errors(function()
+                init:InitFrame(frame)
+            end)
+
+            local button = assert(frame._lsbHeaderActionButtons[1])
+            assert.has_no.errors(function()
+                button:GetScript("OnEnter")(button)
+            end)
+
+            assert.are.equal("Create entry", _G.GameTooltip._title)
+            assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, _G.GameTooltip._titleColor)
+            assert.are.equal(1, _G.GameTooltip._titleAlpha)
+            assert.is_true(_G.GameTooltip._titleWrap)
+        end)
+
+        it("Header hides the duplicated title when actions are attached to the page title row", function()
+            local init = SB.Header({
+                name = "TestSection",
+                category = SB._currentSubcategory,
+                actions = {
+                    { text = "Defaults", width = 100 },
+                },
+            })
+
+            assert.is_table(init)
+            assert.is_true(init.data.hideTitle)
+            assert.is_true(init.data.attachToCategoryHeader)
+            assert.are.equal(1, init:GetExtent())
+        end)
+
+        it("InfoRow with function-backed value registers as refreshable", function()
+            local category = SB._currentSubcategory
+            SB.InfoRow({
+                name = "Dynamic",
+                value = function()
+                    return "value"
+                end,
+            })
+
+            assert.is_table(SB._categoryRefreshables[category])
+            assert.are.equal(1, #SB._categoryRefreshables[category])
+        end)
+
+        it("RegisterFromTable dispatches collection rows through SB.Collection", function()
+            local called
+            local originalCollection = SB.Collection
+            SB.Collection = function(spec)
+                called = spec
+                return { _type = "collection" }
+            end
+
+            SB.RegisterFromTable({
+                name = "Collection Page",
+                args = {
+                    items = {
+                        type = "collection",
+                        height = 200,
+                        preset = "swatch",
+                        items = function()
+                            return {}
+                        end,
+                        order = 1,
+                    },
+                },
+            })
+
+            SB.Collection = originalCollection
+
+            assert.is_table(called)
+            assert.are.equal(200, called.height)
+            assert.are.equal("swatch", called.preset)
+        end)
+
+        it("RefreshCategory reevaluates visible frames and dynamic refreshables", function()
+            local frames = createSettingsPanelMock()
+            local category = SB._currentSubcategory
+            local refreshed = 0
+            local frame = createScriptableFrame()
+            frame.EvaluateState = function(self)
+                self._evaluated = true
+            end
+
+            frames[1] = frame
+            SettingsPanel:SetCurrentCategory(category)
+
+            SB._categoryRefreshables[category] = {
+                {
+                    _lsbActiveFrame = frame,
+                    _lsbRefreshFrame = function(activeFrame)
+                        refreshed = refreshed + 1
+                        activeFrame._refreshed = true
+                    end,
+                },
+            }
+
+            SB.RefreshCategory(category)
+
+            assert.are.equal(1, refreshed)
+            assert.is_true(frame._evaluated)
+            assert.is_true(frame._refreshed)
+        end)
+
+        it("Collection shows cached scroll widgets when a settings row is reused", function()
+            local originalCreateFrame = _G.CreateFrame
+            local originalCreateDataProvider = _G.CreateDataProvider
+            local originalCreateView = _G.CreateScrollBoxListLinearView
+            local originalScrollUtil = _G.ScrollUtil
+
+            _G.CreateFrame = function(_, _, _, template)
+                local frame = createScriptableFrame()
+                frame._template = template
+                frame.SetDataProvider = function(self, provider)
+                    self._dataProvider = provider
+                end
+                return frame
+            end
+            _G.CreateDataProvider = function()
+                return {
+                    Flush = function() end,
+                    Insert = function() end,
+                }
+            end
+            _G.CreateScrollBoxListLinearView = function()
+                return {
+                    SetElementExtent = function() end,
+                    SetElementInitializer = function() end,
+                }
+            end
+            _G.ScrollUtil = {
+                InitScrollBoxListWithScrollBar = function() end,
+            }
+
+            local init = SB.Collection({
+                height = 80,
+                preset = "swatch",
+                items = function()
+                    return {}
+                end,
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            init:InitFrame(frame)
+            local scrollBox = assert(frame._lsbCollectionScrollBox)
+            local scrollBar = assert(frame._lsbCollectionScrollBar)
+            scrollBox:Hide()
+            scrollBar:Hide()
+
+            init:InitFrame(frame)
+
+            assert.is_true(scrollBox:IsShown())
+            assert.is_true(scrollBar:IsShown())
+
+            _G.CreateFrame = originalCreateFrame
+            _G.CreateDataProvider = originalCreateDataProvider
+            _G.CreateScrollBoxListLinearView = originalCreateView
+            _G.ScrollUtil = originalScrollUtil
+        end)
+    end)
+
     describe("Custom control integration", function()
         it("passes the actual template name to CreateElementInitializer", function()
             local capturedTemplate
