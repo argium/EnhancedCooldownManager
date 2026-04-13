@@ -1,43 +1,40 @@
-# Code Style and Conventions
+# Current Style and Conventions
 
-## Copyright Header (MANDATORY on all .lua files)
-```lua
--- Enhanced Cooldown Manager addon for World of Warcraft
--- Author: Argium
--- Licensed under the GNU General Public License v3.0
-```
+## Mandatory Repo Rules
+- Every Lua file keeps the standard GPL copyright header.
+- Keep `ARCHITECTURE.md` in sync with real architecture changes.
+- Target WoW Lua 5.1 only; do not introduce post-5.1 features.
 
-## Naming
-- Constants: UPPER_SNAKE_CASE (stored in ECM_Constants.lua, accessed via `ECM.Constants`)
-- Functions/methods: PascalCase (e.g., `GetGlobalConfig`, `OnEnable`)
-- Private methods/fields: prefixed with underscore (e.g., `_configKey`, `_updateBar`)
-- Local variables: camelCase
-- Module names: PascalCase (e.g., `PowerBar`, `BuffBars`)
+## State and Structure
+- Mutable state belongs on the owning instance as `self._field`, not file-level locals.
+- Prefix private methods/fields with `_`.
+- Do not use forward declarations.
+- Alias shared modules once at file scope when reused.
+- Keep constants in `Constants.lua`; keep defaults in `Defaults.lua`.
 
-## Type Annotations
-- Use LuaCATS `@class`, `@field`, `@param`, `@return` annotations
-- Place `@class` annotations at top of file after copyright header
-- Group related `@field` annotations within each class
-- Add descriptions: getters start with "Gets ...", setters with "Sets ..."
+## Runtime / Performance
+- Never use `OnUpdate` or frame-rate tickers for feature logic; prefer event-driven work plus a single deferred timer when needed.
+- Reuse tables on hot paths with `wipe()`.
+- Cancel superseded timers before scheduling replacement deferred work.
+- Guard hot-path debug logs with `if ECM.IsDebugEnabled() then`.
+- Periodic setup work must stop once setup is complete.
+- Defer once out of restricted contexts; avoid stacked `C_Timer.After(0)` chains.
 
-## Architecture Rules
-- **ALL constants** must be in ECM_Constants.lua
-- Modules using ModuleMixin must use `self:GetGlobalConfig()` and `self:GetModuleConfig()` -- never `mod.db` or `mod.db.profile` directly
-- NEVER create intermediate tables for profile/config
-- NEVER listen to `OnUpdate` event
-- No forward declarations
-- Prefer loose coupling: events, hooks, callbacks for inter-module communication
-- Use assertions liberally to catch error states
+## Architecture Boundaries
+- Prefer loose coupling via events, hooks, callbacks, or messages.
+- Maintain one source of truth for shared state / derived values.
+- Do not add trivial passthrough wrappers or duplicate helpers.
+- Remove dead code, stale fields, unused locale strings, and impossible branches.
+- Shared confirm dialogs should use `ECM.OptionUtil.MakeConfirmDialog(text)` with `data.onAccept`.
+- Migrations in `Migration.lua` are frozen snapshots and must not depend on live production code.
 
-## Testing
-- New features/regression fixes in `/Bars`, `/Modules`, `/UI`, and `ECM.lua` MUST include test cases
-- Tests use Busted framework with WoW API stubs in Tests/stubs/
-- Test files named `*_spec.lua`
+## Options / UI Patterns
+- Current options pages prefer the `LibSettingsBuilder` DSL/table registration flow.
+- Complex pages use collection-style rows (`header`, `subheader`, `info`, `button`, `collection`, `input`) and refresh through `SB.RefreshCategory(...)`.
+- Dynamic option UIs should keep logic in the owning options module rather than reaching into unrelated modules.
 
-## Code Review Standards
-- No unused variables
-- No unnecessary assignments, guards, functions, boilerplate
-- Comments for complex sections (but not redundant comments restating function names)
-- No code duplication
-- Minimal complexity; simplicity is paramount
-- Remove dead code, trivial wrappers, dead type checking
+## Tests / Secrets
+- Be skeptical about changing tests to satisfy failures.
+- Test load order should mirror TOC load order.
+- Reuse `Tests/TestHelpers.lua` before inventing new shared helpers.
+- Treat `UnitPowerMax`, `UnitPower`, `UnitPowerPercent`, and `C_UnitAuras.GetUnitAuraBySpellID` as secret values; only pass them to APIs/built-ins that accept secrets.

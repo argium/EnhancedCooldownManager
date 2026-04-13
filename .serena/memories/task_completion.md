@@ -1,19 +1,20 @@
 # Task Completion Checklist
 
-When completing a task, perform these steps:
+## Validation Commands
+- Addon tests: `busted Tests`
+- Library tests: `busted --run libsettingsbuilder`, `busted --run libconsole`, `busted --run libevent`, `busted --run liblsmsettingswidgets`
+- Lint: `luacheck . -q`
 
-1. **Verify constants**: Any new constants must be in `ECM_Constants.lua`
-2. **Copyright header**: All new/modified .lua files must have the standard header
-3. **Run tests**: `busted Tests`
-4. **Run linter**: `luacheck . -q`
-5. **Code review** (for anything beyond a small targeted fix):
-   - Check for unused variables
-   - Check for unnecessary assignments, guards, boilerplate
-   - Verify no code duplication
-   - Ensure complex sections have comments
-   - Verify test coverage for changes in Modules/, UI/, ECM.lua
-   - Ensure loose coupling between components
-   - Remove dead code and trivial wrappers
-6. **Config access**: Modules using ModuleMixin use `self:GetGlobalConfig()` / `self:GetModuleConfig()` only
-7. **No OnUpdate**: Never use the OnUpdate event
-8. **No forward declarations**
+## When To Run Validation
+- Treat validation as a pre-commit step, not an every-iteration step.
+- Do not run the full test/lint suites while iterating unless they are needed to debug a specific issue.
+- Before committing a change, updates to `Modules/`, `Helpers/`, `UI/`, and `ECM*.lua` must pass `busted Tests` and `luacheck . -q`.
+- Before committing a library change, also run that library's dedicated test suite.
+
+## Completion Checks
+- Verify new constants live in `Constants.lua`.
+- Keep the copyright header intact on all modified/new Lua files.
+- Keep `ARCHITECTURE.md` current when architecture changes.
+- Review for duplication, dead code, redundant guards/assignments, and avoidable allocations.
+- Preserve loose coupling and single-source-of-truth ownership.
+- Do not introduce `OnUpdate` loops or forward declarations.
