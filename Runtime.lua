@@ -151,8 +151,8 @@ local function updateFadeAndHiddenStates()
         return
     end
 
-    -- Force-show while edit mode or the Layout options preview is active so the
-    -- user can see and position modules without hide/fade interference.
+    -- Force-show while edit mode or an options preview is active so the user
+    -- can see and position modules without hide/fade interference.
     if LibEditMode:IsInEditMode() or _layoutPreviewActive then
         setGloballyHidden(false)
         setAlpha(1)
@@ -403,7 +403,7 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 
---- Sets or clears the layout preview override.
+--- Sets or clears the options preview override.
 --- When active, hide-when-mounted, hide-in-rest, and out-of-combat fade are bypassed.
 ---@param active boolean
 function Runtime.SetLayoutPreview(active)

@@ -1061,6 +1061,12 @@ function ExtraIconsOptions.RegisterSettings(SB)
     SB.RegisterFromTable({
         name = categoryName,
         path = "extraIcons",
+        onShow = function()
+            ns.Runtime.SetLayoutPreview(true)
+        end,
+        onHide = function()
+            ns.Runtime.SetLayoutPreview(false)
+        end,
         args = {
             enabled = {
                 type = "toggle",
