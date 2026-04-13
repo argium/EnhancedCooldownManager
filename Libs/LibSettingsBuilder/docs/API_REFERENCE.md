@@ -168,6 +168,7 @@ Supported collection row presets:
 - `editor` — label plus one or more slider fields, optional swatch, and remove button
 - section items use the built-in action-row layout (`up`, `down`, `move`, `delete`)
 - section trailers support `preset = "modeInput"` for toggle + input + preview + submit rows
+  Mode-input trailer display fields may be static values or functions that are re-evaluated during in-place row refreshes.
 
 ## Composite builders
 

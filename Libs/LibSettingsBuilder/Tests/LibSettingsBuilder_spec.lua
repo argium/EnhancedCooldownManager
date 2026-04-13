@@ -2515,6 +2515,104 @@ describe("LibSettingsBuilder", function()
             _G.CreateScrollBoxListLinearView = originalCreateView
             _G.ScrollUtil = originalScrollUtil
         end)
+
+        it("Collection modeInput trailers reevaluate dynamic fields in place while typing", function()
+            local originalCreateFrame = _G.CreateFrame
+            local state = {
+                kind = "spell",
+                idText = "",
+            }
+
+            _G.CreateFrame = function(...)
+                local frame = originalCreateFrame(...)
+                frame.CreateFontString = function()
+                    local fontString = createScriptableFrame()
+                    fontString.SetFontObject = function() end
+                    return fontString
+                end
+                frame.CreateTexture = function()
+                    local texture = createScriptableFrame()
+                    texture.SetTexture = function(self, value)
+                        self._texture = value
+                    end
+                    texture.GetTexture = function(self)
+                        return self._texture
+                    end
+                    return texture
+                end
+                return frame
+            end
+
+            local ok, err = pcall(function()
+                local init = SB.Collection({
+                    height = 120,
+                    sections = function()
+                        return {
+                            {
+                                key = "dynamic",
+                                title = "Dynamic",
+                                items = {},
+                                trailer = {
+                                    preset = "modeInput",
+                                    modeText = function()
+                                        return state.kind == "spell" and "Spell" or "Item"
+                                    end,
+                                    inputText = function()
+                                        return state.idText
+                                    end,
+                                    placeholder = function()
+                                        return state.kind == "spell" and "Spell ID" or "Item ID"
+                                    end,
+                                    previewText = function()
+                                        return state.idText ~= "" and (state.kind .. ":" .. state.idText) or ""
+                                    end,
+                                    submitEnabled = function()
+                                        return state.idText ~= ""
+                                    end,
+                                    onTextChanged = function(text)
+                                        state.idText = text
+                                    end,
+                                    onTabPressed = function()
+                                        state.kind = state.kind == "spell" and "item" or "spell"
+                                        return true
+                                    end,
+                                },
+                            },
+                        }
+                    end,
+                })
+                local frame = createScriptableFrame()
+                frame.Text = createScriptableFrame()
+                frame.NewFeature = createScriptableFrame()
+                frame.SetShown = function(self, shown)
+                    self._shown = shown
+                end
+
+                init:InitFrame(frame)
+
+                local trailerRow = assert(frame._lsbSectionTrailerRows.dynamic)
+                local editBox = assert(trailerRow._editBox)
+                editBox:SetFocus()
+                trailerRow._lsbHasFocus = true
+                editBox:SetText("12345")
+                editBox:GetScript("OnTextChanged")(editBox)
+
+                assert.are.equal("12345", state.idText)
+                assert.are.equal("spell:12345", trailerRow._previewLabel:GetText())
+                assert.is_true(editBox._focused)
+
+                editBox:GetScript("OnTabPressed")()
+
+                assert.are.equal("Item", trailerRow._modeButton:GetText())
+                assert.are.equal("Item ID", trailerRow._placeholder:GetText())
+                assert.is_true(editBox._focused)
+                assert.is_true(editBox._highlighted)
+            end)
+            _G.CreateFrame = originalCreateFrame
+            if not ok then
+                error(err, 0)
+            end
+        end)
     end)
 
     describe("Custom control integration", function()

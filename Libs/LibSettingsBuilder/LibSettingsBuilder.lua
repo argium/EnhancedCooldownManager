@@ -225,8 +225,21 @@ local function showFrame(frame)
     end
 end
 
+local function getTooltipTitleColorComponents()
+    local color = TOOLTIP_TITLE_COLOR
+    if color and color.GetRGBA then
+        return color:GetRGBA()
+    end
+
+    return color and color.r or 1,
+        color and color.g or 1,
+        color and color.b or 1,
+        color and color.a or 1
+end
+
 local function setGameTooltipText(text, wrap)
-    GameTooltip:SetText(text, TOOLTIP_TITLE_COLOR, 1, wrap == true)
+    local r, g, b, a = getTooltipTitleColorComponents()
+    GameTooltip:SetText(text, r, g, b, a, wrap == true)
 end
 
 local function setSimpleTooltip(owner, text)
@@ -1544,6 +1557,9 @@ local function ensureModeInputRow(row)
         if trailer and trailer.onTextChanged then
             trailer.onTextChanged(self:GetText() or "", trailer, row, row._lsbSectionData)
         end
+        if row._lsbTrailerRefresh then
+            row._lsbTrailerRefresh(row)
+        end
     end)
     row._editBox:SetScript("OnEnterPressed", function()
         local trailer = row._lsbTrailerData
@@ -1557,12 +1573,16 @@ local function ensureModeInputRow(row)
     end)
     row._editBox:SetScript("OnTabPressed", function()
         local trailer = row._lsbTrailerData
+        local keepFocus = nil
         if trailer and trailer.onTabPressed then
-            local keepFocus = trailer.onTabPressed(trailer, row, row._lsbSectionData)
-            if keepFocus then
-                row._editBox:SetFocus()
-                row._editBox:HighlightText()
-            end
+            keepFocus = trailer.onTabPressed(trailer, row, row._lsbSectionData)
+        end
+        if row._lsbTrailerRefresh then
+            row._lsbTrailerRefresh(row)
+        end
+        if keepFocus then
+            row._editBox:SetFocus()
+            row._editBox:HighlightText()
         end
     end)
     row._editBox:SetScript("OnEscapePressed", function(self)
@@ -1580,6 +1600,10 @@ local function ensureModeInputRow(row)
     end)
 end
 
+local function getModeInputTrailerValue(trailer, key, row, sectionData)
+    return evaluateStaticOrFunction(trailer and trailer[key], trailer, row, sectionData)
+end
+
 local function refreshModeInputRow(row, trailer, sectionData)
     ensureModeInputRow(row)
 
@@ -1588,17 +1612,32 @@ local function refreshModeInputRow(row, trailer, sectionData)
 
     row._lsbTrailerRefresh = function(activeRow)
         local currentTrailer = activeRow._lsbTrailerData or {}
-        local text = currentTrailer.inputText or ""
+        local activeSectionData = activeRow._lsbSectionData
+        local disabled = getModeInputTrailerValue(currentTrailer, "disabled", activeRow, activeSectionData) == true
+        local modeEnabled = getModeInputTrailerValue(currentTrailer, "modeEnabled", activeRow, activeSectionData)
+        local inputEnabled = getModeInputTrailerValue(currentTrailer, "inputEnabled", activeRow, activeSectionData)
+        local submitEnabled = getModeInputTrailerValue(currentTrailer, "submitEnabled", activeRow, activeSectionData)
+        local modeText = getModeInputTrailerValue(currentTrailer, "modeText", activeRow, activeSectionData)
+        local modeTooltip = getModeInputTrailerValue(currentTrailer, "modeTooltip", activeRow, activeSectionData)
+        local text = getModeInputTrailerValue(currentTrailer, "inputText", activeRow, activeSectionData) or ""
+        local placeholder = getModeInputTrailerValue(currentTrailer, "placeholder", activeRow, activeSectionData)
+        local previewIcon = getModeInputTrailerValue(currentTrailer, "previewIcon", activeRow, activeSectionData)
+        local previewText = getModeInputTrailerValue(currentTrailer, "previewText", activeRow, activeSectionData)
+        local submitText = getModeInputTrailerValue(currentTrailer, "submitText", activeRow, activeSectionData)
+        local submitTooltip = getModeInputTrailerValue(currentTrailer, "submitTooltip", activeRow, activeSectionData)
 
-        activeRow._modeButton:SetText(currentTrailer.modeText or "")
-        setSimpleTooltip(activeRow._modeButton, currentTrailer.modeTooltip)
+        activeRow._modeButton:SetText(modeText or "")
+        setSimpleTooltip(activeRow._modeButton, modeTooltip)
         activeRow._modeButton:SetScript("OnClick", function()
             if currentTrailer.onToggleMode then
                 currentTrailer.onToggleMode(currentTrailer, activeRow, activeRow._lsbSectionData)
             end
+            if activeRow._lsbTrailerRefresh then
+                activeRow._lsbTrailerRefresh(activeRow)
+            end
         end)
         if activeRow._modeButton.SetEnabled then
-            activeRow._modeButton:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.modeEnabled ~= false)
+            activeRow._modeButton:SetEnabled(not disabled and modeEnabled ~= false)
         end
 
         if activeRow._editBox.GetText and activeRow._editBox:GetText() ~= text then
@@ -1607,34 +1646,34 @@ local function refreshModeInputRow(row, trailer, sectionData)
             activeRow._lsbSyncingText = nil
         end
         if activeRow._editBox.SetEnabled then
-            activeRow._editBox:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.inputEnabled ~= false)
+            activeRow._editBox:SetEnabled(not disabled and inputEnabled ~= false)
         end
 
-        activeRow._placeholder:SetText(currentTrailer.placeholder or "")
+        activeRow._placeholder:SetText(placeholder or "")
         if activeRow._lsbHasFocus or text ~= "" then
             activeRow._placeholder:Hide()
         else
             activeRow._placeholder:Show()
         end
 
-        if currentTrailer.previewIcon then
-            activeRow._previewIcon:SetTexture(currentTrailer.previewIcon)
+        if previewIcon then
+            activeRow._previewIcon:SetTexture(previewIcon)
             activeRow._previewIcon:Show()
         else
             activeRow._previewIcon:SetTexture(nil)
             activeRow._previewIcon:Hide()
         end
 
-        if currentTrailer.previewText and currentTrailer.previewText ~= "" then
-            activeRow._previewLabel:SetText(currentTrailer.previewText)
+        if previewText and previewText ~= "" then
+            activeRow._previewLabel:SetText(previewText)
             activeRow._previewLabel:Show()
         else
             activeRow._previewLabel:SetText("")
             activeRow._previewLabel:Hide()
         end
 
-        activeRow._submitButton:SetText(currentTrailer.submitText or ADD or "Add")
-        setSimpleTooltip(activeRow._submitButton, currentTrailer.submitTooltip)
+        activeRow._submitButton:SetText(submitText or ADD or "Add")
+        setSimpleTooltip(activeRow._submitButton, submitTooltip)
         activeRow._submitButton:SetScript("OnClick", function()
             if currentTrailer.onSubmit then
                 local keepFocus = currentTrailer.onSubmit(currentTrailer, activeRow, activeRow._lsbSectionData)
@@ -1645,7 +1684,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
             end
         end)
         if activeRow._submitButton.SetEnabled then
-            activeRow._submitButton:SetEnabled(currentTrailer.disabled ~= true and currentTrailer.submitEnabled ~= false)
+            activeRow._submitButton:SetEnabled(not disabled and submitEnabled ~= false)
         end
     end
 
