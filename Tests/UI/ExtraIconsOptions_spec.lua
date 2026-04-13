@@ -13,8 +13,14 @@ local TestHelpers = assert(
 
 describe("ExtraIconsOptions data helpers", function()
     local ExtraIconsOptions, ns
+    local originalCreateColor
 
     setup(function()
+        originalCreateColor = _G.CreateColor
+        _G.CreateColor = function(r, g, b, a)
+            return { r = r, g = g, b = b, a = a or 1 }
+        end
+
         ns = {}
         _G.Enum = {
             PowerType = {
@@ -35,6 +41,10 @@ describe("ExtraIconsOptions data helpers", function()
         ns.SettingsBuilder = { RegisterSection = function(_, _, section) ns.ExtraIconsOptions = section end }
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
+    end)
+
+    teardown(function()
+        _G.CreateColor = originalCreateColor
     end)
 
     describe("_isStackKeyPresent", function()
@@ -751,7 +761,7 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns, capturedTable, refreshCalls, scheduledReasons
+    local profile, defaults, SB, ns, capturedTable, refreshCalls, scheduledReasons, previewCalls
 
     local function buildSections()
         return assert(capturedTable.args.viewers.sections())
@@ -763,6 +773,14 @@ describe("ExtraIconsOptions settings page", function()
                 return section
             end
         end
+    end
+
+    local function getTrailerValue(trailer, key)
+        local value = trailer[key]
+        if type(value) == "function" then
+            return value()
+        end
+        return value
     end
 
     local function findItem(sectionKey, predicate)
@@ -789,6 +807,7 @@ describe("ExtraIconsOptions settings page", function()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
         refreshCalls = {}
         scheduledReasons = {}
+        previewCalls = {}
 
         profile.extraIcons = {
             enabled = true,
@@ -801,6 +820,9 @@ describe("ExtraIconsOptions settings page", function()
 
         ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
             scheduledReasons[#scheduledReasons + 1] = reason
+        end
+        ns.Runtime.SetLayoutPreview = function(active)
+            previewCalls[#previewCalls + 1] = active
         end
 
         local originalRegisterFromTable = SB.RegisterFromTable
@@ -818,6 +840,16 @@ describe("ExtraIconsOptions settings page", function()
 
     it("creates a subcategory", function()
         assert.is_not_nil(SB.GetSubcategory(ns.L["EXTRA_ICONS"]))
+    end)
+
+    it("registers page-level onShow and onHide callbacks", function()
+        assert.is_function(capturedTable.onShow)
+        assert.is_function(capturedTable.onHide)
+
+        capturedTable.onShow()
+        capturedTable.onHide()
+
+        assert.are.same({ true, false }, previewCalls)
     end)
 
     it("registers a legend info row and collection widget instead of a canvas", function()
@@ -860,10 +892,11 @@ describe("ExtraIconsOptions settings page", function()
 
         local trailer = assert(getSection("main")).trailer
         trailer.onTextChanged("12345")
+        assert.are.same({}, refreshCalls)
 
         trailer = assert(getSection("main")).trailer
-        assert.are.equal("Test Spell", trailer.previewText)
-        assert.is_true(trailer.submitEnabled)
+        assert.are.equal("Test Spell", getTrailerValue(trailer, "previewText"))
+        assert.is_true(getTrailerValue(trailer, "submitEnabled"))
         assert.is_true(trailer.onSubmit())
 
         assert.are.equal("", ns.ExtraIconsOptions._draftStates.main.idText)
@@ -871,7 +904,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("spell", profile.extraIcons.viewers.main[1].kind)
         assert.are.same({ 12345 }, profile.extraIcons.viewers.main[1].ids)
         local category = SB.GetSubcategory(ns.L["EXTRA_ICONS"])
-        assert.are.same({ category, category }, refreshCalls)
+        assert.are.same({ category }, refreshCalls)
         assert.are.same({ "OptionsChanged" }, scheduledReasons)
     end)
 
@@ -897,8 +930,8 @@ describe("ExtraIconsOptions settings page", function()
         trailer.onTextChanged("777")
 
         trailer = assert(getSection("utility")).trailer
-        assert.are.equal("...", trailer.previewText)
-        assert.is_false(trailer.submitEnabled)
+        assert.are.equal("...", getTrailerValue(trailer, "previewText"))
+        assert.is_false(getTrailerValue(trailer, "submitEnabled"))
 
         itemNames[777] = "Loaded Item"
         ns.ExtraIconsOptions._itemLoadFrame:GetScript("OnEvent")(
@@ -909,8 +942,8 @@ describe("ExtraIconsOptions settings page", function()
         )
 
         trailer = assert(getSection("utility")).trailer
-        assert.are.equal("Loaded Item", trailer.previewText)
-        assert.is_true(trailer.submitEnabled)
+        assert.are.equal("Loaded Item", getTrailerValue(trailer, "previewText"))
+        assert.is_true(getTrailerValue(trailer, "submitEnabled"))
     end)
 
     it("blocks duplicate entries and shows which viewer already owns them", function()
@@ -932,9 +965,9 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.are.equal(
             ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["UTILITY_VIEWER_SHORT"]),
-            trailer.previewText
+            getTrailerValue(trailer, "previewText")
         )
-        assert.is_false(trailer.submitEnabled)
+        assert.is_false(getTrailerValue(trailer, "submitEnabled"))
     end)
 
     it("reorder, move, and remove actions operate on the stored viewers", function()

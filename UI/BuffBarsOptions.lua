@@ -8,7 +8,6 @@ local L = ns.L
 
 local REMOVE_STALE_SPELL_COLORS_POPUP = "ECM_CONFIRM_REMOVE_STALE_SPELL_COLORS"
 local SPELL_COLORS_HEADER_BUTTON_WIDTH = 100
-local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
 
 --- Generates the merged list of spell color rows from spell color entries.
 ---@param entries { key: ECM_SpellColorKey }[]|nil
@@ -164,10 +163,10 @@ local function maybeShowSpellColorKeyTooltip(owner, data)
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
-    GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], TOOLTIP_TITLE_COLOR, 1)
+    GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], 1, 1, 1, 1)
 
     for _, line in ipairs(lines) do
-        GameTooltip:AddLine(line, TOOLTIP_TITLE_COLOR, true)
+        GameTooltip:AddLine(line, 1, 1, 1, true)
     end
 
     GameTooltip:Show()

@@ -905,19 +905,53 @@ function TestHelpers.SetupGameTooltipStub()
             self._titleWrap = nil
             self._lines = {}
         end,
-        SetText = function(self, text, color, alpha, wrap, ...)
-            if type(color) == "number" or type(wrap) == "number" or select("#", ...) > 0 then
-                error("GameTooltip:SetText expects text, color, alpha, wrap", 2)
+        SetText = function(self, text, r, g, b, a, wrap, ...)
+            if select("#", ...) > 0 then
+                error("GameTooltip:SetText expects text, r, g, b, alpha, wrap", 2)
             end
+
+            if r ~= nil and type(r) ~= "number" then
+                error("GameTooltip:SetText expects numeric red channel", 2)
+            end
+            if g ~= nil and type(g) ~= "number" then
+                error("GameTooltip:SetText expects numeric green channel", 2)
+            end
+            if b ~= nil and type(b) ~= "number" then
+                error("GameTooltip:SetText expects numeric blue channel", 2)
+            end
+            if a ~= nil and type(a) ~= "number" then
+                error("GameTooltip:SetText expects numeric alpha channel", 2)
+            end
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("GameTooltip:SetText expects boolean wrap flag", 2)
+            end
+
             self._title = text
-            self._titleColor = color
-            self._titleAlpha = alpha
+            if r ~= nil or g ~= nil or b ~= nil then
+                self._titleColor = { r = r, g = g, b = b, a = a }
+            else
+                self._titleColor = nil
+            end
+            self._titleAlpha = a
             self._titleWrap = wrap
             self._lines = {}
         end,
-        AddLine = function(self, text, color, wrap, ...)
-            if type(color) == "number" or select("#", ...) > 0 then
-                error("GameTooltip:AddLine expects text, color, wrap", 2)
+        AddLine = function(self, text, r, g, b, wrap, ...)
+            if select("#", ...) > 0 then
+                error("GameTooltip:AddLine expects text, r, g, b, wrap", 2)
+            end
+
+            if r ~= nil and type(r) ~= "number" then
+                error("GameTooltip:AddLine expects numeric red channel", 2)
+            end
+            if g ~= nil and type(g) ~= "number" then
+                error("GameTooltip:AddLine expects numeric green channel", 2)
+            end
+            if b ~= nil and type(b) ~= "number" then
+                error("GameTooltip:AddLine expects numeric blue channel", 2)
+            end
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("GameTooltip:AddLine expects boolean wrap flag", 2)
             end
             self._lines[#self._lines + 1] = text
         end,

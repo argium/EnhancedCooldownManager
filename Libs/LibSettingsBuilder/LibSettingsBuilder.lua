@@ -18,8 +18,6 @@ lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
 lib.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
 lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
-local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
-
 lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
 lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
 
@@ -225,21 +223,8 @@ local function showFrame(frame)
     end
 end
 
-local function getTooltipTitleColorComponents()
-    local color = TOOLTIP_TITLE_COLOR
-    if color and color.GetRGBA then
-        return color:GetRGBA()
-    end
-
-    return color and color.r or 1,
-        color and color.g or 1,
-        color and color.b or 1,
-        color and color.a or 1
-end
-
 local function setGameTooltipText(text, wrap)
-    local r, g, b, a = getTooltipTitleColorComponents()
-    GameTooltip:SetText(text, r, g, b, a, wrap == true)
+    GameTooltip:SetText(text, 1, 1, 1, 1, wrap == true)
 end
 
 local function setSimpleTooltip(owner, text)

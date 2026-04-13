@@ -16,7 +16,6 @@ local VIEWER_COLLECTION_HEIGHT = 448
 local DEFAULT_SPECIAL_VIEWER = "utility"
 local DRAFT_PENDING_TEXT = "..."
 local VIEWER_ORDER = { "utility", "main" }
-local TOOLTIP_TITLE_COLOR = CreateColor(1, 1, 1, 1)
 local VIEWER_LABELS = {
     utility = "UTILITY_VIEWER_ICONS",
     main = "MAIN_VIEWER_ICONS",
@@ -218,26 +217,35 @@ local function buildTooltipLine(...)
     return table.concat(parts, " ")
 end
 
+local function setTooltipTitle(text, wrap)
+    GameTooltip:SetText(text, 1, 1, 1, 1, wrap == true)
+end
+
+local function addTooltipLine(text, wrap)
+    if text and text ~= "" then
+        GameTooltip:AddLine(text, 1, 1, 1, wrap == true)
+    end
+end
+
 local function addItemStackTooltipLines(entry)
     local stack = entry.stackKey and BUILTIN_STACKS[entry.stackKey]
     if not stack or stack.kind ~= "item" or not stack.ids or #stack.ids == 0 then
         return false
     end
 
-    GameTooltip:AddLine(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"], TOOLTIP_TITLE_COLOR, true)
+    addTooltipLine(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"], true)
 
     for _, itemEntry in ipairs(stack.ids) do
         local itemId = getItemIdFromEntry(itemEntry)
         local icon = itemId and C_Item.GetItemIconByID(itemId) or nil
         local itemName = getItemDisplayName(itemId)
         local quality = type(itemEntry) == "table" and itemEntry.quality or nil
-        GameTooltip:AddLine(
+        addTooltipLine(
             buildTooltipLine(
                 getTextureMarkup(icon, TOOLTIP_ITEM_ICON_SIZE),
                 itemName or ("Item " .. tostring(itemId)),
                 getQualityMarkup(quality)
-            ),
-            TOOLTIP_TITLE_COLOR
+            )
         )
     end
 
@@ -671,13 +679,6 @@ end
 -- UI: Tooltip helpers
 --------------------------------------------------------------------------------
 
---- Set a simple text tooltip on a button.
-local function addTooltipLine(text)
-    if text and text ~= "" then
-        GameTooltip:AddLine(text, TOOLTIP_TITLE_COLOR, true)
-    end
-end
-
 local function showRowTooltip(owner, rowData)
     if not rowData then
         return
@@ -688,18 +689,18 @@ local function showRowTooltip(owner, rowData)
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
-    GameTooltip:SetText(getEntryTooltipTitle(displayEntry), TOOLTIP_TITLE_COLOR, 1)
+    setTooltipTitle(getEntryTooltipTitle(displayEntry))
 
     if rowData.isBuiltin then
         if rowData.isPlaceholder then
-            addTooltipLine(L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"])
+            addTooltipLine(L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"], true)
         end
     elseif rowData.isCurrentRacial and rowData.isPlaceholder then
-        addTooltipLine(L["EXTRA_ICONS_RACIAL_PLACEHOLDER_TOOLTIP"])
+        addTooltipLine(L["EXTRA_ICONS_RACIAL_PLACEHOLDER_TOOLTIP"], true)
     end
 
     if rowData.isBuiltin and rowData.isDisabled and not rowData.isPlaceholder then
-        addTooltipLine(L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"])
+        addTooltipLine(L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"], true)
     end
 
     addItemStackTooltipLines(displayEntry)
@@ -972,57 +973,73 @@ function ExtraIconsOptions.RegisterSettings(SB)
 
     local function buildModeInputTrailer(viewerKey)
         local draftState = draftStates[viewerKey]
-        local controlsDisabled = isDisabled()
-        local status, name, icon = getDraftResolution(viewerKey)
-        local isDuplicate, duplicateViewerKey = getDraftDuplicateInfo(viewerKey)
-        local previewText
-
-        if status == "resolved" and isDuplicate then
-            previewText = L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(getViewerShortLabel(duplicateViewerKey))
-        elseif status == "resolved" then
-            previewText = name or ""
-        elseif status == "pending" then
-            previewText = DRAFT_PENDING_TEXT
+        local function getPreviewState()
+            local status, name, icon = getDraftResolution(viewerKey)
+            local isDuplicate, duplicateViewerKey = getDraftDuplicateInfo(viewerKey)
+            return status, name, icon, isDuplicate, duplicateViewerKey
         end
 
         return {
             preset = "modeInput",
-            disabled = controlsDisabled,
-            modeText = draftState.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"],
+            disabled = function()
+                return isDisabled()
+            end,
+            modeText = function()
+                return draftState.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"]
+            end,
             modeTooltip = L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"],
-            inputText = draftState.idText,
-            placeholder = getDraftPlaceholderText(draftState),
-            previewIcon = icon,
-            previewText = previewText,
+            inputText = function()
+                return draftState.idText
+            end,
+            placeholder = function()
+                return getDraftPlaceholderText(draftState)
+            end,
+            previewIcon = function()
+                local _, _, icon = getPreviewState()
+                return icon
+            end,
+            previewText = function()
+                local status, name, _, isDuplicate, duplicateViewerKey = getPreviewState()
+                if status == "resolved" and isDuplicate then
+                    return L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(getViewerShortLabel(duplicateViewerKey))
+                end
+                if status == "resolved" then
+                    return name or ""
+                end
+                if status == "pending" then
+                    return DRAFT_PENDING_TEXT
+                end
+                return nil
+            end,
             submitText = L["ADD_ENTRY"],
             submitTooltip = L["ADD_ENTRY"],
-            submitEnabled = status == "resolved" and not isDuplicate,
+            submitEnabled = function()
+                local status, _, _, isDuplicate = getPreviewState()
+                return status == "resolved" and not isDuplicate
+            end,
             onToggleMode = function()
-                if controlsDisabled then
+                if isDisabled() then
                     return
                 end
 
                 draftState.kind = draftState.kind == "spell" and "item" or "spell"
-                refreshCategory()
             end,
             onTextChanged = function(text)
                 draftState.idText = text or ""
-                refreshCategory()
             end,
             onSubmit = function()
-                if controlsDisabled then
+                if isDisabled() then
                     return false
                 end
 
                 return addDraftEntry(viewerKey)
             end,
             onTabPressed = function()
-                if controlsDisabled then
+                if isDisabled() then
                     return false
                 end
 
                 draftState.kind = draftState.kind == "spell" and "item" or "spell"
-                refreshCategory()
                 return true
             end,
         }

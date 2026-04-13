@@ -55,9 +55,12 @@ luacheck . -q
 ## Architecture and Boundaries
 
 - Prefer loose coupling via events, hooks, callbacks, or messages.
+- Prefer the simplest production code that satisfies current supported runtime requirements. Do not add fallback paths, compatibility branches, or defensive adapters unless a concrete supported environment requires them.
 - Maintain a single source of truth for shared state and derived values: derive once, store once, read everywhere.
 - Do not duplicate utilities or add trivial passthrough wrappers; extend the canonical owner instead.
+- Before introducing a helper, wrapper, or abstraction, prove that it reduces real complexity for multiple callers or captures a distinct behavior that needs to be tested independently.
 - Do not extract single-use helpers unless they have a clear independently testable contract or 2+ callers.
+- Do not add production-only indirection around fixed literal values or stable API signatures. If a call always uses the same simple value, pass it directly unless a shared abstraction has a real runtime need.
 - Prefer constant lookup tables over pure mapping functions for small fixed domains.
 - Remove dead code, stale fields, impossible branches, and unused locale strings.
 - Clear critical state flags with `pcall` or equivalent so one error cannot wedge later work.
@@ -65,9 +68,10 @@ luacheck . -q
 ## Tests, Libraries, and Migrations
 
 - Be skeptical about changing tests to satisfy failures; the failure may be real.
+- If tests diverge from WoW or library runtime behavior, fix the stub or fixture to match production instead of adding fallback paths or compatibility helpers to live code.
 - Test load order must mirror TOC load order.
 - Stub the canonical function, not a wrapper or alias.
-- Prefer testing live production code; avoid mirrored helper logic in specs.
+- Test production code directly. Do not mirror, duplicate, or reimplement production logic in specs.
 - Reuse `Tests/TestHelpers.lua` before creating new shared test helpers.
 - Test files mirror source paths; library tests stay under `Libs/<Name>/Tests/`.
 - `StaticPopup_Show` stubs must forward `(name, text1, text2, data)` and call `OnAccept(self, data)`.
