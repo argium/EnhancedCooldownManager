@@ -43,9 +43,7 @@ function ns.IsDeathKnight()
 end
 
 local function getAddonVersion()
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
+    return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
 end
 
 local function safeStrTostring(x)
