@@ -14,35 +14,33 @@ end
 local GeneralOptions = {}
 
 function GeneralOptions.RegisterSettings(SB)
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = L["GENERAL"],
         path = "global",
-        args = {
+        rows = {
             -- Visibility
-            visHeader = { type = "header", name = L["VISIBILITY"], order = 10 },
-            hideWhenMounted = {
-                type = "toggle",
+            { type = "header", name = L["VISIBILITY"] },
+            {
+                type = "checkbox",
                 path = "hideWhenMounted",
                 name = L["HIDE_WHEN_MOUNTED"],
                 desc = L["HIDE_WHEN_MOUNTED_DESC"],
-                order = 11,
             },
-            hideInRestAreas = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "hideOutOfCombatInRestAreas",
                 name = L["HIDE_IN_REST_AREAS"],
                 desc = L["HIDE_IN_REST_AREAS_DESC"],
-                order = 12,
             },
-            fade = {
-                type = "toggle",
+            {
+                id = "fade",
+                type = "checkbox",
                 path = "global.outOfCombatFade.enabled",
                 name = L["FADE_OUT_OF_COMBAT"],
                 desc = L["FADE_OUT_OF_COMBAT_DESC"],
-                order = 13,
             },
-            fadeOpacity = {
-                type = "range",
+            {
+                type = "slider",
                 path = "global.outOfCombatFade.opacity",
                 name = L["OUT_OF_COMBAT_OPACITY"],
                 desc = L["OUT_OF_COMBAT_OPACITY_DESC"],
@@ -50,50 +48,44 @@ function GeneralOptions.RegisterSettings(SB)
                 max = 100,
                 step = 5,
                 parent = "fade",
-                order = 14,
             },
-            fadeExceptInstance = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "global.outOfCombatFade.exceptInInstance",
                 name = L["EXCEPT_INSIDE_INSTANCES"],
                 parent = "fade",
-                order = 15,
             },
-            fadeExceptHostile = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "global.outOfCombatFade.exceptIfTargetCanBeAttacked",
                 name = L["EXCEPT_TARGET_HOSTILE"],
                 parent = "fade",
-                order = 16,
             },
-            fadeExceptFriendly = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "global.outOfCombatFade.exceptIfTargetCanBeHelped",
                 name = L["EXCEPT_TARGET_FRIENDLY"],
                 parent = "fade",
-                order = 17,
             },
 
             -- Appearance
-            appearHeader = { type = "header", name = L["APPEARANCE"], order = 20 },
-            texture = {
+            { type = "header", name = L["APPEARANCE"] },
+            {
                 type = "custom",
                 path = "texture",
                 name = L["BAR_TEXTURE"],
                 desc = L["BAR_TEXTURE_DESC"],
                 template = LSMW.TEXTURE_PICKER_TEMPLATE,
-                order = 21,
             },
-            font = {
+            {
                 type = "custom",
                 path = "font",
                 name = L["FONT"],
                 desc = L["FONT_DESC"],
                 template = LSMW.FONT_PICKER_TEMPLATE,
-                order = 22,
             },
-            fontSize = {
-                type = "range",
+            {
+                type = "slider",
                 path = "fontSize",
                 name = L["FONT_SIZE"],
                 min = 6,
@@ -102,10 +94,9 @@ function GeneralOptions.RegisterSettings(SB)
                 getTransform = function(value)
                     return value or 11
                 end,
-                order = 23,
             },
-            fontOutline = {
-                type = "select",
+            {
+                type = "dropdown",
                 path = "fontOutline",
                 name = L["FONT_OUTLINE"],
                 values = {
@@ -114,27 +105,24 @@ function GeneralOptions.RegisterSettings(SB)
                     THICKOUTLINE = L["FONT_OUTLINE_THICK"],
                     MONOCHROME = L["FONT_OUTLINE_MONOCHROME"],
                 },
-                order = 24,
             },
-            fontShadow = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "fontShadow",
                 name = L["FONT_SHADOW"],
                 desc = L["FONT_SHADOW_DESC"],
-                order = 25,
             },
 
             -- Sizing
-            layoutHeader = { type = "header", name = L["SIZING"], order = 30 },
-            barHeight = {
-                type = "range",
+            { type = "header", name = L["SIZING"] },
+            {
+                type = "slider",
                 path = "barHeight",
                 name = L["BAR_HEIGHT"],
                 desc = L["BAR_HEIGHT_DESC"],
                 min = 10,
                 max = 40,
                 step = 1,
-                order = 31,
             },
         },
     })
@@ -145,31 +133,29 @@ ns.SettingsBuilder.RegisterSection(ns, "General", GeneralOptions)
 local AdvancedOptions = {}
 
 function AdvancedOptions.RegisterSettings(SB)
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = L["ADVANCED_OPTIONS"],
         path = "global",
-        args = {
-            troubleshootHeader = { type = "header", name = L["TROUBLESHOOTING"], order = 10 },
-            debug = {
-                type = "toggle",
+        rows = {
+            { type = "header", name = L["TROUBLESHOOTING"] },
+            {
+                type = "checkbox",
                 path = "debug",
                 name = L["DEBUG_MODE"],
                 desc = L["DEBUG_MODE_DESC"],
-                order = 11,
             },
-            debugToChat = {
-                type = "toggle",
+            {
+                type = "checkbox",
                 path = "debugToChat",
                 name = L["DEBUG_TO_CHAT"],
                 desc = L["DEBUG_TO_CHAT_DESC"],
-                order = 12,
                 disabled = function()
                     local gc = getGlobalConfig()
                     return not (gc and gc.debug)
                 end,
             },
-            updatesHeader = { type = "header", name = L["UPDATES"], order = 20 },
-            showWhatsNew = {
+            { type = "header", name = L["UPDATES"] },
+            {
                 type = "button",
                 name = " ",
                 buttonText = L["SHOW_WHATS_NEW"],
@@ -179,18 +165,16 @@ function AdvancedOptions.RegisterSettings(SB)
                         ns.Addon:ShowReleasePopup(true)
                     end
                 end,
-                order = 21,
             },
-            perfHeader = { type = "header", name = L["PERFORMANCE"], order = 30 },
-            updateFrequency = {
-                type = "range",
+            { type = "header", name = L["PERFORMANCE"] },
+            {
+                type = "slider",
                 path = "updateFrequency",
                 name = L["UPDATE_FREQUENCY"],
                 desc = L["UPDATE_FREQUENCY_DESC"],
                 min = 0.04,
                 max = 0.5,
                 step = 0.02,
-                order = 31,
             },
         },
     })

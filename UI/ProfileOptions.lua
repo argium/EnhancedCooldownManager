@@ -123,7 +123,7 @@ function ProfileOptions.RegisterSettings(SB)
 
     local _, switchSetting = SB.Dropdown({
         category = cat,
-        key = "ECM_ProfileSwitch",
+        key = "ProfileSwitch",
         name = L["SWITCH_PROFILE"],
         tooltip = L["SWITCH_PROFILE_DESC"],
         default = ns.Addon.db:GetCurrentProfile(),
@@ -173,7 +173,7 @@ function ProfileOptions.RegisterSettings(SB)
     end
 
     local _, getCopyProfile, clearCopyProfile =
-        createProfilePicker(SB, cat, "ECM_ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
+        createProfilePicker(SB, cat, "ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
 
     SB.Button({
         name = L["COPY"],
@@ -197,7 +197,7 @@ function ProfileOptions.RegisterSettings(SB)
     local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
         SB,
         cat,
-        "ECM_ProfileDelete",
+        "ProfileDelete",
         L["DELETE_PROFILE"],
         L["DELETE_PROFILE_SELECT_DESC"],
         otherProfilesGenerator

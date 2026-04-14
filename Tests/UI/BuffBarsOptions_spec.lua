@@ -318,14 +318,14 @@ describe("BuffBarsOptions", function()
         local spellColorsSpec
         local buttonSpecs = {}
         local refreshCalls = {}
-        local originalRegisterFromTable = SB.RegisterFromTable
+        local originalRegisterPage = SB.RegisterPage
         local originalButton = SB.Button
 
-        SB.RegisterFromTable = function(tbl)
-            if tbl.name == ns.L["SPELL_COLORS_SUBCAT"] then
-                spellColorsSpec = tbl
+        SB.RegisterPage = function(page)
+            if page.name == ns.L["SPELL_COLORS_SUBCAT"] then
+                spellColorsSpec = page
             end
-            return originalRegisterFromTable(tbl)
+            return originalRegisterPage(page)
         end
         SB.Button = function(spec)
             buttonSpecs[#buttonSpecs + 1] = spec
@@ -337,7 +337,7 @@ describe("BuffBarsOptions", function()
 
         BuffBarsOptions.RegisterSettings(SB)
 
-        SB.RegisterFromTable = originalRegisterFromTable
+        SB.RegisterPage = originalRegisterPage
         SB.Button = originalButton
 
         return assert(spellColorsSpec), refreshCalls, buttonSpecs
@@ -346,10 +346,24 @@ describe("BuffBarsOptions", function()
     it("does not add the old configure spell colors shortcut to aura bars", function()
         local _, _, buttonSpecs = registerSpellColorsSpec()
 
+        local sawLayoutButton = false
+        local sawReloadButton = false
+
+        assert.are.equal(2, #buttonSpecs)
+
         for _, spec in ipairs(buttonSpecs) do
             assert.are_not.equal("Configure Spell Colors", spec.name)
-            assert.are_not.equal("Open", spec.buttonText)
+
+            if spec.name == ns.L["LAYOUT_SUBCATEGORY"] then
+                sawLayoutButton = true
+                assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], spec.buttonText)
+            elseif spec.buttonText == ns.L["SPELL_COLORS_RELOAD_BUTTON"] then
+                sawReloadButton = true
+            end
         end
+
+        assert.is_true(sawLayoutButton)
+        assert.is_true(sawReloadButton)
     end)
 
     it("ctrl-hovering a spell color collection row shows all keys for that row", function()
@@ -361,7 +375,11 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local item = spellColorsSpec.args.spellColorCollection.items()[2]
+        assert.are.equal("pageActions", spellColorsSpec.rows[1].type)
+        assert.are.equal("list", spellColorsSpec.rows[4].type)
+        assert.are.equal("swatch", spellColorsSpec.rows[4].variant)
+
+        local item = spellColorsSpec.rows[4].items()[2]
 
         item.onEnter(CreateFrame("Frame"))
 
@@ -388,7 +406,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local defaultItem = spellColorsSpec.args.spellColorCollection.items()[1]
+        local defaultItem = spellColorsSpec.rows[4].items()[1]
 
         assert.are.equal(ns.L["DEFAULT_COLOR"], defaultItem.label)
 
@@ -411,7 +429,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        spellColorsSpec.args.spellColorCollection.onDefault()
+        spellColorsSpec.rows[4].onDefault()
 
         assert.are.same({}, SpellColors.GetAllColorEntries())
         assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, SpellColors.GetDefaultColor())
@@ -425,7 +443,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.args.spellColorsHeader.actions
+        local actions = spellColorsSpec.rows[1].actions
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
@@ -437,7 +455,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.args.spellColorsHeader.actions
+        local actions = spellColorsSpec.rows[1].actions
 
         assert.is_true(actions[1].enabled())
         assert.is_true(actions[2].enabled())
@@ -452,7 +470,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.args.spellColorsHeader.actions
+        local actions = spellColorsSpec.rows[1].actions
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
@@ -469,7 +487,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        spellColorsSpec.args.spellColorsHeader.actions[1].onClick()
+        spellColorsSpec.rows[1].actions[1].onClick()
 
         assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
     end)
@@ -497,7 +515,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local removeStaleAction = spellColorsSpec.args.spellColorsHeader.actions[2]
+        local removeStaleAction = spellColorsSpec.rows[1].actions[2]
 
         assert.are.equal(ns.L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"], removeStaleAction.tooltip)
 

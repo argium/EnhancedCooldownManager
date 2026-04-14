@@ -851,9 +851,9 @@ TestHelpers.OPTIONS_GLOBALS = {
     "IsInInstance",
     "GetInventoryItemID",
     "GetInventoryItemTexture",
-    "IsPlayerSpell",
     "C_Item",
     "C_Spell",
+    "C_SpellBook",
     "CreateTextureMarkup",
     "CreateAtlasMarkup",
     "GameTooltip",
@@ -998,15 +998,15 @@ function TestHelpers.SetupOptionsGlobals()
     _G.GetInventoryItemTexture = function()
         return nil
     end
-    _G.IsPlayerSpell = function()
-        return false
-    end
     _G.C_Item = {
         GetItemIconByID = function()
             return nil
         end,
         GetItemNameByID = function()
             return nil
+        end,
+        GetItemSpell = function()
+            return nil, nil
         end,
         DoesItemExistByID = function()
             return true
@@ -1019,6 +1019,11 @@ function TestHelpers.SetupOptionsGlobals()
         end,
         GetSpellTexture = function()
             return nil
+        end,
+    }
+    _G.C_SpellBook = {
+        IsSpellKnown = function()
+            return false
         end,
     }
     _G.CreateTextureMarkup = function(texture)
@@ -1405,9 +1410,29 @@ function TestHelpers.RunAllTimers()
     end
 end
 
+local LIB_SETTINGS_BUILDER_SOURCE_FILES = {
+    "Libs/LibSettingsBuilder/Core.lua",
+    "Libs/LibSettingsBuilder/Primitives/Rows.lua",
+    "Libs/LibSettingsBuilder/Primitives/BlizzardControls.lua",
+    "Libs/LibSettingsBuilder/Controls/CollectionFrames.lua",
+    "Libs/LibSettingsBuilder/Primitives/Layout.lua",
+    "Libs/LibSettingsBuilder/Controls/Base.lua",
+    "Libs/LibSettingsBuilder/Controls/Collections.lua",
+    "Libs/LibSettingsBuilder/Controls/Rows.lua",
+    "Libs/LibSettingsBuilder/CompositeControls/Groups.lua",
+    "Libs/LibSettingsBuilder/CompositeControls/Lists.lua",
+    "Libs/LibSettingsBuilder/Utility.lua",
+}
+
+function TestHelpers.LoadLibSettingsBuilder()
+    for _, path in ipairs(LIB_SETTINGS_BUILDER_SOURCE_FILES) do
+        TestHelpers.LoadChunk(path, "Unable to load " .. path)()
+    end
+end
+
 --- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.
 function TestHelpers.SetupLibSettingsBuilder()
-    TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+    TestHelpers.LoadLibSettingsBuilder()
 
     local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
     lsmw.GetFontValues = function()

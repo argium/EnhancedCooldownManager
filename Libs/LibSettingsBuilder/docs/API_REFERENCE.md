@@ -145,9 +145,9 @@ Notes:
 
 Dispatches to the correct control factory using `spec.type`.
 
-### `SB.Collection(spec)`
+### `SB.List(spec)`
 
-Creates a first-class dynamic collection row backed by the normal settings list.
+Creates a first-class dynamic flat list row backed by the normal settings list.
 
 Required fields:
 
@@ -155,19 +155,23 @@ Required fields:
 
 Flat-list fields:
 
-- `preset = "swatch"` or `preset = "editor"`
+- `variant = "swatch"` or `variant = "editor"`
 - `items(frame)` → item list
+
+### `SB.SectionList(spec)`
+
+Creates a first-class grouped dynamic list row backed by the normal settings list.
 
 Sectioned-list fields:
 
 - `sections(frame)` → section list
 
-Supported collection row presets:
+Supported list variants:
 
 - `swatch` — label/icon plus color swatch rows
 - `editor` — label plus one or more slider fields, optional swatch, and remove button
 - section items use the built-in action-row layout (`up`, `down`, `move`, `delete`)
-- section trailers support `preset = "modeInput"` for toggle + input + preview + submit rows
+- section trailers support `type = "modeInput"` for toggle + input + preview + submit rows
   Mode-input trailer display fields may be static values or functions that are re-evaluated during in-place row refreshes.
 
 ## Composite builders
@@ -185,31 +189,34 @@ Supported collection row presets:
 - `SB.InfoRow(spec)`
 - `SB.EmbedCanvas(canvas, height[, spec])`
 - `SB.Button(spec)`
+- `SB.PageActions(spec)`
 - `SB.RegisterSection(nsTable, key, section)`
 
 `SB.Button` supports `confirm = true` or a custom confirm string. Confirm dialogs are registered per button to avoid cross-button collisions.
-`SB.Header` also accepts spec tables with `actions = { ... }` for right-aligned action buttons. When the first action header matches the current category title, LibSettingsBuilder treats it as a page action bar and suppresses the duplicate in-list title text.
+`SB.PageActions` renders right-aligned category-header action buttons.
 `SB.InfoRow` accepts function-backed `value` for dynamic text.
 `SB.RefreshCategory(...)` re-evaluates registered dynamic rows for a visible category.
 
-## Table-driven registration
+## Page registration
 
-### `SB.RegisterFromTable(tbl)`
+### `SB.RegisterPage(page)`
 
-Supported standard types:
+Supported canonical row types:
 
-- `checkbox` / `toggle`
-- `slider` / `range`
-- `dropdown` / `select`
+- `checkbox`
+- `slider`
+- `dropdown`
 - `input`
 - `color`
 - `custom`
-- `button` / `execute`
+- `button`
 - `header`
-- `subheader` / `description`
+- `subheader`
 - `info`
 - `canvas`
-- `collection`
+- `pageActions`
+- `list`
+- `sectionList`
 
 Supported composite types:
 
@@ -217,22 +224,18 @@ Supported composite types:
 - `fontOverride`
 - `heightOverride`
 - `colorList`
-- `toggleList`
+- `checkboxList`
 
 ## Implementation model
 
 The library has three main families of row builders:
 
 - **proxy controls** — persisted values backed by `Settings.RegisterProxySetting` (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
-- **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`),
-- **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `toggleList`).
+- **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`, `pageActions`),
+- **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
 
 `input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
-`collection` is the preferred way to build dynamic editors without dropping into a second "canvas" authoring API. `canvas` / `EmbedCanvas` remain available as escape hatches for truly bespoke frames.
-
-## Legacy canvas helpers
-
-Canvas-layout helpers still exist for backwards compatibility, but new pages should prefer `RegisterFromTable(...)` plus `collection`, dynamic `info` rows, handler-mode `dropdown`, and `header.actions`.
+`canvas` rows stay on the current lifecycle path. Keep using `SB.EmbedCanvas(...)` for bespoke frames when a built-in row is not enough.
 
 #### `SB.SetCanvasLayoutDefaults(overrides)`
 

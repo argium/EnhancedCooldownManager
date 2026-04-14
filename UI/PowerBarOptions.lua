@@ -21,32 +21,35 @@ local PowerBarOptions = {}
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
 
 function PowerBarOptions.RegisterSettings(SB)
-    local args = ns.OptionUtil.CreateBarArgs(isDisabled)
-    args.enabled = {
-        type = "toggle",
-        path = "enabled",
-        name = L["ENABLE_POWER_BAR"],
-        order = 0,
-        onSet = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
+    local rows = {
+        {
+            type = "checkbox",
+            path = "enabled",
+            name = L["ENABLE_POWER_BAR"],
+            onSet = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar"),
+        },
     }
-    args.showManaAsPercent = {
-        type = "toggle",
+
+    for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled)) do
+        rows[#rows + 1] = row
+    end
+
+    rows[#rows + 1] = {
+        type = "checkbox",
         path = "showManaAsPercent",
         name = L["SHOW_MANA_AS_PERCENT"],
         desc = L["SHOW_MANA_AS_PERCENT_DESC"],
         disabled = isDisabled,
-        order = 22,
     }
-    args.colors = {
+    rows[#rows + 1] = {
         type = "colorList",
         path = "colors",
         label = L["COLORS"],
         defs = POWER_COLOR_DEFS,
         disabled = isDisabled,
-        order = 30,
     }
 
-    SB.RegisterFromTable({ name = L["POWER_BAR"], path = "powerBar", args = args })
+    SB.RegisterPage({ name = L["POWER_BAR"], path = "powerBar", rows = rows })
     ns.PowerBarTickMarksOptions.RegisterSettings(SB, SB._currentSubcategory)
 end
 

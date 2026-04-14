@@ -11,14 +11,22 @@ describe("PowerBarTickMarksOptions", function()
     local originalGlobals
     local ns
 
+    local function getRow(page, rowId)
+        for _, row in ipairs(assert(page.rows)) do
+            if row.id == rowId then
+                return row
+            end
+        end
+    end
+
     local function registerSettings(parentCategory)
         local captured
         local refreshCalls = {}
         local fakeCategory = {}
 
         local SB = {
-            RegisterFromTable = function(tbl)
-                captured = tbl
+            RegisterPage = function(page)
+                captured = page
             end,
             GetSubcategory = function(name)
                 if name == "Tick Marks" then
@@ -62,16 +70,16 @@ describe("PowerBarTickMarksOptions", function()
         assert.is_function(ns.PowerBarTickMarksStore.AddTick)
     end)
 
-    it("registers a subcategory with collection-based tick editors", function()
+    it("registers a subcategory with page actions and list-based tick editors", function()
         local parentCategory = {}
         local captured = registerSettings(parentCategory)
 
         assert.are.equal("Tick Marks", captured.name)
         assert.are.equal(parentCategory, captured.parentCategory)
-        assert.are.equal("header", captured.args.tickMarksHeader.type)
-        assert.are.equal("collection", captured.args.tickCollection.type)
-        assert.are.equal("editor", captured.args.tickCollection.preset)
-        assert.are.equal(320, captured.args.tickCollection.height)
+        assert.are.equal("pageActions", getRow(captured, "tickMarksPageActions").type)
+        assert.are.equal("list", getRow(captured, "tickCollection").type)
+        assert.are.equal("editor", getRow(captured, "tickCollection").variant)
+        assert.are.equal(320, getRow(captured, "tickCollection").height)
     end)
 
     it("add button appends a tick using the current defaults", function()
@@ -84,7 +92,7 @@ describe("PowerBarTickMarksOptions", function()
 
         local captured, refreshCalls, fakeCategory = registerSettings({})
 
-        captured.args.addTick.onClick()
+        getRow(captured, "addTick").onClick()
 
         local ticks = ns.PowerBarTickMarksStore.GetCurrentTicks()
         assert.are.equal(1, #ticks)
@@ -114,7 +122,7 @@ describe("PowerBarTickMarksOptions", function()
         })
 
         local captured, refreshCalls, fakeCategory = registerSettings({})
-        local defaultsAction = captured.args.tickMarksHeader.actions[1]
+        local defaultsAction = getRow(captured, "tickMarksPageActions").actions[1]
 
         defaultsAction.onClick()
 
@@ -136,7 +144,7 @@ describe("PowerBarTickMarksOptions", function()
         })
 
         local captured, refreshCalls = registerSettings({})
-        local item = captured.args.tickCollection.items()[1]
+        local item = getRow(captured, "tickCollection").items()[1]
 
         item.fields[1].onValueChanged(75)
         item.fields[2].onValueChanged(4)
@@ -158,7 +166,7 @@ describe("PowerBarTickMarksOptions", function()
         })
 
         local captured = registerSettings({})
-        local item = captured.args.tickCollection.items()[1]
+        local item = getRow(captured, "tickCollection").items()[1]
         local minValue, maxValue, step = item.fields[1].getRange(item, 50000)
         local nextMin, nextMax, nextStep = item.fields[1].getRange(item, 120000)
 

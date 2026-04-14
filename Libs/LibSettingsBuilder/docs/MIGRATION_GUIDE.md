@@ -23,7 +23,7 @@
 
 | AceConfig stack | LibSettingsBuilder |
 |---|---|
-| `RegisterOptionsTable` | `SB.RegisterFromTable` |
+| `RegisterOptionsTable` | `SB.RegisterPage` |
 | `AddToBlizOptions` | `SB.RegisterCategories()` |
 | one `get`/`set` per field | one `path` per field in path mode |
 | `type = "input"` | `type = "input"` or `SB.Input(...)` |
@@ -48,23 +48,29 @@ local SB = LSB:New({
 })
 ```
 
-## Useful aliases
+## Canonical row types
 
-`RegisterFromTable` accepts several AceConfig-style aliases:
+`RegisterPage` uses canonical row types only:
 
-- `toggle` → `checkbox`
-- `range` → `slider`
-- `select` → `dropdown`
-- `input` → `input`
-- `execute` → `button`
-- `description` → `subheader`
-- `desc` → `tooltip`
+- `checkbox`
+- `slider`
+- `dropdown`
+- `input`
+- `color`
+- `button`
+- `header`
+- `subheader`
+- `info`
+- `canvas`
+- `pageActions`
+- `list`
+- `sectionList`
 
 ## Features you gain
 
 - native Blizzard Settings integration,
 - composite builders for common UI groups,
-- first-class dynamic collection rows for complex editors,
+- first-class dynamic list rows for complex editors,
 - built-in text input rows with optional debounced previews,
 - explicit category refresh hooks for async/transient state,
 - clickable slider value editing,
@@ -77,7 +83,7 @@ local SB = LSB:New({
 
 If you only need text or numeric entry, use the built-in `input` type first. Reach for `SB.Custom(...)` only when you need a genuinely different widget.
 
-If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "collection"` before reaching for `SB.Custom(...)` or `SB.EmbedCanvas(...)`.
+If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "list"` or `type = "sectionList"` before reaching for `SB.Custom(...)` or `SB.EmbedCanvas(...)`.
 
 ## Migrating AceConfig input fields
 

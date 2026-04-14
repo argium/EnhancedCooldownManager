@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("LayoutOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -28,10 +28,10 @@ describe("LayoutOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
+        local originalRegisterPage = SB.RegisterPage
+        SB.RegisterPage = function(page)
+            capturedPage = page
+            return originalRegisterPage(page)
         end
 
         settings = TestHelpers.CollectSettings(function()
@@ -41,13 +41,13 @@ describe("LayoutOptions getters/setters/defaults", function()
     end)
 
     it("registers the explainer and overview rows", function()
-        assert.is_table(capturedTable.args.positioningExamples)
-        assert.are.equal("canvas", capturedTable.args.positioningExamples.type)
+        assert.is_table(capturedPage.rows)
+        assert.are.equal("canvas", capturedPage.rows[1].type)
     end)
 
     it("registers page-level onShow and onHide callbacks", function()
-        assert.is_function(capturedTable.onShow)
-        assert.is_function(capturedTable.onHide)
+        assert.is_function(capturedPage.onShow)
+        assert.is_function(capturedPage.onHide)
     end)
 
     it("updates attached stack settings", function()
@@ -84,7 +84,7 @@ describe("LayoutOptions getters/setters/defaults", function()
 
     it("does not register aura-bar free grow direction", function()
         assert.is_nil(settings["ECM_buffBars_freeGrowDirection"])
-        assert.is_nil(capturedTable.args.freeGrowDirection)
+        assert.is_nil(settings["ECM_global_freeGrowDirection"])
     end)
 
     it("registers shared attached-stack settings only once when General is also loaded", function()

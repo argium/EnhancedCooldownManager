@@ -8,9 +8,9 @@ local L = ns.L
 
 local LayoutOptions = {}
 
-local function createAnchorModeSpec(name, path, order, disabled)
+local function createAnchorModeSpec(name, path, disabled)
     return {
-        type = "select",
+        type = "dropdown",
         path = path,
         name = name,
         desc = L["POSITION_MODE_DESC"],
@@ -20,7 +20,6 @@ local function createAnchorModeSpec(name, path, order, disabled)
             [C.ANCHORMODE_FREE] = L["POSITION_MODE_FREE"],
         },
         disabled = disabled,
-        order = order,
     }
 end
 
@@ -32,33 +31,35 @@ function LayoutOptions.RegisterSettings(SB)
     local runeBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
     local buffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 
-    local args = {
-        positioningExamples = {
+    local rows = {
+        {
             type = "canvas",
             canvas = ns.OptionUtil.CreatePositioningExamplesCanvas(),
             height = C.POSITION_MODE_EXPLAINER_HEIGHT,
-            order = 0,
         },
-
-        moduleHeader = { type = "header", name = L["MODULE_LAYOUT_HEADER"], order = 10 },
-        powerBarMode = createAnchorModeSpec(L["POWER_BAR"], "powerBar.anchorMode", 11, powerBarDisabled),
-        resourceBarMode = createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", 12, resourceBarDisabled),
-        runeBarMode = createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", 13, runeBarDisabled),
-        buffBarsMode = createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", 14, buffBarsDisabled),
-
-        attachedHeader = { type = "header", name = L["POSITION_MODE_ATTACHED"], order = 20 },
-        offsetY = {
-            type = "range",
+        {
+            type = "header",
+            name = L["MODULE_LAYOUT_HEADER"],
+        },
+        createAnchorModeSpec(L["POWER_BAR"], "powerBar.anchorMode", powerBarDisabled),
+        createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", resourceBarDisabled),
+        createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", runeBarDisabled),
+        createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", buffBarsDisabled),
+        {
+            type = "header",
+            name = L["POSITION_MODE_ATTACHED"],
+        },
+        {
+            type = "slider",
             path = "global.offsetY",
             name = L["VERTICAL_OFFSET"],
             desc = L["VERTICAL_OFFSET_DESC"],
             min = 0,
             max = 20,
             step = 1,
-            order = 21,
         },
-        moduleSpacing = {
-            type = "range",
+        {
+            type = "slider",
             path = "global.moduleSpacing",
             name = L["VERTICAL_SPACING"],
             desc = L["VERTICAL_SPACING_DESC"],
@@ -66,10 +67,9 @@ function LayoutOptions.RegisterSettings(SB)
             max = 20,
             step = 1,
             getTransform = defaultZero,
-            order = 22,
         },
-        moduleGrowDirection = {
-            type = "select",
+        {
+            type = "dropdown",
             path = "global.moduleGrowDirection",
             name = L["GROW_DIRECTION"],
             desc = L["GROW_DIRECTION_ATTACHED_DESC"],
@@ -78,15 +78,14 @@ function LayoutOptions.RegisterSettings(SB)
                 [C.GROW_DIRECTION_UP] = L["UP"],
             },
             getTransform = defaultDetachedGrowDirection,
-            order = 23,
         },
     }
 
-    for key, spec in pairs(ns.OptionUtil.CreateDetachedStackArgs()) do
-        args[key] = spec
+    for _, row in ipairs(ns.OptionUtil.CreateDetachedStackRows()) do
+        rows[#rows + 1] = row
     end
 
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = L["LAYOUT_SUBCATEGORY"],
         onShow = function()
             ns.Runtime.SetLayoutPreview(true)
@@ -94,7 +93,7 @@ function LayoutOptions.RegisterSettings(SB)
         onHide = function()
             ns.Runtime.SetLayoutPreview(false)
         end,
-        args = args,
+        rows = rows,
     })
 end
 

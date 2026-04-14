@@ -216,12 +216,13 @@ function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
         return items
     end
 
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = categoryName,
         parentCategory = parentCategory,
-        args = {
-            tickMarksHeader = {
-                type = "header",
+        rows = {
+            {
+                id = "tickMarksPageActions",
+                type = "pageActions",
                 name = categoryName,
                 actions = {
                     {
@@ -237,27 +238,27 @@ function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
                         end,
                     },
                 },
-                order = 1,
             },
-            description = {
+            {
+                id = "description",
                 type = "info",
                 name = "",
                 value = L["TICK_MARKS_DESC"],
                 wide = true,
                 multiline = true,
                 height = 36,
-                order = 2,
             },
-            summary = {
+            {
+                id = "summary",
                 type = "info",
                 name = "",
                 value = getTickSummary,
                 wide = true,
                 multiline = true,
                 height = 28,
-                order = 3,
             },
-            defaultColor = {
+            {
+                id = "defaultColor",
                 type = "color",
                 key = "tickMarksDefaultColor",
                 name = L["DEFAULT_COLOR"],
@@ -271,10 +272,10 @@ function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
                 onSet = function()
                     refreshCategory()
                 end,
-                order = 4,
             },
-            defaultWidth = {
-                type = "range",
+            {
+                id = "defaultWidth",
+                type = "slider",
                 key = "tickMarksDefaultWidth",
                 name = L["DEFAULT_WIDTH"],
                 default = 1,
@@ -290,9 +291,9 @@ function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
                 onSet = function()
                     refreshCategory()
                 end,
-                order = 5,
             },
-            addTick = {
+            {
+                id = "addTick",
                 type = "button",
                 name = L["ADD_TICK_MARK"],
                 buttonText = L["ADD"],
@@ -301,15 +302,14 @@ function PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
                     scheduleUpdate()
                     refreshCategory()
                 end,
-                order = 6,
             },
-            tickCollection = {
-                type = "collection",
-                preset = "editor",
+            {
+                id = "tickCollection",
+                type = "list",
+                variant = "editor",
                 height = 320,
                 rowHeight = C.SCROLL_ROW_HEIGHT_WITH_CONTROLS,
                 items = buildTickCollectionItems,
-                order = 7,
             },
         },
     })

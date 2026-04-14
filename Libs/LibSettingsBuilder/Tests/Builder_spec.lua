@@ -86,12 +86,22 @@ describe("LibSettingsBuilder", function()
     local function createScriptableFrame()
         local frame = TestHelpers.makeFrame()
         frame._scripts = {}
+        frame._hooks = {}
         frame._text = ""
         frame._focused = false
         frame.RegisterEvent = function() end
         frame.UnregisterAllEvents = function() end
         frame.RegisterForClicks = function(self, ...)
             self._registeredClicks = { ... }
+        end
+        frame.HookScript = function(self, event, fn)
+            self._hooks[event] = self._hooks[event] or {}
+            self._hooks[event][#self._hooks[event] + 1] = fn
+        end
+        frame.RunHookScript = function(self, event, ...)
+            for _, fn in ipairs(self._hooks[event] or {}) do
+                fn(self, ...)
+            end
         end
         frame.SetScript = function(self, event, fn)
             self._scripts[event] = fn
@@ -156,7 +166,7 @@ describe("LibSettingsBuilder", function()
             return frame
         end
 
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+        TestHelpers.LoadLibSettingsBuilder()
 
         return hooks, LibStub("LibSettingsBuilder-1.0")
     end
@@ -237,7 +247,7 @@ describe("LibSettingsBuilder", function()
         end
 
         -- Load the library
-        TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+        TestHelpers.LoadLibSettingsBuilder()
 
         -- Register LSMW stub
         local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
@@ -845,6 +855,71 @@ describe("LibSettingsBuilder", function()
         assert.are.equal(embedFrame, canvas:GetParent())
     end)
 
+    it("canvas rows hide the previous canvas when the frame is reused on another page", function()
+        local function makeListElementFrame()
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                return fontString
+            end
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+            return frame
+        end
+
+        local canvasA = createScriptableFrame()
+        canvasA.SetParent = function(self, parent)
+            self._parent = parent
+        end
+        canvasA.GetParent = function(self)
+            return self._parent
+        end
+
+        local canvasB = createScriptableFrame()
+        canvasB.SetParent = function(self, parent)
+            self._parent = parent
+        end
+        canvasB.GetParent = function(self)
+            return self._parent
+        end
+
+        local canvasRowA = SB.EmbedCanvas(canvasA, 120)
+        local canvasRowB = SB.EmbedCanvas(canvasB, 140)
+        local subheader = SB.Subheader({ name = "Reused Frame" })
+        local frame = makeListElementFrame()
+
+        canvasRowA:InitFrame(frame)
+        assert.is_true(canvasA:IsShown())
+        assert.are.equal(frame, canvasA:GetParent())
+
+        canvasRowA:Resetter(frame)
+        assert.is_false(canvasA:IsShown())
+        assert.is_nil(frame._lsbCanvas)
+
+        subheader:InitFrame(frame)
+        assert.is_false(canvasA:IsShown())
+
+        subheader:Resetter(frame)
+
+        canvasRowB:InitFrame(frame)
+        assert.is_false(canvasA:IsShown())
+        assert.is_true(canvasB:IsShown())
+        assert.are.equal(frame, canvasB:GetParent())
+
+        canvasRowB:Resetter(frame)
+        assert.is_false(canvasB:IsShown())
+
+        canvasRowA:InitFrame(frame)
+        assert.is_true(canvasA:IsShown())
+        assert.are.equal(frame, canvasA:GetParent())
+    end)
+
     -- Button
     it("Button creates button initializer with onClick", function()
         local clicked = false
@@ -1239,15 +1314,11 @@ describe("LibSettingsBuilder", function()
         assert.are.equal("Display", init._text)
     end)
 
-    -- Header first-header suppression
-    it("Header suppresses first header matching subcategory name", function()
+    it("Header matching subcategory name still returns a normal header", function()
         SB.CreateSubcategory("Appearance")
         local init = SB.Header("Appearance")
-        assert.is_nil(init)
-
-        -- Second header with different text is not suppressed
-        local init2 = SB.Header("Colors")
-        assert.is_not_nil(init2)
+        assert.are.equal("header", init._type)
+        assert.are.equal("Appearance", init._text)
     end)
 
     it("Header accepts hidden predicates through spec tables", function()
@@ -1464,18 +1535,18 @@ describe("LibSettingsBuilder", function()
         })
     end)
 
-    -- RegisterFromTable
-    it("RegisterFromTable creates subcategory and controls from table", function()
+    -- RegisterPage
+    it("RegisterPage creates subcategory and controls from ordered rows", function()
         local SB2 = createSB2("TBL1", "TableTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Test Section",
             path = "global",
-            args = {
-                header1 = { type = "header", name = "Visibility", order = 1 },
-                mounted = { type = "toggle", path = "hideWhenMounted", name = "Hide", order = 2 },
-                val = { type = "range", path = "value", name = "Value", min = 0, max = 10, step = 1, order = 3 },
-                mode = { type = "select", path = "mode", name = "Mode", values = { solid = "Solid" }, order = 4 },
+            rows = {
+                { id = "header1", type = "header", name = "Visibility" },
+                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
+                { id = "val", type = "slider", path = "value", name = "Value", min = 0, max = 10, step = 1 },
+                { id = "mode", type = "dropdown", path = "mode", name = "Mode", values = { solid = "Solid" } },
             },
         })
 
@@ -1483,18 +1554,18 @@ describe("LibSettingsBuilder", function()
         assert.is_not_nil(SB2.GetSubcategoryID("Test Section"))
     end)
 
-    it("RegisterFromTable inherits disabled from group", function()
+    it("RegisterPage inherits disabled from the page", function()
         local disabledFn = function()
             return true
         end
         local SB2 = createSB2("TBL2", "InheritTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Inherit Section",
             path = "global",
             disabled = disabledFn,
-            args = {
-                mounted = { type = "toggle", path = "hideWhenMounted", name = "Hide", order = 1 },
+            rows = {
+                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
             },
         })
 
@@ -1503,17 +1574,18 @@ describe("LibSettingsBuilder", function()
         assert.is_not_nil(SB2.GetSubcategoryID("Inherit Section"))
     end)
 
-    it("RegisterFromTable resolves parent references by key", function()
+    it("RegisterPage resolves parent references by row id", function()
         local SB2 = createSB2("TBL3", "ParentRefTest")
 
         assert.has_no.errors(function()
-            SB2.RegisterFromTable({
+            SB2.RegisterPage({
                 name = "Parent Ref Section",
                 path = "global",
-                args = {
-                    parentCtrl = { type = "toggle", path = "hideWhenMounted", name = "Parent", order = 1 },
-                    childCtrl = {
-                        type = "range",
+                rows = {
+                    { id = "parentCtrl", type = "checkbox", path = "hideWhenMounted", name = "Parent" },
+                    {
+                        id = "childCtrl",
+                        type = "slider",
                         path = "value",
                         name = "Child",
                         min = 0,
@@ -1521,34 +1593,32 @@ describe("LibSettingsBuilder", function()
                         step = 1,
                         parent = "parentCtrl",
                         parentCheck = "checked",
-                        order = 2,
                     },
                 },
             })
         end)
     end)
 
-    it("RegisterFromTable supports type aliases", function()
+    it("RegisterPage accepts canonical row types only", function()
         local SB2 = createSB2("TBL4", "AliasTest")
 
-        -- All AceConfig type aliases should work without error
         assert.has_no.errors(function()
-            SB2.RegisterFromTable({
+            SB2.RegisterPage({
                 name = "Alias Section",
                 path = "global",
-                args = {
-                    t = { type = "toggle", path = "hideWhenMounted", name = "Toggle", order = 1 },
-                    r = { type = "range", path = "value", name = "Range", min = 0, max = 10, step = 1, order = 2 },
-                    s = { type = "select", path = "mode", name = "Select", values = { solid = "Solid" }, order = 3 },
-                    h = { type = "header", name = "Header", order = 4 },
-                    d = { type = "description", name = "Desc", order = 5 },
-                    i = { type = "info", name = "Author", value = "Test", order = 6 },
+                rows = {
+                    { id = "t", type = "checkbox", path = "hideWhenMounted", name = "Toggle" },
+                    { id = "r", type = "slider", path = "value", name = "Range", min = 0, max = 10, step = 1 },
+                    { id = "s", type = "dropdown", path = "mode", name = "Select", values = { solid = "Solid" } },
+                    { id = "h", type = "header", name = "Header" },
+                    { id = "d", type = "subheader", name = "Desc" },
+                    { id = "i", type = "info", name = "Author", value = "Test" },
                 },
             })
         end)
     end)
 
-    it("RegisterFromTable supports desc as alias for tooltip", function()
+    it("RegisterPage supports desc as alias for tooltip", function()
         local capturedTooltip
         local settings = Settings
         local origCreateCheckbox = settings.CreateCheckbox
@@ -1559,16 +1629,16 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("TBL5", "DescTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Desc Section",
             path = "global",
-            args = {
-                mounted = {
-                    type = "toggle",
+            rows = {
+                {
+                    id = "mounted",
+                    type = "checkbox",
                     path = "hideWhenMounted",
                     name = "Hide",
                     desc = "Hide when on a mount.",
-                    order = 1,
                 },
             },
         })
@@ -1577,14 +1647,14 @@ describe("LibSettingsBuilder", function()
         assert.are.equal("Hide when on a mount.", capturedTooltip)
     end)
 
-    it("RegisterFromTable path prefixing works", function()
+    it("RegisterPage path prefixing works", function()
         local SB2 = createSB2("TBL7", "PrefixTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Prefix Section",
             path = "powerBar",
-            args = {
-                enabled = { type = "toggle", path = "enabled", name = "Enabled", order = 1 },
+            rows = {
+                { id = "enabled", type = "checkbox", path = "enabled", name = "Enabled" },
             },
         })
 
@@ -1592,8 +1662,8 @@ describe("LibSettingsBuilder", function()
         assert.is_true(addonNS.Addon.db.profile.powerBar.enabled)
     end)
 
-    -- RegisterFromTable condition support
-    it("RegisterFromTable condition=false skips entry", function()
+    -- RegisterPage condition support
+    it("RegisterPage condition=false skips entry", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1605,19 +1675,19 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND1", "CondTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Cond Section",
             path = "global",
-            args = {
-                skipped = {
+            rows = {
+                {
+                    id = "skipped",
                     type = "header",
                     name = "Should Not Appear",
                     condition = function()
                         return false
                     end,
-                    order = 1,
                 },
-                shown = { type = "header", name = "Should Appear", order = 2 },
+                { id = "shown", type = "header", name = "Should Appear" },
             },
         })
 
@@ -1625,7 +1695,7 @@ describe("LibSettingsBuilder", function()
         assert.is_false(headerCreated)
     end)
 
-    it("RegisterFromTable condition=true includes entry", function()
+    it("RegisterPage condition=true includes entry", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1637,17 +1707,17 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND2", "CondTest2")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Cond Section 2",
             path = "global",
-            args = {
-                shown = {
+            rows = {
+                {
+                    id = "shown",
                     type = "header",
                     name = "Conditional Header",
                     condition = function()
                         return true
                     end,
-                    order = 1,
                 },
             },
         })
@@ -1656,7 +1726,7 @@ describe("LibSettingsBuilder", function()
         assert.is_true(headerCreated)
     end)
 
-    it("RegisterFromTable passes hidden predicates to header initializers", function()
+    it("RegisterPage passes hidden predicates to header initializers", function()
         local capturedHeader
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1666,17 +1736,17 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND3", "CondTest3")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Cond Section 3",
             path = "global",
-            args = {
-                shown = {
+            rows = {
+                {
+                    id = "shown",
                     type = "header",
                     name = "Conditional Header",
                     hidden = function()
                         return true
                     end,
-                    order = 1,
                 },
             },
         })
@@ -1687,15 +1757,15 @@ describe("LibSettingsBuilder", function()
         assert.is_false(capturedHeader._shownPredicates[1]())
     end)
 
-    it("RegisterFromTable rootCategory=true uses root instead of subcategory", function()
+    it("RegisterPage rootCategory=true uses root instead of subcategory", function()
         local SB2 = createSB2("ROOT1", "RootTest")
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Root Section",
             rootCategory = true,
             path = "global",
-            args = {
-                mounted = { type = "toggle", path = "hideWhenMounted", name = "Hide", order = 1 },
+            rows = {
+                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
             },
         })
 
@@ -1703,7 +1773,7 @@ describe("LibSettingsBuilder", function()
         assert.is_nil(SB2.GetSubcategoryID("Root Section"))
     end)
 
-    it("RegisterFromTable canvas type embeds a canvas frame", function()
+    it("RegisterPage canvas rows embed a canvas frame", function()
         local SB2 = createSB2("CANVAS1", "CanvasTest")
 
         local canvasFrame = {
@@ -1720,11 +1790,11 @@ describe("LibSettingsBuilder", function()
             return origEmbed(canvas, height, spec)
         end
 
-        SB2.RegisterFromTable({
+        SB2.RegisterPage({
             name = "Canvas Section",
             path = "global",
-            args = {
-                myCanvas = { type = "canvas", canvas = canvasFrame, height = 400, order = 1 },
+            rows = {
+                { id = "myCanvas", type = "canvas", canvas = canvasFrame, height = 400 },
             },
         })
 
@@ -2121,10 +2191,7 @@ describe("LibSettingsBuilder", function()
                 return createScriptableFrame()
             end
 
-            TestHelpers.LoadChunk(
-                "Libs/LibSettingsBuilder/LibSettingsBuilder.lua",
-                "Unable to load LibSettingsBuilder.lua"
-            )()
+            TestHelpers.LoadLibSettingsBuilder()
             LSB = LibStub("LibSettingsBuilder-1.0")
         end)
 
@@ -2141,14 +2208,14 @@ describe("LibSettingsBuilder", function()
             })
         end
 
-        it("stores onShow/onHide callbacks when provided in RegisterFromTable", function()
+        it("stores onShow/onHide callbacks when provided in RegisterPage", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onShow = function() end,
                 onHide = function() end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             assert.is_table(LSB._pageLifecycleCallbacks[cat])
@@ -2166,10 +2233,10 @@ describe("LibSettingsBuilder", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onShow = function() showCount = showCount + 1 end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             navigateTo(cat)
@@ -2180,10 +2247,10 @@ describe("LibSettingsBuilder", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
             local hideCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onHide = function() hideCount = hideCount + 1 end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             local other = { _name = "Other" }
@@ -2196,10 +2263,10 @@ describe("LibSettingsBuilder", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
             local hideCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onHide = function() hideCount = hideCount + 1 end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             navigateTo(cat)
@@ -2211,10 +2278,10 @@ describe("LibSettingsBuilder", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onShow = function() showCount = showCount + 1 end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             navigateTo(cat)
@@ -2225,7 +2292,7 @@ describe("LibSettingsBuilder", function()
         it("does not fire callbacks for categories without lifecycle hooks", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
-            sb.RegisterFromTable({ name = "Plain", args = {} })
+            sb.RegisterPage({ name = "Plain", rows = {} })
             local untracked = sb._subcategories["Plain"]
             -- Should not error
             navigateTo(untracked)
@@ -2235,10 +2302,10 @@ describe("LibSettingsBuilder", function()
             local sb = makeSB()
             sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onShow = function() showCount = showCount + 1 end,
-                args = {},
+                rows = {},
             })
             local cat = sb._subcategories["Page1"]
             navigateTo(cat)
@@ -2274,10 +2341,7 @@ describe("LibSettingsBuilder", function()
                 return deferFrame
             end
 
-            TestHelpers.LoadChunk(
-                "Libs/LibSettingsBuilder/LibSettingsBuilder.lua",
-                "Unable to load LibSettingsBuilder.lua"
-            )()
+            TestHelpers.LoadLibSettingsBuilder()
             local lsb = LibStub("LibSettingsBuilder-1.0")
 
             local sb = lsb:New({
@@ -2293,10 +2357,10 @@ describe("LibSettingsBuilder", function()
             sb.CreateRootCategory("Deferred")
 
             local showCount = 0
-            sb.RegisterFromTable({
+            sb.RegisterPage({
                 name = "Page1",
                 onShow = function() showCount = showCount + 1 end,
-                args = {},
+                rows = {},
             })
 
             -- Hooks not yet installed — deferred frame should exist
@@ -2321,8 +2385,8 @@ describe("LibSettingsBuilder", function()
     -- SB.Custom integration: template, setting, and InitFrame pipeline
     ---------------------------------------------------------------------------
     describe("Dynamic layout rows", function()
-        it("Header accepts action buttons through spec tables", function()
-            local init = SB.Header({
+        it("PageActions accepts action buttons through spec tables", function()
+            local init = SB.PageActions({
                 name = "TestSection",
                 actions = {
                     { text = "Defaults", width = 100 },
@@ -2334,10 +2398,10 @@ describe("LibSettingsBuilder", function()
             assert.are.equal("Defaults", init.data.actions[1].text)
         end)
 
-        it("Header action tooltips use the current GameTooltip SetText signature", function()
+        it("PageActions tooltips use the current GameTooltip SetText signature", function()
             TestHelpers.SetupGameTooltipStub()
 
-            local init = SB.Header({
+            local init = SB.PageActions({
                 name = "TestSection",
                 actions = {
                     { text = "Add", tooltip = "Create entry" },
@@ -2368,8 +2432,8 @@ describe("LibSettingsBuilder", function()
             assert.is_true(_G.GameTooltip._titleWrap)
         end)
 
-        it("Header hides the duplicated title when actions are attached to the page title row", function()
-            local init = SB.Header({
+        it("PageActions attach buttons to the page title row without rendering a duplicate header", function()
+            local init = SB.PageActions({
                 name = "TestSection",
                 category = SB._currentSubcategory,
                 actions = {
@@ -2396,34 +2460,34 @@ describe("LibSettingsBuilder", function()
             assert.are.equal(1, #SB._categoryRefreshables[category])
         end)
 
-        it("RegisterFromTable dispatches collection rows through SB.Collection", function()
+        it("RegisterPage dispatches list rows through SB.List", function()
             local called
-            local originalCollection = SB.Collection
-            SB.Collection = function(spec)
+            local originalList = SB.List
+            SB.List = function(spec)
                 called = spec
-                return { _type = "collection" }
+                return { _type = "list" }
             end
 
-            SB.RegisterFromTable({
+            SB.RegisterPage({
                 name = "Collection Page",
-                args = {
-                    items = {
-                        type = "collection",
+                rows = {
+                    {
+                        id = "items",
+                        type = "list",
                         height = 200,
-                        preset = "swatch",
+                        variant = "swatch",
                         items = function()
                             return {}
                         end,
-                        order = 1,
                     },
                 },
             })
 
-            SB.Collection = originalCollection
+            SB.List = originalList
 
             assert.is_table(called)
             assert.are.equal(200, called.height)
-            assert.are.equal("swatch", called.preset)
+            assert.are.equal("swatch", called.variant)
         end)
 
         it("RefreshCategory reevaluates visible frames and dynamic refreshables", function()
@@ -2455,7 +2519,7 @@ describe("LibSettingsBuilder", function()
             assert.is_true(frame._refreshed)
         end)
 
-        it("Collection shows cached scroll widgets when a settings row is reused", function()
+        it("List shows cached scroll widgets when a settings row is reused", function()
             local originalCreateFrame = _G.CreateFrame
             local originalCreateDataProvider = _G.CreateDataProvider
             local originalCreateView = _G.CreateScrollBoxListLinearView
@@ -2485,9 +2549,9 @@ describe("LibSettingsBuilder", function()
                 InitScrollBoxListWithScrollBar = function() end,
             }
 
-            local init = SB.Collection({
+            local init = SB.List({
                 height = 80,
-                preset = "swatch",
+                variant = "swatch",
                 items = function()
                     return {}
                 end,
@@ -2516,7 +2580,468 @@ describe("LibSettingsBuilder", function()
             _G.ScrollUtil = originalScrollUtil
         end)
 
-        it("Collection modeInput trailers reevaluate dynamic fields in place while typing", function()
+        it("swatch list rows open the color callback from the swatch click script", function()
+            local originalCreateFrame = _G.CreateFrame
+            local originalCreateDataProvider = _G.CreateDataProvider
+            local originalCreateView = _G.CreateScrollBoxListLinearView
+            local originalScrollUtil = _G.ScrollUtil
+            local clicked = 0
+            local entered = 0
+
+            _G.CreateFrame = function(frameType, name, parent, template)
+                local frame = originalCreateFrame(frameType, name, parent, template)
+                frame.SetDataProvider = function(self, provider)
+                    self._dataProvider = provider
+                end
+                frame.SetColorRGB = function(self, r, g, b)
+                    self._color = { r, g, b }
+                end
+                return frame
+            end
+            _G.CreateDataProvider = function()
+                return {
+                    Flush = function() end,
+                    Insert = function() end,
+                }
+            end
+            _G.CreateScrollBoxListLinearView = function()
+                return {
+                    SetElementExtent = function() end,
+                    SetElementInitializer = function(self, _, fn)
+                        self._initFn = fn
+                    end,
+                }
+            end
+            _G.ScrollUtil = {
+                InitScrollBoxListWithScrollBar = function() end,
+            }
+
+            local init = SB.List({
+                height = 80,
+                variant = "swatch",
+                items = function()
+                    return {
+                        {
+                            label = "Spell",
+                            icon = 1234,
+                            onEnter = function()
+                                entered = entered + 1
+                            end,
+                            color = {
+                                value = { r = 0.1, g = 0.2, b = 0.3 },
+                                onClick = function()
+                                    clicked = clicked + 1
+                                end,
+                            },
+                        },
+                    }
+                end,
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            init:InitFrame(frame)
+
+            local row = createScriptableFrame()
+            row.CreateTexture = function()
+                local texture = createScriptableFrame()
+                texture.SetTexture = function(self, value)
+                    self._texture = value
+                end
+                texture.GetTexture = function(self)
+                    return self._texture
+                end
+                return texture
+            end
+            row.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                return fontString
+            end
+            frame._lsbCollectionView._initFn(row, {
+                preset = "swatch",
+                item = init.data.items()[1],
+            })
+
+            local point, relativeTo, relativePoint, x, y = row._swatch:GetPoint(1)
+            assert.is_true(row._mouseEnabled)
+            assert.are.equal("LEFT", point)
+            assert.are.equal(row, relativeTo)
+            assert.are.equal("CENTER", relativePoint)
+            assert.are.equal(-73, x)
+            assert.are.equal(0, y)
+
+            row:GetScript("OnEnter")(row)
+            assert.are.equal(1, entered)
+
+            assert.is_nil(row:GetScript("OnMouseUp"))
+            row._swatch:GetScript("OnClick")(row._swatch, "LeftButton")
+
+            assert.are.equal(1, clicked)
+
+            _G.CreateFrame = originalCreateFrame
+            _G.CreateDataProvider = originalCreateDataProvider
+            _G.CreateScrollBoxListLinearView = originalCreateView
+            _G.ScrollUtil = originalScrollUtil
+        end)
+
+        it("swatch list rows rebind the swatch click handler when a recycled row is reused", function()
+            local originalCreateFrame = _G.CreateFrame
+            local originalCreateDataProvider = _G.CreateDataProvider
+            local originalCreateView = _G.CreateScrollBoxListLinearView
+            local originalScrollUtil = _G.ScrollUtil
+            local firstClicks = 0
+            local secondClicks = 0
+
+            _G.CreateFrame = function(frameType, name, parent, template)
+                local frame = originalCreateFrame(frameType, name, parent, template)
+                frame.SetDataProvider = function(self, provider)
+                    self._dataProvider = provider
+                end
+                frame.SetColorRGB = function(self, r, g, b)
+                    self._color = { r, g, b }
+                end
+                return frame
+            end
+            _G.CreateDataProvider = function()
+                return {
+                    Flush = function() end,
+                    Insert = function() end,
+                }
+            end
+            _G.CreateScrollBoxListLinearView = function()
+                return {
+                    SetElementExtent = function() end,
+                    SetElementInitializer = function(self, _, fn)
+                        self._initFn = fn
+                    end,
+                }
+            end
+            _G.ScrollUtil = {
+                InitScrollBoxListWithScrollBar = function() end,
+            }
+
+            local init = SB.List({
+                height = 80,
+                variant = "swatch",
+                items = function()
+                    return {}
+                end,
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            init:InitFrame(frame)
+
+            local row = createScriptableFrame()
+            row.CreateTexture = function()
+                local texture = createScriptableFrame()
+                texture.SetTexture = function(self, value)
+                    self._texture = value
+                end
+                texture.GetTexture = function(self)
+                    return self._texture
+                end
+                return texture
+            end
+            row.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                return fontString
+            end
+
+            frame._lsbCollectionView._initFn(row, {
+                preset = "swatch",
+                item = {
+                    label = "First",
+                    color = {
+                        value = { r = 0.1, g = 0.2, b = 0.3 },
+                        onClick = function()
+                            firstClicks = firstClicks + 1
+                        end,
+                    },
+                },
+            })
+            row._swatch:GetScript("OnClick")(row._swatch, "LeftButton")
+
+            frame._lsbCollectionView._initFn(row, {
+                preset = "swatch",
+                item = {
+                    label = "Second",
+                    color = {
+                        value = { r = 0.4, g = 0.5, b = 0.6 },
+                        onClick = function()
+                            secondClicks = secondClicks + 1
+                        end,
+                    },
+                },
+            })
+            row._swatch:GetScript("OnClick")(row._swatch, "LeftButton")
+
+            assert.are.equal(1, firstClicks)
+            assert.are.equal(1, secondClicks)
+
+            _G.CreateFrame = originalCreateFrame
+            _G.CreateDataProvider = originalCreateDataProvider
+            _G.CreateScrollBoxListLinearView = originalCreateView
+            _G.ScrollUtil = originalScrollUtil
+        end)
+
+        it("editor list rows open the color callback from the swatch click script", function()
+            local originalCreateFrame = _G.CreateFrame
+            local originalCreateDataProvider = _G.CreateDataProvider
+            local originalCreateView = _G.CreateScrollBoxListLinearView
+            local originalScrollUtil = _G.ScrollUtil
+            local clicked = 0
+
+            _G.CreateFrame = function(frameType, name, parent, template)
+                local frame = originalCreateFrame(frameType, name, parent, template)
+                frame.SetDataProvider = function(self, provider)
+                    self._dataProvider = provider
+                end
+                frame.SetColorRGB = function(self, r, g, b)
+                    self._color = { r, g, b }
+                end
+                return frame
+            end
+            _G.CreateDataProvider = function()
+                return {
+                    Flush = function() end,
+                    Insert = function() end,
+                }
+            end
+            _G.CreateScrollBoxListLinearView = function()
+                return {
+                    SetElementExtent = function() end,
+                    SetElementInitializer = function(self, _, fn)
+                        self._initFn = fn
+                    end,
+                }
+            end
+            _G.ScrollUtil = {
+                InitScrollBoxListWithScrollBar = function() end,
+            }
+
+            local row = createScriptableFrame()
+            row.CreateTexture = function()
+                return createScriptableFrame()
+            end
+            row.CreateFontString = function()
+                local fontString = createScriptableFrame()
+                fontString.SetFontObject = function() end
+                return fontString
+            end
+
+            local item = {
+                label = "Tick",
+                fields = {},
+                color = {
+                    value = { r = 0.1, g = 0.2, b = 0.3 },
+                    onClick = function()
+                        clicked = clicked + 1
+                    end,
+                },
+                remove = {
+                    onClick = function() end,
+                },
+            }
+
+            local init = SB.List({
+                height = 80,
+                variant = "editor",
+                items = function()
+                    return { item }
+                end,
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            init:InitFrame(frame)
+            frame._lsbCollectionView._initFn(row, {
+                preset = "editor",
+                item = item,
+            })
+
+            row._swatch:GetScript("OnClick")(row._swatch, "LeftButton")
+
+            assert.are.equal(1, clicked)
+
+            _G.CreateFrame = originalCreateFrame
+            _G.CreateDataProvider = originalCreateDataProvider
+            _G.CreateScrollBoxListLinearView = originalCreateView
+            _G.ScrollUtil = originalScrollUtil
+        end)
+
+        it("SectionList action rows apply icon button textures, click registration, and spacing", function()
+            local originalCreateFrame = _G.CreateFrame
+
+            local function attachButtonTextureState(frame, key)
+                local texture = createScriptableFrame()
+                texture.ClearAllPoints = function() end
+                texture.SetAllPoints = function(self, owner)
+                    self._allPoints = owner
+                end
+                texture.SetAlpha = function(self, alpha)
+                    self._alpha = alpha
+                end
+                texture.GetTexture = function(self)
+                    return self._texture
+                end
+
+                frame["Set" .. key .. "Texture"] = function(self, value)
+                    self["_" .. key:lower() .. "TextureValue"] = value
+                    texture._texture = value
+                end
+                frame["Get" .. key .. "Texture"] = function()
+                    return texture
+                end
+            end
+
+            _G.CreateFrame = function(...)
+                local frame = originalCreateFrame(...)
+                attachButtonTextureState(frame, "Normal")
+                attachButtonTextureState(frame, "Pushed")
+                attachButtonTextureState(frame, "Disabled")
+                frame.CreateFontString = function()
+                    local fontString = createScriptableFrame()
+                    fontString.SetFontObject = function() end
+                    return fontString
+                end
+                frame.CreateTexture = function()
+                    local texture = createScriptableFrame()
+                    texture.SetTexture = function(self, value)
+                        self._texture = value
+                    end
+                    texture.GetTexture = function(self)
+                        return self._texture
+                    end
+                    return texture
+                end
+                frame.SetHighlightTexture = function(self, value, blendMode)
+                    self._highlightTextureValue = value
+                    self._highlightBlendMode = blendMode
+                    self._highlightTexture = self._highlightTexture or createScriptableFrame()
+                    self._highlightTexture.ClearAllPoints = function() end
+                    self._highlightTexture.SetAllPoints = function(texture, owner)
+                        texture._allPoints = owner
+                    end
+                    self._highlightTexture.SetAlpha = function(texture, alpha)
+                        texture._alpha = alpha
+                    end
+                    self._highlightTexture.GetTexture = function(texture)
+                        return texture._texture
+                    end
+                    self._highlightTexture._texture = value
+                end
+                frame.GetHighlightTexture = function(self)
+                    return self._highlightTexture
+                end
+                return frame
+            end
+
+            local init = SB.SectionList({
+                height = 120,
+                sections = function()
+                    return {
+                        {
+                            key = "icons",
+                            title = "Icons",
+                            items = {
+                                {
+                                    label = "Spell",
+                                    icon = 1234,
+                                    actions = {
+                                        up = {
+                                            text = "^",
+                                            width = 20,
+                                            height = 20,
+                                            enabled = false,
+                                            buttonTextures = {
+                                                normal = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_normal",
+                                                pushed = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_down",
+                                            },
+                                        },
+                                        down = {
+                                            text = "v",
+                                            width = 20,
+                                            height = 20,
+                                            enabled = true,
+                                            buttonTextures = {
+                                                normal = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_down_normal",
+                                                pushed = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_down_down",
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    }
+                end,
+            })
+            local frame = createScriptableFrame()
+            frame.Text = createScriptableFrame()
+            frame.NewFeature = createScriptableFrame()
+            frame.SetShown = function(self, shown)
+                self._shown = shown
+            end
+
+            init:InitFrame(frame)
+
+            local row = assert(frame._lsbSectionRowPools.icons[1])
+            local upButton = assert(row._buttons.up)
+            local downButton = assert(row._buttons.down)
+
+            assert.are.equal("", upButton:GetText())
+            assert.are.equal(
+                "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_normal",
+                upButton._normalTextureValue
+            )
+            assert.are.equal(
+                "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_down",
+                upButton._pushedTextureValue
+            )
+            assert.are.equal(
+                "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_normal",
+                upButton._disabledTextureValue
+            )
+            assert.are.equal("Interface\\Buttons\\ButtonHilight-Square", upButton._highlightTextureValue)
+            assert.are.equal("ADD", upButton._highlightBlendMode)
+            assert.are.equal(0.25, upButton:GetHighlightTexture()._alpha)
+            assert.are.equal(0.4, upButton:GetAlpha())
+            assert.is_false(upButton._enabled)
+            assert.are.same({ "LeftButtonDown" }, upButton._registeredClicks)
+
+            local point, relativeTo, relativePoint, x, y = upButton:GetPoint(1)
+            assert.are.equal("RIGHT", point)
+            assert.are.equal(row, relativeTo)
+            assert.are.equal("RIGHT", relativePoint)
+            assert.are.equal(-2, x)
+            assert.are.equal(0, y)
+
+            point, relativeTo, relativePoint, x, y = downButton:GetPoint(1)
+            assert.are.equal("RIGHT", point)
+            assert.are.equal(upButton, relativeTo)
+            assert.are.equal("LEFT", relativePoint)
+            assert.are.equal(-2, x)
+            assert.are.equal(0, y)
+            assert.are.same({ "LeftButtonDown" }, downButton._registeredClicks)
+
+            _G.CreateFrame = originalCreateFrame
+        end)
+
+        it("SectionList modeInput footers reevaluate dynamic fields in place while typing", function()
             local originalCreateFrame = _G.CreateFrame
             local state = {
                 kind = "spell",
@@ -2544,7 +3069,7 @@ describe("LibSettingsBuilder", function()
             end
 
             local ok, err = pcall(function()
-                local init = SB.Collection({
+                local init = SB.SectionList({
                     height = 120,
                     sections = function()
                         return {
@@ -2552,8 +3077,8 @@ describe("LibSettingsBuilder", function()
                                 key = "dynamic",
                                 title = "Dynamic",
                                 items = {},
-                                trailer = {
-                                    preset = "modeInput",
+                                footer = {
+                                    type = "modeInput",
                                     modeText = function()
                                         return state.kind == "spell" and "Spell" or "Item"
                                     end,
@@ -2698,7 +3223,7 @@ describe("LibSettingsBuilder", function()
             assert.are.equal("Global Font", setting:GetValue())
         end)
 
-        it("RegisterFromTable dispatches custom type through SB.Custom", function()
+        it("RegisterPage dispatches custom type through SB.Custom", function()
             local capturedTemplate
             local settings = Settings
             local origCEI = settings.CreateElementInitializer
@@ -2707,17 +3232,17 @@ describe("LibSettingsBuilder", function()
                 return origCEI(template, data)
             end)
 
-            SB.RegisterFromTable({
+            SB.RegisterPage({
                 name = "Test Custom Section",
                 path = "global",
-                args = {
-                    testHeader = { type = "header", name = "Appearance", order = 1 },
-                    fontPicker = {
+                rows = {
+                    { id = "testHeader", type = "header", name = "Appearance" },
+                    {
+                        id = "fontPicker",
                         type = "custom",
                         path = "font",
                         name = "Font",
                         template = "LibLSMSettingsWidgets_FontPickerTemplate",
-                        order = 2,
                     },
                 },
             })

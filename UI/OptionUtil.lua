@@ -226,6 +226,7 @@ end
 ---@param hasOpacity boolean
 ---@param onChange fun(color: {r:number, g:number, b:number, a:number})
 function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
+    local isSettingUp = true
     ColorPickerFrame:SetupColorPickerAndShow({
         r = currentColor.r,
         g = currentColor.g,
@@ -233,6 +234,7 @@ function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
         opacity = currentColor.a,
         hasOpacity = hasOpacity,
         swatchFunc = function()
+            if isSettingUp then return end
             local r, g, b = ColorPickerFrame:GetColorRGB()
             local a = hasOpacity and ColorPickerFrame:GetColorAlpha() or 1
             onChange({ r = r, g = g, b = b, a = a })
@@ -241,6 +243,7 @@ function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
             onChange({ r = prev.r, g = prev.g, b = prev.b, a = hasOpacity and prev.opacity or 1 })
         end,
     })
+    isSettingUp = false
 end
 
 --- Returns a closure that checks if the module at configPath is disabled.
@@ -294,41 +297,44 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
     end
 end
 
---- Generates standard layout and appearance args shared by bar-type modules.
+--- Generates standard layout and appearance rows shared by bar-type modules.
+--- This is the canonical rows-array form used by RegisterPage pages.
 ---@param isDisabled fun(): boolean
----@param options table|nil { showText: boolean, border: boolean, layoutOrder: number, appearanceOrder: number }
----@return table args Partial args table to merge into RegisterFromTable
-function OptionUtil.CreateBarArgs(isDisabled, options)
+---@param options table|nil { showText: boolean, border: boolean }
+---@return table[] rows
+function OptionUtil.CreateBarRows(isDisabled, options)
     options = options or {}
-    local layoutOrder = options.layoutOrder or 10
-    local appearanceOrder = options.appearanceOrder or 20
-    local breadcrumbArgs = OptionUtil.CreateLayoutBreadcrumbArgs(layoutOrder)
-
-    local args = {
-        layoutMovedButton = breadcrumbArgs.layoutMovedButton,
-        appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = appearanceOrder },
-        heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
-        fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
+    local rows = {
+        OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
+        {
+            type = "header",
+            name = L["APPEARANCE"],
+            disabled = isDisabled,
+        },
     }
 
     if options.showText ~= false then
-        args.showText = {
-            type = "toggle",
+        rows[#rows + 1] = {
+            type = "checkbox",
             path = "showText",
             name = L["SHOW_TEXT"],
             desc = L["SHOW_TEXT_DESC"],
             disabled = isDisabled,
-            order = appearanceOrder + 1,
         }
-        args.heightOverride.order = appearanceOrder + 2
-        args.fontOverride.order = appearanceOrder + 3
     end
+
+    rows[#rows + 1] = { type = "heightOverride", disabled = isDisabled }
+    rows[#rows + 1] = { type = "fontOverride", disabled = isDisabled }
 
     if options.border ~= false then
-        args.border = { type = "border", path = "border", disabled = isDisabled, order = args.fontOverride.order + 1 }
+        rows[#rows + 1] = {
+            type = "border",
+            path = "border",
+            disabled = isDisabled,
+        }
     end
 
-    return args
+    return rows
 end
 
 local function createDetachedSettingSpecs()
@@ -367,40 +373,40 @@ local function createDetachedSettingSpecs()
     }
 end
 
-function OptionUtil.CreateDetachedStackArgs()
-    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
-    local args = {
-        detachedHeader = { type = "header", name = L["POSITION_MODE_DETACHED"], order = 30 },
+function OptionUtil.CreateDetachedStackRows()
+    local rows = {
+        {
+            type = "header",
+            name = L["POSITION_MODE_DETACHED"],
+        },
     }
 
-    local order = 31
+    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
     for _, spec in ipairs(createDetachedSettingSpecs()) do
-        local arg = {
+        local row = {
             path = "global." .. spec.key,
             name = spec.name,
             desc = spec.desc,
-            order = order,
             getTransform = spec.default == 0 and defaultZero or OptionUtil.CreateDefaultValueTransform(spec.default),
         }
 
         if spec.values then
-            arg.type = "select"
-            arg.values = {}
+            row.type = "dropdown"
+            row.values = {}
             for _, option in ipairs(spec.values) do
-                arg.values[option.value] = option.text
+                row.values[option.value] = option.text
             end
         else
-            arg.type = "range"
-            arg.min = spec.min
-            arg.max = spec.max
-            arg.step = spec.step
+            row.type = "slider"
+            row.min = spec.min
+            row.max = spec.max
+            row.step = spec.step
         end
 
-        args[spec.key] = arg
-        order = order + 1
+        rows[#rows + 1] = row
     end
 
-    return args
+    return rows
 end
 
 function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)

@@ -31,6 +31,11 @@ describe("ExtraIconsOptions data helpers", function()
             },
         }
         _G.StaticPopupDialogs = _G.StaticPopupDialogs or {}
+        _G.C_SpellBook = {
+            IsSpellKnown = function()
+                return false
+            end,
+        }
         TestHelpers.LoadLiveConstants(ns)
         ns.L = setmetatable({}, { __index = function(_, k) return k end })
         ns.OptionUtil = {
@@ -364,40 +369,6 @@ describe("ExtraIconsOptions data helpers", function()
         end)
     end)
 
-    describe("_parseIds", function()
-        it("parses single ID", function()
-            assert.are.same({ 12345 }, ExtraIconsOptions._parseIds("12345"))
-        end)
-
-        it("parses comma-separated IDs", function()
-            assert.are.same({ 100, 200, 300 }, ExtraIconsOptions._parseIds("100, 200, 300"))
-        end)
-
-        it("returns nil for empty string", function()
-            assert.is_nil(ExtraIconsOptions._parseIds(""))
-        end)
-
-        it("returns nil for nil", function()
-            assert.is_nil(ExtraIconsOptions._parseIds(nil))
-        end)
-
-        it("returns nil for non-numeric input", function()
-            assert.is_nil(ExtraIconsOptions._parseIds("abc"))
-        end)
-
-        it("returns nil for negative numbers", function()
-            assert.is_nil(ExtraIconsOptions._parseIds("-5"))
-        end)
-
-        it("returns nil for decimals", function()
-            assert.is_nil(ExtraIconsOptions._parseIds("1.5"))
-        end)
-
-        it("returns nil if any value is invalid", function()
-            assert.is_nil(ExtraIconsOptions._parseIds("100, abc, 200"))
-        end)
-    end)
-
     describe("_parseSingleId", function()
         it("parses a single integer ID", function()
             assert.are.equal(12345, ExtraIconsOptions._parseSingleId("12345"))
@@ -408,56 +379,6 @@ describe("ExtraIconsOptions data helpers", function()
             assert.is_nil(ExtraIconsOptions._parseSingleId("abc"))
             assert.is_nil(ExtraIconsOptions._parseSingleId("1.5"))
             assert.is_nil(ExtraIconsOptions._parseSingleId("-4"))
-        end)
-    end)
-
-    describe("_resolveDraftEntryName", function()
-        local savedCSpell, savedCItem
-
-        before_each(function()
-            savedCSpell = _G.C_Spell
-            savedCItem = _G.C_Item
-            _G.C_Spell = {
-                GetSpellName = function(spellId)
-                    return spellId == 12345 and "Test Spell" or nil
-                end,
-                GetSpellTexture = function(spellId)
-                    return spellId == 12345 and "spell-tex" or nil
-                end,
-            }
-            _G.C_Item = {
-                DoesItemExistByID = function(itemId)
-                    return itemId ~= 99999
-                end,
-                GetItemNameByID = function(itemId)
-                    return itemId == 777 and "Test Item" or nil
-                end,
-                GetItemIconByID = function(itemId)
-                    return itemId == 12345 and "item-tex" or nil
-                end,
-                RequestLoadItemDataByID = function() end,
-            }
-        end)
-
-        after_each(function()
-            _G.C_Spell = savedCSpell
-            _G.C_Item = savedCItem
-        end)
-
-        it("resolves spell names for valid spell IDs", function()
-            assert.are.equal("Test Spell", ExtraIconsOptions._resolveDraftEntryName("spell", "12345"))
-        end)
-
-        it("returns nil for invalid spell IDs", function()
-            assert.is_nil(ExtraIconsOptions._resolveDraftEntryName("spell", "99999"))
-        end)
-
-        it("returns nil while valid items are still pending", function()
-            assert.is_nil(ExtraIconsOptions._resolveDraftEntryName("item", "12345"))
-        end)
-
-        it("returns nil for invalid items", function()
-            assert.is_nil(ExtraIconsOptions._resolveDraftEntryName("item", "99999"))
         end)
     end)
 
@@ -673,20 +594,40 @@ describe("ExtraIconsOptions data helpers", function()
 
     describe("_buildViewerRows", function()
         local savedUnitRace
-        local savedIsPlayerSpell
+        local savedCSpellBook
+        local savedGetInventoryItemID
+        local savedCItem
 
         before_each(function()
             savedUnitRace = _G.UnitRace
-            savedIsPlayerSpell = _G.IsPlayerSpell
+            savedCSpellBook = _G.C_SpellBook
+            savedGetInventoryItemID = _G.GetInventoryItemID
+            savedCItem = _G.C_Item
             _G.UnitRace = function() return "Human", "Human", 1 end
-            _G.IsPlayerSpell = function()
-                return false
+            _G.C_SpellBook = {
+                IsSpellKnown = function()
+                    return false
+                end,
+            }
+            _G.GetInventoryItemID = function(_, slotId)
+                if slotId == 13 then return 10001 end
+                if slotId == 14 then return 10002 end
+                return nil
             end
+            _G.C_Item = {
+                GetItemSpell = function(itemId)
+                    if itemId == 10001 then return "Trinket 1 Use", 90001 end
+                    if itemId == 10002 then return "Trinket 2 Use", 90002 end
+                    return nil, nil
+                end,
+            }
         end)
 
         after_each(function()
             _G.UnitRace = savedUnitRace
-            _G.IsPlayerSpell = savedIsPlayerSpell
+            _G.C_SpellBook = savedCSpellBook
+            _G.GetInventoryItemID = savedGetInventoryItemID
+            _G.C_Item = savedCItem
         end)
 
         it("adds builtin and current-racial placeholders to utility when absent", function()
@@ -719,6 +660,35 @@ describe("ExtraIconsOptions data helpers", function()
             assert.are.equal("trinket1", rows[1].displayEntry.stackKey)
         end)
 
+        it("hides stored trinket rows without an on-use spell", function()
+            local viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "healthstones" },
+                },
+                main = {},
+            }
+
+            _G.C_Item = {
+                GetItemSpell = function(itemId)
+                    if itemId == 10002 then return "Trinket 2 Use", 90002 end
+                    return nil, nil
+                end,
+            }
+
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local hasTrinket1 = false
+            for _, row in ipairs(rows) do
+                if row.displayEntry and row.displayEntry.stackKey == "trinket1" then
+                    hasTrinket1 = true
+                    break
+                end
+            end
+
+            assert.is_false(hasTrinket1)
+            assert.are.equal("healthstones", rows[1].displayEntry.stackKey)
+        end)
+
         it("keeps disabled builtins in default order", function()
             local viewers = {
                 utility = {},
@@ -743,14 +713,35 @@ describe("ExtraIconsOptions data helpers", function()
             }
 
             _G.UnitRace = function() return "Unknown", "Unknown", 99 end
-            _G.IsPlayerSpell = function(spellId)
-                return spellId == 59752
-            end
+            _G.C_SpellBook = {
+                IsSpellKnown = function(spellId)
+                    return spellId == 59752
+                end,
+            }
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
 
             assert.are.equal("racialPlaceholder", rows[#rows].rowType)
             assert.are.equal(59752, rows[#rows].spellId)
+        end)
+
+        it("falls back to spellbook-known racials for Shadowmeld", function()
+            local viewers = {
+                utility = {},
+                main = {},
+            }
+
+            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
+            _G.C_SpellBook = {
+                IsSpellKnown = function(spellId)
+                    return spellId == 58984
+                end,
+            }
+
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+
+            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
+            assert.are.equal(58984, rows[#rows].spellId)
         end)
     end)
 end)
@@ -761,10 +752,20 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns, capturedTable, refreshCalls, scheduledReasons, previewCalls
+    local profile, defaults, SB, ns, capturedPage, refreshCalls, scheduledReasons, previewCalls
+
+    local function getRow(rowId)
+        local rows = assert(capturedPage and capturedPage.rows)
+        for _, row in ipairs(rows) do
+            if row.id == rowId then
+                return row
+            end
+        end
+    end
 
     local function buildSections()
-        return assert(capturedTable.args.viewers.sections())
+        local row = assert(getRow("viewers"))
+        return assert(row.sections())
     end
 
     local function getSection(sectionKey)
@@ -803,6 +804,21 @@ describe("ExtraIconsOptions settings page", function()
     before_each(function()
         TestHelpers.SetupOptionsGlobals()
         _G.UnitRace = function() return "Human", "Human", 1 end
+        _G.GetInventoryItemID = function(_, slotId)
+            if slotId == 13 then return 10001 end
+            if slotId == 14 then return 10002 end
+            return nil
+        end
+        _G.C_Item.GetItemNameByID = function(itemId)
+            if itemId == 10001 then return "On-use Trinket 1" end
+            if itemId == 10002 then return "On-use Trinket 2" end
+            return nil
+        end
+        _G.C_Item.GetItemSpell = function(itemId)
+            if itemId == 10001 then return "Trinket 1 Use", 90001 end
+            if itemId == 10002 then return "Trinket 2 Use", 90002 end
+            return nil, nil
+        end
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
         refreshCalls = {}
@@ -825,10 +841,10 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
+        local originalRegisterPage = SB.RegisterPage
+        SB.RegisterPage = function(page)
+            capturedPage = page
+            return originalRegisterPage(page)
         end
         SB.RefreshCategory = function(category)
             refreshCalls[#refreshCalls + 1] = category
@@ -843,35 +859,33 @@ describe("ExtraIconsOptions settings page", function()
     end)
 
     it("registers page-level onShow and onHide callbacks", function()
-        assert.is_function(capturedTable.onShow)
-        assert.is_function(capturedTable.onHide)
+        assert.is_function(capturedPage.onShow)
+        assert.is_function(capturedPage.onHide)
 
-        capturedTable.onShow()
-        capturedTable.onHide()
+        capturedPage.onShow()
+        capturedPage.onHide()
 
         assert.are.same({ true, false }, previewCalls)
     end)
 
-    it("registers a legend info row and collection widget instead of a canvas", function()
+    it("registers canonical rows and a section list instead of a canvas", function()
         local opts = ns.ExtraIconsOptions
 
-        assert.is_nil(opts._viewerCanvas)
-        assert.is_nil(opts._draftEntryCanvas)
         assert.is_table(opts._draftStates)
-        assert.are.equal("toggle", capturedTable.args.enabled.type)
-        assert.are.equal("info", capturedTable.args.specialRowsLegend.type)
-        assert.are.equal("collection", capturedTable.args.viewers.type)
-        assert.are.equal(ns.L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"], capturedTable.args.specialRowsLegend.value)
+        assert.are.equal("checkbox", getRow("enabled").type)
+        assert.are.equal("info", getRow("specialRowsLegend").type)
+        assert.are.equal("sectionList", getRow("viewers").type)
+        assert.are.equal(ns.L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"], getRow("specialRowsLegend").value)
     end)
 
-    it("builds utility and main sections with placeholder rows and trailers", function()
+    it("builds utility and main sections with placeholder rows and footers", function()
         local utility = assert(getSection("utility"))
         local main = assert(getSection("main"))
 
         assert.are.equal(ns.L["UTILITY_VIEWER_ICONS"], utility.title)
         assert.are.equal(ns.L["MAIN_VIEWER_ICONS"], main.title)
-        assert.is_not_nil(utility.trailer)
-        assert.is_not_nil(main.trailer)
+        assert.is_not_nil(utility.footer)
+        assert.is_not_nil(main.footer)
         assert.is_not_nil(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
         end))
@@ -880,7 +894,83 @@ describe("ExtraIconsOptions settings page", function()
         end))
     end)
 
-    it("uses trailer callbacks to add custom entries per viewer", function()
+    it("maps row actions to the addon icon button textures", function()
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return spellId == 12345 and "Test Spell" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return spellId == 12345 and "spell-12345" or nil
+            end,
+        }
+        profile.extraIcons.viewers.utility = {
+            { stackKey = "healthstones" },
+            { kind = "spell", ids = { 12345 } },
+        }
+
+        local custom = assert(findItem("utility", function(item)
+            return item.label == "Test Spell"
+        end))
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_normal",
+            custom.actions.up.buttonTextures.normal
+        )
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_down_normal",
+            custom.actions.down.buttonTextures.normal
+        )
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\swap_normal",
+            custom.actions.move.buttonTextures.normal
+        )
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\delete_normal",
+            custom.actions.delete.buttonTextures.normal
+        )
+
+        local activeBuiltin = assert(findItem("utility", function(item)
+            return item.label == "Healthstones"
+        end))
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\hide_normal",
+            activeBuiltin.actions.delete.buttonTextures.normal
+        )
+
+        local builtinPlaceholder = assert(findItem("utility", function(item)
+            return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
+        end))
+        assert.are.equal(
+            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\show_normal",
+            builtinPlaceholder.actions.delete.buttonTextures.normal
+        )
+    end)
+
+    it("hides trinket rows in the table when the equipped trinket has no on-use spell", function()
+        profile.extraIcons.viewers.utility = {
+            { stackKey = "trinket1" },
+            { stackKey = "healthstones" },
+        }
+
+        _G.GetInventoryItemID = function(_, slotId)
+            return slotId == 13 and 10001 or nil
+        end
+        _G.C_Item.GetItemSpell = function()
+            return nil, nil
+        end
+        _G.C_Item.GetItemNameByID = function(itemId)
+            return itemId == 10001 and "Passive Trinket" or nil
+        end
+
+        assert.are.equal("trinket1", profile.extraIcons.viewers.utility[1].stackKey)
+        assert.is_nil(findItem("utility", function(item)
+            return type(item.label) == "string" and item.label:match("^Trinket 1") ~= nil
+        end))
+        assert.is_not_nil(findItem("utility", function(item)
+            return item.label == "Healthstones"
+        end))
+    end)
+
+    it("uses footer callbacks to add custom entries per viewer", function()
         _G.C_Spell = {
             GetSpellName = function(spellId)
                 return spellId == 12345 and "Test Spell" or nil
@@ -890,14 +980,14 @@ describe("ExtraIconsOptions settings page", function()
             end,
         }
 
-        local trailer = assert(getSection("main")).trailer
-        trailer.onTextChanged("12345")
+        local footer = assert(getSection("main")).footer
+        footer.onTextChanged("12345")
         assert.are.same({}, refreshCalls)
 
-        trailer = assert(getSection("main")).trailer
-        assert.are.equal("Test Spell", getTrailerValue(trailer, "previewText"))
-        assert.is_true(getTrailerValue(trailer, "submitEnabled"))
-        assert.is_true(trailer.onSubmit())
+        footer = assert(getSection("main")).footer
+        assert.are.equal("Test Spell", getTrailerValue(footer, "previewText"))
+        assert.is_true(getTrailerValue(footer, "submitEnabled"))
+        assert.is_true(footer.onSubmit())
 
         assert.are.equal("", ns.ExtraIconsOptions._draftStates.main.idText)
         assert.are.equal(1, #profile.extraIcons.viewers.main)
@@ -912,6 +1002,11 @@ describe("ExtraIconsOptions settings page", function()
         local itemNames = {}
 
         _G.C_Item = {
+            GetItemSpell = function(itemId)
+                if itemId == 10001 then return "Trinket 1 Use", 90001 end
+                if itemId == 10002 then return "Trinket 2 Use", 90002 end
+                return nil, nil
+            end,
             DoesItemExistByID = function(itemId)
                 return itemId == 777
             end,
@@ -924,14 +1019,14 @@ describe("ExtraIconsOptions settings page", function()
             RequestLoadItemDataByID = function() end,
         }
 
-        local trailer = assert(getSection("utility")).trailer
-        trailer.onToggleMode()
-        trailer = assert(getSection("utility")).trailer
-        trailer.onTextChanged("777")
+        local footer = assert(getSection("utility")).footer
+        footer.onToggleMode()
+        footer = assert(getSection("utility")).footer
+        footer.onTextChanged("777")
 
-        trailer = assert(getSection("utility")).trailer
-        assert.are.equal("...", getTrailerValue(trailer, "previewText"))
-        assert.is_false(getTrailerValue(trailer, "submitEnabled"))
+        footer = assert(getSection("utility")).footer
+        assert.are.equal("...", getTrailerValue(footer, "previewText"))
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
 
         itemNames[777] = "Loaded Item"
         ns.ExtraIconsOptions._itemLoadFrame:GetScript("OnEvent")(
@@ -941,9 +1036,19 @@ describe("ExtraIconsOptions settings page", function()
             true
         )
 
-        trailer = assert(getSection("utility")).trailer
-        assert.are.equal("Loaded Item", getTrailerValue(trailer, "previewText"))
-        assert.is_true(getTrailerValue(trailer, "submitEnabled"))
+        footer = assert(getSection("utility")).footer
+        assert.are.equal("Loaded Item", getTrailerValue(footer, "previewText"))
+        assert.is_true(getTrailerValue(footer, "submitEnabled"))
+    end)
+
+    it("refreshes the category when trinket equipment changes", function()
+        local category = SB.GetSubcategory(ns.L["EXTRA_ICONS"])
+        local eventHandler = ns.ExtraIconsOptions._itemLoadFrame:GetScript("OnEvent")
+
+        eventHandler(ns.ExtraIconsOptions._itemLoadFrame, "PLAYER_EQUIPMENT_CHANGED", 13, true)
+        eventHandler(ns.ExtraIconsOptions._itemLoadFrame, "PLAYER_EQUIPMENT_CHANGED", 1, true)
+
+        assert.are.same({ category }, refreshCalls)
     end)
 
     it("blocks duplicate entries and shows which viewer already owns them", function()
@@ -959,15 +1064,15 @@ describe("ExtraIconsOptions settings page", function()
             { kind = "spell", ids = { 12345 } },
         }
 
-        local trailer = assert(getSection("main")).trailer
-        trailer.onTextChanged("12345")
-        trailer = assert(getSection("main")).trailer
+        local footer = assert(getSection("main")).footer
+        footer.onTextChanged("12345")
+        footer = assert(getSection("main")).footer
 
         assert.are.equal(
             ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["UTILITY_VIEWER_SHORT"]),
-            getTrailerValue(trailer, "previewText")
+            getTrailerValue(footer, "previewText")
         )
-        assert.is_false(getTrailerValue(trailer, "submitEnabled"))
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
     end)
 
     it("reorder, move, and remove actions operate on the stored viewers", function()
@@ -1007,6 +1112,66 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal(0, #profile.extraIcons.viewers.main)
     end)
 
+    it("reorders against the next visible row when hidden entries sit in between", function()
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return ({
+                    [12345] = "Spell A",
+                    [23456] = "Spell B",
+                })[spellId]
+            end,
+            GetSpellTexture = function(spellId)
+                return "spell-" .. tostring(spellId)
+            end,
+        }
+        _G.GetInventoryItemID = function(_, slotId)
+            return slotId == 13 and 10001 or nil
+        end
+        _G.C_Item = {
+            GetItemSpell = function(itemId)
+                if itemId == 10001 then
+                    return nil, nil
+                end
+
+                return nil, nil
+            end,
+            DoesItemExistByID = function()
+                return false
+            end,
+            GetItemIconByID = function(itemId)
+                return itemId == 10001 and "passive-trinket" or nil
+            end,
+            GetItemNameByID = function(itemId)
+                return itemId == 10001 and "Passive Trinket" or nil
+            end,
+            RequestLoadItemDataByID = function() end,
+        }
+
+        profile.extraIcons.viewers.utility = {
+            { kind = "spell", ids = { 12345 } },
+            { stackKey = "trinket1" },
+            { kind = "spell", ids = { 23456 } },
+        }
+
+        local spellA = assert(findItem("utility", function(item)
+            return item.label == "Spell A"
+        end))
+        spellA.actions.down.onClick()
+
+        assert.are.same({ 23456 }, profile.extraIcons.viewers.utility[1].ids)
+        assert.are.equal("trinket1", profile.extraIcons.viewers.utility[2].stackKey)
+        assert.are.same({ 12345 }, profile.extraIcons.viewers.utility[3].ids)
+
+        spellA = assert(findItem("utility", function(item)
+            return item.label == "Spell A"
+        end))
+        spellA.actions.up.onClick()
+
+        assert.are.same({ 12345 }, profile.extraIcons.viewers.utility[1].ids)
+        assert.are.equal("trinket1", profile.extraIcons.viewers.utility[2].stackKey)
+        assert.are.same({ 23456 }, profile.extraIcons.viewers.utility[3].ids)
+    end)
+
     it("keeps disabled builtins at the end of the active list in builtin order", function()
         profile.extraIcons.viewers.main = {
             { stackKey = "healthstones", disabled = true },
@@ -1021,7 +1186,7 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.are.same({
             "Spell 59752",
-            "Trinket 1",
+            "Trinket 1 [On-use Trinket 1]",
             "Healthstones",
         }, labels)
     end)

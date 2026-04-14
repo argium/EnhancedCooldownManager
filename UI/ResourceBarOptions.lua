@@ -65,13 +65,13 @@ local ResourceBarOptions = {}
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
 
 function ResourceBarOptions.RegisterSettings(SB)
-    local args = ns.OptionUtil.CreateBarArgs(isDisabled)
-    args.enabled = {
-        type = "toggle",
-        path = "enabled",
-        name = L["ENABLE_RESOURCE_BAR"],
-        order = 0,
-        onSet = ns.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+    local rows = {
+        {
+            type = "checkbox",
+            path = "enabled",
+            name = L["ENABLE_RESOURCE_BAR"],
+            onSet = ns.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+        },
     }
     local maxColorDefs = {}
     for _, def in ipairs(RESOURCE_COLOR_DEFS) do
@@ -84,38 +84,38 @@ function ResourceBarOptions.RegisterSettings(SB)
         end
     end
 
-    args.colorsHeader = { type = "header", name = L["COLORS"], disabled = isDisabled, order = 29 }
+    for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled)) do
+        rows[#rows + 1] = row
+    end
 
-    args.colors = {
+    rows[#rows + 1] = { type = "header", name = L["COLORS"], disabled = isDisabled }
+    rows[#rows + 1] = {
         type = "colorList",
         path = "colors",
         label = L["RESOURCE_TYPES"],
         defs = RESOURCE_COLOR_DEFS,
         disabled = isDisabled,
-        order = 30,
     }
-    args.maxColorsEnabled = {
-        type = "toggleList",
+    rows[#rows + 1] = {
+        type = "checkboxList",
         path = "maxColorsEnabled",
         label = L["USE_ALTERNATE_COLOR_WHEN_CAPPED"],
         defs = maxColorDefs,
         disabled = isDisabled,
-        order = 31,
     }
-    args.maxColors = {
+    rows[#rows + 1] = {
         type = "colorList",
         path = "maxColors",
         label = L["ALTERNATE_COLORS"],
         defs = maxColorDefs,
         disabled = isDisabled,
-        order = 32,
     }
 
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = L["RESOURCE_BAR"],
         path = "resourceBar",
         disabled = ns.IsDeathKnight,
-        args = args,
+        rows = rows,
     })
 end
 

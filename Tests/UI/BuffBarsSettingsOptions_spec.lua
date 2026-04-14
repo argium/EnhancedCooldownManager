@@ -9,7 +9,16 @@ local TestHelpers = assert(
 
 describe("BuffBarsOptions settings getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
+
+    local function getRow(rows, rowID)
+        for _, row in ipairs(rows or {}) do
+            if row.id == rowID then
+                return row
+            end
+        end
+        return nil
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -23,6 +32,7 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         TestHelpers.SetupOptionsGlobals()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+        capturedPage = nil
 
         ns.SpellColors = {
             NormalizeKey = function() end,
@@ -41,16 +51,20 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         }
         ns.Addon.ConfirmReloadUI = function(_, _, cb) if cb then cb() end end
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
+        local originalRegisterPage = SB.RegisterPage
+        SB.RegisterPage = function(page)
+            if page.name == ns.L["AURA_BARS"] then
+                capturedPage = page
+            end
+            return originalRegisterPage(page)
         end
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "BuffBarsOptions")(nil, ns)
             ns.OptionsSections.BuffBars.RegisterSettings(SB)
         end)
+
+        assert.is_not_nil(capturedPage)
     end)
 
     describe("enabled", function()
@@ -66,6 +80,11 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         it("default matches expected", function()
             assert.is_true(settings["ECM_buffBars_enabled"]._default)
         end)
+        it("registers the row as a checkbox in the ordered rows array", function()
+            assert.is_not_nil(capturedPage)
+            assert.are.equal("checkbox", capturedPage.rows[1].type)
+            assert.are.equal("enabled", capturedPage.rows[1].id)
+        end)
     end)
 
     -- Positioning composite
@@ -74,17 +93,19 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
             assert.is_nil(settings["ECM_buffBars_anchorMode"])
         end)
         it("uses the updated labels and help text", function()
-            local args = capturedTable.args
-            assert.is_nil(args.layoutMovedInfo)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
-            assert.is_nil(args.positioning)
+            local layoutMovedButton = getRow(capturedPage.rows, "layoutMovedButton")
+
+            assert.is_nil(getRow(capturedPage.rows, "layoutMovedInfo"))
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], layoutMovedButton.name)
+            assert.are.equal("button", layoutMovedButton.type)
+            assert.is_nil(getRow(capturedPage.rows, "positioning"))
         end)
     end)
 
     describe("freeGrowDirection", function()
         it("moves off the Aura Bars page", function()
             assert.is_nil(settings["ECM_buffBars_freeGrowDirection"])
-            assert.is_nil(capturedTable.args.freeGrowDirection)
+            assert.is_nil(getRow(capturedPage.rows, "freeGrowDirection"))
         end)
     end)
 

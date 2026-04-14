@@ -195,7 +195,7 @@ describe("ExtraIcons real source", function()
     local itemCounts
     local itemIconsByID
     local itemCooldownByID
-    local playerSpells
+    local knownSpells
     local spellTextures
     local spellCooldowns
     local spellCooldownInfos
@@ -211,11 +211,11 @@ describe("ExtraIcons real source", function()
             "CreateFrame",
             "C_Timer",
             "C_Spell",
+            "C_SpellBook",
             "GetInventoryItemID",
             "GetInventoryItemTexture",
             "GetInventoryItemCooldown",
             "C_Item",
-            "IsPlayerSpell",
             "C_PvP",
         })
     end)
@@ -236,12 +236,17 @@ describe("ExtraIcons real source", function()
         itemCounts = {}
         itemIconsByID = {}
         itemCooldownByID = {}
-        playerSpells = {}
+        knownSpells = {}
         spellTextures = {}
         spellCooldowns = {}
         spellCooldownInfos = {}
         spellCharges = {}
         ratedMap = false
+        _G.C_SpellBook = {
+            IsSpellKnown = function(spellId)
+                return knownSpells[spellId] or false
+            end,
+        }
         ns = {
             Log = function() end,
             BarMixin = {
@@ -305,9 +310,6 @@ describe("ExtraIcons real source", function()
                 return cooldown[1], cooldown[2], cooldown[3]
             end,
         }
-        _G.IsPlayerSpell = function(spellId)
-            return playerSpells[spellId] or false
-        end
         _G.C_Spell = {
             GetSpellTexture = function(spellId)
                 return spellTextures[spellId]
@@ -1071,7 +1073,7 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        playerSpells[59752] = true
+        knownSpells[59752] = true
         spellTextures[59752] = "racial-icon"
         spellCooldowns[59752] = "durObj:59752"
         spellCooldownInfos[59752] = { isOnGCD = false }
@@ -1088,6 +1090,30 @@ describe("ExtraIcons real source", function()
         assert.are.equal("durObj:59752", vs.iconPool[1].Cooldown.__durObj)
     end)
 
+    it("resolves spells known via C_SpellBook.IsSpellKnown", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        knownSpells[59752] = true
+        spellTextures[59752] = "racial-icon"
+        spellCooldowns[59752] = "durObj:59752"
+        spellCooldownInfos[59752] = { isOnGCD = false }
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "spell", ids = { { spellId = 59752 } } } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local vs = ExtraIcons._viewers.utility
+        assert.are.equal(59752, vs.iconPool[1].spellId)
+        assert.are.equal("racial-icon", vs.iconPool[1].Icon:GetTexture())
+    end)
+
     it("skips spell cooldown swipe when only on GCD", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end
@@ -1096,7 +1122,7 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        playerSpells[59752] = true
+        knownSpells[59752] = true
         spellTextures[59752] = "racial-icon"
         spellCooldowns[59752] = "durObj:59752"
         spellCooldownInfos[59752] = { isOnGCD = true }
@@ -1120,7 +1146,7 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        playerSpells[108853] = true
+        knownSpells[108853] = true
         spellTextures[108853] = "fire-blast-icon"
         spellCooldowns[108853] = "chargeDurObj:108853"
         spellCooldownInfos[108853] = { isOnGCD = false }

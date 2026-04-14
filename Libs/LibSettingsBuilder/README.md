@@ -7,9 +7,9 @@ It supports:
 - path-based bindings for AceDB-style profile tables,
 - handler-mode bindings for arbitrary storage,
 - built-in text input rows with optional debounced preview resolution,
-- first-class dynamic collections for scrollable or sectioned list editors,
+- first-class dynamic lists and sectioned editors,
 - composite builders for common settings groups,
-- layout-only rows such as headers, subheaders, info rows, buttons, and embedded canvases,
+- canonical row types for headers, subheaders, info rows, buttons, canvases, and page actions,
 - XML/template-backed custom controls when a built-in row is not enough,
 - category refresh hooks for out-of-band state changes,
 - deterministic dropdown ordering,
@@ -21,12 +21,12 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
 | Need | LibSettingsBuilder |
 |---|---|
-| Standard settings pages | `RegisterFromTable(...)` |
+| Standard settings pages | `RegisterPage(...)` |
 | Fine-grained control | imperative `SB.Checkbox(...)`, `SB.Slider(...)`, `SB.Input(...)`, etc. |
 | Existing AceDB profiles | `PathAdapter(...)` |
 | Custom storage | handler mode with `get` / `set` / `key` |
 | Text entry / numeric ID fields | `SB.Input(...)` or `type = "input"` |
-| Dynamic editors / ordered lists | `SB.Collection(...)` or `type = "collection"` |
+| Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"` |
 | Reusable settings groups | border, font override, positioning composites |
 | XML-backed bespoke widgets | `SB.Custom(...)` |
 | Force visible rows to refresh | `SB.RefreshCategory(...)` |
@@ -53,24 +53,22 @@ local SB = LSB:New({
 
 SB.CreateRootCategory("My Addon")
 
-SB.RegisterFromTable({
+SB.RegisterPage({
     name = "General",
     path = "general",
-    args = {
-        enabled = {
-            type = "toggle",
+    rows = {
+        {
+            type = "checkbox",
             path = "enabled",
             name = "Enable",
-            order = 1,
         },
-        opacity = {
-            type = "range",
+        {
+            type = "slider",
             path = "opacity",
             name = "Opacity",
             min = 0,
             max = 100,
             step = 1,
-            order = 2,
         },
     },
 })
@@ -78,26 +76,28 @@ SB.RegisterFromTable({
 SB.RegisterCategories()
 ```
 
-## Supported `RegisterFromTable` types
+## Canonical row types
 
-The table API understands both AceConfig-style aliases and library-specific row types.
+The page API accepts canonical row types only.
 
 | Type | Meaning |
 |---|---|
-| `toggle` | Alias for a checkbox proxy setting |
-| `range` | Alias for a slider proxy setting |
-| `select` | Alias for a dropdown proxy setting |
+| `checkbox` | Boolean proxy setting |
+| `slider` | Numeric proxy setting |
+| `dropdown` | Deterministic menu proxy setting |
 | `input` | Built-in text input row with optional preview / debounce support |
 | `color` | Color swatch proxy setting |
-| `execute` | Alias for a button row |
+| `button` | Button row |
 | `header` | Blizzard-style section header |
-| `description` | Alias for a subheader row |
+| `subheader` | Secondary text row |
 | `info` | Left-label / right-value informational row |
 | `canvas` | Embedded frame row for canvas content |
-| `collection` | First-class dynamic list/section widget |
+| `pageActions` | Right-aligned category-header action row |
+| `list` | First-class dynamic flat list widget |
+| `sectionList` | First-class dynamic grouped list widget |
 | `custom` | Proxy setting backed by a custom XML template |
 | `colorList` | Expands `defs` into multiple color swatches |
-| `toggleList` | Expands `defs` into multiple checkboxes |
+| `checkboxList` | Expands `defs` into multiple checkboxes |
 | `border` | Composite group for border enable / width / color |
 | `fontOverride` | Composite group for override toggle, font picker, and size slider |
 | `heightOverride` | Composite slider with nil/zero transforms |
@@ -145,10 +145,10 @@ spellId = {
 The library has three main implementation paths:
 
 - **Proxy controls** — `checkbox`, `slider`, `dropdown`, `color`, `input`, and `custom` all go through the same proxy-setting pipeline. That means path mode and handler mode work consistently across them.
-- **Layout rows** — `header`, `subheader`, `info`, `button`, `canvas`, and `collection` are initializer/layout helpers rather than persisted settings.
-- **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `toggleList` expand into multiple child controls.
+- **Layout rows** — `header`, `subheader`, `info`, `button`, `canvas`, and `pageActions` are initializer/layout helpers rather than persisted settings.
+- **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `checkboxList` expand into multiple child controls.
 
-`header` supports optional `actions = { ... }` for right-aligned page or section buttons, and `collection` covers the common "custom canvas page" cases without making authors drop into a second authoring API. Use `canvas` and `custom` as escape hatches, not the default path.
+Use `pageActions` for right-aligned page buttons. Use `list` and `sectionList` for dynamic editors, and keep `canvas` / `custom` as escape hatches for truly bespoke frames. Canvas rows stay on the existing lifecycle path, so page switches continue to reuse the same proven frame handling.
 
 `input` specifically is implemented as a built-in custom list row using `SettingsListElementTemplate`, with an `InputBoxTemplate` edit box anchored in the standard left-label / right-control layout. It does **not** need a separate XML template the way `custom` controls do.
 
@@ -184,8 +184,9 @@ The `.busted` config defines the `libsettingsbuilder` task pointing at this libr
 
 - Embed the library inside your addon's `Libs/` folder.
 - Load `LibStub` before `LibSettingsBuilder`.
-- Prefer one `RegisterFromTable(...)` DSL for both simple rows and complex editors.
-- `SB.RefreshCategory(...)` is the intended way to refresh dynamic info rows, dropdown options, and collections after profile mutations, async item loads, or other out-of-band changes.
+- Load `Libs\LibSettingsBuilder\embed.xml` rather than the individual library Lua files.
+- Prefer `RegisterPage(...)` for declarative pages and the imperative builders for fine-grained control.
+- `SB.RefreshCategory(...)` is the intended way to refresh dynamic info rows, dropdown options, and dynamic list rows after profile mutations, async item loads, or other out-of-band changes.
 - Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 
 ## License

@@ -10,6 +10,14 @@ describe("OptionUtil", function()
     local ns
     local optionsModule
 
+    local function getRow(rows, rowType, path)
+        for _, row in ipairs(rows) do
+            if row.type == rowType and (path == nil or row.path == path) then
+                return row
+            end
+        end
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ECM_DeepEquals",
@@ -56,6 +64,11 @@ describe("OptionUtil", function()
             },
             OptionsSections = {},
         }
+        ns.ColorUtil = {
+            Sparkle = function(text)
+                return text
+            end,
+        }
 
         TestHelpers.LoadLiveConstants(ns)
         -- Test-specific sentinel values for anchor modes
@@ -73,6 +86,29 @@ describe("OptionUtil", function()
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
         optionsModule = ns.Addon._modules.Options
+    end)
+
+    describe("About section RegisterSettings", function()
+        it("registers the root About page with ordered rows", function()
+            local registeredPage
+            ns.OptionsSections["About"].RegisterSettings({
+                RegisterPage = function(page)
+                    registeredPage = page
+                end,
+            })
+
+            assert.is_table(registeredPage)
+            assert.are.equal(ns.L["ADDON_NAME"], registeredPage.name)
+            assert.is_true(registeredPage.rootCategory)
+            assert.are.equal(6, #registeredPage.rows)
+            assert.are.equal("info", registeredPage.rows[1].type)
+            assert.are.equal("info", registeredPage.rows[2].type)
+            assert.are.equal("info", registeredPage.rows[3].type)
+            assert.are.equal("subheader", registeredPage.rows[4].type)
+            assert.are.equal(ns.L["LINKS"], registeredPage.rows[4].name)
+            assert.are.equal("button", registeredPage.rows[5].type)
+            assert.are.equal("button", registeredPage.rows[6].type)
+        end)
     end)
 
     describe("CreateModuleEnabledHandler", function()
@@ -184,115 +220,97 @@ describe("OptionUtil", function()
         end)
     end)
 
-    describe("CreateBarArgs", function()
+    describe("CreateBarRows", function()
         it("is exposed on ECM.OptionUtil", function()
-            assert.is_function(ns.OptionUtil.CreateBarArgs)
+            assert.is_function(ns.OptionUtil.CreateBarRows)
         end)
 
-        it("returns layout and appearance args with defaults", function()
+        it("returns layout and appearance rows with defaults", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.is_nil(args.layoutMovedInfo)
+            local layoutMovedButton = getRow(rows, "button")
+            local appearanceHeader = getRow(rows, "header")
 
-            assert.is_table(args.layoutMovedButton)
-            assert.are.equal("button", args.layoutMovedButton.type)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
-            assert.are.equal("Open", args.layoutMovedButton.buttonText)
-            assert.are.equal(10, args.layoutMovedButton.order)
+            assert.is_table(layoutMovedButton)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], layoutMovedButton.buttonText)
 
-            assert.is_table(args.appearanceHeader)
-            assert.are.equal("header", args.appearanceHeader.type)
-            assert.are.equal("Appearance", args.appearanceHeader.name)
-            assert.are.equal(20, args.appearanceHeader.order)
+            assert.is_table(appearanceHeader)
+            assert.are.equal("Appearance", appearanceHeader.name)
         end)
 
         it("includes showText and border by default", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
+            local showText = getRow(rows, "checkbox", "showText")
+            local border = getRow(rows, "border", "border")
 
-            assert.is_table(args.showText)
-            assert.are.equal("toggle", args.showText.type)
-            assert.are.equal("showText", args.showText.path)
-            assert.are.equal(21, args.showText.order)
+            assert.is_table(showText)
+            assert.are.equal("showText", showText.path)
 
-            assert.is_table(args.border)
-            assert.are.equal("border", args.border.type)
+            assert.is_table(border)
         end)
 
-        it("shifts height and font after showText when present", function()
+        it("orders showText before height and font when present", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.are.equal(21, args.showText.order)
-            assert.are.equal(22, args.heightOverride.order)
-            assert.are.equal(23, args.fontOverride.order)
-            assert.are.equal(24, args.border.order)
+            assert.are.equal("checkbox", rows[3].type)
+            assert.are.equal("heightOverride", rows[4].type)
+            assert.are.equal("fontOverride", rows[5].type)
+            assert.are.equal("border", rows[6].type)
         end)
 
         it("omits showText when showText=false", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { showText = false })
 
-            assert.is_nil(args.showText)
-            assert.are.equal(21, args.heightOverride.order)
-            assert.are.equal(22, args.fontOverride.order)
+            assert.is_nil(getRow(rows, "checkbox", "showText"))
+            assert.are.equal("heightOverride", rows[3].type)
+            assert.are.equal("fontOverride", rows[4].type)
         end)
 
         it("omits border when border=false", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { border = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { border = false })
 
-            assert.is_nil(args.border)
+            assert.is_nil(getRow(rows, "border", "border"))
         end)
 
         it("omits both showText and border", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false, border = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { showText = false, border = false })
 
-            assert.is_nil(args.showText)
-            assert.is_nil(args.border)
-            assert.are.equal(21, args.heightOverride.order)
-            assert.are.equal(22, args.fontOverride.order)
+            assert.is_nil(getRow(rows, "checkbox", "showText"))
+            assert.is_nil(getRow(rows, "border", "border"))
+            assert.are.equal("heightOverride", rows[3].type)
+            assert.are.equal("fontOverride", rows[4].type)
         end)
 
-        it("respects custom layoutOrder and appearanceOrder", function()
-            local disabled = function()
-                return false
-            end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
-
-            assert.are.equal(1, args.layoutMovedButton.order)
-            assert.are.equal(5, args.appearanceHeader.order)
-            assert.are.equal(6, args.showText.order)
-            assert.are.equal(7, args.heightOverride.order)
-            assert.are.equal(8, args.fontOverride.order)
-            assert.are.equal(9, args.border.order)
-        end)
-
-        it("passes isDisabled to all args", function()
+        it("passes isDisabled to all rows", function()
             local disabled = function()
                 return true
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.are.equal(disabled, args.appearanceHeader.disabled)
-            assert.are.equal(disabled, args.showText.disabled)
-            assert.are.equal(disabled, args.heightOverride.disabled)
-            assert.are.equal(disabled, args.fontOverride.disabled)
-            assert.are.equal(disabled, args.border.disabled)
+            assert.are.equal(disabled, rows[2].disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showText").disabled)
+            assert.are.equal(disabled, getRow(rows, "heightOverride").disabled)
+            assert.are.equal(disabled, getRow(rows, "fontOverride").disabled)
+            assert.are.equal(disabled, getRow(rows, "border", "border").disabled)
         end)
     end)
 

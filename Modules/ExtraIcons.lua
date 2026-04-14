@@ -112,10 +112,18 @@ end
 --- Returns the first known spell from an ID list.
 ---@param ids { spellId: number }[]|number[] Array of spell entries or raw IDs.
 ---@return ECM_IconData|nil iconData Icon data if found, nil otherwise.
+local function isKnownSpell(spellId)
+    if not spellId then
+        return false
+    end
+
+    return C_SpellBook.IsSpellKnown(spellId)
+end
+
 local function getSpellData(ids)
     for _, entry in ipairs(ids) do
         local spellId = type(entry) == "table" and entry.spellId or entry
-        if IsPlayerSpell(spellId) then
+        if isKnownSpell(spellId) then
             local texture = C_Spell.GetSpellTexture(spellId)
             if texture then
                 return {

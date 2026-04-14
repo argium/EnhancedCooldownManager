@@ -4,7 +4,7 @@
 
 - [README](../README.md) — overview and quick links
 - [Quick Start](QUICK_START.md) — common setup patterns
-- [API Reference](API_REFERENCE.md) — builder, controls, composites, canvas helpers
+- [API Reference](API_REFERENCE.md) — builder, controls, composites, page registration, canvas helpers
 - [Migration Guide](MIGRATION_GUIDE.md) — moving from AceConfig/AceGUI
 - [Troubleshooting](TROUBLESHOOTING.md) — common issues and fixes
 
@@ -21,14 +21,15 @@ Include the library in your addon's TOC or load-on-demand manifest.
 
 ```toc
 Libs\LibStub\LibStub.lua
-Libs\LibSettingsBuilder\LibSettingsBuilder.lua
+Libs\LibSettingsBuilder\embed.xml
 ```
 
 Recommended pattern for addon authors:
 
 1. Ship the library inside your addon's `Libs/` folder.
 2. Load `LibStub` before `LibSettingsBuilder`.
-3. Treat the library as embedded, not as a standalone dependency players must install separately.
+3. Load `Libs\LibSettingsBuilder\embed.xml` so the library's internal source files keep their required order.
+4. Treat the library as embedded, not as a standalone dependency players must install separately.
 
 ## Versioning notes
 
@@ -57,7 +58,7 @@ Those hooks are part of the library's behavior and should be considered when deb
 Most library features are available with no extra XML:
 
 - proxy controls like `checkbox`, `slider`, `dropdown`, `color`, and `input`,
-- layout rows like `header`, `subheader`, `info`, `button`, and `canvas`,
+- layout rows like `header`, `subheader`, `info`, `button`, `pageActions`, and `canvas`,
 - composite builders like `border`, `fontOverride`, and `heightOverride`.
 
 `input` is a built-in row type implemented entirely in Lua on top of `SettingsListElementTemplate` plus a runtime-created `InputBoxTemplate` edit box.
@@ -68,9 +69,9 @@ Only `SB.Custom(...)` requires you to supply your own template. In that case:
 2. load that XML from your TOC before registering categories, and
 3. pass the template name through `spec.template`.
 
-## Legacy canvas layout compatibility
+## Canvas layout compatibility
 
-Canvas layout spacing defaults are still available for older `CreateCanvasLayout(...)` pages, but new work should prefer `RegisterFromTable(...)` plus `collection` / dynamic rows.
+Canvas layout spacing defaults are still available for older `CreateCanvasLayout(...)` pages. New `canvas` rows stay on the current lifecycle path, so canvas content continues to reuse the existing frame handling without special-case rewrites.
 
 - per-library via `SB.SetCanvasLayoutDefaults(overrides)`
 - per-layout via `SB.ConfigureCanvasLayout(layout, overrides)`

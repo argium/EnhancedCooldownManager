@@ -235,6 +235,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
     local function buildSpellColorItems()
         local items = {}
+        local rows = getRows()
 
         items[#items + 1] = {
             label = L["DEFAULT_COLOR"],
@@ -245,9 +246,12 @@ local function createSpellColorCanvas(SB, subcatName)
                     return not locked
                 end,
                 onClick = function()
-                    if ns.Addon.BuffBars:IsEditLocked() then
+                    local locked = ns.Addon.BuffBars:IsEditLocked()
+
+                    if locked then
                         return
                     end
+
                     ns.OptionUtil.OpenColorPicker(ns.SpellColors.GetDefaultColor(), false, function(color)
                         ns.SpellColors.SetDefaultColor(color)
                         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
@@ -257,16 +261,19 @@ local function createSpellColorCanvas(SB, subcatName)
             },
         }
 
-        for _, row in ipairs(getRows()) do
+        for _, row in ipairs(rows) do
             items[#items + 1] = {
                 label = getSpellColorRowName(row.key),
                 icon = row.textureFileID,
                 color = {
                     value = ns.SpellColors.GetColorByKey(row.key) or ns.SpellColors.GetDefaultColor(),
                     onClick = function()
-                        if ns.Addon.BuffBars:IsEditLocked() then
+                        local locked = ns.Addon.BuffBars:IsEditLocked()
+
+                        if locked then
                             return
                         end
+
                         local current = ns.SpellColors.GetColorByKey(row.key) or ns.SpellColors.GetDefaultColor()
                         ns.OptionUtil.OpenColorPicker(current, false, function(color)
                             ns.SpellColors.SetColorByKey(row.key, color)
@@ -286,11 +293,12 @@ local function createSpellColorCanvas(SB, subcatName)
         return items
     end
 
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = subcatName,
-        args = {
-            spellColorsHeader = {
-                type = "header",
+        rows = {
+            {
+                id = "spellColorsPageActions",
+                type = "pageActions",
                 name = subcatName,
                 actions = {
                     {
@@ -321,18 +329,18 @@ local function createSpellColorCanvas(SB, subcatName)
                         end,
                     },
                 },
-                order = 1,
             },
-            spellColorsDescription = {
+            {
+                id = "spellColorsDescription",
                 type = "info",
                 name = "",
                 value = L["SPELL_COLORS_DESC"],
                 wide = true,
                 multiline = true,
                 height = 36,
-                order = 2,
             },
-            spellColorsWarning = {
+            {
+                id = "spellColorsWarning",
                 type = "info",
                 name = "",
                 value = getWarningText,
@@ -342,18 +350,18 @@ local function createSpellColorCanvas(SB, subcatName)
                 hidden = function()
                     return getWarningText() == ""
                 end,
-                order = 3,
             },
-            spellColorCollection = {
-                type = "collection",
-                preset = "swatch",
+            {
+                id = "spellColorCollection",
+                type = "list",
+                variant = "swatch",
                 height = 260,
                 rowHeight = C.SCROLL_ROW_HEIGHT_COMPACT,
                 items = buildSpellColorItems,
                 onDefault = resetAllSpellColors,
-                order = 4,
             },
-            secretNameDescription = {
+            {
+                id = "secretNameDescription",
                 type = "info",
                 name = "",
                 value = L["SPELL_COLORS_SECRET_NAMES_DESC"],
@@ -363,9 +371,9 @@ local function createSpellColorCanvas(SB, subcatName)
                 hidden = function()
                     return not getSecretNameFooterState(getRows()).show
                 end,
-                order = 5,
             },
-            secretNameReload = {
+            {
+                id = "secretNameReload",
                 type = "button",
                 name = " ",
                 buttonText = L["SPELL_COLORS_RELOAD_BUTTON"],
@@ -378,7 +386,6 @@ local function createSpellColorCanvas(SB, subcatName)
                 onClick = function()
                     ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
                 end,
-                order = 6,
             },
         },
     })
@@ -402,40 +409,50 @@ local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 
 function BuffBarsOptions.RegisterSettings(SB)
     local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
-    SB.RegisterFromTable({
+    local layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton
+    layoutMovedButton.id = "layoutMovedButton"
+
+    SB.RegisterPage({
         name = L["AURA_BARS"],
         path = "buffBars",
-        args = {
-            enabled = {
-                type = "toggle",
+        rows = {
+            {
+                id = "enabled",
+                type = "checkbox",
                 path = "enabled",
                 name = L["ENABLE_AURA_BARS"],
                 desc = L["ENABLE_AURA_BARS_DESC"],
-                order = 0,
                 onSet = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
             },
 
-            layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
+            layoutMovedButton,
 
             -- Appearance
-            appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = 20 },
-            showIcon = { type = "toggle", path = "showIcon", name = L["SHOW_ICON"], disabled = isDisabled, order = 21 },
-            showSpellName = {
-                type = "toggle",
+            { id = "appearanceHeader", type = "header", name = L["APPEARANCE"], disabled = isDisabled },
+            {
+                id = "showIcon",
+                type = "checkbox",
+                path = "showIcon",
+                name = L["SHOW_ICON"],
+                disabled = isDisabled,
+            },
+            {
+                id = "showSpellName",
+                type = "checkbox",
                 path = "showSpellName",
                 name = L["SHOW_SPELL_NAME"],
                 disabled = isDisabled,
-                order = 22,
             },
-            showDuration = {
-                type = "toggle",
+            {
+                id = "showDuration",
+                type = "checkbox",
                 path = "showDuration",
                 name = L["SHOW_REMAINING_DURATION"],
                 disabled = isDisabled,
-                order = 23,
             },
-            height = {
-                type = "range",
+            {
+                id = "height",
+                type = "slider",
                 path = "height",
                 name = L["HEIGHT_OVERRIDE"],
                 desc = L["HEIGHT_OVERRIDE_DESC"],
@@ -447,10 +464,10 @@ function BuffBarsOptions.RegisterSettings(SB)
                 setTransform = function(value)
                     return value > 0 and value or nil
                 end,
-                order = 24,
             },
-            verticalSpacing = {
-                type = "range",
+            {
+                id = "verticalSpacing",
+                type = "slider",
                 path = "verticalSpacing",
                 name = L["AURA_VERTICAL_SPACING"],
                 desc = L["AURA_VERTICAL_SPACING_DESC"],
@@ -459,9 +476,8 @@ function BuffBarsOptions.RegisterSettings(SB)
                 step = 1,
                 disabled = isDisabled,
                 getTransform = defaultZero,
-                order = 25,
             },
-            fontOverride = { type = "fontOverride", disabled = isDisabled, order = 26 },
+            { id = "fontOverride", type = "fontOverride", disabled = isDisabled },
         },
     })
 

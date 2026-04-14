@@ -137,6 +137,74 @@ describe("Options sections and root assembly", function()
         assert.is_not_nil(ns.SettingsBuilder.GetRootCategoryID())
     end)
 
+    it("general option pages register canonical rows through RegisterPage", function()
+        TestHelpers.SetupOptionsGlobals()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
+        lsmw.GetFontValues = function()
+            return {}
+        end
+        lsmw.GetStatusbarValues = function()
+            return {}
+        end
+
+        local ns = {
+            Addon = {
+                db = {
+                    profile = {},
+                    defaults = { profile = {} },
+                },
+                NewModule = function(_, name)
+                    return { moduleName = name }
+                end,
+            },
+            OptionsSections = {},
+            Runtime = {
+                ScheduleLayoutUpdate = function() end,
+            },
+        }
+
+        TestHelpers.LoadLiveConstants(ns)
+
+        TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
+        TestHelpers.LoadChunk("UI/Options.lua", "Options")(nil, ns)
+        TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
+
+        local capturedPages = {}
+        local captureSB = {
+            RegisterPage = function(page)
+                capturedPages[#capturedPages + 1] = page
+            end,
+        }
+
+        ns.OptionsSections.General.RegisterSettings(captureSB)
+        ns.OptionsSections["Advanced Options"].RegisterSettings(captureSB)
+
+        local generalPage = capturedPages[1]
+        assert.is_table(generalPage)
+        assert.are.equal(ns.L["GENERAL"], generalPage.name)
+        assert.are.equal("global", generalPage.path)
+        assert.are.equal(16, #generalPage.rows)
+        assert.are.equal("header", generalPage.rows[1].type)
+        assert.are.equal("checkbox", generalPage.rows[2].type)
+        assert.are.equal("checkbox", generalPage.rows[4].type)
+        assert.are.equal("fade", generalPage.rows[4].id)
+        assert.are.equal("slider", generalPage.rows[5].type)
+        assert.are.equal("fade", generalPage.rows[5].parent)
+        assert.are.equal("dropdown", generalPage.rows[13].type)
+        assert.are.equal("slider", generalPage.rows[16].type)
+
+        local advancedPage = capturedPages[2]
+        assert.is_table(advancedPage)
+        assert.are.equal(ns.L["ADVANCED_OPTIONS"], advancedPage.name)
+        assert.are.equal("global", advancedPage.path)
+        assert.are.equal(7, #advancedPage.rows)
+        assert.are.equal("header", advancedPage.rows[1].type)
+        assert.are.equal("checkbox", advancedPage.rows[2].type)
+        assert.are.equal("checkbox", advancedPage.rows[3].type)
+        assert.are.equal("button", advancedPage.rows[5].type)
+        assert.are.equal("slider", advancedPage.rows[7].type)
+    end)
+
     it("resource/rune sections register via SB.RegisterSection and have class gating", function()
         TestHelpers.SetupOptionsGlobals()
         local lsmw = TestHelpers.SetupLibSettingsBuilder()

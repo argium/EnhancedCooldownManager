@@ -10,11 +10,11 @@
 
 ## Choose a setup style
 
-- Use **table-driven registration** if you want the shortest path to a normal settings page.
+- Use **page registration** if you want the shortest path to a normal settings page.
 - Use the **imperative API** if you want precise control over layout and call order.
 - Use **handler mode** if your settings are not stored in a dot-path table.
 - Use `input` rows when you need text or numeric entry without building a custom template.
-- Use `collection` rows when you need ordered lists, grouped editors, or add/remove workflows without dropping into a bespoke frame API.
+- Use `list` or `sectionList` rows when you need ordered lists, grouped editors, or add/remove workflows without dropping into a bespoke frame API.
 
 ## Table-driven setup
 
@@ -38,34 +38,31 @@ local SB = LSB:New({
 
 SB.CreateRootCategory("My Addon")
 
-SB.RegisterFromTable({
+SB.RegisterPage({
     name = "General",
     path = "general",
-    args = {
-        enabled = {
-            type = "toggle",
+    rows = {
+        {
+            type = "checkbox",
             path = "enabled",
             name = "Enable",
             desc = "Enable or disable the addon.",
-            order = 1,
         },
-        opacity = {
-            type = "range",
+        {
+            type = "slider",
             path = "opacity",
             name = "Opacity",
             min = 0,
             max = 100,
             step = 1,
-            order = 2,
         },
-        spellId = {
+        {
             type = "input",
             path = "spellIdText",
             name = "Spell ID",
             numeric = true,
             maxLetters = 10,
             debounce = 1,
-            order = 3,
             resolveText = function(value)
                 local id = tonumber(value)
                 return id and C_Spell.GetSpellName(id) or nil
@@ -111,7 +108,7 @@ SB.Input({
 SB.RegisterCategories()
 ```
 
-`RegisterFromTable(...)` can mix persisted controls and layout-only rows freely, so it is normal to combine `toggle`, `range`, `input`, `header`, `description`, `info`, `button`, `collection`, and `canvas` entries on one page.
+`RegisterPage(...)` can mix persisted controls and layout-only rows freely, so it is normal to combine `checkbox`, `slider`, `input`, `header`, `subheader`, `info`, `button`, `pageActions`, `list`, `sectionList`, and `canvas` entries on one page.
 
 ## Handler mode
 
@@ -161,4 +158,4 @@ SB.RegisterCategories()
 - Use composites for repeated patterns like borders, font overrides, and positioning.
 - Prefer table-driven registration for large standard settings pages.
 - Use `SB.RefreshCategory(...)` for async or transient state that needs the visible page to redraw.
-- Reach for `SB.Custom(...)` or `SB.EmbedCanvas(...)` only when built-ins like `input` and `collection` stop fitting.
+- Reach for `SB.Custom(...)` or `SB.EmbedCanvas(...)` only when built-ins like `input`, `list`, and `sectionList` stop fitting.

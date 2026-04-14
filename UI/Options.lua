@@ -65,50 +65,44 @@ function About.RegisterSettings(SB)
     local version = (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
     local authorText = ns.ColorUtil.Sparkle("Argi")
 
-    SB.RegisterFromTable({
+    SB.RegisterPage({
         name = L["ADDON_NAME"],
         rootCategory = true,
-        args = {
-            author = {
+        rows = {
+            {
                 type = "info",
                 name = L["AUTHOR"],
                 value = authorText,
-                order = 1,
             },
-            contributors = {
+            {
                 type = "info",
                 name = L["CONTRIBUTORS"],
                 value = "kayti-wow",
-                order = 2,
             },
-            version = {
+            {
                 type = "info",
                 name = L["VERSION"],
                 value = version,
-                order = 3,
             },
-            linksHeader = {
-                type = "description",
+            {
+                type = "subheader",
                 name = L["LINKS"],
-                order = 9,
             },
-            curseforge = {
+            {
                 type = "button",
                 name = L["CURSEFORGE"],
                 buttonText = L["CURSEFORGE"],
                 onClick = function()
                     ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
                 end,
-                order = 10,
             },
-            github = {
+            {
                 type = "button",
                 name = L["GITHUB"],
                 buttonText = L["GITHUB"],
                 onClick = function()
                     ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
                 end,
-                order = 11,
             },
         },
     })

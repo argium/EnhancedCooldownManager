@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("PowerBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -26,10 +26,10 @@ describe("PowerBarOptions getters/setters/defaults", function()
 
         ns.PowerBarTickMarksOptions = { RegisterSettings = function() end }
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
+        local originalRegisterPage = SB.RegisterPage
+        SB.RegisterPage = function(page)
+            capturedPage = page
+            return originalRegisterPage(page)
         end
 
         settings = TestHelpers.CollectSettings(function()
@@ -76,10 +76,10 @@ describe("PowerBarOptions getters/setters/defaults", function()
         it("removes anchorMode from the module page", function()
             assert.is_nil(settings["ECM_powerBar_anchorMode"])
         end)
-        it("adds a breadcrumb to the Layout page", function()
-            assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
-            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedTable.args.layoutMovedButton.buttonText)
+        it("adds an inline layout button row to the page", function()
+            assert.are.equal("button", capturedPage.rows[2].type)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[2].name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[2].buttonText)
         end)
     end)
 

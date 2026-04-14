@@ -92,7 +92,7 @@ If debugging slider behavior:
 
 ## Legacy canvas pages look slightly off after a WoW patch
 
-Canvas layout spacing is configurable for older `CreateCanvasLayout(...)` pages. New pages should prefer the standard settings DSL with `collection` rows instead of tuning canvas metrics by default.
+Canvas layout spacing is configurable for older `CreateCanvasLayout(...)` pages. New pages should prefer the standard settings DSL with `list` or `sectionList` rows instead of tuning canvas metrics by default.
 
 Use:
 

@@ -44,18 +44,22 @@ describe("ProfileOptions getters/setters/defaults", function()
         initializers = SB._layouts[profileCategory]._initializers
     end)
 
+    local function getSetting(variable)
+        return assert(settings["ECM_" .. variable])
+    end
+
     describe("switch profile", function()
         it("getter returns current profile", function()
-            assert.are.equal("Default", settings["ECM_ProfileSwitch"]:GetValue())
+            assert.are.equal("Default", getSetting("ProfileSwitch"):GetValue())
         end)
         it("setter calls db:SetProfile", function()
             local called
             ns.Addon.db.SetProfile = function(_, value) called = value end
-            settings["ECM_ProfileSwitch"]:SetValue("Other")
+            getSetting("ProfileSwitch"):SetValue("Other")
             assert.are.equal("Other", called)
         end)
         it("setter refreshes the category", function()
-            settings["ECM_ProfileSwitch"]:SetValue("Other")
+            getSetting("ProfileSwitch"):SetValue("Other")
             assert.are.same({ profileCategory }, refreshCalls)
         end)
         it("uses the localized New Profile row label", function()
@@ -79,41 +83,41 @@ describe("ProfileOptions getters/setters/defaults", function()
 
     describe("copy profile picker", function()
         it("setting exists", function()
-            assert.is_not_nil(settings["ECM_ProfileCopy"])
+            assert.is_not_nil(getSetting("ProfileCopy"))
         end)
         it("defaults to the first available profile when Default is unavailable", function()
-            assert.are.equal("Other", settings["ECM_ProfileCopy"]:GetValue())
+            assert.are.equal("Other", getSetting("ProfileCopy"):GetValue())
         end)
         it("keeps the picker row label", function()
-            assert.are.equal(ns.L["COPY_FROM"], settings["ECM_ProfileCopy"]._name)
+            assert.are.equal(ns.L["COPY_FROM"], getSetting("ProfileCopy")._name)
         end)
         it("options do not include a blank entry", function()
-            local options = settings["ECM_ProfileCopy"]._optionsGen()
+            local options = getSetting("ProfileCopy")._optionsGen()
             assert.same({ value = "Other", label = "Other" }, options[1])
         end)
         it("setter updates transient selection", function()
-            settings["ECM_ProfileCopy"]:SetValue("Other")
-            assert.are.equal("Other", settings["ECM_ProfileCopy"]:GetValue())
+            getSetting("ProfileCopy"):SetValue("Other")
+            assert.are.equal("Other", getSetting("ProfileCopy"):GetValue())
         end)
     end)
 
     describe("delete profile picker", function()
         it("setting exists", function()
-            assert.is_not_nil(settings["ECM_ProfileDelete"])
+            assert.is_not_nil(getSetting("ProfileDelete"))
         end)
         it("defaults to the first available profile when Default is unavailable", function()
-            assert.are.equal("Other", settings["ECM_ProfileDelete"]:GetValue())
+            assert.are.equal("Other", getSetting("ProfileDelete"):GetValue())
         end)
         it("keeps the picker row label", function()
-            assert.are.equal(ns.L["DELETE_PROFILE"], settings["ECM_ProfileDelete"]._name)
+            assert.are.equal(ns.L["DELETE_PROFILE"], getSetting("ProfileDelete")._name)
         end)
         it("options do not include a blank entry", function()
-            local options = settings["ECM_ProfileDelete"]._optionsGen()
+            local options = getSetting("ProfileDelete")._optionsGen()
             assert.same({ value = "Other", label = "Other" }, options[1])
         end)
         it("setter updates transient selection", function()
-            settings["ECM_ProfileDelete"]:SetValue("Other")
-            assert.are.equal("Other", settings["ECM_ProfileDelete"]:GetValue())
+            getSetting("ProfileDelete"):SetValue("Other")
+            assert.are.equal("Other", getSetting("ProfileDelete"):GetValue())
         end)
     end)
 
@@ -131,7 +135,7 @@ describe("ProfileOptions getters/setters/defaults", function()
         end)
 
         it("Copy shows a confirmation dialog before copying", function()
-            settings["ECM_ProfileCopy"]:SetValue("Other")
+            getSetting("ProfileCopy"):SetValue("Other")
             local getShown = TestHelpers.InstallPopupAutoAccept()
             local copied
             ns.Addon.db.CopyProfile = function(_, p) copied = p end
@@ -150,7 +154,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             ns.Addon.db.GetProfiles = function()
                 return { current }
             end
-            settings["ECM_ProfileCopy"]:SetValue("")
+            getSetting("ProfileCopy"):SetValue("")
 
             TestHelpers.FindButtonInitializer(initializers, ns.L["COPY"])._onClick()
 
@@ -158,7 +162,7 @@ describe("ProfileOptions getters/setters/defaults", function()
         end)
 
         it("Delete shows a confirmation dialog before deleting", function()
-            settings["ECM_ProfileDelete"]:SetValue("Other")
+            getSetting("ProfileDelete"):SetValue("Other")
             local getShown = TestHelpers.InstallPopupAutoAccept()
             local deleted
             ns.Addon.db.DeleteProfile = function(_, p) deleted = p end
@@ -177,7 +181,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             ns.Addon.db.GetProfiles = function()
                 return { current }
             end
-            settings["ECM_ProfileDelete"]:SetValue("")
+            getSetting("ProfileDelete"):SetValue("")
 
             TestHelpers.FindButtonInitializer(initializers, ns.L["DELETE"])._onClick()
 

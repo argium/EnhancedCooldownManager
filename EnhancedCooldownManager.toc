@@ -20,7 +20,7 @@ Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml
 Libs\LibEditMode\embed.xml
 Libs\LibSharedMedia-3.0\lib.xml
-Libs\LibSettingsBuilder\LibSettingsBuilder.lua
+Libs\LibSettingsBuilder\embed.xml
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
 Constants.lua
