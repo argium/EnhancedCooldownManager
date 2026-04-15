@@ -15,7 +15,7 @@ local getSettingVariable = internal.getSettingVariable
 local applyInputRowEnabledState = internal.applyInputRowEnabledState
 local applyInputRowFrame = internal.applyInputRowFrame
 local cancelInputPreviewTimer = internal.cancelInputPreviewTimer
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = internal.BuilderMixin
 
 function BuilderMixin:Checkbox(spec)
     self:_validateSpecFields("checkbox", spec)
@@ -165,23 +165,8 @@ function BuilderMixin:Input(spec)
         width = spec.width,
     }
 
-    local watchVariables = {}
-    if spec.watch then
-        for _, identifier in ipairs(spec.watch) do
-            watchVariables[#watchVariables + 1] = self:_makeVarNameFromIdentifier(identifier)
-        end
-    end
-    if spec.watchVariables then
-        for _, variable in ipairs(spec.watchVariables) do
-            watchVariables[#watchVariables + 1] = variable
-        end
-    end
-    if #watchVariables > 0 then
-        data.watchVariables = watchVariables
-    end
-
     local extent = spec.resolveText and 46 or 26
-    local initializer = createCustomListRowInitializer(lib.INPUTROW_TEMPLATE, data, extent, applyInputRowFrame)
+    local initializer = createCustomListRowInitializer(internal.INPUTROW_TEMPLATE, data, extent, applyInputRowFrame)
     local originalInitFrame = initializer.InitFrame
     local originalResetter = initializer.Resetter
 

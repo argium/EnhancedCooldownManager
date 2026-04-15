@@ -45,9 +45,14 @@ describe("About section", function()
         end
     end
 
+    local function getInitializerData(init)
+        return init and (init._lsbData or (init.GetData and init:GetData()) or init.data) or nil
+    end
+
     local function findInfoRow(layout, name)
         return findInitializer(layout, function(init)
-            return init._template == SB.INFOROW_TEMPLATE and init.data.name == name
+            local data = getInitializerData(init)
+            return data and data._lsbKind == "infoRow" and data.name == name
         end)
     end
 
@@ -71,24 +76,28 @@ describe("About section", function()
         it("creates Author info row with sparkle text", function()
             local init = findInfoRow(rootLayout, "Author")
             assert.is_not_nil(init, "expected Author info row")
-            assert.are.equal("<<sparkle:Argi>>", type(init.data.value) == "function" and init.data.value() or init.data.value)
+            local data = getInitializerData(init)
+            assert.are.equal("<<sparkle:Argi>>", type(data.value) == "function" and data.value() or data.value)
         end)
 
         it("creates Contributors info row", function()
             local init = findInfoRow(rootLayout, "Contributors")
             assert.is_not_nil(init, "expected Contributors info row")
-            assert.are.equal("kayti-wow", type(init.data.value) == "function" and init.data.value() or init.data.value)
+            local data = getInitializerData(init)
+            assert.are.equal("kayti-wow", type(data.value) == "function" and data.value() or data.value)
         end)
 
         it("creates Version info row with leading v stripped", function()
             local init = findInfoRow(rootLayout, "Version")
             assert.is_not_nil(init, "expected Version info row")
-            assert.are.equal("1.2.3-test", type(init.data.value) == "function" and init.data.value() or init.data.value)
+            local data = getInitializerData(init)
+            assert.are.equal("1.2.3-test", type(data.value) == "function" and data.value() or data.value)
         end)
 
         it("includes Links subheader", function()
             local init = findInitializer(rootLayout, function(i)
-                return i._template == SB.SUBHEADER_TEMPLATE and i.data.name == "Links"
+                local data = getInitializerData(i)
+                return data and data._lsbKind == "subheader" and data.name == "Links"
             end)
             assert.is_not_nil(init, "expected Links subheader")
         end)
@@ -149,7 +158,8 @@ describe("About section", function()
 
             local init = findInfoRow(freshRootLayout, "Version")
             assert.is_not_nil(init, "expected Version info row")
-            assert.are.equal("Unknown", type(init.data.value) == "function" and init.data.value() or init.data.value)
+            local data = getInitializerData(init)
+            assert.are.equal("Unknown", type(data.value) == "function" and data.value() or data.value)
         end)
     end)
 end)

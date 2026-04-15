@@ -132,7 +132,7 @@ local function ensureSwatchCollectionRow(row)
     row._label:SetJustifyH("LEFT")
     row._label:SetWordWrap(false)
 
-    row._swatch = lib.CreateColorSwatch(row)
+    row._swatch = internal.createColorSwatch(row)
     row._swatch:SetPoint("LEFT", row, "CENTER", DEFAULT_SWATCH_CENTER_X, 0)
 end
 
@@ -189,7 +189,7 @@ local function ensureEditorCollectionRow(row)
     row._label:SetJustifyH("LEFT")
 
     row._fieldWidgets = {}
-    row._swatch = lib.CreateColorSwatch(row)
+    row._swatch = internal.createColorSwatch(row)
     row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row._removeButton:SetSize(70, 22)
 end

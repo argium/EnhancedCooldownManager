@@ -19,7 +19,7 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
 ## v2 status
 
-Phase 1 of the v2 rearchitecture is now frozen.
+Phases 1 and 2 of the v2 rearchitecture are now in place.
 
 That means the target public surface is defined even though the runtime still carries the compatibility APIs used by the current addon code:
 
@@ -28,23 +28,23 @@ That means the target public surface is defined even though the runtime still ca
 - target lookups: `lsb:GetSection(sectionKey)`, `lsb:GetRootPage()`, `lsb:GetPage(sectionKey, pageKey)`, `lsb:HasCategory(category)`
 - target page handle: `page:GetId()`, `page:Refresh()`
 - target schema root: `config.page` plus `config.sections`
+- raw row tables are the canonical schema at registration boundaries
+- builder-level row helper constructors are no longer public on `lsb` instances
 - deprecated compatibility namespace: `LSBDeprecated`
-
-Until later migration phases land, existing `LSB:New(...)`, `SB.GetRoot(...)`, `root:Register(...)`, and helper-style APIs remain available for compatibility.
 
 ## At a glance
 
 | Need | LibSettingsBuilder |
 |---|---|
-| Standard settings pages | `SB.GetRoot(name)` → `root:Register({ page = ..., sections = { ... } })` |
+| Standard settings pages | `LSB.New({ name = ..., page = ..., sections = ... })` |
 | Root-owned landing page | `page = { key = ..., rows = ... }` inside the root spec |
-| Dynamic refresh | `onRegistered(page)` + `page:Refresh()` |
-| Existing AceDB profiles | `PathAdapter(...)` |
+| Dynamic refresh | lookup the registered page with `lsb:GetRootPage()` / `lsb:GetPage(...)`, then call `page:Refresh()` |
+| Existing AceDB profiles | `store = db.profile`, `defaults = defaults.profile` |
 | Custom storage | handler mode with `get` / `set` / `key` |
-| Text entry / numeric ID fields | `SB.Input(...)` or `type = "input"` |
+| Text entry / numeric ID fields | `type = "input"` |
 | Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"` |
 | Reusable settings groups | border, font override, positioning composites |
-| XML-backed bespoke widgets | `SB.Custom(...)` |
+| XML-backed bespoke widgets | `type = "custom"` |
 | Force visible rows to refresh | `page:Refresh()` |
 
 ## Quick start
@@ -52,24 +52,13 @@ Until later migration phases land, existing `LSB:New(...)`, `SB.GetRoot(...)`, `
 ```lua
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
-local SB = LSB:New({
-    pathAdapter = LSB.PathAdapter({
-        getStore = function()
-            return MyAddonDB.profile
-        end,
-        getDefaults = function()
-            return MyAddonDefaults.profile
-        end,
-    }),
-    varPrefix = "MYADDON",
-    onChanged = function()
+local lsb = LSB.New({
+    name = "My Addon",
+    store = MyAddonDB.profile,
+    defaults = MyAddonDefaults.profile,
+    onChanged = function(ctx)
         MyAddon:Refresh()
     end,
-})
-
-local root = SB.GetRoot("My Addon")
-
-root:Register({
     page = {
         key = "about",
         rows = {
@@ -85,19 +74,24 @@ root:Register({
             key = "general",
             name = "General",
             path = "general",
-            rows = {
+            pages = {
                 {
-                    type = "checkbox",
-                    path = "enabled",
-                    name = "Enable",
-                },
-                {
-                    type = "slider",
-                    path = "opacity",
-                    name = "Opacity",
-                    min = 0,
-                    max = 100,
-                    step = 1,
+                    key = "main",
+                    rows = {
+                        {
+                            type = "checkbox",
+                            path = "enabled",
+                            name = "Enable",
+                        },
+                        {
+                            type = "slider",
+                            path = "opacity",
+                            name = "Opacity",
+                            min = 0,
+                            max = 100,
+                            step = 1,
+                        },
+                    },
                 },
             },
         },
@@ -142,8 +136,6 @@ Supported `input` spec fields include the standard binding/modifier fields plus:
 - `width` — overrides the edit box width (default `140`).
 - `debounce` — delays preview refresh by N seconds.
 - `resolveText(value, setting, frame)` — returns the preview text shown under the edit box.
-- `watch = { ... }` — names/paths of sibling settings that should force the preview to refresh.
-- `watchVariables = { ... }` — direct proxy-setting variable names to watch.
 - `onTextChanged(text, setting, frame)` — optional hook fired after the new text is written.
 
 Example:
@@ -177,7 +169,7 @@ The library has three main implementation paths:
 - **Layout rows** — `header`, `subheader`, `info`, `button`, `canvas`, and `pageActions` are initializer/layout helpers rather than persisted settings.
 - **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `checkboxList` expand into multiple child controls.
 
-The recommended author-facing registration model is declarative: get the singleton root once, export plain page/section spec tables, and call `root:Register(...)` with the assembled tree. Deprecated non-declarative page-construction APIs have been removed.
+The recommended author-facing registration model is declarative: export plain page/section spec tables and pass the assembled tree to `LSB.New({ ... })`. Deprecated non-declarative page-construction APIs have been removed.
 
 Use `pageActions` for right-aligned page buttons. Use `list` and `sectionList` for dynamic editors, and keep `canvas` / `custom` as escape hatches for truly bespoke frames. Canvas rows stay on the existing lifecycle path, so page switches continue to reuse the same proven frame handling.
 
@@ -216,7 +208,7 @@ The `.busted` config defines the `libsettingsbuilder` task pointing at this libr
 - Embed the library inside your addon's `Libs/` folder.
 - Load `LibStub` before `LibSettingsBuilder`.
 - Load `Libs\LibSettingsBuilder\embed.xml` rather than the individual library Lua files.
-- Prefer a single `root:Register({ page = ..., sections = { ... } })` call and keep page handles only for later `page:Refresh()` calls.
+- Prefer a single `LSB.New({ page = ..., sections = { ... } })` call and keep page handles only for later `page:Refresh()` calls.
 - `page:Refresh()` is the intended way to refresh dynamic info rows, dropdown options, and dynamic list rows after profile mutations, async item loads, or other out-of-band changes.
 - Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 

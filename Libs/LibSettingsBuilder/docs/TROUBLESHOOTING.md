@@ -10,17 +10,17 @@
 
 ## Controls do not save values
 
-Check the `PathAdapter` first.
+Check the path binding config first.
 
-- `getStore()` must return the live writable table.
-- `getDefaults()` should return the matching defaults table.
+- `store` must point at the live writable table.
+- `defaults` should point at the matching defaults table.
 - In handler mode, verify both `get` and `set` are present.
 
 ## Path mode errors immediately
 
 Common causes:
 
-- you created the builder without `pathAdapter`,
+- you created the builder without `store` / `defaults`,
 - a spec mixes `path` with `get` / `set`,
 - handler mode is missing `key`.
 
@@ -28,7 +28,8 @@ Common causes:
 
 Usually one of these:
 
-- you never called `SB.GetRoot("My Addon"):Register({ ... })`,
+- you created `LSB.New({ name = "My Addon", ... })` without a `page` or `sections` tree,
+- you created `LSB.New({ ... })` without `page` or `sections`,
 - your registered root page or section page ended up with no visible rows,
 - a `hidden` predicate is always returning `true`,
 - a `custom` template was never loaded from XML.
@@ -39,7 +40,6 @@ Check modifier predicates:
 
 - `disabled = function() ... end`
 - `hidden = function() ... end`
-- `parent` + `parentCheck`
 
 Remember these are reactive and will be re-evaluated after setting changes.
 
@@ -49,9 +49,6 @@ Check these pieces:
 
 - `resolveText(...)` must return a string or `nil`,
 - `debounce` delays preview updates intentionally,
-- `watch = { ... }` uses sibling spec identifiers / paths, not display labels,
-- `watchVariables` expects already-resolved proxy-setting variable names,
-- watched settings must come from the same builder instance so callback handles can observe them.
 
 If you just need raw text entry with no secondary preview, omit `resolveText` entirely.
 
@@ -97,14 +94,14 @@ Canvas layout spacing is configurable for older `CreateCanvasLayout(...)` pages.
 Use:
 
 ```lua
-SB.SetCanvasLayoutDefaults({ elementHeight = 28 })
+LSBDeprecated.SetCanvasLayoutDefaults({ elementHeight = 28 })
 ```
 
 or per layout:
 
 ```lua
-local layout = SB.CreateCanvasLayout("My Page")
-SB.ConfigureCanvasLayout(layout, { labelX = 40 })
+local layout = LSBDeprecated.CreateCanvasLayout("My Page")
+LSBDeprecated.ConfigureCanvasLayout(layout, { labelX = 40 })
 ```
 
 If Blizzard adjusts Settings panel spacing in a major patch, this is the intended escape hatch.

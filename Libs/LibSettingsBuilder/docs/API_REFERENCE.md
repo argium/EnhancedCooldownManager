@@ -10,7 +10,7 @@
 
 ## v2 Freeze
 
-Phase 1 freezes the intended v2 public surface, but does not yet remove the compatibility APIs that the current addon still uses.
+Phases 1 and 2 freeze the intended v2 public surface and make raw declarative rows the canonical registration schema.
 
 Target v2 surface:
 
@@ -21,9 +21,10 @@ Target v2 surface:
 - `lsb:HasCategory(category)`
 - `page:GetId()`
 - `page:Refresh()`
+- raw row tables at registration boundaries
 - deprecated compatibility namespace: `LSBDeprecated`
 
-Current compatibility APIs documented below remain live until the later migration phases replace them.
+Builder-level row helper constructors are no longer part of the public `lsb` instance surface. Use raw row tables through `LSB.New({ ... })`.
 
 ### `LSBDeprecated`
 
@@ -41,65 +42,30 @@ Currently exposed there:
 
 ## Factory
 
-### `LSB:New(config)`
+### `LSB.New(config)`
 
 Required fields:
 
-- `varPrefix`
-- `onChanged(spec, value)`
+- `name`
+- `onChanged(ctx, value)`
 
 Optional fields:
 
-- `pathAdapter`
-- `compositeDefaults`
+- `store`
+- `defaults`
+- `page`
+- `sections`
 
-Returns a builder instance referred to as `SB` in the examples below.
-
-## Path adapters
-
-### `LSB.PathAdapter(config)`
-
-Required:
-
-- `getStore()`
-- `getDefaults()`
-
-Optional:
-
-- `getNestedValue(tbl, path)`
-- `setNestedValue(tbl, path, value)`
-
-Methods:
-
-- `adapter:resolve(path)` → `{ get, set, default }`
-- `adapter:read(path)` → current value
-
-The built-in path helpers support numeric segments like `colors.0`.
+Returns an `lsb` runtime instance bound to one category tree.
 
 ## Registration tree
 
-### `SB.GetRoot(name)`
-
-Returns the singleton root handle, creating and registering the addon root category on the first call.
-
-Required on first call:
-
-- `name`
-
-Notes:
-
-- later calls return the same root handle,
-- passing a different name after creation raises an error,
-- new consumer code should call this once and reuse the returned handle.
-
-### `root:Register(spec)`
-
-Registers a declarative tree rooted at the singleton root handle.
+`LSB.New(config)` accepts and registers the full declarative tree.
 
 Supported fields:
 
-- `spec.page` — optional root-owned landing page definition
-- `spec.sections` — optional array of section definitions
+- `config.page` — optional root-owned landing page definition
+- `config.sections` — optional array of section definitions
 
 Root page definition fields:
 
@@ -108,7 +74,6 @@ Root page definition fields:
 - `name` (optional; defaults to the root name)
 - `onShow`
 - `onHide`
-- `onRegistered(page)`
 - `order`
 
 Section definition fields:
@@ -116,11 +81,8 @@ Section definition fields:
 - `key`
 - `name`
 - `path` (defaults to `key`)
-- `display = "auto"` or `"nested"`
 - `order`
-- either `rows` for the single-page shorthand, or `pages` for multi-page sections
-- `pageKey`, `pageName`, `pageOrder` for the single-page shorthand
-- `onShow`, `onHide`, `onRegistered(page)`, `disabled`, `hidden` for the single-page shorthand page
+- `pages`
 
 Page definition fields inside `pages`:
 
@@ -130,7 +92,6 @@ Page definition fields inside `pages`:
 - `rows`
 - `onShow`
 - `onHide`
-- `onRegistered(page)`
 - `disabled`
 - `hidden`
 - `order`
@@ -138,18 +99,17 @@ Page definition fields inside `pages`:
 Notes:
 
 - single-page sections flatten to a single leaf by default,
-- multi-page sections create a visible section node automatically,
-- `onRegistered(page)` is the intended hook for storing a registered page handle when you need later `page:Refresh()` calls.
+- multi-page sections create a visible section node automatically.
 
 Declarative root registration is the only supported page-construction API.
 
 ### Lookup and page operations
 
-- `root:GetSection(key)`
-- `root:GetPage(key)`
-- `root:HasCategory(category)`
-- `section:GetPage(key)`
-- `page:GetID()`
+- `lsb:GetSection(key)`
+- `lsb:GetRootPage()`
+- `lsb:GetPage(sectionKey, pageKey)`
+- `lsb:HasCategory(category)`
+- `page:GetId()`
 - `page:Refresh()`
 
 ## Controls
@@ -166,18 +126,16 @@ Common spec fields:
 - `default`
 - `disabled`
 - `hidden`
-- `parent`
-- `parentCheck`
 - `getTransform`
 - `setTransform`
 - `onSet`
 - `layout`
 
-### `SB.Checkbox(spec)`
+### `checkbox` row
 
 Creates a boolean checkbox.
 
-### `SB.Slider(spec)`
+### `slider` row
 
 Additional fields:
 
@@ -201,7 +159,7 @@ Dropdown values are emitted in deterministic order to keep menus stable between 
 
 Reads and writes `{ r, g, b, a }` tables through a hex proxy value.
 
-### `SB.Input(spec)`
+### `input` row
 
 Creates a text input row using the standard settings-row layout.
 
@@ -212,19 +170,15 @@ Additional fields:
 - `width`
 - `debounce`
 - `resolveText(value, setting, frame)`
-- `watch`
-- `watchVariables`
 - `onTextChanged(text, setting, frame)`
 
 Notes:
 
 - the edit box writes through the same proxy-setting pipeline as the other built-in controls,
 - `resolveText` enables an optional preview line below the edit box,
-- `debounce` delays preview recomputation through `C_Timer.NewTimer`,
-- `watch` accepts sibling spec identifiers and resolves them to this builder's proxy-setting variables,
-- `watchVariables` accepts already-resolved proxy-setting variable names.
+- `debounce` delays preview recomputation through `C_Timer.NewTimer`.
 
-### `SB.Custom(spec)`
+### `custom` row
 
 Additional fields:
 
@@ -276,14 +230,14 @@ Supported list variants:
 - `SB.FontOverrideGroup(sectionPath[, spec])`
 - `SB.BorderGroup(borderPath[, spec])`
 - `SB.ColorPickerList(basePath, defs[, spec])`
-- `SB.CheckboxList(basePath, defs[, spec])`
+- `checkboxList`
 
 ## Utility helpers
 
 - `SB.Header(text[, category])`
 - `SB.Subheader(spec)`
 - `SB.InfoRow(spec)`
-- `SB.EmbedCanvas(canvas, height[, spec])`
+- `canvas`
 - `SB.Button(spec)`
 - `SB.PageActions(spec)`
 
@@ -317,7 +271,7 @@ Supported composite types:
 - `colorList`
 - `checkboxList`
 
-Declarative pages are normally supplied through `root:Register({ page = ..., sections = { ... } })`, either as a root page definition or through section `rows` / `pages` definitions.
+Declarative pages are normally supplied through `LSB.New({ page = ..., sections = { ... } })`, either as a root page definition or through section `rows` / `pages` definitions.
 
 ## Implementation model
 
@@ -328,9 +282,9 @@ The library has three main families of row builders:
 - **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
 
 `input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
-`canvas` rows stay on the current lifecycle path. Keep using `SB.EmbedCanvas(...)` for bespoke frames when a built-in row is not enough.
+`canvas` rows stay on the current lifecycle path. Keep using `type = "canvas"` rows for bespoke frames when a built-in row is not enough.
 
-#### `SB.SetCanvasLayoutDefaults(overrides)`
+#### `LSBDeprecated.SetCanvasLayoutDefaults(overrides)`
 
 Merges overrides into the shared defaults table.
 

@@ -24,7 +24,6 @@ local VIEWER_SHORT_LABELS = {
 }
 
 local ACTION_BUTTON_TEXTURE_BASE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\"
-local SPELL_API = type(C_Spell) == "table" and C_Spell or nil
 
 local function makeTexturePair(name)
     return { normal = ACTION_BUTTON_TEXTURE_BASE .. name .. "_normal", pushed = ACTION_BUTTON_TEXTURE_BASE .. name .. "_down" }
@@ -95,12 +94,18 @@ local function getViewerShortLabel(viewerKey)
     return VIEWER_SHORT_LABELS[viewerKey]
 end
 
+local function getSpellAPI()
+    return type(C_Spell) == "table" and C_Spell or nil
+end
+
 local function getSpellName(spellId)
-    return spellId and SPELL_API and SPELL_API.GetSpellName and SPELL_API.GetSpellName(spellId) or nil
+    local api = getSpellAPI()
+    return spellId and api and api.GetSpellName and api.GetSpellName(spellId) or nil
 end
 
 local function getSpellTexture(spellId)
-    return spellId and SPELL_API and SPELL_API.GetSpellTexture and SPELL_API.GetSpellTexture(spellId) or nil
+    local api = getSpellAPI()
+    return spellId and api and api.GetSpellTexture and api.GetSpellTexture(spellId) or nil
 end
 
 local function isDisabledBuiltinEntry(entry)

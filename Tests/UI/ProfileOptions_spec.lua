@@ -38,7 +38,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             profileCategory = page._category
         end)
         refreshCalls = {}
-        local page = assert(SB:GetSection("profile"):GetPage("main"))
+        local page = assert(SB:GetPage("profile", "main"))
         page.Refresh = function()
             refreshCalls[#refreshCalls + 1] = profileCategory
         end

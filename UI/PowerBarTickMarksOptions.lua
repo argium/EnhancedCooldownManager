@@ -104,6 +104,9 @@ end
 StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ns.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
 
 local registeredPage
+function PowerBarTickMarksOptions.SetRegisteredPage(page)
+    registeredPage = page
+end
 
 local function refreshPage()
     if registeredPage then
@@ -211,9 +214,6 @@ end
 
 PowerBarTickMarksOptions.key = "tickMarks"
 PowerBarTickMarksOptions.name = "Tick Marks"
-PowerBarTickMarksOptions.onRegistered = function(page)
-    registeredPage = page
-end
 PowerBarTickMarksOptions.rows = {
     {
         id = "tickMarksPageActions",
@@ -264,8 +264,8 @@ PowerBarTickMarksOptions.rows = {
         set = function(color)
             setDefaultColor(color)
         end,
-        onSet = function(_, _, page)
-            page:Refresh()
+        onSet = function(ctx)
+            ctx.page:Refresh()
         end,
     },
     {
@@ -283,8 +283,8 @@ PowerBarTickMarksOptions.rows = {
         set = function(width)
             setDefaultWidth(width)
         end,
-        onSet = function(_, _, page)
-            page:Refresh()
+        onSet = function(ctx)
+            ctx.page:Refresh()
         end,
     },
     {
@@ -292,10 +292,10 @@ PowerBarTickMarksOptions.rows = {
         type = "button",
         name = L["ADD_TICK_MARK"],
         buttonText = L["ADD"],
-        onClick = function(page)
+        onClick = function(ctx)
             addTick(50, nil, nil)
             scheduleUpdate()
-            page:Refresh()
+            ctx.page:Refresh()
         end,
     },
     {

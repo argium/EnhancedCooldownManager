@@ -114,4 +114,9 @@ rows[#rows + 1] = {
 ResourceBarOptions.key = "resourceBar"
 ResourceBarOptions.name = L["RESOURCE_BAR"]
 ResourceBarOptions.disabled = ns.IsDeathKnight
-ResourceBarOptions.rows = rows
+ResourceBarOptions.pages = {
+    {
+        key = "main",
+        rows = rows,
+    },
+}

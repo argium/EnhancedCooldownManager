@@ -7,15 +7,17 @@ local L = ns.L
 local RuneBarOptions = {}
 ns.RuneBarOptions = RuneBarOptions
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
+local function isUseSpecColorDisabled()
+    local runeBar = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.runeBar
+    return isDisabled() or not (runeBar and runeBar.useSpecColor)
+end
+
+local function isSingleRuneColorDisabled()
+    local runeBar = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.runeBar
+    return isDisabled() or (runeBar and runeBar.useSpecColor) == true
+end
 
 local rows = {
-    {
-        type = "subheader",
-        name = L["DK_ONLY_WARNING"],
-        condition = function()
-            return not ns.IsDeathKnight()
-        end,
-    },
     {
         type = "checkbox",
         path = "enabled",
@@ -26,6 +28,13 @@ local rows = {
 
 for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled, { showText = false, border = false })) do
     rows[#rows + 1] = row
+end
+
+if not ns.IsDeathKnight() then
+    table.insert(rows, 1, {
+        type = "subheader",
+        name = L["DK_ONLY_WARNING"],
+    })
 end
 
 rows[#rows + 1] = {
@@ -39,41 +48,32 @@ rows[#rows + 1] = {
     type = "checkbox",
     path = "useSpecColor",
     name = L["USE_SPEC_COLOR"],
-    desc = L["USE_SPEC_COLOR_DESC"],
-    parent = "colorLabel",
+    tooltip = L["USE_SPEC_COLOR_DESC"],
     disabled = isDisabled,
 }
 rows[#rows + 1] = {
     type = "color",
     path = "color",
     name = L["RUNE_COLOR"],
-    parent = "useSpecColor",
-    parentCheck = "notChecked",
-    disabled = isDisabled,
+    disabled = isSingleRuneColorDisabled,
 }
 rows[#rows + 1] = {
     type = "color",
     path = "colorBlood",
     name = L["BLOOD_COLOR"],
-    parent = "useSpecColor",
-    parentCheck = "checked",
-    disabled = isDisabled,
+    disabled = isUseSpecColorDisabled,
 }
 rows[#rows + 1] = {
     type = "color",
     path = "colorFrost",
     name = L["FROST_COLOR"],
-    parent = "useSpecColor",
-    parentCheck = "checked",
-    disabled = isDisabled,
+    disabled = isUseSpecColorDisabled,
 }
 rows[#rows + 1] = {
     type = "color",
     path = "colorUnholy",
     name = L["UNHOLY_COLOR"],
-    parent = "useSpecColor",
-    parentCheck = "checked",
-    disabled = isDisabled,
+    disabled = isUseSpecColorDisabled,
 }
 
 RuneBarOptions.key = "runeBar"
@@ -81,4 +81,9 @@ RuneBarOptions.name = L["RUNE_BAR"]
 RuneBarOptions.disabled = function()
     return not ns.IsDeathKnight()
 end
-RuneBarOptions.rows = rows
+RuneBarOptions.pages = {
+    {
+        key = "main",
+        rows = rows,
+    },
+}

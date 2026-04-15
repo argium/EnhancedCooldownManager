@@ -14,7 +14,7 @@ local function createAnchorModeSpec(name, path, disabled)
         type = "dropdown",
         path = path,
         name = name,
-        desc = L["POSITION_MODE_DESC"],
+        tooltip = L["POSITION_MODE_DESC"],
         values = {
             [C.ANCHORMODE_CHAIN] = L["POSITION_MODE_ATTACHED"],
             [C.ANCHORMODE_DETACHED] = L["POSITION_MODE_DETACHED"],
@@ -53,7 +53,7 @@ local rows = {
         type = "slider",
         path = "global.offsetY",
         name = L["VERTICAL_OFFSET"],
-        desc = L["VERTICAL_OFFSET_DESC"],
+        tooltip = L["VERTICAL_OFFSET_DESC"],
         min = 0,
         max = 20,
         step = 1,
@@ -62,7 +62,7 @@ local rows = {
         type = "slider",
         path = "global.moduleSpacing",
         name = L["VERTICAL_SPACING"],
-        desc = L["VERTICAL_SPACING_DESC"],
+        tooltip = L["VERTICAL_SPACING_DESC"],
         min = 0,
         max = 20,
         step = 1,
@@ -72,7 +72,7 @@ local rows = {
         type = "dropdown",
         path = "global.moduleGrowDirection",
         name = L["GROW_DIRECTION"],
-        desc = L["GROW_DIRECTION_ATTACHED_DESC"],
+        tooltip = L["GROW_DIRECTION_ATTACHED_DESC"],
         values = {
             [C.GROW_DIRECTION_DOWN] = L["DOWN"],
             [C.GROW_DIRECTION_UP] = L["UP"],
@@ -88,10 +88,15 @@ end
 LayoutOptions.key = "layout"
 LayoutOptions.name = L["LAYOUT_SUBCATEGORY"]
 LayoutOptions.path = ""
-LayoutOptions.onShow = function()
-    ns.Runtime.SetLayoutPreview(true)
-end
-LayoutOptions.onHide = function()
-    ns.Runtime.SetLayoutPreview(false)
-end
-LayoutOptions.rows = rows
+LayoutOptions.pages = {
+    {
+        key = "main",
+        onShow = function()
+            ns.Runtime.SetLayoutPreview(true)
+        end,
+        onHide = function()
+            ns.Runtime.SetLayoutPreview(false)
+        end,
+        rows = rows,
+    },
+}

@@ -178,6 +178,9 @@ end
 
 local function createSpellColorPage(subcatName)
     local registeredPage
+    local function setRegisteredPage(page)
+        registeredPage = page
+    end
 
     local function refreshPage()
         if registeredPage then
@@ -293,9 +296,6 @@ local function createSpellColorPage(subcatName)
     local pageSpec = {
         key = "spellColors",
         name = subcatName,
-        onRegistered = function(page)
-            registeredPage = page
-        end,
         rows = {
             {
                 id = "spellColorsPageActions",
@@ -375,6 +375,7 @@ local function createSpellColorPage(subcatName)
             },
         },
     }
+    pageSpec.SetRegisteredPage = setRegisteredPage
     return pageSpec
 end
 
@@ -406,7 +407,7 @@ BuffBarsOptions.pages = {
                 type = "checkbox",
                 path = "enabled",
                 name = L["ENABLE_AURA_BARS"],
-                desc = L["ENABLE_AURA_BARS_DESC"],
+                tooltip = L["ENABLE_AURA_BARS_DESC"],
                 onSet = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", L["DISABLE_AURA_BARS_RELOAD"]),
             },
 
@@ -440,7 +441,7 @@ BuffBarsOptions.pages = {
                 type = "slider",
                 path = "height",
                 name = L["HEIGHT_OVERRIDE"],
-                desc = L["HEIGHT_OVERRIDE_DESC"],
+                tooltip = L["HEIGHT_OVERRIDE_DESC"],
                 min = 0,
                 max = 40,
                 step = 1,
@@ -455,15 +456,26 @@ BuffBarsOptions.pages = {
                 type = "slider",
                 path = "verticalSpacing",
                 name = L["AURA_VERTICAL_SPACING"],
-                desc = L["AURA_VERTICAL_SPACING_DESC"],
+                tooltip = L["AURA_VERTICAL_SPACING_DESC"],
                 min = 0,
                 max = 20,
                 step = 1,
                 disabled = isDisabled,
                 getTransform = defaultZero,
             },
-            { id = "fontOverride", type = "fontOverride", disabled = isDisabled },
+            (function()
+                local row = ns.OptionUtil.CreateFontOverrideRow(isDisabled)
+                row.id = "fontOverride"
+                return row
+            end)(),
         },
     },
     createSpellColorPage(L["SPELL_COLORS_SUBCAT"]),
 }
+
+function BuffBarsOptions.SetSpellColorsPage(page)
+    local spellColorsPage = BuffBarsOptions.pages[2]
+    if spellColorsPage and spellColorsPage.SetRegisteredPage then
+        spellColorsPage.SetRegisteredPage(page)
+    end
+end

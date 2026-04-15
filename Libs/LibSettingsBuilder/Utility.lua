@@ -12,11 +12,19 @@ local internal = lib._internal
 local copyMixin = internal.copyMixin
 local installPageLifecycleHooks = internal.installPageLifecycleHooks
 local getCanvasLayoutMetrics = internal.getCanvasLayoutMetrics
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
 
-local SectionMethods = {}
-local PageMethods = {}
+local PUBLIC_BUILDER_METHODS = {
+    GetSection = true,
+    GetRootPage = true,
+    GetPage = true,
+    HasCategory = true,
+}
+
+internal.publicBuilderMethods = PUBLIC_BUILDER_METHODS
+
+local PublicPageMethods = {}
 
 local DISPATCH = {
     checkbox = "Checkbox",
@@ -29,15 +37,15 @@ local DISPATCH = {
 
 local COMPOSITE_ROW_DISPATCH = {
     border = function(builder, path, spec)
-        local result = builder:BorderGroup(path, spec)
+        local result = BuilderMixin.BorderGroup(builder, path, spec)
         return result.enabledInit, result.enabledSetting
     end,
     fontOverride = function(builder, path, spec)
-        local result = builder:FontOverrideGroup(path, spec)
+        local result = BuilderMixin.FontOverrideGroup(builder, path, spec)
         return result.enabledInit, result.enabledSetting
     end,
     heightOverride = function(builder, path, spec)
-        return builder:HeightOverrideSlider(path, spec)
+        return BuilderMixin.HeightOverrideSlider(builder, path, spec)
     end,
 }
 
@@ -50,41 +58,42 @@ local PROXY_ROW_TYPES = {
     custom = true,
 }
 
-local proxyMethods = {}
-local proxyMT = {
-    __index = function(self, key)
-        local method = proxyMethods[key]
-        if method then
-            return method
-        end
-
-        local target = rawget(self, "_lsbTarget")
-        if not target then
-            return nil
-        end
-
-        local value = target[key]
-        if type(value) == "function" then
-            return function(_, ...)
-                return value(target, ...)
-            end
-        end
-
-        return value
-    end,
+local COMPOSITE_ROW_TYPES = {
+    border = true,
+    checkboxList = true,
+    colorList = true,
+    fontOverride = true,
+    heightOverride = true,
 }
 
-function proxyMethods:_lsbBind(target)
-    self._lsbTarget = target
-    return target
-end
+local VALID_ROW_TYPES = {
+    border = true,
+    button = true,
+    canvas = true,
+    checkbox = true,
+    checkboxList = true,
+    color = true,
+    colorList = true,
+    custom = true,
+    dropdown = true,
+    fontOverride = true,
+    header = true,
+    heightOverride = true,
+    info = true,
+    input = true,
+    list = true,
+    pageActions = true,
+    sectionList = true,
+    slider = true,
+    subheader = true,
+}
 
 function BuilderMixin:SetCanvasLayoutDefaults(overrides)
     if not overrides then
-        return lib.CanvasLayoutDefaults
+        return internal.CanvasLayoutDefaults
     end
 
-    return copyMixin(lib.CanvasLayoutDefaults, overrides)
+    return copyMixin(internal.CanvasLayoutDefaults, overrides)
 end
 
 function BuilderMixin:ConfigureCanvasLayout(layout, overrides)
@@ -93,7 +102,7 @@ function BuilderMixin:ConfigureCanvasLayout(layout, overrides)
         return getCanvasLayoutMetrics(layout)
     end
 
-    layout._metrics = copyMixin(copyMixin({}, lib.CanvasLayoutDefaults), overrides)
+    layout._metrics = copyMixin(copyMixin({}, internal.CanvasLayoutDefaults), overrides)
     return layout._metrics
 end
 
@@ -108,7 +117,7 @@ end
 function BuilderMixin:Control(spec)
     local methodName = DISPATCH[spec.type]
     assert(methodName, "Control: unknown type '" .. tostring(spec.type) .. "'")
-    return self[methodName](self, spec)
+    return BuilderMixin[methodName](self, spec)
 end
 
 local function refreshCategory(builder, category)
@@ -145,90 +154,159 @@ local function refreshCategory(builder, category)
     end
 end
 
-local function shouldProcessRow(row)
-    local condition = row and row.condition
-    return condition == nil
-        or (type(condition) == "function" and condition())
-        or (type(condition) ~= "function" and condition)
-end
-
 local function resolvePagePath(pagePath, rowPath)
-    if not rowPath or rowPath:find("%.") or pagePath == "" then
-        return rowPath or pagePath
+    if rowPath == nil or rowPath == "" or rowPath:find("%.") or pagePath == "" then
+        return (rowPath ~= nil and rowPath ~= "") and rowPath or pagePath
     end
     return pagePath .. "." .. rowPath
 end
 
-local function copyDeclarativeRowSpec(row)
+local function assertBooleanOrCallback(sourceName, fieldName, value)
+    local valueType = type(value)
+    assert(
+        value == nil or valueType == "boolean" or valueType == "function",
+        sourceName .. ": " .. fieldName .. " must be a boolean or function"
+    )
+end
+
+local function getRowLabel(row)
+    return tostring(row.id or row.key or row.path or row.name or row.type)
+end
+
+local function normalizeDeclarativeRowSpec(sourceName, row)
+    assert(type(row) == "table", sourceName .. ": each row must be a table")
+
     local spec = copyMixin({}, row)
-    spec.id = nil
-    spec.condition = nil
-    if spec.desc and not spec.tooltip then
-        spec.tooltip = spec.desc
+    assert(spec.desc == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses deprecated field 'desc'; use 'tooltip'")
+    assert(spec.condition == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'condition'")
+    assert(spec.parent == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parent'")
+    assert(spec.parentCheck == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parentCheck'")
+
+    local rowType = spec.type
+    assert(type(rowType) == "string" and VALID_ROW_TYPES[rowType], sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
+
+    if rowType == "button" and spec.buttonText == nil and spec.value ~= nil then
+        spec.buttonText = spec.value
     end
-    spec.desc = nil
+    spec.value = rowType == "button" and nil or spec.value
+
+    if rowType == "dropdown" and spec.scrollHeight == nil and spec.maxScrollDisplayHeight ~= nil then
+        spec.scrollHeight = spec.maxScrollDisplayHeight
+    end
+    spec.maxScrollDisplayHeight = nil
+
+    if rowType == "info" and spec.values ~= nil then
+        assert(spec.value == nil, sourceName .. ": info row '" .. getRowLabel(spec) .. "' cannot define both value and values")
+        assert(type(spec.values) == "table", sourceName .. ": info row '" .. getRowLabel(spec) .. "' values must be a table")
+        spec.value = table.concat(spec.values, "\n")
+        spec.multiline = true
+        spec.values = nil
+    end
+
+    if rowType == "input" and spec.debounce == nil and spec.debounceMilliseconds ~= nil then
+        spec.debounce = spec.debounceMilliseconds / 1000
+    end
+    spec.debounceMilliseconds = nil
+
+    if rowType == "slider" and spec.formatter == nil and spec.formatValue ~= nil then
+        spec.formatter = spec.formatValue
+    end
+    spec.formatValue = nil
+
+    spec.id = row.id
+
     return spec
 end
 
-local function resolveDeclarativeParent(sourceName, created, rowID, spec)
-    if type(spec.parent) ~= "string" then
-        return
-    end
+local function validateDeclarativeRow(sourceName, builder, row)
+    local rowType = row.type
+    local rowLabel = getRowLabel(row)
+    local hasHandler = row.get ~= nil or row.set ~= nil
 
-    local ref = created[spec.parent]
-    assert(
-        ref,
-        sourceName .. ": parent '" .. spec.parent .. "' not found for row '" .. tostring(rowID or spec.name or spec.type) .. "'"
-    )
+    assertBooleanOrCallback(sourceName, "disabled", row.disabled)
+    assertBooleanOrCallback(sourceName, "hidden", row.hidden)
 
-    spec.parent = ref.initializer
-    local parentCheck = spec.parentCheck
-    if parentCheck == "checked" or parentCheck == "notChecked" then
-        local setting = ref.setting
-        assert(setting, sourceName .. ": parentCheck='" .. parentCheck .. "' requires a parent setting")
-        spec.parentCheck = parentCheck == "checked" and function()
-            return setting:GetValue()
-        end or function()
-            return not setting:GetValue()
+    if PROXY_ROW_TYPES[rowType] then
+        if hasHandler then
+            assert(row.get, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires get")
+            assert(row.set, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires set")
+            assert(row.key or row.id, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires key or id")
+        else
+            assert(row.path ~= nil, sourceName .. ": path-bound row '" .. rowLabel .. "' requires path")
+            assert(builder._adapter, sourceName .. ": path-bound row '" .. rowLabel .. "' requires store/defaults on the builder")
         end
     end
-end
 
-local function createProxy(kind)
-    return setmetatable({ _lsbProxyKind = kind }, proxyMT)
-end
-
-local function bindProxy(proxy, target)
-    if proxy then
-        proxy:_lsbBind(target)
+    if rowType == "button" then
+        assert(type(row.onClick) == "function", sourceName .. ": button row '" .. rowLabel .. "' requires onClick")
+    elseif rowType == "canvas" then
+        assert(row.canvas, sourceName .. ": canvas row '" .. rowLabel .. "' requires canvas")
+    elseif rowType == "custom" then
+        assert(row.template, sourceName .. ": custom row '" .. rowLabel .. "' requires template")
+    elseif rowType == "dropdown" then
+        assert(row.values ~= nil, sourceName .. ": dropdown row '" .. rowLabel .. "' requires values")
+    elseif rowType == "list" then
+        assert(type(row.items) == "function", sourceName .. ": list row '" .. rowLabel .. "' requires items")
+        assert(row.height, sourceName .. ": list row '" .. rowLabel .. "' requires height")
+    elseif rowType == "pageActions" then
+        assert(type(row.actions) == "table", sourceName .. ": pageActions row '" .. rowLabel .. "' requires actions")
+    elseif rowType == "sectionList" then
+        assert(type(row.sections) == "function", sourceName .. ": sectionList row '" .. rowLabel .. "' requires sections")
+        assert(row.height, sourceName .. ": sectionList row '" .. rowLabel .. "' requires height")
+    elseif rowType == "slider" then
+        assert(row.min ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires min")
+        assert(row.max ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires max")
+    elseif COMPOSITE_ROW_TYPES[rowType] then
+        assert(row.path ~= nil, sourceName .. ": composite row '" .. rowLabel .. "' requires path")
+        if rowType == "checkboxList" or rowType == "colorList" then
+            assert(type(row.defs) == "table", sourceName .. ": composite row '" .. rowLabel .. "' requires defs")
+        end
+    elseif rowType == "info" then
+        assert(
+            row.value ~= nil or row.values ~= nil or row.name ~= nil,
+            sourceName .. ": info row '" .. rowLabel .. "' requires value, values, or name"
+        )
+    elseif rowType == "header" or rowType == "subheader" then
+        assert(row.name ~= nil, sourceName .. ": " .. rowType .. " row '" .. rowLabel .. "' requires name")
     end
-    return target
 end
 
-local function unwrapProxy(value, kind, sourceName)
-    if type(value) ~= "table" or value._lsbProxyKind ~= kind then
-        return value
-    end
+local function validateDeclarativeRows(sourceName, builder, rows, seenRowIDs)
+    assert(type(rows) == "table", sourceName .. ": rows must be a table")
 
-    local target = rawget(value, "_lsbTarget")
-    assert(target, sourceName .. ": dependent control was not materialized yet")
-    return target
+    for _, row in ipairs(rows) do
+        local normalized = normalizeDeclarativeRowSpec(sourceName, row)
+        local rowID = normalized.id
+        if rowID ~= nil then
+            assert(not seenRowIDs[rowID], sourceName .. ": duplicate row id '" .. tostring(rowID) .. "'")
+            seenRowIDs[rowID] = true
+        end
+        validateDeclarativeRow(sourceName, builder, normalized)
+    end
+end
+
+local function validatePageDefinition(sourceName, pageDef)
+    assert(type(pageDef) == "table", sourceName .. ": page definition must be a table")
+    assert(pageDef.key, sourceName .. ": page definition requires key")
+    assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
 end
 
 local function callBuilder(builder, methodName, ...)
-    return builder[methodName](builder, ...)
+    local method = BuilderMixin[methodName]
+    assert(type(method) == "function", "callBuilder: unknown builder method '" .. tostring(methodName) .. "'")
+    return method(builder, ...)
 end
 
 local function registerLabeledList(page, spec, methodName)
     local builder = page._builder
     if spec.label then
-        local labelInit = builder:Subheader({
+        local labelInit = callBuilder(builder, "Subheader", {
             name = spec.label,
             disabled = spec.disabled,
             hidden = spec.hidden,
             category = page._category,
         })
-        spec.parent = spec.parent or labelInit
+        spec._parentInitializer = spec._parentInitializer or labelInit
     end
 
     local results = callBuilder(
@@ -242,11 +320,10 @@ local function registerLabeledList(page, spec, methodName)
 end
 
 local function registerDeclarativeRow(sourceName, page, row, created)
-    local rowType = row.type
-    assert(rowType, sourceName .. ": each row requires a type")
+    local spec = normalizeDeclarativeRowSpec(sourceName, row)
+    local rowType = spec.type
 
     local builder = page._builder
-    local spec = copyDeclarativeRowSpec(row)
     if page.disabled and spec.disabled == nil then
         spec.disabled = page.disabled
     end
@@ -257,37 +334,29 @@ local function registerDeclarativeRow(sourceName, page, row, created)
         spec.category = page._category
     end
 
-    resolveDeclarativeParent(sourceName, created, row.id, spec)
     spec._page = page
-
-    if spec.onClick then
-        local original = spec.onClick
-        spec.onClick = function(...)
-            return original(page, ...)
-        end
-    end
 
     local initializer, setting
     if rowType == "button" then
-        initializer = builder:Button(spec)
+        initializer = callBuilder(builder, "Button", spec)
     elseif rowType == "canvas" then
-        initializer = builder:EmbedCanvas(spec.canvas, spec.height, spec)
+        initializer = callBuilder(builder, "EmbedCanvas", spec.canvas, spec.height, spec)
     elseif rowType == "checkboxList" then
         initializer, setting = registerLabeledList(page, spec, "CheckboxList")
     elseif rowType == "colorList" then
         initializer, setting = registerLabeledList(page, spec, "ColorPickerList")
     elseif rowType == "header" then
-        initializer = builder:Header(spec)
+        initializer = callBuilder(builder, "Header", spec)
     elseif rowType == "info" then
-        initializer = builder:InfoRow(spec)
+        initializer = callBuilder(builder, "InfoRow", spec)
     elseif rowType == "list" then
-        initializer = builder:List(spec)
+        initializer = callBuilder(builder, "List", spec)
     elseif rowType == "pageActions" then
-        initializer = builder:PageActions(spec)
+        initializer = callBuilder(builder, "PageActions", spec)
     elseif rowType == "sectionList" then
-        initializer = builder:SectionList(spec)
+        initializer = callBuilder(builder, "SectionList", spec)
     elseif rowType == "subheader" then
-        initializer = builder:Subheader(spec)
+        initializer = callBuilder(builder, "Subheader", spec)
     elseif COMPOSITE_ROW_DISPATCH[rowType] then
         initializer, setting = COMPOSITE_ROW_DISPATCH[rowType](
             builder,
@@ -304,7 +373,7 @@ local function registerDeclarativeRow(sourceName, page, row, created)
             error(sourceName .. ": handler-mode row '" .. tostring(row.id or spec.name) .. "' requires key or id")
         end
         spec.type = rowType
-        initializer, setting = builder:Control(spec)
+        initializer, setting = callBuilder(builder, "Control", spec)
     else
         error(sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
     end
@@ -354,134 +423,9 @@ local function bindPageLifecycle(page)
     end
 end
 
-local function prepareSpec(page, sourceName, spec)
-    local prepared = copyMixin({}, spec)
-    prepared._page = page
-    if prepared.category == nil then
-        prepared.category = page._category
-    end
-    if prepared.parent then
-        prepared.parent = unwrapProxy(prepared.parent, "initializer", sourceName)
-    end
-    if prepared.onClick then
-        local original = prepared.onClick
-        prepared.onClick = function(...)
-            return original(page, ...)
-        end
-    end
-    return prepared
-end
-
-local function prepareControlSpec(page, sourceName, spec)
-    local prepared = prepareSpec(page, sourceName, spec)
-    if not prepared.get and prepared.path then
-        prepared.path = resolvePagePath(page.path or "", prepared.path)
-    end
-    return prepared
-end
-
 local function queuePageOperation(page, sourceName, fn)
     assertPageMutable(page, sourceName)
     page._operations[#page._operations + 1] = fn
-end
-
-local function queueSpecPair(page, sourceName, methodName, spec)
-    local initializerProxy = createProxy("initializer")
-    local settingProxy = createProxy("setting")
-    local snapshot = copyMixin({}, spec or {})
-
-    queuePageOperation(page, sourceName, function()
-        local initializer, setting = callBuilder(
-            page._builder,
-            methodName,
-            prepareControlSpec(page, sourceName, snapshot)
-        )
-        bindProxy(initializerProxy, initializer)
-        bindProxy(settingProxy, setting)
-    end)
-
-    return initializerProxy, settingProxy
-end
-
-local function queueSpecInit(page, sourceName, methodName, spec)
-    local initializerProxy = createProxy("initializer")
-    local snapshot = copyMixin({}, spec or {})
-
-    queuePageOperation(page, sourceName, function()
-        local initializer = callBuilder(page._builder, methodName, prepareSpec(page, sourceName, snapshot))
-        bindProxy(initializerProxy, initializer)
-    end)
-
-    return initializerProxy
-end
-
-local function queueHeightOverride(page, sectionPath, spec)
-    local initializerProxy = createProxy("initializer")
-    local settingProxy = createProxy("setting")
-    local snapshot = copyMixin({}, spec or {})
-
-    queuePageOperation(page, "page:HeightOverrideSlider", function()
-        local initializer, setting = callBuilder(
-            page._builder,
-            "HeightOverrideSlider",
-            resolvePagePath(page.path or "", sectionPath),
-            prepareSpec(page, "page:HeightOverrideSlider", snapshot)
-        )
-        bindProxy(initializerProxy, initializer)
-        bindProxy(settingProxy, setting)
-    end)
-
-    return initializerProxy, settingProxy
-end
-
-local function queueCompositeGroup(page, sourceName, methodName, basePath, spec, fields)
-    local result = {}
-    for key, kind in pairs(fields) do
-        result[key] = createProxy(kind)
-    end
-
-    local snapshot = copyMixin({}, spec or {})
-    queuePageOperation(page, sourceName, function()
-        local actual = callBuilder(
-            page._builder,
-            methodName,
-            resolvePagePath(page.path or "", basePath),
-            prepareSpec(page, sourceName, snapshot)
-        )
-        for key in pairs(fields) do
-            bindProxy(result[key], actual[key])
-        end
-    end)
-
-    return result
-end
-
-local function queueCompositeList(page, sourceName, methodName, basePath, defs, spec)
-    local proxies = {}
-    for i, def in ipairs(defs or {}) do
-        proxies[i] = {
-            key = def.key,
-            initializer = createProxy("initializer"),
-            setting = createProxy("setting"),
-        }
-    end
-
-    local snapshot = copyMixin({}, spec or {})
-    queuePageOperation(page, sourceName, function()
-        local actual = callBuilder(
-            page._builder,
-            methodName,
-            resolvePagePath(page.path or "", basePath),
-            defs,
-            prepareSpec(page, sourceName, snapshot)
-        )
-        for i, proxy in ipairs(proxies) do
-            bindProxy(proxy.initializer, actual[i] and actual[i].initializer)
-            bindProxy(proxy.setting, actual[i] and actual[i].setting)
-        end
-    end)
-
-    return proxies
 end
 
 local function materializePage(page, category)
@@ -494,138 +438,27 @@ local function materializePage(page, category)
         operation(created)
     end
 
-    setmetatable(page, { __index = PageMethods })
+    setmetatable(page, { __index = PublicPageMethods })
     page._registered = true
-    if page._onRegistered then
-        page._onRegistered(page)
-    end
     return page
 end
 
 local function appendDeclarativeRows(page, sourceName, rows)
+    validateDeclarativeRows(sourceName, page._builder, rows, page._rowIDs)
     queuePageOperation(page, sourceName, function(created)
-        for _, row in ipairs(rows or {}) do
-            if shouldProcessRow(row) then
-                registerDeclarativeRow(sourceName, page, row, created)
-            end
+        for _, row in ipairs(rows) do
+            registerDeclarativeRow(sourceName, page, row, created)
         end
     end)
     return page
 end
 
-function PageMethods:RegisterRows(rows)
-    return appendDeclarativeRows(self, "page:RegisterRows", rows)
-end
-
-function PageMethods:Checkbox(spec)
-    return queueSpecPair(self, "page:Checkbox", "Checkbox", spec)
-end
-
-function PageMethods:Slider(spec)
-    return queueSpecPair(self, "page:Slider", "Slider", spec)
-end
-
-function PageMethods:Dropdown(spec)
-    return queueSpecPair(self, "page:Dropdown", "Dropdown", spec)
-end
-
-function PageMethods:Input(spec)
-    return queueSpecPair(self, "page:Input", "Input", spec)
-end
-
-function PageMethods:Color(spec)
-    return queueSpecPair(self, "page:Color", "Color", spec)
-end
-
-function PageMethods:Custom(spec)
-    return queueSpecPair(self, "page:Custom", "Custom", spec)
-end
-
-function PageMethods:Button(spec)
-    return queueSpecInit(self, "page:Button", "Button", spec)
-end
-
-function PageMethods:PageActions(spec)
-    return queueSpecInit(self, "page:PageActions", "PageActions", spec)
-end
-
-function PageMethods:Header(spec)
-    if type(spec) ~= "table" then
-        spec = { name = spec }
-    end
-    return queueSpecInit(self, "page:Header", "Header", spec)
-end
-
-function PageMethods:Subheader(spec)
-    return queueSpecInit(self, "page:Subheader", "Subheader", spec)
-end
-
-function PageMethods:InfoRow(spec)
-    return queueSpecInit(self, "page:InfoRow", "InfoRow", spec)
-end
-
-function PageMethods:List(spec)
-    return queueSpecInit(self, "page:List", "List", spec)
-end
-
-function PageMethods:SectionList(spec)
-    return queueSpecInit(self, "page:SectionList", "SectionList", spec)
-end
-
-function PageMethods:EmbedCanvas(canvas, height, spec)
-    local initializerProxy = createProxy("initializer")
-    local snapshot = copyMixin({}, spec or {})
-
-    queuePageOperation(self, "page:EmbedCanvas", function()
-        local initializer = callBuilder(
-            self._builder,
-            "EmbedCanvas",
-            canvas,
-            height,
-            prepareSpec(self, "page:EmbedCanvas", snapshot)
-        )
-        bindProxy(initializerProxy, initializer)
-    end)
-
-    return initializerProxy
-end
-
-function PageMethods:HeightOverrideSlider(sectionPath, spec)
-    return queueHeightOverride(self, sectionPath, spec)
-end
-
-function PageMethods:FontOverrideGroup(sectionPath, spec)
-    return queueCompositeGroup(self, "page:FontOverrideGroup", "FontOverrideGroup", sectionPath, spec, {
-        enabledInit = "initializer",
-        enabledSetting = "setting",
-        fontInit = "initializer",
-        sizeInit = "initializer",
-    })
-end
-
-function PageMethods:BorderGroup(borderPath, spec)
-    return queueCompositeGroup(self, "page:BorderGroup", "BorderGroup", borderPath, spec, {
-        enabledInit = "initializer",
-        enabledSetting = "setting",
-        thicknessInit = "initializer",
-        colorInit = "initializer",
-    })
-end
-
-function PageMethods:ColorPickerList(basePath, defs, spec)
-    return queueCompositeList(self, "page:ColorPickerList", "ColorPickerList", basePath, defs, spec)
-end
-
-function PageMethods:CheckboxList(basePath, defs, spec)
-    return queueCompositeList(self, "page:CheckboxList", "CheckboxList", basePath, defs, spec)
-end
-
-function PageMethods:GetID()
-    assert(self._registered and self._category, "page:GetID: page is not registered")
+function PublicPageMethods:GetId()
+    assert(self._registered and self._category, "page:GetId: page is not registered")
     return self._category:GetID()
 end
 
-function PageMethods:Refresh()
+function PublicPageMethods:Refresh()
     assert(self._registered and self._category, "page:Refresh: page is not registered")
     refreshCategory(self._builder, self._category)
 end
@@ -643,8 +476,8 @@ local function createPage(owner, key, rows, opts)
         _name = opts.name,
         _onShow = opts.onShow,
         _onHide = opts.onHide,
-        _onRegistered = opts.onRegistered,
         _operations = {},
+        _rowIDs = {},
         _registered = false,
         disabled = opts.disabled,
         hidden = opts.hidden,
@@ -652,17 +485,13 @@ local function createPage(owner, key, rows, opts)
         name = opts.name,
         order = opts.order,
         path = opts.path ~= nil and opts.path or ownerPath,
-    }, { __index = PageMethods })
+    }, { __index = PublicPageMethods })
 
     if rows then
         appendDeclarativeRows(page, "CreatePage", rows)
     end
 
     return page
-end
-
-function SectionMethods:GetPage(key)
-    return self._pages[key]
 end
 
 local function createSectionPage(section, key, rows, opts)
@@ -695,7 +524,7 @@ local function registerSection(section)
     assert(#section._pageList > 0, "registerSection: section must contain at least one page")
 
     local builder = section._builder
-    local nested = section.display == "nested" or #section._pageList > 1
+    local nested = #section._pageList > 1
     local orderedPages = {}
     for i = 1, #section._pageList do
         orderedPages[i] = section._pageList[i]
@@ -726,10 +555,7 @@ local function createSection(root, key, name, opts)
 
     opts = opts or {}
     root._nextSectionSequence = root._nextSectionSequence + 1
-    local display = opts.display or "auto"
-    assert(display == "auto" or display == "nested", "createSection: display must be 'auto' or 'nested'")
-
-    local section = setmetatable({
+    local section = {
         _builder = root,
         _root = root,
         _pages = {},
@@ -737,12 +563,11 @@ local function createSection(root, key, name, opts)
         _nextPageSequence = 0,
         _registered = false,
         _sequence = root._nextSectionSequence,
-        display = display,
         key = key,
         name = name,
         order = opts.order,
         path = opts.path ~= nil and opts.path or key,
-    }, { __index = SectionMethods })
+    }
 
     root._sections[key] = section
     root._sectionList[#root._sectionList + 1] = section
@@ -765,13 +590,17 @@ function BuilderMixin:GetSection(key)
     return self._sections[key]
 end
 
-function BuilderMixin:GetPage(key)
-    return self._pages[key]
+function BuilderMixin:GetRootPage()
+    return self._registeredRootPage
 end
 
-function BuilderMixin:GetRoot(name)
-    self:_initializeRoot(name)
-    return self
+function BuilderMixin:GetPage(sectionKey, pageKey)
+    if pageKey == nil then
+        return nil
+    end
+
+    local section = self._sections[sectionKey]
+    return section and section._pages[pageKey] or nil
 end
 
 function BuilderMixin:HasCategory(category)
@@ -779,15 +608,13 @@ function BuilderMixin:HasCategory(category)
 end
 
 local function registerPageDefinition(owner, pageDef, defaultName)
-    assert(type(pageDef) == "table", "registerPageDefinition: page definition must be a table")
-    assert(pageDef.key, "registerPageDefinition: page definition requires key")
+    validatePageDefinition("registerPageDefinition", pageDef)
 
     local creator = owner._root and createSectionPage or createRootPage
     return creator(owner, pageDef.key, pageDef.rows, {
         name = pageDef.name or defaultName,
         onShow = pageDef.onShow,
         onHide = pageDef.onHide,
-        onRegistered = pageDef.onRegistered,
         disabled = pageDef.disabled,
         hidden = pageDef.hidden,
         order = pageDef.order,
@@ -795,9 +622,10 @@ local function registerPageDefinition(owner, pageDef, defaultName)
     })
 end
 
-function BuilderMixin:Register(spec)
+function BuilderMixin:_registerTree(spec)
     assertRootConfigured(self, "Register")
     assert(type(spec) == "table", "Register: spec must be a table")
+    assert(spec.page or spec.sections, "Register: spec requires page or sections")
 
     if spec.page then
         registerRootPage(self, registerPageDefinition(self, spec.page, self.name))
@@ -809,26 +637,13 @@ function BuilderMixin:Register(spec)
         assert(sectionDef.name, "Register: each section requires a name")
 
         local section = createSection(self, sectionDef.key, sectionDef.name, {
-            display = sectionDef.display,
             order = sectionDef.order,
             path = sectionDef.path,
         })
 
-        if sectionDef.pages then
-            assert(sectionDef.rows == nil, "Register: a section cannot define both rows and pages")
-            for _, pageDef in ipairs(sectionDef.pages) do
-                registerPageDefinition(section, pageDef, sectionDef.name)
-            end
-        else
-            createSectionPage(section, sectionDef.pageKey or "main", sectionDef.rows, {
-                name = sectionDef.pageName or (sectionDef.display == "nested" and sectionDef.name or nil),
-                onShow = sectionDef.onShow,
-                onHide = sectionDef.onHide,
-                onRegistered = sectionDef.onRegistered,
-                disabled = sectionDef.disabled,
-                hidden = sectionDef.hidden,
-                order = sectionDef.pageOrder,
-            })
+        assert(type(sectionDef.pages) == "table", "Register: each section requires a pages array")
+        for _, pageDef in ipairs(sectionDef.pages) do
+            registerPageDefinition(section, pageDef, sectionDef.name)
         end
 
         registerSection(section)

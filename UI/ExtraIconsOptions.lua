@@ -13,26 +13,23 @@ local Util = assert(ns.ExtraIconsOptionsUtil, "ExtraIconsOptionsUtil missing")
 ExtraIconsOptions.key = "extraIcons"
 ExtraIconsOptions.name = L["EXTRA_ICONS"]
 
-function ExtraIconsOptions.onShow()
-    ns.Runtime.SetLayoutPreview(true)
-end
-
-function ExtraIconsOptions.onHide()
-    ns.Runtime.SetLayoutPreview(false)
-end
-
-function ExtraIconsOptions.onRegistered(page)
-    Util.SetRegisteredPage(page)
-    Util.EnsureItemLoadFrame()
-end
-
-ExtraIconsOptions.rows = {
+ExtraIconsOptions.pages = {
+    {
+        key = "main",
+        onShow = function()
+            ns.Runtime.SetLayoutPreview(true)
+            Util.EnsureItemLoadFrame()
+        end,
+        onHide = function()
+            ns.Runtime.SetLayoutPreview(false)
+        end,
+        rows = {
     {
         id = "enabled", type = "checkbox", path = "enabled",
-        name = L["ENABLE_EXTRA_ICONS"], desc = L["ENABLE_EXTRA_ICONS_DESC"],
-        onSet = function(value, _, page)
-            ns.OptionUtil.CreateModuleEnabledHandler("ExtraIcons")(value)
-            page:Refresh()
+        name = L["ENABLE_EXTRA_ICONS"], tooltip = L["ENABLE_EXTRA_ICONS_DESC"],
+        onSet = function(ctx, value)
+            ns.OptionUtil.CreateModuleEnabledHandler("ExtraIcons")(ctx, value)
+            ctx.page:Refresh()
         end,
     },
     {
@@ -45,6 +42,8 @@ ExtraIconsOptions.rows = {
         disabled = Util.IsDisabled,
         sections = Util.BuildSections,
         onDefault = Util.ResetToDefaults,
+    },
+        },
     },
 }
 

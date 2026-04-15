@@ -9,6 +9,7 @@ local _, ns = ...
 local C = ns.Constants
 local L = ns.L
 local OptionUtil = ns.OptionUtil or {}
+local LSMW = LibStub("LibLSMSettingsWidgets-1.0", true)
 
 ns.OptionUtil = OptionUtil
 
@@ -126,9 +127,8 @@ end
 
 function OptionUtil.OpenLayoutPage()
     local root = ns.Settings
-    local section = root and root:GetSection("layout")
-    local page = section and section:GetPage("main")
-    local categoryID = page and page:GetID()
+    local page = root and root:GetPage("layout", "main")
+    local categoryID = page and page:GetId()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
@@ -277,9 +277,10 @@ end
 --- For modules that require a reload to disable, pass requiresReload with a message.
 ---@param moduleName string The module name (e.g., "PowerBar")
 ---@param requiresReload string|nil If set, disabling shows a reload confirmation with this message
----@return fun(value: boolean, setting: table)
+---@return fun(ctx: table, value: boolean)
 function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
-    return function(value, setting)
+    return function(ctx, value)
+        local setting = ctx and ctx.setting
         if value then
             ns.Addon:EnableModule(moduleName)
             return
@@ -298,6 +299,30 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
 
         ns.Addon:DisableModule(moduleName)
     end
+end
+
+local function getGlobalFont()
+    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    return gc and gc.font
+end
+
+local function getGlobalFontSize()
+    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    return gc and gc.fontSize
+end
+
+function OptionUtil.CreateFontOverrideRow(isDisabled)
+    return {
+        type = "fontOverride",
+        path = "",
+        disabled = isDisabled,
+        fontValues = function()
+            return LSMW and LSMW.GetFontValues and LSMW.GetFontValues() or {}
+        end,
+        fontFallback = getGlobalFont,
+        fontSizeFallback = getGlobalFontSize,
+        fontTemplate = LSMW and LSMW.FONT_PICKER_TEMPLATE or nil,
+    }
 end
 
 --- Generates standard layout and appearance rows shared by bar-type modules.
@@ -321,13 +346,13 @@ function OptionUtil.CreateBarRows(isDisabled, options)
             type = "checkbox",
             path = "showText",
             name = L["SHOW_TEXT"],
-            desc = L["SHOW_TEXT_DESC"],
+            tooltip = L["SHOW_TEXT_DESC"],
             disabled = isDisabled,
         }
     end
 
-    rows[#rows + 1] = { type = "heightOverride", disabled = isDisabled }
-    rows[#rows + 1] = { type = "fontOverride", disabled = isDisabled }
+    rows[#rows + 1] = { type = "heightOverride", path = "", disabled = isDisabled }
+    rows[#rows + 1] = OptionUtil.CreateFontOverrideRow(isDisabled)
 
     if options.border ~= false then
         rows[#rows + 1] = {
@@ -345,7 +370,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedBarWidth",
             name = L["WIDTH"],
-            desc = L["DETACHED_WIDTH_DESC"],
+            tooltip = L["DETACHED_WIDTH_DESC"],
             default = C.DEFAULT_BAR_WIDTH,
             min = 100,
             max = 600,
@@ -355,7 +380,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedModuleSpacing",
             name = L["SPACING"],
-            desc = L["DETACHED_SPACING_DESC"],
+            tooltip = L["DETACHED_SPACING_DESC"],
             default = 0,
             min = 0,
             max = 20,
@@ -365,7 +390,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedGrowDirection",
             name = L["GROW_DIRECTION"],
-            desc = L["DETACHED_GROW_DIRECTION_DESC"],
+            tooltip = L["DETACHED_GROW_DIRECTION_DESC"],
             default = C.GROW_DIRECTION_DOWN,
             values = {
                 { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
@@ -389,7 +414,7 @@ function OptionUtil.CreateDetachedStackRows()
         local row = {
             path = "global." .. spec.key,
             name = spec.name,
-            desc = spec.desc,
+            tooltip = spec.tooltip,
             getTransform = spec.default == 0 and defaultZero or OptionUtil.CreateDefaultValueTransform(spec.default),
         }
 

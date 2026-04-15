@@ -24,24 +24,18 @@
 | AceConfig stack | LibSettingsBuilder |
 |---|---|
 | `RegisterOptionsTable` | export declarative root/page/section specs |
-| `AddToBlizOptions` | `SB.GetRoot("My Addon"):Register({ page = ..., sections = { ... } })` |
+| `AddToBlizOptions` | `LSB.New({ name = "My Addon", page = ..., sections = ... })` |
 | one `get`/`set` per field | one `path` per field in path mode |
-| `type = "input"` | `type = "input"` or `SB.Input(...)` |
+| `type = "input"` | `type = "input"` |
 | custom refresh dance | reactive modifiers re-evaluate automatically |
 
 ## Path mode replaces repeated getters and setters
 
 ```lua
-local SB = LSB:New({
-    pathAdapter = LSB.PathAdapter({
-        getStore = function()
-            return db.profile
-        end,
-        getDefaults = function()
-            return db.defaults.profile
-        end,
-    }),
-    varPrefix = "MYADDON",
+local lsb = LSB.New({
+    name = "My Addon",
+    store = db.profile,
+    defaults = db.defaults.profile,
     onChanged = function()
         MyAddon:Refresh()
     end,
@@ -81,9 +75,9 @@ Declarative pages use canonical row types only:
 - specialized row templates,
 - genuinely bespoke embedded frames.
 
-If you only need text or numeric entry, use the built-in `input` type first. Reach for `SB.Custom(...)` only when you need a genuinely different widget.
+If you only need text or numeric entry, use the built-in `input` type first. Reach for `type = "custom"` only when you need a genuinely different widget.
 
-If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "list"` or `type = "sectionList"` before reaching for `SB.Custom(...)` or `SB.EmbedCanvas(...)`.
+If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "list"` or `type = "sectionList"` before reaching for `type = "custom"` or `type = "canvas"`.
 
 ## Migrating AceConfig input fields
 

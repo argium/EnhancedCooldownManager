@@ -12,7 +12,7 @@ local internal = lib._internal
 local applyCollectionFrame = internal.applyCollectionFrame
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local copyMixin = internal.copyMixin
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = internal.BuilderMixin
 
 function BuilderMixin:_createCollectionInitializer(spec, errorPrefix)
     assert(spec.height, errorPrefix .. ": spec.height is required")
@@ -23,7 +23,7 @@ function BuilderMixin:_createCollectionInitializer(spec, errorPrefix)
         data.preset = data.variant
     end
 
-    local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
+    local initializer = createCustomListRowInitializer(internal.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
 
     initializer._lsbEnabled = true
     initializer.SetEnabled = function(controlInitializer, enabled)

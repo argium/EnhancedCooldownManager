@@ -334,8 +334,8 @@ describe("BuffBarsOptions", function()
             end,
         }
 
-        if spellColorsSpec.onRegistered then
-            spellColorsSpec.onRegistered(fakePage)
+        if spellColorsSpec.SetRegisteredPage then
+            spellColorsSpec.SetRegisteredPage(fakePage)
         end
 
         return spellColorsSpec, refreshCalls

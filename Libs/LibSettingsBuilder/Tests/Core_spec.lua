@@ -33,9 +33,11 @@ describe("LibSettingsBuilder Core", function()
     it("loads the split library through the shared ordered loader", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
         assert.is_table(lsb)
-        assert.is_function(lsb.PathAdapter)
-        assert.is_function(lsb.CreateColorSwatch)
         assert.is_table(lsb.LSBDeprecated)
+        assert.is_nil(lsb.BuilderMixin)
+        assert.is_nil(lsb.CanvasLayout)
+        assert.is_nil(lsb.CanvasLayoutDefaults)
+        assert.is_nil(lsb.CreateColorSwatch)
         assert.is_nil(lsb._loadState.open)
     end)
 
@@ -43,16 +45,49 @@ describe("LibSettingsBuilder Core", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
         local deprecated = lsb.LSBDeprecated
 
-        assert.are.equal(lsb.CreateColorSwatch, deprecated.CreateColorSwatch)
-        assert.are.equal(lsb.CreateHeaderTitle, deprecated.CreateHeaderTitle)
-        assert.are.equal(lsb.CreateSubheaderTitle, deprecated.CreateSubheaderTitle)
+        assert.is_function(deprecated.CreateColorSwatch)
+        assert.is_function(deprecated.CreateHeaderTitle)
+        assert.is_function(deprecated.CreateSubheaderTitle)
         assert.is_function(deprecated.CreateCanvasLayout)
         assert.is_function(deprecated.SetCanvasLayoutDefaults)
         assert.is_function(deprecated.ConfigureCanvasLayout)
-        assert.are.equal(lsb.CanvasLayout, deprecated.CanvasLayout)
+        assert.is_table(deprecated.CanvasLayout)
     end)
 
-    it("PathAdapter resolves nested values and defaults", function()
+    it("exposes only the planned public runtime surface on builder instances", function()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local sb = lsb.New({
+            name = "Phase 2",
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        assert.is_function(sb.GetSection)
+        assert.is_function(sb.GetRootPage)
+        assert.is_function(sb.GetPage)
+        assert.is_function(sb.HasCategory)
+        assert.is_nil(sb.GetRoot)
+        assert.is_nil(sb.Register)
+        assert.is_nil(sb.EmbedCanvas)
+        assert.is_nil(sb.Checkbox)
+        assert.is_nil(sb.List)
+        assert.is_nil(sb.Control)
+    end)
+
+    it("store/defaults bindings resolve nested values and defaults", function()
         local profile = {
             root = {
                 enabled = true,
@@ -64,20 +99,107 @@ describe("LibSettingsBuilder Core", function()
             },
         }
         local lsb = LibStub("LibSettingsBuilder-1.0")
-        local adapter = lsb.PathAdapter({
-            getStore = function()
+        local sb = lsb.New({
+            name = "Store Binding",
+            store = function()
                 return profile
             end,
-            getDefaults = function()
+            defaults = function()
                 return defaults
             end,
+            onChanged = function() end,
         })
 
-        local binding = adapter:resolve("root.enabled")
+        local binding = sb._adapter:resolve("root.enabled")
         assert.are.equal(true, binding.get())
         assert.are.equal(false, binding.default)
 
         binding.set(false)
         assert.are.equal(false, profile.root.enabled)
+    end)
+
+    it("registers canonical raw row tables without public helper constructors", function()
+        local profile = {
+            general = {
+                enabled = true,
+                threshold = 5,
+            },
+        }
+        local defaults = {
+            general = {
+                enabled = false,
+                threshold = 0,
+            },
+        }
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local sb = lsb.New({
+            name = "Phase 2",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                { id = "enabled", type = "checkbox", path = "general.enabled", name = "Enable" },
+                                {
+                                    id = "threshold",
+                                    type = "slider",
+                                    path = "general.threshold",
+                                    name = "Threshold",
+                                    min = 0,
+                                    max = 10,
+                                    step = 1,
+                                    formatValue = function(value)
+                                        return tostring(value)
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        assert.has_no.errors(function()
+            local page = sb:GetPage("general", "main")
+            assert.is_table(page)
+            assert.are.equal("Phase 2.General", page:GetId())
+        end)
+    end)
+
+    it("fails early when a raw path-bound row is registered without a path adapter", function()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local ok, err = pcall(function()
+            lsb.New({
+                name = "Phase 2 Invalid",
+                onChanged = function() end,
+                sections = {
+                    {
+                        key = "general",
+                        name = "General",
+                        pages = {
+                            {
+                                key = "main",
+                                rows = {
+                                    { type = "checkbox", path = "general.enabled", name = "Enable" },
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+        end)
+
+        assert.is_false(ok)
+        assert.is_truthy(tostring(err):find("requires store/defaults on the builder", 1, true))
     end)
 end)

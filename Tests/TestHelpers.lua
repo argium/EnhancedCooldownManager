@@ -1487,6 +1487,9 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     ns.CloneValue = deepClone
     ns.Runtime = ns.Runtime or {}
     ns.Runtime.ScheduleLayoutUpdate = function() end
+    ns.GetGlobalConfig = function()
+        return mod.db.profile and mod.db.profile.global
+    end
     ns.IsDeathKnight = function()
         local _, classToken = UnitClass("player")
         return classToken == "DEATHKNIGHT"
@@ -1515,7 +1518,7 @@ function TestHelpers.RegisterSettingsTree(SB, spec, rootName)
         error(("RegisterSettingsTree: root already exists with name '%s'"):format(tostring(SB.name)))
     end
 
-    SB:Register(spec)
+    SB:_registerTree(spec)
     return SB
 end
 
@@ -1534,9 +1537,9 @@ function TestHelpers.RegisterSectionSpec(SB, sectionSpec, rootName)
     if section then
         if sectionSpec.pages then
             local firstPage = sectionSpec.pages[1]
-            page = firstPage and section:GetPage(firstPage.key) or nil
+            page = firstPage and root:GetPage(sectionSpec.key, firstPage.key) or nil
         else
-            page = section:GetPage(sectionSpec.pageKey or "main")
+            page = root:GetPage(sectionSpec.key, sectionSpec.pageKey or "main")
         end
     end
 
@@ -1551,7 +1554,7 @@ end
 --- @return table|nil page Registered root page handle
 function TestHelpers.RegisterRootPageSpec(SB, pageSpec, rootName)
     local root = TestHelpers.RegisterSettingsTree(SB, { page = pageSpec }, rootName)
-    return root, root:GetPage(pageSpec.key)
+    return root, root:GetRootPage()
 end
 
 --- Collect all proxy settings created during a function call.

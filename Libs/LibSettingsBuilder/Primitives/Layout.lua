@@ -10,7 +10,7 @@ end
 
 local internal = lib._internal
 local copyMixin = internal.copyMixin
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
 
 function BuilderMixin:_createRootCategory(name)
@@ -45,13 +45,13 @@ end
 function BuilderMixin:CreateCanvasLayout(name, parentCategory)
     local frame = CreateFrame("Frame", nil)
     self:_createCanvasSubcategory(frame, name, parentCategory)
-    local metrics = copyMixin({}, lib.CanvasLayoutDefaults)
+    local metrics = copyMixin({}, internal.CanvasLayoutDefaults)
     return setmetatable({
         frame = frame,
         yPos = 0,
         elements = {},
         _metrics = metrics,
-    }, { __index = lib.CanvasLayout })
+    }, { __index = internal.CanvasLayout })
 end
 
 Deprecated.CreateCanvasLayout = function(...)

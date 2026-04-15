@@ -139,7 +139,10 @@ local deleteProfileRow, getDeleteProfile, resetDeleteProfile = createProfilePick
 
 ProfileOptions.key = "profile"
 ProfileOptions.name = L["PROFILES"]
-ProfileOptions.rows = {
+ProfileOptions.pages = {
+    {
+        key = "main",
+        rows = {
     { type = "header", name = L["ACTIVE_PROFILE"] },
     {
         type = "dropdown",
@@ -161,8 +164,8 @@ ProfileOptions.rows = {
         set = function(value)
             ns.Addon.db:SetProfile(value)
         end,
-        onSet = function(_, _, page)
-            page:Refresh()
+        onSet = function(ctx)
+            ctx.page:Refresh()
         end,
     },
     {
@@ -170,11 +173,11 @@ ProfileOptions.rows = {
         name = L["NEW_PROFILE"],
         buttonText = L["NEW_PROFILE"],
         tooltip = L["NEW_PROFILE_DESC"],
-        onClick = function(page)
+        onClick = function(ctx)
             StaticPopup_Show("ECM_NEW_PROFILE", nil, nil, {
                 onAccept = function(name)
                     ns.Addon.db:SetProfile(name)
-                    page:Refresh()
+                    ctx.page:Refresh()
                 end,
             })
         end,
@@ -186,7 +189,7 @@ ProfileOptions.rows = {
         name = L["COPY"],
         buttonText = L["COPY"],
         tooltip = L["COPY_DESC"],
-        onClick = function(page)
+        onClick = function(ctx)
             local profile = getCopyProfile()
             if not profile or profile == "" then
                 return
@@ -195,7 +198,7 @@ ProfileOptions.rows = {
                 onAccept = function()
                     ns.Addon.db:CopyProfile(profile)
                     resetCopyProfile()
-                    page:Refresh()
+                    ctx.page:Refresh()
                 end,
             })
         end,
@@ -206,7 +209,7 @@ ProfileOptions.rows = {
         name = L["DELETE"],
         buttonText = L["DELETE"],
         tooltip = L["DELETE_DESC"],
-        onClick = function(page)
+        onClick = function(ctx)
             local profile = getDeleteProfile()
             if not profile or profile == "" then
                 return
@@ -215,7 +218,7 @@ ProfileOptions.rows = {
                 onAccept = function()
                     ns.Addon.db:DeleteProfile(profile)
                     resetDeleteProfile()
-                    page:Refresh()
+                    ctx.page:Refresh()
                 end,
             })
         end,
@@ -227,9 +230,9 @@ ProfileOptions.rows = {
         buttonText = L["RESET_PROFILE_BUTTON"],
         tooltip = L["RESET_PROFILE_DESC"],
         confirm = L["RESET_PROFILE_CONFIRM"],
-        onClick = function(page)
+        onClick = function(ctx)
             ns.Addon.db:ResetProfile()
-            page:Refresh()
+            ctx.page:Refresh()
         end,
     },
     { type = "header", name = L["IMPORT_EXPORT"] },
@@ -259,5 +262,7 @@ ProfileOptions.rows = {
             end
             ns.Addon:ShowExportDialog(exportString)
         end,
+    },
+        },
     },
 }

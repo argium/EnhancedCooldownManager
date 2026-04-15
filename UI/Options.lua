@@ -4,14 +4,6 @@
 
 local _, ns = ...
 local L = ns.L
-local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
-
-local OU = ns.OptionUtil
-local getGlobalConfig = ns.GetGlobalConfig or function()
-    local db = ns.Addon and ns.Addon.db
-    local profile = db and db.profile
-    return profile and profile.global
-end
 
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
 local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
@@ -24,36 +16,17 @@ local LSB = LibStub("LibSettingsBuilder-1.0")
 
 ns.Settings = LSB:New({
     name = L["ADDON_NAME"],
-    pathAdapter = LSB.PathAdapter({
-        getStore = function()
-            return ns.Addon.db and ns.Addon.db.profile
-        end,
-        getDefaults = function()
-            return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
-        end,
-        getNestedValue = OU.GetNestedValue,
-        setNestedValue = OU.SetNestedValue,
-    }),
-    varPrefix = "ECM",
-    onChanged = function(spec)
-        if spec.layout ~= false then
+    store = function()
+        return ns.Addon.db and ns.Addon.db.profile
+    end,
+    defaults = function()
+        return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    end,
+    onChanged = function(ctx)
+        if ctx.spec.layout ~= false then
             ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
     end,
-    compositeDefaults = {
-        FontOverrideGroup = {
-            fontValues = LSMW.GetFontValues,
-            fontFallback = function()
-                local gc = getGlobalConfig()
-                return gc and gc.font
-            end,
-            fontSizeFallback = function()
-                local gc = getGlobalConfig()
-                return gc and gc.fontSize
-            end,
-            fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
-        },
-    },
 })
 ns.SettingsBuilder = ns.Settings
 
@@ -138,10 +111,9 @@ end
 
 local function getDefaultOptionsCategoryToken()
     local root = ns.Settings
-    local section = root and root:GetSection("general")
-    local page = section and section:GetPage("main")
+    local page = root and root:GetPage("general", "main")
     if page then
-        return page:GetID()
+        return page:GetId()
     end
 
     return nil
@@ -180,7 +152,7 @@ function Options:InstallCategoryTracking()
 end
 
 function Options:OnInitialize()
-    ns.Settings:Register({
+    ns.Settings:_registerTree({
         page = ns.AboutPage,
         sections = {
             ns.GeneralOptions,
@@ -194,6 +166,17 @@ function Options:OnInitialize()
             ns.AdvancedOptions,
         },
     })
+
+    if ns.ExtraIconsOptionsUtil then
+        ns.ExtraIconsOptionsUtil.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
+        ns.ExtraIconsOptionsUtil.EnsureItemLoadFrame()
+    end
+    if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
+        ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))
+    end
+    if ns.BuffBarsOptions and ns.BuffBarsOptions.SetSpellColorsPage then
+        ns.BuffBarsOptions.SetSpellColorsPage(ns.Settings:GetPage("buffBars", "spellColors"))
+    end
 
     self:InstallCategoryTracking()
 end

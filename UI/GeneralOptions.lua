@@ -5,59 +5,68 @@
 local _, ns = ...
 local L = ns.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
+local function isFadeDisabled()
+    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local fade = gc and gc.outOfCombatFade
+    return not (fade and fade.enabled)
+end
+
 local GeneralOptions = {
     key = "general",
     name = L["GENERAL"],
     path = "global",
-    rows = {
+    pages = {
+        {
+            key = "main",
+            rows = {
         -- Visibility
         { type = "header", name = L["VISIBILITY"] },
         {
             type = "checkbox",
             path = "hideWhenMounted",
             name = L["HIDE_WHEN_MOUNTED"],
-            desc = L["HIDE_WHEN_MOUNTED_DESC"],
+            tooltip = L["HIDE_WHEN_MOUNTED_DESC"],
         },
         {
             type = "checkbox",
             path = "hideOutOfCombatInRestAreas",
             name = L["HIDE_IN_REST_AREAS"],
-            desc = L["HIDE_IN_REST_AREAS_DESC"],
+            tooltip = L["HIDE_IN_REST_AREAS_DESC"],
         },
         {
             id = "fade",
             type = "checkbox",
             path = "global.outOfCombatFade.enabled",
             name = L["FADE_OUT_OF_COMBAT"],
-            desc = L["FADE_OUT_OF_COMBAT_DESC"],
+            tooltip = L["FADE_OUT_OF_COMBAT_DESC"],
         },
         {
             type = "slider",
             path = "global.outOfCombatFade.opacity",
             name = L["OUT_OF_COMBAT_OPACITY"],
-            desc = L["OUT_OF_COMBAT_OPACITY_DESC"],
+            tooltip = L["OUT_OF_COMBAT_OPACITY_DESC"],
             min = 0,
             max = 100,
             step = 5,
-            parent = "fade",
+            disabled = isFadeDisabled,
         },
         {
             type = "checkbox",
             path = "global.outOfCombatFade.exceptInInstance",
             name = L["EXCEPT_INSIDE_INSTANCES"],
-            parent = "fade",
+            disabled = isFadeDisabled,
         },
         {
             type = "checkbox",
             path = "global.outOfCombatFade.exceptIfTargetCanBeAttacked",
             name = L["EXCEPT_TARGET_HOSTILE"],
-            parent = "fade",
+            disabled = isFadeDisabled,
         },
         {
             type = "checkbox",
             path = "global.outOfCombatFade.exceptIfTargetCanBeHelped",
             name = L["EXCEPT_TARGET_FRIENDLY"],
-            parent = "fade",
+            disabled = isFadeDisabled,
         },
 
         -- Appearance
@@ -66,14 +75,14 @@ local GeneralOptions = {
             type = "custom",
             path = "texture",
             name = L["BAR_TEXTURE"],
-            desc = L["BAR_TEXTURE_DESC"],
+            tooltip = L["BAR_TEXTURE_DESC"],
             template = LSMW.TEXTURE_PICKER_TEMPLATE,
         },
         {
             type = "custom",
             path = "font",
             name = L["FONT"],
-            desc = L["FONT_DESC"],
+            tooltip = L["FONT_DESC"],
             template = LSMW.FONT_PICKER_TEMPLATE,
         },
         {
@@ -102,7 +111,7 @@ local GeneralOptions = {
             type = "checkbox",
             path = "fontShadow",
             name = L["FONT_SHADOW"],
-            desc = L["FONT_SHADOW_DESC"],
+            tooltip = L["FONT_SHADOW_DESC"],
         },
 
         -- Sizing
@@ -111,10 +120,12 @@ local GeneralOptions = {
             type = "slider",
             path = "barHeight",
             name = L["BAR_HEIGHT"],
-            desc = L["BAR_HEIGHT_DESC"],
+            tooltip = L["BAR_HEIGHT_DESC"],
             min = 10,
             max = 40,
             step = 1,
+        },
+            },
         },
     },
 }
@@ -124,19 +135,22 @@ local AdvancedOptions = {
     key = "advancedOptions",
     name = L["ADVANCED_OPTIONS"],
     path = "global",
-    rows = {
+    pages = {
+        {
+            key = "main",
+            rows = {
         { type = "header", name = L["TROUBLESHOOTING"] },
         {
             type = "checkbox",
             path = "debug",
             name = L["DEBUG_MODE"],
-            desc = L["DEBUG_MODE_DESC"],
+            tooltip = L["DEBUG_MODE_DESC"],
         },
         {
             type = "checkbox",
             path = "debugToChat",
             name = L["DEBUG_TO_CHAT"],
-            desc = L["DEBUG_TO_CHAT_DESC"],
+            tooltip = L["DEBUG_TO_CHAT_DESC"],
             disabled = function()
                 local gc = ns.GetGlobalConfig()
                 return not (gc and gc.debug)
@@ -159,10 +173,12 @@ local AdvancedOptions = {
             type = "slider",
             path = "updateFrequency",
             name = L["UPDATE_FREQUENCY"],
-            desc = L["UPDATE_FREQUENCY_DESC"],
+            tooltip = L["UPDATE_FREQUENCY_DESC"],
             min = 0.04,
             max = 0.5,
             step = 0.02,
+        },
+            },
         },
     },
 }

@@ -43,6 +43,7 @@ describe("ExtraIconsOptions data helpers", function()
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
         }
+        TestHelpers.LoadChunk("UI/ExtraIconsOptionsUtil.lua", "ExtraIconsOptionsUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
     end)
@@ -840,10 +841,13 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
+        TestHelpers.LoadChunk("UI/ExtraIconsOptionsUtil.lua", "ExtraIconsOptionsUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
-        capturedPage = ns.ExtraIconsOptions
+        capturedPage = ns.ExtraIconsOptions.pages[1]
         local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
         registeredPage = page
+        ns.ExtraIconsOptionsUtil.SetRegisteredPage(page)
+        ns.ExtraIconsOptionsUtil.EnsureItemLoadFrame()
         registeredPage.Refresh = function()
             refreshCalls[#refreshCalls + 1] = registeredPage._category
         end

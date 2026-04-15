@@ -62,51 +62,55 @@ describe("LibSettingsBuilder Collections", function()
         TestHelpers.LoadLibSettingsBuilder()
     end)
 
-    it("creates first-class list and sectionList initializers after the split load", function()
+    it("creates first-class list and sectionList initializers from raw row specs", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
-        local SB = lsb:New({
-            pathAdapter = lsb.PathAdapter({
-                getStore = function()
-                    return { root = {} }
-                end,
-                getDefaults = function()
-                    return { root = {} }
-                end,
-            }),
-            varPrefix = "COLL",
+        local SB = lsb.New({
+            name = "Collections",
+            store = function()
+                return { root = {} }
+            end,
+            defaults = function()
+                return { root = {} }
+            end,
             onChanged = function() end,
-        })
-        local root = SB.GetRoot("Collections")
-        root:Register({
             sections = {
                 {
                     key = "rows",
                     name = "Rows",
-                    rows = {},
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    id = "listRow",
+                                    type = "list",
+                                    height = 120,
+                                    items = function()
+                                        return {}
+                                    end,
+                                    variant = "swatch",
+                                },
+                                {
+                                    id = "sectionRow",
+                                    type = "sectionList",
+                                    height = 120,
+                                    sections = function()
+                                        return {}
+                                    end,
+                                },
+                            },
+                        },
+                    },
                 },
             },
         })
-        local page = root:GetSection("rows"):GetPage("main")
-        local category = page._category
+        local page = SB:GetPage("rows", "main")
+        local initializers = page._category:GetLayout()._initializers
+        local listInit = initializers[1]
+        local sectionInit = initializers[2]
 
-        local listInit = SB.List({
-            category = category,
-            height = 120,
-            items = function()
-                return {}
-            end,
-            variant = "swatch",
-        })
-        local sectionInit = SB.SectionList({
-            category = category,
-            height = 120,
-            sections = function()
-                return {}
-            end,
-        })
-
-        assert.are.equal(SB.EMBED_CANVAS_TEMPLATE, listInit._template)
-        assert.are.equal(SB.EMBED_CANVAS_TEMPLATE, sectionInit._template)
+        assert.are.equal("SettingsListElementTemplate", listInit._template)
+        assert.are.equal("SettingsListElementTemplate", sectionInit._template)
         assert.is_function(page.Refresh)
     end)
 end)

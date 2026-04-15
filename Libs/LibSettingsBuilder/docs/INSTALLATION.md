@@ -63,17 +63,17 @@ Most library features are available with no extra XML:
 
 `input` is a built-in row type implemented entirely in Lua on top of `SettingsListElementTemplate` plus a runtime-created `InputBoxTemplate` edit box.
 
-Only `SB.Custom(...)` requires you to supply your own template. In that case:
+Only `type = "custom"` rows require you to supply your own template. In that case:
 
 1. define the template in XML,
-2. load that XML from your TOC before calling `root:Register({ ... })`, and
+2. load that XML from your TOC before calling `LSB.New({ ... })`, and
 3. pass the template name through `spec.template`.
 
 ## Canvas layout compatibility
 
 Canvas layout spacing defaults are still available for older `CreateCanvasLayout(...)` pages. New `canvas` rows stay on the current lifecycle path, so canvas content continues to reuse the existing frame handling without special-case rewrites.
 
-- per-library via `SB.SetCanvasLayoutDefaults(overrides)`
-- per-layout via `SB.ConfigureCanvasLayout(layout, overrides)`
+- per-library via `LSBDeprecated.SetCanvasLayoutDefaults(overrides)`
+- per-layout via `LSBDeprecated.ConfigureCanvasLayout(layout, overrides)`
 
 See [API Reference](API_REFERENCE.md) for examples.

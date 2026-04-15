@@ -8,7 +8,11 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = lib._internal.BuilderMixin
+
+local function callBuilder(builder, methodName, ...)
+    return BuilderMixin[methodName](builder, ...)
+end
 
 function BuilderMixin:HeightOverrideSlider(sectionPath, spec)
     spec = spec or {}
@@ -27,7 +31,7 @@ function BuilderMixin:HeightOverrideSlider(sectionPath, spec)
         end,
     }
     self:_propagateModifiers(childSpec, spec)
-    return self:Slider(childSpec)
+    return callBuilder(self, "Slider", childSpec)
 end
 
 --- Font override group.
@@ -37,7 +41,7 @@ end
 ---   fontSizeFallback  function() -> number    (fallback font size)
 ---   fontTemplate      string                  (custom template for the font picker)
 function BuilderMixin:FontOverrideGroup(sectionPath, spec)
-    spec = self:_mergeCompositeDefaults("FontOverrideGroup", spec)
+    spec = spec or {}
     local overridePath = sectionPath .. ".overrideFont"
 
     local enabledSpec = {
@@ -49,7 +53,7 @@ function BuilderMixin:FontOverrideGroup(sectionPath, spec)
         end,
     }
     self:_propagateModifiers(enabledSpec, spec)
-    local enabledInit, enabledSetting = self:Checkbox(enabledSpec)
+    local enabledInit, enabledSetting = callBuilder(self, "Checkbox", enabledSpec)
 
     local outerDisabled = spec.disabled
     local function isOverrideDisabled()
@@ -80,9 +84,9 @@ function BuilderMixin:FontOverrideGroup(sectionPath, spec)
     local fontInit
     if spec.fontTemplate then
         fontSpec.template = spec.fontTemplate
-        fontInit = self:Custom(fontSpec)
+        fontInit = callBuilder(self, "Custom", fontSpec)
     else
-        fontInit = self:Dropdown(fontSpec)
+        fontInit = callBuilder(self, "Dropdown", fontSpec)
     end
 
     local sizeSpec = {
@@ -104,7 +108,7 @@ function BuilderMixin:FontOverrideGroup(sectionPath, spec)
         end,
     }
     self:_propagateModifiers(sizeSpec, spec)
-    local sizeInit = self:Slider(sizeSpec)
+    local sizeInit = callBuilder(self, "Slider", sizeSpec)
 
     return {
         enabledInit = enabledInit,
@@ -123,7 +127,7 @@ function BuilderMixin:BorderGroup(borderPath, spec)
         tooltip = spec.enabledTooltip,
     }
     self:_propagateModifiers(enabledSpec, spec)
-    local enabledInit, enabledSetting = self:Checkbox(enabledSpec)
+    local enabledInit, enabledSetting = callBuilder(self, "Checkbox", enabledSpec)
 
     local thicknessSpec = {
         path = borderPath .. ".thickness",
@@ -132,25 +136,25 @@ function BuilderMixin:BorderGroup(borderPath, spec)
         min = spec.thicknessMin or 1,
         max = spec.thicknessMax or 10,
         step = spec.thicknessStep or 1,
-        parent = enabledInit,
-        parentCheck = function()
+        _parentInitializer = enabledInit,
+        _parentPredicate = function()
             return enabledSetting:GetValue()
         end,
     }
     self:_propagateModifiers(thicknessSpec, spec)
-    local thicknessInit = self:Slider(thicknessSpec)
+    local thicknessInit = callBuilder(self, "Slider", thicknessSpec)
 
     local colorSpec = {
         path = borderPath .. ".color",
         name = spec.colorName or "Border color",
         tooltip = spec.colorTooltip,
-        parent = enabledInit,
-        parentCheck = function()
+        _parentInitializer = enabledInit,
+        _parentPredicate = function()
             return enabledSetting:GetValue()
         end,
     }
     self:_propagateModifiers(colorSpec, spec)
-    local colorInit = self:Color(colorSpec)
+    local colorInit = callBuilder(self, "Color", colorSpec)
 
     return {
         enabledInit = enabledInit,

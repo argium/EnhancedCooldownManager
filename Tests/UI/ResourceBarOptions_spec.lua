@@ -25,7 +25,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
             TestHelpers.RegisterSectionSpec(SB, ns.ResourceBarOptions)
-            capturedPage = ns.ResourceBarOptions
+            capturedPage = ns.ResourceBarOptions.pages[1]
         end)
     end)
 

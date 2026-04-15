@@ -29,7 +29,7 @@ describe("RuneBarOptions getters/setters/defaults", function()
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
             TestHelpers.RegisterSectionSpec(SB, ns.RuneBarOptions)
-            capturedPage = ns.RuneBarOptions
+            capturedPage = ns.RuneBarOptions.pages[1]
         end)
     end)
 
@@ -103,9 +103,9 @@ describe("RuneBarOptions getters/setters/defaults", function()
             assert.is_nil(settings["ECM_runeBar_anchorMode"])
         end)
         it("adds an inline layout button row to the page", function()
-            assert.are.equal("button", capturedPage.rows[3].type)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[3].name)
-            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[3].buttonText)
+            assert.are.equal("button", capturedPage.rows[2].type)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[2].name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[2].buttonText)
         end)
     end)
 

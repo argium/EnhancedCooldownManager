@@ -13,19 +13,19 @@ if not lib then
 end
 
 lib._loadState = { open = true }
-lib._internal = {}
-lib.BuilderMixin = lib.BuilderMixin or {}
+lib._internal = lib._internal or {}
 lib.LSBDeprecated = lib.LSBDeprecated or {}
 
 local internal = lib._internal
-local BuilderMixin = lib.BuilderMixin
+internal.BuilderMixin = internal.BuilderMixin or {}
+local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
 
-lib.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
-lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
-lib.INFOROW_TEMPLATE = "SettingsListElementTemplate"
-lib.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
-lib.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
+internal.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
+internal.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
+internal.INFOROW_TEMPLATE = "SettingsListElementTemplate"
+internal.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
+internal.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
 
 lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
 lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
@@ -368,10 +368,6 @@ local function createHeaderTitle(parent, text)
     return createTitle(parent, "GameFontHighlightLarge", 7, -16, text)
 end
 
-lib.CreateHeaderTitle = createHeaderTitle
-lib.CreateSubheaderTitle = createSubheaderTitle
-BuilderMixin.CreateHeaderTitle = createHeaderTitle
-BuilderMixin.CreateSubheaderTitle = createSubheaderTitle
 Deprecated.CreateHeaderTitle = createHeaderTitle
 Deprecated.CreateSubheaderTitle = createSubheaderTitle
 
@@ -390,7 +386,7 @@ Deprecated.CreateSubheaderTitle = createSubheaderTitle
 --   Indent per level:    15
 --------------------------------------------------------------------------------
 
-lib.CanvasLayoutDefaults = lib.CanvasLayoutDefaults
+internal.CanvasLayoutDefaults = internal.CanvasLayoutDefaults
     or {
         elementHeight = 26,
         headerHeight = 50,
@@ -402,13 +398,14 @@ lib.CanvasLayoutDefaults = lib.CanvasLayoutDefaults
         swatchCenterX = DEFAULT_SWATCH_CENTER_X,
         verifiedPatch = "Retail 12.0/12.1",
     }
+Deprecated.CanvasLayoutDefaults = internal.CanvasLayoutDefaults
 
 local CanvasLayout = {}
-lib.CanvasLayout = CanvasLayout
+internal.CanvasLayout = CanvasLayout
 Deprecated.CanvasLayout = CanvasLayout
 
 local function getCanvasLayoutMetrics(layout)
-    return layout._metrics or lib.CanvasLayoutDefaults
+    return layout._metrics or internal.CanvasLayoutDefaults
 end
 
 function CanvasLayout:_Advance(h)
@@ -479,7 +476,7 @@ function CanvasLayout:AddColorSwatch(labelText)
     local metrics = getCanvasLayoutMetrics(self)
     local row = self:_CreateRow()
     self:_AddLabel(row, labelText)
-    local swatch = lib.CreateColorSwatch(row)
+    local swatch = internal.createColorSwatch(row)
     swatch:SetPoint("LEFT", row, "CENTER", metrics.swatchCenterX, 0)
     row._swatch = swatch
     return row, swatch
@@ -545,7 +542,7 @@ end
 --- SettingsColorSwatchMixin (hover effects, color picker integration).
 ---@param parent Frame
 ---@return Button swatch  (swatch._tex points to swatch.Color for backward compat)
-function lib.CreateColorSwatch(parent)
+local function createColorSwatch(parent)
     local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
     swatch._tex = swatch.Color
     if swatch.EnableMouse then
@@ -556,14 +553,9 @@ function lib.CreateColorSwatch(parent)
     end
     return swatch
 end
+internal.createColorSwatch = createColorSwatch
 
-BuilderMixin.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
-BuilderMixin.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
-BuilderMixin.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
-BuilderMixin.INPUTROW_TEMPLATE = lib.INPUTROW_TEMPLATE
-BuilderMixin.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
-BuilderMixin.CreateColorSwatch = lib.CreateColorSwatch
-Deprecated.CreateColorSwatch = lib.CreateColorSwatch
+Deprecated.CreateColorSwatch = createColorSwatch
 
 --------------------------------------------------------------------------------
 -- Path accessors: built-in dot-path resolution with numeric key support
@@ -619,16 +611,7 @@ local function defaultSetNestedValue(tbl, path, value)
     current[resolved] = value
 end
 
---- Creates a path adapter for resolving dot-delimited paths to get/set/default
---- bindings. Built-in accessors handle numeric path segments (e.g. "colors.0").
----@param config table
----   Required: getStore (function() -> table), getDefaults (function() -> table)
----   Optional: getNestedValue, setNestedValue (custom path accessors)
----@return table adapter with :resolve(path) and :read(path) methods
-function lib.PathAdapter(config)
-    assert(config.getStore, "PathAdapter: getStore is required")
-    assert(config.getDefaults, "PathAdapter: getDefaults is required")
-
+local function createStoreAdapter(config)
     local getNested = config.getNestedValue or defaultGetNestedValue
     local setNested = config.setNestedValue or defaultSetNestedValue
 
@@ -654,7 +637,29 @@ local function defaultSliderFormatter(value)
     return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
 end
 
-local MODIFIER_KEYS = { "category", "parent", "parentCheck", "disabled", "hidden", "layout" }
+local function makeVarPrefixFromName(name)
+    local words = {}
+    for word in tostring(name or ""):gmatch("[A-Za-z0-9]+") do
+        words[#words + 1] = word
+    end
+
+    local prefix = ""
+    if #words > 1 then
+        for _, word in ipairs(words) do
+            prefix = prefix .. word:sub(1, 1):upper()
+        end
+    elseif words[1] then
+        prefix = words[1]:upper():gsub("[^A-Z0-9]", "")
+    end
+
+    if prefix == "" then
+        prefix = "LSB"
+    end
+
+    return prefix
+end
+
+local MODIFIER_KEYS = { "category", "disabled", "hidden", "layout" }
 
 local COMMON_SPEC_FIELDS = {
     path = true,
@@ -664,8 +669,6 @@ local COMMON_SPEC_FIELDS = {
     onSet = true,
     getTransform = true,
     setTransform = true,
-    parent = true,
-    parentCheck = true,
     disabled = true,
     hidden = true,
     layout = true,
@@ -688,8 +691,6 @@ local EXTRA_FIELDS_BY_TYPE = {
         numeric = true,
         onTextChanged = true,
         resolveText = true,
-        watch = true,
-        watchVariables = true,
         width = true,
     },
     custom = { template = true, varType = true },
@@ -702,6 +703,18 @@ end
 function BuilderMixin:_makeVarName(spec)
     local id = spec.key or spec.path
     return self:_makeVarNameFromIdentifier(id)
+end
+
+function BuilderMixin:_createCallbackContext(spec, setting)
+    return {
+        builder = self,
+        category = self:_resolveCategory(spec),
+        key = spec.key,
+        page = spec._page,
+        path = spec.path,
+        setting = setting,
+        spec = spec,
+    }
 end
 
 function BuilderMixin:_resolveCategory(spec)
@@ -729,10 +742,11 @@ function BuilderMixin:_registerCategoryRefreshable(category, initializer)
 end
 
 function BuilderMixin:_postSet(spec, value, setting)
+    local ctx = self:_createCallbackContext(spec, setting)
     if spec.onSet then
-        spec.onSet(value, setting, spec._page)
+        spec.onSet(ctx, value)
     end
-    self._config.onChanged(spec, value)
+    self._config.onChanged(ctx, value)
     self:_reevaluateReactiveControls()
 end
 
@@ -750,7 +764,7 @@ function BuilderMixin:_resolveBinding(spec)
     end
 
     assert(hasPath, "spec must have either path or get/set")
-    assert(self._adapter, "path mode requires a pathAdapter on the builder")
+    assert(self._adapter, "path mode requires store/defaults on the builder")
 
     local binding = self._adapter:resolve(spec.path)
     if spec.default ~= nil then
@@ -789,7 +803,7 @@ function BuilderMixin:_makeProxySetting(spec, varType, defaultFallback, binding)
 
     local function setValueNoCallback(_, value)
         value = applyValue(value)
-        self._config.onChanged(spec, value)
+        self._config.onChanged(self:_createCallbackContext(spec, setting), value)
         self:_reevaluateReactiveControls()
     end
 
@@ -814,14 +828,6 @@ function BuilderMixin:_propagateModifiers(target, source)
             target[key] = source[key]
         end
     end
-end
-
-function BuilderMixin:_mergeCompositeDefaults(functionName, spec)
-    local defaults = self._config.compositeDefaults and self._config.compositeDefaults[functionName]
-    if not defaults then
-        return spec or {}
-    end
-    return spec and copyMixin(copyMixin({}, defaults), spec) or copyMixin({}, defaults)
 end
 
 function BuilderMixin:_validateSpecFields(controlType, spec)
@@ -865,17 +871,17 @@ function BuilderMixin:_setCanvasInteractive(frame, enabled)
 end
 
 function BuilderMixin:_isParentEnabled(spec)
-    if not spec.parent then
+    if not spec._parentInitializer then
         return true
     end
-    if spec.parentCheck then
-        return spec.parentCheck()
+    if spec._parentPredicate then
+        return spec._parentPredicate()
     end
-    if not spec.parent.GetSetting then
+    if not spec._parentInitializer.GetSetting then
         return true
     end
 
-    local setting = spec.parent:GetSetting()
+    local setting = spec._parentInitializer:GetSetting()
     if not setting then
         return true
     end
@@ -934,15 +940,15 @@ function BuilderMixin:_applyModifiers(initializer, spec)
         return
     end
 
-    if spec.disabled or spec.canvas or spec.parent then
+    if spec.disabled or spec.canvas or spec._parentInitializer then
         initializer:AddModifyPredicate(function()
             return self:_applyEnabledState(initializer, spec)
         end)
         self:_applyEnabledState(initializer, spec)
     end
 
-    if spec.parent then
-        initializer:SetParentInitializer(spec.parent, function()
+    if spec._parentInitializer then
+        initializer:SetParentInitializer(spec._parentInitializer, function()
             return self:_isParentEnabled(spec)
         end)
     end
@@ -980,24 +986,45 @@ end
 
 BuilderMixin._defaultSliderFormatter = defaultSliderFormatter
 
---- Create a new SettingsBuilder instance.
+--- Create a new LibSettingsBuilder runtime instance.
 ---@param config table
 ---   Required fields:
----     varPrefix      string            e.g. "ECM"
----     onChanged      function(spec, value) called after each setter
+---     onChanged      function(ctx, value) called after each setter
 ---   Optional fields:
 ---     name           string            root category display name for declarative registration
----     pathAdapter    table  PathAdapter instance for path-based controls
----     compositeDefaults table keyed by composite function name
+---     store          table             nested config store for path-bound rows
+---     defaults       table             nested defaults table for path-bound rows
 ---@return table builder instance with the full SB API
-function lib:New(config)
-    assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
+function lib.New(selfOrConfig, maybeConfig)
+    local config = maybeConfig or selfOrConfig
+    assert(type(config) == "table", "LibSettingsBuilder.New: config table is required")
+
+    assert(config.varPrefix == nil, "LibSettingsBuilder: varPrefix is not part of the v2 config")
+    assert(config.pathAdapter == nil, "LibSettingsBuilder: pathAdapter is not part of the v2 config")
+    assert(config.compositeDefaults == nil, "LibSettingsBuilder: compositeDefaults is not part of the v2 config")
+    config.varPrefix = makeVarPrefixFromName(config.name)
     assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
+
+    local adapter
+    if config.store ~= nil then
+        local getStore = type(config.store) == "function" and config.store or function()
+            return config.store
+        end
+        local getDefaults = type(config.defaults) == "function" and config.defaults or function()
+            return config.defaults
+        end
+        adapter = createStoreAdapter({
+            getDefaults = getDefaults,
+            getNestedValue = config.getNestedValue,
+            getStore = getStore,
+            setNestedValue = config.setNestedValue,
+        })
+    end
 
     local SB
     SB = setmetatable({
         _config = config,
-        _adapter = config.pathAdapter,
+        _adapter = adapter,
         _boundMethods = {},
         _rootCategory = nil,
         _rootCategoryName = nil,
@@ -1023,6 +1050,11 @@ function lib:New(config)
                 return value
             end
 
+            local publicBuilderMethods = internal.publicBuilderMethods
+            if publicBuilderMethods and key:sub(1, 1) ~= "_" and not publicBuilderMethods[key] then
+                return nil
+            end
+
             local bound = SB._boundMethods[key]
             if bound then
                 return bound
@@ -1043,6 +1075,13 @@ function lib:New(config)
         SB:_initializeRoot(config.name)
     end
 
+    if config.page or config.sections then
+        SB:_registerTree({
+            page = config.page,
+            sections = config.sections,
+        })
+    end
+
     return SB
 end
 
@@ -1061,3 +1100,15 @@ internal.applyActionButtonTextures = applyActionButtonTextures
 internal.evaluateStaticOrFunction = evaluateStaticOrFunction
 internal.getCanvasLayoutMetrics = getCanvasLayoutMetrics
 internal.defaultSwatchCenterX = DEFAULT_SWATCH_CENTER_X
+
+lib.BuilderMixin = nil
+lib.CanvasLayout = nil
+lib.CanvasLayoutDefaults = nil
+lib.CreateColorSwatch = nil
+lib.CreateHeaderTitle = nil
+lib.CreateSubheaderTitle = nil
+lib.EMBED_CANVAS_TEMPLATE = nil
+lib.INFOROW_TEMPLATE = nil
+lib.INPUTROW_TEMPLATE = nil
+lib.SCROLL_DROPDOWN_TEMPLATE = nil
+lib.SUBHEADER_TEMPLATE = nil

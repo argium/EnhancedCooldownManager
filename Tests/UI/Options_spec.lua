@@ -97,7 +97,7 @@ describe("OptionUtil", function()
             local rows = ns.AboutPage.rows
 
             assert.is_table(registeredPage)
-            assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetID())
+            assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetId())
             assert.are.equal(6, #rows)
             assert.are.equal("info", rows[1].type)
             assert.are.equal("info", rows[2].type)
@@ -126,7 +126,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(true)
+            handler({}, true)
 
             assert.are.equal("PowerBar", enabledModule)
         end)
@@ -138,7 +138,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(false)
+            handler({}, false)
 
             assert.are.equal("PowerBar", disabledModule)
         end)
@@ -150,7 +150,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(false)
+            handler({}, false)
 
             assert.is_false(reloadCalled)
         end)
@@ -163,7 +163,7 @@ describe("OptionUtil", function()
                 end
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload?")
-                handler(true)
+                handler({}, true)
 
                 assert.are.equal("BuffBars", enabledModule)
             end)
@@ -181,7 +181,7 @@ describe("OptionUtil", function()
                 }
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false, setting)
+                handler({ setting = setting }, false)
 
                 assert.is_true(revertedValue)
                 assert.are.equal("Reload now?", reloadMessage)
@@ -192,7 +192,7 @@ describe("OptionUtil", function()
                 ns.Addon.ConfirmReloadUI = function() end
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false)
+                handler({}, false)
 
                 assert.is_true(ns.Addon.db.profile.buffBars.enabled)
             end)
@@ -209,7 +209,7 @@ describe("OptionUtil", function()
                 local setting = { SetValueNoCallback = function() end }
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false, setting)
+                handler({ setting = setting }, false)
 
                 assert.is_function(capturedCallback)
                 capturedCallback()
@@ -354,7 +354,12 @@ describe("OptionUtil", function()
                 return {
                     key = key,
                     name = name,
-                    rows = {},
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {},
+                        },
+                    },
                 }
             end
 
@@ -369,8 +374,8 @@ describe("OptionUtil", function()
             ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
 
             optionsModule:OnInitialize()
-            generalCategory = ns.Settings:GetSection("general"):GetPage("main")._category
-            profileCategory = ns.Settings:GetSection("profile"):GetPage("main")._category
+            generalCategory = ns.Settings:GetPage("general", "main")._category
+            profileCategory = ns.Settings:GetPage("profile", "main")._category
         end)
 
         it("opens General when no ECM page has been visited yet", function()

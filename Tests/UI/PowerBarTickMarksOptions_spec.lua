@@ -40,8 +40,8 @@ describe("PowerBarTickMarksOptions", function()
             end,
         }
 
-        if captured.onRegistered then
-            captured.onRegistered(fakePage)
+        if captured.SetRegisteredPage then
+            captured.SetRegisteredPage(fakePage)
         end
 
         return captured, refreshCalls, fakePage
@@ -115,7 +115,7 @@ describe("PowerBarTickMarksOptions", function()
         getRow(captured, "defaultWidth").set(3)
         getRow(captured, "defaultColor").set(defaultColor)
 
-        getRow(captured, "addTick").onClick(fakePage)
+        getRow(captured, "addTick").onClick({ page = fakePage })
 
         local items = tickCollection.items()
         assert.are.equal(1, #items)

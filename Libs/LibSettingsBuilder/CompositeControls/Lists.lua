@@ -8,7 +8,7 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = lib._internal.BuilderMixin
 
 local function buildControlList(builder, basePath, defs, spec, methodName)
     local results = {}
@@ -20,7 +20,7 @@ local function buildControlList(builder, basePath, defs, spec, methodName)
             tooltip = def.tooltip,
         }
         builder:_propagateModifiers(childSpec, spec)
-        local initializer, setting = builder[methodName](builder, childSpec)
+        local initializer, setting = BuilderMixin[methodName](builder, childSpec)
         results[#results + 1] = { key = def.key, initializer = initializer, setting = setting }
     end
     return results

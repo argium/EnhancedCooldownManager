@@ -209,6 +209,8 @@ LibSettingsBuilder v2 Phase 1 also freezes the intended replacement surface with
 - target page handle API: `page:GetId()`, `page:Refresh()`
 - deprecated compatibility namespace: `LSBDeprecated`
 
+Phase 2 then makes raw declarative row tables the canonical registration schema and removes builder-level row helper constructors from the public `lsb` surface. ECM continues to register through plain row tables.
+
 Deprecated non-declarative page-construction APIs were removed from the builder surface. ECM settings pages are registered through the root tree only.
 
 Pages still use the same canonical row types:

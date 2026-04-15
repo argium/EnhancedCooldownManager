@@ -79,7 +79,12 @@ describe("Options root assembly", function()
             return {
                 key = key,
                 name = name,
-                rows = {},
+                pages = {
+                    {
+                        key = "main",
+                        rows = {},
+                    },
+                },
             }
         end
 
@@ -98,7 +103,7 @@ describe("Options root assembly", function()
 
         assert.is_table(ns.Settings)
         assert.are.equal(ns.L["ADDON_NAME"], ns.Settings.name)
-        assert.is_not_nil(ns.Settings:GetPage("about"))
+        assert.is_not_nil(ns.Settings:GetRootPage())
 
         for _, key in ipairs({
             "general",
@@ -125,14 +130,16 @@ describe("Options root assembly", function()
         assert.are.equal("general", ns.GeneralOptions.key)
         assert.are.equal(ns.L["GENERAL"], ns.GeneralOptions.name)
         assert.are.equal("global", ns.GeneralOptions.path)
-        assert.are.equal(16, #ns.GeneralOptions.rows)
-        assert.are.equal("header", ns.GeneralOptions.rows[1].type)
-        assert.are.equal("slider", ns.GeneralOptions.rows[16].type)
+        assert.are.equal(1, #ns.GeneralOptions.pages)
+        assert.are.equal(16, #ns.GeneralOptions.pages[1].rows)
+        assert.are.equal("header", ns.GeneralOptions.pages[1].rows[1].type)
+        assert.are.equal("slider", ns.GeneralOptions.pages[1].rows[16].type)
 
         assert.are.equal("advancedOptions", ns.AdvancedOptions.key)
         assert.are.equal(ns.L["ADVANCED_OPTIONS"], ns.AdvancedOptions.name)
         assert.are.equal("global", ns.AdvancedOptions.path)
-        assert.are.equal(7, #ns.AdvancedOptions.rows)
-        assert.are.equal("button", ns.AdvancedOptions.rows[5].type)
+        assert.are.equal(1, #ns.AdvancedOptions.pages)
+        assert.are.equal(7, #ns.AdvancedOptions.pages[1].rows)
+        assert.are.equal("button", ns.AdvancedOptions.pages[1].rows[5].type)
     end)
 end)

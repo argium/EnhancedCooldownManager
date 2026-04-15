@@ -38,7 +38,7 @@ rows[#rows + 1] = {
     type = "checkbox",
     path = "showManaAsPercent",
     name = L["SHOW_MANA_AS_PERCENT"],
-    desc = L["SHOW_MANA_AS_PERCENT_DESC"],
+    tooltip = L["SHOW_MANA_AS_PERCENT_DESC"],
     disabled = isDisabled,
 }
 rows[#rows + 1] = {

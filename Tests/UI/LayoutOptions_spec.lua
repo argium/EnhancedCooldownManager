@@ -31,7 +31,7 @@ describe("LayoutOptions getters/setters/defaults", function()
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/LayoutOptions.lua", "LayoutOptions")(nil, ns)
             TestHelpers.RegisterSectionSpec(SB, ns.LayoutOptions)
-            capturedPage = ns.LayoutOptions
+            capturedPage = ns.LayoutOptions.pages[1]
         end)
     end)
 

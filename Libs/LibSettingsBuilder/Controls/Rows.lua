@@ -16,7 +16,7 @@ local applySubheaderFrame = internal.applySubheaderFrame
 local copyMixin = internal.copyMixin
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local hideHeaderActionButtons = internal.hideHeaderActionButtons
-local BuilderMixin = lib.BuilderMixin
+local BuilderMixin = internal.BuilderMixin
 
 function BuilderMixin:_addLayoutInitializer(spec, initializer, refreshable)
     local category = self:_resolveCategory(spec)
@@ -46,7 +46,7 @@ function BuilderMixin:PageActions(spec)
     local categoryName = self._subcategoryNames[category]
         or (category == self._rootCategory and self._rootCategoryName)
         or ""
-    local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
+    local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
         _lsbKind = "pageActions",
         name = spec.name or categoryName,
         actions = spec.actions,
@@ -61,7 +61,7 @@ function BuilderMixin:PageActions(spec)
 end
 
 function BuilderMixin:Subheader(spec)
-    local initializer = createCustomListRowInitializer(lib.SUBHEADER_TEMPLATE, {
+    local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
         _lsbKind = "subheader",
         name = spec.name,
     }, 28, applySubheaderFrame)
@@ -69,7 +69,7 @@ function BuilderMixin:Subheader(spec)
 end
 
 function BuilderMixin:InfoRow(spec)
-    local initializer = createCustomListRowInitializer(lib.INFOROW_TEMPLATE, {
+    local initializer = createCustomListRowInitializer(internal.INFOROW_TEMPLATE, {
         _lsbKind = "infoRow",
         name = spec.name,
         value = spec.value,
@@ -88,7 +88,7 @@ function BuilderMixin:EmbedCanvas(canvas, height, spec)
     local modifiers = copyMixin({}, spec)
     modifiers.canvas = canvas
 
-    local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, {
+    local initializer = createCustomListRowInitializer(internal.EMBED_CANVAS_TEMPLATE, {
         _lsbKind = "embedCanvas",
         canvas = canvas,
     }, height or canvas:GetHeight(), applyEmbedCanvasFrame)
@@ -125,16 +125,23 @@ function BuilderMixin:_ensureConfirmDialog()
 end
 
 function BuilderMixin:Button(spec)
+    local callbackContext = self:_createCallbackContext(spec)
     local onClick = spec.onClick
     if spec.confirm then
         local confirmDialogName = self:_ensureConfirmDialog()
         local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
         local originalClick = onClick
-        onClick = function()
-            StaticPopup_Show(confirmDialogName, confirmText, nil, { onAccept = originalClick })
+        onClick = function(ctx)
+            StaticPopup_Show(confirmDialogName, confirmText, nil, {
+                onAccept = function()
+                    originalClick(ctx)
+                end,
+            })
         end
     end
 
-    local initializer = CreateSettingsButtonInitializer(spec.name, spec.buttonText or spec.name, onClick, spec.tooltip, true)
+    local initializer = CreateSettingsButtonInitializer(spec.name, spec.buttonText or spec.name, function()
+        onClick(callbackContext)
+    end, spec.tooltip, true)
     return self:_addLayoutInitializer(spec, initializer)
 end

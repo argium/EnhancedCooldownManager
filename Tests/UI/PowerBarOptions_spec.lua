@@ -165,8 +165,8 @@ describe("PowerBarOptions getters/setters/defaults", function()
             TestHelpers.LoadChunk("UI/PowerBarOptions.lua", "PowerBarOptions")(nil, ns2)
 
             local _, section = TestHelpers.RegisterSectionSpec(SB2, ns2.PowerBarOptions)
-            local powerBarSectionCategory = section:GetPage("main")._category._parent
-            local tickMarksCategory = section:GetPage("tickMarks")._category
+            local powerBarSectionCategory = SB2:GetPage(section.key, "main")._category._parent
+            local tickMarksCategory = SB2:GetPage(section.key, "tickMarks")._category
 
             assert.is_not_nil(powerBarSectionCategory)
             assert.is_not_nil(tickMarksCategory)
