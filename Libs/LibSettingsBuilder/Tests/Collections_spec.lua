@@ -76,8 +76,18 @@ describe("LibSettingsBuilder Collections", function()
             varPrefix = "COLL",
             onChanged = function() end,
         })
-        SB.CreateRootCategory("Collections")
-        local category = SB.CreateSubcategory("Rows")
+        local root = SB.GetRoot("Collections")
+        root:Register({
+            sections = {
+                {
+                    key = "rows",
+                    name = "Rows",
+                    rows = {},
+                },
+            },
+        })
+        local page = root:GetSection("rows"):GetPage("main")
+        local category = page._category
 
         local listInit = SB.List({
             category = category,
@@ -97,6 +107,6 @@ describe("LibSettingsBuilder Collections", function()
 
         assert.are.equal(SB.EMBED_CANVAS_TEMPLATE, listInit._template)
         assert.are.equal(SB.EMBED_CANVAS_TEMPLATE, sectionInit._template)
-        assert.is_function(SB.RefreshCategory)
+        assert.is_function(page.Refresh)
     end)
 end)

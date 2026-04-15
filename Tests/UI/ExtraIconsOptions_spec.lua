@@ -43,7 +43,6 @@ describe("ExtraIconsOptions data helpers", function()
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
         }
-        ns.SettingsBuilder = { RegisterSection = function(_, _, section) ns.ExtraIconsOptions = section end }
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
     end)
@@ -752,7 +751,7 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns, capturedPage, refreshCalls, scheduledReasons, previewCalls
+    local profile, defaults, SB, ns, capturedPage, registeredPage, refreshCalls, scheduledReasons, previewCalls
 
     local function getRow(rowId)
         local rows = assert(capturedPage and capturedPage.rows)
@@ -841,21 +840,17 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            capturedPage = page
-            return originalRegisterPage(page)
-        end
-        SB.RefreshCategory = function(category)
-            refreshCalls[#refreshCalls + 1] = category
-        end
-
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
-        ns.OptionsSections.ExtraIcons.RegisterSettings(SB)
+        capturedPage = ns.ExtraIconsOptions
+        local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
+        registeredPage = page
+        registeredPage.Refresh = function()
+            refreshCalls[#refreshCalls + 1] = registeredPage._category
+        end
     end)
 
-    it("creates a subcategory", function()
-        assert.is_not_nil(SB.GetSubcategory(ns.L["EXTRA_ICONS"]))
+    it("registers a page category", function()
+        assert.is_not_nil(registeredPage._category)
     end)
 
     it("registers page-level onShow and onHide callbacks", function()
@@ -993,7 +988,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal(1, #profile.extraIcons.viewers.main)
         assert.are.equal("spell", profile.extraIcons.viewers.main[1].kind)
         assert.are.same({ 12345 }, profile.extraIcons.viewers.main[1].ids)
-        local category = SB.GetSubcategory(ns.L["EXTRA_ICONS"])
+        local category = registeredPage._category
         assert.are.same({ category }, refreshCalls)
         assert.are.same({ "OptionsChanged" }, scheduledReasons)
     end)
@@ -1042,7 +1037,7 @@ describe("ExtraIconsOptions settings page", function()
     end)
 
     it("refreshes the category when trinket equipment changes", function()
-        local category = SB.GetSubcategory(ns.L["EXTRA_ICONS"])
+        local category = registeredPage._category
         local eventHandler = ns.ExtraIconsOptions._itemLoadFrame:GetScript("OnEvent")
 
         eventHandler(ns.ExtraIconsOptions._itemLoadFrame, "PLAYER_EQUIPMENT_CHANGED", 13, true)

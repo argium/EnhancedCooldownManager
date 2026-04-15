@@ -12,54 +12,47 @@ local internal = lib._internal
 local applyCollectionFrame = internal.applyCollectionFrame
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local copyMixin = internal.copyMixin
+local BuilderMixin = lib.BuilderMixin
 
-function lib._installStandardCollectionControls(SB, env)
-    local applyCanvasState = env.applyCanvasState
-    local applyModifiers = env.applyModifiers
-    local registerCategoryRefreshable = env.registerCategoryRefreshable
-    local resolveCategory = env.resolveCategory
+function BuilderMixin:_createCollectionInitializer(spec, errorPrefix)
+    assert(spec.height, errorPrefix .. ": spec.height is required")
 
-    local function createCollectionInitializer(spec, errorPrefix)
-        assert(spec.height, errorPrefix .. ": spec.height is required")
-        local cat = resolveCategory(spec)
-        local data = copyMixin({}, spec)
-        if data.variant and data.preset == nil then
-            data.preset = data.variant
-        end
-
-        local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
-
-        initializer._lsbEnabled = true
-        initializer.SetEnabled = function(controlInitializer, enabled)
-            controlInitializer._lsbEnabled = enabled
-            local activeFrame = controlInitializer._lsbActiveFrame
-            if activeFrame then
-                applyCanvasState(activeFrame, enabled)
-            end
-        end
-
-        initializer._lsbRefreshFrame = function(frame)
-            applyCollectionFrame(frame, data, initializer)
-            initializer:SetEnabled(initializer._lsbEnabled ~= false)
-        end
-
-        Settings.RegisterInitializer(cat, initializer)
-        registerCategoryRefreshable(cat, initializer)
-        applyModifiers(initializer, spec)
-
-        return initializer
+    local category = self:_resolveCategory(spec)
+    local data = copyMixin({}, spec)
+    if data.variant and data.preset == nil then
+        data.preset = data.variant
     end
 
-    function SB.List(spec)
-        assert(spec.items, "List: spec.items is required")
-        assert(not spec.sections, "List: spec.sections is not supported")
-        return createCollectionInitializer(spec, "List")
+    local initializer = createCustomListRowInitializer(lib.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
+
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            self:_applyCanvasState(activeFrame, enabled)
+        end
     end
 
-    function SB.SectionList(spec)
-        assert(spec.sections, "SectionList: spec.sections is required")
-        return createCollectionInitializer(spec, "SectionList")
+    initializer._lsbRefreshFrame = function(frame)
+        applyCollectionFrame(frame, data, initializer)
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
     end
 
-    return SB
+    Settings.RegisterInitializer(category, initializer)
+    self:_registerCategoryRefreshable(category, initializer)
+    self:_applyModifiers(initializer, spec)
+
+    return initializer
+end
+
+function BuilderMixin:List(spec)
+    assert(spec.items, "List: spec.items is required")
+    assert(not spec.sections, "List: spec.sections is not supported")
+    return self:_createCollectionInitializer(spec, "List")
+end
+
+function BuilderMixin:SectionList(spec)
+    assert(spec.sections, "SectionList: spec.sections is required")
+    return self:_createCollectionInitializer(spec, "SectionList")
 end

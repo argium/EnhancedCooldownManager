@@ -125,7 +125,10 @@ function OptionUtil.CreatePositioningExamplesCanvas()
 end
 
 function OptionUtil.OpenLayoutPage()
-    local categoryID = ns.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
+    local root = ns.Settings
+    local section = root and root:GetSection("layout")
+    local page = section and section:GetPage("main")
+    local categoryID = page and page:GetID()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
@@ -298,7 +301,7 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
 end
 
 --- Generates standard layout and appearance rows shared by bar-type modules.
---- This is the canonical rows-array form used by RegisterPage pages.
+--- This is the canonical rows-array form used by declarative section/page specs.
 ---@param isDisabled fun(): boolean
 ---@param options table|nil { showText: boolean, border: boolean }
 ---@return table[] rows

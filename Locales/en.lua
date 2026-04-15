@@ -202,8 +202,6 @@ L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"] =
 L["SPELL_COLORS_DONT_REMOVE"] = "Don't Remove"
 L["SPELL_COLORS_REMOVED_STALE_ENTRY"] = "Removed stale spell color entry: %s"
 L["SPELL_COLORS_COMBAT_WARNING"] = "|cffFF0000These settings cannot be changed while in combat lockdown.|r"
-L["SPELL_COLORS_SECRETS_WARNING"] =
-    "|cffFFDD3CSpell names are currently secret. Changes are blocked until you reload your UI out of combat.|r"
 L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"] = "Spell color keys"
 L["SPELL_COLORS_KEY_SPELL_NAME"] = "Spell name: %s"
 L["SPELL_COLORS_KEY_SPELL_ID"] = "Spell ID: %s"

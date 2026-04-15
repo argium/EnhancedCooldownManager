@@ -28,15 +28,10 @@ describe("LayoutOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            capturedPage = page
-            return originalRegisterPage(page)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/LayoutOptions.lua", "LayoutOptions")(nil, ns)
-            ns.OptionsSections.Layout.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.LayoutOptions)
+            capturedPage = ns.LayoutOptions
         end)
     end)
 
@@ -102,9 +97,16 @@ describe("LayoutOptions getters/setters/defaults", function()
         end
         _G.Settings = proxiedSettings
 
-        TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
-        ns.OptionsSections.General.RegisterSettings(SB)
-        ns.OptionsSections.Layout.RegisterSettings(SB)
+        local profile2, defaults2 = TestHelpers.MakeOptionsProfile()
+        local SB2, ns2 = TestHelpers.SetupOptionsEnv(profile2, defaults2)
+        TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns2)
+        TestHelpers.LoadChunk("UI/LayoutOptions.lua", "LayoutOptions")(nil, ns2)
+        TestHelpers.RegisterSettingsTree(SB2, {
+            sections = {
+                ns2.GeneralOptions,
+                ns2.LayoutOptions,
+            },
+        })
 
         _G.Settings = originalSettings
 

@@ -26,9 +26,9 @@ describe("AdvancedOptions getters/setters/defaults", function()
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
-            ns.OptionsSections["Advanced Options"].RegisterSettings(SB)
+            local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.AdvancedOptions)
+            advancedCategory = page._category
         end)
-        advancedCategory = SB._subcategories[ns.L["ADVANCED_OPTIONS"]]
         initializers = SB._layouts[advancedCategory]._initializers
     end)
 

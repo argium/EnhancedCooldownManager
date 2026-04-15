@@ -11,7 +11,7 @@ It supports:
 - composite builders for common settings groups,
 - canonical row types for headers, subheaders, info rows, buttons, canvases, and page actions,
 - XML/template-backed custom controls when a built-in row is not enough,
-- category refresh hooks for out-of-band state changes,
+- page-owned refresh hooks for out-of-band state changes,
 - deterministic dropdown ordering,
 - clickable slider value editing.
 
@@ -21,15 +21,16 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
 | Need | LibSettingsBuilder |
 |---|---|
-| Standard settings pages | `RegisterPage(...)` |
-| Fine-grained control | imperative `SB.Checkbox(...)`, `SB.Slider(...)`, `SB.Input(...)`, etc. |
+| Standard settings pages | `SB.GetRoot(name)` → `root:Register({ page = ..., sections = { ... } })` |
+| Root-owned landing page | `page = { key = ..., rows = ... }` inside the root spec |
+| Dynamic refresh | `onRegistered(page)` + `page:Refresh()` |
 | Existing AceDB profiles | `PathAdapter(...)` |
 | Custom storage | handler mode with `get` / `set` / `key` |
 | Text entry / numeric ID fields | `SB.Input(...)` or `type = "input"` |
 | Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"` |
 | Reusable settings groups | border, font override, positioning composites |
 | XML-backed bespoke widgets | `SB.Custom(...)` |
-| Force visible rows to refresh | `SB.RefreshCategory(...)` |
+| Force visible rows to refresh | `page:Refresh()` |
 
 ## Quick start
 
@@ -51,34 +52,47 @@ local SB = LSB:New({
     end,
 })
 
-SB.CreateRootCategory("My Addon")
+local root = SB.GetRoot("My Addon")
 
-SB.RegisterPage({
-    name = "General",
-    path = "general",
-    rows = {
-        {
-            type = "checkbox",
-            path = "enabled",
-            name = "Enable",
+root:Register({
+    page = {
+        key = "about",
+        rows = {
+            {
+                type = "info",
+                name = "Version",
+                value = "1.0.0",
+            },
         },
+    },
+    sections = {
         {
-            type = "slider",
-            path = "opacity",
-            name = "Opacity",
-            min = 0,
-            max = 100,
-            step = 1,
+            key = "general",
+            name = "General",
+            path = "general",
+            rows = {
+                {
+                    type = "checkbox",
+                    path = "enabled",
+                    name = "Enable",
+                },
+                {
+                    type = "slider",
+                    path = "opacity",
+                    name = "Opacity",
+                    min = 0,
+                    max = 100,
+                    step = 1,
+                },
+            },
         },
     },
 })
-
-SB.RegisterCategories()
 ```
 
 ## Canonical row types
 
-The page API accepts canonical row types only.
+Declarative pages accept canonical row types only.
 
 | Type | Meaning |
 |---|---|
@@ -92,7 +106,7 @@ The page API accepts canonical row types only.
 | `subheader` | Secondary text row |
 | `info` | Left-label / right-value informational row |
 | `canvas` | Embedded frame row for canvas content |
-| `pageActions` | Right-aligned category-header action row |
+| `pageActions` | Right-aligned page-header action row |
 | `list` | First-class dynamic flat list widget |
 | `sectionList` | First-class dynamic grouped list widget |
 | `custom` | Proxy setting backed by a custom XML template |
@@ -148,6 +162,8 @@ The library has three main implementation paths:
 - **Layout rows** — `header`, `subheader`, `info`, `button`, `canvas`, and `pageActions` are initializer/layout helpers rather than persisted settings.
 - **Composite rows** — `border`, `fontOverride`, `heightOverride`, `colorList`, and `checkboxList` expand into multiple child controls.
 
+The recommended author-facing registration model is declarative: get the singleton root once, export plain page/section spec tables, and call `root:Register(...)` with the assembled tree. Deprecated non-declarative page-construction APIs have been removed.
+
 Use `pageActions` for right-aligned page buttons. Use `list` and `sectionList` for dynamic editors, and keep `canvas` / `custom` as escape hatches for truly bespoke frames. Canvas rows stay on the existing lifecycle path, so page switches continue to reuse the same proven frame handling.
 
 `input` specifically is implemented as a built-in custom list row using `SettingsListElementTemplate`, with an `InputBoxTemplate` edit box anchored in the standard left-label / right-control layout. It does **not** need a separate XML template the way `custom` controls do.
@@ -185,8 +201,8 @@ The `.busted` config defines the `libsettingsbuilder` task pointing at this libr
 - Embed the library inside your addon's `Libs/` folder.
 - Load `LibStub` before `LibSettingsBuilder`.
 - Load `Libs\LibSettingsBuilder\embed.xml` rather than the individual library Lua files.
-- Prefer `RegisterPage(...)` for declarative pages and the imperative builders for fine-grained control.
-- `SB.RefreshCategory(...)` is the intended way to refresh dynamic info rows, dropdown options, and dynamic list rows after profile mutations, async item loads, or other out-of-band changes.
+- Prefer a single `root:Register({ page = ..., sections = { ... } })` call and keep page handles only for later `page:Refresh()` calls.
+- `page:Refresh()` is the intended way to refresh dynamic info rows, dropdown options, and dynamic list rows after profile mutations, async item loads, or other out-of-band changes.
 - Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 
 ## License

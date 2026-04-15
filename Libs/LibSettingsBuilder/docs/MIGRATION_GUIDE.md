@@ -23,8 +23,8 @@
 
 | AceConfig stack | LibSettingsBuilder |
 |---|---|
-| `RegisterOptionsTable` | `SB.RegisterPage` |
-| `AddToBlizOptions` | `SB.RegisterCategories()` |
+| `RegisterOptionsTable` | export declarative root/page/section specs |
+| `AddToBlizOptions` | `SB.GetRoot("My Addon"):Register({ page = ..., sections = { ... } })` |
 | one `get`/`set` per field | one `path` per field in path mode |
 | `type = "input"` | `type = "input"` or `SB.Input(...)` |
 | custom refresh dance | reactive modifiers re-evaluate automatically |
@@ -50,7 +50,7 @@ local SB = LSB:New({
 
 ## Canonical row types
 
-`RegisterPage` uses canonical row types only:
+Declarative pages use canonical row types only:
 
 - `checkbox`
 - `slider`
@@ -72,7 +72,7 @@ local SB = LSB:New({
 - composite builders for common UI groups,
 - first-class dynamic list rows for complex editors,
 - built-in text input rows with optional debounced previews,
-- explicit category refresh hooks for async/transient state,
+- page-owned refresh hooks for async/transient state,
 - clickable slider value editing,
 - deterministic dropdown ordering.
 

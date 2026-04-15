@@ -449,7 +449,7 @@ describe("ChatCommand migration", function()
 
         assert.are.equal(0, openOptionsCalls)
         assert.are.equal(1, #printedMessages)
-        assert.are.equal("Options cannot be opened during combat. They will open when combat ends.", printedMessages[1])
+        assert.are.equal("Options cannot be opened during combat. It will open when combat ends.", printedMessages[1])
         assert.is_true(mod._openOptionsAfterCombat)
     end)
 

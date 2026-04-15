@@ -62,61 +62,56 @@ local RESOURCE_COLOR_DEFS = {
 }
 
 local ResourceBarOptions = {}
+ns.ResourceBarOptions = ResourceBarOptions
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
 
-function ResourceBarOptions.RegisterSettings(SB)
-    local rows = {
-        {
-            type = "checkbox",
-            path = "enabled",
-            name = L["ENABLE_RESOURCE_BAR"],
-            onSet = ns.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
-        },
-    }
-    local maxColorDefs = {}
-    for _, def in ipairs(RESOURCE_COLOR_DEFS) do
-        if C.RESOURCEBAR_MAX_COLOR_TYPES[def.key] then
-            maxColorDefs[#maxColorDefs + 1] = {
-                key = def.key,
-                name = def.name,
-                tooltip = L["ALTERNATE_COLOR_TOOLTIP"],
-            }
-        end
+local rows = {
+    {
+        type = "checkbox",
+        path = "enabled",
+        name = L["ENABLE_RESOURCE_BAR"],
+        onSet = ns.OptionUtil.CreateModuleEnabledHandler("ResourceBar"),
+    },
+}
+local maxColorDefs = {}
+for _, def in ipairs(RESOURCE_COLOR_DEFS) do
+    if C.RESOURCEBAR_MAX_COLOR_TYPES[def.key] then
+        maxColorDefs[#maxColorDefs + 1] = {
+            key = def.key,
+            name = def.name,
+            tooltip = L["ALTERNATE_COLOR_TOOLTIP"],
+        }
     end
-
-    for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled)) do
-        rows[#rows + 1] = row
-    end
-
-    rows[#rows + 1] = { type = "header", name = L["COLORS"], disabled = isDisabled }
-    rows[#rows + 1] = {
-        type = "colorList",
-        path = "colors",
-        label = L["RESOURCE_TYPES"],
-        defs = RESOURCE_COLOR_DEFS,
-        disabled = isDisabled,
-    }
-    rows[#rows + 1] = {
-        type = "checkboxList",
-        path = "maxColorsEnabled",
-        label = L["USE_ALTERNATE_COLOR_WHEN_CAPPED"],
-        defs = maxColorDefs,
-        disabled = isDisabled,
-    }
-    rows[#rows + 1] = {
-        type = "colorList",
-        path = "maxColors",
-        label = L["ALTERNATE_COLORS"],
-        defs = maxColorDefs,
-        disabled = isDisabled,
-    }
-
-    SB.RegisterPage({
-        name = L["RESOURCE_BAR"],
-        path = "resourceBar",
-        disabled = ns.IsDeathKnight,
-        rows = rows,
-    })
 end
 
-ns.SettingsBuilder.RegisterSection(ns, "ResourceBar", ResourceBarOptions)
+for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled)) do
+    rows[#rows + 1] = row
+end
+
+rows[#rows + 1] = { type = "header", name = L["COLORS"], disabled = isDisabled }
+rows[#rows + 1] = {
+    type = "colorList",
+    path = "colors",
+    label = L["RESOURCE_TYPES"],
+    defs = RESOURCE_COLOR_DEFS,
+    disabled = isDisabled,
+}
+rows[#rows + 1] = {
+    type = "checkboxList",
+    path = "maxColorsEnabled",
+    label = L["USE_ALTERNATE_COLOR_WHEN_CAPPED"],
+    defs = maxColorDefs,
+    disabled = isDisabled,
+}
+rows[#rows + 1] = {
+    type = "colorList",
+    path = "maxColors",
+    label = L["ALTERNATE_COLORS"],
+    defs = maxColorDefs,
+    disabled = isDisabled,
+}
+
+ResourceBarOptions.key = "resourceBar"
+ResourceBarOptions.name = L["RESOURCE_BAR"]
+ResourceBarOptions.disabled = ns.IsDeathKnight
+ResourceBarOptions.rows = rows

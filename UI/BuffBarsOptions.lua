@@ -40,59 +40,58 @@ local function buildSpellColorRows(entries)
     return rows
 end
 
---- Scans rows for entries whose primary key is a secret or empty string.
----@param rows { key: ECM_SpellColorKey }[]
----@return boolean
-local function hasUnlabeledBars(rows)
-    for _, row in ipairs(rows) do
-        local key = row.key.primaryKey
-        if type(key) == "string" and (issecretvalue(key) or key == "") then
-            return true
-        end
+---@param key ECM_SpellColorKey|table|nil
+---@return { hasSecretName: boolean, isIncomplete: boolean }|nil
+local function getSpellColorKeyState(key)
+    local normalized = ns.SpellColors.NormalizeKey(key)
+    local primaryKey = normalized and normalized.primaryKey or (type(key) == "table" and key.primaryKey)
+    if not normalized and type(primaryKey) ~= "string" then
+        return nil
     end
-    return false
-end
 
---- Returns whether the player is in an environment where secret-name recovery should stay disabled.
----@return boolean
-local function isSpellColorsReloadRestricted()
-    return InCombatLockdown() or IsInInstance()
-end
-
---- Returns the footer state for the secret-name recovery controls.
----@param rows { key: ECM_SpellColorKey }[]
----@return { show: boolean, enabled: boolean }
-local function getSecretNameFooterState(rows)
-    local show = hasUnlabeledBars(rows)
     return {
-        show = show,
-        enabled = show and not isSpellColorsReloadRestricted(),
+        hasSecretName = type(primaryKey) == "string" and (issecretvalue(primaryKey) or primaryKey == ""),
+        isIncomplete = normalized ~= nil and (normalized.spellName == nil
+            or normalized.spellID == nil
+            or normalized.cooldownID == nil
+            or normalized.textureFileID == nil),
     }
 end
 
---- Returns true when the key is missing one or more identifying fields.
----@param key ECM_SpellColorKey|table|nil
 ---@return boolean
-local function isIncompleteSpellColorKey(key)
-    local normalized = ns.SpellColors.NormalizeKey(key)
-    return normalized ~= nil
-        and (normalized.spellName == nil
-            or normalized.spellID == nil
-            or normalized.cooldownID == nil
-            or normalized.textureFileID == nil)
+local function isSpellColorsReconcileRestricted()
+    return _G.UnitAffectingCombat("player") or InCombatLockdown() or IsInInstance()
 end
 
---- Returns whether any row is missing one or more identifying fields.
 ---@param rows { key: ECM_SpellColorKey }[]|nil
----@return boolean
-local function hasRowsNeedingReconcile(rows)
+---@return { hasRowsNeedingReconcile: boolean, showSecretNameWarning: boolean, warningText: string, canReconcile: boolean }
+local function getSpellColorsPageState(rows)
+    local state = {
+        hasRowsNeedingReconcile = false,
+        showSecretNameWarning = false,
+        warningText = "",
+        canReconcile = false,
+    }
+
     for _, row in ipairs(rows or {}) do
-        if isIncompleteSpellColorKey(row and row.key) then
-            return true
+        local keyState = getSpellColorKeyState(row and row.key)
+        if keyState then
+            state.hasRowsNeedingReconcile = state.hasRowsNeedingReconcile or keyState.isIncomplete
+            state.showSecretNameWarning = state.showSecretNameWarning or keyState.hasSecretName
+
+            if state.hasRowsNeedingReconcile and state.showSecretNameWarning then
+                break
+            end
         end
     end
 
-    return false
+    if InCombatLockdown() then
+        state.warningText = L["SPELL_COLORS_COMBAT_WARNING"]
+    end
+
+    state.canReconcile = state.hasRowsNeedingReconcile and not isSpellColorsReconcileRestricted()
+
+    return state
 end
 
 ---@param rows { key: ECM_SpellColorKey }[]|nil
@@ -101,7 +100,8 @@ local function collectIncompleteSpellColorRows(rows)
     local incompleteRows = {}
 
     for _, row in ipairs(rows or {}) do
-        if isIncompleteSpellColorKey(row and row.key) then
+        local keyState = getSpellColorKeyState(row and row.key)
+        if keyState and keyState.isIncomplete then
             incompleteRows[#incompleteRows + 1] = row
         end
     end
@@ -176,12 +176,20 @@ end
 -- Canvas Frame for Spell Colors
 --------------------------------------------------------------------------------
 
-local function createSpellColorCanvas(SB, subcatName)
+local function createSpellColorPage(subcatName)
+    local registeredPage
+
+    local function refreshPage()
+        if registeredPage then
+            registeredPage:Refresh()
+        end
+    end
+
     local function resetAllSpellColors()
         ns.SpellColors.ClearCurrentSpecColors()
         ns.SpellColors.SetDefaultColor(C.BUFFBARS_DEFAULT_COLOR)
         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-        SB.RefreshCategory(subcatName)
+        refreshPage()
     end
 
     local function reconcileSpellColors()
@@ -212,7 +220,7 @@ local function createSpellColorCanvas(SB, subcatName)
 
                 if #removedKeys > 0 then
                     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-                    SB.RefreshCategory(subcatName)
+                    refreshPage()
                 end
             end
         )
@@ -220,17 +228,6 @@ local function createSpellColorCanvas(SB, subcatName)
 
     local function getRows()
         return buildSpellColorRows(ns.SpellColors.GetAllColorEntries())
-    end
-
-    local function getWarningText()
-        local parts = {}
-        local locked, reason = ns.Addon.BuffBars:IsEditLocked()
-        if locked and reason == "combat" then
-            parts[#parts + 1] = L["SPELL_COLORS_COMBAT_WARNING"]
-        elseif locked and reason == "secrets" then
-            parts[#parts + 1] = L["SPELL_COLORS_SECRETS_WARNING"]
-        end
-        return table.concat(parts, "\n")
     end
 
     local function buildSpellColorItems()
@@ -255,7 +252,7 @@ local function createSpellColorCanvas(SB, subcatName)
                     ns.OptionUtil.OpenColorPicker(ns.SpellColors.GetDefaultColor(), false, function(color)
                         ns.SpellColors.SetDefaultColor(color)
                         ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-                        SB.RefreshCategory(subcatName)
+                        refreshPage()
                     end)
                 end,
             },
@@ -278,7 +275,7 @@ local function createSpellColorCanvas(SB, subcatName)
                         ns.OptionUtil.OpenColorPicker(current, false, function(color)
                             ns.SpellColors.SetColorByKey(row.key, color)
                             ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-                            SB.RefreshCategory(subcatName)
+                            refreshPage()
                         end)
                     end,
                 },
@@ -293,8 +290,12 @@ local function createSpellColorCanvas(SB, subcatName)
         return items
     end
 
-    SB.RegisterPage({
+    local pageSpec = {
+        key = "spellColors",
         name = subcatName,
+        onRegistered = function(page)
+            registeredPage = page
+        end,
         rows = {
             {
                 id = "spellColorsPageActions",
@@ -305,11 +306,10 @@ local function createSpellColorCanvas(SB, subcatName)
                         text = L["SPELL_COLORS_RECONCILE_BUTTON"],
                         width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                         enabled = function()
-                            local rows = getRows()
-                            return hasRowsNeedingReconcile(rows) and not isSpellColorsReloadRestricted()
+                            return getSpellColorsPageState(getRows()).canReconcile
                         end,
                         onClick = function()
-                            if hasRowsNeedingReconcile(getRows()) and not isSpellColorsReloadRestricted() then
+                            if getSpellColorsPageState(getRows()).canReconcile then
                                 reconcileSpellColors()
                             end
                         end,
@@ -319,11 +319,10 @@ local function createSpellColorCanvas(SB, subcatName)
                         width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                         tooltip = L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
                         enabled = function()
-                            local rows = getRows()
-                            return hasRowsNeedingReconcile(rows) and not isSpellColorsReloadRestricted()
+                            return getSpellColorsPageState(getRows()).canReconcile
                         end,
                         onClick = function()
-                            if hasRowsNeedingReconcile(getRows()) and not isSpellColorsReloadRestricted() then
+                            if getSpellColorsPageState(getRows()).canReconcile then
                                 removeStaleSpellColors()
                             end
                         end,
@@ -343,12 +342,14 @@ local function createSpellColorCanvas(SB, subcatName)
                 id = "spellColorsWarning",
                 type = "info",
                 name = "",
-                value = getWarningText,
+                value = function()
+                    return getSpellColorsPageState(getRows()).warningText
+                end,
                 wide = true,
                 multiline = true,
                 height = 30,
                 hidden = function()
-                    return getWarningText() == ""
+                    return getSpellColorsPageState(getRows()).warningText == ""
                 end,
             },
             {
@@ -369,26 +370,12 @@ local function createSpellColorCanvas(SB, subcatName)
                 multiline = true,
                 height = C.SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT,
                 hidden = function()
-                    return not getSecretNameFooterState(getRows()).show
-                end,
-            },
-            {
-                id = "secretNameReload",
-                type = "button",
-                name = " ",
-                buttonText = L["SPELL_COLORS_RELOAD_BUTTON"],
-                hidden = function()
-                    return not getSecretNameFooterState(getRows()).show
-                end,
-                disabled = function()
-                    return not getSecretNameFooterState(getRows()).enabled
-                end,
-                onClick = function()
-                    ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
+                    return not getSpellColorsPageState(getRows()).showSecretNameWarning
                 end,
             },
         },
-    })
+    }
+    return pageSpec
 end
 
 --------------------------------------------------------------------------------
@@ -398,23 +385,21 @@ end
 local BuffBarsOptions = {}
 ns.BuffBarsOptions = BuffBarsOptions
 BuffBarsOptions._BuildSpellColorRows = buildSpellColorRows
-BuffBarsOptions._HasUnlabeledBars = hasUnlabeledBars
-BuffBarsOptions._HasRowsNeedingReconcile = hasRowsNeedingReconcile
 BuffBarsOptions._CollectIncompleteSpellColorRows = collectIncompleteSpellColorRows
-BuffBarsOptions._IsSpellColorsReloadRestricted = isSpellColorsReloadRestricted
-BuffBarsOptions._GetSecretNameFooterState = getSecretNameFooterState
+BuffBarsOptions._GetSpellColorsPageState = getSpellColorsPageState
 BuffBarsOptions._BuildSpellColorKeyTooltipLines = buildSpellColorKeyTooltipLines
 
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
 
-function BuffBarsOptions.RegisterSettings(SB)
-    local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
-    local layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton
-    layoutMovedButton.id = "layoutMovedButton"
+local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
+local layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton
+layoutMovedButton.id = "layoutMovedButton"
 
-    SB.RegisterPage({
-        name = L["AURA_BARS"],
-        path = "buffBars",
+BuffBarsOptions.key = "buffBars"
+BuffBarsOptions.name = L["AURA_BARS"]
+BuffBarsOptions.pages = {
+    {
+        key = "main",
         rows = {
             {
                 id = "enabled",
@@ -479,9 +464,6 @@ function BuffBarsOptions.RegisterSettings(SB)
             },
             { id = "fontOverride", type = "fontOverride", disabled = isDisabled },
         },
-    })
-
-    createSpellColorCanvas(SB, L["SPELL_COLORS_SUBCAT"])
-end
-
-ns.SettingsBuilder.RegisterSection(ns, "BuffBars", BuffBarsOptions)
+    },
+    createSpellColorPage(L["SPELL_COLORS_SUBCAT"]),
+}

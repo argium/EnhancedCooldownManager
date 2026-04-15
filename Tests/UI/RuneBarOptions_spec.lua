@@ -26,15 +26,10 @@ describe("RuneBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            capturedPage = page
-            return originalRegisterPage(page)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
-            ns.OptionsSections.RuneBar.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.RuneBarOptions)
+            capturedPage = ns.RuneBarOptions
         end)
     end)
 
@@ -160,7 +155,6 @@ describe("RuneBarOptions class gating (non-DK)", function()
         local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
-        assert.is_not_nil(ns.OptionsSections.RuneBar)
-        assert.is_function(ns.OptionsSections.RuneBar.RegisterSettings)
+        assert.is_true(ns.RuneBarOptions.disabled())
     end)
 end)

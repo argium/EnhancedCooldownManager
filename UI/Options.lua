@@ -22,7 +22,8 @@ local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
 
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
-ns.SettingsBuilder = LSB:New({
+ns.Settings = LSB:New({
+    name = L["ADDON_NAME"],
     pathAdapter = LSB.PathAdapter({
         getStore = function()
             return ns.Addon.db and ns.Addon.db.profile
@@ -54,72 +55,68 @@ ns.SettingsBuilder = LSB:New({
         },
     },
 })
+ns.SettingsBuilder = ns.Settings
 
 --------------------------------------------------------------------------------
 -- About section
 --------------------------------------------------------------------------------
 
-local About = {}
-
-function About.RegisterSettings(SB)
-    local version = (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
-    local authorText = ns.ColorUtil.Sparkle("Argi")
-
-    SB.RegisterPage({
-        name = L["ADDON_NAME"],
-        rootCategory = true,
-        rows = {
-            {
-                type = "info",
-                name = L["AUTHOR"],
-                value = authorText,
-            },
-            {
-                type = "info",
-                name = L["CONTRIBUTORS"],
-                value = "kayti-wow",
-            },
-            {
-                type = "info",
-                name = L["VERSION"],
-                value = version,
-            },
-            {
-                type = "subheader",
-                name = L["LINKS"],
-            },
-            {
-                type = "button",
-                name = L["CURSEFORGE"],
-                buttonText = L["CURSEFORGE"],
-                onClick = function()
-                    ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
-                end,
-            },
-            {
-                type = "button",
-                name = L["GITHUB"],
-                buttonText = L["GITHUB"],
-                onClick = function()
-                    ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
-                end,
-            },
-        },
-    })
+local function getAddonVersion()
+    return (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
 end
+
+ns.AboutPage = {
+    key = "about",
+    rows = {
+        {
+            type = "info",
+            name = L["AUTHOR"],
+            value = function()
+                return ns.ColorUtil.Sparkle("Argi")
+            end,
+        },
+        {
+            type = "info",
+            name = L["CONTRIBUTORS"],
+            value = "kayti-wow",
+        },
+        {
+            type = "info",
+            name = L["VERSION"],
+            value = getAddonVersion,
+        },
+        {
+            type = "subheader",
+            name = L["LINKS"],
+        },
+        {
+            type = "button",
+            name = L["CURSEFORGE"],
+            buttonText = L["CURSEFORGE"],
+            onClick = function()
+                ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
+            end,
+        },
+        {
+            type = "button",
+            name = L["GITHUB"],
+            buttonText = L["GITHUB"],
+            onClick = function()
+                ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
+            end,
+        },
+    },
+}
 
 --------------------------------------------------------------------------------
 -- Options module
 --------------------------------------------------------------------------------
 
-ns.OptionsSections = ns.OptionsSections or {}
-ns.OptionsSections["About"] = About
-
 local Options = ns.Addon:NewModule("Options")
 
 local function isTrackedECMCategory(category)
-    local SB = ns.SettingsBuilder
-    return SB ~= nil and SB.HasCategory(category)
+    local root = ns.Settings
+    return root ~= nil and root:HasCategory(category)
 end
 
 local function getCategoryOpenToken(category)
@@ -140,9 +137,14 @@ local function rememberTrackedCategory(module, category)
 end
 
 local function getDefaultOptionsCategoryToken()
-    local SB = ns.SettingsBuilder
-    local category = SB.GetSubcategory(L["GENERAL"]) or SB.GetRootCategory()
-    return getCategoryOpenToken(category)
+    local root = ns.Settings
+    local section = root and root:GetSection("general")
+    local page = section and section:GetPage("main")
+    if page then
+        return page:GetID()
+    end
+
+    return nil
 end
 
 function Options:InstallCategoryTracking()
@@ -178,33 +180,21 @@ function Options:InstallCategoryTracking()
 end
 
 function Options:OnInitialize()
-    local SB = ns.SettingsBuilder
-    SB.CreateRootCategory(L["ADDON_NAME"])
+    ns.Settings:Register({
+        page = ns.AboutPage,
+        sections = {
+            ns.GeneralOptions,
+            ns.LayoutOptions,
+            ns.PowerBarOptions,
+            ns.ResourceBarOptions,
+            ns.RuneBarOptions,
+            ns.BuffBarsOptions,
+            ns.ExtraIconsOptions,
+            ns.ProfileOptions,
+            ns.AdvancedOptions,
+        },
+    })
 
-    -- About section renders on the root category (no subcategory entry)
-    ns.OptionsSections["About"].RegisterSettings(SB)
-
-    -- Register subcategory sections in display order
-    local sectionOrder = {
-        "General",
-        "Layout",
-        "PowerBar",
-        "ResourceBar",
-        "RuneBar",
-        "BuffBars",
-        "ExtraIcons",
-        "Profile",
-        "Advanced Options",
-    }
-
-    for _, key in ipairs(sectionOrder) do
-        local section = ns.OptionsSections[key]
-        if section and section.RegisterSettings then
-            section.RegisterSettings(SB)
-        end
-    end
-
-    SB.RegisterCategories()
     self:InstallCategoryTracking()
 end
 

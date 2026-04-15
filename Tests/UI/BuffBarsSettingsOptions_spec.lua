@@ -51,17 +51,10 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         }
         ns.Addon.ConfirmReloadUI = function(_, _, cb) if cb then cb() end end
 
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            if page.name == ns.L["AURA_BARS"] then
-                capturedPage = page
-            end
-            return originalRegisterPage(page)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "BuffBarsOptions")(nil, ns)
-            ns.OptionsSections.BuffBars.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.BuffBarsOptions)
+            capturedPage = ns.BuffBarsOptions.pages[1]
         end)
 
         assert.is_not_nil(capturedPage)

@@ -9,6 +9,8 @@ local TestHelpers = assert(
 
 describe("PowerBarTickMarksOptions", function()
     local originalGlobals
+    local currentClassID
+    local currentSpecIndex
     local ns
 
     local function getRow(page, rowId)
@@ -19,28 +21,30 @@ describe("PowerBarTickMarksOptions", function()
         end
     end
 
-    local function registerSettings(parentCategory)
-        local captured
-        local refreshCalls = {}
-        local fakeCategory = {}
+    local function setTickMappings(mappings)
+        ns.Addon.db.profile.powerBar = {
+            ticks = {
+                mappings = mappings,
+                defaultColor = ns.Constants.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultWidth = 1,
+            },
+        }
+    end
 
-        local SB = {
-            RegisterPage = function(page)
-                captured = page
-            end,
-            GetSubcategory = function(name)
-                if name == "Tick Marks" then
-                    return fakeCategory
-                end
-            end,
-            RefreshCategory = function(category)
-                refreshCalls[#refreshCalls + 1] = category
+    local function registerPageSpec()
+        local captured = assert(ns.PowerBarTickMarksOptions)
+        local refreshCalls = {}
+        local fakePage = {
+            Refresh = function()
+                refreshCalls[#refreshCalls + 1] = true
             end,
         }
 
-        ns.PowerBarTickMarksOptions.RegisterSettings(SB, parentCategory)
+        if captured.onRegistered then
+            captured.onRegistered(fakePage)
+        end
 
-        return captured, refreshCalls, fakeCategory
+        return captured, refreshCalls, fakePage
     end
 
     setup(function()
@@ -58,28 +62,42 @@ describe("PowerBarTickMarksOptions", function()
     end)
 
     before_each(function()
-        ns = TestHelpers.SetupPowerBarTickMarksEnv()
+        currentClassID = 1
+        currentSpecIndex = 2
+
+        ns = TestHelpers.SetupPowerBarTickMarksEnv({
+            getCurrentClassSpec = function()
+                return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
+            end,
+        })
     end)
 
-    it("module loads and exposes RegisterSettings and Store", function()
+    it("module loads and exposes only the page spec", function()
         assert.is_table(ns.PowerBarTickMarksOptions)
-        assert.is_function(ns.PowerBarTickMarksOptions.RegisterSettings)
-
-        assert.is_table(ns.PowerBarTickMarksStore)
-        assert.is_function(ns.PowerBarTickMarksStore.GetCurrentTicks)
-        assert.is_function(ns.PowerBarTickMarksStore.AddTick)
+        assert.are.equal("tickMarks", ns.PowerBarTickMarksOptions.key)
+        assert.is_nil(ns.PowerBarTickMarksStore)
     end)
 
-    it("registers a subcategory with page actions and list-based tick editors", function()
-        local parentCategory = {}
-        local captured = registerSettings(parentCategory)
+    it("exports a page with page actions and list-based tick editors", function()
+        local captured = registerPageSpec()
 
         assert.are.equal("Tick Marks", captured.name)
-        assert.are.equal(parentCategory, captured.parentCategory)
         assert.are.equal("pageActions", getRow(captured, "tickMarksPageActions").type)
         assert.are.equal("list", getRow(captured, "tickCollection").type)
         assert.are.equal("editor", getRow(captured, "tickCollection").variant)
         assert.are.equal(320, getRow(captured, "tickCollection").height)
+    end)
+
+    it("shows an empty collection when class/spec is unavailable", function()
+        currentClassID = nil
+        currentSpecIndex = nil
+
+        local captured = registerPageSpec()
+        local defaultsAction = getRow(captured, "tickMarksPageActions").actions[1]
+        local tickCollection = getRow(captured, "tickCollection")
+
+        assert.are.same({}, tickCollection.items())
+        assert.is_false(defaultsAction.enabled())
     end)
 
     it("add button appends a tick using the current defaults", function()
@@ -90,22 +108,40 @@ describe("PowerBarTickMarksOptions", function()
             end,
         }
 
-        local captured, refreshCalls, fakeCategory = registerSettings({})
+        local captured, refreshCalls, fakePage = registerPageSpec()
+        local defaultColor = { r = 0.1, g = 0.2, b = 0.3, a = 0.4 }
+        local tickCollection = getRow(captured, "tickCollection")
 
-        getRow(captured, "addTick").onClick()
+        getRow(captured, "defaultWidth").set(3)
+        getRow(captured, "defaultColor").set(defaultColor)
 
-        local ticks = ns.PowerBarTickMarksStore.GetCurrentTicks()
-        assert.are.equal(1, #ticks)
-        assert.are.equal(50, ticks[1].value)
-        assert.are.equal(ns.PowerBarTickMarksStore.GetDefaultWidth(), ticks[1].width)
-        assert.are.same(ns.PowerBarTickMarksStore.GetDefaultColor(), ticks[1].color)
+        getRow(captured, "addTick").onClick(fakePage)
+
+        local items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(50, items[1].fields[1].value)
+        assert.are.equal(3, items[1].fields[2].value)
+        assert.are.same(defaultColor, items[1].color.value)
         assert.are.equal("OptionsChanged", scheduledReason)
-        assert.are.same({ fakeCategory }, refreshCalls)
+        assert.are.same({ true }, refreshCalls)
     end)
 
-    it("defaults action clears the current spec ticks after confirmation", function()
+    it("defaults action clears only the current spec ticks after confirmation", function()
         local shownPopup
         local scheduledReason
+
+        setTickMappings({
+            [1] = {
+                [2] = {
+                    { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+                },
+            },
+            [2] = {
+                [1] = {
+                    { value = 30, width = 1, color = { r = 0, g = 1, b = 0, a = 1 } },
+                },
+            },
+        })
 
         _G.StaticPopup_Show = function(name, _, _, data)
             shownPopup = name
@@ -117,55 +153,96 @@ describe("PowerBarTickMarksOptions", function()
                 scheduledReason = reason
             end,
         }
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
-        })
 
-        local captured, refreshCalls, fakeCategory = registerSettings({})
+        local captured, refreshCalls = registerPageSpec()
         local defaultsAction = getRow(captured, "tickMarksPageActions").actions[1]
+        local tickCollection = getRow(captured, "tickCollection")
 
         defaultsAction.onClick()
 
         assert.are.equal("ECM_CONFIRM_CLEAR_TICKS", shownPopup)
-        assert.are.same({}, ns.PowerBarTickMarksStore.GetCurrentTicks())
+        assert.are.same({}, tickCollection.items())
+
+        currentClassID = 2
+        currentSpecIndex = 1
+
+        local otherSpecItems = tickCollection.items()
+        assert.are.equal(1, #otherSpecItems)
+        assert.are.equal(30, otherSpecItems[1].fields[1].value)
         assert.are.equal("OptionsChanged", scheduledReason)
-        assert.are.same({ fakeCategory }, refreshCalls)
+        assert.are.same({ true }, refreshCalls)
     end)
 
-    it("collection editor callbacks update tick values, widths, and removal", function()
+    it("collection editor callbacks update color, values, widths, and removal without touching another spec", function()
         local scheduledReasons = {}
+        local pickedColor = { r = 0.25, g = 0.5, b = 0.75, a = 1 }
+
+        setTickMappings({
+            [1] = {
+                [1] = {
+                    { value = 20, width = 1, color = { r = 0.5, g = 0.5, b = 0.5, a = 1 } },
+                },
+                [2] = {
+                    { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+                    { value = 80, width = 3, color = { r = 0, g = 0, b = 0, a = 1 } },
+                },
+            },
+        })
+
         ns.Runtime = {
             ScheduleLayoutUpdate = function(_, reason)
                 scheduledReasons[#scheduledReasons + 1] = reason
             end,
         }
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
-        })
+        ns.OptionUtil.OpenColorPicker = function(current, withAlpha, onChanged)
+            assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, current)
+            assert.is_true(withAlpha)
+            onChanged(pickedColor)
+        end
 
-        local captured, refreshCalls = registerSettings({})
-        local item = getRow(captured, "tickCollection").items()[1]
+        local captured, refreshCalls = registerPageSpec()
+        local tickCollection = getRow(captured, "tickCollection")
+        local item = tickCollection.items()[1]
+
+        item.color.onClick()
+        local items = tickCollection.items()
+        assert.are.same(pickedColor, items[1].color.value)
+
+        item = items[1]
 
         item.fields[1].onValueChanged(75)
         item.fields[2].onValueChanged(4)
 
-        local ticks = ns.PowerBarTickMarksStore.GetCurrentTicks()
-        assert.are.equal(75, ticks[1].value)
-        assert.are.equal(4, ticks[1].width)
+        items = tickCollection.items()
+        assert.are.equal(75, items[1].fields[1].value)
+        assert.are.equal(4, items[1].fields[2].value)
+
+        item = items[1]
 
         item.remove.onClick()
 
-        assert.are.same({}, ns.PowerBarTickMarksStore.GetCurrentTicks())
-        assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
-        assert.are.equal(3, #refreshCalls)
+        items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(80, items[1].fields[1].value)
+
+        currentSpecIndex = 1
+        items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(20, items[1].fields[1].value)
+        assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
+        assert.are.equal(4, #refreshCalls)
     end)
 
     it("rescales the value field range for large resource values", function()
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 50000, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+        setTickMappings({
+            [1] = {
+                [2] = {
+                    { value = 50000, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+                },
+            },
         })
 
-        local captured = registerSettings({})
+        local captured = registerPageSpec()
         local item = getRow(captured, "tickCollection").items()[1]
         local minValue, maxValue, step = item.fields[1].getRange(item, 50000)
         local nextMin, nextMax, nextStep = item.fields[1].getRange(item, 120000)

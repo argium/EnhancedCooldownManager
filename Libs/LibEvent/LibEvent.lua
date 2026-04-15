@@ -104,10 +104,6 @@ local function createInstance(target)
     local instance = LibEvent.embeds[target]
     if type(instance) ~= "table" then
         instance = { _events = {}, _stats = {} }
-    else
-        -- Preserve existing events and stats on re-embed (library upgrade)
-        instance._events = instance._events or {}
-        instance._stats = instance._stats or {}
     end
 
     instance.frame = instance.frame or CreateFrame("Frame")

@@ -28,11 +28,6 @@
 - Shared confirm dialogs should use `ECM.OptionUtil.MakeConfirmDialog(text)` with `data.onAccept`.
 - Migrations in `Migration.lua` are frozen snapshots and must not depend on live production code.
 
-## Options / UI Patterns
-- Current options pages prefer the `LibSettingsBuilder` DSL/table registration flow.
-- Complex pages use collection-style rows (`header`, `subheader`, `info`, `button`, `collection`, `input`) and refresh through `SB.RefreshCategory(...)`.
-- Dynamic option UIs should keep logic in the owning options module rather than reaching into unrelated modules.
-
 ## Tests / Secrets
 - Be skeptical about changing tests to satisfy failures.
 - Test load order should mirror TOC load order.

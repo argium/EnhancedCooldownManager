@@ -22,15 +22,10 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            capturedPage = page
-            return originalRegisterPage(page)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
-            ns.OptionsSections.ResourceBar.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.ResourceBarOptions)
+            capturedPage = ns.ResourceBarOptions
         end)
     end)
 
@@ -242,7 +237,6 @@ describe("ResourceBarOptions class gating (DK)", function()
         local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
-        assert.is_not_nil(ns.OptionsSections.ResourceBar)
-        assert.is_function(ns.OptionsSections.ResourceBar.RegisterSettings)
+        assert.is_true(ns.ResourceBarOptions.disabled())
     end)
 end)

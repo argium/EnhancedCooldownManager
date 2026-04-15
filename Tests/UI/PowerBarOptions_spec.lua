@@ -24,17 +24,12 @@ describe("PowerBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        ns.PowerBarTickMarksOptions = { RegisterSettings = function() end }
-
-        local originalRegisterPage = SB.RegisterPage
-        SB.RegisterPage = function(page)
-            capturedPage = page
-            return originalRegisterPage(page)
-        end
+        ns.PowerBarTickMarksOptions = { key = "tickMarks", name = "Tick Marks", rows = {} }
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/PowerBarOptions.lua", "PowerBarOptions")(nil, ns)
-            ns.OptionsSections.PowerBar.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.PowerBarOptions)
+            capturedPage = ns.PowerBarOptions.pages[1]
         end)
     end)
 
@@ -163,16 +158,19 @@ describe("PowerBarOptions getters/setters/defaults", function()
 
     describe("tick marks menu placement", function()
         it("registers Tick Marks as a subcategory of Power Bar", function()
-            TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "PowerBarTickMarksOptions")(nil, ns)
+            local profile2, defaults2 = TestHelpers.MakeOptionsProfile()
+            local SB2, ns2 = TestHelpers.SetupOptionsEnv(profile2, defaults2)
 
-            ns.OptionsSections.PowerBar.RegisterSettings(SB)
+            TestHelpers.LoadChunk("UI/PowerBarTickMarksOptions.lua", "PowerBarTickMarksOptions")(nil, ns2)
+            TestHelpers.LoadChunk("UI/PowerBarOptions.lua", "PowerBarOptions")(nil, ns2)
 
-            local powerBarCategory = SB._subcategories[ns.L["POWER_BAR"]]
-            local tickMarksCategory = SB._subcategories["Tick Marks"]
+            local _, section = TestHelpers.RegisterSectionSpec(SB2, ns2.PowerBarOptions)
+            local powerBarSectionCategory = section:GetPage("main")._category._parent
+            local tickMarksCategory = section:GetPage("tickMarks")._category
 
-            assert.is_not_nil(powerBarCategory)
+            assert.is_not_nil(powerBarSectionCategory)
             assert.is_not_nil(tickMarksCategory)
-            assert.are.equal(powerBarCategory, tickMarksCategory._parent)
+            assert.are.equal(powerBarSectionCategory, tickMarksCategory._parent)
         end)
     end)
 end)

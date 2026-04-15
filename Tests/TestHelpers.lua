@@ -265,8 +265,12 @@ function TestHelpers.SetupSettingsStubs()
                 layout
         end,
 
-        RegisterAddOnCategory = function() end,
-        OpenToCategory = function() end,
+        RegisterAddOnCategory = function(category)
+            return category
+        end,
+        OpenToCategory = function(category)
+            return category
+        end,
 
         RegisterInitializer = function(category, initializer)
             local layout = category and category.GetLayout and category:GetLayout()
@@ -1434,7 +1438,7 @@ end
 function TestHelpers.SetupLibSettingsBuilder()
     TestHelpers.LoadLibSettingsBuilder()
 
-    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1) or LibStub("LibLSMSettingsWidgets-1.0")
     lsmw.GetFontValues = function()
         return { Expressway = "Expressway" }
     end
@@ -1478,23 +1482,76 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
         DisableModule = function() end,
     }
 
-    local ns = { Addon = mod, OptionsSections = {} }
+    local ns = { Addon = mod }
     TestHelpers.LoadLiveConstants(ns)
     ns.CloneValue = deepClone
     ns.Runtime = ns.Runtime or {}
     ns.Runtime.ScheduleLayoutUpdate = function() end
     ns.IsDeathKnight = function()
-        return false
+        local _, classToken = UnitClass("player")
+        return classToken == "DEATHKNIGHT"
     end
     ns.ClassUtil = {}
 
     TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
-    local SB = ns.SettingsBuilder
-    SB.CreateRootCategory("Test")
-
+    local SB = ns.Settings
     return SB, ns
+end
+
+--- Register a declarative settings tree into a fresh root handle.
+--- @param SB table SettingsBuilder instance
+--- @param spec table Declarative root spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+function TestHelpers.RegisterSettingsTree(SB, spec, rootName)
+    local resolvedRootName = rootName or SB.name or "Test"
+
+    if not SB.name then
+        assert(type(SB._initializeRoot) == "function", "RegisterSettingsTree expected an initialized settings root")
+        SB:_initializeRoot(resolvedRootName)
+    elseif rootName ~= nil and rootName ~= SB.name then
+        error(("RegisterSettingsTree: root already exists with name '%s'"):format(tostring(SB.name)))
+    end
+
+    SB:Register(spec)
+    return SB
+end
+
+--- Register a single declarative section spec.
+--- @param SB table SettingsBuilder instance
+--- @param sectionSpec table Declarative section spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+--- @return table section Registered section handle
+--- @return table|nil page Registered default page handle
+function TestHelpers.RegisterSectionSpec(SB, sectionSpec, rootName)
+    local root = TestHelpers.RegisterSettingsTree(SB, { sections = { sectionSpec } }, rootName)
+    local section = root:GetSection(sectionSpec.key)
+    local page
+
+    if section then
+        if sectionSpec.pages then
+            local firstPage = sectionSpec.pages[1]
+            page = firstPage and section:GetPage(firstPage.key) or nil
+        else
+            page = section:GetPage(sectionSpec.pageKey or "main")
+        end
+    end
+
+    return root, section, page
+end
+
+--- Register a declarative root page spec.
+--- @param SB table SettingsBuilder instance
+--- @param pageSpec table Declarative root page spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+--- @return table|nil page Registered root page handle
+function TestHelpers.RegisterRootPageSpec(SB, pageSpec, rootName)
+    local root = TestHelpers.RegisterSettingsTree(SB, { page = pageSpec }, rootName)
+    return root, root:GetPage(pageSpec.key)
 end
 
 --- Collect all proxy settings created during a function call.
@@ -1597,7 +1654,7 @@ function TestHelpers.InstallPopupRecorder()
     end
 end
 
---- Set up the PowerBar tick marks options/store environment and load the live module.
+--- Set up the PowerBar tick marks options environment and load the live module.
 --- @param opts table|nil Optional overrides for constants, profile, or GetCurrentClassSpec
 --- @return table addonNS
 function TestHelpers.SetupPowerBarTickMarksEnv(opts)

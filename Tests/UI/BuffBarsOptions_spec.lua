@@ -9,7 +9,6 @@ describe("BuffBarsOptions", function()
     local originalGlobals
     local BuffBarsOptions
     local SpellColors
-    local SB
     local ns
     local printedMessages
 
@@ -33,6 +32,7 @@ describe("BuffBarsOptions", function()
             "canaccessvalue",
             "canaccesstable",
             "time",
+            "UnitAffectingCombat",
             "InCombatLockdown",
             "IsInInstance",
             "IsControlKeyDown",
@@ -50,7 +50,7 @@ describe("BuffBarsOptions", function()
         TestHelpers.SetupOptionsGlobals()
 
         local profile, defaults = TestHelpers.MakeOptionsProfile()
-        SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+        ns = select(2, TestHelpers.SetupOptionsEnv(profile, defaults))
 
         _G.UnitClass = function()
             return "Demon Hunter", "DEMONHUNTER", 12
@@ -76,6 +76,9 @@ describe("BuffBarsOptions", function()
         end
         _G.time = function()
             return 1000
+        end
+        _G.UnitAffectingCombat = function()
+            return false
         end
         _G.InCombatLockdown = function()
             return false
@@ -159,9 +162,6 @@ describe("BuffBarsOptions", function()
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
-        -- Create root category so subcategory calls work
-        SB.CreateRootCategory("Test")
-
         -- Load BuffBarsOptions
         TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, ns)
         BuffBarsOptions = ns.BuffBarsOptions
@@ -235,56 +235,67 @@ describe("BuffBarsOptions", function()
         assert.are.equal("Valid", rows[1].key.primaryKey)
     end)
 
-    it("section registers with key BuffBars", function()
-        -- BuffBarsOptions should have registered itself
-        assert.is_function(BuffBarsOptions.RegisterSettings)
+    it("exports a declarative BuffBars section spec", function()
+        assert.are.equal("buffBars", BuffBarsOptions.key)
+        assert.are.equal(ns.L["AURA_BARS"], BuffBarsOptions.name)
+        assert.are.equal("main", BuffBarsOptions.pages[1].key)
+        assert.are.equal("spellColors", BuffBarsOptions.pages[2].key)
     end)
 
-    it("_GetSecretNameFooterState hides the footer when all bar names are available", function()
-        local state = BuffBarsOptions._GetSecretNameFooterState({
+    it("_GetSpellColorsPageState hides the secret-name warning when all bar names are available", function()
+        local state = BuffBarsOptions._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
-        assert.is_false(state.show)
-        assert.is_false(state.enabled)
+        assert.is_false(state.showSecretNameWarning)
+        assert.is_true(state.hasRowsNeedingReconcile)
+        assert.is_true(state.canReconcile)
+        assert.are.equal("", state.warningText)
     end)
 
-    it("_GetSecretNameFooterState shows an enabled footer for unlabeled bars outside restricted areas", function()
-        local state = BuffBarsOptions._GetSecretNameFooterState({
+    it("_GetSpellColorsPageState shows the secret-name warning for unlabeled bars", function()
+        local state = BuffBarsOptions._GetSpellColorsPageState({
             { key = { primaryKey = "" } },
         })
 
-        assert.is_true(state.show)
-        assert.is_true(state.enabled)
+        assert.is_true(state.showSecretNameWarning)
     end)
 
-    it("_GetSecretNameFooterState disables reload in instances", function()
+    it("_GetSpellColorsPageState disables reconcile in instances", function()
         _G.IsInInstance = function()
             return true, "party"
         end
 
-        local state = BuffBarsOptions._GetSecretNameFooterState({
-            { key = { primaryKey = "" } },
+        local state = BuffBarsOptions._GetSpellColorsPageState({
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
-        assert.is_true(state.show)
-        assert.is_false(state.enabled)
+        assert.is_false(state.canReconcile)
     end)
 
-    it("_GetSecretNameFooterState disables reload during combat", function()
+    it("_GetSpellColorsPageState disables reconcile when the player is in combat", function()
+        _G.UnitAffectingCombat = function()
+            return true
+        end
+
+        local state = BuffBarsOptions._GetSpellColorsPageState({
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
+        })
+
+        assert.is_false(state.canReconcile)
+    end)
+
+    it("_GetSpellColorsPageState disables reconcile during combat lockdown", function()
         _G.InCombatLockdown = function()
             return true
         end
-        _G.issecretvalue = function(value)
-            return value == "Secret Spell"
-        end
 
-        local state = BuffBarsOptions._GetSecretNameFooterState({
-            { key = { primaryKey = "Secret Spell" } },
+        local state = BuffBarsOptions._GetSpellColorsPageState({
+            { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
-        assert.is_true(state.show)
-        assert.is_false(state.enabled)
+        assert.is_false(state.canReconcile)
+        assert.are.equal(ns.L["SPELL_COLORS_COMBAT_WARNING"], state.warningText)
     end)
 
     it("_BuildSpellColorKeyTooltipLines includes every available key", function()
@@ -300,70 +311,47 @@ describe("BuffBarsOptions", function()
         }, lines)
     end)
 
-    it("_HasRowsNeedingReconcile detects rows missing any identifying key", function()
-        assert.is_false(BuffBarsOptions._HasRowsNeedingReconcile({
+    it("_GetSpellColorsPageState detects rows missing any identifying key", function()
+        assert.is_false(BuffBarsOptions._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001) },
-        }))
+        }).hasRowsNeedingReconcile)
 
-        assert.is_true(BuffBarsOptions._HasRowsNeedingReconcile({
+        assert.is_true(BuffBarsOptions._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
-        }))
+        }).hasRowsNeedingReconcile)
 
-        assert.is_true(BuffBarsOptions._HasRowsNeedingReconcile({
+        assert.is_true(BuffBarsOptions._GetSpellColorsPageState({
             { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
-        }))
+        }).hasRowsNeedingReconcile)
     end)
 
     local function registerSpellColorsSpec()
-        local spellColorsSpec
-        local buttonSpecs = {}
+        local spellColorsSpec = assert(BuffBarsOptions.pages[2])
         local refreshCalls = {}
-        local originalRegisterPage = SB.RegisterPage
-        local originalButton = SB.Button
+        local fakePage = {
+            Refresh = function()
+                refreshCalls[#refreshCalls + 1] = spellColorsSpec.name
+            end,
+        }
 
-        SB.RegisterPage = function(page)
-            if page.name == ns.L["SPELL_COLORS_SUBCAT"] then
-                spellColorsSpec = page
-            end
-            return originalRegisterPage(page)
-        end
-        SB.Button = function(spec)
-            buttonSpecs[#buttonSpecs + 1] = spec
-            return originalButton(spec)
-        end
-        SB.RefreshCategory = function(category)
-            refreshCalls[#refreshCalls + 1] = category
+        if spellColorsSpec.onRegistered then
+            spellColorsSpec.onRegistered(fakePage)
         end
 
-        BuffBarsOptions.RegisterSettings(SB)
-
-        SB.RegisterPage = originalRegisterPage
-        SB.Button = originalButton
-
-        return assert(spellColorsSpec), refreshCalls, buttonSpecs
+        return spellColorsSpec, refreshCalls
     end
 
     it("does not add the old configure spell colors shortcut to aura bars", function()
-        local _, _, buttonSpecs = registerSpellColorsSpec()
-
-        local sawLayoutButton = false
-        local sawReloadButton = false
-
-        assert.are.equal(2, #buttonSpecs)
-
-        for _, spec in ipairs(buttonSpecs) do
-            assert.are_not.equal("Configure Spell Colors", spec.name)
-
-            if spec.name == ns.L["LAYOUT_SUBCATEGORY"] then
-                sawLayoutButton = true
-                assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], spec.buttonText)
-            elseif spec.buttonText == ns.L["SPELL_COLORS_RELOAD_BUTTON"] then
-                sawReloadButton = true
+        local buttonRows = {}
+        for _, row in ipairs(BuffBarsOptions.pages[1].rows) do
+            if row.type == "button" then
+                buttonRows[#buttonRows + 1] = row
             end
         end
 
-        assert.is_true(sawLayoutButton)
-        assert.is_true(sawReloadButton)
+        assert.are.equal(1, #buttonRows)
+        assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], buttonRows[1].name)
+        assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], buttonRows[1].buttonText)
     end)
 
     it("ctrl-hovering a spell color collection row shows all keys for that row", function()

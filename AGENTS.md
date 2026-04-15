@@ -69,7 +69,7 @@ luacheck . -q
 
 - Inline single-use local functions into their sole call site. Do not extract a helper just to give a three-line block a name.
 - When multiple table literals share identical structure (e.g. `{ normal = base .. X .. "_normal", pushed = base .. X .. "_down" }`), generate them with a constructor instead of writing each one out.
-- When the same two- or three-call sequence repeats across many callbacks (e.g. `scheduleUpdate(); refreshCategory()`), extract one thin wrapper and call it everywhere.
+- When the same two- or three-call sequence repeats across many callbacks (e.g. `scheduleUpdate(); refreshPage()`), extract one thin wrapper and call it everywhere.
 - Use `O(1)` set lookups (`SET[key]`) instead of linear scans (`for i, v in ipairs(list)`) when the list is fixed at load time.
 - Prefer compact single-line bodies for trivial functions: `local function f() return x end`.
 - When building repetitive declarative structures (action buttons, menu items), extract a factory that takes only the varying parts and returns the full structure.

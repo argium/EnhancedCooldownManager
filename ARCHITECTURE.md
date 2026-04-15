@@ -194,11 +194,21 @@ LibEditMode detects WoW's Edit Mode enter/exit. On enter, all modules are forced
 Setting changes flow through LibSettingsBuilder's `onChange` → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`.
 The embedded library is loaded through `Libs/LibSettingsBuilder/embed.xml`, which guarantees `Core.lua`, the primitive helper modules, standard control modules, composite control modules, and `Utility.lua` initialize in order before options pages register.
 
-Options pages now use `SB.RegisterPage(...)` plus canonical row types:
+Options pages now use LibSettingsBuilder as a single declarative registration tree:
+
+- `SB.GetRoot(L["ADDON_NAME"])` returns the singleton root handle,
+- each options module exports plain section/page spec tables (`ns.GeneralOptions`, `ns.PowerBarOptions`, `ns.AboutPage`, etc.) instead of registering itself,
+- `UI/Options.lua` combines those specs and calls `root:Register({ page = ns.AboutPage, sections = { ... } })` once,
+- `root:Register(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
+- dynamic pages keep a registered page handle through `onRegistered(page)` and refresh via `page:Refresh()` when async or transient state changes.
+
+Deprecated non-declarative page-construction APIs were removed from the builder surface. ECM settings pages are registered through the root tree only.
+
+Pages still use the same canonical row types:
 
 - standard persisted controls (`checkbox`, `slider`, `dropdown`, `color`, `input`) bind through path mode or handler mode,
 - layout rows (`header`, `subheader`, `info`, `button`, `pageActions`, `canvas`) handle structure and copy,
-- dynamic editors use `list` and `sectionList` rows with library-owned rendering plus `SB.RefreshCategory(...)` for async or transient state such as profile pickers and item-preview updates,
+- dynamic editors use `list` and `sectionList` rows with library-owned rendering,
 - `canvas` rows stay on the existing lifecycle path so page switches do not lose or misplace embedded content.
 
 ### Watchdog Ticker
@@ -390,7 +400,7 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
 }
 ```
 
-**Settings UI (`UI/ExtraIconsOptions.lua`):** Uses `SB.RegisterPage(...)` for the enabled proxy setting and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the canvas as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows. Built-in rows use the trailing button as an enable/disable toggle instead of removal, and disabled built-ins are normalized to the bottom of their viewer in `BUILTIN_STACK_ORDER` so they stay visually stable. Trinket built-ins are only rendered when the currently equipped slot resolves to an on-use spell, so passive trinkets stay in saved variables but disappear from the table until they become usable again. Missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section, but equip-slot placeholders follow the same on-use filter. The current-player racial is also synthesized as a disabled placeholder when absent; if race lookup misses, the fallback known-racial scan uses the same spellbook-aware check as runtime resolution so racials like Shadowmeld still surface in the settings list. Adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables, and trinket-slot equipment changes refresh the category so the visible rows stay in sync. Special-row behavior is explained through a short legend plus row-specific tooltips. Canvas rows stay on the current lifecycle path so viewer switches do not lose or misplace embedded content.
+**Settings UI (`UI/ExtraIconsOptions.lua`):** Registers through the new root/section/page API and exposes only native controls plus the single viewer-management canvas. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) are exposed on `ns.ExtraIconsOptions` for testability. Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the page as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows. Built-in rows use the trailing button as an enable/disable toggle instead of removal, and disabled built-ins are normalized to the bottom of their viewer in `BUILTIN_STACK_ORDER` so they stay visually stable. Trinket built-ins are only rendered when the currently equipped slot resolves to an on-use spell, so passive trinkets stay in saved variables but disappear from the table until they become usable again. Missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section, but equip-slot placeholders follow the same on-use filter. The current-player racial is also synthesized as a disabled placeholder when absent; if race lookup misses, the fallback known-racial scan uses the same spellbook-aware check as runtime resolution so racials like Shadowmeld still surface in the settings list. Adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables, and trinket-slot equipment changes refresh the page so the visible rows stay in sync. Special-row behavior is explained through a short legend plus row-specific tooltips. Canvas rows stay on the current lifecycle path so viewer switches do not lose or misplace embedded content.
 
 ### FrameUtil (`ns.FrameUtil`)
 
@@ -491,7 +501,7 @@ Shared helpers for the Settings UI, used by all option pages.
 | `CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)` | Create Edit Mode settings for detached anchor |
 | `OpenColorPicker(currentColor, hasOpacity, onChange)` | Open Blizzard color picker |
 | `MakeConfirmDialog(text)` | Create confirm dialog for `StaticPopup` |
-| `OpenLayoutPage()` | Open settings to Layout subcategory |
+| `OpenLayoutPage()` | Open settings to the registered Layout page |
 
 ### ECM Addon Instance
 

@@ -48,6 +48,7 @@ StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ns.OptionUtil.MakeConfirmDialog
 StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(L["DELETE_PROFILE_CONFIRM"])
 
 local ProfileOptions = {}
+ns.ProfileOptions = ProfileOptions
 
 local function getPreferredProfileSelection(valuesGenerator)
     local values = valuesGenerator()
@@ -69,7 +70,7 @@ local function getPreferredProfileSelection(valuesGenerator)
 end
 
 --- Creates a handler-backed dropdown for transient profile selection (not stored in SavedVars).
-local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGenerator)
+local function createProfilePickerRow(variable, name, tooltip, valuesGenerator)
     local selected = getPreferredProfileSelection(valuesGenerator)
 
     local function ensureSelection()
@@ -86,12 +87,14 @@ local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGener
         return map
     end
 
-    local _, setting = SB.Dropdown({
-        category = cat,
+    ensureSelection()
+
+    return {
+        type = "dropdown",
         key = variable,
         name = name,
         tooltip = tooltip,
-        default = selected,
+        default = "",
         scrollHeight = 240,
         values = values,
         get = function()
@@ -101,10 +104,7 @@ local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGener
         set = function(value)
             selected = value
         end,
-    })
-    ensureSelection()
-
-    return setting, function()
+    }, function()
         ensureSelection()
         return selected
     end, function()
@@ -112,21 +112,41 @@ local function createProfilePicker(SB, cat, variable, name, tooltip, valuesGener
     end
 end
 
-function ProfileOptions.RegisterSettings(SB)
-    local cat = SB.CreateSubcategory(L["PROFILES"])
-    local function refreshCategory()
-        SB.RefreshCategory(cat)
+local function otherProfilesGenerator()
+    local container = Settings.CreateControlTextContainer()
+    local current = ns.Addon.db:GetCurrentProfile()
+    for _, name in ipairs(ns.Addon.db:GetProfiles()) do
+        if name ~= current then
+            container:Add(name, name)
+        end
     end
+    return container:GetData()
+end
 
-    -- Switch Profile
-    SB.Header(L["ACTIVE_PROFILE"])
+local copyProfileRow, getCopyProfile, resetCopyProfile = createProfilePickerRow(
+    "ProfileCopy",
+    L["COPY_FROM"],
+    L["COPY_FROM_DESC"],
+    otherProfilesGenerator
+)
 
-    local _, switchSetting = SB.Dropdown({
-        category = cat,
+local deleteProfileRow, getDeleteProfile, resetDeleteProfile = createProfilePickerRow(
+    "ProfileDelete",
+    L["DELETE_PROFILE"],
+    L["DELETE_PROFILE_SELECT_DESC"],
+    otherProfilesGenerator
+)
+
+ProfileOptions.key = "profile"
+ProfileOptions.name = L["PROFILES"]
+ProfileOptions.rows = {
+    { type = "header", name = L["ACTIVE_PROFILE"] },
+    {
+        type = "dropdown",
         key = "ProfileSwitch",
         name = L["SWITCH_PROFILE"],
         tooltip = L["SWITCH_PROFILE_DESC"],
-        default = ns.Addon.db:GetCurrentProfile(),
+        default = "",
         scrollHeight = 240,
         values = function()
             local values = {}
@@ -140,46 +160,33 @@ function ProfileOptions.RegisterSettings(SB)
         end,
         set = function(value)
             ns.Addon.db:SetProfile(value)
-            refreshCategory()
         end,
-    })
-
-    SB.Button({
+        onSet = function(_, _, page)
+            page:Refresh()
+        end,
+    },
+    {
+        type = "button",
         name = L["NEW_PROFILE"],
         buttonText = L["NEW_PROFILE"],
         tooltip = L["NEW_PROFILE_DESC"],
-        onClick = function()
+        onClick = function(page)
             StaticPopup_Show("ECM_NEW_PROFILE", nil, nil, {
                 onAccept = function(name)
-                    switchSetting:SetValue(name)
-                    refreshCategory()
+                    ns.Addon.db:SetProfile(name)
+                    page:Refresh()
                 end,
             })
         end,
-    })
-
-    -- Copy / Delete
-    SB.Header(L["PROFILE_ACTIONS"])
-
-    local function otherProfilesGenerator()
-        local container = Settings.CreateControlTextContainer()
-        local current = ns.Addon.db:GetCurrentProfile()
-        for _, name in ipairs(ns.Addon.db:GetProfiles()) do
-            if name ~= current then
-                container:Add(name, name)
-            end
-        end
-        return container:GetData()
-    end
-
-    local _, getCopyProfile, clearCopyProfile =
-        createProfilePicker(SB, cat, "ProfileCopy", L["COPY_FROM"], L["COPY_FROM_DESC"], otherProfilesGenerator)
-
-    SB.Button({
+    },
+    { type = "header", name = L["PROFILE_ACTIONS"] },
+    copyProfileRow,
+    {
+        type = "button",
         name = L["COPY"],
         buttonText = L["COPY"],
         tooltip = L["COPY_DESC"],
-        onClick = function()
+        onClick = function(page)
             local profile = getCopyProfile()
             if not profile or profile == "" then
                 return
@@ -187,27 +194,19 @@ function ProfileOptions.RegisterSettings(SB)
             StaticPopup_Show("ECM_CONFIRM_COPY_PROFILE", profile, nil, {
                 onAccept = function()
                     ns.Addon.db:CopyProfile(profile)
-                    clearCopyProfile()
-                    refreshCategory()
+                    resetCopyProfile()
+                    page:Refresh()
                 end,
             })
         end,
-    })
-
-    local _, getDeleteProfile, clearDeleteProfile = createProfilePicker(
-        SB,
-        cat,
-        "ProfileDelete",
-        L["DELETE_PROFILE"],
-        L["DELETE_PROFILE_SELECT_DESC"],
-        otherProfilesGenerator
-    )
-
-    SB.Button({
+    },
+    deleteProfileRow,
+    {
+        type = "button",
         name = L["DELETE"],
         buttonText = L["DELETE"],
         tooltip = L["DELETE_DESC"],
-        onClick = function()
+        onClick = function(page)
             local profile = getDeleteProfile()
             if not profile or profile == "" then
                 return
@@ -215,30 +214,27 @@ function ProfileOptions.RegisterSettings(SB)
             StaticPopup_Show("ECM_CONFIRM_DELETE_PROFILE", profile, nil, {
                 onAccept = function()
                     ns.Addon.db:DeleteProfile(profile)
-                    clearDeleteProfile()
-                    refreshCategory()
+                    resetDeleteProfile()
+                    page:Refresh()
                 end,
             })
         end,
-    })
-
-    -- Reset
-    SB.Header(L["RESET"])
-
-    SB.Button({
+    },
+    { type = "header", name = L["RESET"] },
+    {
+        type = "button",
         name = L["RESET_PROFILE"],
         buttonText = L["RESET_PROFILE_BUTTON"],
         tooltip = L["RESET_PROFILE_DESC"],
         confirm = L["RESET_PROFILE_CONFIRM"],
-        onClick = function()
+        onClick = function(page)
             ns.Addon.db:ResetProfile()
+            page:Refresh()
         end,
-    })
-
-    -- Import / Export
-    SB.Header(L["IMPORT_EXPORT"])
-
-    SB.Button({
+    },
+    { type = "header", name = L["IMPORT_EXPORT"] },
+    {
+        type = "button",
         name = L["IMPORT_PROFILE"],
         buttonText = L["IMPORT"],
         tooltip = L["IMPORT_DESC"],
@@ -249,9 +245,9 @@ function ProfileOptions.RegisterSettings(SB)
             end
             ns.Addon:ShowImportDialog()
         end,
-    })
-
-    SB.Button({
+    },
+    {
+        type = "button",
         name = L["EXPORT_PROFILE"],
         buttonText = L["EXPORT"],
         tooltip = L["EXPORT_DESC"],
@@ -263,7 +259,5 @@ function ProfileOptions.RegisterSettings(SB)
             end
             ns.Addon:ShowExportDialog(exportString)
         end,
-    })
-end
-
-ns.SettingsBuilder.RegisterSection(ns, "Profile", ProfileOptions)
+    },
+}

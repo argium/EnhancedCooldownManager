@@ -66,7 +66,7 @@ Most library features are available with no extra XML:
 Only `SB.Custom(...)` requires you to supply your own template. In that case:
 
 1. define the template in XML,
-2. load that XML from your TOC before registering categories, and
+2. load that XML from your TOC before calling `root:Register({ ... })`, and
 3. pass the template name through `spec.template`.
 
 ## Canvas layout compatibility

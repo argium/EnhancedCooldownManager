@@ -45,15 +45,81 @@ Methods:
 
 The built-in path helpers support numeric segments like `colors.0`.
 
-## Category helpers
+## Registration tree
 
-- `SB.CreateRootCategory(name)`
-- `SB.CreateSubcategory(name[, parentCategory])`
-- `SB.CreateCanvasSubcategory(frame, name[, parentCategory])`
-- `SB.RegisterCategories()`
-- `SB.GetRootCategoryID()`
-- `SB.GetSubcategoryID(name)`
-- `SB.RefreshCategory(categoryOrName)`
+### `SB.GetRoot(name)`
+
+Returns the singleton root handle, creating and registering the addon root category on the first call.
+
+Required on first call:
+
+- `name`
+
+Notes:
+
+- later calls return the same root handle,
+- passing a different name after creation raises an error,
+- new consumer code should call this once and reuse the returned handle.
+
+### `root:Register(spec)`
+
+Registers a declarative tree rooted at the singleton root handle.
+
+Supported fields:
+
+- `spec.page` — optional root-owned landing page definition
+- `spec.sections` — optional array of section definitions
+
+Root page definition fields:
+
+- `key`
+- `rows`
+- `name` (optional; defaults to the root name)
+- `onShow`
+- `onHide`
+- `onRegistered(page)`
+- `order`
+
+Section definition fields:
+
+- `key`
+- `name`
+- `path` (defaults to `key`)
+- `display = "auto"` or `"nested"`
+- `order`
+- either `rows` for the single-page shorthand, or `pages` for multi-page sections
+- `pageKey`, `pageName`, `pageOrder` for the single-page shorthand
+- `onShow`, `onHide`, `onRegistered(page)`, `disabled`, `hidden` for the single-page shorthand page
+
+Page definition fields inside `pages`:
+
+- `key`
+- `name` (required for nested/multi-page pages unless you want the section name as the default)
+- `path`
+- `rows`
+- `onShow`
+- `onHide`
+- `onRegistered(page)`
+- `disabled`
+- `hidden`
+- `order`
+
+Notes:
+
+- single-page sections flatten to a single leaf by default,
+- multi-page sections create a visible section node automatically,
+- `onRegistered(page)` is the intended hook for storing a registered page handle when you need later `page:Refresh()` calls.
+
+Declarative root registration is the only supported page-construction API.
+
+### Lookup and page operations
+
+- `root:GetSection(key)`
+- `root:GetPage(key)`
+- `root:HasCategory(category)`
+- `section:GetPage(key)`
+- `page:GetID()`
+- `page:Refresh()`
 
 ## Controls
 
@@ -67,7 +133,6 @@ Common spec fields:
 - `name`
 - `tooltip`
 - `default`
-- `category`
 - `disabled`
 - `hidden`
 - `parent`
@@ -190,16 +255,11 @@ Supported list variants:
 - `SB.EmbedCanvas(canvas, height[, spec])`
 - `SB.Button(spec)`
 - `SB.PageActions(spec)`
-- `SB.RegisterSection(nsTable, key, section)`
 
 `SB.Button` supports `confirm = true` or a custom confirm string. Confirm dialogs are registered per button to avoid cross-button collisions.
-`SB.PageActions` renders right-aligned category-header action buttons.
+`SB.PageActions` renders right-aligned page-header action buttons.
 `SB.InfoRow` accepts function-backed `value` for dynamic text.
-`SB.RefreshCategory(...)` re-evaluates registered dynamic rows for a visible category.
-
-## Page registration
-
-### `SB.RegisterPage(page)`
+## Declarative page rows
 
 Supported canonical row types:
 
@@ -225,6 +285,8 @@ Supported composite types:
 - `heightOverride`
 - `colorList`
 - `checkboxList`
+
+Declarative pages are normally supplied through `root:Register({ page = ..., sections = { ... } })`, either as a root page definition or through section `rows` / `pages` definitions.
 
 ## Implementation model
 

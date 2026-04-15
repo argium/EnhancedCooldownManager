@@ -37,8 +37,14 @@ describe("LibSettingsBuilder", function()
             varPrefix = varPrefix,
             onChanged = function() end,
         })
-        SB2.CreateRootCategory(categoryName or "Test")
+        SB2.GetRoot(categoryName or "Test")
         return SB2
+    end
+
+    local function setCurrentCategoryFromSection(sb, sectionSpec, rootName)
+        local root, _, page = TestHelpers.RegisterSectionSpec(sb, sectionSpec, rootName)
+        sb._currentSubcategory = page and page._category or nil
+        return root, page
     end
 
     local function createSettingsPanelMock()
@@ -250,7 +256,7 @@ describe("LibSettingsBuilder", function()
         TestHelpers.LoadLibSettingsBuilder()
 
         -- Register LSMW stub
-        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+        local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1) or LibStub("LibLSMSettingsWidgets-1.0")
         lsmw.GetFontValues = function()
             return { Expressway = "Expressway" }
         end
@@ -299,6 +305,14 @@ describe("LibSettingsBuilder", function()
                 ANCHORMODE_FREE = 2,
                 DEFAULT_BAR_WIDTH = 300,
             },
+            L = setmetatable({}, { __index = function(_, key)
+                return key
+            end }),
+            ColorUtil = {
+                Sparkle = function(text)
+                    return text
+                end,
+            },
             CloneValue = TestHelpers.deepClone,
             Runtime = {
                 ScheduleLayoutUpdate = function()
@@ -311,21 +325,31 @@ describe("LibSettingsBuilder", function()
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, addonNS)
 
         SB = addonNS.SettingsBuilder
-        SB.CreateRootCategory("TestAddon")
-        SB.CreateSubcategory("TestSection")
+        setCurrentCategoryFromSection(SB, {
+            key = "testSection",
+            name = "TestSection",
+            rows = {},
+        }, "TestAddon")
     end)
 
     -- Category lifecycle
-    it("CreateRootCategory, CreateSubcategory, GetRootCategoryID, GetSubcategoryID", function()
-        assert.are.equal("TestAddon", SB.GetRootCategoryID())
-        assert.is_not_nil(SB.GetSubcategoryID("TestSection"))
-        assert.is_nil(SB.GetSubcategoryID("MissingSection"))
+    it("GetRoot exposes registered sections and owned categories", function()
+        local root = SB.GetRoot("TestAddon")
+        local section = root:GetSection("testSection")
+        local page = assert(section and section:GetPage("main"))
+
+        assert.are.equal("TestAddon", root.name)
+        assert.is_not_nil(section)
+        assert.is_nil(root:GetSection("missingSection"))
+        assert.is_true(root:HasCategory(page._category))
+        assert.is_false(root:HasCategory({}))
     end)
 
-    it("RegisterCategories does not error", function()
-        assert.has_no.errors(function()
-            SB.RegisterCategories()
-        end)
+    it("GetRoot reuses the singleton root handle", function()
+        local rootA = SB.GetRoot("TestAddon")
+        local rootB = SB.GetRoot("TestAddon")
+
+        assert.are.equal(rootA, rootB)
     end)
 
     it("Setting current subcategory to root allows adding headers there", function()
@@ -1268,18 +1292,15 @@ describe("LibSettingsBuilder", function()
         assert.is_not_nil(results[2].setting)
     end)
 
-    -- RegisterSection
-    it("RegisterSection stores section in namespace", function()
-        local ns = {}
-        local section = { RegisterSettings = function() end }
-        SB.RegisterSection(ns, "Foo", section)
-        assert.are.same(section, ns.OptionsSections.Foo)
-    end)
-
     -- Built-in path accessors
     it("path accessors read and write nested values", function()
         local SB2 = createSB2("TEST2", "Test2")
-        SB2.CreateSubcategory("Sub2")
+        local _, page = setCurrentCategoryFromSection(SB2, {
+            key = "sub2",
+            name = "Sub2",
+            rows = {},
+        }, "Test2")
+        SB2._currentSubcategory = page._category
 
         local _, setting = SB2.Checkbox({
             path = "global.hideWhenMounted",
@@ -1296,7 +1317,12 @@ describe("LibSettingsBuilder", function()
         addonNS.Addon.db.defaults.profile.powerBar.colors[0] = { r = 0, g = 0, b = 1, a = 1 }
 
         local SB2 = createSB2("TEST3", "Test3")
-        SB2.CreateSubcategory("Sub3")
+        local _, page = setCurrentCategoryFromSection(SB2, {
+            key = "sub3",
+            name = "Sub3",
+            rows = {},
+        }, "Test3")
+        SB2._currentSubcategory = page._category
 
         local _, setting = SB2.Color({
             path = "powerBar.colors.0",
@@ -1315,7 +1341,12 @@ describe("LibSettingsBuilder", function()
     end)
 
     it("Header matching subcategory name still returns a normal header", function()
-        SB.CreateSubcategory("Appearance")
+        local _, page = setCurrentCategoryFromSection(SB, {
+            key = "appearance",
+            name = "Appearance",
+            rows = {},
+        }, "TestAddon")
+        SB._currentSubcategory = page._category
         local init = SB.Header("Appearance")
         assert.are.equal("header", init._type)
         assert.are.equal("Appearance", init._text)
@@ -1535,90 +1566,110 @@ describe("LibSettingsBuilder", function()
         })
     end)
 
-    -- RegisterPage
-    it("RegisterPage creates subcategory and controls from ordered rows", function()
+    -- Declarative root registration
+    it("root:Register creates section pages and controls from ordered rows", function()
         local SB2 = createSB2("TBL1", "TableTest")
+        local root = SB2.GetRoot("TableTest")
 
-        SB2.RegisterPage({
-            name = "Test Section",
-            path = "global",
-            rows = {
-                { id = "header1", type = "header", name = "Visibility" },
-                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
-                { id = "val", type = "slider", path = "value", name = "Value", min = 0, max = 10, step = 1 },
-                { id = "mode", type = "dropdown", path = "mode", name = "Mode", values = { solid = "Solid" } },
+        root:Register({
+            sections = {
+                {
+                    key = "testSection",
+                    name = "Test Section",
+                    path = "global",
+                    rows = {
+                        { id = "header1", type = "header", name = "Visibility" },
+                        { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
+                        { id = "val", type = "slider", path = "value", name = "Value", min = 0, max = 10, step = 1 },
+                        { id = "mode", type = "dropdown", path = "mode", name = "Mode", values = { solid = "Solid" } },
+                    },
+                },
             },
         })
 
-        -- Verify subcategory was created
-        assert.is_not_nil(SB2.GetSubcategoryID("Test Section"))
+        local page = root:GetSection("testSection"):GetPage("main")
+        assert.is_not_nil(page)
+        assert.is_true(root:HasCategory(page._category))
     end)
 
-    it("RegisterPage inherits disabled from the page", function()
+    it("root:Register inherits disabled from the page spec", function()
         local disabledFn = function()
             return true
         end
         local SB2 = createSB2("TBL2", "InheritTest")
 
-        SB2.RegisterPage({
-            name = "Inherit Section",
-            path = "global",
-            disabled = disabledFn,
-            rows = {
-                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
-            },
-        })
-
-        -- The control should have the disabled predicate applied
-        -- (We can't directly inspect the predicate, but we verify no error occurs)
-        assert.is_not_nil(SB2.GetSubcategoryID("Inherit Section"))
-    end)
-
-    it("RegisterPage resolves parent references by row id", function()
-        local SB2 = createSB2("TBL3", "ParentRefTest")
-
         assert.has_no.errors(function()
-            SB2.RegisterPage({
-                name = "Parent Ref Section",
-                path = "global",
-                rows = {
-                    { id = "parentCtrl", type = "checkbox", path = "hideWhenMounted", name = "Parent" },
+            SB2.GetRoot("InheritTest"):Register({
+                sections = {
                     {
-                        id = "childCtrl",
-                        type = "slider",
-                        path = "value",
-                        name = "Child",
-                        min = 0,
-                        max = 10,
-                        step = 1,
-                        parent = "parentCtrl",
-                        parentCheck = "checked",
+                        key = "inheritSection",
+                        name = "Inherit Section",
+                        path = "global",
+                        disabled = disabledFn,
+                        rows = {
+                            { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
+                        },
                     },
                 },
             })
         end)
     end)
 
-    it("RegisterPage accepts canonical row types only", function()
-        local SB2 = createSB2("TBL4", "AliasTest")
+    it("root:Register resolves parent references by row id", function()
+        local SB2 = createSB2("TBL3", "ParentRefTest")
 
         assert.has_no.errors(function()
-            SB2.RegisterPage({
-                name = "Alias Section",
-                path = "global",
-                rows = {
-                    { id = "t", type = "checkbox", path = "hideWhenMounted", name = "Toggle" },
-                    { id = "r", type = "slider", path = "value", name = "Range", min = 0, max = 10, step = 1 },
-                    { id = "s", type = "dropdown", path = "mode", name = "Select", values = { solid = "Solid" } },
-                    { id = "h", type = "header", name = "Header" },
-                    { id = "d", type = "subheader", name = "Desc" },
-                    { id = "i", type = "info", name = "Author", value = "Test" },
+            SB2.GetRoot("ParentRefTest"):Register({
+                sections = {
+                    {
+                        key = "parentRefSection",
+                        name = "Parent Ref Section",
+                        path = "global",
+                        rows = {
+                            { id = "parentCtrl", type = "checkbox", path = "hideWhenMounted", name = "Parent" },
+                            {
+                                id = "childCtrl",
+                                type = "slider",
+                                path = "value",
+                                name = "Child",
+                                min = 0,
+                                max = 10,
+                                step = 1,
+                                parent = "parentCtrl",
+                                parentCheck = "checked",
+                            },
+                        },
+                    },
                 },
             })
         end)
     end)
 
-    it("RegisterPage supports desc as alias for tooltip", function()
+    it("root:Register accepts canonical row types only", function()
+        local SB2 = createSB2("TBL4", "AliasTest")
+
+        assert.has_no.errors(function()
+            SB2.GetRoot("AliasTest"):Register({
+                sections = {
+                    {
+                        key = "aliasSection",
+                        name = "Alias Section",
+                        path = "global",
+                        rows = {
+                            { id = "t", type = "checkbox", path = "hideWhenMounted", name = "Toggle" },
+                            { id = "r", type = "slider", path = "value", name = "Range", min = 0, max = 10, step = 1 },
+                            { id = "s", type = "dropdown", path = "mode", name = "Select", values = { solid = "Solid" } },
+                            { id = "h", type = "header", name = "Header" },
+                            { id = "d", type = "subheader", name = "Desc" },
+                            { id = "i", type = "info", name = "Author", value = "Test" },
+                        },
+                    },
+                },
+            })
+        end)
+    end)
+
+    it("root:Register supports desc as alias for tooltip", function()
         local capturedTooltip
         local settings = Settings
         local origCreateCheckbox = settings.CreateCheckbox
@@ -1629,16 +1680,21 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("TBL5", "DescTest")
 
-        SB2.RegisterPage({
-            name = "Desc Section",
-            path = "global",
-            rows = {
+        SB2.GetRoot("DescTest"):Register({
+            sections = {
                 {
-                    id = "mounted",
-                    type = "checkbox",
-                    path = "hideWhenMounted",
-                    name = "Hide",
-                    desc = "Hide when on a mount.",
+                    key = "descSection",
+                    name = "Desc Section",
+                    path = "global",
+                    rows = {
+                        {
+                            id = "mounted",
+                            type = "checkbox",
+                            path = "hideWhenMounted",
+                            name = "Hide",
+                            desc = "Hide when on a mount.",
+                        },
+                    },
                 },
             },
         })
@@ -1647,23 +1703,26 @@ describe("LibSettingsBuilder", function()
         assert.are.equal("Hide when on a mount.", capturedTooltip)
     end)
 
-    it("RegisterPage path prefixing works", function()
+    it("root:Register applies section path prefixing", function()
         local SB2 = createSB2("TBL7", "PrefixTest")
 
-        SB2.RegisterPage({
-            name = "Prefix Section",
-            path = "powerBar",
-            rows = {
-                { id = "enabled", type = "checkbox", path = "enabled", name = "Enabled" },
+        SB2.GetRoot("PrefixTest"):Register({
+            sections = {
+                {
+                    key = "prefixSection",
+                    name = "Prefix Section",
+                    path = "powerBar",
+                    rows = {
+                        { id = "enabled", type = "checkbox", path = "enabled", name = "Enabled" },
+                    },
+                },
             },
         })
 
-        -- The checkbox should read from powerBar.enabled
         assert.is_true(addonNS.Addon.db.profile.powerBar.enabled)
     end)
 
-    -- RegisterPage condition support
-    it("RegisterPage condition=false skips entry", function()
+    it("root:Register condition=false skips entry", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1675,19 +1734,24 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND1", "CondTest")
 
-        SB2.RegisterPage({
-            name = "Cond Section",
-            path = "global",
-            rows = {
+        SB2.GetRoot("CondTest"):Register({
+            sections = {
                 {
-                    id = "skipped",
-                    type = "header",
-                    name = "Should Not Appear",
-                    condition = function()
-                        return false
-                    end,
+                    key = "condSection",
+                    name = "Cond Section",
+                    path = "global",
+                    rows = {
+                        {
+                            id = "skipped",
+                            type = "header",
+                            name = "Should Not Appear",
+                            condition = function()
+                                return false
+                            end,
+                        },
+                        { id = "shown", type = "header", name = "Should Appear" },
+                    },
                 },
-                { id = "shown", type = "header", name = "Should Appear" },
             },
         })
 
@@ -1695,7 +1759,7 @@ describe("LibSettingsBuilder", function()
         assert.is_false(headerCreated)
     end)
 
-    it("RegisterPage condition=true includes entry", function()
+    it("root:Register condition=true includes entry", function()
         local headerCreated = false
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1707,17 +1771,22 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND2", "CondTest2")
 
-        SB2.RegisterPage({
-            name = "Cond Section 2",
-            path = "global",
-            rows = {
+        SB2.GetRoot("CondTest2"):Register({
+            sections = {
                 {
-                    id = "shown",
-                    type = "header",
-                    name = "Conditional Header",
-                    condition = function()
-                        return true
-                    end,
+                    key = "condSection2",
+                    name = "Cond Section 2",
+                    path = "global",
+                    rows = {
+                        {
+                            id = "shown",
+                            type = "header",
+                            name = "Conditional Header",
+                            condition = function()
+                                return true
+                            end,
+                        },
+                    },
                 },
             },
         })
@@ -1726,7 +1795,7 @@ describe("LibSettingsBuilder", function()
         assert.is_true(headerCreated)
     end)
 
-    it("RegisterPage passes hidden predicates to header initializers", function()
+    it("root:Register passes hidden predicates to header initializers", function()
         local capturedHeader
         local origHeader = CreateSettingsListSectionHeaderInitializer
         _G.CreateSettingsListSectionHeaderInitializer = function(text)
@@ -1736,17 +1805,22 @@ describe("LibSettingsBuilder", function()
 
         local SB2 = createSB2("COND3", "CondTest3")
 
-        SB2.RegisterPage({
-            name = "Cond Section 3",
-            path = "global",
-            rows = {
+        SB2.GetRoot("CondTest3"):Register({
+            sections = {
                 {
-                    id = "shown",
-                    type = "header",
-                    name = "Conditional Header",
-                    hidden = function()
-                        return true
-                    end,
+                    key = "condSection3",
+                    name = "Cond Section 3",
+                    path = "global",
+                    rows = {
+                        {
+                            id = "shown",
+                            type = "header",
+                            name = "Conditional Header",
+                            hidden = function()
+                                return true
+                            end,
+                        },
+                    },
                 },
             },
         })
@@ -1757,23 +1831,24 @@ describe("LibSettingsBuilder", function()
         assert.is_false(capturedHeader._shownPredicates[1]())
     end)
 
-    it("RegisterPage rootCategory=true uses root instead of subcategory", function()
+    it("root:Register root pages stay on the root category", function()
         local SB2 = createSB2("ROOT1", "RootTest")
+        local root = SB2.GetRoot("RootTest")
 
-        SB2.RegisterPage({
-            name = "Root Section",
-            rootCategory = true,
-            path = "global",
-            rows = {
-                { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
+        root:Register({
+            page = {
+                key = "rootSection",
+                path = "global",
+                rows = {
+                    { id = "mounted", type = "checkbox", path = "hideWhenMounted", name = "Hide" },
+                },
             },
         })
 
-        -- rootCategory=true should NOT create a subcategory
-        assert.is_nil(SB2.GetSubcategoryID("Root Section"))
+        assert.are.equal("RootTest", root:GetPage("rootSection"):GetID())
     end)
 
-    it("RegisterPage canvas rows embed a canvas frame", function()
+    it("root:Register canvas rows embed a canvas frame", function()
         local SB2 = createSB2("CANVAS1", "CanvasTest")
 
         local canvasFrame = {
@@ -1790,11 +1865,16 @@ describe("LibSettingsBuilder", function()
             return origEmbed(canvas, height, spec)
         end
 
-        SB2.RegisterPage({
-            name = "Canvas Section",
-            path = "global",
-            rows = {
-                { id = "myCanvas", type = "canvas", canvas = canvasFrame, height = 400 },
+        SB2.GetRoot("CanvasTest"):Register({
+            sections = {
+                {
+                    key = "canvasSection",
+                    name = "Canvas Section",
+                    path = "global",
+                    rows = {
+                        { id = "myCanvas", type = "canvas", canvas = canvasFrame, height = 400 },
+                    },
+                },
             },
         })
 
@@ -1934,8 +2014,12 @@ describe("LibSettingsBuilder", function()
                 varPrefix = "Handler",
                 onChanged = function() end,
             })
-            SBH.CreateRootCategory("HandlerTest")
-            SBH.CreateSubcategory("HandlerSection")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "handlerSection",
+                name = "HandlerSection",
+                rows = {},
+            }, "HandlerTest")
+            SBH._currentSubcategory = page._category
 
             local store = { myVal = true }
             local _, setting = SBH.Checkbox({
@@ -1961,8 +2045,12 @@ describe("LibSettingsBuilder", function()
                 varPrefix = "Handler",
                 onChanged = function() end,
             })
-            SBH.CreateRootCategory("HandlerTest2")
-            SBH.CreateSubcategory("HandlerSection2")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "handlerSection2",
+                name = "HandlerSection2",
+                rows = {},
+            }, "HandlerTest2")
+            SBH._currentSubcategory = page._category
 
             local store = { scale = 0.75 }
             local _, setting = SBH.Slider({
@@ -2008,8 +2096,12 @@ describe("LibSettingsBuilder", function()
         it("errors when handler mode missing set", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local SBH = LSB:New({ varPrefix = "H", onChanged = function() end })
-            SBH.CreateRootCategory("HErr")
-            SBH.CreateSubcategory("HErrS")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "hErrS",
+                name = "HErrS",
+                rows = {},
+            }, "HErr")
+            SBH._currentSubcategory = page._category
 
             assert.has.errors(function()
                 SBH.Checkbox({
@@ -2025,8 +2117,12 @@ describe("LibSettingsBuilder", function()
         it("errors when handler mode missing key", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local SBH = LSB:New({ varPrefix = "H2", onChanged = function() end })
-            SBH.CreateRootCategory("HErr2")
-            SBH.CreateSubcategory("HErrS2")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "hErrS2",
+                name = "HErrS2",
+                rows = {},
+            }, "HErr2")
+            SBH._currentSubcategory = page._category
 
             assert.has.errors(function()
                 SBH.Checkbox({
@@ -2042,8 +2138,12 @@ describe("LibSettingsBuilder", function()
         it("path mode errors without pathAdapter", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local SBH = LSB:New({ varPrefix = "NP", onChanged = function() end })
-            SBH.CreateRootCategory("NoPath")
-            SBH.CreateSubcategory("NoPathS")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "noPathS",
+                name = "NoPathS",
+                rows = {},
+            }, "NoPath")
+            SBH._currentSubcategory = page._category
 
             assert.has.errors(function()
                 SBH.Checkbox({
@@ -2056,8 +2156,12 @@ describe("LibSettingsBuilder", function()
         it("Control dispatches handler-mode checkbox", function()
             local LSB = LibStub("LibSettingsBuilder-1.0")
             local SBH = LSB:New({ varPrefix = "Disp", onChanged = function() end })
-            SBH.CreateRootCategory("DispTest")
-            SBH.CreateSubcategory("DispSect")
+            local _, page = setCurrentCategoryFromSection(SBH, {
+                key = "dispSect",
+                name = "DispSect",
+                rows = {},
+            }, "DispTest")
+            SBH._currentSubcategory = page._category
 
             local store = { flag = false }
             local _, setting = SBH.Control({
@@ -2208,16 +2312,33 @@ describe("LibSettingsBuilder", function()
             })
         end
 
-        it("stores onShow/onHide callbacks when provided in RegisterPage", function()
+        local function registerLifecycleSection(sb, opts)
+            local root = sb.GetRoot(opts.rootName or "Lifecycle")
+            local key = opts.key or "page1"
+
+            root:Register({
+                sections = {
+                    {
+                        key = key,
+                        name = opts.name or "Page1",
+                        onShow = opts.onShow,
+                        onHide = opts.onHide,
+                        rows = opts.rows or {},
+                    },
+                },
+            })
+
+            local page = root:GetSection(key):GetPage("main")
+            return root, page, page._category
+        end
+
+        it("stores onShow/onHide callbacks when provided declaratively", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onShow = function() end,
                 onHide = function() end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             assert.is_table(LSB._pageLifecycleCallbacks[cat])
             assert.is_function(LSB._pageLifecycleCallbacks[cat].onShow)
             assert.is_function(LSB._pageLifecycleCallbacks[cat].onHide)
@@ -2231,28 +2352,22 @@ describe("LibSettingsBuilder", function()
 
         it("fires onShow when DisplayCategory is called with a tracked category", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onShow = function() showCount = showCount + 1 end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             navigateTo(cat)
             assert.are.equal(1, showCount)
         end)
 
         it("fires onHide when switching away from a tracked category", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
             local hideCount = 0
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onHide = function() hideCount = hideCount + 1 end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             local other = { _name = "Other" }
             navigateTo(cat)
             navigateTo(other)
@@ -2261,14 +2376,11 @@ describe("LibSettingsBuilder", function()
 
         it("fires onHide when SettingsPanel is hidden", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
             local hideCount = 0
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onHide = function() hideCount = hideCount + 1 end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             navigateTo(cat)
             SettingsPanel._fireScript("OnHide")
             assert.are.equal(1, hideCount)
@@ -2276,14 +2388,11 @@ describe("LibSettingsBuilder", function()
 
         it("does not fire duplicate onShow when same category re-selected", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onShow = function() showCount = showCount + 1 end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             navigateTo(cat)
             navigateTo(cat)
             assert.are.equal(1, showCount)
@@ -2291,23 +2400,22 @@ describe("LibSettingsBuilder", function()
 
         it("does not fire callbacks for categories without lifecycle hooks", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
-            sb.RegisterPage({ name = "Plain", rows = {} })
-            local untracked = sb._subcategories["Plain"]
+            local _, _, untracked = registerLifecycleSection(sb, {
+                key = "plain",
+                name = "Plain",
+            })
+
             -- Should not error
             navigateTo(untracked)
         end)
 
         it("clears active category on panel hide so next open fires onShow", function()
             local sb = makeSB()
-            sb.CreateRootCategory("Lifecycle")
             local showCount = 0
-            sb.RegisterPage({
-                name = "Page1",
+            local _, _, cat = registerLifecycleSection(sb, {
                 onShow = function() showCount = showCount + 1 end,
-                rows = {},
             })
-            local cat = sb._subcategories["Page1"]
+
             navigateTo(cat)
             SettingsPanel._fireScript("OnHide")
             navigateTo(cat)
@@ -2354,13 +2462,18 @@ describe("LibSettingsBuilder", function()
                 varPrefix = "D",
                 onChanged = function() end,
             })
-            sb.CreateRootCategory("Deferred")
+            local root = sb.GetRoot("Deferred")
 
             local showCount = 0
-            sb.RegisterPage({
-                name = "Page1",
-                onShow = function() showCount = showCount + 1 end,
-                rows = {},
+            root:Register({
+                sections = {
+                    {
+                        key = "page1",
+                        name = "Page1",
+                        onShow = function() showCount = showCount + 1 end,
+                        rows = {},
+                    },
+                },
             })
 
             -- Hooks not yet installed — deferred frame should exist
@@ -2374,7 +2487,7 @@ describe("LibSettingsBuilder", function()
             assert.is_true(lsb._pageLifecycleHooked)
 
             -- Hooks should now work
-            local cat = sb._subcategories["Page1"]
+            local cat = root:GetSection("page1"):GetPage("main")._category
             SettingsPanel:SetCurrentCategory(cat)
             SettingsPanel:DisplayCategory(cat)
             assert.are.equal(1, showCount)
@@ -2460,7 +2573,7 @@ describe("LibSettingsBuilder", function()
             assert.are.equal(1, #SB._categoryRefreshables[category])
         end)
 
-        it("RegisterPage dispatches list rows through SB.List", function()
+        it("root:Register dispatches list rows through SB.List", function()
             local called
             local originalList = SB.List
             SB.List = function(spec)
@@ -2468,17 +2581,22 @@ describe("LibSettingsBuilder", function()
                 return { _type = "list" }
             end
 
-            SB.RegisterPage({
-                name = "Collection Page",
-                rows = {
+            SB.GetRoot("TestAddon"):Register({
+                sections = {
                     {
-                        id = "items",
-                        type = "list",
-                        height = 200,
-                        variant = "swatch",
-                        items = function()
-                            return {}
-                        end,
+                        key = "collectionPage",
+                        name = "Collection Page",
+                        rows = {
+                            {
+                                id = "items",
+                                type = "list",
+                                height = 200,
+                                variant = "swatch",
+                                items = function()
+                                    return {}
+                                end,
+                            },
+                        },
                     },
                 },
             })
@@ -2490,9 +2608,10 @@ describe("LibSettingsBuilder", function()
             assert.are.equal("swatch", called.variant)
         end)
 
-        it("RefreshCategory reevaluates visible frames and dynamic refreshables", function()
+        it("page:Refresh reevaluates visible frames and dynamic refreshables", function()
             local frames = createSettingsPanelMock()
-            local category = SB._currentSubcategory
+            local page = SB.GetRoot("TestAddon"):GetSection("testSection"):GetPage("main")
+            local category = page._category
             local refreshed = 0
             local frame = createScriptableFrame()
             frame.EvaluateState = function(self)
@@ -2512,7 +2631,7 @@ describe("LibSettingsBuilder", function()
                 },
             }
 
-            SB.RefreshCategory(category)
+            page:Refresh()
 
             assert.are.equal(1, refreshed)
             assert.is_true(frame._evaluated)
@@ -3223,7 +3342,7 @@ describe("LibSettingsBuilder", function()
             assert.are.equal("Global Font", setting:GetValue())
         end)
 
-        it("RegisterPage dispatches custom type through SB.Custom", function()
+        it("root:Register dispatches custom type through SB.Custom", function()
             local capturedTemplate
             local settings = Settings
             local origCEI = settings.CreateElementInitializer
@@ -3232,17 +3351,22 @@ describe("LibSettingsBuilder", function()
                 return origCEI(template, data)
             end)
 
-            SB.RegisterPage({
-                name = "Test Custom Section",
-                path = "global",
-                rows = {
-                    { id = "testHeader", type = "header", name = "Appearance" },
+            SB.GetRoot("TestAddon"):Register({
+                sections = {
                     {
-                        id = "fontPicker",
-                        type = "custom",
-                        path = "font",
-                        name = "Font",
-                        template = "LibLSMSettingsWidgets_FontPickerTemplate",
+                        key = "testCustomSection",
+                        name = "Test Custom Section",
+                        path = "global",
+                        rows = {
+                            { id = "testHeader", type = "header", name = "Appearance" },
+                            {
+                                id = "fontPicker",
+                                type = "custom",
+                                path = "font",
+                                name = "Font",
+                                template = "LibLSMSettingsWidgets_FontPickerTemplate",
+                            },
+                        },
                     },
                 },
             })
@@ -3262,6 +3386,176 @@ describe("LibSettingsBuilder", function()
             -- InitFrame. If SB.Custom starts injecting one (e.g. for mixin
             -- injection), that's a regression — XML templates handle this.
             assert.is_nil(init.InitFrame)
+        end)
+    end)
+
+    describe("root declarative API", function()
+        it("GetRoot is idempotent and rejects conflicting names", function()
+            local sb = createSB2("ROOTAPI1", "Root API")
+            local rootA = sb.GetRoot("Root API")
+            local rootB = sb.GetRoot("Root API")
+
+            assert.are.equal(rootA, rootB)
+            assert.has_error(function()
+                sb.GetRoot("Other Root")
+            end)
+        end)
+
+        it("registers a root page on the root category and rejects a second root page", function()
+            local sb = createSB2("ROOTAPI2", "Root API")
+            local root = sb.GetRoot("Root API")
+            root:Register({
+                page = {
+                    key = "about",
+                    rows = {
+                        { type = "info", name = "Version", value = "1.0" },
+                    },
+                },
+            })
+
+            assert.are.equal("Root API", root:GetPage("about"):GetID())
+
+            assert.has_error(function()
+                root:Register({
+                    page = {
+                        key = "second",
+                        rows = {
+                            { type = "info", name = "Other", value = "2.0" },
+                        },
+                    },
+                })
+            end)
+        end)
+
+        it("flattens single-page sections and preserves path-bound settings", function()
+            local sb = createSB2("ROOTAPI3", "Root API")
+            local root = sb.GetRoot("Root API")
+            local captured = TestHelpers.CollectSettings(function()
+                root:Register({
+                    sections = {
+                        {
+                            key = "general",
+                            name = "General",
+                            path = "global",
+                            rows = {
+                                {
+                                    type = "checkbox",
+                                    path = "hideWhenMounted",
+                                    name = "Hide When Mounted",
+                                },
+                            },
+                        },
+                    },
+                })
+            end)
+
+            local page = root:GetSection("general"):GetPage("main")
+            local _, setting = next(captured)
+
+            assert.are.equal("Root API.General", page:GetID())
+            assert.is_true(setting:GetValue())
+            setting:SetValue(false)
+            assert.is_false(addonNS.Addon.db.profile.global.hideWhenMounted)
+        end)
+
+        it("nests multi-page sections and honors explicit nested display for single-page sections", function()
+            local sb = createSB2("ROOTAPI4", "Root API")
+            local root = sb.GetRoot("Root API")
+            root:Register({
+                sections = {
+                    {
+                        key = "multi",
+                        name = "Multi",
+                        pages = {
+                            { key = "first", name = "First", rows = {} },
+                            { key = "second", name = "Second", rows = {} },
+                        },
+                    },
+                    {
+                        key = "nested",
+                        name = "Nested",
+                        display = "nested",
+                        rows = {},
+                    },
+                },
+            })
+
+            local second = root:GetSection("multi"):GetPage("second")
+            local only = root:GetSection("nested"):GetPage("main")
+
+            assert.are.equal("Root API.Multi.Second", second:GetID())
+            assert.are.equal("Root API.Nested.Nested", only:GetID())
+        end)
+
+        it("injects page as first arg to onClick callbacks in declarative rows", function()
+            local sb = createSB2("ROOTAPI5", "Root API")
+            local root = sb.GetRoot("Root API")
+            local receivedPage
+            root:Register({
+                sections = {
+                    {
+                        key = "clicks",
+                        name = "Clicks",
+                        rows = {
+                            {
+                                type = "button",
+                                name = "Test",
+                                buttonText = "Test",
+                                onClick = function(pg) receivedPage = pg end,
+                            },
+                        },
+                    },
+                },
+            })
+
+            local page = root:GetSection("clicks"):GetPage("main")
+
+            local layout = page._category:GetLayout()
+            local inits = layout._initializers
+            local buttonInit
+            for i = #inits, 1, -1 do
+                if inits[i]._type == "button" then
+                    buttonInit = inits[i]
+                    break
+                end
+            end
+            assert.is_not_nil(buttonInit, "button initializer not found")
+            buttonInit._onClick()
+            assert.are.equal(page, receivedPage)
+        end)
+
+        it("injects page as third arg to onSet callbacks in declarative rows", function()
+            local sb = createSB2("ROOTAPI6", "Root API")
+            local root = sb.GetRoot("Root API")
+            local receivedArgs = {}
+            local captured = TestHelpers.CollectSettings(function()
+                root:Register({
+                    sections = {
+                        {
+                            key = "onset",
+                            name = "OnSet",
+                            path = "global",
+                            rows = {
+                                {
+                                    type = "checkbox",
+                                    path = "hideWhenMounted",
+                                    name = "Hide When Mounted",
+                                    onSet = function(value, _, pg)
+                                        receivedArgs = { value = value, page = pg }
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                })
+            end)
+
+            local page = root:GetSection("onset"):GetPage("main")
+            local _, setting = next(captured)
+
+            setting:SetValue(false)
+            assert.are.equal(false, receivedArgs.value)
+            assert.are.equal(page, receivedArgs.page)
         end)
     end)
 end)

@@ -62,7 +62,6 @@ describe("OptionUtil", function()
                 DisableModule = function() end,
                 ConfirmReloadUI = function() end,
             },
-            OptionsSections = {},
         }
         ns.ColorUtil = {
             Sparkle = function(text)
@@ -88,26 +87,25 @@ describe("OptionUtil", function()
         optionsModule = ns.Addon._modules.Options
     end)
 
-    describe("About section RegisterSettings", function()
+    describe("About page spec", function()
         it("registers the root About page with ordered rows", function()
-            local registeredPage
-            ns.OptionsSections["About"].RegisterSettings({
-                RegisterPage = function(page)
-                    registeredPage = page
-                end,
-            })
+            local _, registeredPage = TestHelpers.RegisterRootPageSpec(
+                ns.SettingsBuilder,
+                ns.AboutPage,
+                ns.L["ADDON_NAME"]
+            )
+            local rows = ns.AboutPage.rows
 
             assert.is_table(registeredPage)
-            assert.are.equal(ns.L["ADDON_NAME"], registeredPage.name)
-            assert.is_true(registeredPage.rootCategory)
-            assert.are.equal(6, #registeredPage.rows)
-            assert.are.equal("info", registeredPage.rows[1].type)
-            assert.are.equal("info", registeredPage.rows[2].type)
-            assert.are.equal("info", registeredPage.rows[3].type)
-            assert.are.equal("subheader", registeredPage.rows[4].type)
-            assert.are.equal(ns.L["LINKS"], registeredPage.rows[4].name)
-            assert.are.equal("button", registeredPage.rows[5].type)
-            assert.are.equal("button", registeredPage.rows[6].type)
+            assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetID())
+            assert.are.equal(6, #rows)
+            assert.are.equal("info", rows[1].type)
+            assert.are.equal("info", rows[2].type)
+            assert.are.equal("info", rows[3].type)
+            assert.are.equal("subheader", rows[4].type)
+            assert.are.equal(ns.L["LINKS"], rows[4].name)
+            assert.are.equal("button", rows[5].type)
+            assert.are.equal("button", rows[6].type)
         end)
     end)
 
@@ -352,21 +350,27 @@ describe("OptionUtil", function()
                 openedCategory = categoryID
             end)
 
-            ns.OptionsSections["About"] = {
-                RegisterSettings = function() end,
-            }
-            ns.OptionsSections["General"] = {
-                RegisterSettings = function(SB)
-                    generalCategory = SB.CreateSubcategory(ns.L["GENERAL"])
-                end,
-            }
-            ns.OptionsSections["Profile"] = {
-                RegisterSettings = function(SB)
-                    profileCategory = SB.CreateSubcategory(ns.L["PROFILES"])
-                end,
-            }
+            local function placeholderSection(key, name)
+                return {
+                    key = key,
+                    name = name,
+                    rows = {},
+                }
+            end
+
+            ns.GeneralOptions = placeholderSection("general", ns.L["GENERAL"])
+            ns.LayoutOptions = placeholderSection("layout", ns.L["LAYOUT_SUBCATEGORY"])
+            ns.PowerBarOptions = placeholderSection("powerBar", ns.L["POWER_BAR"])
+            ns.ResourceBarOptions = placeholderSection("resourceBar", ns.L["RESOURCE_BAR"])
+            ns.RuneBarOptions = placeholderSection("runeBar", ns.L["RUNE_BAR"])
+            ns.BuffBarsOptions = placeholderSection("buffBars", ns.L["AURA_BARS"])
+            ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
+            ns.ProfileOptions = placeholderSection("profile", ns.L["PROFILES"])
+            ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
 
             optionsModule:OnInitialize()
+            generalCategory = ns.Settings:GetSection("general"):GetPage("main")._category
+            profileCategory = ns.Settings:GetSection("profile"):GetPage("main")._category
         end)
 
         it("opens General when no ECM page has been visited yet", function()

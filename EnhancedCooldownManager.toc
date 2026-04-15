@@ -55,5 +55,6 @@ UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
+UI\ExtraIconsOptionsUtil.lua
 UI\ExtraIconsOptions.lua
 UI\BuffBarsOptions.lua

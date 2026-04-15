@@ -14,8 +14,10 @@ end
 
 lib._loadState = { open = true }
 lib._internal = {}
+lib.BuilderMixin = lib.BuilderMixin or {}
 
 local internal = lib._internal
+local BuilderMixin = lib.BuilderMixin
 
 lib.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
 lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
@@ -27,7 +29,7 @@ lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
 lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
 
 --- Installs one-time hooks on SettingsPanel to fire page-level onShow/onHide
---- callbacks registered via RegisterPage. Defers automatically if
+--- callbacks registered through the root/section/page API. Defers automatically if
 --- SettingsPanel has not been created yet (Blizzard_Settings loads on demand).
 local function installPageLifecycleHooks()
     if lib._pageLifecycleHooked then
@@ -366,6 +368,8 @@ end
 
 lib.CreateHeaderTitle = createHeaderTitle
 lib.CreateSubheaderTitle = createSubheaderTitle
+BuilderMixin.CreateHeaderTitle = createHeaderTitle
+BuilderMixin.CreateSubheaderTitle = createSubheaderTitle
 
 --------------------------------------------------------------------------------
 -- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
@@ -548,6 +552,13 @@ function lib.CreateColorSwatch(parent)
     return swatch
 end
 
+BuilderMixin.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
+BuilderMixin.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
+BuilderMixin.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
+BuilderMixin.INPUTROW_TEMPLATE = lib.INPUTROW_TEMPLATE
+BuilderMixin.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
+BuilderMixin.CreateColorSwatch = lib.CreateColorSwatch
+
 --------------------------------------------------------------------------------
 -- Path accessors: built-in dot-path resolution with numeric key support
 --------------------------------------------------------------------------------
@@ -575,19 +586,23 @@ local function defaultSetNestedValue(tbl, path, value)
     for segment in path:gmatch("[^.]+") do
         if lastKey then
             local resolved = lastKey
-            if current[lastKey] == nil then
+            local existing = current[lastKey]
+            if existing == nil then
                 local num = tonumber(lastKey)
                 if num and current[num] ~= nil then
                     resolved = num
+                    existing = current[num]
                 end
             end
-            if current[resolved] == nil then
-                current[resolved] = {}
+            if type(existing) ~= "table" then
+                existing = {}
+                current[resolved] = existing
             end
-            current = current[resolved]
+            current = existing
         end
         lastKey = segment
     end
+    assert(lastKey, "defaultSetNestedValue: path is required")
     local resolved = lastKey
     if current[lastKey] == nil then
         local num = tonumber(lastKey)
@@ -629,12 +644,343 @@ function lib.PathAdapter(config)
     }
 end
 
+local function defaultSliderFormatter(value)
+    return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
+end
+
+local MODIFIER_KEYS = { "category", "parent", "parentCheck", "disabled", "hidden", "layout" }
+
+local COMMON_SPEC_FIELDS = {
+    path = true,
+    name = true,
+    tooltip = true,
+    category = true,
+    onSet = true,
+    getTransform = true,
+    setTransform = true,
+    parent = true,
+    parentCheck = true,
+    disabled = true,
+    hidden = true,
+    layout = true,
+    type = true,
+    desc = true,
+    get = true,
+    set = true,
+    key = true,
+    default = true,
+}
+
+local EXTRA_FIELDS_BY_TYPE = {
+    checkbox = {},
+    slider = { min = true, max = true, step = true, formatter = true },
+    dropdown = { values = true, scrollHeight = true },
+    color = {},
+    input = {
+        debounce = true,
+        maxLetters = true,
+        numeric = true,
+        onTextChanged = true,
+        resolveText = true,
+        watch = true,
+        watchVariables = true,
+        width = true,
+    },
+    custom = { template = true, varType = true },
+}
+
+function BuilderMixin:_makeVarNameFromIdentifier(identifier)
+    return self._config.varPrefix .. "_" .. tostring(identifier):gsub("%.", "_")
+end
+
+function BuilderMixin:_makeVarName(spec)
+    local id = spec.key or spec.path
+    return self:_makeVarNameFromIdentifier(id)
+end
+
+function BuilderMixin:_resolveCategory(spec)
+    return spec.category or self._currentSubcategory or self._rootCategory
+end
+
+function BuilderMixin:_registerCategoryRefreshable(category, initializer)
+    if not category or not initializer then
+        return
+    end
+
+    local refreshables = self._categoryRefreshables[category]
+    if not refreshables then
+        refreshables = {}
+        self._categoryRefreshables[category] = refreshables
+    end
+
+    for _, existing in ipairs(refreshables) do
+        if existing == initializer then
+            return
+        end
+    end
+
+    refreshables[#refreshables + 1] = initializer
+end
+
+function BuilderMixin:_postSet(spec, value, setting)
+    if spec.onSet then
+        spec.onSet(value, setting, spec._page)
+    end
+    self._config.onChanged(spec, value)
+    self:_reevaluateReactiveControls()
+end
+
+function BuilderMixin:_resolveBinding(spec)
+    local hasPath = spec.path ~= nil
+    local hasHandler = spec.get ~= nil or spec.set ~= nil
+
+    assert(not (hasPath and hasHandler), "spec cannot have both path and get/set")
+
+    if hasHandler then
+        assert(spec.get, "handler mode requires get")
+        assert(spec.set, "handler mode requires set")
+        assert(spec.key, "handler mode requires key")
+        return { get = spec.get, set = spec.set, default = spec.default }
+    end
+
+    assert(hasPath, "spec must have either path or get/set")
+    assert(self._adapter, "path mode requires a pathAdapter on the builder")
+
+    local binding = self._adapter:resolve(spec.path)
+    if spec.default ~= nil then
+        binding.default = spec.default
+    end
+    return binding
+end
+
+function BuilderMixin:_makeProxySetting(spec, varType, defaultFallback, binding)
+    local variable = self:_makeVarName(spec)
+    local category = self:_resolveCategory(spec)
+    local setting
+
+    binding = binding or self:_resolveBinding(spec)
+
+    local function getter()
+        local value = binding.get()
+        if spec.getTransform then
+            value = spec.getTransform(value)
+        end
+        return value
+    end
+
+    local function applyValue(value)
+        if spec.setTransform then
+            value = spec.setTransform(value)
+        end
+        binding.set(value)
+        return value
+    end
+
+    local function setter(value)
+        value = applyValue(value)
+        self:_postSet(spec, value, setting)
+    end
+
+    local function setValueNoCallback(_, value)
+        value = applyValue(value)
+        self._config.onChanged(spec, value)
+        self:_reevaluateReactiveControls()
+    end
+
+    local defaultValue = binding.default
+    if spec.getTransform then
+        defaultValue = spec.getTransform(defaultValue)
+    end
+    if defaultValue == nil then
+        defaultValue = defaultFallback
+    end
+
+    setting = Settings.RegisterProxySetting(category, variable, varType, spec.name, defaultValue, getter, setter)
+    setting.SetValueNoCallback = setValueNoCallback
+    setting._lsbVariable = variable
+
+    return setting, category
+end
+
+function BuilderMixin:_propagateModifiers(target, source)
+    for _, key in ipairs(MODIFIER_KEYS) do
+        if target[key] == nil then
+            target[key] = source[key]
+        end
+    end
+end
+
+function BuilderMixin:_mergeCompositeDefaults(functionName, spec)
+    local defaults = self._config.compositeDefaults and self._config.compositeDefaults[functionName]
+    if not defaults then
+        return spec or {}
+    end
+    return spec and copyMixin(copyMixin({}, defaults), spec) or copyMixin({}, defaults)
+end
+
+function BuilderMixin:_validateSpecFields(controlType, spec)
+    if not LSB_DEBUG then
+        return
+    end
+
+    local allowed = EXTRA_FIELDS_BY_TYPE[controlType]
+    if not allowed then
+        return
+    end
+
+    for key in pairs(spec) do
+        if not COMMON_SPEC_FIELDS[key] and not allowed[key] then
+            print(
+                "|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
+                    .. tostring(key)
+                    .. "' on "
+                    .. controlType
+                    .. " control '"
+                    .. tostring(spec.name or spec.path)
+                    .. "'"
+            )
+        end
+    end
+end
+
+function BuilderMixin:_setCanvasInteractive(frame, enabled)
+    if frame.SetEnabled then
+        frame:SetEnabled(enabled)
+    end
+    if frame.EnableMouse then
+        frame:EnableMouse(enabled)
+    end
+    if frame.GetChildren then
+        local children = { frame:GetChildren() }
+        for i = 1, #children do
+            self:_setCanvasInteractive(children[i], enabled)
+        end
+    end
+end
+
+function BuilderMixin:_isParentEnabled(spec)
+    if not spec.parent then
+        return true
+    end
+    if spec.parentCheck then
+        return spec.parentCheck()
+    end
+    if not spec.parent.GetSetting then
+        return true
+    end
+
+    local setting = spec.parent:GetSetting()
+    if not setting then
+        return true
+    end
+
+    return setting:GetValue()
+end
+
+function BuilderMixin:_isControlEnabled(spec)
+    if spec.disabled and spec.disabled() then
+        return false
+    end
+    return self:_isParentEnabled(spec)
+end
+
+function BuilderMixin:_applyCanvasState(canvas, enabled)
+    if canvas.SetAlpha then
+        canvas:SetAlpha(enabled and 1 or 0.5)
+    end
+    self:_setCanvasInteractive(canvas, enabled)
+end
+
+function BuilderMixin:_reevaluateReactiveControls()
+    local panel = SettingsPanel
+    if panel and panel:IsShown() then
+        local settingsList = panel:GetSettingsList()
+        if settingsList and settingsList.ScrollBox then
+            settingsList.ScrollBox:ForEachFrame(function(frame)
+                if frame.EvaluateState then
+                    frame:EvaluateState()
+                end
+            end)
+        end
+    end
+
+    for _, entry in ipairs(self._reactiveControls) do
+        local spec = entry[2]
+        if spec.canvas then
+            self:_applyCanvasState(spec.canvas, self:_isControlEnabled(spec))
+        end
+    end
+end
+
+function BuilderMixin:_applyEnabledState(initializer, spec)
+    local enabled = self:_isControlEnabled(spec)
+    if initializer.SetEnabled then
+        initializer:SetEnabled(enabled)
+    end
+    if spec.canvas then
+        self:_applyCanvasState(spec.canvas, enabled)
+    end
+    return enabled
+end
+
+function BuilderMixin:_applyModifiers(initializer, spec)
+    if not initializer then
+        return
+    end
+
+    if spec.disabled or spec.canvas or spec.parent then
+        initializer:AddModifyPredicate(function()
+            return self:_applyEnabledState(initializer, spec)
+        end)
+        self:_applyEnabledState(initializer, spec)
+    end
+
+    if spec.parent then
+        initializer:SetParentInitializer(spec.parent, function()
+            return self:_isParentEnabled(spec)
+        end)
+    end
+
+    if spec.hidden then
+        initializer:AddShownPredicate(function()
+            return not spec.hidden()
+        end)
+    end
+
+    if spec.canvas then
+        self._reactiveControls[#self._reactiveControls + 1] = { initializer, spec }
+    end
+end
+
+function BuilderMixin:_colorTableToHex(tbl)
+    if not tbl then
+        return "FFFFFFFF"
+    end
+    return string.format(
+        "%02X%02X%02X%02X",
+        math.floor((tbl.a or 1) * 255 + 0.5),
+        math.floor((tbl.r or 1) * 255 + 0.5),
+        math.floor((tbl.g or 1) * 255 + 0.5),
+        math.floor((tbl.b or 1) * 255 + 0.5)
+    )
+end
+
+function BuilderMixin:_storeCategory(name, category, layout)
+    self._subcategories[name] = category
+    self._subcategoryNames[category] = name
+    self._layouts[category] = layout
+    return category
+end
+
+BuilderMixin._defaultSliderFormatter = defaultSliderFormatter
+
 --- Create a new SettingsBuilder instance.
 ---@param config table
 ---   Required fields:
 ---     varPrefix      string            e.g. "ECM"
 ---     onChanged      function(spec, value) called after each setter
 ---   Optional fields:
+---     name           string            root category display name for declarative registration
 ---     pathAdapter    table  PathAdapter instance for path-based controls
 ---     compositeDefaults table keyed by composite function name
 ---@return table builder instance with the full SB API
@@ -642,409 +988,54 @@ function lib:New(config)
     assert(config.varPrefix, "LibSettingsBuilder: varPrefix is required")
     assert(config.onChanged, "LibSettingsBuilder: onChanged is required")
 
-    local SB = {}
-    SB._rootCategory = nil
-    SB._rootCategoryName = nil
-    SB._currentSubcategory = nil
-    SB._subcategories = {}
-    SB._subcategoryNames = {}
-    SB._layouts = {}
-    SB._reactiveControls = {}
-    SB._categoryRefreshables = {}
-
-    SB.EMBED_CANVAS_TEMPLATE = lib.EMBED_CANVAS_TEMPLATE
-    SB.SUBHEADER_TEMPLATE = lib.SUBHEADER_TEMPLATE
-    SB.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
-    SB.INPUTROW_TEMPLATE = lib.INPUTROW_TEMPLATE
-    SB.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
-    SB.CreateHeaderTitle = lib.CreateHeaderTitle
-    SB.CreateSubheaderTitle = lib.CreateSubheaderTitle
-    SB.CreateColorSwatch = lib.CreateColorSwatch
-
-    local function defaultSliderFormatter(value)
-        return value == math.floor(value) and tostring(math.floor(value)) or string.format("%.1f", value)
-    end
-
-    local adapter = config.pathAdapter
-
-    local function makeVarNameFromIdentifier(identifier)
-        return config.varPrefix .. "_" .. tostring(identifier):gsub("%.", "_")
-    end
-
-    local function makeVarName(spec)
-        local id = spec.key or spec.path
-        return makeVarNameFromIdentifier(id)
-    end
-
-    local function resolveCategory(spec)
-        return spec.category or SB._currentSubcategory or SB._rootCategory
-    end
-
-    local function registerCategoryRefreshable(category, initializer)
-        if not category or not initializer then
-            return
-        end
-
-        local refreshables = SB._categoryRefreshables[category]
-        if not refreshables then
-            refreshables = {}
-            SB._categoryRefreshables[category] = refreshables
-        end
-
-        for _, existing in ipairs(refreshables) do
-            if existing == initializer then
-                return
+    local SB
+    SB = setmetatable({
+        _config = config,
+        _adapter = config.pathAdapter,
+        _boundMethods = {},
+        _rootCategory = nil,
+        _rootCategoryName = nil,
+        _rootRegistered = nil,
+        _registeredRootPage = nil,
+        _currentSubcategory = nil,
+        _subcategories = {},
+        _subcategoryNames = {},
+        _layouts = {},
+        _reactiveControls = {},
+        _categoryRefreshables = {},
+        _pages = {},
+        _pageList = {},
+        _sectionList = {},
+        _sections = {},
+        _nextRootPageSequence = 0,
+        _nextSectionSequence = 0,
+        name = nil,
+    }, {
+        __index = function(_, key)
+            local value = BuilderMixin[key]
+            if type(value) ~= "function" then
+                return value
             end
-        end
 
-        refreshables[#refreshables + 1] = initializer
-    end
-
-    local reevaluateReactiveControls
-    local setCanvasInteractive
-
-    local function postSet(spec, value, setting)
-        if spec.onSet then
-            spec.onSet(value, setting)
-        end
-        config.onChanged(spec, value)
-        reevaluateReactiveControls()
-    end
-
-    --- Resolves a spec into a binding with get/set/default.
-    --- Handler mode: spec provides explicit get, set, key, and default.
-    --- Path mode: spec provides a path string; the pathAdapter generates get/set/default.
-    local function resolveBinding(spec)
-        local hasPath = spec.path ~= nil
-        local hasHandler = spec.get ~= nil or spec.set ~= nil
-
-        assert(not (hasPath and hasHandler), "spec cannot have both path and get/set")
-
-        if hasHandler then
-            assert(spec.get, "handler mode requires get")
-            assert(spec.set, "handler mode requires set")
-            assert(spec.key, "handler mode requires key")
-            return { get = spec.get, set = spec.set, default = spec.default }
-        end
-
-        assert(hasPath, "spec must have either path or get/set")
-        assert(adapter, "path mode requires a pathAdapter on the builder")
-
-        local binding = adapter:resolve(spec.path)
-        if spec.default ~= nil then
-            binding.default = spec.default
-        end
-        return binding
-    end
-
-    --- Consolidates the getter/setter/default/transform/register boilerplate
-    --- shared by Checkbox, Slider, Dropdown, and Custom.
-    local function makeProxySetting(spec, varType, defaultFallback, binding)
-        local variable = makeVarName(spec)
-        local cat = resolveCategory(spec)
-        local setting
-
-        binding = binding or resolveBinding(spec)
-
-        local function getter()
-            local val = binding.get()
-            if spec.getTransform then
-                val = spec.getTransform(val)
+            local bound = SB._boundMethods[key]
+            if bound then
+                return bound
             end
-            return val
-        end
 
-        local function applyValue(value)
-            if spec.setTransform then
-                value = spec.setTransform(value)
+            bound = function(first, ...)
+                if first == nil or first == SB then
+                    return value(SB, ...)
+                end
+                return value(SB, first, ...)
             end
-            binding.set(value)
-            return value
-        end
+            SB._boundMethods[key] = bound
+            return bound
+        end,
+    })
 
-        local function setter(value)
-            value = applyValue(value)
-            postSet(spec, value, setting)
-        end
-
-        local function setValueNoCallback(_, value)
-            value = applyValue(value)
-            config.onChanged(spec, value)
-            reevaluateReactiveControls()
-        end
-
-        local default = binding.default
-        if spec.getTransform then
-            default = spec.getTransform(default)
-        end
-
-        if default == nil then
-            default = defaultFallback
-        end
-
-        setting = Settings.RegisterProxySetting(cat, variable, varType, spec.name, default, getter, setter)
-        setting.SetValueNoCallback = setValueNoCallback
-        setting._lsbVariable = variable
-
-        return setting, cat
+    if config.name ~= nil then
+        SB:_initializeRoot(config.name)
     end
-
-    --- Copies inherited modifier keys from a composite spec onto a child spec
-    --- when the child hasn't set them explicitly.
-    local MODIFIER_KEYS = { "category", "parent", "parentCheck", "disabled", "hidden", "layout" }
-    local function propagateModifiers(target, source)
-        for _, key in ipairs(MODIFIER_KEYS) do
-            if target[key] == nil then
-                target[key] = source[key]
-            end
-        end
-    end
-
-    --- Merges compositeDefaults for the given composite function name onto spec.
-    --- Spec values win over defaults.
-    local function mergeCompositeDefaults(functionName, spec)
-        local defaults = config.compositeDefaults and config.compositeDefaults[functionName]
-        if not defaults then
-            return spec or {}
-        end
-        return spec and copyMixin(copyMixin({}, defaults), spec) or copyMixin({}, defaults)
-    end
-
-    ----------------------------------------------------------------------------
-    -- Debug spec validation (active only when LSB_DEBUG is truthy)
-    ----------------------------------------------------------------------------
-
-    local COMMON_SPEC_FIELDS = {
-        path = true,
-        name = true,
-        tooltip = true,
-        category = true,
-        onSet = true,
-        getTransform = true,
-        setTransform = true,
-        parent = true,
-        parentCheck = true,
-        disabled = true,
-        hidden = true,
-        layout = true,
-        type = true,
-        desc = true,
-        get = true,
-        set = true,
-        key = true,
-        default = true,
-    }
-
-    local EXTRA_FIELDS_BY_TYPE = {
-        checkbox = {},
-        slider = { min = true, max = true, step = true, formatter = true },
-        dropdown = { values = true, scrollHeight = true },
-        color = {},
-        input = {
-            debounce = true,
-            maxLetters = true,
-            numeric = true,
-            onTextChanged = true,
-            resolveText = true,
-            watch = true,
-            watchVariables = true,
-            width = true,
-        },
-        custom = { template = true, varType = true },
-    }
-
-    local function validateSpecFields(controlType, spec)
-        if not LSB_DEBUG then
-            return
-        end
-        local allowed = EXTRA_FIELDS_BY_TYPE[controlType]
-        if not allowed then
-            return
-        end
-        for key in pairs(spec) do
-            if not COMMON_SPEC_FIELDS[key] and not allowed[key] then
-                print(
-                    "|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
-                        .. tostring(key)
-                        .. "' on "
-                        .. controlType
-                        .. " control '"
-                        .. tostring(spec.name or spec.path)
-                        .. "'"
-                )
-            end
-        end
-    end
-
-    setCanvasInteractive = function(frame, enabled)
-        if frame.SetEnabled then
-            frame:SetEnabled(enabled)
-        end
-        if frame.EnableMouse then
-            frame:EnableMouse(enabled)
-        end
-        if frame.GetChildren then
-            local children = { frame:GetChildren() }
-            for i = 1, #children do
-                setCanvasInteractive(children[i], enabled)
-            end
-        end
-    end
-
-    local function isParentEnabled(spec)
-        if not spec.parent then
-            return true
-        end
-
-        if spec.parentCheck then
-            return spec.parentCheck()
-        end
-
-        if not spec.parent.GetSetting then
-            return true
-        end
-
-        local setting = spec.parent:GetSetting()
-        if not setting then
-            return true
-        end
-
-        return setting:GetValue()
-    end
-
-    local function isControlEnabled(spec)
-        if spec.disabled and spec.disabled() then
-            return false
-        end
-        return isParentEnabled(spec)
-    end
-
-    local function applyCanvasState(canvas, enabled)
-        if canvas.SetAlpha then
-            canvas:SetAlpha(enabled and 1 or 0.5)
-        end
-        setCanvasInteractive(canvas, enabled)
-    end
-
-    reevaluateReactiveControls = function()
-        local panel = SettingsPanel
-        if panel and panel:IsShown() then
-            local settingsList = panel:GetSettingsList()
-            if settingsList and settingsList.ScrollBox then
-                settingsList.ScrollBox:ForEachFrame(function(frame)
-                    if frame.EvaluateState then
-                        frame:EvaluateState()
-                    end
-                end)
-            end
-        end
-
-        for _, entry in ipairs(SB._reactiveControls) do
-            local spec = entry[2]
-            if spec.canvas then
-                applyCanvasState(spec.canvas, isControlEnabled(spec))
-            end
-        end
-    end
-
-    local function applyEnabledState(initializer, spec)
-        local enabled = isControlEnabled(spec)
-        if initializer.SetEnabled then
-            initializer:SetEnabled(enabled)
-        end
-        if spec.canvas then
-            applyCanvasState(spec.canvas, enabled)
-        end
-        return enabled
-    end
-
-    local function applyModifiers(initializer, spec)
-        if not initializer then
-            return
-        end
-
-        if spec.disabled or spec.canvas or spec.parent then
-            initializer:AddModifyPredicate(function()
-                return applyEnabledState(initializer, spec)
-            end)
-            applyEnabledState(initializer, spec)
-        end
-
-        if spec.parent then
-            initializer:SetParentInitializer(spec.parent, function()
-                return isParentEnabled(spec)
-            end)
-        end
-
-        if spec.hidden then
-            initializer:AddShownPredicate(function()
-                return not spec.hidden()
-            end)
-        end
-
-        if spec.canvas then
-            SB._reactiveControls[#SB._reactiveControls + 1] = { initializer, spec }
-        end
-    end
-
-    local function colorTableToHex(tbl)
-        if not tbl then
-            return "FFFFFFFF"
-        end
-        return string.format(
-            "%02X%02X%02X%02X",
-            math.floor((tbl.a or 1) * 255 + 0.5),
-            math.floor((tbl.r or 1) * 255 + 0.5),
-            math.floor((tbl.g or 1) * 255 + 0.5),
-            math.floor((tbl.b or 1) * 255 + 0.5)
-        )
-    end
-
-    local function storeCategory(name, category, layout)
-        SB._subcategories[name], SB._subcategoryNames[category], SB._layouts[category] = category, name, layout
-        return category
-    end
-
-    local env = {
-        applyCanvasState = applyCanvasState,
-        applyModifiers = applyModifiers,
-        colorTableToHex = colorTableToHex,
-        defaultSliderFormatter = defaultSliderFormatter,
-        getCanvasLayoutMetrics = getCanvasLayoutMetrics,
-        makeProxySetting = makeProxySetting,
-        makeVarName = makeVarName,
-        makeVarNameFromIdentifier = makeVarNameFromIdentifier,
-        mergeCompositeDefaults = mergeCompositeDefaults,
-        postSet = postSet,
-        propagateModifiers = propagateModifiers,
-        registerCategoryRefreshable = registerCategoryRefreshable,
-        resolveBinding = resolveBinding,
-        resolveCategory = resolveCategory,
-        storeCategory = storeCategory,
-        validateSpecFields = validateSpecFields,
-    }
-
-    assert(type(lib._installPrimitiveLayout) == "function", "LibSettingsBuilder primitive layout module not loaded")
-    assert(type(lib._installStandardControls) == "function", "LibSettingsBuilder controls module not loaded")
-    assert(
-        type(lib._installStandardCollectionControls) == "function",
-        "LibSettingsBuilder collection controls module not loaded"
-    )
-    assert(type(lib._installStandardRowControls) == "function", "LibSettingsBuilder row controls module not loaded")
-    assert(type(lib._installCompositeGroups) == "function", "LibSettingsBuilder composite group module not loaded")
-    assert(
-        type(lib._installCompositeListControls) == "function",
-        "LibSettingsBuilder composite list module not loaded"
-    )
-    assert(type(lib._installUtility) == "function", "LibSettingsBuilder utility module not loaded")
-
-    lib._installPrimitiveLayout(SB, env)
-    lib._installStandardControls(SB, env)
-    lib._installStandardCollectionControls(SB, env)
-    lib._installStandardRowControls(SB, env, config)
-    lib._installCompositeGroups(SB, env)
-    lib._installCompositeListControls(SB, env)
-    lib._installUtility(SB, env)
 
     return SB
 end

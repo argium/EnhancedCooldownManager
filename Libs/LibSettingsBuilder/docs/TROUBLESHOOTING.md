@@ -28,8 +28,8 @@ Common causes:
 
 Usually one of these:
 
-- you forgot `SB.RegisterCategories()`,
-- you created a subcategory but never added controls to it,
+- you never called `SB.GetRoot("My Addon"):Register({ ... })`,
+- your registered root page or section page ended up with no visible rows,
 - a `hidden` predicate is always returning `true`,
 - a `custom` template was never loaded from XML.
 

@@ -23,10 +23,6 @@ describe("ProfileOptions getters/setters/defaults", function()
         TestHelpers.SetupOptionsGlobals()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
-        refreshCalls = {}
-        SB.RefreshCategory = function(category)
-            refreshCalls[#refreshCalls + 1] = category
-        end
 
         -- Profile module needs import/export stubs
         ns.ImportExport = {
@@ -38,9 +34,14 @@ describe("ProfileOptions getters/setters/defaults", function()
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ProfileOptions.lua", "ProfileOptions")(nil, ns)
-            ns.OptionsSections.Profile.RegisterSettings(SB)
+            local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ProfileOptions)
+            profileCategory = page._category
         end)
-        profileCategory = SB._subcategories[ns.L["PROFILES"]]
+        refreshCalls = {}
+        local page = assert(SB:GetSection("profile"):GetPage("main"))
+        page.Refresh = function()
+            refreshCalls[#refreshCalls + 1] = profileCategory
+        end
         initializers = SB._layouts[profileCategory]._initializers
     end)
 
@@ -77,7 +78,7 @@ describe("ProfileOptions getters/setters/defaults", function()
 
             assert.are.equal("ECM_NEW_PROFILE", getShown())
             assert.are.equal("MyCustomProfile", switched)
-            assert.are.same({ profileCategory, profileCategory }, refreshCalls)
+            assert.are.same({ profileCategory }, refreshCalls)
         end)
     end)
 

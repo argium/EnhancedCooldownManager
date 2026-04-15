@@ -7,7 +7,7 @@ local TestHelpers =
 
 describe("About section", function()
     local originalGlobals
-    local SB, ns
+    local SB, ns, root
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -35,8 +35,6 @@ describe("About section", function()
                 return "<<sparkle:" .. text .. ">>"
             end,
         }
-
-        TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
     end)
 
     local function findInitializer(layout, predicate)
@@ -53,17 +51,17 @@ describe("About section", function()
         end)
     end
 
-    it("registers an About section", function()
-        assert.is_not_nil(ns.OptionsSections["About"])
-        assert.is_function(ns.OptionsSections["About"].RegisterSettings)
+    it("exports an About root page spec", function()
+        assert.is_table(ns.AboutPage)
+        assert.are.equal("about", ns.AboutPage.key)
     end)
 
-    describe("RegisterSettings", function()
+    describe("root registration", function()
         local rootLayout
 
         before_each(function()
-            ns.OptionsSections["About"].RegisterSettings(SB)
-            rootLayout = SB._layouts[SB._rootCategory]
+            root = TestHelpers.RegisterRootPageSpec(SB, ns.AboutPage, ns.L["ADDON_NAME"])
+            rootLayout = root._category:GetLayout()
         end)
 
         it("adds initializers to the root category layout", function()
@@ -73,19 +71,19 @@ describe("About section", function()
         it("creates Author info row with sparkle text", function()
             local init = findInfoRow(rootLayout, "Author")
             assert.is_not_nil(init, "expected Author info row")
-            assert.are.equal("<<sparkle:Argi>>", init.data.value)
+            assert.are.equal("<<sparkle:Argi>>", type(init.data.value) == "function" and init.data.value() or init.data.value)
         end)
 
         it("creates Contributors info row", function()
             local init = findInfoRow(rootLayout, "Contributors")
             assert.is_not_nil(init, "expected Contributors info row")
-            assert.are.equal("kayti-wow", init.data.value)
+            assert.are.equal("kayti-wow", type(init.data.value) == "function" and init.data.value() or init.data.value)
         end)
 
         it("creates Version info row with leading v stripped", function()
             local init = findInfoRow(rootLayout, "Version")
             assert.is_not_nil(init, "expected Version info row")
-            assert.are.equal("1.2.3-test", init.data.value)
+            assert.are.equal("1.2.3-test", type(init.data.value) == "function" and init.data.value() or init.data.value)
         end)
 
         it("includes Links subheader", function()
@@ -143,13 +141,15 @@ describe("About section", function()
                 end,
             }
 
-            SB._layouts[SB._rootCategory]._initializers = {}
-            ns.OptionsSections["About"].RegisterSettings(SB)
+            local profile, defaults = TestHelpers.MakeOptionsProfile()
+            local freshSB, freshNS = TestHelpers.SetupOptionsEnv(profile, defaults)
+            freshNS.ColorUtil = ns.ColorUtil
+            local freshRoot = TestHelpers.RegisterRootPageSpec(freshSB, freshNS.AboutPage, freshNS.L["ADDON_NAME"])
+            local freshRootLayout = freshRoot._category:GetLayout()
 
-            local rootLayout = SB._layouts[SB._rootCategory]
-            local init = findInfoRow(rootLayout, "Version")
+            local init = findInfoRow(freshRootLayout, "Version")
             assert.is_not_nil(init, "expected Version info row")
-            assert.are.equal("Unknown", init.data.value)
+            assert.are.equal("Unknown", type(init.data.value) == "function" and init.data.value() or init.data.value)
         end)
     end)
 end)
