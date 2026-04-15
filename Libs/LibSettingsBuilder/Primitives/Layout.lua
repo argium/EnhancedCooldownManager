@@ -11,6 +11,7 @@ end
 local internal = lib._internal
 local copyMixin = internal.copyMixin
 local BuilderMixin = lib.BuilderMixin
+local Deprecated = lib.LSBDeprecated
 
 function BuilderMixin:_createRootCategory(name)
     local category, layout = Settings.RegisterVerticalLayoutCategory(name)
@@ -51,4 +52,8 @@ function BuilderMixin:CreateCanvasLayout(name, parentCategory)
         elements = {},
         _metrics = metrics,
     }, { __index = lib.CanvasLayout })
+end
+
+Deprecated.CreateCanvasLayout = function(...)
+    return BuilderMixin.CreateCanvasLayout(...)
 end

@@ -13,6 +13,7 @@ local copyMixin = internal.copyMixin
 local installPageLifecycleHooks = internal.installPageLifecycleHooks
 local getCanvasLayoutMetrics = internal.getCanvasLayoutMetrics
 local BuilderMixin = lib.BuilderMixin
+local Deprecated = lib.LSBDeprecated
 
 local SectionMethods = {}
 local PageMethods = {}
@@ -94,6 +95,14 @@ function BuilderMixin:ConfigureCanvasLayout(layout, overrides)
 
     layout._metrics = copyMixin(copyMixin({}, lib.CanvasLayoutDefaults), overrides)
     return layout._metrics
+end
+
+Deprecated.SetCanvasLayoutDefaults = function(...)
+    return BuilderMixin.SetCanvasLayoutDefaults(...)
+end
+
+Deprecated.ConfigureCanvasLayout = function(...)
+    return BuilderMixin.ConfigureCanvasLayout(...)
 end
 
 function BuilderMixin:Control(spec)

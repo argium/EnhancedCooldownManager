@@ -202,6 +202,13 @@ Options pages now use LibSettingsBuilder as a single declarative registration tr
 - `root:Register(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
 - dynamic pages keep a registered page handle through `onRegistered(page)` and refresh via `page:Refresh()` when async or transient state changes.
 
+LibSettingsBuilder v2 Phase 1 also freezes the intended replacement surface without switching ECM over to it yet:
+
+- target factory: `LSB.New(config)`
+- target runtime lookups: `lsb:GetSection(...)`, `lsb:GetRootPage()`, `lsb:GetPage(...)`, `lsb:HasCategory(...)`
+- target page handle API: `page:GetId()`, `page:Refresh()`
+- deprecated compatibility namespace: `LSBDeprecated`
+
 Deprecated non-declarative page-construction APIs were removed from the builder surface. ECM settings pages are registered through the root tree only.
 
 Pages still use the same canonical row types:

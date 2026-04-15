@@ -17,6 +17,21 @@ It supports:
 
 Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
+## v2 status
+
+Phase 1 of the v2 rearchitecture is now frozen.
+
+That means the target public surface is defined even though the runtime still carries the compatibility APIs used by the current addon code:
+
+- target factory: `LSB.New(config)`
+- target runtime object: `lsb`
+- target lookups: `lsb:GetSection(sectionKey)`, `lsb:GetRootPage()`, `lsb:GetPage(sectionKey, pageKey)`, `lsb:HasCategory(category)`
+- target page handle: `page:GetId()`, `page:Refresh()`
+- target schema root: `config.page` plus `config.sections`
+- deprecated compatibility namespace: `LSBDeprecated`
+
+Until later migration phases land, existing `LSB:New(...)`, `SB.GetRoot(...)`, `root:Register(...)`, and helper-style APIs remain available for compatibility.
+
 ## At a glance
 
 | Need | LibSettingsBuilder |

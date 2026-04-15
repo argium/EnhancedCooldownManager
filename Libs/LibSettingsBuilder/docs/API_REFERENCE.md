@@ -8,6 +8,37 @@
 - [Migration Guide](MIGRATION_GUIDE.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
 
+## v2 Freeze
+
+Phase 1 freezes the intended v2 public surface, but does not yet remove the compatibility APIs that the current addon still uses.
+
+Target v2 surface:
+
+- `LSB.New(config)`
+- `lsb:GetSection(sectionKey)`
+- `lsb:GetRootPage()`
+- `lsb:GetPage(sectionKey, pageKey)`
+- `lsb:HasCategory(category)`
+- `page:GetId()`
+- `page:Refresh()`
+- deprecated compatibility namespace: `LSBDeprecated`
+
+Current compatibility APIs documented below remain live until the later migration phases replace them.
+
+### `LSBDeprecated`
+
+Phase 1 establishes `LSBDeprecated` as the compatibility namespace for APIs that will move off the main `LSB` table in a later phase.
+
+Currently exposed there:
+
+- `LSBDeprecated.CreateCanvasLayout(...)`
+- `LSBDeprecated.SetCanvasLayoutDefaults(...)`
+- `LSBDeprecated.ConfigureCanvasLayout(...)`
+- `LSBDeprecated.CreateColorSwatch(...)`
+- `LSBDeprecated.CreateHeaderTitle(...)`
+- `LSBDeprecated.CreateSubheaderTitle(...)`
+- `LSBDeprecated.CanvasLayout`
+
 ## Factory
 
 ### `LSB:New(config)`

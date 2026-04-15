@@ -35,7 +35,21 @@ describe("LibSettingsBuilder Core", function()
         assert.is_table(lsb)
         assert.is_function(lsb.PathAdapter)
         assert.is_function(lsb.CreateColorSwatch)
+        assert.is_table(lsb.LSBDeprecated)
         assert.is_nil(lsb._loadState.open)
+    end)
+
+    it("exposes the planned deprecated namespace aliases", function()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local deprecated = lsb.LSBDeprecated
+
+        assert.are.equal(lsb.CreateColorSwatch, deprecated.CreateColorSwatch)
+        assert.are.equal(lsb.CreateHeaderTitle, deprecated.CreateHeaderTitle)
+        assert.are.equal(lsb.CreateSubheaderTitle, deprecated.CreateSubheaderTitle)
+        assert.is_function(deprecated.CreateCanvasLayout)
+        assert.is_function(deprecated.SetCanvasLayoutDefaults)
+        assert.is_function(deprecated.ConfigureCanvasLayout)
+        assert.are.equal(lsb.CanvasLayout, deprecated.CanvasLayout)
     end)
 
     it("PathAdapter resolves nested values and defaults", function()

@@ -15,9 +15,11 @@ end
 lib._loadState = { open = true }
 lib._internal = {}
 lib.BuilderMixin = lib.BuilderMixin or {}
+lib.LSBDeprecated = lib.LSBDeprecated or {}
 
 local internal = lib._internal
 local BuilderMixin = lib.BuilderMixin
+local Deprecated = lib.LSBDeprecated
 
 lib.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
 lib.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
@@ -370,6 +372,8 @@ lib.CreateHeaderTitle = createHeaderTitle
 lib.CreateSubheaderTitle = createSubheaderTitle
 BuilderMixin.CreateHeaderTitle = createHeaderTitle
 BuilderMixin.CreateSubheaderTitle = createSubheaderTitle
+Deprecated.CreateHeaderTitle = createHeaderTitle
+Deprecated.CreateSubheaderTitle = createSubheaderTitle
 
 --------------------------------------------------------------------------------
 -- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
@@ -401,6 +405,7 @@ lib.CanvasLayoutDefaults = lib.CanvasLayoutDefaults
 
 local CanvasLayout = {}
 lib.CanvasLayout = CanvasLayout
+Deprecated.CanvasLayout = CanvasLayout
 
 local function getCanvasLayoutMetrics(layout)
     return layout._metrics or lib.CanvasLayoutDefaults
@@ -558,6 +563,7 @@ BuilderMixin.INFOROW_TEMPLATE = lib.INFOROW_TEMPLATE
 BuilderMixin.INPUTROW_TEMPLATE = lib.INPUTROW_TEMPLATE
 BuilderMixin.SCROLL_DROPDOWN_TEMPLATE = lib.SCROLL_DROPDOWN_TEMPLATE
 BuilderMixin.CreateColorSwatch = lib.CreateColorSwatch
+Deprecated.CreateColorSwatch = lib.CreateColorSwatch
 
 --------------------------------------------------------------------------------
 -- Path accessors: built-in dot-path resolution with numeric key support
