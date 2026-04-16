@@ -8,8 +8,6 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local BuilderMixin = lib._internal.BuilderMixin
-
 local function buildControlList(builder, basePath, defs, spec, methodName)
     local results = {}
     spec = spec or {}
@@ -20,16 +18,16 @@ local function buildControlList(builder, basePath, defs, spec, methodName)
             tooltip = def.tooltip,
         }
         builder:_propagateModifiers(childSpec, spec)
-        local initializer, setting = BuilderMixin[methodName](builder, childSpec)
+        local initializer, setting = lib[methodName](builder, childSpec)
         results[#results + 1] = { key = def.key, initializer = initializer, setting = setting }
     end
     return results
 end
 
-function BuilderMixin:ColorPickerList(basePath, defs, spec)
+function lib:ColorPickerList(basePath, defs, spec)
     return buildControlList(self, basePath, defs, spec, "Color")
 end
 
-function BuilderMixin:CheckboxList(basePath, defs, spec)
+function lib:CheckboxList(basePath, defs, spec)
     return buildControlList(self, basePath, defs, spec, "Checkbox")
 end

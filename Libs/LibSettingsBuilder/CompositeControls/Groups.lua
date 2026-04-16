@@ -8,13 +8,11 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local BuilderMixin = lib._internal.BuilderMixin
-
 local function callBuilder(builder, methodName, ...)
-    return BuilderMixin[methodName](builder, ...)
+    return lib[methodName](builder, ...)
 end
 
-function BuilderMixin:HeightOverrideSlider(sectionPath, spec)
+function lib:HeightOverrideSlider(sectionPath, spec)
     spec = spec or {}
     local childSpec = {
         path = sectionPath .. ".height",
@@ -40,7 +38,7 @@ end
 ---   fontFallback      function() -> string    (fallback font name)
 ---   fontSizeFallback  function() -> number    (fallback font size)
 ---   fontTemplate      string                  (custom template for the font picker)
-function BuilderMixin:FontOverrideGroup(sectionPath, spec)
+function lib:FontOverrideGroup(sectionPath, spec)
     spec = spec or {}
     local overridePath = sectionPath .. ".overrideFont"
 
@@ -118,7 +116,7 @@ function BuilderMixin:FontOverrideGroup(sectionPath, spec)
     }
 end
 
-function BuilderMixin:BorderGroup(borderPath, spec)
+function lib:BorderGroup(borderPath, spec)
     spec = spec or {}
 
     local enabledSpec = {

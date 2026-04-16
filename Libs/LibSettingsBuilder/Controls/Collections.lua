@@ -12,9 +12,7 @@ local internal = lib._internal
 local applyCollectionFrame = internal.applyCollectionFrame
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local copyMixin = internal.copyMixin
-local BuilderMixin = internal.BuilderMixin
-
-function BuilderMixin:_createCollectionInitializer(spec, errorPrefix)
+function lib:_createCollectionInitializer(spec, errorPrefix)
     assert(spec.height, errorPrefix .. ": spec.height is required")
 
     local category = self:_resolveCategory(spec)
@@ -46,13 +44,13 @@ function BuilderMixin:_createCollectionInitializer(spec, errorPrefix)
     return initializer
 end
 
-function BuilderMixin:List(spec)
+function lib:List(spec)
     assert(spec.items, "List: spec.items is required")
     assert(not spec.sections, "List: spec.sections is not supported")
     return self:_createCollectionInitializer(spec, "List")
 end
 
-function BuilderMixin:SectionList(spec)
+function lib:SectionList(spec)
     assert(spec.sections, "SectionList: spec.sections is required")
     return self:_createCollectionInitializer(spec, "SectionList")
 end

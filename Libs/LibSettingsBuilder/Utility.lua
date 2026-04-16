@@ -12,19 +12,7 @@ local internal = lib._internal
 local copyMixin = internal.copyMixin
 local installPageLifecycleHooks = internal.installPageLifecycleHooks
 local getCanvasLayoutMetrics = internal.getCanvasLayoutMetrics
-local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
-
-local PUBLIC_BUILDER_METHODS = {
-    GetSection = true,
-    GetRootPage = true,
-    GetPage = true,
-    HasCategory = true,
-}
-
-internal.publicBuilderMethods = PUBLIC_BUILDER_METHODS
-
-local PublicPageMethods = {}
 
 local DISPATCH = {
     checkbox = "Checkbox",
@@ -37,15 +25,15 @@ local DISPATCH = {
 
 local COMPOSITE_ROW_DISPATCH = {
     border = function(builder, path, spec)
-        local result = BuilderMixin.BorderGroup(builder, path, spec)
+        local result = lib.BorderGroup(builder, path, spec)
         return result.enabledInit, result.enabledSetting
     end,
     fontOverride = function(builder, path, spec)
-        local result = BuilderMixin.FontOverrideGroup(builder, path, spec)
+        local result = lib.FontOverrideGroup(builder, path, spec)
         return result.enabledInit, result.enabledSetting
     end,
     heightOverride = function(builder, path, spec)
-        return BuilderMixin.HeightOverrideSlider(builder, path, spec)
+        return lib.HeightOverrideSlider(builder, path, spec)
     end,
 }
 
@@ -88,7 +76,7 @@ local VALID_ROW_TYPES = {
     subheader = true,
 }
 
-function BuilderMixin:SetCanvasLayoutDefaults(overrides)
+function lib:SetCanvasLayoutDefaults(overrides)
     if not overrides then
         return internal.CanvasLayoutDefaults
     end
@@ -96,7 +84,7 @@ function BuilderMixin:SetCanvasLayoutDefaults(overrides)
     return copyMixin(internal.CanvasLayoutDefaults, overrides)
 end
 
-function BuilderMixin:ConfigureCanvasLayout(layout, overrides)
+function lib:ConfigureCanvasLayout(layout, overrides)
     assert(layout, "ConfigureCanvasLayout: layout is required")
     if not overrides then
         return getCanvasLayoutMetrics(layout)
@@ -107,17 +95,17 @@ function BuilderMixin:ConfigureCanvasLayout(layout, overrides)
 end
 
 Deprecated.SetCanvasLayoutDefaults = function(...)
-    return BuilderMixin.SetCanvasLayoutDefaults(...)
+    return lib.SetCanvasLayoutDefaults(...)
 end
 
 Deprecated.ConfigureCanvasLayout = function(...)
-    return BuilderMixin.ConfigureCanvasLayout(...)
+    return lib.ConfigureCanvasLayout(...)
 end
 
-function BuilderMixin:Control(spec)
+function lib:Control(spec)
     local methodName = DISPATCH[spec.type]
     assert(methodName, "Control: unknown type '" .. tostring(spec.type) .. "'")
-    return BuilderMixin[methodName](self, spec)
+    return lib[methodName](self, spec)
 end
 
 local function refreshCategory(builder, category)
@@ -292,7 +280,7 @@ local function validatePageDefinition(sourceName, pageDef)
 end
 
 local function callBuilder(builder, methodName, ...)
-    local method = BuilderMixin[methodName]
+    local method = lib[methodName]
     assert(type(method) == "function", "callBuilder: unknown builder method '" .. tostring(methodName) .. "'")
     return method(builder, ...)
 end
@@ -433,12 +421,23 @@ local function materializePage(page, category)
     page._category = category
     bindPageLifecycle(page)
 
+    -- Create the handle before row operations so ctx.page is available in callbacks
+    -- registered during those operations (e.g. onClick, onSet).
+    page._handle = {
+        _category = page._category,
+        GetId = function(_)
+            return page._category:GetID()
+        end,
+        Refresh = function(_)
+            refreshCategory(page._builder, page._category)
+        end,
+    }
+
     local created = {}
     for _, operation in ipairs(page._operations) do
         operation(created)
     end
 
-    setmetatable(page, { __index = PublicPageMethods })
     page._registered = true
     return page
 end
@@ -453,22 +452,12 @@ local function appendDeclarativeRows(page, sourceName, rows)
     return page
 end
 
-function PublicPageMethods:GetId()
-    assert(self._registered and self._category, "page:GetId: page is not registered")
-    return self._category:GetID()
-end
-
-function PublicPageMethods:Refresh()
-    assert(self._registered and self._category, "page:Refresh: page is not registered")
-    refreshCategory(self._builder, self._category)
-end
-
 local function createPage(owner, key, rows, opts)
     assert(key, "CreatePage: key is required")
 
     opts = opts or {}
     local ownerPath = owner.path or ""
-    local page = setmetatable({
+    local page = {
         _builder = owner._builder or owner,
         _root = owner._root or owner,
         _section = owner._root and owner or nil,
@@ -485,7 +474,7 @@ local function createPage(owner, key, rows, opts)
         name = opts.name,
         order = opts.order,
         path = opts.path ~= nil and opts.path or ownerPath,
-    }, { __index = PublicPageMethods })
+    }
 
     if rows then
         appendDeclarativeRows(page, "CreatePage", rows)
@@ -586,24 +575,26 @@ local function createRootPage(root, key, rows, opts)
     return page
 end
 
-function BuilderMixin:GetSection(key)
+function lib:GetSection(key)
     return self._sections[key]
 end
 
-function BuilderMixin:GetRootPage()
-    return self._registeredRootPage
+function lib:GetRootPage()
+    local page = self._registeredRootPage
+    return page and page._handle or nil
 end
 
-function BuilderMixin:GetPage(sectionKey, pageKey)
+function lib:GetPage(sectionKey, pageKey)
     if pageKey == nil then
         return nil
     end
 
     local section = self._sections[sectionKey]
-    return section and section._pages[pageKey] or nil
+    local page = section and section._pages[pageKey] or nil
+    return page and page._handle or nil
 end
 
-function BuilderMixin:HasCategory(category)
+function lib:HasCategory(category)
     return category ~= nil and self._layouts[category] ~= nil
 end
 
@@ -622,7 +613,7 @@ local function registerPageDefinition(owner, pageDef, defaultName)
     })
 end
 
-function BuilderMixin:_registerTree(spec)
+function lib:_registerTree(spec)
     assertRootConfigured(self, "Register")
     assert(type(spec) == "table", "Register: spec must be a table")
     assert(spec.page or spec.sections, "Register: spec requires page or sections")
@@ -652,7 +643,7 @@ function BuilderMixin:_registerTree(spec)
     return self
 end
 
-function BuilderMixin:_initializeRoot(name)
+function lib:_initializeRoot(name)
     if not self._rootCategory then
         assert(name, "_initializeRoot: name is required")
         self:_createRootCategory(name)

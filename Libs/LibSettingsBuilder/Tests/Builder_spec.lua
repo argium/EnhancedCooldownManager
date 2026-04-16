@@ -235,4 +235,67 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_nil(page.Checkbox)
         assert.is_nil(page.List)
     end)
+
+    it("returns an lsb instance with all methods accessible via lib prototype", function()
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = { { type = "info", name = "Version", value = "1.0" } },
+                        },
+                    },
+                },
+            },
+        })
+
+        -- Public API methods accessible via __index = lib
+        assert.is_function(sb.GetSection)
+        assert.is_function(sb.GetRootPage)
+        assert.is_function(sb.GetPage)
+        assert.is_function(sb.HasCategory)
+
+        -- Control builder methods also accessible via prototype
+        assert.is_function(sb.Checkbox)
+        assert.is_function(sb.Slider)
+        assert.is_function(sb.BorderGroup)
+
+        -- Instance state is raw on the table
+        assert.is_table(rawget(sb, "_sections"))
+        assert.is_table(rawget(sb, "_layouts"))
+    end)
+
+    it("returns plain page handles with methods directly on the table", function()
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = { { type = "info", name = "Version", value = "1.0" } },
+                        },
+                    },
+                },
+            },
+        })
+        local page = assert(sb:GetPage("general", "main"))
+
+        -- Methods are directly on the handle, not via metatable
+        assert.is_function(rawget(page, "GetId"))
+        assert.is_function(rawget(page, "Refresh"))
+        -- _category is kept for HasCategory use
+        assert.is_not_nil(rawget(page, "_category"))
+
+        -- Internal page state is not on the handle
+        assert.is_nil(page._operations)
+        assert.is_nil(page._rowIDs)
+        assert.is_nil(page._registered)
+        assert.is_nil(page._builder)
+        assert.is_nil(page._root)
+    end)
 end)

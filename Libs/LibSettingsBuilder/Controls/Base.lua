@@ -15,9 +15,7 @@ local getSettingVariable = internal.getSettingVariable
 local applyInputRowEnabledState = internal.applyInputRowEnabledState
 local applyInputRowFrame = internal.applyInputRowFrame
 local cancelInputPreviewTimer = internal.cancelInputPreviewTimer
-local BuilderMixin = internal.BuilderMixin
-
-function BuilderMixin:Checkbox(spec)
+function lib:Checkbox(spec)
     self:_validateSpecFields("checkbox", spec)
     local setting, category = self:_makeProxySetting(spec, Settings.VarType.Boolean, false)
     local initializer = Settings.CreateCheckbox(category, setting, spec.tooltip)
@@ -25,7 +23,7 @@ function BuilderMixin:Checkbox(spec)
     return initializer, setting
 end
 
-function BuilderMixin:Slider(spec)
+function lib:Slider(spec)
     self:_validateSpecFields("slider", spec)
     local setting, category = self:_makeProxySetting(spec, Settings.VarType.Number, 0)
 
@@ -38,7 +36,7 @@ function BuilderMixin:Slider(spec)
     return initializer, setting
 end
 
-function BuilderMixin:Dropdown(spec)
+function lib:Dropdown(spec)
     self:_validateSpecFields("dropdown", spec)
 
     local binding = self:_resolveBinding(spec)
@@ -111,7 +109,7 @@ function BuilderMixin:Dropdown(spec)
     return initializer, setting
 end
 
-function BuilderMixin:Color(spec)
+function lib:Color(spec)
     self:_validateSpecFields("color", spec)
 
     local variable = self:_makeVarName(spec)
@@ -148,7 +146,7 @@ function BuilderMixin:Color(spec)
     return initializer, setting
 end
 
-function BuilderMixin:Input(spec)
+function lib:Input(spec)
     self:_validateSpecFields("input", spec)
 
     local setting, category = self:_makeProxySetting(spec, Settings.VarType.String, "")
@@ -208,7 +206,7 @@ end
 
 --- Creates a proxy setting backed by a custom frame template.
 --- The template's Init receives initializer data containing {setting, name, tooltip}.
-function BuilderMixin:Custom(spec)
+function lib:Custom(spec)
     self:_validateSpecFields("custom", spec)
     assert(spec.template, "Custom: spec.template is required")
 

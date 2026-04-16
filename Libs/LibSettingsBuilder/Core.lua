@@ -17,8 +17,6 @@ lib._internal = lib._internal or {}
 lib.LSBDeprecated = lib.LSBDeprecated or {}
 
 local internal = lib._internal
-internal.BuilderMixin = internal.BuilderMixin or {}
-local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
 
 internal.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
@@ -696,32 +694,32 @@ local EXTRA_FIELDS_BY_TYPE = {
     custom = { template = true, varType = true },
 }
 
-function BuilderMixin:_makeVarNameFromIdentifier(identifier)
+function lib:_makeVarNameFromIdentifier(identifier)
     return self._config.varPrefix .. "_" .. tostring(identifier):gsub("%.", "_")
 end
 
-function BuilderMixin:_makeVarName(spec)
+function lib:_makeVarName(spec)
     local id = spec.key or spec.path
     return self:_makeVarNameFromIdentifier(id)
 end
 
-function BuilderMixin:_createCallbackContext(spec, setting)
+function lib:_createCallbackContext(spec, setting)
     return {
         builder = self,
         category = self:_resolveCategory(spec),
         key = spec.key,
-        page = spec._page,
+        page = spec._page and spec._page._handle,
         path = spec.path,
         setting = setting,
         spec = spec,
     }
 end
 
-function BuilderMixin:_resolveCategory(spec)
+function lib:_resolveCategory(spec)
     return spec.category or self._currentSubcategory or self._rootCategory
 end
 
-function BuilderMixin:_registerCategoryRefreshable(category, initializer)
+function lib:_registerCategoryRefreshable(category, initializer)
     if not category or not initializer then
         return
     end
@@ -741,7 +739,7 @@ function BuilderMixin:_registerCategoryRefreshable(category, initializer)
     refreshables[#refreshables + 1] = initializer
 end
 
-function BuilderMixin:_postSet(spec, value, setting)
+function lib:_postSet(spec, value, setting)
     local ctx = self:_createCallbackContext(spec, setting)
     if spec.onSet then
         spec.onSet(ctx, value)
@@ -750,7 +748,7 @@ function BuilderMixin:_postSet(spec, value, setting)
     self:_reevaluateReactiveControls()
 end
 
-function BuilderMixin:_resolveBinding(spec)
+function lib:_resolveBinding(spec)
     local hasPath = spec.path ~= nil
     local hasHandler = spec.get ~= nil or spec.set ~= nil
 
@@ -773,7 +771,7 @@ function BuilderMixin:_resolveBinding(spec)
     return binding
 end
 
-function BuilderMixin:_makeProxySetting(spec, varType, defaultFallback, binding)
+function lib:_makeProxySetting(spec, varType, defaultFallback, binding)
     local variable = self:_makeVarName(spec)
     local category = self:_resolveCategory(spec)
     local setting
@@ -822,7 +820,7 @@ function BuilderMixin:_makeProxySetting(spec, varType, defaultFallback, binding)
     return setting, category
 end
 
-function BuilderMixin:_propagateModifiers(target, source)
+function lib:_propagateModifiers(target, source)
     for _, key in ipairs(MODIFIER_KEYS) do
         if target[key] == nil then
             target[key] = source[key]
@@ -830,7 +828,7 @@ function BuilderMixin:_propagateModifiers(target, source)
     end
 end
 
-function BuilderMixin:_validateSpecFields(controlType, spec)
+function lib:_validateSpecFields(controlType, spec)
     if not LSB_DEBUG then
         return
     end
@@ -855,7 +853,7 @@ function BuilderMixin:_validateSpecFields(controlType, spec)
     end
 end
 
-function BuilderMixin:_setCanvasInteractive(frame, enabled)
+function lib:_setCanvasInteractive(frame, enabled)
     if frame.SetEnabled then
         frame:SetEnabled(enabled)
     end
@@ -870,7 +868,7 @@ function BuilderMixin:_setCanvasInteractive(frame, enabled)
     end
 end
 
-function BuilderMixin:_isParentEnabled(spec)
+function lib:_isParentEnabled(spec)
     if not spec._parentInitializer then
         return true
     end
@@ -889,21 +887,21 @@ function BuilderMixin:_isParentEnabled(spec)
     return setting:GetValue()
 end
 
-function BuilderMixin:_isControlEnabled(spec)
+function lib:_isControlEnabled(spec)
     if spec.disabled and spec.disabled() then
         return false
     end
     return self:_isParentEnabled(spec)
 end
 
-function BuilderMixin:_applyCanvasState(canvas, enabled)
+function lib:_applyCanvasState(canvas, enabled)
     if canvas.SetAlpha then
         canvas:SetAlpha(enabled and 1 or 0.5)
     end
     self:_setCanvasInteractive(canvas, enabled)
 end
 
-function BuilderMixin:_reevaluateReactiveControls()
+function lib:_reevaluateReactiveControls()
     local panel = SettingsPanel
     if panel and panel:IsShown() then
         local settingsList = panel:GetSettingsList()
@@ -924,7 +922,7 @@ function BuilderMixin:_reevaluateReactiveControls()
     end
 end
 
-function BuilderMixin:_applyEnabledState(initializer, spec)
+function lib:_applyEnabledState(initializer, spec)
     local enabled = self:_isControlEnabled(spec)
     if initializer.SetEnabled then
         initializer:SetEnabled(enabled)
@@ -935,7 +933,7 @@ function BuilderMixin:_applyEnabledState(initializer, spec)
     return enabled
 end
 
-function BuilderMixin:_applyModifiers(initializer, spec)
+function lib:_applyModifiers(initializer, spec)
     if not initializer then
         return
     end
@@ -964,7 +962,7 @@ function BuilderMixin:_applyModifiers(initializer, spec)
     end
 end
 
-function BuilderMixin:_colorTableToHex(tbl)
+function lib:_colorTableToHex(tbl)
     if not tbl then
         return "FFFFFFFF"
     end
@@ -977,14 +975,14 @@ function BuilderMixin:_colorTableToHex(tbl)
     )
 end
 
-function BuilderMixin:_storeCategory(name, category, layout)
+function lib:_storeCategory(name, category, layout)
     self._subcategories[name] = category
     self._subcategoryNames[category] = name
     self._layouts[category] = layout
     return category
 end
 
-BuilderMixin._defaultSliderFormatter = defaultSliderFormatter
+lib._defaultSliderFormatter = defaultSliderFormatter
 
 --- Create a new LibSettingsBuilder runtime instance.
 ---@param config table
@@ -1021,11 +1019,9 @@ function lib.New(selfOrConfig, maybeConfig)
         })
     end
 
-    local SB
-    SB = setmetatable({
+    local lsb = setmetatable({
         _config = config,
         _adapter = adapter,
-        _boundMethods = {},
         _rootCategory = nil,
         _rootCategoryName = nil,
         _rootRegistered = nil,
@@ -1043,46 +1039,20 @@ function lib.New(selfOrConfig, maybeConfig)
         _nextRootPageSequence = 0,
         _nextSectionSequence = 0,
         name = nil,
-    }, {
-        __index = function(_, key)
-            local value = BuilderMixin[key]
-            if type(value) ~= "function" then
-                return value
-            end
-
-            local publicBuilderMethods = internal.publicBuilderMethods
-            if publicBuilderMethods and key:sub(1, 1) ~= "_" and not publicBuilderMethods[key] then
-                return nil
-            end
-
-            local bound = SB._boundMethods[key]
-            if bound then
-                return bound
-            end
-
-            bound = function(first, ...)
-                if first == nil or first == SB then
-                    return value(SB, ...)
-                end
-                return value(SB, first, ...)
-            end
-            SB._boundMethods[key] = bound
-            return bound
-        end,
-    })
+    }, { __index = lib })
 
     if config.name ~= nil then
-        SB:_initializeRoot(config.name)
+        lsb:_initializeRoot(config.name)
     end
 
     if config.page or config.sections then
-        SB:_registerTree({
+        lsb:_registerTree({
             page = config.page,
             sections = config.sections,
         })
     end
 
-    return SB
+    return lsb
 end
 
 internal.installPageLifecycleHooks = installPageLifecycleHooks
@@ -1101,7 +1071,6 @@ internal.evaluateStaticOrFunction = evaluateStaticOrFunction
 internal.getCanvasLayoutMetrics = getCanvasLayoutMetrics
 internal.defaultSwatchCenterX = DEFAULT_SWATCH_CENTER_X
 
-lib.BuilderMixin = nil
 lib.CanvasLayout = nil
 lib.CanvasLayoutDefaults = nil
 lib.CreateColorSwatch = nil

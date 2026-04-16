@@ -10,10 +10,9 @@ end
 
 local internal = lib._internal
 local copyMixin = internal.copyMixin
-local BuilderMixin = internal.BuilderMixin
 local Deprecated = lib.LSBDeprecated
 
-function BuilderMixin:_createRootCategory(name)
+function lib:_createRootCategory(name)
     local category, layout = Settings.RegisterVerticalLayoutCategory(name)
     self._rootCategory = category
     self._rootCategoryName = name
@@ -22,14 +21,14 @@ function BuilderMixin:_createRootCategory(name)
     return category
 end
 
-function BuilderMixin:_createSubcategory(name, parentCategory)
+function lib:_createSubcategory(name, parentCategory)
     local parent = parentCategory or self._rootCategory
     local subcategory, layout = Settings.RegisterVerticalLayoutSubcategory(parent, name)
     self._currentSubcategory = self:_storeCategory(name, subcategory, layout)
     return subcategory
 end
 
-function BuilderMixin:_createCanvasSubcategory(frame, name, parentCategory)
+function lib:_createCanvasSubcategory(frame, name, parentCategory)
     local parent = parentCategory or self._rootCategory
     local subcategory, layout = Settings.RegisterCanvasLayoutSubcategory(parent, frame, name)
     return self:_storeCategory(name, subcategory, layout)
@@ -42,7 +41,7 @@ end
 ---@param name string  Subcategory display name.
 ---@param parentCategory? table  Parent category (defaults to root).
 ---@return table layout  CanvasLayout instance (layout.frame for the raw frame).
-function BuilderMixin:CreateCanvasLayout(name, parentCategory)
+function lib:CreateCanvasLayout(name, parentCategory)
     local frame = CreateFrame("Frame", nil)
     self:_createCanvasSubcategory(frame, name, parentCategory)
     local metrics = copyMixin({}, internal.CanvasLayoutDefaults)
@@ -55,5 +54,5 @@ function BuilderMixin:CreateCanvasLayout(name, parentCategory)
 end
 
 Deprecated.CreateCanvasLayout = function(...)
-    return BuilderMixin.CreateCanvasLayout(...)
+    return lib.CreateCanvasLayout(...)
 end

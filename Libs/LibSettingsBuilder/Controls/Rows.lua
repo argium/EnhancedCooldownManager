@@ -16,9 +16,7 @@ local applySubheaderFrame = internal.applySubheaderFrame
 local copyMixin = internal.copyMixin
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local hideHeaderActionButtons = internal.hideHeaderActionButtons
-local BuilderMixin = internal.BuilderMixin
-
-function BuilderMixin:_addLayoutInitializer(spec, initializer, refreshable)
+function lib:_addLayoutInitializer(spec, initializer, refreshable)
     local category = self:_resolveCategory(spec)
     self._layouts[category]:AddInitializer(initializer)
     if refreshable then
@@ -28,7 +26,7 @@ function BuilderMixin:_addLayoutInitializer(spec, initializer, refreshable)
     return initializer, category
 end
 
-function BuilderMixin:Header(textOrSpec, category)
+function lib:Header(textOrSpec, category)
     local spec = type(textOrSpec) == "table" and textOrSpec or {
         name = textOrSpec,
         category = category,
@@ -39,7 +37,7 @@ function BuilderMixin:Header(textOrSpec, category)
     return self:_addLayoutInitializer(spec, initializer)
 end
 
-function BuilderMixin:PageActions(spec)
+function lib:PageActions(spec)
     assert(spec.actions, "PageActions: spec.actions is required")
 
     local category = self:_resolveCategory(spec)
@@ -60,7 +58,7 @@ function BuilderMixin:PageActions(spec)
     return self:_addLayoutInitializer(spec, initializer, true)
 end
 
-function BuilderMixin:Subheader(spec)
+function lib:Subheader(spec)
     local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
         _lsbKind = "subheader",
         name = spec.name,
@@ -68,7 +66,7 @@ function BuilderMixin:Subheader(spec)
     return self:_addLayoutInitializer(spec, initializer)
 end
 
-function BuilderMixin:InfoRow(spec)
+function lib:InfoRow(spec)
     local initializer = createCustomListRowInitializer(internal.INFOROW_TEMPLATE, {
         _lsbKind = "infoRow",
         name = spec.name,
@@ -82,7 +80,7 @@ function BuilderMixin:InfoRow(spec)
     return self:_addLayoutInitializer(spec, initializer, type(spec.value) == "function" or type(spec.name) == "function")
 end
 
-function BuilderMixin:EmbedCanvas(canvas, height, spec)
+function lib:EmbedCanvas(canvas, height, spec)
     spec = spec or {}
 
     local modifiers = copyMixin({}, spec)
@@ -99,7 +97,7 @@ function BuilderMixin:EmbedCanvas(canvas, height, spec)
     return initializer
 end
 
-function BuilderMixin:_ensureConfirmDialog()
+function lib:_ensureConfirmDialog()
     if self._confirmDialogName then
         return self._confirmDialogName
     end
@@ -124,7 +122,7 @@ function BuilderMixin:_ensureConfirmDialog()
     return self._confirmDialogName
 end
 
-function BuilderMixin:Button(spec)
+function lib:Button(spec)
     local callbackContext = self:_createCallbackContext(spec)
     local onClick = spec.onClick
     if spec.confirm then
