@@ -3,7 +3,7 @@ name: Iterate
 description: Orchestrates an implement-then-review loop. Delegates implementation to the default agent (GPT-5.4) and review to LuaReview, iterating until the review is clean or two review cycles have completed.
 argument-hint: A task to implement (e.g. "add X to module Y", "refactor Z").
 tools: [agent, todo]
-model: GPT-5.4 (copilot)
+model: Claude Opus 4.7 (copilot)
 ---
 
 You are an orchestrator. You do not write code or review code yourself. You delegate every step to a subagent via `runSubagent` and relay results.
