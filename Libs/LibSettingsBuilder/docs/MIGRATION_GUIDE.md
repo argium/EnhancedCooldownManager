@@ -42,6 +42,14 @@ local lsb = LSB.New({
 })
 ```
 
+## Field name updates
+
+When moving old option tables over:
+
+- use `tooltip`, not AceConfig's `desc`,
+- replace removed fields like `condition`, `parent`, and `parentCheck` with `disabled` / `hidden` predicates on rows or pages,
+- prefer the current field names `formatter`, `scrollHeight`, and `debounce` even though the declarative loader still normalizes a few older aliases for compatibility.
+
 ## Canonical row types
 
 Declarative pages use canonical row types only:
@@ -51,6 +59,7 @@ Declarative pages use canonical row types only:
 - `dropdown`
 - `input`
 - `color`
+- `custom`
 - `button`
 - `header`
 - `subheader`

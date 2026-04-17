@@ -70,6 +70,8 @@ local lsb = LSB.New({
 })
 ```
 
+`name` and `onChanged` are required when you register a root page or section tree. `store` enables path mode; use handler mode when your values do not live in a dot-path table.
+
 Declarative pages can mix persisted controls and layout-only rows freely, so it is normal to combine `checkbox`, `slider`, `input`, `header`, `subheader`, `info`, `button`, `pageActions`, `list`, `sectionList`, and `canvas` entries on one page.
 
 ## Handler mode
@@ -120,12 +122,14 @@ local lsb = LSB.New({
 })
 ```
 
+Handler rows require `get`, `set`, and a stable `key` (or `id`).
+
 ## Good defaults for public addons
 
 - Pick a stable `name`; the library derives its internal variable prefix from that.
 - Point `store` and `defaults` at live tables.
 - Keep `onChanged` fast; use it to refresh UI, not rebuild the world.
-- Use composites for repeated patterns like borders, font overrides, and positioning.
+- Use composites for repeated patterns like borders, font overrides, and height overrides.
 - Prefer declarative root registration for large standard settings pages.
 - Look up registered page handles with `lsb:GetRootPage()` or `lsb:GetPage(...)`, then call `page:Refresh()` for async or transient redraws.
 - Reach for `type = "custom"` or `type = "canvas"` only when built-ins like `input`, `list`, and `sectionList` stop fitting.

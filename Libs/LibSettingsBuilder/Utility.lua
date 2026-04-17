@@ -2,6 +2,302 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+--- No-arg predicate used by declarative `disabled` and `hidden` fields.
+---@alias LibSettingsBuilderPredicate boolean|fun(): boolean
+
+--- Dropdown value source used by `dropdown` rows.
+---@alias LibSettingsBuilderDropdownValues table<any, string>|fun(): table<any, string>
+
+--- Inline slider label formatter used by `slider` rows.
+---@alias LibSettingsBuilderSliderFormatter fun(value: number): string
+
+--- Button row callback.
+---@alias LibSettingsBuilderButtonClickCallback fun(ctx: LibSettingsBuilderCallbackContext)
+
+--- Input preview resolver.
+---@alias LibSettingsBuilderInputResolveTextCallback fun(value: string, setting: table, frame: Frame): string|nil
+
+--- Input text-change hook.
+---@alias LibSettingsBuilderInputTextChangedCallback fun(text: string, setting: table, frame: Frame)
+
+--- Page-actions button callback.
+---@alias LibSettingsBuilderPageActionClickCallback fun(action: LibSettingsBuilderPageActionConfig, frame: Frame)
+
+--- Dynamic flat-list provider.
+---@alias LibSettingsBuilderListItemsProvider fun(frame: Frame): table[]
+
+--- Dynamic grouped-list provider.
+---@alias LibSettingsBuilderSectionListProvider fun(frame: Frame): table[]
+
+--- Canonical declarative row kinds accepted by `config.page.rows` and section page rows.
+---@alias LibSettingsBuilderRowKind
+---| "border"
+---| "button"
+---| "canvas"
+---| "checkbox"
+---| "checkboxList"
+---| "color"
+---| "colorList"
+---| "custom"
+---| "dropdown"
+---| "fontOverride"
+---| "header"
+---| "heightOverride"
+---| "info"
+---| "input"
+---| "list"
+---| "pageActions"
+---| "sectionList"
+---| "slider"
+---| "subheader"
+
+--- Dynamic list presets supported by `type = "list"` rows.
+---@alias LibSettingsBuilderListVariant
+---| "editor"
+---| "swatch"
+
+--- Registered section metadata returned by `lsb:GetSection(...)`.
+---@class LibSettingsBuilderSectionHandle
+---@field key string Gets the stable section key.
+---@field name string Gets the section display name.
+---@field path string Gets the base path prefix applied to child pages and rows.
+
+--- Plain page handle returned by `lsb:GetRootPage()` and `lsb:GetPage(...)`.
+---@class LibSettingsBuilderPageHandle
+---@field GetId fun(self: LibSettingsBuilderPageHandle): string Gets the Blizzard Settings category ID for this registered page.
+---@field Refresh fun(self: LibSettingsBuilderPageHandle) Refreshes visible rows and dynamic content for this registered page.
+
+--- Runtime object returned by `LSB.New(...)`.
+---@class LibSettingsBuilderRuntime
+---@field GetSection fun(self: LibSettingsBuilderRuntime, key: string): LibSettingsBuilderSectionHandle|nil Gets the registered section metadata by key.
+---@field GetRootPage fun(self: LibSettingsBuilderRuntime): LibSettingsBuilderPageHandle|nil Gets the registered root page handle.
+---@field GetPage fun(self: LibSettingsBuilderRuntime, sectionKey: string, pageKey: string): LibSettingsBuilderPageHandle|nil Gets the registered section page handle by section and page key.
+---@field HasCategory fun(self: LibSettingsBuilderRuntime, category: table|nil): boolean Gets whether this runtime owns the supplied Blizzard Settings category.
+
+--- Declarative page definition registered under the root category or a section.
+---@class LibSettingsBuilderPageConfig
+---@field key string Gets the stable page key within its owner.
+---@field name string|nil Gets the page display name; defaults to the root or section name when omitted.
+---@field path string|nil Gets the optional base path prefix prepended to child path-bound rows.
+---@field rows LibSettingsBuilderRowConfig[] Gets the declarative row array registered on the page.
+---@field onShow LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard shows this page.
+---@field onHide LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard hides this page.
+---@field disabled LibSettingsBuilderPredicate|nil Gets the page-level disabled predicate propagated to child rows.
+---@field hidden LibSettingsBuilderPredicate|nil Gets the page-level hidden predicate propagated to child rows.
+---@field order number|nil Gets the sort order used when a section declares multiple pages.
+
+--- Declarative section definition registered under `config.sections`.
+--- Example (section page):
+---     {
+---         key = "general",
+---         name = "General",
+---         pages = {
+---             {
+---                 key = "main",
+---                 rows = { { type = "checkbox", path = "enabled", name = "Enable" } },
+---             },
+---         },
+---     }
+---@class LibSettingsBuilderSectionConfig
+---@field key string Gets the stable section key.
+---@field name string Gets the section display name.
+---@field path string|nil Gets the optional base path prefix; defaults to `key`.
+---@field order number|nil Gets the sort order among sibling sections.
+---@field pages LibSettingsBuilderPageConfig[] Gets the page definitions registered under this section.
+
+--- Shared fields accepted by all declarative row kinds.
+---@class LibSettingsBuilderRowBase
+---@field type LibSettingsBuilderRowKind Gets the canonical row kind to register.
+---@field id string|number|nil Gets the optional per-page row identifier.
+---@field name string|nil Gets the primary display label when the row kind uses one.
+---@field tooltip string|nil Gets the tooltip text shown for the row or control.
+---@field disabled LibSettingsBuilderPredicate|nil Gets the disabled predicate reevaluated during row refreshes.
+---@field hidden LibSettingsBuilderPredicate|nil Gets the hidden predicate reevaluated during row refreshes.
+
+--- Shared binding fields for persisted row kinds.
+--- Use either path mode (`path`) or handler mode (`key` + `get` + `set`), never both.
+--- Example (path-bound row):
+---     { type = "checkbox", path = "general.enabled", name = "Enable" }
+--- Example (handler-bound row):
+---     {
+---         type = "input",
+---         key = "draftSpellId",
+---         name = "Spell ID",
+---         get = function() return draft.spellIdText end,
+---         set = function(value) draft.spellIdText = value or "" end,
+---     }
+---@class LibSettingsBuilderBindableRowBase: LibSettingsBuilderRowBase
+---@field path string|nil Gets the dot-path resolved against `config.store` and `config.defaults`.
+---@field key string|number|nil Gets the stable handler key used when the row is not path-bound.
+---@field default any Gets the default value used when the binding does not provide one.
+---@field get (fun(): any)|nil Gets the handler-mode getter callback.
+---@field set fun(value: any)|nil Gets the handler-mode setter callback.
+---@field getTransform (fun(value: any): any)|nil Gets the read transform applied before the control sees the stored value.
+---@field setTransform (fun(value: any): any)|nil Gets the write transform applied before the value is stored.
+---@field onSet LibSettingsBuilderRowSetCallback|nil Gets the row-local callback fired before `config.onChanged`.
+
+--- Shared fields for composite rows that always consume a path prefix.
+---@class LibSettingsBuilderPathRowBase: LibSettingsBuilderRowBase
+---@field path string Gets the dot-path prefix consumed by this composite row.
+
+--- Child definition used by `checkboxList` and `colorList` rows.
+---@class LibSettingsBuilderCompositeListDef
+---@field key string|number Gets the child key appended to the parent row path.
+---@field name string Gets the child row label.
+---@field tooltip string|nil Gets the child row tooltip.
+
+--- Action button definition used by `pageActions` rows.
+---@class LibSettingsBuilderPageActionConfig
+---@field name string|nil Gets the fallback button label when `text` is omitted.
+---@field text string|nil Gets the button label.
+---@field width number|nil Gets the button width.
+---@field height number|nil Gets the button height.
+---@field enabled boolean|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): boolean|nil)|nil Gets the enabled predicate or static enabled flag.
+---@field hidden boolean|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): boolean|nil)|nil Gets the hidden predicate or static hidden flag.
+---@field tooltip string|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): string|nil)|nil Gets the tooltip text or tooltip resolver.
+---@field onClick LibSettingsBuilderPageActionClickCallback|nil Gets the click callback.
+
+---@class LibSettingsBuilderCheckboxRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "checkbox" Gets the checkbox row kind.
+
+---@class LibSettingsBuilderSliderRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "slider" Gets the slider row kind.
+---@field min number Gets the minimum slider value.
+---@field max number Gets the maximum slider value.
+---@field step number|nil Gets the slider step size.
+---@field formatter LibSettingsBuilderSliderFormatter|nil Gets the inline value formatter.
+
+---@class LibSettingsBuilderDropdownRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "dropdown" Gets the dropdown row kind.
+---@field values LibSettingsBuilderDropdownValues Gets the dropdown value table or provider.
+---@field scrollHeight number|nil Gets the optional scrollable menu height.
+---@field varType any Gets the optional `Settings.VarType` override.
+
+---@class LibSettingsBuilderColorRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "color" Gets the color-swatch row kind.
+
+---@class LibSettingsBuilderInputRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "input" Gets the text-input row kind.
+---@field debounce number|nil Gets the preview debounce in seconds.
+---@field maxLetters number|nil Gets the maximum edit-box length.
+---@field numeric boolean|nil Gets whether the edit box only accepts numeric input.
+---@field onTextChanged LibSettingsBuilderInputTextChangedCallback|nil Gets the callback fired after the new text is written.
+---@field resolveText LibSettingsBuilderInputResolveTextCallback|nil Gets the preview-text resolver shown beneath the edit box.
+---@field width number|nil Gets the edit-box width.
+
+---@class LibSettingsBuilderCustomRowConfig: LibSettingsBuilderBindableRowBase
+---@field type "custom" Gets the XML-template-backed custom row kind.
+---@field template string Gets the XML template name registered with Blizzard's Settings API.
+---@field varType any Gets the optional `Settings.VarType` override.
+
+---@class LibSettingsBuilderButtonRowConfig: LibSettingsBuilderRowBase
+---@field type "button" Gets the button row kind.
+---@field buttonText string|nil Gets the button label; defaults to `name`.
+---@field confirm boolean|string|nil Gets whether the row shows a confirmation dialog, or the confirmation text to use.
+---@field onClick LibSettingsBuilderButtonClickCallback Gets the click callback.
+
+---@class LibSettingsBuilderHeaderRowConfig: LibSettingsBuilderRowBase
+---@field type "header" Gets the header row kind.
+---@field name string Gets the header label.
+
+---@class LibSettingsBuilderSubheaderRowConfig: LibSettingsBuilderRowBase
+---@field type "subheader" Gets the subheader row kind.
+---@field name string Gets the subheader label.
+
+---@class LibSettingsBuilderInfoRowConfig: LibSettingsBuilderRowBase
+---@field type "info" Gets the informational row kind.
+---@field value string|number|boolean|(fun(frame: Frame, data: table): any)|nil Gets the primary value or dynamic value resolver.
+---@field values string[]|nil Gets the optional multiline value array, joined with newlines during normalization.
+---@field wide boolean|nil Gets whether the value should span the full row without a left label.
+---@field multiline boolean|nil Gets whether the value text may wrap across multiple lines.
+---@field height number|nil Gets the custom row height.
+
+---@class LibSettingsBuilderCanvasRowConfig: LibSettingsBuilderRowBase
+---@field type "canvas" Gets the embedded-canvas row kind.
+---@field canvas Frame Gets the prebuilt frame to embed into the settings page.
+---@field height number|nil Gets the embedded row height; defaults to the canvas height.
+
+---@class LibSettingsBuilderPageActionsRowConfig: LibSettingsBuilderRowBase
+---@field type "pageActions" Gets the page-actions row kind.
+---@field actions LibSettingsBuilderPageActionConfig[] Gets the action button definitions attached to the page header.
+---@field height number|nil Gets the placeholder row height used by the initializer.
+
+---@class LibSettingsBuilderListRowConfig: LibSettingsBuilderRowBase
+---@field type "list" Gets the dynamic flat-list row kind.
+---@field height number Gets the total row height reserved for the list widget.
+---@field variant LibSettingsBuilderListVariant|nil Gets the built-in list preset applied to item data.
+---@field items LibSettingsBuilderListItemsProvider Gets the item provider called during refreshes.
+
+---@class LibSettingsBuilderSectionListRowConfig: LibSettingsBuilderRowBase
+---@field type "sectionList" Gets the dynamic grouped-list row kind.
+---@field height number Gets the total row height reserved for the list widget.
+---@field sections LibSettingsBuilderSectionListProvider Gets the section provider called during refreshes.
+
+---@class LibSettingsBuilderCheckboxListRowConfig: LibSettingsBuilderPathRowBase
+---@field type "checkboxList" Gets the checkbox-list composite row kind.
+---@field defs LibSettingsBuilderCompositeListDef[] Gets the child checkbox definitions.
+---@field label string|nil Gets the optional composite subheader label.
+
+---@class LibSettingsBuilderColorListRowConfig: LibSettingsBuilderPathRowBase
+---@field type "colorList" Gets the color-list composite row kind.
+---@field defs LibSettingsBuilderCompositeListDef[] Gets the child color definitions.
+---@field label string|nil Gets the optional composite subheader label.
+
+---@class LibSettingsBuilderBorderRowConfig: LibSettingsBuilderPathRowBase
+---@field type "border" Gets the border composite row kind.
+---@field enabledName string|nil Gets the enable-row label.
+---@field enabledTooltip string|nil Gets the enable-row tooltip.
+---@field thicknessName string|nil Gets the border-width row label.
+---@field thicknessTooltip string|nil Gets the border-width row tooltip.
+---@field thicknessMin number|nil Gets the minimum border width.
+---@field thicknessMax number|nil Gets the maximum border width.
+---@field thicknessStep number|nil Gets the border-width step size.
+---@field colorName string|nil Gets the color-row label.
+---@field colorTooltip string|nil Gets the color-row tooltip.
+
+---@class LibSettingsBuilderFontOverrideRowConfig: LibSettingsBuilderPathRowBase
+---@field type "fontOverride" Gets the font-override composite row kind.
+---@field enabledName string|nil Gets the override toggle label.
+---@field enabledTooltip string|nil Gets the override toggle tooltip.
+---@field fontName string|nil Gets the font-row label.
+---@field fontTooltip string|nil Gets the font-row tooltip.
+---@field fontValues (fun(): table<any, string>)|nil Gets the optional dropdown value provider for the font row.
+---@field fontFallback (fun(): string|nil)|nil Gets the fallback font name used when no override is stored.
+---@field fontTemplate string|nil Gets the optional custom template used instead of the built-in dropdown.
+---@field sizeName string|nil Gets the font-size row label.
+---@field sizeTooltip string|nil Gets the font-size row tooltip.
+---@field sizeMin number|nil Gets the minimum font size.
+---@field sizeMax number|nil Gets the maximum font size.
+---@field sizeStep number|nil Gets the font-size step size.
+---@field fontSizeFallback (fun(): number|nil)|nil Gets the fallback font size used when no override is stored.
+
+---@class LibSettingsBuilderHeightOverrideRowConfig: LibSettingsBuilderPathRowBase
+---@field type "heightOverride" Gets the height-override composite row kind.
+---@field min number|nil Gets the minimum slider value.
+---@field max number|nil Gets the maximum slider value.
+---@field step number|nil Gets the slider step size.
+
+---@alias LibSettingsBuilderRowConfig
+---| LibSettingsBuilderCheckboxRowConfig
+---| LibSettingsBuilderSliderRowConfig
+---| LibSettingsBuilderDropdownRowConfig
+---| LibSettingsBuilderColorRowConfig
+---| LibSettingsBuilderInputRowConfig
+---| LibSettingsBuilderCustomRowConfig
+---| LibSettingsBuilderButtonRowConfig
+---| LibSettingsBuilderHeaderRowConfig
+---| LibSettingsBuilderSubheaderRowConfig
+---| LibSettingsBuilderInfoRowConfig
+---| LibSettingsBuilderCanvasRowConfig
+---| LibSettingsBuilderPageActionsRowConfig
+---| LibSettingsBuilderListRowConfig
+---| LibSettingsBuilderSectionListRowConfig
+---| LibSettingsBuilderCheckboxListRowConfig
+---| LibSettingsBuilderColorListRowConfig
+---| LibSettingsBuilderBorderRowConfig
+---| LibSettingsBuilderFontOverrideRowConfig
+---| LibSettingsBuilderHeightOverrideRowConfig
+
 local MAJOR = "LibSettingsBuilder-1.0"
 local lib = LibStub(MAJOR, true)
 if not lib or not lib._loadState or not lib._loadState.open then
@@ -520,15 +816,24 @@ local function createRootPage(root, key, rows, opts)
     return page
 end
 
+--- Gets the registered section metadata by key.
+---@param key string
+---@return LibSettingsBuilderSectionHandle|nil section
 function lib:GetSection(key)
     return self._sections[key]
 end
 
+--- Gets the registered root page handle.
+---@return LibSettingsBuilderPageHandle|nil page
 function lib:GetRootPage()
     local page = self._registeredRootPage
     return page and page._handle or nil
 end
 
+--- Gets the registered section page handle by section and page key.
+---@param sectionKey string
+---@param pageKey string
+---@return LibSettingsBuilderPageHandle|nil page
 function lib:GetPage(sectionKey, pageKey)
     if pageKey == nil then
         return nil
@@ -539,6 +844,9 @@ function lib:GetPage(sectionKey, pageKey)
     return page and page._handle or nil
 end
 
+--- Gets whether this runtime owns the supplied Blizzard Settings category.
+---@param category table|nil
+---@return boolean owned
 function lib:HasCategory(category)
     return category ~= nil and self._layouts[category] ~= nil
 end

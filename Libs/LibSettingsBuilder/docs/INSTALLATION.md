@@ -4,7 +4,7 @@
 
 - [README](../README.md) — overview and quick links
 - [Quick Start](QUICK_START.md) — common setup patterns
-- [API Reference](API_REFERENCE.md) — builder, controls, composites, page registration, canvas helpers
+- [API Reference](API_REFERENCE.md) — public surface, row types, page registration, compatibility notes
 - [Migration Guide](MIGRATION_GUIDE.md) — moving from AceConfig/AceGUI
 - [Troubleshooting](TROUBLESHOOTING.md) — common issues and fixes
 
@@ -69,11 +69,10 @@ Only `type = "custom"` rows require you to supply your own template. In that cas
 2. load that XML from your TOC before calling `LSB.New({ ... })`, and
 3. pass the template name through `spec.template`.
 
-## Canvas layout compatibility
+## Canvas support
 
-Canvas layout spacing defaults are still available for older `CreateCanvasLayout(...)` pages. New `canvas` rows stay on the current lifecycle path, so canvas content continues to reuse the existing frame handling without special-case rewrites.
+The documented public API for embedded custom content is the `canvas` row type.
 
-- per-library via `LSBDeprecated.SetCanvasLayoutDefaults(overrides)`
-- per-layout via `LSBDeprecated.ConfigureCanvasLayout(layout, overrides)`
+Build the frame yourself, then register it through `type = "canvas"` with an explicit `height` when needed.
 
-See [API Reference](API_REFERENCE.md) for examples.
+Older canvas-layout helpers live under internal implementation details and are not part of the documented library surface.

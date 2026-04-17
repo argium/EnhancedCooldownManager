@@ -6,6 +6,51 @@
 -- World of Warcraft Settings API.  Provides proxy controls, composite groups
 -- and utility helpers.
 
+--- Row or builder-level change hook fired after a value is written.
+---@alias LibSettingsBuilderChangedCallback fun(ctx: LibSettingsBuilderCallbackContext, value: any)
+
+--- Row-local post-set hook fired before `config.onChanged`.
+---@alias LibSettingsBuilderRowSetCallback fun(ctx: LibSettingsBuilderCallbackContext, value: any)
+
+--- Page lifecycle hook fired when Blizzard shows or hides a registered page.
+---@alias LibSettingsBuilderPageLifecycleCallback fun()
+
+--- Custom nested-path getter used by path-bound rows.
+---@alias LibSettingsBuilderGetNestedValue fun(tbl: table, path: string): any
+
+--- Custom nested-path setter used by path-bound rows.
+---@alias LibSettingsBuilderSetNestedValue fun(tbl: table, path: string, value: any)
+
+--- Callback context passed to row callbacks and `config.onChanged`.
+---@class LibSettingsBuilderCallbackContext
+---@field builder LibSettingsBuilderRuntime Gets the runtime instance that owns the registered page tree.
+---@field category table Gets the Blizzard Settings category backing the active row.
+---@field key string|number|nil Gets the handler-mode key for rows registered through `key`.
+---@field page LibSettingsBuilderPageHandle|nil Gets the registered page handle that owns the row, when available.
+---@field path string|nil Gets the resolved path used by path-bound rows.
+---@field setting table|nil Gets the proxy setting object for persisted row kinds.
+---@field spec LibSettingsBuilderRowConfig Gets the normalized row spec that triggered the callback.
+
+--- Root registration config passed to `LSB.New(...)`.
+--- Example (root page):
+---     local lsb = LSB.New({
+---         name = "My Addon",
+---         onChanged = function(ctx) MyAddon:Refresh() end,
+---         page = {
+---             key = "about",
+---             rows = { { type = "info", name = "Version", value = AddOnVersion } },
+---         },
+---     })
+---@class LibSettingsBuilderConfig
+---@field name string|nil Gets the root category display name.
+---@field onChanged LibSettingsBuilderChangedCallback Gets the callback fired after a row setter completes.
+---@field store table|(fun(): table)|nil Gets the store table or lazy provider used by path-bound rows.
+---@field defaults table|(fun(): table)|nil Gets the defaults table or lazy provider used by path-bound rows.
+---@field getNestedValue LibSettingsBuilderGetNestedValue|nil Gets the custom nested-path reader used by path-bound rows.
+---@field setNestedValue LibSettingsBuilderSetNestedValue|nil Gets the custom nested-path writer used by path-bound rows.
+---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.
+---@field sections LibSettingsBuilderSectionConfig[]|nil Gets the optional section definitions registered under the root category.
+
 local MAJOR, MINOR = "LibSettingsBuilder-1.0", 3
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then
@@ -681,6 +726,8 @@ function internal.makeVarName(self, spec)
     return self._config.varPrefix .. "_" .. tostring(id):gsub("%.", "_")
 end
 
+---@param self LibSettingsBuilderRuntime
+---@param spec LibSettingsBuilderRowConfig|table
 function internal.createCallbackContext(self, spec, setting)
     return {
         builder = self,
@@ -962,15 +1009,13 @@ end
 
 internal.defaultSliderFormatter = defaultSliderFormatter
 
---- Create a new LibSettingsBuilder runtime instance.
----@param config table
----   Required fields:
----     onChanged      function(ctx, value) called after each setter
----   Optional fields:
----     name           string            root category display name for declarative registration
----     store          table             nested config store for path-bound rows
----     defaults       table             nested defaults table for path-bound rows
----@return table builder instance with the full SB API
+--- Creates a LibSettingsBuilder runtime instance and optionally registers the full declarative tree.
+--- `config.onChanged(ctx, value)` runs after any row-local `onSet(ctx, value)` hook.
+--- Path-bound rows resolve against `config.store` / `config.defaults`; handler-bound rows use row-local `get`, `set`, and `key` callbacks.
+---@overload fun(config: LibSettingsBuilderConfig): LibSettingsBuilderRuntime
+---@param selfOrConfig LibSettingsBuilderConfig|table
+---@param maybeConfig LibSettingsBuilderConfig|nil
+---@return LibSettingsBuilderRuntime lsb
 function lib.New(selfOrConfig, maybeConfig)
     local config = maybeConfig or selfOrConfig
     assert(type(config) == "table", "LibSettingsBuilder.New: config table is required")

@@ -17,20 +17,17 @@ It supports:
 
 Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
-## v2 status
+## Public surface
 
-Phases 1 and 2 of the v2 rearchitecture are now in place.
+The documented public surface is the current declarative API:
 
-That means the target public surface is defined even though the runtime still carries the compatibility APIs used by the current addon code:
+- factory: `LSB.New(config)`
+- runtime lookups: `lsb:GetSection(sectionKey)`, `lsb:GetRootPage()`, `lsb:GetPage(sectionKey, pageKey)`, `lsb:HasCategory(category)`
+- page handle methods: `page:GetId()`, `page:Refresh()`
+- registration root: `config.page` plus `config.sections`
+- canonical registration schema: raw row tables in `rows = { ... }`
 
-- target factory: `LSB.New(config)`
-- target runtime object: `lsb`
-- target lookups: `lsb:GetSection(sectionKey)`, `lsb:GetRootPage()`, `lsb:GetPage(sectionKey, pageKey)`, `lsb:HasCategory(category)`
-- target page handle: `page:GetId()`, `page:Refresh()`
-- target schema root: `config.page` plus `config.sections`
-- raw row tables are the canonical schema at registration boundaries
-- builder-level row helper constructors are no longer public on `lsb` instances
-- deprecated compatibility namespace: `LSBDeprecated`
+The runtime returned by `LSB.New(...)` is intentionally narrow. Builder/helper constructors are not exposed on `lsb` instances, and deprecated transition namespaces like `LSBDeprecated` are not part of the documented public API.
 
 ## At a glance
 
@@ -40,10 +37,10 @@ That means the target public surface is defined even though the runtime still ca
 | Root-owned landing page | `page = { key = ..., rows = ... }` inside the root spec |
 | Dynamic refresh | lookup the registered page with `lsb:GetRootPage()` / `lsb:GetPage(...)`, then call `page:Refresh()` |
 | Existing AceDB profiles | `store = db.profile`, `defaults = defaults.profile` |
-| Custom storage | handler mode with `get` / `set` / `key` |
+| Custom storage | handler mode with `get` / `set` / `key` (or `id`) |
 | Text entry / numeric ID fields | `type = "input"` |
 | Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"` |
-| Reusable settings groups | border, font override, positioning composites |
+| Reusable settings groups | border, font override, and height override composites |
 | XML-backed bespoke widgets | `type = "custom"` |
 | Force visible rows to refresh | `page:Refresh()` |
 
@@ -98,6 +95,8 @@ local lsb = LSB.New({
     },
 })
 ```
+
+For a registered category tree, `name` and `onChanged` are required. `store` enables path-bound rows, and `defaults` supplies their default values.
 
 ## Canonical row types
 
@@ -208,7 +207,7 @@ The `.busted` config defines the `libsettingsbuilder` task pointing at this libr
 - Embed the library inside your addon's `Libs/` folder.
 - Load `LibStub` before `LibSettingsBuilder`.
 - Load `Libs\LibSettingsBuilder\embed.xml` rather than the individual library Lua files.
-- Prefer a single `LSB.New({ page = ..., sections = { ... } })` call and keep page handles only for later `page:Refresh()` calls.
+- Prefer a single `LSB.New({ name = ..., onChanged = ..., page = ..., sections = { ... } })` call and keep page handles only for later `page:Refresh()` calls.
 - `page:Refresh()` is the intended way to refresh dynamic info rows, dropdown options, and dynamic list rows after profile mutations, async item loads, or other out-of-band changes.
 - Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 

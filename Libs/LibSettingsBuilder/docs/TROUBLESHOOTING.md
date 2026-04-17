@@ -20,16 +20,24 @@ Check the path binding config first.
 
 Common causes:
 
+- you created `LSB.New({ ... })` with `page` or `sections` but no `name`,
 - you created the builder without `store` / `defaults`,
 - a spec mixes `path` with `get` / `set`,
-- handler mode is missing `key`.
+- handler mode is missing `key` or `id`.
+
+## Registration fails with deprecated or removed field errors
+
+Common fixes:
+
+- rename `desc` to `tooltip`,
+- replace removed fields like `condition`, `parent`, and `parentCheck` with `disabled` / `hidden`,
+- use `pageActions` for page-header buttons instead of attaching actions to a `header` row.
 
 ## Settings page exists but nothing appears in-game
 
 Usually one of these:
 
 - you created `LSB.New({ name = "My Addon", ... })` without a `page` or `sections` tree,
-- you created `LSB.New({ ... })` without `page` or `sections`,
 - your registered root page or section page ended up with no visible rows,
 - a `hidden` predicate is always returning `true`,
 - a `custom` template was never loaded from XML.
@@ -87,24 +95,13 @@ If debugging slider behavior:
 - confirm no other addon is replacing the slider frame structure,
 - test with other UI customizers disabled.
 
-## Legacy canvas pages look slightly off after a WoW patch
+## Embedded canvas rows look off
 
-Canvas layout spacing is configurable for older `CreateCanvasLayout(...)` pages. New pages should prefer the standard settings DSL with `list` or `sectionList` rows instead of tuning canvas metrics by default.
+`type = "canvas"` embeds the frame you provide. If spacing or clipping looks wrong:
 
-Use:
-
-```lua
-LSBDeprecated.SetCanvasLayoutDefaults({ elementHeight = 28 })
-```
-
-or per layout:
-
-```lua
-local layout = LSBDeprecated.CreateCanvasLayout("My Page")
-LSBDeprecated.ConfigureCanvasLayout(layout, { labelX = 40 })
-```
-
-If Blizzard adjusts Settings panel spacing in a major patch, this is the intended escape hatch.
+- give the row an explicit `height`, or make sure the frame reports a stable height,
+- prefer built-in rows, `list`, or `sectionList` when you want Blizzard-style settings layout instead of a bespoke frame,
+- use `type = "custom"` for XML-backed row widgets rather than a full embedded canvas when you only need one custom control.
 
 ## Debugging spec mistakes
 
