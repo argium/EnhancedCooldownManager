@@ -10,7 +10,6 @@ end
 
 local internal = lib._internal
 local copyMixin = internal.copyMixin
-local Deprecated = lib.LSBDeprecated
 
 function internal.createRootCategory(self, name)
     local category, layout = Settings.RegisterVerticalLayoutCategory(name)
@@ -41,7 +40,7 @@ end
 ---@param name string  Subcategory display name.
 ---@param parentCategory? table  Parent category (defaults to root).
 ---@return table layout  CanvasLayout instance (layout.frame for the raw frame).
-function lib.CreateCanvasLayout(self, name, parentCategory)
+function internal.createCanvasLayout(self, name, parentCategory)
     local frame = CreateFrame("Frame", nil)
     internal.createCanvasSubcategory(self, frame, name, parentCategory)
     local metrics = copyMixin({}, internal.CanvasLayoutDefaults)
@@ -51,8 +50,4 @@ function lib.CreateCanvasLayout(self, name, parentCategory)
         elements = {},
         _metrics = metrics,
     }, { __index = internal.CanvasLayout })
-end
-
-Deprecated.CreateCanvasLayout = function(...)
-    return lib.CreateCanvasLayout(...)
 end

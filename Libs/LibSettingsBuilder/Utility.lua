@@ -11,8 +11,6 @@ end
 local internal = lib._internal
 local copyMixin = internal.copyMixin
 local installPageLifecycleHooks = internal.installPageLifecycleHooks
-local getCanvasLayoutMetrics = internal.getCanvasLayoutMetrics
-local Deprecated = lib.LSBDeprecated
 
 local PROXY_ROW_TYPES = {
     checkbox = true,
@@ -52,25 +50,6 @@ local VALID_ROW_TYPES = {
     slider = true,
     subheader = true,
 }
-
-local function setCanvasLayoutDefaults(overrides)
-    if not overrides then
-        return internal.CanvasLayoutDefaults
-    end
-    return copyMixin(internal.CanvasLayoutDefaults, overrides)
-end
-
-local function configureCanvasLayout(layout, overrides)
-    assert(layout, "ConfigureCanvasLayout: layout is required")
-    if not overrides then
-        return getCanvasLayoutMetrics(layout)
-    end
-    layout._metrics = copyMixin(copyMixin({}, internal.CanvasLayoutDefaults), overrides)
-    return layout._metrics
-end
-
-Deprecated.SetCanvasLayoutDefaults = setCanvasLayoutDefaults
-Deprecated.ConfigureCanvasLayout = configureCanvasLayout
 
 local function refreshCategory(builder, category)
     if not category then

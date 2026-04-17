@@ -14,10 +14,8 @@ end
 
 lib._loadState = { open = true }
 lib._internal = lib._internal or {}
-lib.LSBDeprecated = lib.LSBDeprecated or {}
 
 local internal = lib._internal
-local Deprecated = lib.LSBDeprecated
 
 internal.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
 internal.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
@@ -366,9 +364,6 @@ local function createHeaderTitle(parent, text)
     return createTitle(parent, "GameFontHighlightLarge", 7, -16, text)
 end
 
-Deprecated.CreateHeaderTitle = createHeaderTitle
-Deprecated.CreateSubheaderTitle = createSubheaderTitle
-
 --------------------------------------------------------------------------------
 -- CanvasLayout: Vertical stacking engine for canvas subcategory pages.
 -- Replicates Blizzard's Settings panel positioning so canvas pages are
@@ -396,11 +391,8 @@ internal.CanvasLayoutDefaults = internal.CanvasLayoutDefaults
         swatchCenterX = DEFAULT_SWATCH_CENTER_X,
         verifiedPatch = "Retail 12.0/12.1",
     }
-Deprecated.CanvasLayoutDefaults = internal.CanvasLayoutDefaults
-
 local CanvasLayout = {}
 internal.CanvasLayout = CanvasLayout
-Deprecated.CanvasLayout = CanvasLayout
 
 local function getCanvasLayoutMetrics(layout)
     return layout._metrics or internal.CanvasLayoutDefaults
@@ -552,8 +544,6 @@ local function createColorSwatch(parent)
     return swatch
 end
 internal.createColorSwatch = createColorSwatch
-
-Deprecated.CreateColorSwatch = createColorSwatch
 
 --------------------------------------------------------------------------------
 -- Path accessors: built-in dot-path resolution with numeric key support
@@ -1067,10 +1057,13 @@ internal.applyActionButtonTextures = applyActionButtonTextures
 internal.evaluateStaticOrFunction = evaluateStaticOrFunction
 internal.getCanvasLayoutMetrics = getCanvasLayoutMetrics
 internal.defaultSwatchCenterX = DEFAULT_SWATCH_CENTER_X
+internal.createHeaderTitle = createHeaderTitle
+internal.createSubheaderTitle = createSubheaderTitle
 
 -- Clear stale keys from prior MINOR versions (LibStub reuses the same table)
 lib.CanvasLayout = nil
 lib.CanvasLayoutDefaults = nil
+lib.CreateCanvasLayout = nil
 lib.CreateColorSwatch = nil
 lib.CreateHeaderTitle = nil
 lib.CreateSubheaderTitle = nil
@@ -1079,3 +1072,4 @@ lib.INFOROW_TEMPLATE = nil
 lib.INPUTROW_TEMPLATE = nil
 lib.SCROLL_DROPDOWN_TEMPLATE = nil
 lib.SUBHEADER_TEMPLATE = nil
+lib.LSBDeprecated = nil

@@ -57,7 +57,7 @@ local function ensureSubheaderTitle(frame)
         return frame._lsbSubheaderTitle
     end
 
-    local title = lib.CreateSubheaderTitle(frame)
+    local title = internal.createSubheaderTitle(frame)
     frame._lsbSubheaderTitle = title
     frame.Title = title
     return title
@@ -90,7 +90,7 @@ local function ensureHeaderRowWidgets(frame)
         return frame
     end
 
-    frame._lsbHeaderTitle = lib.CreateHeaderTitle(frame)
+    frame._lsbHeaderTitle = internal.createHeaderTitle(frame)
     frame._lsbHeaderActionButtons = frame._lsbHeaderActionButtons or {}
 
     return frame

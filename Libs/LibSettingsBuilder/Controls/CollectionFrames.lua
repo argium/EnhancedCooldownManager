@@ -698,7 +698,7 @@ local function ensureSectionHeaderRow(content, headers, sectionKey, title)
 
     row = CreateFrame("Frame", nil, content)
     row:SetHeight(28)
-    row._title = lib.CreateSubheaderTitle(row, title)
+    row._title = internal.createSubheaderTitle(row, title)
     headers[sectionKey] = row
     return row
 end
