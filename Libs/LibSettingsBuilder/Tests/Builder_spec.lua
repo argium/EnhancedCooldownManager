@@ -236,7 +236,7 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_nil(page.List)
     end)
 
-    it("returns an lsb instance with all methods accessible via lib prototype", function()
+    it("returns an lsb instance with only the public API on its prototype", function()
         local sb = createBuilder({
             sections = {
                 {
@@ -252,16 +252,18 @@ describe("LibSettingsBuilder Builder", function()
             },
         })
 
-        -- Public API methods accessible via __index = lib
+        -- Public API accessible via narrow prototype
         assert.is_function(sb.GetSection)
         assert.is_function(sb.GetRootPage)
         assert.is_function(sb.GetPage)
         assert.is_function(sb.HasCategory)
 
-        -- Control builder methods also accessible via prototype
-        assert.is_function(sb.Checkbox)
-        assert.is_function(sb.Slider)
-        assert.is_function(sb.BorderGroup)
+        -- Internal row-builder methods not on the public prototype
+        assert.is_nil(sb.Checkbox)
+        assert.is_nil(sb.Slider)
+        assert.is_nil(sb.BorderGroup)
+        assert.is_nil(sb.Control)
+        assert.is_nil(sb.EmbedCanvas)
 
         -- Instance state is raw on the table
         assert.is_table(rawget(sb, "_sections"))

@@ -14,29 +14,6 @@ local installPageLifecycleHooks = internal.installPageLifecycleHooks
 local getCanvasLayoutMetrics = internal.getCanvasLayoutMetrics
 local Deprecated = lib.LSBDeprecated
 
-local DISPATCH = {
-    checkbox = "Checkbox",
-    slider = "Slider",
-    dropdown = "Dropdown",
-    color = "Color",
-    input = "Input",
-    custom = "Custom",
-}
-
-local COMPOSITE_ROW_DISPATCH = {
-    border = function(builder, path, spec)
-        local result = lib.BorderGroup(builder, path, spec)
-        return result.enabledInit, result.enabledSetting
-    end,
-    fontOverride = function(builder, path, spec)
-        local result = lib.FontOverrideGroup(builder, path, spec)
-        return result.enabledInit, result.enabledSetting
-    end,
-    heightOverride = function(builder, path, spec)
-        return lib.HeightOverrideSlider(builder, path, spec)
-    end,
-}
-
 local PROXY_ROW_TYPES = {
     checkbox = true,
     slider = true,
@@ -76,37 +53,24 @@ local VALID_ROW_TYPES = {
     subheader = true,
 }
 
-function lib:SetCanvasLayoutDefaults(overrides)
+local function setCanvasLayoutDefaults(overrides)
     if not overrides then
         return internal.CanvasLayoutDefaults
     end
-
     return copyMixin(internal.CanvasLayoutDefaults, overrides)
 end
 
-function lib:ConfigureCanvasLayout(layout, overrides)
+local function configureCanvasLayout(layout, overrides)
     assert(layout, "ConfigureCanvasLayout: layout is required")
     if not overrides then
         return getCanvasLayoutMetrics(layout)
     end
-
     layout._metrics = copyMixin(copyMixin({}, internal.CanvasLayoutDefaults), overrides)
     return layout._metrics
 end
 
-Deprecated.SetCanvasLayoutDefaults = function(...)
-    return lib.SetCanvasLayoutDefaults(...)
-end
-
-Deprecated.ConfigureCanvasLayout = function(...)
-    return lib.ConfigureCanvasLayout(...)
-end
-
-function lib:Control(spec)
-    local methodName = DISPATCH[spec.type]
-    assert(methodName, "Control: unknown type '" .. tostring(spec.type) .. "'")
-    return lib[methodName](self, spec)
-end
+Deprecated.SetCanvasLayoutDefaults = setCanvasLayoutDefaults
+Deprecated.ConfigureCanvasLayout = configureCanvasLayout
 
 local function refreshCategory(builder, category)
     if not category then
@@ -279,16 +243,10 @@ local function validatePageDefinition(sourceName, pageDef)
     assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
 end
 
-local function callBuilder(builder, methodName, ...)
-    local method = lib[methodName]
-    assert(type(method) == "function", "callBuilder: unknown builder method '" .. tostring(methodName) .. "'")
-    return method(builder, ...)
-end
-
-local function registerLabeledList(page, spec, methodName)
+local function registerLabeledList(page, spec, builderMethod)
     local builder = page._builder
     if spec.label then
-        local labelInit = callBuilder(builder, "Subheader", {
+        local labelInit = lib.Subheader(builder, {
             name = spec.label,
             disabled = spec.disabled,
             hidden = spec.hidden,
@@ -297,13 +255,7 @@ local function registerLabeledList(page, spec, methodName)
         spec._parentInitializer = spec._parentInitializer or labelInit
     end
 
-    local results = callBuilder(
-        builder,
-        methodName,
-        resolvePagePath(page.path or "", spec.path),
-        spec.defs or {},
-        spec
-    )
+    local results = builderMethod(builder, resolvePagePath(page.path or "", spec.path), spec.defs or {}, spec)
     return results[1] and results[1].initializer, results[1] and results[1].setting
 end
 
@@ -325,43 +277,57 @@ local function registerDeclarativeRow(sourceName, page, row, created)
     spec._page = page
 
     local initializer, setting
+    local path = resolvePagePath(page.path or "", spec.path)
     if rowType == "button" then
-        initializer = callBuilder(builder, "Button", spec)
+        initializer = lib.Button(builder, spec)
     elseif rowType == "canvas" then
-        initializer = callBuilder(builder, "EmbedCanvas", spec.canvas, spec.height, spec)
+        initializer = lib.EmbedCanvas(builder, spec.canvas, spec.height, spec)
     elseif rowType == "checkboxList" then
-        initializer, setting = registerLabeledList(page, spec, "CheckboxList")
+        initializer, setting = registerLabeledList(page, spec, lib.CheckboxList)
     elseif rowType == "colorList" then
-        initializer, setting = registerLabeledList(page, spec, "ColorPickerList")
+        initializer, setting = registerLabeledList(page, spec, lib.ColorPickerList)
     elseif rowType == "header" then
-        initializer = callBuilder(builder, "Header", spec)
+        initializer = lib.Header(builder, spec)
     elseif rowType == "info" then
-        initializer = callBuilder(builder, "InfoRow", spec)
+        initializer = lib.InfoRow(builder, spec)
     elseif rowType == "list" then
-        initializer = callBuilder(builder, "List", spec)
+        initializer = lib.List(builder, spec)
     elseif rowType == "pageActions" then
-        initializer = callBuilder(builder, "PageActions", spec)
+        initializer = lib.PageActions(builder, spec)
     elseif rowType == "sectionList" then
-        initializer = callBuilder(builder, "SectionList", spec)
+        initializer = lib.SectionList(builder, spec)
     elseif rowType == "subheader" then
-        initializer = callBuilder(builder, "Subheader", spec)
-    elseif COMPOSITE_ROW_DISPATCH[rowType] then
-        initializer, setting = COMPOSITE_ROW_DISPATCH[rowType](
-            builder,
-            resolvePagePath(page.path or "", spec.path),
-            spec
-        )
+        initializer = lib.Subheader(builder, spec)
+    elseif rowType == "border" then
+        local result = lib.BorderGroup(builder, path, spec)
+        initializer, setting = result.enabledInit, result.enabledSetting
+    elseif rowType == "fontOverride" then
+        local result = lib.FontOverrideGroup(builder, path, spec)
+        initializer, setting = result.enabledInit, result.enabledSetting
+    elseif rowType == "heightOverride" then
+        initializer, setting = lib.HeightOverrideSlider(builder, path, spec)
     elseif PROXY_ROW_TYPES[rowType] then
         if not spec.get then
-            spec.path = resolvePagePath(page.path or "", spec.path)
+            spec.path = path
         elseif not spec.key then
             spec.key = row.id
         end
         if spec.get and not spec.key then
             error(sourceName .. ": handler-mode row '" .. tostring(row.id or spec.name) .. "' requires key or id")
         end
-        spec.type = rowType
-        initializer, setting = callBuilder(builder, "Control", spec)
+        if rowType == "checkbox" then
+            initializer, setting = lib.Checkbox(builder, spec)
+        elseif rowType == "slider" then
+            initializer, setting = lib.Slider(builder, spec)
+        elseif rowType == "dropdown" then
+            initializer, setting = lib.Dropdown(builder, spec)
+        elseif rowType == "color" then
+            initializer, setting = lib.Color(builder, spec)
+        elseif rowType == "input" then
+            initializer, setting = lib.Input(builder, spec)
+        elseif rowType == "custom" then
+            initializer, setting = lib.Custom(builder, spec)
+        end
     else
         error(sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
     end
@@ -373,7 +339,7 @@ end
 
 local function createManagedSubcategory(builder, name, parentCategory)
     local previous = builder._currentSubcategory
-    local category = builder:_createSubcategory(name, parentCategory)
+    local category = internal.createSubcategory(builder, name, parentCategory)
     builder._currentSubcategory = previous
     return category
 end
@@ -613,7 +579,7 @@ local function registerPageDefinition(owner, pageDef, defaultName)
     })
 end
 
-function lib:_registerTree(spec)
+function internal.registerTree(self, spec)
     assertRootConfigured(self, "Register")
     assert(type(spec) == "table", "Register: spec must be a table")
     assert(spec.page or spec.sections, "Register: spec requires page or sections")
@@ -643,10 +609,10 @@ function lib:_registerTree(spec)
     return self
 end
 
-function lib:_initializeRoot(name)
+function internal.initializeRoot(self, name)
     if not self._rootCategory then
         assert(name, "_initializeRoot: name is required")
-        self:_createRootCategory(name)
+        internal.createRootCategory(self, name)
     elseif name and self._rootCategoryName ~= name then
         error("_initializeRoot: root already exists with name '" .. tostring(self._rootCategoryName) .. "'")
     end
@@ -660,5 +626,14 @@ function lib:_initializeRoot(name)
     self.name = self._rootCategoryName
     return self
 end
+
+lib._publicApi = {
+    GetSection = lib.GetSection,
+    GetRootPage = lib.GetRootPage,
+    GetPage = lib.GetPage,
+    HasCategory = lib.HasCategory,
+    _registerTree = internal.registerTree,
+    _initializeRoot = internal.initializeRoot,
+}
 
 lib._loadState.open = nil

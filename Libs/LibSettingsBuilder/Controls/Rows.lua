@@ -16,17 +16,17 @@ local applySubheaderFrame = internal.applySubheaderFrame
 local copyMixin = internal.copyMixin
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local hideHeaderActionButtons = internal.hideHeaderActionButtons
-function lib:_addLayoutInitializer(spec, initializer, refreshable)
-    local category = self:_resolveCategory(spec)
+function internal.addLayoutInitializer(self, spec, initializer, refreshable)
+    local category = internal.resolveCategory(self, spec)
     self._layouts[category]:AddInitializer(initializer)
     if refreshable then
-        self:_registerCategoryRefreshable(category, initializer)
+        internal.registerCategoryRefreshable(self, category, initializer)
     end
-    self:_applyModifiers(initializer, spec)
+    internal.applyModifiers(self, initializer, spec)
     return initializer, category
 end
 
-function lib:Header(textOrSpec, category)
+function lib.Header(self, textOrSpec, category)
     local spec = type(textOrSpec) == "table" and textOrSpec or {
         name = textOrSpec,
         category = category,
@@ -34,13 +34,13 @@ function lib:Header(textOrSpec, category)
 
     assert(not spec.actions, "Header: use PageActions for page header buttons")
     local initializer = CreateSettingsListSectionHeaderInitializer(spec.name)
-    return self:_addLayoutInitializer(spec, initializer)
+    return internal.addLayoutInitializer(self, spec, initializer)
 end
 
-function lib:PageActions(spec)
+function lib.PageActions(self, spec)
     assert(spec.actions, "PageActions: spec.actions is required")
 
-    local category = self:_resolveCategory(spec)
+    local category = internal.resolveCategory(self, spec)
     local categoryName = self._subcategoryNames[category]
         or (category == self._rootCategory and self._rootCategoryName)
         or ""
@@ -55,18 +55,18 @@ function lib:PageActions(spec)
         applyHeaderFrame(frame, initializer:GetData())
     end
     initializer._lsbResetFrame = hideHeaderActionButtons
-    return self:_addLayoutInitializer(spec, initializer, true)
+    return internal.addLayoutInitializer(self, spec, initializer, true)
 end
 
-function lib:Subheader(spec)
+function lib.Subheader(self, spec)
     local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
         _lsbKind = "subheader",
         name = spec.name,
     }, 28, applySubheaderFrame)
-    return self:_addLayoutInitializer(spec, initializer)
+    return internal.addLayoutInitializer(self, spec, initializer)
 end
 
-function lib:InfoRow(spec)
+function lib.InfoRow(self, spec)
     local initializer = createCustomListRowInitializer(internal.INFOROW_TEMPLATE, {
         _lsbKind = "infoRow",
         name = spec.name,
@@ -77,10 +77,10 @@ function lib:InfoRow(spec)
     initializer._lsbRefreshFrame = function(frame)
         applyInfoRowFrame(frame, initializer:GetData())
     end
-    return self:_addLayoutInitializer(spec, initializer, type(spec.value) == "function" or type(spec.name) == "function")
+    return internal.addLayoutInitializer(self, spec, initializer, type(spec.value) == "function" or type(spec.name) == "function")
 end
 
-function lib:EmbedCanvas(canvas, height, spec)
+function lib.EmbedCanvas(self, canvas, height, spec)
     spec = spec or {}
 
     local modifiers = copyMixin({}, spec)
@@ -91,13 +91,13 @@ function lib:EmbedCanvas(canvas, height, spec)
         canvas = canvas,
     }, height or canvas:GetHeight(), applyEmbedCanvasFrame)
 
-    Settings.RegisterInitializer(self:_resolveCategory(spec), initializer)
-    self:_applyModifiers(initializer, modifiers)
+    Settings.RegisterInitializer(internal.resolveCategory(self, spec), initializer)
+    internal.applyModifiers(self, initializer, modifiers)
 
     return initializer
 end
 
-function lib:_ensureConfirmDialog()
+function internal.ensureConfirmDialog(self)
     if self._confirmDialogName then
         return self._confirmDialogName
     end
@@ -122,11 +122,11 @@ function lib:_ensureConfirmDialog()
     return self._confirmDialogName
 end
 
-function lib:Button(spec)
-    local callbackContext = self:_createCallbackContext(spec)
+function lib.Button(self, spec)
+    local callbackContext = internal.createCallbackContext(self, spec)
     local onClick = spec.onClick
     if spec.confirm then
-        local confirmDialogName = self:_ensureConfirmDialog()
+        local confirmDialogName = internal.ensureConfirmDialog(self)
         local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
         local originalClick = onClick
         onClick = function(ctx)
@@ -141,5 +141,5 @@ function lib:Button(spec)
     local initializer = CreateSettingsButtonInitializer(spec.name, spec.buttonText or spec.name, function()
         onClick(callbackContext)
     end, spec.tooltip, true)
-    return self:_addLayoutInitializer(spec, initializer)
+    return internal.addLayoutInitializer(self, spec, initializer)
 end

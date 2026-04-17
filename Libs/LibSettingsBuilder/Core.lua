@@ -694,19 +694,15 @@ local EXTRA_FIELDS_BY_TYPE = {
     custom = { template = true, varType = true },
 }
 
-function lib:_makeVarNameFromIdentifier(identifier)
-    return self._config.varPrefix .. "_" .. tostring(identifier):gsub("%.", "_")
-end
-
-function lib:_makeVarName(spec)
+function internal.makeVarName(self, spec)
     local id = spec.key or spec.path
-    return self:_makeVarNameFromIdentifier(id)
+    return self._config.varPrefix .. "_" .. tostring(id):gsub("%.", "_")
 end
 
-function lib:_createCallbackContext(spec, setting)
+function internal.createCallbackContext(self, spec, setting)
     return {
         builder = self,
-        category = self:_resolveCategory(spec),
+        category = internal.resolveCategory(self, spec),
         key = spec.key,
         page = spec._page and spec._page._handle,
         path = spec.path,
@@ -715,11 +711,11 @@ function lib:_createCallbackContext(spec, setting)
     }
 end
 
-function lib:_resolveCategory(spec)
+function internal.resolveCategory(self, spec)
     return spec.category or self._currentSubcategory or self._rootCategory
 end
 
-function lib:_registerCategoryRefreshable(category, initializer)
+function internal.registerCategoryRefreshable(self, category, initializer)
     if not category or not initializer then
         return
     end
@@ -739,16 +735,16 @@ function lib:_registerCategoryRefreshable(category, initializer)
     refreshables[#refreshables + 1] = initializer
 end
 
-function lib:_postSet(spec, value, setting)
-    local ctx = self:_createCallbackContext(spec, setting)
+function internal.postSet(self, spec, value, setting)
+    local ctx = internal.createCallbackContext(self, spec, setting)
     if spec.onSet then
         spec.onSet(ctx, value)
     end
     self._config.onChanged(ctx, value)
-    self:_reevaluateReactiveControls()
+    internal.reevaluateReactiveControls(self)
 end
 
-function lib:_resolveBinding(spec)
+function internal.resolveBinding(self, spec)
     local hasPath = spec.path ~= nil
     local hasHandler = spec.get ~= nil or spec.set ~= nil
 
@@ -771,12 +767,12 @@ function lib:_resolveBinding(spec)
     return binding
 end
 
-function lib:_makeProxySetting(spec, varType, defaultFallback, binding)
-    local variable = self:_makeVarName(spec)
-    local category = self:_resolveCategory(spec)
+function internal.makeProxySetting(self, spec, varType, defaultFallback, binding)
+    local variable = internal.makeVarName(self, spec)
+    local category = internal.resolveCategory(self, spec)
     local setting
 
-    binding = binding or self:_resolveBinding(spec)
+    binding = binding or internal.resolveBinding(self, spec)
 
     local function getter()
         local value = binding.get()
@@ -796,13 +792,13 @@ function lib:_makeProxySetting(spec, varType, defaultFallback, binding)
 
     local function setter(value)
         value = applyValue(value)
-        self:_postSet(spec, value, setting)
+        internal.postSet(self, spec, value, setting)
     end
 
     local function setValueNoCallback(_, value)
         value = applyValue(value)
-        self._config.onChanged(self:_createCallbackContext(spec, setting), value)
-        self:_reevaluateReactiveControls()
+        self._config.onChanged(internal.createCallbackContext(self, spec, setting), value)
+        internal.reevaluateReactiveControls(self)
     end
 
     local defaultValue = binding.default
@@ -820,7 +816,7 @@ function lib:_makeProxySetting(spec, varType, defaultFallback, binding)
     return setting, category
 end
 
-function lib:_propagateModifiers(target, source)
+function internal.propagateModifiers(self, target, source)
     for _, key in ipairs(MODIFIER_KEYS) do
         if target[key] == nil then
             target[key] = source[key]
@@ -828,7 +824,7 @@ function lib:_propagateModifiers(target, source)
     end
 end
 
-function lib:_validateSpecFields(controlType, spec)
+function internal.validateSpecFields(self, controlType, spec)
     if not LSB_DEBUG then
         return
     end
@@ -853,7 +849,7 @@ function lib:_validateSpecFields(controlType, spec)
     end
 end
 
-function lib:_setCanvasInteractive(frame, enabled)
+function internal.setCanvasInteractive(self, frame, enabled)
     if frame.SetEnabled then
         frame:SetEnabled(enabled)
     end
@@ -863,12 +859,12 @@ function lib:_setCanvasInteractive(frame, enabled)
     if frame.GetChildren then
         local children = { frame:GetChildren() }
         for i = 1, #children do
-            self:_setCanvasInteractive(children[i], enabled)
+            internal.setCanvasInteractive(self, children[i], enabled)
         end
     end
 end
 
-function lib:_isParentEnabled(spec)
+function internal.isParentEnabled(self, spec)
     if not spec._parentInitializer then
         return true
     end
@@ -887,21 +883,21 @@ function lib:_isParentEnabled(spec)
     return setting:GetValue()
 end
 
-function lib:_isControlEnabled(spec)
+function internal.isControlEnabled(self, spec)
     if spec.disabled and spec.disabled() then
         return false
     end
-    return self:_isParentEnabled(spec)
+    return internal.isParentEnabled(self, spec)
 end
 
-function lib:_applyCanvasState(canvas, enabled)
+function internal.applyCanvasState(self, canvas, enabled)
     if canvas.SetAlpha then
         canvas:SetAlpha(enabled and 1 or 0.5)
     end
-    self:_setCanvasInteractive(canvas, enabled)
+    internal.setCanvasInteractive(self, canvas, enabled)
 end
 
-function lib:_reevaluateReactiveControls()
+function internal.reevaluateReactiveControls(self)
     local panel = SettingsPanel
     if panel and panel:IsShown() then
         local settingsList = panel:GetSettingsList()
@@ -917,37 +913,37 @@ function lib:_reevaluateReactiveControls()
     for _, entry in ipairs(self._reactiveControls) do
         local spec = entry[2]
         if spec.canvas then
-            self:_applyCanvasState(spec.canvas, self:_isControlEnabled(spec))
+            internal.applyCanvasState(self, spec.canvas, internal.isControlEnabled(self, spec))
         end
     end
 end
 
-function lib:_applyEnabledState(initializer, spec)
-    local enabled = self:_isControlEnabled(spec)
+function internal.applyEnabledState(self, initializer, spec)
+    local enabled = internal.isControlEnabled(self, spec)
     if initializer.SetEnabled then
         initializer:SetEnabled(enabled)
     end
     if spec.canvas then
-        self:_applyCanvasState(spec.canvas, enabled)
+        internal.applyCanvasState(self, spec.canvas, enabled)
     end
     return enabled
 end
 
-function lib:_applyModifiers(initializer, spec)
+function internal.applyModifiers(self, initializer, spec)
     if not initializer then
         return
     end
 
     if spec.disabled or spec.canvas or spec._parentInitializer then
         initializer:AddModifyPredicate(function()
-            return self:_applyEnabledState(initializer, spec)
+            return internal.applyEnabledState(self, initializer, spec)
         end)
-        self:_applyEnabledState(initializer, spec)
+        internal.applyEnabledState(self, initializer, spec)
     end
 
     if spec._parentInitializer then
         initializer:SetParentInitializer(spec._parentInitializer, function()
-            return self:_isParentEnabled(spec)
+            return internal.isParentEnabled(self, spec)
         end)
     end
 
@@ -962,7 +958,7 @@ function lib:_applyModifiers(initializer, spec)
     end
 end
 
-function lib:_colorTableToHex(tbl)
+function internal.colorTableToHex(self, tbl)
     if not tbl then
         return "FFFFFFFF"
     end
@@ -975,14 +971,14 @@ function lib:_colorTableToHex(tbl)
     )
 end
 
-function lib:_storeCategory(name, category, layout)
+function internal.storeCategory(self, name, category, layout)
     self._subcategories[name] = category
     self._subcategoryNames[category] = name
     self._layouts[category] = layout
     return category
 end
 
-lib._defaultSliderFormatter = defaultSliderFormatter
+internal.defaultSliderFormatter = defaultSliderFormatter
 
 --- Create a new LibSettingsBuilder runtime instance.
 ---@param config table
@@ -1039,7 +1035,7 @@ function lib.New(selfOrConfig, maybeConfig)
         _nextRootPageSequence = 0,
         _nextSectionSequence = 0,
         name = nil,
-    }, { __index = lib })
+    }, { __index = lib._publicApi or lib })
 
     if config.name ~= nil then
         lsb:_initializeRoot(config.name)
@@ -1055,6 +1051,7 @@ function lib.New(selfOrConfig, maybeConfig)
     return lsb
 end
 
+-- Export local functions to internal for cross-file access
 internal.installPageLifecycleHooks = installPageLifecycleHooks
 internal.copyMixin = copyMixin
 internal.setInitializerExtent = setInitializerExtent
@@ -1071,6 +1068,7 @@ internal.evaluateStaticOrFunction = evaluateStaticOrFunction
 internal.getCanvasLayoutMetrics = getCanvasLayoutMetrics
 internal.defaultSwatchCenterX = DEFAULT_SWATCH_CENTER_X
 
+-- Clear stale keys from prior MINOR versions (LibStub reuses the same table)
 lib.CanvasLayout = nil
 lib.CanvasLayoutDefaults = nil
 lib.CreateColorSwatch = nil

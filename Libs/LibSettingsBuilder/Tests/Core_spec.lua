@@ -54,7 +54,7 @@ describe("LibSettingsBuilder Core", function()
         assert.is_table(deprecated.CanvasLayout)
     end)
 
-    it("exposes the full builder API on instances via lib prototype", function()
+    it("exposes only the public API on builder instances", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
         local sb = lsb.New({
             name = "Phase 2",
@@ -79,10 +79,13 @@ describe("LibSettingsBuilder Core", function()
         assert.is_function(sb.GetRootPage)
         assert.is_function(sb.GetPage)
         assert.is_function(sb.HasCategory)
-        assert.is_function(sb.Checkbox)
-        assert.is_function(sb.List)
-        assert.is_function(sb.Control)
-        assert.is_function(sb.EmbedCanvas)
+
+        -- Internal builder methods not on the public prototype
+        assert.is_nil(sb.Control)
+        assert.is_nil(sb.Checkbox)
+        assert.is_nil(sb.List)
+        assert.is_nil(sb.EmbedCanvas)
+        assert.is_nil(sb.BorderGroup)
     end)
 
     it("store/defaults bindings resolve nested values and defaults", function()

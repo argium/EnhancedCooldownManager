@@ -8,11 +8,9 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local function callBuilder(builder, methodName, ...)
-    return lib[methodName](builder, ...)
-end
+local internal = lib._internal
 
-function lib:HeightOverrideSlider(sectionPath, spec)
+function lib.HeightOverrideSlider(self, sectionPath, spec)
     spec = spec or {}
     local childSpec = {
         path = sectionPath .. ".height",
@@ -28,8 +26,8 @@ function lib:HeightOverrideSlider(sectionPath, spec)
             return value > 0 and value or nil
         end,
     }
-    self:_propagateModifiers(childSpec, spec)
-    return callBuilder(self, "Slider", childSpec)
+    internal.propagateModifiers(self, childSpec, spec)
+    return lib.Slider(self, childSpec)
 end
 
 --- Font override group.
@@ -38,7 +36,7 @@ end
 ---   fontFallback      function() -> string    (fallback font name)
 ---   fontSizeFallback  function() -> number    (fallback font size)
 ---   fontTemplate      string                  (custom template for the font picker)
-function lib:FontOverrideGroup(sectionPath, spec)
+function lib.FontOverrideGroup(self, sectionPath, spec)
     spec = spec or {}
     local overridePath = sectionPath .. ".overrideFont"
 
@@ -50,8 +48,8 @@ function lib:FontOverrideGroup(sectionPath, spec)
             return value == true
         end,
     }
-    self:_propagateModifiers(enabledSpec, spec)
-    local enabledInit, enabledSetting = callBuilder(self, "Checkbox", enabledSpec)
+    internal.propagateModifiers(self, enabledSpec, spec)
+    local enabledInit, enabledSetting = lib.Checkbox(self, enabledSpec)
 
     local outerDisabled = spec.disabled
     local function isOverrideDisabled()
@@ -77,14 +75,14 @@ function lib:FontOverrideGroup(sectionPath, spec)
             return nil
         end,
     }
-    self:_propagateModifiers(fontSpec, spec)
+    internal.propagateModifiers(self, fontSpec, spec)
 
     local fontInit
     if spec.fontTemplate then
         fontSpec.template = spec.fontTemplate
-        fontInit = callBuilder(self, "Custom", fontSpec)
+        fontInit = lib.Custom(self, fontSpec)
     else
-        fontInit = callBuilder(self, "Dropdown", fontSpec)
+        fontInit = lib.Dropdown(self, fontSpec)
     end
 
     local sizeSpec = {
@@ -105,8 +103,8 @@ function lib:FontOverrideGroup(sectionPath, spec)
             return 11
         end,
     }
-    self:_propagateModifiers(sizeSpec, spec)
-    local sizeInit = callBuilder(self, "Slider", sizeSpec)
+    internal.propagateModifiers(self, sizeSpec, spec)
+    local sizeInit = lib.Slider(self, sizeSpec)
 
     return {
         enabledInit = enabledInit,
@@ -116,7 +114,7 @@ function lib:FontOverrideGroup(sectionPath, spec)
     }
 end
 
-function lib:BorderGroup(borderPath, spec)
+function lib.BorderGroup(self, borderPath, spec)
     spec = spec or {}
 
     local enabledSpec = {
@@ -124,8 +122,8 @@ function lib:BorderGroup(borderPath, spec)
         name = spec.enabledName or "Show border",
         tooltip = spec.enabledTooltip,
     }
-    self:_propagateModifiers(enabledSpec, spec)
-    local enabledInit, enabledSetting = callBuilder(self, "Checkbox", enabledSpec)
+    internal.propagateModifiers(self, enabledSpec, spec)
+    local enabledInit, enabledSetting = lib.Checkbox(self, enabledSpec)
 
     local thicknessSpec = {
         path = borderPath .. ".thickness",
@@ -139,8 +137,8 @@ function lib:BorderGroup(borderPath, spec)
             return enabledSetting:GetValue()
         end,
     }
-    self:_propagateModifiers(thicknessSpec, spec)
-    local thicknessInit = callBuilder(self, "Slider", thicknessSpec)
+    internal.propagateModifiers(self, thicknessSpec, spec)
+    local thicknessInit = lib.Slider(self, thicknessSpec)
 
     local colorSpec = {
         path = borderPath .. ".color",
@@ -151,8 +149,8 @@ function lib:BorderGroup(borderPath, spec)
             return enabledSetting:GetValue()
         end,
     }
-    self:_propagateModifiers(colorSpec, spec)
-    local colorInit = callBuilder(self, "Color", colorSpec)
+    internal.propagateModifiers(self, colorSpec, spec)
+    local colorInit = lib.Color(self, colorSpec)
 
     return {
         enabledInit = enabledInit,

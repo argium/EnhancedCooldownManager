@@ -12,10 +12,10 @@ local internal = lib._internal
 local applyCollectionFrame = internal.applyCollectionFrame
 local createCustomListRowInitializer = internal.createCustomListRowInitializer
 local copyMixin = internal.copyMixin
-function lib:_createCollectionInitializer(spec, errorPrefix)
+function internal.createCollectionInitializer(self, spec, errorPrefix)
     assert(spec.height, errorPrefix .. ": spec.height is required")
 
-    local category = self:_resolveCategory(spec)
+    local category = internal.resolveCategory(self, spec)
     local data = copyMixin({}, spec)
     if data.variant and data.preset == nil then
         data.preset = data.variant
@@ -28,7 +28,7 @@ function lib:_createCollectionInitializer(spec, errorPrefix)
         controlInitializer._lsbEnabled = enabled
         local activeFrame = controlInitializer._lsbActiveFrame
         if activeFrame then
-            self:_applyCanvasState(activeFrame, enabled)
+            internal.applyCanvasState(self, activeFrame, enabled)
         end
     end
 
@@ -38,19 +38,19 @@ function lib:_createCollectionInitializer(spec, errorPrefix)
     end
 
     Settings.RegisterInitializer(category, initializer)
-    self:_registerCategoryRefreshable(category, initializer)
-    self:_applyModifiers(initializer, spec)
+    internal.registerCategoryRefreshable(self, category, initializer)
+    internal.applyModifiers(self, initializer, spec)
 
     return initializer
 end
 
-function lib:List(spec)
+function lib.List(self, spec)
     assert(spec.items, "List: spec.items is required")
     assert(not spec.sections, "List: spec.sections is not supported")
-    return self:_createCollectionInitializer(spec, "List")
+    return internal.createCollectionInitializer(self, spec, "List")
 end
 
-function lib:SectionList(spec)
+function lib.SectionList(self, spec)
     assert(spec.sections, "SectionList: spec.sections is required")
-    return self:_createCollectionInitializer(spec, "SectionList")
+    return internal.createCollectionInitializer(self, spec, "SectionList")
 end
