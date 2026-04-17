@@ -164,7 +164,7 @@ function lib.Input(self, spec)
     }
 
     local extent = spec.resolveText and 46 or 26
-    local initializer = createCustomListRowInitializer(internal.INPUTROW_TEMPLATE, data, extent, applyInputRowFrame)
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", data, extent, applyInputRowFrame)
     local originalInitFrame = initializer.InitFrame
     local originalResetter = initializer.Resetter
 

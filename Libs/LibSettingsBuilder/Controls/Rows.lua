@@ -44,7 +44,7 @@ function lib.PageActions(self, spec)
     local categoryName = self._subcategoryNames[category]
         or (category == self._rootCategory and self._rootCategoryName)
         or ""
-    local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", {
         _lsbKind = "pageActions",
         name = spec.name or categoryName,
         actions = spec.actions,
@@ -59,7 +59,7 @@ function lib.PageActions(self, spec)
 end
 
 function lib.Subheader(self, spec)
-    local initializer = createCustomListRowInitializer(internal.SUBHEADER_TEMPLATE, {
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", {
         _lsbKind = "subheader",
         name = spec.name,
     }, 28, applySubheaderFrame)
@@ -67,7 +67,7 @@ function lib.Subheader(self, spec)
 end
 
 function lib.InfoRow(self, spec)
-    local initializer = createCustomListRowInitializer(internal.INFOROW_TEMPLATE, {
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", {
         _lsbKind = "infoRow",
         name = spec.name,
         value = spec.value,
@@ -86,7 +86,7 @@ function lib.EmbedCanvas(self, canvas, height, spec)
     local modifiers = copyMixin({}, spec)
     modifiers.canvas = canvas
 
-    local initializer = createCustomListRowInitializer(internal.EMBED_CANVAS_TEMPLATE, {
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", {
         _lsbKind = "embedCanvas",
         canvas = canvas,
     }, height or canvas:GetHeight(), applyEmbedCanvasFrame)

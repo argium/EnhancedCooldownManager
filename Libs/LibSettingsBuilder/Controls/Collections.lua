@@ -21,7 +21,7 @@ function internal.createCollectionInitializer(self, spec, errorPrefix)
         data.preset = data.variant
     end
 
-    local initializer = createCustomListRowInitializer(internal.EMBED_CANVAS_TEMPLATE, data, spec.height, applyCollectionFrame)
+    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", data, spec.height, applyCollectionFrame)
 
     initializer._lsbEnabled = true
     initializer.SetEnabled = function(controlInitializer, enabled)

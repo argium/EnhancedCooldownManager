@@ -129,20 +129,23 @@ end
 --- Setup a minimal LibStub stub for tests.
 function TestHelpers.SetupLibStub()
     local libs = {}
+    local minors = {}
     local LibStub = {
         NewLibrary = function(self, major, minor)
-            if not libs[major] or libs[major].minor < minor then
-                libs[major] = { minor = minor, lib = {} }
-                return libs[major].lib
+            local oldMinor = minors[major]
+            if oldMinor and oldMinor >= minor then
+                return nil
             end
-            return nil
+            minors[major] = minor
+            libs[major] = libs[major] or {}
+            return libs[major], oldMinor
         end,
     }
     setmetatable(LibStub, {
         __call = function(self, major, silent)
-            local entry = libs[major]
-            if entry then
-                return entry.lib
+            local lib = libs[major]
+            if lib then
+                return lib
             end
             if not silent then
                 error("Library not found: " .. major)

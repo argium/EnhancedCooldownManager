@@ -13,18 +13,11 @@ if not lib then
 end
 
 lib._loadState = { open = true }
-lib._internal = lib._internal or {}
+lib._internal = {}
+lib._pageLifecycleCallbacks = {}
+lib._pageLifecycleHooked = false
 
 local internal = lib._internal
-
-internal.EMBED_CANVAS_TEMPLATE = "SettingsListElementTemplate"
-internal.SUBHEADER_TEMPLATE = "SettingsListElementTemplate"
-internal.INFOROW_TEMPLATE = "SettingsListElementTemplate"
-internal.INPUTROW_TEMPLATE = "SettingsListElementTemplate"
-internal.SCROLL_DROPDOWN_TEMPLATE = "SettingsDropdownControlTemplate"
-
-lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
-lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
 
 --- Installs one-time hooks on SettingsPanel to fire page-level onShow/onHide
 --- callbacks registered through the root/section/page API. Defers automatically if
@@ -379,18 +372,17 @@ end
 --   Indent per level:    15
 --------------------------------------------------------------------------------
 
-internal.CanvasLayoutDefaults = internal.CanvasLayoutDefaults
-    or {
-        elementHeight = 26,
-        headerHeight = 50,
-        labelX = 37,
-        controlCenterX = -80,
-        buttonCenterX = -40,
-        buttonWidth = 200,
-        sliderWidth = 250,
-        swatchCenterX = DEFAULT_SWATCH_CENTER_X,
-        verifiedPatch = "Retail 12.0/12.1",
-    }
+internal.CanvasLayoutDefaults = {
+    elementHeight = 26,
+    headerHeight = 50,
+    labelX = 37,
+    controlCenterX = -80,
+    buttonCenterX = -40,
+    buttonWidth = 200,
+    sliderWidth = 250,
+    swatchCenterX = DEFAULT_SWATCH_CENTER_X,
+    verifiedPatch = "Retail 12.0/12.1",
+}
 local CanvasLayout = {}
 internal.CanvasLayout = CanvasLayout
 
@@ -1059,17 +1051,3 @@ internal.getCanvasLayoutMetrics = getCanvasLayoutMetrics
 internal.defaultSwatchCenterX = DEFAULT_SWATCH_CENTER_X
 internal.createHeaderTitle = createHeaderTitle
 internal.createSubheaderTitle = createSubheaderTitle
-
--- Clear stale keys from prior MINOR versions (LibStub reuses the same table)
-lib.CanvasLayout = nil
-lib.CanvasLayoutDefaults = nil
-lib.CreateCanvasLayout = nil
-lib.CreateColorSwatch = nil
-lib.CreateHeaderTitle = nil
-lib.CreateSubheaderTitle = nil
-lib.EMBED_CANVAS_TEMPLATE = nil
-lib.INFOROW_TEMPLATE = nil
-lib.INPUTROW_TEMPLATE = nil
-lib.SCROLL_DROPDOWN_TEMPLATE = nil
-lib.SUBHEADER_TEMPLATE = nil
-lib.LSBDeprecated = nil
