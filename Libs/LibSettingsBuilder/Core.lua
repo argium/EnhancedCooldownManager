@@ -395,7 +395,7 @@ local function createTitle(parent, template, x, y, text, fontObject)
 end
 
 local function createSubheaderTitle(parent, text)
-    return createTitle(parent, "GameFontHighlightSmall", 35, -8, text, GameFontHighlight)
+    return createTitle(parent, "GameFontNormalSmall", 35, -8, text)
 end
 
 local function createHeaderTitle(parent, text)

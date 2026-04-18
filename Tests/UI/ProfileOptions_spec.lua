@@ -19,6 +19,30 @@ describe("ProfileOptions getters/setters/defaults", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
+    it("loads before AceDB initialization and registers once db exists", function()
+        TestHelpers.SetupOptionsGlobals()
+        profile, defaults = TestHelpers.MakeOptionsProfile()
+        SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
+
+        local db = ns.Addon.db
+        ns.Addon.db = nil
+
+        assert.has_no.errors(function()
+            TestHelpers.LoadChunk("UI/ProfileOptions.lua", "ProfileOptions")(nil, ns)
+        end)
+
+        ns.Addon.db = db
+
+        settings = TestHelpers.CollectSettings(function()
+            local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ProfileOptions)
+            profileCategory = page._category
+        end)
+
+        assert.are.equal("profile", ns.ProfileOptions.key)
+        assert.are.equal("Other", settings.ECM_ProfileCopy:GetValue())
+        assert.is_not_nil(profileCategory)
+    end)
+
     before_each(function()
         TestHelpers.SetupOptionsGlobals()
         profile, defaults = TestHelpers.MakeOptionsProfile()

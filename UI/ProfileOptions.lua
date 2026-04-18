@@ -71,12 +71,14 @@ end
 
 --- Creates a handler-backed dropdown for transient profile selection (not stored in SavedVars).
 local function createProfilePickerRow(variable, name, tooltip, valuesGenerator)
-    local selected = getPreferredProfileSelection(valuesGenerator)
+    local selected
 
     local function ensureSelection()
-        if not selected or selected == "" then
+        if selected == nil or selected == "" then
             selected = getPreferredProfileSelection(valuesGenerator)
         end
+
+        return selected
     end
 
     local function values()
@@ -87,8 +89,6 @@ local function createProfilePickerRow(variable, name, tooltip, valuesGenerator)
         return map
     end
 
-    ensureSelection()
-
     return {
         type = "dropdown",
         key = variable,
@@ -98,24 +98,27 @@ local function createProfilePickerRow(variable, name, tooltip, valuesGenerator)
         scrollHeight = 240,
         values = values,
         get = function()
-            ensureSelection()
-            return selected
+            return ensureSelection()
         end,
         set = function(value)
             selected = value
         end,
     }, function()
-        ensureSelection()
-        return selected
+        return ensureSelection()
     end, function()
-        selected = getPreferredProfileSelection(valuesGenerator)
+        selected = nil
     end
 end
 
 local function otherProfilesGenerator()
     local container = Settings.CreateControlTextContainer()
-    local current = ns.Addon.db:GetCurrentProfile()
-    for _, name in ipairs(ns.Addon.db:GetProfiles()) do
+    local db = ns.Addon and ns.Addon.db
+    if not db then
+        return container:GetData()
+    end
+
+    local current = db:GetCurrentProfile()
+    for _, name in ipairs(db:GetProfiles()) do
         if name ~= current then
             container:Add(name, name)
         end
