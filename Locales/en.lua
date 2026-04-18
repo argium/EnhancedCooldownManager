@@ -70,6 +70,7 @@ L["POWER_BAR"] = "Power Bar"
 L["RESOURCE_BAR"] = "Resource Bar"
 L["RUNE_BAR"] = "Rune Bar"
 L["AURA_BARS"] = "Aura Bars"
+L["EXTERNAL_BARS"] = "External Cooldowns"
 L["EXTRA_ICONS"] = "Extra Icons"
 
 --------------------------------------------------------------------------------
@@ -189,6 +190,14 @@ L["HEIGHT_OVERRIDE"] = "Height Override"
 L["HEIGHT_OVERRIDE_DESC"] = "Override the default bar height. Set to 0 to use the global default."
 L["AURA_VERTICAL_SPACING"] = "Vertical Spacing"
 L["AURA_VERTICAL_SPACING_DESC"] = "Vertical gap between aura bars. Set to 0 for no spacing."
+
+L["ENABLE_EXTERNAL_BARS"] = "Show external cooldowns as bars"
+L["ENABLE_EXTERNAL_BARS_DESC"] =
+    "Display Blizzard's tracked external defensive cooldowns as bars that can be positioned separately."
+L["HIDE_ORIGINAL_ICONS"] = "Hide the original icons"
+L["HIDE_ORIGINAL_ICONS_DESC"] =
+    "Hide Blizzard's original external defensive icons while keeping the external cooldown bars active."
+L["DISABLE_EXTERNAL_BARS_RELOAD"] = "Disabling external cooldown bars requires a UI reload. Reload now?"
 
 L["SPELL_COLORS_SUBCAT"] = "Spell Colors"
 L["SPELL_COLORS_DESC"] =

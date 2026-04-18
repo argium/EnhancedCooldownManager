@@ -152,19 +152,32 @@ function Options:InstallCategoryTracking()
 end
 
 function Options:OnInitialize()
+    local sections = {
+        ns.GeneralOptions,
+        ns.LayoutOptions,
+        ns.PowerBarOptions,
+        ns.ResourceBarOptions,
+        ns.RuneBarOptions,
+        ns.BuffBarsOptions,
+        ns.ExtraIconsOptions,
+    }
+
+    if ns.ExternalBarsOptions then
+        sections[#sections + 1] = ns.ExternalBarsOptions
+    end
+
+    sections[#sections + 1] = {
+        key = "spellColors",
+        name = L["SPELL_COLORS_SUBCAT"],
+        pages = { ns.SpellColorsPage.CreatePage(L["SPELL_COLORS_SUBCAT"]) },
+    }
+
+    sections[#sections + 1] = ns.ProfileOptions
+    sections[#sections + 1] = ns.AdvancedOptions
+
     ns.Settings:_registerTree({
         page = ns.AboutPage,
-        sections = {
-            ns.GeneralOptions,
-            ns.LayoutOptions,
-            ns.PowerBarOptions,
-            ns.ResourceBarOptions,
-            ns.RuneBarOptions,
-            ns.BuffBarsOptions,
-            ns.ExtraIconsOptions,
-            ns.ProfileOptions,
-            ns.AdvancedOptions,
-        },
+        sections = sections,
     })
 
     if ns.ExtraIconsOptionsUtil then
@@ -174,8 +187,8 @@ function Options:OnInitialize()
     if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
         ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))
     end
-    if ns.BuffBarsOptions and ns.BuffBarsOptions.SetSpellColorsPage then
-        ns.BuffBarsOptions.SetSpellColorsPage(ns.Settings:GetPage("buffBars", "spellColors"))
+    if ns.SpellColorsPage and ns.SpellColorsPage.SetRegisteredPage then
+        ns.SpellColorsPage.SetRegisteredPage(ns.Settings:GetPage("spellColors", "spellColors"))
     end
 
     self:InstallCategoryTracking()

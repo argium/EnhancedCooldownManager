@@ -372,6 +372,12 @@ describe("OptionUtil", function()
             ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
             ns.ProfileOptions = placeholderSection("profile", ns.L["PROFILES"])
             ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
+            ns.SpellColorsPage = {
+                CreatePage = function(name)
+                    return { key = "spellColors", name = name, rows = {} }
+                end,
+                SetRegisteredPage = function() end,
+            }
 
             optionsModule:OnInitialize()
             generalCategory = ns.Settings:GetPage("general", "main")._category

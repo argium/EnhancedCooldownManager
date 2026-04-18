@@ -1,7 +1,7 @@
 # ECM Architecture
 
 EnhancedCooldownManager is an event-driven WoW addon built on AceAddon-3.0 / AceDB-3.0.
-`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, and iterates modules. Each module (PowerBar, ResourceBar, RuneBar, BuffBars, ExtraIcons) inherits from `BarMixin` and implements its own `UpdateLayout()`.
+`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, lays out `ExtraIcons` first when it widens the main viewer, and then iterates the chained bar modules. `PowerBar`, `ResourceBar`, and `RuneBar` use `BarMixin.AddBarMixin()`. `BuffBars`, `ExternalBars`, and `ExtraIcons` use `BarMixin.AddFrameMixin()` and manage their own child content.
 
 ## Initialization Chain
 
@@ -27,7 +27,8 @@ flowchart TD
         RB_INIT["ResourceBar:OnInitialize()<br/>BarMixin.AddBarMixin(self)"]
         RUNE_INIT["RuneBar:OnInitialize()<br/>BarMixin.AddBarMixin(self)"]
         BB_INIT["BuffBars:OnInitialize()<br/>BarMixin.AddFrameMixin(self)"]
-        II_INIT["ExtraIcons:OnInitialize()"]
+        EB_INIT["ExternalBars:OnInitialize()<br/>BarMixin.AddFrameMixin(self)"]
+        II_INIT["ExtraIcons:OnInitialize()<br/>BarMixin.AddFrameMixin(self)"]
     end
 
     subgraph ENABLE["Phase 4 · OnEnable → Runtime.Enable"]
@@ -55,8 +56,10 @@ flowchart TD
         REG_FRAME["Runtime.RegisterFrame(self)<br/>→ _modules[name] = self"]
         REG_EVENTS["Register module-specific events<br/>(UNIT_POWER_UPDATE, etc.)"]
         HOOK_BB["BuffBars: C_Timer.After(0.1)<br/>→ HookViewer() + RequestLayout"]
+        HOOK_EB["ExternalBars: C_Timer.After(0.1)<br/>→ HookViewer() + UpdateAuras + RequestLayout"]
         ENSURE --> REG_FRAME --> REG_EVENTS
         REG_EVENTS -.->|BuffBars only| HOOK_BB
+        REG_FRAME -.->|ExternalBars only| HOOK_EB
     end
 
     subgraph FIRST["Phase 6 · First Layout"]
@@ -99,11 +102,12 @@ flowchart TD
         BB_ZONE["ZONE_CHANGED_* / PLAYER_ENTERING_WORLD<br/>→ BuffBars:OnZoneChanged"]
     end
 
-    subgraph HOOKS["Frame Hooks (BuffBars)"]
+    subgraph HOOKS["Frame Hooks (BuffBars / ExternalBars)"]
         BB_SETPT["child:SetPoint hook<br/>→ restore anchors + restyle"]
         BB_SHOW["child:OnShow hook<br/>→ restyle"]
         BB_HIDE["child:OnHide hook"]
         BB_VIEWER["viewer:OnShow / OnSizeChanged"]
+        EB_VIEWER["ExternalDefensivesFrame:UpdateAuras / OnShow / OnHide<br/>→ ExternalBars sync + RequestLayout"]
     end
 
     subgraph RUNTIME["Runtime.lua — Event Dispatch"]
@@ -143,10 +147,12 @@ flowchart TD
     subgraph UPDATE_ALL["updateAllLayouts(reason)"]
         INV_DET["invalidateDetachedAnchorMetrics()"]
         UPD_DET["updateDetachedAnchorLayout()"]
-        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ExtraIcons"]
+        EXTRA_FIRST["ExtraIcons:UpdateLayout(reason)<br/>first, so the main viewer width is final"]
+        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ExternalBars"]
+        OTHER_LOOP["Remaining non-chain modules (if any)"]
         MOD_UPD["module:UpdateLayout(reason)"]
 
-        INV_DET --> UPD_DET --> CHAIN_LOOP --> MOD_UPD
+        INV_DET --> UPD_DET --> EXTRA_FIRST --> CHAIN_LOOP --> OTHER_LOOP --> MOD_UPD
     end
 
     %% Event Sources → Runtime
@@ -159,7 +165,7 @@ flowchart TD
     PB_PWR & RB_AURA & BB_ZONE --> REQ_LAY
 
     %% Hooks → RequestLayout
-    BB_SETPT & BB_SHOW & BB_HIDE & BB_VIEWER --> REQ_LAY
+    BB_SETPT & BB_SHOW & BB_HIDE & BB_VIEWER & EB_VIEWER --> REQ_LAY
 
     %% All paths → executeLayout
     REQ_LAY --> EXEC_LAY
@@ -183,7 +189,7 @@ flowchart TD
 
 ### Profile Change
 
-When a user switches, copies, or resets a profile, AceDB fires a callback → `ECM:OnProfileChangedHandler()` → re-runs migration → `Runtime.Enable()` re-enables/disables modules per new config → schedules a full layout with reason `"ProfileChanged"`. BuffBars clears its SpellColors cache on this reason.
+When a user switches, copies, or resets a profile, AceDB fires a callback → `ECM:OnProfileChangedHandler()` → re-runs migration → `Runtime.Enable()` re-enables/disables modules per new config → schedules a full layout with reason `"ProfileChanged"`. BuffBars and ExternalBars clear their scoped SpellColors discovered-key caches on this reason.
 
 ### Edit Mode
 
@@ -201,6 +207,8 @@ Options pages now use LibSettingsBuilder as a single declarative registration tr
 - `UI/Options.lua` combines those specs and calls `root:Register({ page = ns.AboutPage, sections = { ... } })` once,
 - `root:Register(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
 - dynamic pages keep a registered page handle through `onRegistered(page)` and refresh via `page:Refresh()` when async or transient state changes.
+
+`UI/SpellColorsPage.lua` now owns the shared Spell Colors subcategory. `BuffBarsOptions` registers the page once, and both `BuffBars` and `ExternalBars` register scoped sections into it, so the two modules share one editor without sharing saved color pools.
 
 LibSettingsBuilder v2 Phase 1 also freezes the intended replacement surface without switching ECM over to it yet:
 
@@ -224,6 +232,17 @@ Pages still use the same canonical row types:
 
 A 0.5s `C_Timer.NewTicker` handles deferred Blizzard frame hooking (stops retrying once setup completes), enforces hidden/alpha state against Blizzard re-shows, and syncs module alpha.
 
+### External Bars / `ExternalDefensivesFrame`
+
+`ExternalBars` is hook-driven rather than event-driven. It mirrors Blizzard's `ExternalDefensivesFrame` instead of scanning auras itself:
+
+1. `OnEnable()` defers `HookViewer()` by `C_Timer.After(0.1)` so the Blizzard frame exists before hooks are attached.
+2. `HookViewer()` post-hooks `ExternalDefensivesFrame:UpdateAuras()` and listens to the frame's `OnShow` / `OnHide` transitions.
+3. `OnExternalAurasUpdated()` copies `viewer.auraInfo[]` into `_auraStates[]`, enriches accessible spell metadata through `C_UnitAuras.GetAuraDataByAuraInstanceID()`, and requests a layout pass.
+4. `UpdateLayout()` maps `_auraStates[]` to pooled child bars, styles each row through `BarStyle.StyleChildBar(...)`, and routes spell-color discovery / lookup through the `ns.SpellColors.Get("externalBars")` store.
+5. Bar fill is rendered by a `Cooldown` overlay via `SetCooldownDuration(duration, timeMod)`. Lua only formats duration text when expiration data is safe to inspect directly.
+6. `hideOriginalIcons` uses `ExternalDefensivesFrame:SetAlpha(0)` plus `EnableMouse(false)` rather than `Hide()`, so Blizzard keeps driving `UpdateAuras()`.
+
 ```mermaid
 flowchart TD
     subgraph PROFILE["Profile Change Flow"]
@@ -233,9 +252,9 @@ flowchart TD
         MIG["Migration.Run(new profile)"]
         RT_EN2["Runtime.Enable(addon)<br/>→ Re-enable/disable modules per new config"]
         SCHED_PC["ScheduleLayoutUpdate(0, 'ProfileChanged')"]
-        BB_CLEAR["BuffBars:UpdateLayout('ProfileChanged')<br/>→ SpellColors.ClearDiscoveredKeys()"]
+        SPELL_CLEAR["BuffBars / ExternalBars:UpdateLayout('ProfileChanged')<br/>→ SpellColors.Get(scope):ClearDiscoveredKeys()"]
 
-        USER_SWITCH --> ACE_CB --> PROF_HANDLER --> MIG --> RT_EN2 --> SCHED_PC --> BB_CLEAR
+        USER_SWITCH --> ACE_CB --> PROF_HANDLER --> MIG --> RT_EN2 --> SCHED_PC --> SPELL_CLEAR
     end
 
     subgraph EDITMODE["Edit Mode Flow"]
@@ -291,6 +310,8 @@ flowchart TD
 
 Runtime registers the shared layout events; modules register their own data-driven events in `OnEnable`. Events with multiple registrants are intentional — Runtime handles visibility/positioning while the module handles its own data refresh.
 
+`ExternalBars` is intentionally absent from this table: it mirrors `ExternalDefensivesFrame` through hooks rather than registering its own aura event stream.
+
 | Event | Registrant(s) | Purpose |
 |-------|---------------|---------|
 | CVAR_UPDATE | Runtime | Schedules layout when `cooldownViewerEnabled` changes |
@@ -344,7 +365,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 
 | Method | Description |
 |--------|-------------|
-| `AddFrameMixin(target, name)` | Apply frame-only mixin (used by BuffBars, ExtraIcons) |
+| `AddFrameMixin(target, name)` | Apply frame-only mixin (used by BuffBars, ExternalBars, ExtraIcons) |
 | `AddBarMixin(module, name)` | Apply bar mixin: frame + StatusBar + ticks (used by PowerBar, ResourceBar, RuneBar) |
 
 **FrameProto (mixed into every module):**
@@ -375,6 +396,31 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | `HideAllTicks(poolKey?)` | Hide all ticks in pool |
 | `LayoutResourceTicks(maxResources, color?, tickWidth?, poolKey?)` | Position ticks as resource dividers |
 | `LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, defaultWidth, poolKey?)` | Position ticks at specific values |
+
+`BarStyle` (`BarStyle.lua`) is a stateless namespace of shared child-bar styling helpers used by both `BuffBars` and `ExternalBars`. It is not a mixin — callers invoke the helpers directly (e.g. `BarStyle.StyleChildBar(...)`) so both modules render through the same icon, background, anchor, and spell-color paths.
+
+**Shared child-bar styling helpers:**
+
+| Method | Description |
+|--------|-------------|
+| `ApplySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)` | Remove Blizzard round-mask / overlay treatment once and keep icons square |
+| `StyleBarHeight(frame, bar, iconFrame, config, globalConfig)` | Apply shared row height to the container, status bar, and icon |
+| `StyleBarBackground(frame, barBG, config, globalConfig)` | Reparent and restyle the shared bar background texture |
+| `StyleBarColor(module, frame, bar, globalConfig, spellColors?, retryCount?)` | Resolve spell colors through a per-scope store with secret-value retry handling |
+| `StyleBarIcon(frame, iconFrame, config)` | Show, hide, and align the optional icon region |
+| `StyleBarAnchors(frame, bar, iconFrame, config)` | Apply the shared text / icon anchor layout |
+| `StyleChildBar(module, frame, config, globalConfig, spellColors?)` | Run the complete shared BuffBars / ExternalBars child-bar styling pass |
+
+### ExternalBars (`Modules/ExternalBars.lua`)
+
+Renders Blizzard external defensive auras as ECM-owned bar rows. `ExternalBars` inherits `FrameProto`, owns a pooled set of child bars, and shares the BuffBars row styling helpers from `BarStyle`.
+
+- **Authoritative source:** `ExternalDefensivesFrame.auraInfo[]` populated by Blizzard `UpdateAuras()`.
+- **Viewer hook:** `HookViewer()` post-hooks `UpdateAuras()` and `OnShow` / `OnHide`.
+- **Internal state:** `OnExternalAurasUpdated()` copies current aura entries into `_auraStates[]` keyed by Blizzard's aura-array index, not by `auraInstanceID`.
+- **Rendering:** `UpdateLayout()` sizes the container, configures pooled child bars, and uses a `Cooldown` overlay per row for the draining fill.
+- **Color scope:** spell-color lookup and discovery run through `ns.SpellColors.Get("externalBars")`, so the shared Spell Colors page can manage it independently from BuffBars while the runtime avoids passing scope strings through every call.
+- **Original icon suppression:** `hideOriginalIcons` drives `SetAlpha(0)` / `EnableMouse(false)` on `ExternalDefensivesFrame`; it never calls `Hide()`.
 
 ### ExtraIcons (`Modules/ExtraIcons.lua`)
 
@@ -432,7 +478,7 @@ Lazy setters avoid redundant frame API calls — they compare the new value agai
 
 ### SpellColors (`ns.SpellColors`)
 
-Multi-tier key system for per-spell color customization on buff bars. Keys match across spell name, spell ID, cooldown ID, and texture file ID.
+Shared multi-tier key system for per-spell color customization on BuffBars and ExternalBars. Keys match across spell name, spell ID, cooldown ID, and texture file ID. Scope-specific state now lives on `ECM_SpellColorStore` instances created by `ns.SpellColors.New(scope, accessor?)` or retrieved from the shared registry via `ns.SpellColors.Get(scope)`, so BuffBars and ExternalBars share lookup logic while keeping separate defaults, saved colors, and discovered-key caches.
 
 | Method | Description |
 |--------|-------------|
@@ -440,21 +486,39 @@ Multi-tier key system for per-spell color customization on buff bars. Keys match
 | `NormalizeKey(key)` | Normalize key payload into opaque key |
 | `KeysMatch(left, right)` | Check if two keys identify the same spell |
 | `MergeKeys(base, other)` | Merge identifiers from matching keys |
-| `GetColorByKey(key)` | Get custom color for spell |
-| `GetColorForBar(frame)` | Get custom color for a buff bar frame |
-| `SetColorByKey(key, color)` | Set custom color for spell |
-| `ResetColorByKey(key)` | Remove custom color entry |
-| `GetAllColorEntries()` | Return deduplicated color entries for current class/spec |
-| `GetDefaultColor()` | Return default color for class/spec |
-| `SetDefaultColor(color)` | Set default color for class/spec |
-| `ReconcileAllKeys(keys)` | Batch-reconcile keys (propagate most-recent across tiers) |
-| `RemoveEntriesByKeys(keys)` | Remove matching persisted and discovered spell-color keys |
-| `DiscoverBar(frame)` | Register a discovered bar key |
-| `ClearDiscoveredKeys()` | Clear discovered key cache |
-| `ClearCurrentSpecColors()` | Clear all colors for current class/spec |
-| `SetConfigAccessor(accessor)` | Inject config accessor (decouples from AceDB) |
+| `New(scope, accessor?)` | Create an isolated spell-color store (primarily for tests) |
+| `Get(scope?)` | Return the shared spell-color store for a scope |
 
-The spell-color settings canvas (`UI/BuffBarsOptions.lua`) merges persisted and discovered keys into one list, enables `Reconcile` and `Remove Stale` only when a row is still missing one or more identifiers, and lets `Remove Stale` confirmed-delete incomplete entries from both the current-spec stores and the runtime discovered-key cache while echoing each removal to chat.
+Store methods (`SpellColors.Get(scope):...`):
+
+| Method | Description |
+|--------|-------------|
+| `GetColorByKey(key)` | Get a custom color for a spell within that store's scope |
+| `GetColorForBar(frame)` | Get a custom color for a BuffBars / ExternalBars row |
+| `SetColorByKey(key, color)` | Set a custom color for a spell within that store's scope |
+| `ResetColorByKey(key)` | Remove a custom color entry |
+| `GetAllColorEntries()` | Return deduplicated color entries for the current class/spec in that store's scope |
+| `GetDefaultColor()` | Return the default color for the current class/spec in that store's scope |
+| `SetDefaultColor(color)` | Set the default color for the current class/spec in that store's scope |
+| `ReconcileAllKeys(keys)` | Batch-reconcile keys within that store's scope (propagate most-recent across tiers) |
+| `RemoveEntriesByKeys(keys)` | Remove matching persisted and discovered spell-color keys within that store's scope |
+| `DiscoverBar(frame)` | Register a discovered bar key within that store's scope |
+| `ClearDiscoveredKeys()` | Clear the discovered-key cache for that store's scope |
+| `ClearCurrentSpecColors()` | Clear all colors for the current class/spec in that store's scope |
+| `_SetConfigAccessor(accessor)` | Private test-only override for swapping the config source after construction |
+
+The spell-color settings page (`UI/SpellColorsPage.lua`) renders one shared multi-section canvas. Each section merges persisted and discovered keys for its own scope, enables `Reconcile` and `Remove Stale` only when a row is still missing one or more identifiers, and lets `Remove Stale` confirmed-delete incomplete entries from both the current-spec stores and the runtime discovered-key cache while echoing each removal to chat.
+
+### SpellColorsPage (`UI/SpellColorsPage.lua`)
+
+Shared settings-page builder for spell colors. BuffBars and ExternalBars both register sections into the same page rather than owning duplicate subcategories.
+
+| Method | Description |
+|--------|-------------|
+| `RegisterSection(section)` | Register or update a spell-color section (`key`, `label`, `scope`, `isDisabledDelegate`, `ownerModuleName`) |
+| `CreateSectionDisabledDelegate(configPath, ownerModuleName)` | Create the disabled predicate used by a section |
+| `CreatePage(subcatName)` | Return the shared multi-section page spec used by options registration |
+| `SetRegisteredPage(page)` | Cache the live page handle so runtime changes can refresh it |
 
 ### ClassUtil (`ns.ClassUtil`)
 

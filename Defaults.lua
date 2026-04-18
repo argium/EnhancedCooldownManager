@@ -15,6 +15,10 @@ local _, ns = ...
 ---@field x number X offset from anchor.
 ---@field y number Y offset from anchor.
 
+---@alias ns.Constants.ANCHORMODE_CHAIN "chain"
+---@alias ns.Constants.ANCHORMODE_DETACHED "detached"
+---@alias ns.Constants.ANCHORMODE_FREE "free"
+
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
 ---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
@@ -85,7 +89,7 @@ local _, ns = ...
 ---@field byCooldownID table<number, table<number, table<number, table>>> Per-cooldownID colors by class/spec/cooldownID.
 ---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
----@field defaultColor ECM_Color Default color for buff bars.
+---@field defaultColor ECM_Color Default color when no per-spell override applies.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
@@ -97,6 +101,22 @@ local _, ns = ...
 ---@field overrideFont boolean|nil Whether aura bars override global font settings.
 ---@field font string|nil Font face override for aura bar text.
 ---@field fontSize number|nil Font size override for aura bar text.
+---@field colors ECM_SpellColorsConfig Per-spell color settings.
+
+---@class ECM_ExternalBarsConfig External cooldown bars configuration.
+---@field enabled boolean Whether external cooldown bars are enabled.
+---@field hideOriginalIcons boolean Whether Blizzard's original external cooldown icons are hidden.
+---@field anchorMode ns.Constants.ANCHORMODE_CHAIN|ns.Constants.ANCHORMODE_DETACHED|ns.Constants.ANCHORMODE_FREE|nil Anchor behavior for external cooldown bars.
+---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
+---@field width number|nil Bar width override.
+---@field height number|nil Bar height override.
+---@field verticalSpacing number|nil Vertical gap between bars (pixels).
+---@field showIcon boolean|nil Whether to show external cooldown icons.
+---@field showSpellName boolean|nil Whether to show spell names.
+---@field showDuration boolean|nil Whether to show durations.
+---@field overrideFont boolean|nil Whether external cooldown bars override global font settings.
+---@field font string|nil Font face override for bar text.
+---@field fontSize number|nil Font size override for bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
 ---@class ECM_ExtraIconEntry
@@ -134,6 +154,7 @@ local _, ns = ...
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
+---@field externalBars ECM_ExternalBarsConfig External cooldown bars configuration.
 ---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
 
 local C = ns.Constants
@@ -274,6 +295,27 @@ local defaults = {
                 byTexture = {},
                 cache = {},
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
+            },
+        },
+        externalBars = {
+            enabled = false,
+            hideOriginalIcons = false,
+            anchorMode = C.ANCHORMODE_CHAIN,
+            editModePositions = {},
+            width = C.DEFAULT_BAR_WIDTH,
+            height = 0,
+            verticalSpacing = 0,
+            showIcon = true,
+            showSpellName = true,
+            showDuration = true,
+            overrideFont = false,
+            colors = {
+                byName = {},
+                bySpellID = {},
+                byCooldownID = {},
+                byTexture = {},
+                cache = {},
+                defaultColor = { r = 0.40, g = 0.78, b = 0.95, a = 1 },
             },
         },
         extraIcons = {

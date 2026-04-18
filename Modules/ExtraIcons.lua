@@ -34,6 +34,8 @@ local VIEWER_REGISTRY = {
     main    = { blizzFrameKey = "EssentialCooldownViewer" },
 }
 
+-- Keep main first: utility may reuse the current pass's main viewer offset when
+-- its cached Blizzard anchor is not relative to the main viewer.
 local VIEWER_ORDER = { "main", "utility" }
 
 local function cacheOriginalPoint(viewerState, blizzFrame)
@@ -424,6 +426,15 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
     local container = vs.container
     cacheOriginalPoint(vs, blizzFrame)
 
+    local sharedOffsetX = 0
+    if viewerKey == "utility" and vs.originalPoint then
+        local mainBlizzFrame = _G[VIEWER_REGISTRY.main.blizzFrameKey]
+        local isAnchoredToMainViewer = mainBlizzFrame and vs.originalPoint[2] == mainBlizzFrame or false
+        if not isAnchoredToMainViewer then
+            sharedOffsetX = self._mainViewerOffsetX or 0
+        end
+    end
+
     -- Resolve entries to displayable items
     local items
     if not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0 then
@@ -434,7 +445,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
 
     if #items == 0 then
         -- Restore viewer position and hide container
-        applyViewerPoint(vs, blizzFrame)
+        applyViewerPoint(vs, blizzFrame, sharedOffsetX)
         if isEditing then
             vs.originalPoint = nil
         end
@@ -497,7 +508,10 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing)
     local activeContentWidth = numActiveViewerIcons * iconSize + math.max(0, numActiveViewerIcons - 1) * spacing
     local viewerWidth = numActiveViewerIcons > 0 and blizzFrame:GetWidth() or 0
     local viewerOffsetX = (viewerWidth - activeContentWidth - spacing - totalWidth * viewerScale) / 2
-    applyViewerPoint(vs, blizzFrame, viewerOffsetX)
+    if viewerKey == "main" then
+        self._mainViewerOffsetX = viewerOffsetX
+    end
+    applyViewerPoint(vs, blizzFrame, sharedOffsetX + viewerOffsetX)
 
     -- Position and configure each icon
     local borderScale = ns.Constants.EXTRA_ICON_BORDER_SCALE
@@ -544,6 +558,8 @@ function ExtraIcons:UpdateLayout(why)
     if not self.InnerFrame or not self._viewers then
         return false
     end
+
+    self._mainViewerOffsetX = 0
 
     local shouldShow = self:ShouldShow()
     local moduleConfig = self:GetModuleConfig()
@@ -780,5 +796,6 @@ function ExtraIcons:OnDisable()
         end
     end
     self._isEditModeActive = nil
+    self._mainViewerOffsetX = nil
     self._trackedEquipSlots = nil
 end

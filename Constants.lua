@@ -14,6 +14,7 @@ local constants = {
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
+    EXTERNALBARS = "ExternalBars",
     EXTRAICONS = "ExtraIcons",
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
@@ -27,6 +28,8 @@ local constants = {
     EDIT_MODE_DEFAULT_POINT = "CENTER",
     GROW_DIRECTION_DOWN = "down",
     GROW_DIRECTION_UP = "up",
+    SCOPE_BUFFBARS = "buffBars",
+    SCOPE_EXTERNALBARS = "externalBars",
 
     -- Shared visuals and defaults
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
@@ -275,7 +278,8 @@ local moduleConfigKeys = {
     [constants.POWERBAR] = "powerBar",
     [constants.RESOURCEBAR] = "resourceBar",
     [constants.RUNEBAR] = "runeBar",
-    [constants.BUFFBARS] = "buffBars",
+    [constants.BUFFBARS] = constants.SCOPE_BUFFBARS,
+    [constants.EXTERNALBARS] = constants.SCOPE_EXTERNALBARS,
     [constants.EXTRAICONS] = "extraIcons",
 }
 
@@ -285,9 +289,22 @@ function constants.ConfigKeyForModule(name)
     return moduleConfigKeys[name] or (name:sub(1, 1):lower() .. name:sub(2))
 end
 
-local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
+local chainOrder = {
+    constants.POWERBAR,
+    constants.RESOURCEBAR,
+    constants.RUNEBAR,
+    constants.BUFFBARS,
+    constants.EXTERNALBARS,
+}
 constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.EXTRAICONS }
+constants.MODULE_ORDER = {
+    constants.POWERBAR,
+    constants.RESOURCEBAR,
+    constants.RUNEBAR,
+    constants.BUFFBARS,
+    constants.EXTERNALBARS,
+    constants.EXTRAICONS,
+}
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.BUILTIN_STACKS = BUILTIN_STACKS

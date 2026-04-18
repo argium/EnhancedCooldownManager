@@ -11,9 +11,12 @@ describe("BuffBars real source", function()
     local BuffBarCooldownViewer
     local ns
     local makeFrame = TestHelpers.makeFrame
+    local makeTexture = TestHelpers.makeTexture
     local registerFrameCalls
     local unregisterFrameCalls
     local addMixinCalls
+    local spellColorStore
+    local spellColorGetScopes
     local timerCallbacks
 
     setup(function()
@@ -24,6 +27,9 @@ describe("BuffBars real source", function()
             "InCombatLockdown",
             "issecretvalue",
             "C_Timer",
+            "GetTime",
+            "CreateFrame",
+            "LibStub",
         })
     end)
 
@@ -34,10 +40,10 @@ describe("BuffBars real source", function()
     local makeHookableFrame = TestHelpers.makeHookableFrame
 
     local function stubChildLayoutEnvironment()
-        ns.SpellColors.GetColorForBar = function()
+        spellColorStore.GetColorForBar = function(_, _)
             return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
         end
-        ns.SpellColors.GetDefaultColor = function()
+        spellColorStore.GetDefaultColor = function(_)
             return { r = 1, g = 1, b = 1, a = 1 }
         end
         ns.ColorUtil = {
@@ -127,7 +133,18 @@ describe("BuffBars real source", function()
         registerFrameCalls = 0
         unregisterFrameCalls = 0
         addMixinCalls = 0
+        spellColorGetScopes = {}
         timerCallbacks = {}
+        spellColorStore = {
+            GetColorForBar = function()
+                return nil
+            end,
+            GetDefaultColor = function()
+                return { r = 1, g = 1, b = 1, a = 1 }
+            end,
+            ClearDiscoveredKeys = function() end,
+            DiscoverBar = function() end,
+        }
         ns = {
             Log = function() end,
             DebugAssert = function() end,
@@ -207,11 +224,13 @@ describe("BuffBars real source", function()
                         textureFileID = textureFileID,
                     }
                 end,
-                SetConfigAccessor = function() end,
-                ClearDiscoveredKeys = function() end,
-                DiscoverBar = function() end,
+                Get = function(scope)
+                    spellColorGetScopes[#spellColorGetScopes + 1] = scope
+                    return spellColorStore
+                end,
             },
             Runtime = {
+                ScheduleLayoutUpdate = function() end,
                 RegisterFrame = function()
                     registerFrameCalls = registerFrameCalls + 1
                 end,
@@ -223,6 +242,67 @@ describe("BuffBars real source", function()
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+
+        _G.GetTime = function()
+            return 0
+        end
+        _G.CreateFrame = function(_, name)
+            local frame = makeFrame({ name = name })
+            frame.CreateTexture = function()
+                return makeTexture()
+            end
+            frame.CreateFontString = function()
+                local fs = makeTexture()
+                fs.SetText = function() end
+                fs.SetJustifyH = function() end
+                fs.SetJustifyV = function() end
+                fs.SetPoint = function() end
+                return fs
+            end
+            frame.SetFrameStrata = function() end
+            frame.SetFrameLevel = function() end
+            frame.GetFrameLevel = function()
+                return 1
+            end
+            frame.SetAllPoints = function() end
+            frame.SetMinMaxValues = function() end
+            frame.SetValue = function() end
+            frame.SetStatusBarTexture = function() end
+            frame.SetStatusBarColor = function() end
+            return frame
+        end
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupLibEditModeStub()
+        TestHelpers.LoadChunk("BarMixin.lua", "Unable to load BarMixin.lua")(nil, ns)
+        TestHelpers.LoadChunk("BarStyle.lua", "Unable to load BarStyle.lua")(nil, ns)
+        assert(ns.BarMixin, "BarMixin module did not initialize")
+        assert(ns.BarStyle, "BarStyle module did not initialize")
+        ns.BarMixin = {
+            FrameProto = {
+                ChainRightPoint = function(point, fallback)
+                    if point == "TOPLEFT" then
+                        return "TOPRIGHT"
+                    end
+                    if point == "BOTTOMLEFT" then
+                        return "BOTTOMRIGHT"
+                    end
+                    return fallback
+                end,
+                NormalizeGrowDirection = function(direction)
+                    return direction
+                end,
+                CalculateLayoutParams = function()
+                    return {}
+                end,
+                IsReady = function()
+                    return true
+                end,
+            },
+            AddFrameMixin = function(target)
+                addMixinCalls = addMixinCalls + 1
+                target.EnsureFrame = target.EnsureFrame or function() end
+            end,
+        }
 
         _G.UIParent = makeFrame({ name = "UIParent", width = 1920, height = 1080 })
         _G.hooksecurefunc = function(object, methodName, callback)
@@ -660,11 +740,11 @@ describe("BuffBars real source", function()
             return false
         end
         local secretColorRequested = false
-        ns.SpellColors.GetColorForBar = function()
+        spellColorStore.GetColorForBar = function()
             secretColorRequested = true
             return nil
         end
-        ns.SpellColors.GetDefaultColor = function()
+        spellColorStore.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
         ns.ColorUtil = {
@@ -768,16 +848,17 @@ describe("BuffBars real source", function()
         local cleared = 0
         local appliedTextures = {}
         local appliedColors = {}
-        ns.SpellColors.ClearDiscoveredKeys = function()
+        spellColorGetScopes = {}
+        spellColorStore.ClearDiscoveredKeys = function()
             cleared = cleared + 1
         end
-        ns.SpellColors.DiscoverBar = function(frame)
+        spellColorStore.DiscoverBar = function(_, frame)
             discovered[#discovered + 1] = frame
         end
-        ns.SpellColors.GetColorForBar = function()
+        spellColorStore.GetColorForBar = function()
             return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
         end
-        ns.SpellColors.GetDefaultColor = function()
+        spellColorStore.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
         ns.ColorUtil = {
@@ -849,6 +930,10 @@ describe("BuffBars real source", function()
         assert.is_true(result)
         assert.are.equal(1, cleared)
         assert.same({ second, first }, discovered)
+        assert.is_true(#spellColorGetScopes > 0)
+        for _, scope in ipairs(spellColorGetScopes) do
+            assert.are.equal(ns.Constants.SCOPE_BUFFBARS, scope)
+        end
         assert.is_true(first.__ecmHooked)
         assert.is_true(second.__ecmHooked)
         assert.are.equal(2, #appliedTextures)
@@ -857,11 +942,11 @@ describe("BuffBars real source", function()
     end)
 
     it("clears _layoutRunning even when styleChildFrame throws", function()
-        ns.SpellColors.DiscoverBar = function() end
-        ns.SpellColors.GetColorForBar = function()
+        spellColorStore.DiscoverBar = function() end
+        spellColorStore.GetColorForBar = function()
             error("simulated style error")
         end
-        ns.SpellColors.GetDefaultColor = function()
+        spellColorStore.GetDefaultColor = function()
             return { r = 1, g = 1, b = 1, a = 1 }
         end
         ns.ColorUtil = { ColorToHex = function() return "ffffff" end }
@@ -909,7 +994,7 @@ describe("BuffBars real source", function()
     -- Helper: runs a single child through UpdateLayout and returns it styled.
     local function layoutSingleChild(child, moduleConfig, globalConfig)
         stubChildLayoutEnvironment()
-        ns.SpellColors.DiscoverBar = function() end
+        spellColorStore.DiscoverBar = function() end
         function BuffBarCooldownViewer:GetChildren() return child end
         function BuffBars:ShouldShow() return true end
         function BuffBars:GetGlobalConfig() return globalConfig end
@@ -966,7 +1051,7 @@ describe("BuffBars real source", function()
             local child = makeStyledChild("BG", true, 1)
             local bgColor = { r = 0.1, g = 0.2, b = 0.3, a = 0.5 }
             stubChildLayoutEnvironment()
-            ns.SpellColors.DiscoverBar = function() end
+            spellColorStore.DiscoverBar = function() end
             ns.FrameUtil.GetBarBackground = function() return bgRegion end
             function BuffBarCooldownViewer:GetChildren() return child end
             function BuffBars:ShouldShow() return true end
@@ -985,7 +1070,11 @@ describe("BuffBars real source", function()
             local appliedColor
             local child = makeStyledChild("C", true, 1)
             stubChildLayoutEnvironment()
-            ns.SpellColors.DiscoverBar = function() end
+            spellColorGetScopes = {}
+            spellColorStore.DiscoverBar = function() end
+            spellColorStore.GetColorForBar = function()
+                return { r = 0.4, g = 0.5, b = 0.6, a = 1 }
+            end
             ns.FrameUtil.LazySetStatusBarColor = function(_, r, g, b, a)
                 appliedColor = { r, g, b, a }
             end
@@ -997,6 +1086,10 @@ describe("BuffBars real source", function()
 
             assert.is_not_nil(appliedColor)
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, appliedColor)
+            assert.is_true(#spellColorGetScopes > 0)
+            for _, scope in ipairs(spellColorGetScopes) do
+                assert.are.equal(ns.Constants.SCOPE_BUFFBARS, scope)
+            end
         end)
 
         it("schedules retry when all identifiers are secret", function()

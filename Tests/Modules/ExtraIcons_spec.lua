@@ -866,7 +866,6 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer.GetItemFrames = function()
             return { utilityActiveFrame }
         end
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
         local mainActiveFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
         mainActiveFrame.isActive = true
@@ -877,6 +876,7 @@ describe("ExtraIcons real source", function()
             return { mainActiveFrame }
         end
         EssentialCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+        UtilityCooldownViewer:SetPoint("LEFT", EssentialCooldownViewer, "RIGHT", 8, 0)
 
         inventoryItemBySlot[13] = 101
         inventoryTextureBySlot[13] = "trinket-1"
@@ -891,18 +891,26 @@ describe("ExtraIcons real source", function()
 
         assert.is_true(ExtraIcons:UpdateLayout("utility"))
 
-        local _, _, _, utilityBeforeX = UtilityCooldownViewer:GetPoint(1)
-        assert.are.equal(-13, utilityBeforeX)
+        local utilityBeforePoint, utilityBeforeRelativeTo, utilityBeforeRelativePoint, utilityBeforeX, utilityBeforeY = UtilityCooldownViewer:GetPoint(1)
+        assert.are.equal("LEFT", utilityBeforePoint)
+        assert.are.equal(EssentialCooldownViewer, utilityBeforeRelativeTo)
+        assert.are.equal("RIGHT", utilityBeforeRelativePoint)
+        assert.are.equal(-5, utilityBeforeX)
+        assert.are.equal(0, utilityBeforeY)
 
         config.viewers.utility = {}
         config.viewers.main = { { stackKey = "trinket1" } }
 
         assert.is_true(ExtraIcons:UpdateLayout("main"))
 
-        local _, _, _, utilityAfterX = UtilityCooldownViewer:GetPoint(1)
+        local utilityAfterPoint, utilityAfterRelativeTo, utilityAfterRelativePoint, utilityAfterX, utilityAfterY = UtilityCooldownViewer:GetPoint(1)
         local _, _, _, mainAfterX = EssentialCooldownViewer:GetPoint(1)
 
-        assert.are.equal(0, utilityAfterX)
+        assert.are.equal("LEFT", utilityAfterPoint)
+        assert.are.equal(EssentialCooldownViewer, utilityAfterRelativeTo)
+        assert.are.equal("RIGHT", utilityAfterRelativePoint)
+        assert.are.equal(8, utilityAfterX)
+        assert.are.equal(0, utilityAfterY)
         assert.are.equal(87, mainAfterX)
         assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
         assert.is_true(ExtraIcons._viewers.main.container:IsShown())

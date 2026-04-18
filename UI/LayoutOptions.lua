@@ -30,6 +30,7 @@ local powerBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
 local resourceBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
 local runeBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
 local buffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
+local externalBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("externalBars")
 
 local rows = {
     {
@@ -45,6 +46,7 @@ local rows = {
     createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", resourceBarDisabled),
     createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", runeBarDisabled),
     createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", buffBarsDisabled),
+    createAnchorModeSpec(L["EXTERNAL_BARS"], "externalBars.anchorMode", externalBarsDisabled),
     {
         type = "header",
         name = L["POSITION_MODE_ATTACHED"],

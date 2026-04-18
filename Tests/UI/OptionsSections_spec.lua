@@ -97,6 +97,12 @@ describe("Options root assembly", function()
         ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
         ns.ProfileOptions = placeholderSection("profile", ns.L["PROFILES"])
         ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
+        ns.SpellColorsPage = {
+            CreatePage = function(name)
+                return { key = "spellColors", name = name, rows = {} }
+            end,
+            SetRegisteredPage = function() end,
+        }
 
         assert.is_table(createdModule)
         createdModule:OnInitialize()
@@ -113,6 +119,7 @@ describe("Options root assembly", function()
             "runeBar",
             "buffBars",
             "extraIcons",
+            "spellColors",
             "profile",
             "advancedOptions",
         }) do

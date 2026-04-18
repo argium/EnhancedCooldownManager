@@ -417,6 +417,14 @@ function Runtime.SetLayoutPreview(active)
     Runtime.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
 end
 
+--- Returns the current alpha chosen by Runtime's fade logic.
+--- External viewers that are not enforced directly by Runtime can use this
+--- to restore themselves without hardcoding full opacity.
+---@return number
+function Runtime.GetDesiredAlpha()
+    return _desiredAlpha
+end
+
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
 local function executeLayout(reason)
     _layoutPending = false

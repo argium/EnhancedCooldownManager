@@ -382,6 +382,15 @@ describe("ECM.Runtime layout system", function()
             assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
         end)
 
+        it("reports the current desired alpha for external viewer restores", function()
+            makeRegisteredModule()
+            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(50)
+
+            ns.Runtime.ScheduleLayoutUpdate(0, "fade")
+
+            assert.are.equal(0.5, ns.Runtime.GetDesiredAlpha())
+        end)
+
         it("does not fade in a delve when instance exceptions are enabled", function()
             local mod = makeRegisteredModule()
             local fadeConfig = makeFadeConfig(50)

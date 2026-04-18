@@ -300,4 +300,46 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_nil(page._builder)
         assert.is_nil(page._root)
     end)
+
+    it("registers declarative pageActions rows", function()
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            name = "Main",
+                            rows = {
+                                {
+                                    id = "actions",
+                                    type = "pageActions",
+                                    name = "Spell Colors",
+                                    attachToCategoryHeader = false,
+                                    hideTitle = false,
+                                    actions = {
+                                        {
+                                            text = "Reset",
+                                            onClick = function() end,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+        local page = assert(sb:GetPage("general", "main"))
+        local initializers = assert(page._category:GetLayout())._initializers
+        local initializer = assert(initializers[1])
+        local data = initializer:GetData()
+
+        assert.are.equal("pageActions", data._lsbKind)
+        assert.are.equal("Spell Colors", data.name)
+        assert.is_false(data.attachToCategoryHeader)
+        assert.is_false(data.hideTitle)
+        assert.are.equal("Reset", data.actions[1].text)
+    end)
 end)

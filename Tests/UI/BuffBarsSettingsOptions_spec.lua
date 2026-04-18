@@ -52,6 +52,7 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         ns.Addon.ConfirmReloadUI = function(_, _, cb) if cb then cb() end end
 
         settings = TestHelpers.CollectSettings(function()
+            TestHelpers.LoadChunk("UI/SpellColorsPage.lua", "SpellColorsPage")(nil, ns)
             TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "BuffBarsOptions")(nil, ns)
             TestHelpers.RegisterSectionSpec(SB, ns.BuffBarsOptions)
             capturedPage = ns.BuffBarsOptions.pages[1]

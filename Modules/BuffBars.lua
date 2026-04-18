@@ -6,8 +6,15 @@ local _, ns = ...
 local BarMixin = ns.BarMixin
 local FrameUtil = ns.FrameUtil
 local ChainRightPoint = BarMixin.FrameProto.ChainRightPoint
+local StyleChildBar = ns.BarStyle.StyleChildBar
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
+
+local SPELL_COLOR_SCOPE = ns.Constants.SCOPE_BUFFBARS
+
+local function getSpellColors()
+    return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
+end
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
@@ -49,228 +56,12 @@ local function getChildrenOrdered(viewer)
     return result
 end
 
---- Strips circular masks and hides overlay/border to produce a square icon.
---- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
---- frame via `__ecmSquareStyled` so it only runs once per icon frame.
----@param iconFrame Frame|nil
----@param iconTexture Texture|nil
----@param iconOverlay Texture|nil
----@param debuffBorder Texture|nil
-local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffBorder)
-    if not iconFrame or iconFrame.__ecmSquareStyled or not iconTexture then
-        return
-    end
-
-    iconTexture:SetTexCoord(0, 1, 0, 1)
-
-    -- Remove circular masks from the icon texture
-    if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
-        for i = (iconTexture:GetNumMaskTextures() or 0), 1, -1 do
-            local mask = iconTexture:GetMaskTexture(i)
-            if mask then
-                iconTexture:RemoveMaskTexture(mask)
-                if mask.Hide then mask:Hide() end
-            end
-        end
-    elseif iconTexture.SetMask then
-        pcall(iconTexture.SetMask, iconTexture, nil)
-    end
-
-    -- Remove mask regions from the icon frame
-    if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
-        for _, region in ipairs({ iconFrame:GetRegions() }) do
-            if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
-                pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                if region.Hide then region:Hide() end
-            end
-        end
-    end
-
-    if iconOverlay then iconOverlay:Hide() end
-    if debuffBorder then debuffBorder:Hide() end
-
-    iconFrame.__ecmSquareStyled = true
-end
-
-local function styleBarHeight(frame, bar, iconFrame, config, globalConfig)
-    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
-    if height <= 0 then
-        return
-    end
-    FrameUtil.LazySetHeight(frame, height)
-    FrameUtil.LazySetHeight(bar, height)
-    if iconFrame then
-        FrameUtil.LazySetHeight(iconFrame, height)
-        FrameUtil.LazySetWidth(iconFrame, height)
-    end
-end
-
-local function styleBarBackground(frame, barBG, config, globalConfig)
-    if not barBG then
-        return
-    end
-
-    -- One-time setup: reparent BarBG to the outer frame and hook SetPoint
-    -- so Blizzard cannot override our anchors. SetAllPoints does not fire
-    -- SetPoint hooks, so no re-entrancy guard is needed.
-    if not barBG.__ecmBGHooked then
-        barBG.__ecmBGHooked = true
-        barBG:SetParent(frame)
-        hooksecurefunc(barBG, "SetPoint", function()
-            barBG:ClearAllPoints()
-            barBG:SetAllPoints(frame)
-        end)
-    end
-
-    local bgColor = (config and config.bgColor)
-        or (globalConfig and globalConfig.barBgColor)
-        or ns.Constants.COLOR_BLACK
-    barBG:SetTexture(ns.Constants.FALLBACK_TEXTURE)
-    barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
-    barBG:ClearAllPoints()
-    barBG:SetAllPoints(frame)
-    barBG:SetDrawLayer("BACKGROUND", 0)
-end
-
---- Resolves the spell color for a bar, handling secret values with retry.
---- Returns true if the module's _editLocked flag was set by this call.
-local function styleBarColor(module, frame, bar, globalConfig, retryCount)
-    local textureName = globalConfig and globalConfig.texture
-    FrameUtil.LazySetStatusBarTexture(bar, FrameUtil.GetTexture(textureName))
-
-    local barColor = ns.SpellColors.GetColorForBar(frame)
-    local spellName = bar.Name and bar.Name.GetText and bar.Name:GetText()
-    local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
-    local cooldownID = frame.cooldownID
-    local textureFileID = FrameUtil.GetIconTextureFileID(frame)
-
-    -- When in a raid instance, and after exiting combat, all identifying
-    -- values may remain secret.  Lock editing only when every key is
-    -- unusable.  With four tiers (name, spellID, cooldownID, texture)
-    -- the colour lookup is much more resilient to partial secrecy.
-    local allSecret = issecretvalue(spellName)
-        and issecretvalue(spellID)
-        and issecretvalue(cooldownID)
-        and issecretvalue(textureFileID)
-    module._editLocked = module._editLocked or allSecret
-
-    if allSecret and not InCombatLockdown() then
-        if retryCount < 3 then
-            if frame._ecmColorRetryTimer then
-                frame._ecmColorRetryTimer:Cancel()
-            end
-            frame._ecmColorRetryTimer = C_Timer.NewTimer(1, function()
-                frame._ecmColorRetryTimer = nil
-                styleBarColor(module, frame, bar, globalConfig, retryCount + 1)
-            end)
-            -- Don't apply any colour while retries are pending — preserve
-            -- the bar's existing colour rather than clobbering it with the
-            -- default while we wait for secrets to clear.
-            return
-        elseif ns.IsDebugEnabled() and not module._warned then
-            ns.Log(ns.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
-            module._warned = true
-        end
-    end
-
-    if frame._ecmColorRetryTimer then
-        frame._ecmColorRetryTimer:Cancel()
-        frame._ecmColorRetryTimer = nil
-    end
-
-    if barColor == nil and not allSecret then
-        barColor = ns.SpellColors.GetDefaultColor()
-    end
-    if barColor then
-        FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
-    end
-end
-
-local function styleBarIcon(frame, iconFrame, config)
-    local showIcon = config and config.showIcon ~= false
-
-    if iconFrame then
-        FrameUtil.LazySetAnchors(iconFrame, {
-            { "TOPLEFT", frame, "TOPLEFT", 0, 0 },
-        })
-        local iconTexture = FrameUtil.GetIconTexture(frame)
-        local iconOverlay = FrameUtil.GetIconOverlay(frame)
-        applySquareIconStyle(iconFrame, iconTexture, iconOverlay, frame.DebuffBorder)
-        iconFrame:SetShown(showIcon)
-        if iconTexture then
-            iconTexture:SetShown(showIcon)
-        end
-    end
-
-    if frame.DebuffBorder then
-        FrameUtil.LazySetAlpha(frame.DebuffBorder, 0)
-        frame.DebuffBorder:Hide()
-    end
-    if iconFrame and iconFrame.Applications then
-        FrameUtil.LazySetAlpha(iconFrame.Applications, showIcon and 1 or 0)
-    end
-end
-
-local function styleBarAnchors(frame, bar, iconFrame, config)
-    local showSpellName = config and config.showSpellName ~= false
-    local showDuration = config and config.showDuration ~= false
-    if bar.Name then
-        bar.Name:SetShown(showSpellName)
-    end
-    if bar.Duration then
-        bar.Duration:SetShown(showDuration)
-    end
-
-    local iconVisible = iconFrame and iconFrame:IsShown()
-    local barLeftAnchor = iconVisible and iconFrame or frame
-    local barLeftPoint = iconVisible and "TOPRIGHT" or "TOPLEFT"
-    FrameUtil.LazySetAnchors(bar, {
-        { "TOPLEFT", barLeftAnchor, barLeftPoint, 0, 0 },
-        { "TOPRIGHT", frame, "TOPRIGHT", 0, 0 },
-    })
-
-    FrameUtil.LazySetAnchors(bar.Name, {
-        { "LEFT", bar, "LEFT", ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
-        { "RIGHT", bar, "RIGHT", -ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
-    })
-
-    if bar.Duration then
-        FrameUtil.LazySetAnchors(bar.Duration, {
-            { "RIGHT", bar, "RIGHT", -ns.Constants.BUFFBARS_TEXT_PADDING, 0 },
-        })
-    end
-end
-
---- Applies all sizing, styling, visibility, and anchoring to a single buff bar
---- child frame. Lazy setters ensure no-ops when values haven't changed.
-local function styleChildFrame(module, frame, config, globalConfig)
-    if not (frame and frame.__ecmHooked) then
-        ns.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
-        return
-    end
-
-    local bar = frame.Bar
-    local iconFrame = frame.Icon
-
-    styleBarHeight(frame, bar, iconFrame, config, globalConfig)
-
-    bar.Pip:Hide()
-    bar.Pip:SetTexture(nil)
-
-    styleBarBackground(frame, FrameUtil.GetBarBackground(bar), config, globalConfig)
-    styleBarColor(module, frame, bar, globalConfig, 0)
-
-    FrameUtil.ApplyFont(bar.Name, globalConfig, config)
-    FrameUtil.ApplyFont(bar.Duration, globalConfig, config)
-
-    styleBarIcon(frame, iconFrame, config)
-    styleBarAnchors(frame, bar, iconFrame, config)
-end
-
 local function hookChildFrame(child, module)
     if child.__ecmHooked then
         return
     end
+
+    local spellColors = getSpellColors()
 
     -- Hook various parts of the blizzard frames to ensure our modifications aren't removed or overridden.
     -- Each hook guards against _layoutRunning to prevent recursion from our lazy setters.
@@ -286,7 +77,7 @@ local function hookChildFrame(child, module)
         if cached then
             FrameUtil.LazySetAnchors(child, cached)
         end
-        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
+        StyleChildBar(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), spellColors)
         module._layoutRunning = nil
         ns.Runtime.RequestLayout("BuffBars:SetPoint:hook", { secondPass = true })
     end)
@@ -296,7 +87,7 @@ local function hookChildFrame(child, module)
             return
         end
         module._layoutRunning = true
-        styleChildFrame(module, child, module:GetModuleConfig(), module:GetGlobalConfig())
+        StyleChildBar(module, child, module:GetModuleConfig(), module:GetGlobalConfig(), spellColors)
         module._layoutRunning = nil
         ns.Runtime.RequestLayout("BuffBars:OnShow:child", { secondPass = true })
     end)
@@ -394,16 +185,17 @@ function BuffBars:UpdateLayout(why)
     local viewer = _G["BuffBarCooldownViewer"]
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
+    local spellColors = getSpellColors()
 
     if why == "PLAYER_SPECIALIZATION_CHANGED" or why == "ProfileChanged" then
-        ns.SpellColors.ClearDiscoveredKeys()
+        spellColors:ClearDiscoveredKeys()
     end
 
     -- Discover bars regardless of visibility so the spell colours options
     -- panel has the full list even when hidden (e.g. resting).
     local visibleChildren = getChildrenOrdered(viewer)
     for _, entry in ipairs(visibleChildren) do
-        ns.SpellColors.DiscoverBar(entry.frame)
+        spellColors:DiscoverBar(entry.frame)
     end
 
     if not self:ShouldShow() then
@@ -461,7 +253,7 @@ function BuffBars:UpdateLayout(why)
     local ok, err = pcall(function()
         for _, entry in ipairs(visibleChildren) do
             hookChildFrame(entry.frame, self)
-            styleChildFrame(self, entry.frame, cfg, globalConfig)
+            StyleChildBar(self, entry.frame, cfg, globalConfig, spellColors)
         end
 
         layoutBars(visibleChildren, viewer, growsUp, verticalSpacing)
@@ -556,10 +348,6 @@ end
 function BuffBars:OnEnable()
     self._warned = false
 
-    ns.SpellColors.SetConfigAccessor(function()
-        return self:GetModuleConfig()
-    end)
-
     self:EnsureFrame()
     ns.Runtime.RegisterFrame(self)
 
@@ -575,7 +363,6 @@ function BuffBars:OnEnable()
 end
 
 function BuffBars:OnDisable()
-    ns.SpellColors.SetConfigAccessor(nil)
     self:UnregisterAllEvents()
     ns.Runtime.UnregisterFrame(self)
 end

@@ -198,6 +198,18 @@ describe("BarMixin", function()
         end)
     end)
 
+    it("exports shared child-bar styling helpers", function()
+        TestHelpers.LoadChunk("BarStyle.lua", "Unable to load BarStyle.lua")(nil, ns)
+        local BarStyle = assert(ns.BarStyle, "BarStyle module did not initialize")
+        assert.is_function(BarStyle.ApplySquareIconStyle)
+        assert.is_function(BarStyle.StyleBarHeight)
+        assert.is_function(BarStyle.StyleBarBackground)
+        assert.is_function(BarStyle.StyleBarColor)
+        assert.is_function(BarStyle.StyleBarIcon)
+        assert.is_function(BarStyle.StyleBarAnchors)
+        assert.is_function(BarStyle.StyleChildBar)
+    end)
+
     describe("tick helpers", function()
         local function makeTick()
             return {

@@ -9,6 +9,7 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
+local applyCanvasState = internal.applyCanvasState
 local applyEmbedCanvasFrame = internal.applyEmbedCanvasFrame
 local applyHeaderFrame = internal.applyHeaderFrame
 local applyInfoRowFrame = internal.applyInfoRowFrame
@@ -44,15 +45,31 @@ function lib.PageActions(self, spec)
     local categoryName = self._subcategoryNames[category]
         or (category == self._rootCategory and self._rootCategoryName)
         or ""
+    local attachToCategoryHeader = spec.attachToCategoryHeader ~= false
+    local hideTitle = spec.hideTitle
+    if hideTitle == nil then
+        hideTitle = attachToCategoryHeader
+    end
     local initializer = createCustomListRowInitializer("SettingsListElementTemplate", {
         _lsbKind = "pageActions",
         name = spec.name or categoryName,
         actions = spec.actions,
-        hideTitle = true,
-        attachToCategoryHeader = true,
-    }, spec.height or 1, applyHeaderFrame)
+        hideTitle = hideTitle,
+        attachToCategoryHeader = attachToCategoryHeader,
+    }, spec.height or (attachToCategoryHeader and 1 or 28), applyHeaderFrame)
+
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            applyCanvasState(self, activeFrame, enabled)
+        end
+    end
+
     initializer._lsbRefreshFrame = function(frame)
         applyHeaderFrame(frame, initializer:GetData())
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
     end
     initializer._lsbResetFrame = hideHeaderActionButtons
     return internal.addLayoutInitializer(self, spec, initializer, true)
