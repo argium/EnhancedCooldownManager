@@ -1,6 +1,6 @@
 # Enhanced Cooldown Manager by Argium
 
-Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.** It adds a mana/power bar and resource bar, extra icons for potions, and supports per-spell color and customisation for aura bars. Modular design allow each part to be attached to the CDM or detached and freely placed.
+Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.** It adds a mana/power bar and resource bar, extra icons for potions, and supports per-spell color and customisation for aura bars. Its modular design allows each part to be attached to the CDM or detached and freely placed.
 
 Made with ❤️, with little features you won't want to live without.
 

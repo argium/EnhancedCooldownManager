@@ -1161,7 +1161,7 @@ end
 _migrations[12] = function(profile)
     local old = profile.itemIcons
     if type(old) ~= "table" then
-        log("V12 no itemIcons section found; seeding default extraIcons")
+        log("V12 no itemIcons section found; ensuring default extraIcons")
         profile.extraIcons = profile.extraIcons or {
             enabled = true,
             viewers = {

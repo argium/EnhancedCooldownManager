@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ns.Constants
 local FrameUtil = ns.FrameUtil
 
 --------------------------------------------------------------------------------
@@ -62,7 +61,11 @@ end
 ---@param config table|nil
 ---@param globalConfig table|nil
 local function styleBarHeight(frame, bar, iconFrame, config, globalConfig)
-    local height = (config and config.height) or (globalConfig and globalConfig.barHeight) or 15
+    assert(frame ~= nil, "BarStyle.styleBarHeight requires a frame")
+    assert(bar ~= nil, "BarStyle.styleBarHeight requires a bar")
+
+    local height = (config and config.height) or (globalConfig and globalConfig.barHeight)
+    assert(type(height) == "number", "BarStyle.styleBarHeight requires config.height or globalConfig.barHeight")
     if height <= 0 then
         return
     end
@@ -79,6 +82,8 @@ end
 ---@param config table|nil
 ---@param globalConfig table|nil
 local function styleBarBackground(frame, barBG, config, globalConfig)
+    assert(frame ~= nil, "BarStyle.styleBarBackground requires a frame")
+
     if not barBG then
         return
     end
@@ -97,7 +102,7 @@ local function styleBarBackground(frame, barBG, config, globalConfig)
 
     local bgColor = (config and config.bgColor)
         or (globalConfig and globalConfig.barBgColor)
-        or ns.Constants.COLOR_BLACK
+    assert(bgColor ~= nil, "BarStyle.styleBarBackground requires config.bgColor or globalConfig.barBgColor")
     barBG:SetTexture(ns.Constants.FALLBACK_TEXTURE)
     barBG:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a)
     barBG:ClearAllPoints()
@@ -111,16 +116,21 @@ end
 ---@param frame ECM_BuffBarMixin|Frame
 ---@param bar StatusBar
 ---@param globalConfig table|nil
----@param spellColors ECM_SpellColorStore|nil
+---@param spellColors ECM_SpellColorStore
 ---@param retryCount number|nil
 ---@return boolean|nil
 local function styleBarColor(module, frame, bar, globalConfig, spellColors, retryCount)
-    local resolvedSpellColors = spellColors or ns.SpellColors.Get(C.SCOPE_BUFFBARS)
+    assert(module ~= nil, "BarStyle.styleBarColor requires a module")
+    assert(type(module.Name) == "string" and module.Name ~= "", "BarStyle.styleBarColor requires module.Name")
+    assert(frame ~= nil, "BarStyle.styleBarColor requires a frame")
+    assert(bar ~= nil, "BarStyle.styleBarColor requires a bar")
+    assert(spellColors ~= nil, "BarStyle.styleBarColor requires an explicit spellColors store")
+
     local currentRetryCount = retryCount or 0
     local textureName = globalConfig and globalConfig.texture
     FrameUtil.LazySetStatusBarTexture(bar, FrameUtil.GetTexture(textureName))
 
-    local barColor = resolvedSpellColors:GetColorForBar(frame)
+    local barColor = spellColors:GetColorForBar(frame)
     local spellName = bar.Name and bar.Name.GetText and bar.Name:GetText()
     local spellID = frame.cooldownInfo and frame.cooldownInfo.spellID
     local cooldownID = frame.cooldownID
@@ -143,14 +153,14 @@ local function styleBarColor(module, frame, bar, globalConfig, spellColors, retr
             end
             frame._ecmColorRetryTimer = C_Timer.NewTimer(1, function()
                 frame._ecmColorRetryTimer = nil
-                styleBarColor(module, frame, bar, globalConfig, resolvedSpellColors, currentRetryCount + 1)
+                styleBarColor(module, frame, bar, globalConfig, spellColors, currentRetryCount + 1)
             end)
             -- Don't apply any colour while retries are pending — preserve
             -- the bar's existing colour rather than clobbering it with the
             -- default while we wait for secrets to clear.
             return nil
         elseif ns.IsDebugEnabled() and not module._warned then
-            ns.Log(ns.Constants.BUFFBARS, "All identifying keys are secret outside of combat.")
+            ns.Log(module.Name, "All identifying keys are secret outside of combat.")
             module._warned = true
         end
     end
@@ -161,7 +171,7 @@ local function styleBarColor(module, frame, bar, globalConfig, spellColors, retr
     end
 
     if barColor == nil and not allSecret then
-        barColor = resolvedSpellColors:GetDefaultColor()
+        barColor = spellColors:GetDefaultColor()
     end
     if barColor then
         FrameUtil.LazySetStatusBarColor(bar, barColor.r, barColor.g, barColor.b, 1.0)
@@ -174,6 +184,8 @@ end
 ---@param iconFrame Frame|nil
 ---@param config table|nil
 local function styleBarIcon(frame, iconFrame, config)
+    assert(frame ~= nil, "BarStyle.styleBarIcon requires a frame")
+
     local showIcon = config and config.showIcon ~= false
 
     if iconFrame then
@@ -203,6 +215,10 @@ end
 ---@param iconFrame Frame|nil
 ---@param config table|nil
 local function styleBarAnchors(frame, bar, iconFrame, config)
+    assert(frame ~= nil, "BarStyle.styleBarAnchors requires a frame")
+    assert(bar ~= nil, "BarStyle.styleBarAnchors requires a bar")
+    assert(bar.Name ~= nil, "BarStyle.styleBarAnchors requires bar.Name")
+
     local showSpellName = config and config.showSpellName ~= false
     local showDuration = config and config.showDuration ~= false
     if bar.Name then
@@ -238,15 +254,18 @@ end
 ---@param frame ECM_BuffBarMixin|Frame
 ---@param config table|nil
 ---@param globalConfig table|nil
----@param spellColors ECM_SpellColorStore|nil
+---@param spellColors ECM_SpellColorStore
 local function styleChildBar(module, frame, config, globalConfig, spellColors)
-    if not (frame and frame.__ecmHooked) then
-        ns.DebugAssert(false, "Attempted to style a child frame that wasn't hooked.")
-        return
-    end
+    assert(module ~= nil, "BarStyle.styleChildBar requires a module")
+    assert(frame ~= nil, "BarStyle.styleChildBar requires a frame")
+    assert(frame.__ecmHooked, "Attempted to style a child frame that wasn't hooked.")
+    assert(spellColors ~= nil, "BarStyle.styleChildBar requires an explicit spellColors store")
 
-    local bar = frame.Bar
+    local bar = assert(frame.Bar, "BarStyle.styleChildBar requires frame.Bar")
     local iconFrame = frame.Icon
+    assert(bar.Pip ~= nil, "BarStyle.styleChildBar requires bar.Pip")
+    assert(bar.Name ~= nil, "BarStyle.styleChildBar requires bar.Name")
+    assert(bar.Duration ~= nil, "BarStyle.styleChildBar requires bar.Duration")
 
     styleBarHeight(frame, bar, iconFrame, config, globalConfig)
 

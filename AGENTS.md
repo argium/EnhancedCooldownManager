@@ -36,6 +36,7 @@ luacheck . -q
 - Target WoW Lua 5.1; do not use post-5.1 features such as `goto`, labels, or `//`.
 - Do not add compatibility shims for built-ins already present in WoW. If a shim exists only for `busted`, document that.
 - Do not nil-check or wrap built-ins such as `issecretvalue`, `issecrettable`, or `canaccesstable`.
+- Prefer assertions for required parameters over guards and fallbacks. This prevents unexpected states from propogating deeper in to the system.
 
 ## Config, Events, and State
 
