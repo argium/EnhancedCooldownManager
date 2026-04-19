@@ -403,6 +403,11 @@ describe("BuffBarsOptions", function()
         return row.items()
     end
 
+    local function getSpellColorActions(spellColorsSpec)
+        local row = assert(getSpellColorsRow(spellColorsSpec, "spellColorsPageActions"))
+        return assert(row.actions)
+    end
+
     local function getItemLabels(items)
         local labels = {}
         for _, item in ipairs(items or {}) do
@@ -413,7 +418,7 @@ describe("BuffBarsOptions", function()
 
     it("does not add the old configure spell colors shortcut to aura bars", function()
         local buttonRows = {}
-        for _, row in ipairs(BuffBarsOptions.pages[1].rows) do
+        for _, row in ipairs(BuffBarsOptions.pages[1].rows) doy
             if row.type == "button" then
                 buttonRows[#buttonRows + 1] = row
             end
@@ -433,19 +438,20 @@ describe("BuffBarsOptions", function()
         end
 
         assert.same({
-            "buffBarsSpellColorsPageActions",
+            "spellColorsPageActions",
             "spellColorsDescription",
+            "buffBarsSpellColorsHeader",
             "buffBarsSpellColorsWarning",
             "buffBarsSpellColorCollection",
             "buffBarsSecretNameDescription",
-            "externalBarsSpellColorsPageActions",
+            "externalBarsSpellColorsHeader",
             "externalBarsSpellColorsWarning",
             "externalBarsSpellColorCollection",
             "externalBarsSecretNameDescription",
         }, rowIDs)
     end)
 
-    it("keeps a single action set per spell color section", function()
+    it("keeps a single shared action set on the spell colors page", function()
         local spellColorsSpec = registerSpellColorsSpec()
         local actionRowCount = 0
 
@@ -455,7 +461,9 @@ describe("BuffBarsOptions", function()
             end
         end
 
-        assert.are.equal(2, actionRowCount)
+        assert.are.equal(1, actionRowCount)
+        assert.is_not_nil(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorsHeader"))
+        assert.is_not_nil(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsHeader"))
         assert.is_nil(assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorCollection")).onDefault)
         assert.is_nil(assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorCollection")).onDefault)
     end)
@@ -562,7 +570,7 @@ describe("BuffBarsOptions", function()
         assert.are.same(pickedEntryColor, ExternalSpellColors:GetColorByKey(externalKey))
     end)
 
-    it("enables reconcile and remove-stale actions per section state", function()
+    it("enables the shared reconcile and remove-stale actions when any editable section needs them", function()
         BuffSpellColors:SetColorByKey(SpellColors.MakeKey("Buff Incomplete", 258920, nil, nil), {
             r = 0.2, g = 0.3, b = 0.4, a = 1,
         })
@@ -576,23 +584,21 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local buffActions = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorsPageActions")).actions
-        local externalActions = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsPageActions")).actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
-        assert.is_true(buffActions[1].enabled())
-        assert.is_true(buffActions[2].enabled())
-        assert.is_false(externalActions[1].enabled())
-        assert.is_false(externalActions[2].enabled())
+        assert.is_true(actions[1].enabled())
+        assert.is_true(actions[2].enabled())
 
-        buffActions[1].onClick()
+        actions[1].onClick()
 
         assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
     end)
 
-    it("reset action clears only the targeted section", function()
+    it("shared reset clears all editable spell color sections", function()
         local buffKey = SpellColors.MakeKey("Buff Keep", 111, 222, 333)
         local externalKey = SpellColors.MakeKey("External Reset", 444, 555, 666)
         local buffDefaultColor = { r = 0.2, g = 0.3, b = 0.4, a = 1 }
+        local buffResetDefaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR
         local externalResetDefaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR
         local externalCustomDefaultColor = { r = 0.9, g = 0.8, b = 0.7, a = 1 }
 
@@ -602,18 +608,18 @@ describe("BuffBarsOptions", function()
         ExternalSpellColors:SetColorByKey(externalKey, { r = 0.6, g = 0.5, b = 0.4, a = 1 })
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local externalActions = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsPageActions")).actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
-        externalActions[3].onClick()
+        actions[3].onClick()
 
-        assert.are.same(buffDefaultColor, BuffSpellColors:GetDefaultColor())
+        assert.are.same(buffResetDefaultColor, BuffSpellColors:GetDefaultColor())
         assert.are.same(externalResetDefaultColor, ExternalSpellColors:GetDefaultColor())
-        assert.are.same({ r = 0.3, g = 0.4, b = 0.5, a = 1 }, BuffSpellColors:GetColorByKey(buffKey))
+        assert.is_nil(BuffSpellColors:GetColorByKey(buffKey))
         assert.is_nil(ExternalSpellColors:GetColorByKey(externalKey))
         assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
     end)
 
-    it("remove stale action clears only the targeted section", function()
+    it("shared remove stale action clears stale entries across editable sections", function()
         local buffKey = SpellColors.MakeKey("Buff Stale", 111, nil, nil)
         local externalKey = SpellColors.MakeKey("External Stale", 444, nil, nil)
         local acceptFn
@@ -625,16 +631,17 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local externalActions = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsPageActions")).actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
-        externalActions[2].onClick()
+        actions[2].onClick()
         assert.is_function(acceptFn)
 
         acceptFn()
 
-        assert.are.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, BuffSpellColors:GetColorByKey(buffKey))
+        assert.is_nil(BuffSpellColors:GetColorByKey(buffKey))
         assert.is_nil(ExternalSpellColors:GetColorByKey(externalKey))
         assert.are.same({
+            ns.L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format("Buff Stale"),
             ns.L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format("External Stale"),
         }, printedMessages)
         assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
@@ -650,11 +657,13 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local buffHeader = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorsPageActions"))
-        local externalHeader = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsPageActions"))
+        local actions = getSpellColorActions(spellColorsSpec)
+        local buffHeader = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorsHeader"))
+        local externalHeader = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsHeader"))
         local buffItems = getSpellColorCollectionItems(spellColorsSpec, "buffBars")
         local externalItems = getSpellColorCollectionItems(spellColorsSpec, "externalBars")
 
+        assert.is_true(actions[3].enabled())
         assert.is_false(buffHeader.disabled())
         assert.is_true(externalHeader.disabled())
         assert.is_true(buffItems[1].color.enabled())
@@ -675,10 +684,11 @@ describe("BuffBarsOptions", function()
 
         local spellColorsSpec = registerSpellColorsSpec()
         assert.are.equal("pageActions", spellColorsSpec.rows[1].type)
-        assert.are.equal("list", spellColorsSpec.rows[4].type)
-        assert.are.equal("swatch", spellColorsSpec.rows[4].variant)
+    local buffCollection = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorCollection"))
+    assert.are.equal("list", buffCollection.type)
+    assert.are.equal("swatch", buffCollection.variant)
 
-        local item = spellColorsSpec.rows[4].items()[2]
+    local item = buffCollection.items()[2]
 
         item.onEnter(CreateFrame("Frame"))
 
@@ -705,7 +715,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local defaultItem = spellColorsSpec.rows[4].items()[1]
+        local defaultItem = getSpellColorCollectionItems(spellColorsSpec, "buffBars")[1]
 
         assert.are.equal(ns.L["DEFAULT_COLOR"], defaultItem.label)
 
@@ -722,7 +732,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.rows[1].actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
@@ -734,7 +744,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.rows[1].actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
         assert.is_true(actions[1].enabled())
         assert.is_true(actions[2].enabled())
@@ -749,7 +759,7 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.rows[1].actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
@@ -762,9 +772,36 @@ describe("BuffBarsOptions", function()
         ns.Addon.BuffBars.IsEditLocked = function()
             return true, "combat"
         end
+        ns.Addon.ExternalBars.IsEditLocked = function()
+            return true, "combat"
+        end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = spellColorsSpec.rows[1].actions
+        local actions = getSpellColorActions(spellColorsSpec)
+
+        assert.is_false(actions[1].enabled())
+        assert.is_false(actions[2].enabled())
+        assert.is_false(actions[3].enabled())
+    end)
+
+    it("header actions re-evaluate live edit locks after page creation", function()
+        BuffSpellColors:SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+
+        local spellColorsSpec = registerSpellColorsSpec()
+        local actions = getSpellColorActions(spellColorsSpec)
+
+        assert.is_true(actions[1].enabled())
+        assert.is_true(actions[2].enabled())
+        assert.is_true(actions[3].enabled())
+
+        ns.Addon.BuffBars.IsEditLocked = function()
+            return true, "combat"
+        end
+        ns.Addon.ExternalBars.IsEditLocked = function()
+            return true, "combat"
+        end
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
@@ -782,7 +819,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        spellColorsSpec.rows[1].actions[1].onClick()
+        getSpellColorActions(spellColorsSpec)[1].onClick()
 
         assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
     end)
@@ -810,7 +847,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local removeStaleAction = spellColorsSpec.rows[1].actions[2]
+        local removeStaleAction = getSpellColorActions(spellColorsSpec)[2]
 
         assert.are.equal(ns.L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"], removeStaleAction.tooltip)
 
@@ -845,6 +882,9 @@ describe("BuffBarsOptions", function()
         ns.Addon.BuffBars.IsEditLocked = function()
             return true, "combat"
         end
+        ns.Addon.ExternalBars.IsEditLocked = function()
+            return true, "combat"
+        end
         ns.Addon.ConfirmReloadUI = function(_, text)
             confirmText = text
         end
@@ -856,7 +896,7 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local actions = spellColorsSpec.rows[1].actions
+        local actions = getSpellColorActions(spellColorsSpec)
 
         actions[1].onClick()
         actions[2].onClick()

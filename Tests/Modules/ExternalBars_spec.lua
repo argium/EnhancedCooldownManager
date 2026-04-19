@@ -24,7 +24,8 @@ describe("ExternalBars real source", function()
     local colorLookupScopes
     local discoveredScopes
     local spellColorStores
-    local runtimeAlpha
+    local debugLoggingEnabled
+    local logCalls
 
     local makeFrame = TestHelpers.makeFrame
     local makeHookableFrame = TestHelpers.makeHookableFrame
@@ -284,6 +285,17 @@ describe("ExternalBars real source", function()
         return ExternalBars:UpdateLayout(reason or "test")
     end
 
+    local function findLogCall(message)
+        for index = #logCalls, 1, -1 do
+            local entry = logCalls[index]
+            if entry.message == message then
+                return entry
+            end
+        end
+
+        return nil
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "UIParent",
@@ -318,13 +330,13 @@ describe("ExternalBars real source", function()
         colorLookupScopes = {}
         discoveredScopes = {}
         spellColorStores = {}
-        runtimeAlpha = 1
+        debugLoggingEnabled = false
+        logCalls = {}
 
         ns = {
-            Log = function() end,
             DebugAssert = function() end,
             IsDebugEnabled = function()
-                return false
+                return debugLoggingEnabled
             end,
             ToString = tostring,
             Runtime = {
@@ -333,9 +345,6 @@ describe("ExternalBars real source", function()
                 end,
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
-                end,
-                GetDesiredAlpha = function()
-                    return runtimeAlpha
                 end,
                 RequestLayout = function(reason)
                     requestLayoutReasons[#requestLayoutReasons + 1] = reason
@@ -418,6 +427,13 @@ describe("ExternalBars real source", function()
                 end,
             },
         }
+        ns.Log = function(scope, message, payload)
+            logCalls[#logCalls + 1] = {
+                scope = scope,
+                message = message,
+                payload = payload,
+            }
+        end
 
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
@@ -590,6 +606,43 @@ describe("ExternalBars real source", function()
         assert.are.equal(1, #durationTickers)
     end)
 
+    it("emits detailed aura diagnostics when debug logging is enabled", function()
+        debugLoggingEnabled = true
+
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                timeMod = 1.5,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        ExternalBars:OnExternalAurasUpdated()
+
+        local logEntry = assert(findLogCall("OnExternalAurasUpdated"))
+
+        assert.are.equal("ExternalBars", logEntry.scope)
+        assert.are.equal(1, logEntry.payload.auraCount)
+        assert.is_true(logEntry.payload.viewerShown)
+        assert.are.equal("table", logEntry.payload.auraInfoType)
+        assert.are.equal(1, #logEntry.payload.auras)
+        assert.same({
+            index = 1,
+            auraInstanceID = 11,
+            name = "Ironbark",
+            spellID = 102342,
+            texture = 5011,
+            hasAuraData = true,
+            durationIsSecret = false,
+            expirationTimeIsSecret = false,
+            canShowDurationText = true,
+            hasRenderableDuration = true,
+        }, logEntry.payload.auras[1])
+    end)
+
     it("hides duration text but still configures cooldown and schedules the all-secret color retry path", function()
         _G.issecretvalue = function()
             return true
@@ -671,7 +724,7 @@ describe("ExternalBars real source", function()
         assert.are.equal(3, #ExternalBars._barPool)
     end)
 
-    it("hides the original icons on enable and restores them on disable", function()
+    it("hides the original icons on enable and restores the viewer on disable", function()
         profile.externalBars.hideOriginalIcons = true
 
         ExternalBars:OnEnable()
@@ -691,16 +744,45 @@ describe("ExternalBars real source", function()
         assert.are.equal(1, unregisterFrameCalls)
         assert.are.equal(1, viewer:GetAlpha())
         assert.is_true(viewer:IsMouseEnabled())
-        assert.same({ "ExternalBars:OriginalIconsShown" }, requestLayoutReasons)
+        assert.same({}, requestLayoutReasons)
     end)
 
-    it("restores the viewer alpha when showing the original icons again", function()
+    it("restores viewer alpha and mouse directly when original icons are shown again", function()
         local setAlphaCalls = {}
+        local enableMouseCalls = {}
 
         profile.externalBars.hideOriginalIcons = true
         ExternalBars:_RefreshOriginalIconsState()
         requestLayoutReasons = {}
-        runtimeAlpha = 0.35
+
+        local originalSetAlpha = viewer.SetAlpha
+        function viewer:SetAlpha(alpha)
+            setAlphaCalls[#setAlphaCalls + 1] = alpha
+            originalSetAlpha(self, alpha)
+        end
+
+        local originalEnableMouse = viewer.EnableMouse
+        function viewer:EnableMouse(enabled)
+            enableMouseCalls[#enableMouseCalls + 1] = enabled
+            originalEnableMouse(self, enabled)
+        end
+
+        profile.externalBars.hideOriginalIcons = false
+        ExternalBars:_RefreshOriginalIconsState()
+        ExternalBars:_RefreshOriginalIconsState()
+
+        assert.same({ 1 }, setAlphaCalls)
+        assert.same({ true }, enableMouseCalls)
+        assert.are.equal(1, viewer:GetAlpha())
+        assert.is_true(viewer:IsMouseEnabled())
+        assert.same({}, requestLayoutReasons)
+    end)
+
+    it("does not restamp viewer alpha when original icons are already shown", function()
+        local setAlphaCalls = {}
+
+        profile.externalBars.hideOriginalIcons = true
+        ExternalBars:_RefreshOriginalIconsState()
 
         local originalSetAlpha = viewer.SetAlpha
         function viewer:SetAlpha(alpha)
@@ -711,24 +793,10 @@ describe("ExternalBars real source", function()
         profile.externalBars.hideOriginalIcons = false
         ExternalBars:_RefreshOriginalIconsState()
 
-        assert.same({ 0.35 }, setAlphaCalls)
-        assert.are.equal(0.35, viewer:GetAlpha())
-        assert.is_true(viewer:IsMouseEnabled())
-        assert.same({ "ExternalBars:OriginalIconsShown" }, requestLayoutReasons)
-    end)
-
-    it("keeps viewer mouse disabled when the runtime fade alpha is zero", function()
-        profile.externalBars.hideOriginalIcons = true
-        ExternalBars:_RefreshOriginalIconsState()
-        requestLayoutReasons = {}
-        runtimeAlpha = 0
-
-        profile.externalBars.hideOriginalIcons = false
+        setAlphaCalls = {}
         ExternalBars:_RefreshOriginalIconsState()
 
-        assert.are.equal(0, viewer:GetAlpha())
-        assert.is_false(viewer:IsMouseEnabled())
-        assert.same({ "ExternalBars:OriginalIconsShown" }, requestLayoutReasons)
+        assert.same({}, setAlphaCalls)
     end)
 
     it("computes container height from bar count, height, and vertical spacing", function()

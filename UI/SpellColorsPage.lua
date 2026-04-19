@@ -287,14 +287,10 @@ function SpellColorsPage.SetRegisteredPage(page)
 end
 
 ---@param section table
----@param refreshPage fun()
-local function resetSpellColors(section, refreshPage)
+local function resetSpellColorSection(section)
     local spellColors = getSpellColors(section.scope)
     spellColors:ClearCurrentSpecColors()
     spellColors:SetDefaultColor(getScopeDefaultColor(section.scope))
-    refreshSpellColors(function()
-        doRefreshPage(refreshPage)
-    end)
 end
 
 local function reconcileSpellColors()
@@ -302,38 +298,24 @@ local function reconcileSpellColors()
 end
 
 ---@param section table
----@param refreshPage fun()
-local function removeStaleSpellColors(section, refreshPage)
+---@return ECM_SpellColorKey[]
+local function removeStaleSpellColorSection(section)
     local staleRows = collectIncompleteSpellColorRows(nil, section.scope)
     if #staleRows == 0 then
-        return
+        return {}
     end
 
-    local spellColors = getSpellColors(section.scope)
+    local staleKeys = {}
+    for _, row in ipairs(staleRows) do
+        staleKeys[#staleKeys + 1] = row.key
+    end
 
-    ns.Addon:ShowConfirmDialog(
-        REMOVE_STALE_SPELL_COLORS_POPUP,
-        L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
-        L["REMOVE"],
-        L["SPELL_COLORS_DONT_REMOVE"],
-        function()
-            local staleKeys = {}
-            for _, row in ipairs(staleRows) do
-                staleKeys[#staleKeys + 1] = row.key
-            end
+    local removedKeys = getSpellColors(section.scope):RemoveEntriesByKeys(staleKeys)
+    for _, key in ipairs(removedKeys) do
+        ns.Print(L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format(getSpellColorRowName(key, section.scope)))
+    end
 
-            local removedKeys = spellColors:RemoveEntriesByKeys(staleKeys)
-            for _, key in ipairs(removedKeys) do
-                ns.Print(L["SPELL_COLORS_REMOVED_STALE_ENTRY"]:format(getSpellColorRowName(key, section.scope)))
-            end
-
-            if #removedKeys > 0 then
-                refreshSpellColors(function()
-                    doRefreshPage(refreshPage)
-                end)
-            end
-        end
-    )
+    return removedKeys
 end
 
 ---@param section table
@@ -413,29 +395,99 @@ local function buildSpellColorItems(section, refreshPage)
     return items
 end
 
----@param section table
+---@param predicate fun(section: table): boolean
+---@return boolean
+local function doesAnySpellColorSectionMatch(predicate)
+    for _, section in ipairs(spellColorSections) do
+        if predicate(section) then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@return boolean
+local function canResetAnySpellColorSection()
+    return doesAnySpellColorSectionMatch(function(section)
+        return not isSpellColorSectionInteractionDisabled(section)
+    end)
+end
+
+---@return boolean
+local function canMaintainAnySpellColorSection()
+    return doesAnySpellColorSectionMatch(function(section)
+        return not isSpellColorSectionInteractionDisabled(section)
+            and getSectionSpellColorPageState(section).canReconcile
+    end)
+end
+
+---@param refreshPage fun()
+local function resetAllSpellColors(refreshPage)
+    local didReset = false
+
+    for _, section in ipairs(spellColorSections) do
+        if not isSpellColorSectionInteractionDisabled(section) then
+            resetSpellColorSection(section)
+            didReset = true
+        end
+    end
+
+    if didReset then
+        refreshSpellColors(function()
+            doRefreshPage(refreshPage)
+        end)
+    end
+end
+
+---@param refreshPage fun()
+local function removeAllStaleSpellColors(refreshPage)
+    if not canMaintainAnySpellColorSection() then
+        return
+    end
+
+    ns.Addon:ShowConfirmDialog(
+        REMOVE_STALE_SPELL_COLORS_POPUP,
+        L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
+        L["REMOVE"],
+        L["SPELL_COLORS_DONT_REMOVE"],
+        function()
+            local removedAny = false
+
+            for _, section in ipairs(spellColorSections) do
+                if not isSpellColorSectionInteractionDisabled(section)
+                    and getSectionSpellColorPageState(section).canReconcile then
+                    local removedKeys = removeStaleSpellColorSection(section)
+                    if #removedKeys > 0 then
+                        removedAny = true
+                    end
+                end
+            end
+
+            if removedAny then
+                refreshSpellColors(function()
+                    doRefreshPage(refreshPage)
+                end)
+            end
+        end
+    )
+end
+
 ---@param refreshPage fun()
 ---@return table
-local function createSpellColorSectionHeaderRow(section, refreshPage)
+local function createSpellColorPageActionsRow(refreshPage)
     return {
-        id = section.key .. "SpellColorsPageActions",
+        id = "spellColorsPageActions",
         type = "pageActions",
-        name = section.label,
-        attachToCategoryHeader = false,
-        hideTitle = false,
-        height = 28,
-        disabled = section.isDisabledDelegate,
         actions = {
             {
                 text = L["SPELL_COLORS_RECONCILE_BUTTON"],
                 width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                 enabled = function()
-                    return not isSpellColorSectionInteractionDisabled(section)
-                        and getSectionSpellColorPageState(section).canReconcile
+                    return canMaintainAnySpellColorSection()
                 end,
                 onClick = function()
-                    if isSpellColorSectionInteractionDisabled(section)
-                        or not getSectionSpellColorPageState(section).canReconcile then
+                    if not canMaintainAnySpellColorSection() then
                         return
                     end
 
@@ -447,33 +499,42 @@ local function createSpellColorSectionHeaderRow(section, refreshPage)
                 width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                 tooltip = L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
                 enabled = function()
-                    return not isSpellColorSectionInteractionDisabled(section)
-                        and getSectionSpellColorPageState(section).canReconcile
+                    return canMaintainAnySpellColorSection()
                 end,
                 onClick = function()
-                    if isSpellColorSectionInteractionDisabled(section)
-                        or not getSectionSpellColorPageState(section).canReconcile then
+                    if not canMaintainAnySpellColorSection() then
                         return
                     end
 
-                    removeStaleSpellColors(section, refreshPage)
+                    removeAllStaleSpellColors(refreshPage)
                 end,
             },
             {
                 text = L["RESET"],
                 width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                 enabled = function()
-                    return not isSpellColorSectionInteractionDisabled(section)
+                    return canResetAnySpellColorSection()
                 end,
                 onClick = function()
-                    if isSpellColorSectionInteractionDisabled(section) then
+                    if not canResetAnySpellColorSection() then
                         return
                     end
 
-                    resetSpellColors(section, refreshPage)
+                    resetAllSpellColors(refreshPage)
                 end,
             },
         },
+    }
+end
+
+---@param section table
+---@return table
+local function createSpellColorSectionHeaderRow(section)
+    return {
+        id = section.key .. "SpellColorsHeader",
+        type = "header",
+        name = section.label,
+        disabled = section.isDisabledDelegate,
     }
 end
 
@@ -538,20 +599,21 @@ local function buildPageRows()
         end
     end
 
-    for index, section in ipairs(spellColorSections) do
-        rows[#rows + 1] = createSpellColorSectionHeaderRow(section, refreshPage)
+    if #spellColorSections > 0 then
+        rows[#rows + 1] = createSpellColorPageActionsRow(refreshPage)
+        rows[#rows + 1] = {
+            id = "spellColorsDescription",
+            type = "info",
+            name = "",
+            value = L["SPELL_COLORS_DESC"],
+            wide = true,
+            multiline = true,
+            height = 36,
+        }
+    end
 
-        if index == 1 then
-            rows[#rows + 1] = {
-                id = "spellColorsDescription",
-                type = "info",
-                name = "",
-                value = L["SPELL_COLORS_DESC"],
-                wide = true,
-                multiline = true,
-                height = 36,
-            }
-        end
+    for _, section in ipairs(spellColorSections) do
+        rows[#rows + 1] = createSpellColorSectionHeaderRow(section)
 
         rows[#rows + 1] = createSpellColorWarningRow(section)
         rows[#rows + 1] = createSpellColorListRow(section, refreshPage)

@@ -149,28 +149,23 @@ function ExternalBars:_SetOriginalIconsHidden(hidden)
     end
 
     if hidden then
+        if self._originalIconsHidden then
+            return
+        end
+
         self._originalIconsHidden = true
         viewer:SetAlpha(0)
         viewer:EnableMouse(false)
         return
     end
 
-    if self._originalIconsHidden then
-        local alpha = 1
-
-        self._originalIconsHidden = nil
-
-        if ns.Runtime and ns.Runtime.GetDesiredAlpha then
-            alpha = ns.Runtime.GetDesiredAlpha()
-        end
-
-        viewer:SetAlpha(alpha)
-        viewer:EnableMouse(alpha > 0)
-
-        if ns.Runtime and ns.Runtime.RequestLayout then
-            ns.Runtime.RequestLayout("ExternalBars:OriginalIconsShown")
-        end
+    if not self._originalIconsHidden then
+        return
     end
+
+    self._originalIconsHidden = nil
+    viewer:SetAlpha(1)
+    viewer:EnableMouse(true)
 end
 
 function ExternalBars:_RefreshOriginalIconsState()
@@ -467,6 +462,8 @@ function ExternalBars:OnExternalAurasUpdated()
     local auraInfo = viewer and viewer.auraInfo or nil
     local auraStates = self._auraStates or {}
     self._auraStates = auraStates
+    local debugEnabled = ns.IsDebugEnabled()
+    local auraDiagnostics = debugEnabled and {} or nil
 
     local activeAuraCount = 0
     if type(auraInfo) == "table" then
@@ -513,10 +510,38 @@ function ExternalBars:OnExternalAurasUpdated()
                 and duration > 0
                 and type(expirationTime) == "number"
             auraState.hasRenderableDuration = durationIsSecret or (type(duration) == "number" and duration > 0)
+
+            if auraDiagnostics then
+                auraDiagnostics[#auraDiagnostics + 1] = {
+                    index = index,
+                    auraInstanceID = auraInstanceID,
+                    name = auraName,
+                    spellID = spellID,
+                    texture = info.texture,
+                    hasAuraData = accessibleAuraData ~= nil,
+                    durationIsSecret = durationIsSecret,
+                    expirationTimeIsSecret = expirationTimeIsSecret,
+                    canShowDurationText = auraState.canShowDurationText,
+                    hasRenderableDuration = auraState.hasRenderableDuration,
+                }
+            end
         end
     end
 
     self._activeAuraCount = activeAuraCount
+
+    if debugEnabled then
+        ns.Log(self.Name, "OnExternalAurasUpdated", {
+            viewerShown = viewer ~= nil and viewer:IsShown() or false,
+            viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+            hideOriginalIcons = self._originalIconsHidden == true,
+            runtimeOriginalIconsHidden = self._originalIconsHidden == true,
+            auraCount = activeAuraCount,
+            auraInfoType = type(auraInfo),
+            auras = auraDiagnostics,
+        })
+    end
+
     ns.Runtime.RequestLayout("ExternalBars:UpdateAuras")
 end
 
@@ -524,7 +549,15 @@ end
 ---@return boolean
 function ExternalBars:UpdateLayout(why)
     local frame = self.InnerFrame
+    local debugEnabled = ns.IsDebugEnabled()
     if not frame then
+        if debugEnabled then
+            ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+                applied = false,
+                reason = "no-frame",
+                activeAuraCount = self._activeAuraCount or 0,
+            })
+        end
         return false
     end
 
@@ -544,6 +577,13 @@ function ExternalBars:UpdateLayout(why)
     if not params then
         self:_hideExcessBars(0)
         self:_StopDurationTicker()
+        if debugEnabled then
+            ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+                applied = false,
+                reason = "no-position",
+                activeAuraCount = self._activeAuraCount or 0,
+            })
+        end
         return false
     end
 
@@ -598,8 +638,15 @@ function ExternalBars:UpdateLayout(why)
 
     self:_RestartDurationTicker()
 
+    local viewer = getViewer()
     ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+        activeAuraCount = activeAuraCount,
         barCount = barCount,
+        viewerShown = viewer ~= nil and viewer:IsShown() or false,
+        viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+        hideOriginalIcons = self._originalIconsHidden == true,
+        runtimeOriginalIconsHidden = self._originalIconsHidden == true,
+        editLocked = self._editLocked == true,
         anchorPoint = params.anchorPoint,
         offsetX = params.offsetX,
         offsetY = params.offsetY,

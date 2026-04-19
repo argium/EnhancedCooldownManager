@@ -57,20 +57,27 @@ end
 local _detachedAnchor = nil
 local _detachedAnchorMetrics = nil
 
+--- Applies the current Runtime-owned visibility and alpha to one
+--- Blizzard-managed cooldown viewer frame.
+---@param frame Frame
+local function applyBlizzardFrameState(frame)
+    if _globallyHidden then
+        if frame:IsShown() then frame:Hide() end
+        return
+    end
+
+    if not frame:IsShown() then frame:Show() end
+    ns.FrameUtil.LazySetAlpha(frame, _desiredAlpha)
+end
+
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
 local function enforceBlizzardFrameState()
-    local alpha = _desiredAlpha
     for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
-            if _globallyHidden then
-                if frame:IsShown() then frame:Hide() end
-            else
-                if not frame:IsShown() then frame:Show() end
-                ns.FrameUtil.LazySetAlpha(frame, alpha)
-            end
+            applyBlizzardFrameState(frame)
         end
     end
 end
@@ -85,11 +92,7 @@ local function hookBlizzardFrame(frame, name)
     end
 
     frame:HookScript("OnShow", function(self)
-        if _globallyHidden then
-            self:Hide()
-        else
-            ns.FrameUtil.LazySetAlpha(self, _desiredAlpha)
-        end
+        applyBlizzardFrameState(self)
     end)
 
     _hookedBlizzardFrames[name] = true
@@ -415,14 +418,6 @@ function Runtime.SetLayoutPreview(active)
     ns.Log(nil, "Layout preview " .. (active and "ON" or "OFF"))
     updateFadeAndHiddenStates()
     Runtime.ScheduleLayoutUpdate(0, active and "LayoutPreviewOn" or "LayoutPreviewOff")
-end
-
---- Returns the current alpha chosen by Runtime's fade logic.
---- External viewers that are not enforced directly by Runtime can use this
---- to restore themselves without hardcoding full opacity.
----@return number
-function Runtime.GetDesiredAlpha()
-    return _desiredAlpha
 end
 
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.

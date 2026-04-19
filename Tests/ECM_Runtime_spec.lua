@@ -123,6 +123,20 @@ describe("ECM.Runtime layout system", function()
         }
     end
 
+    local function makeBlizzardFrame(name)
+        local frame = makeFrame({ name = name })
+        frame._hookScriptCalls = 0
+
+        local origHookScript = frame.HookScript
+        function frame:HookScript(...)
+            self._hookScriptCalls = self._hookScriptCalls + 1
+            return origHookScript(self, ...)
+        end
+
+        _G[name] = frame
+        return frame
+    end
+
     local CAPTURED_GLOBALS = {
         "LibStub",
         "C_Timer",
@@ -380,15 +394,6 @@ describe("ECM.Runtime layout system", function()
             ns.Runtime.ScheduleLayoutUpdate(0, "fade")
 
             assert.are.equal(0.5, mod.InnerFrame:GetAlpha())
-        end)
-
-        it("reports the current desired alpha for external viewer restores", function()
-            makeRegisteredModule()
-            _G._testDB.profile.global.outOfCombatFade = makeFadeConfig(50)
-
-            ns.Runtime.ScheduleLayoutUpdate(0, "fade")
-
-            assert.are.equal(0.5, ns.Runtime.GetDesiredAlpha())
         end)
 
         it("does not fade in a delve when instance exceptions are enabled", function()
@@ -880,20 +885,7 @@ describe("ECM.Runtime layout system", function()
     end)
 
     describe("watchdog graceful degradation", function()
-        --- Creates a Blizzard frame stub in _G with HookScript call tracking.
-        local function makeBlizzardFrame(name)
-            local frame = makeFrame({ name = name })
-            frame._hookScriptCalls = 0
-            local origHookScript = frame.HookScript
-            function frame:HookScript(...)
-                self._hookScriptCalls = self._hookScriptCalls + 1
-                return origHookScript(self, ...)
-            end
-            _G[name] = frame
-            return frame
-        end
-
-        --- Places all 4 Blizzard frames + CooldownViewerSettings in _G.
+        --- Places all Blizzard frames and CooldownViewerSettings in _G.
         local function createAllBlizzardFrames()
             local frames = {}
             for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
@@ -916,10 +908,11 @@ describe("ECM.Runtime layout system", function()
             ns.Runtime.Enable(fakeAddon)
 
             local ticker = createdTickers[1]
+            local allNames = ns.Constants.BLIZZARD_FRAMES
 
             -- First tick: hooks all frames + settings
             ticker.callback()
-            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(allNames) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should be hooked exactly once after first tick")
             end
@@ -928,7 +921,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Second tick: setup should be skipped
             ticker.callback()
-            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(allNames) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should still be hooked exactly once after second tick")
             end
@@ -954,11 +947,16 @@ describe("ECM.Runtime layout system", function()
         end)
 
         it("continues setup when frames appear late", function()
-            -- Start with only 2 of 4 Blizzard frames
+            -- Start with only 2 Blizzard frames.
+            local allNames = ns.Constants.BLIZZARD_FRAMES
             local firstTwo = {}
+            local remainingNames = {}
             for i = 1, 2 do
-                local name = ns.Constants.BLIZZARD_FRAMES[i]
+                local name = allNames[i]
                 firstTwo[name] = makeBlizzardFrame(name)
+            end
+            for i = 3, #allNames do
+                remainingNames[#remainingNames + 1] = allNames[i]
             end
 
             ns.Runtime.Enable(fakeAddon)
@@ -966,7 +964,7 @@ describe("ECM.Runtime layout system", function()
 
             -- First tick: hooks 2 frames, but no CooldownViewerSettings yet
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[1], ns.Constants.BLIZZARD_FRAMES[2] }) do
+            for _, name in ipairs({ allNames[1], allNames[2] }) do
                 assert.are.equal(1, firstTwo[name]._hookScriptCalls)
             end
 
@@ -975,8 +973,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Now add remaining frames + settings
             local laterFrames = {}
-            for i = 3, 4 do
-                local name = ns.Constants.BLIZZARD_FRAMES[i]
+            for _, name in ipairs(remainingNames) do
                 laterFrames[name] = makeBlizzardFrame(name)
             end
             local settings = makeFrame({ name = "CooldownViewerSettings" })
@@ -990,7 +987,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Third tick: hooks remaining frames + settings, setup completes
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs(remainingNames) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should be hooked on third tick")
             end
@@ -998,7 +995,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Fourth tick: setup skipped, no additional hooks
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs(remainingNames) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should not be re-hooked after setup complete")
             end
