@@ -115,10 +115,6 @@ describe("ExtraIcons", function()
             end)
         end
 
-        function mod:HookUtilityViewer()
-            self:_hookViewer("utility")
-        end
-
         function mod:OnDisable()
             self:UnregisterAllEvents()
             self:UpdateLayout("OnDisable")
@@ -249,6 +245,7 @@ describe("ExtraIcons real source", function()
         }
         ns = {
             Log = function() end,
+            IsDebugEnabled = function() return false end,
             BarMixin = {
                 FrameProto = {
                     ShouldShow = function()
@@ -424,6 +421,124 @@ describe("ExtraIcons real source", function()
         }
     end
 
+    local function makeActiveFrames(count, width)
+        local frames = {}
+        for i = 1, count do
+            local frame = TestHelpers.makeFrame({ shown = true, width = width, height = width })
+            frame.isActive = true
+            frames[i] = frame
+        end
+        return frames
+    end
+
+    local function getPointAnchorOffset(point, width)
+        if point == "LEFT" or point == "TOPLEFT" or point == "BOTTOMLEFT" then
+            return 0
+        elseif point == "RIGHT" or point == "TOPRIGHT" or point == "BOTTOMRIGHT" then
+            return width
+        elseif point == "CENTER" or point == "TOP" or point == "BOTTOM" then
+            return width / 2
+        end
+
+        error("Unsupported point " .. tostring(point))
+    end
+
+    local function getFrameLeft(frame)
+        local point, relativeTo, relativePoint, x = frame:GetPoint(1)
+        local width = frame:GetWidth() or 0
+        local anchorX = x or 0
+
+        if relativeTo and relativeTo ~= UIParent then
+            local relativeLeft = getFrameLeft(relativeTo)
+            local relativeWidth = relativeTo:GetWidth() or 0
+            anchorX = relativeLeft + getPointAnchorOffset(relativePoint, relativeWidth) + (x or 0)
+        end
+
+        return anchorX - getPointAnchorOffset(point, width)
+    end
+
+    local function getViewerRowCenter(viewerFrame, container)
+        local rowWidth = viewerFrame:GetWidth() or 0
+        if container and container:IsShown() then
+            rowWidth = rowWidth + (viewerFrame.childXPadding or 0) + ((container:GetWidth() or 0) * (container.__scale or 1))
+        end
+        return getFrameLeft(viewerFrame) + (rowWidth / 2)
+    end
+
+    local function resolveAnchorTarget(anchorTarget)
+        if anchorTarget == "UIParent" then
+            return UIParent
+        elseif anchorTarget == "main" then
+            return EssentialCooldownViewer
+        elseif anchorTarget == "utility" then
+            return UtilityCooldownViewer
+        end
+        return nil
+    end
+
+    local function assertViewerRowsStayCenteredAfterMove(args)
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(args.utilityViewerWidth)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return makeActiveFrames(args.utilityActiveCount, 22)
+        end
+        UtilityCooldownViewer:SetPoint(
+            args.utilityAnchor.point,
+            resolveAnchorTarget(args.utilityAnchor.relativeTo),
+            args.utilityAnchor.relativePoint,
+            args.utilityAnchor.x,
+            args.utilityAnchor.y
+        )
+
+        EssentialCooldownViewer.childXPadding = 4
+        EssentialCooldownViewer.iconScale = 1.0
+        EssentialCooldownViewer:SetWidth(args.mainViewerWidth)
+        EssentialCooldownViewer.GetItemFrames = function()
+            return makeActiveFrames(args.mainActiveCount, 22)
+        end
+        EssentialCooldownViewer:SetPoint(
+            args.mainAnchor.point,
+            resolveAnchorTarget(args.mainAnchor.relativeTo),
+            args.mainAnchor.relativePoint,
+            args.mainAnchor.x,
+            args.mainAnchor.y
+        )
+
+        inventoryItemBySlot[13] = 101
+        inventoryTextureBySlot[13] = "trinket-1"
+        inventorySpellByItem[101] = 9001
+        inventoryItemBySlot[14] = 102
+        inventoryTextureBySlot[14] = "trinket-2"
+        inventorySpellByItem[102] = 9002
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+
+        local config = makeViewersConfig(args.beforeUtility, args.beforeMain)
+        ExtraIcons.GetModuleConfig = function()
+            return config
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("before-move"))
+
+        config.viewers.utility = args.afterUtility
+        config.viewers.main = args.afterMain
+
+        assert.is_true(ExtraIcons:UpdateLayout("after-move"))
+
+        local utilityCenter = getViewerRowCenter(UtilityCooldownViewer, ExtraIcons._viewers.utility.container)
+        local mainCenter = getViewerRowCenter(EssentialCooldownViewer, ExtraIcons._viewers.main.container)
+
+        assert.are.equal(mainCenter, utilityCenter)
+
+        if args.expectUtilityRelativeTo then
+            local _, relativeTo = UtilityCooldownViewer:GetPoint(1)
+            assert.are.equal(resolveAnchorTarget(args.expectUtilityRelativeTo), relativeTo)
+        end
+    end
+
     it("requires at least one viewer to be visible in ShouldShow", function()
         assert.is_true(ExtraIcons:ShouldShow())
 
@@ -442,9 +557,9 @@ describe("ExtraIcons real source", function()
 
         ExtraIcons._trackedEquipSlots = { [13] = true, [14] = true }
 
-        ExtraIcons:OnPlayerEquipmentChanged(nil, 1)
-        ExtraIcons:OnPlayerEquipmentChanged(nil, 13)
-        ExtraIcons:OnPlayerEquipmentChanged(nil, 14)
+        ExtraIcons:OnPlayerEquipmentChanged(1)
+        ExtraIcons:OnPlayerEquipmentChanged(13)
+        ExtraIcons:OnPlayerEquipmentChanged(14)
 
         assert.same({ "ExtraIcons:OnPlayerEquipmentChanged", "ExtraIcons:OnPlayerEquipmentChanged" }, reasons)
     end)
@@ -522,15 +637,11 @@ describe("ExtraIcons real source", function()
         assert.is_true(#vs.iconPool >= 1)
     end)
 
-    it("only refreshes cooldowns when viewers exist", function()
+    it("refreshes cooldowns via ThrottledRefresh", function()
         local reasons = {}
         function ExtraIcons:ThrottledRefresh(reason)
             reasons[#reasons + 1] = reason
         end
-
-        ExtraIcons._viewers = nil
-        ExtraIcons:OnBagUpdateCooldown()
-        assert.same({}, reasons)
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons:OnBagUpdateCooldown()
@@ -761,7 +872,7 @@ describe("ExtraIcons real source", function()
         assert.are.equal("CENTER", point)
         assert.are.equal(UIParent, relativeTo)
         assert.are.equal("CENTER", relativePoint)
-        assert.are.equal(40.75, x)
+        assert.are.equal(40, x)
         assert.are.equal(50, y)
     end)
 
@@ -916,6 +1027,155 @@ describe("ExtraIcons real source", function()
         assert.is_true(ExtraIcons._viewers.main.container:IsShown())
     end)
 
+    for _, case in ipairs({
+        {
+            name = "keeps same-parent viewer rows centered when utility becomes empty",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
+            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {
+                { stackKey = "trinket1" },
+            },
+            afterUtility = {},
+            afterMain = {
+                { stackKey = "trinket1" },
+                { stackKey = "healthstones" },
+            },
+        },
+        {
+            name = "keeps same-parent viewer rows centered when main becomes empty",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
+            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {
+                { stackKey = "trinket1" },
+            },
+            afterUtility = {
+                { stackKey = "healthstones" },
+                { stackKey = "trinket1" },
+            },
+            afterMain = {},
+        },
+        {
+            name = "keeps same-parent viewer rows centered when both viewers still have different ECM counts",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
+            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+                { stackKey = "trinket1" },
+            },
+            beforeMain = {
+                { stackKey = "trinket2" },
+            },
+            afterUtility = {
+                { stackKey = "healthstones" },
+            },
+            afterMain = {
+                { stackKey = "trinket2" },
+                { stackKey = "trinket1" },
+            },
+        },
+        {
+            name = "keeps same-parent viewer rows centered for center anchors when utility becomes empty",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 0 },
+            mainAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {
+                { stackKey = "trinket1" },
+            },
+            afterUtility = {},
+            afterMain = {
+                { stackKey = "trinket1" },
+                { stackKey = "healthstones" },
+            },
+        },
+        {
+            name = "keeps same-parent viewer rows centered for top-left anchors when utility becomes empty",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -100 },
+            mainAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -60 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {
+                { stackKey = "trinket1" },
+            },
+            afterUtility = {},
+            afterMain = {
+                { stackKey = "trinket1" },
+                { stackKey = "healthstones" },
+            },
+        },
+        {
+            name = "keeps same-parent viewer rows centered for right anchors when utility becomes empty",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 0 },
+            mainAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {
+                { stackKey = "trinket1" },
+            },
+            afterUtility = {},
+            afterMain = {
+                { stackKey = "trinket1" },
+                { stackKey = "healthstones" },
+            },
+        },
+        {
+            name = "keeps a utility viewer anchored to main centered without same-parent coupling",
+            utilityViewerWidth = 22,
+            utilityActiveCount = 1,
+            mainViewerWidth = 48,
+            mainActiveCount = 2,
+            utilityAnchor = { point = "LEFT", relativeTo = "main", relativePoint = "LEFT", x = 26, y = -40 },
+            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
+            beforeUtility = {
+                { stackKey = "healthstones" },
+            },
+            beforeMain = {},
+            afterUtility = {},
+            afterMain = {
+                { stackKey = "healthstones" },
+            },
+            expectUtilityRelativeTo = "main",
+        },
+    }) do
+        local currentCase = case
+        it(currentCase.name, function()
+            assertViewerRowsStayCenteredAfterMove(currentCase)
+        end)
+    end
+
     it("prefers demonic healthstone over the legacy healthstone", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end
@@ -994,7 +1254,7 @@ describe("ExtraIcons real source", function()
         local _, anchorFrame = ExtraIcons._viewers.utility.container:GetPoint(1)
         assert.are.equal(activeFrame, anchorFrame)
         local _, _, _, x = UtilityCooldownViewer:GetPoint(1)
-        assert.are.equal(100, x)
+        assert.are.equal(88, x)
     end)
 
     it("restores the viewer and hides the container when no items are available", function()
