@@ -418,7 +418,7 @@ describe("BuffBarsOptions", function()
 
     it("does not add the old configure spell colors shortcut to aura bars", function()
         local buttonRows = {}
-        for _, row in ipairs(BuffBarsOptions.pages[1].rows) doy
+        for _, row in ipairs(BuffBarsOptions.pages[1].rows) do
             if row.type == "button" then
                 buttonRows[#buttonRows + 1] = row
             end
@@ -608,9 +608,8 @@ describe("BuffBarsOptions", function()
         ExternalSpellColors:SetColorByKey(externalKey, { r = 0.6, g = 0.5, b = 0.4, a = 1 })
 
         local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
-        local actions = getSpellColorActions(spellColorsSpec)
 
-        actions[3].onClick()
+        spellColorsSpec.onDefault()
 
         assert.are.same(buffResetDefaultColor, BuffSpellColors:GetDefaultColor())
         assert.are.same(externalResetDefaultColor, ExternalSpellColors:GetDefaultColor())
@@ -657,13 +656,12 @@ describe("BuffBarsOptions", function()
         })
 
         local spellColorsSpec = registerSpellColorsSpec()
-        local actions = getSpellColorActions(spellColorsSpec)
         local buffHeader = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorsHeader"))
         local externalHeader = assert(getSpellColorsRow(spellColorsSpec, "externalBarsSpellColorsHeader"))
         local buffItems = getSpellColorCollectionItems(spellColorsSpec, "buffBars")
         local externalItems = getSpellColorCollectionItems(spellColorsSpec, "externalBars")
 
-        assert.is_true(actions[3].enabled())
+        assert.is_true(spellColorsSpec.onDefaultEnabled())
         assert.is_false(buffHeader.disabled())
         assert.is_true(externalHeader.disabled())
         assert.is_true(buffItems[1].color.enabled())
@@ -781,7 +779,7 @@ describe("BuffBarsOptions", function()
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
-        assert.is_false(actions[3].enabled())
+        assert.is_false(spellColorsSpec.onDefaultEnabled())
     end)
 
     it("header actions re-evaluate live edit locks after page creation", function()
@@ -794,7 +792,7 @@ describe("BuffBarsOptions", function()
 
         assert.is_true(actions[1].enabled())
         assert.is_true(actions[2].enabled())
-        assert.is_true(actions[3].enabled())
+        assert.is_true(spellColorsSpec.onDefaultEnabled())
 
         ns.Addon.BuffBars.IsEditLocked = function()
             return true, "combat"
@@ -805,7 +803,7 @@ describe("BuffBarsOptions", function()
 
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
-        assert.is_false(actions[3].enabled())
+        assert.is_false(spellColorsSpec.onDefaultEnabled())
     end)
 
     it("reconcile action uses ConfirmReloadUI for incomplete rows", function()
@@ -900,7 +898,7 @@ describe("BuffBarsOptions", function()
 
         actions[1].onClick()
         actions[2].onClick()
-        actions[3].onClick()
+        spellColorsSpec.onDefault()
 
         assert.is_nil(confirmText)
         assert.is_nil(popupKey)

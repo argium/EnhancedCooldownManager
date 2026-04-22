@@ -78,6 +78,18 @@ ns.AboutPage = {
                 ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
             end,
         },
+        {
+            type = "header",
+            name = L["WHATS_NEW"],
+        },
+        {
+            type = "button",
+            name = L["WHATS_NEW"],
+            buttonText = L["WHATS_NEW"],
+            onClick = function()
+                ns.Addon:ShowReleasePopup(true)
+            end,
+        },
     },
 }
 

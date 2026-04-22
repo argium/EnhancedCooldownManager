@@ -64,11 +64,57 @@ lib._pageLifecycleHooked = false
 
 local internal = lib._internal
 
+--- Returns Blizzard's category-header `Defaults` button if the SettingsPanel
+--- has been created and the settings list is available.
+local function getCategoryDefaultsButton()
+    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local header = settingsList and settingsList.Header
+    return header and header.DefaultsButton or nil
+end
+
+--- Replaces the category-header `Defaults` button click handler with `onClick`
+--- and forces it enabled (or evaluates `enabledPredicate` when supplied) for as
+--- long as the override is active. Returns a restore function the caller must
+--- invoke when the page is hidden so other categories keep Blizzard's default
+--- behavior.
+function internal.installCategoryDefaultsOverride(onClick, enabledPredicate)
+    local button = getCategoryDefaultsButton()
+    if not button then
+        return function() end
+    end
+
+    local originalOnClick = button:GetScript("OnClick")
+    local originalEnabled = button:IsEnabled()
+
+    local function applyEnabled()
+        if enabledPredicate then
+            button:SetEnabled(enabledPredicate() and true or false)
+        else
+            button:SetEnabled(true)
+        end
+    end
+
+    button:SetScript("OnClick", function()
+        if enabledPredicate and not enabledPredicate() then
+            return
+        end
+        onClick()
+        applyEnabled()
+    end)
+    applyEnabled()
+
+    return function()
+        if button:GetScript("OnClick") then
+            button:SetScript("OnClick", originalOnClick)
+        end
+        button:SetEnabled(originalEnabled)
+    end
+end
+
 --- Installs one-time hooks on SettingsPanel to fire page-level onShow/onHide
 --- callbacks registered through the root/section/page API. Defers automatically if
 --- SettingsPanel has not been created yet (Blizzard_Settings loads on demand).
-local function installPageLifecycleHooks()
-    if lib._pageLifecycleHooked then
+local function installPageLifecycleHooks()    if lib._pageLifecycleHooked then
         return
     end
 
@@ -102,16 +148,27 @@ local function installPageLifecycleHooks()
 
         if old then
             local cbs = lib._pageLifecycleCallbacks[old]
-            if cbs and cbs.onHide then
-                cbs.onHide()
+            if cbs then
+                if cbs._defaultsRestore then
+                    cbs._defaultsRestore()
+                    cbs._defaultsRestore = nil
+                end
+                if cbs.onHide then
+                    cbs.onHide()
+                end
             end
         end
 
         lib._activeLifecycleCategory = category
         if category then
             local cbs = lib._pageLifecycleCallbacks[category]
-            if cbs and cbs.onShow then
-                cbs.onShow()
+            if cbs then
+                if cbs.onDefault then
+                    cbs._defaultsRestore = internal.installCategoryDefaultsOverride(cbs.onDefault, cbs.onDefaultEnabled)
+                end
+                if cbs.onShow then
+                    cbs.onShow()
+                end
             end
         end
     end)
@@ -120,8 +177,14 @@ local function installPageLifecycleHooks()
         local active = lib._activeLifecycleCategory
         if active then
             local cbs = lib._pageLifecycleCallbacks[active]
-            if cbs and cbs.onHide then
-                cbs.onHide()
+            if cbs then
+                if cbs._defaultsRestore then
+                    cbs._defaultsRestore()
+                    cbs._defaultsRestore = nil
+                end
+                if cbs.onHide then
+                    cbs.onHide()
+                end
             end
         end
         lib._activeLifecycleCategory = nil

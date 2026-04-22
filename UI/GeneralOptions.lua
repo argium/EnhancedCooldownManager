@@ -156,18 +156,6 @@ local AdvancedOptions = {
                 return not (gc and gc.debug)
             end,
         },
-        {
-            type = "header",
-            name = L["WHATS_NEW"],
-        },
-        {
-            type = "button",
-            name = " ",
-            buttonText = L["SHOW_WHATS_NEW"],
-            onClick = function()
-                ns.Addon:ShowReleasePopup(true)
-            end,
-        },
         { type = "header", name = L["PERFORMANCE"] },
         {
             type = "slider",

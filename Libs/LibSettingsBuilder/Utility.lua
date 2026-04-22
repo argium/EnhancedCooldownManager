@@ -82,6 +82,8 @@
 ---@field rows LibSettingsBuilderRowConfig[] Gets the declarative row array registered on the page.
 ---@field onShow LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard shows this page.
 ---@field onHide LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard hides this page.
+---@field onDefault fun()|nil Gets the callback invoked when the user clicks the Blizzard category-header `Defaults` button while this page is active. When supplied, the library replaces the button's default reset behavior for the duration the page is shown.
+---@field onDefaultEnabled fun(): boolean|nil Gets the predicate that controls whether the `Defaults` button is enabled while this page is active. Defaults to always-enabled when `onDefault` is supplied.
 ---@field disabled LibSettingsBuilderPredicate|nil Gets the page-level disabled predicate propagated to child rows.
 ---@field hidden LibSettingsBuilderPredicate|nil Gets the page-level hidden predicate propagated to child rows.
 ---@field order number|nil Gets the sort order used when a section declares multiple pages.
@@ -643,10 +645,12 @@ local function assertPageMutable(page, sourceName)
 end
 
 local function bindPageLifecycle(page)
-    if page._onShow or page._onHide then
+    if page._onShow or page._onHide or page._onDefault then
         lib._pageLifecycleCallbacks[page._category] = {
             onShow = page._onShow,
             onHide = page._onHide,
+            onDefault = page._onDefault,
+            onDefaultEnabled = page._onDefaultEnabled,
         }
         installPageLifecycleHooks()
     end
@@ -706,6 +710,8 @@ local function createPage(owner, key, rows, opts)
         _name = opts.name,
         _onShow = opts.onShow,
         _onHide = opts.onHide,
+        _onDefault = opts.onDefault,
+        _onDefaultEnabled = opts.onDefaultEnabled,
         _operations = {},
         _rowIDs = {},
         _registered = false,
@@ -859,6 +865,8 @@ local function registerPageDefinition(owner, pageDef, defaultName)
         name = pageDef.name or defaultName,
         onShow = pageDef.onShow,
         onHide = pageDef.onHide,
+        onDefault = pageDef.onDefault,
+        onDefaultEnabled = pageDef.onDefaultEnabled,
         disabled = pageDef.disabled,
         hidden = pageDef.hidden,
         order = pageDef.order,

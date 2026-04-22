@@ -698,7 +698,7 @@ local function ensureSectionHeaderRow(content, headers, sectionKey, title)
 
     row = CreateFrame("Frame", nil, content)
     row:SetHeight(28)
-    row._title = internal.createSubheaderTitle(row, title)
+    row._title = internal.createHeaderTitle(row, title)
     headers[sectionKey] = row
     return row
 end
@@ -750,8 +750,9 @@ local function refreshSectionedCollection(frame, data)
 
     for _, section in ipairs(sections) do
         local sectionKey = section.key or section.name or tostring(_)
-        local header = ensureSectionHeaderRow(content, headers, sectionKey, section.title or section.name or "")
-        header._title:SetText(section.title or section.name or "")
+        local titleText = section.title or section.name or ""
+        local header = ensureSectionHeaderRow(content, headers, sectionKey, titleText)
+        header._title:SetText(titleText)
         header:ClearAllPoints()
         header:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
         header:SetPoint("RIGHT", content, "RIGHT", 0, 0)

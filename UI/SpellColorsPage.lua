@@ -509,20 +509,6 @@ local function createSpellColorPageActionsRow(refreshPage)
                     removeAllStaleSpellColors(refreshPage)
                 end,
             },
-            {
-                text = L["RESET"],
-                width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
-                enabled = function()
-                    return canResetAnySpellColorSection()
-                end,
-                onClick = function()
-                    if not canResetAnySpellColorSection() then
-                        return
-                    end
-
-                    resetAllSpellColors(refreshPage)
-                end,
-            },
         },
     }
 end
@@ -565,7 +551,7 @@ local function createSpellColorListRow(section, refreshPage)
         id = section.key .. "SpellColorCollection",
         type = "list",
         variant = "swatch",
-        height = 260,
+        height = 180,
         rowHeight = C.SCROLL_ROW_HEIGHT_COMPACT,
         items = function()
             return buildSpellColorItems(section, refreshPage)
@@ -670,10 +656,26 @@ end
 ---@return table
 function SpellColorsPage.CreatePage(subcatName)
     if not pageSpec then
+        local function refreshRegisteredPage()
+            if registeredPage then
+                registeredPage:Refresh()
+            end
+        end
+
         pageSpec = {
             key = "spellColors",
             name = subcatName,
             rows = {},
+            onDefault = function()
+                if not canResetAnySpellColorSection() then
+                    return
+                end
+
+                resetAllSpellColors(refreshRegisteredPage)
+            end,
+            onDefaultEnabled = function()
+                return canResetAnySpellColorSection()
+            end,
         }
         pageSpec.SetRegisteredPage = SpellColorsPage.SetRegisteredPage
         SpellColorsPage._pageSpec = pageSpec
