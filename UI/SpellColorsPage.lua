@@ -210,13 +210,6 @@ local function refreshSpellColors(refreshPage)
     refreshPage()
 end
 
-local function applySpellColorChange(rowFrame, color)
-    ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    if rowFrame and rowFrame._swatch and rowFrame._swatch.SetColorRGB then
-        rowFrame._swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
-    end
-end
-
 ---@param section table
 ---@return boolean
 local function isSpellColorSectionDisabled(section)
@@ -326,8 +319,9 @@ local function removeStaleSpellColorSection(section)
 end
 
 ---@param section table
+---@param refreshPage fun()
 ---@return table[]
-local function buildSpellColorItems(section)
+local function buildSpellColorItems(section, refreshPage)
     local items = {}
     local rows = getSectionSpellColorRows(section)
     local spellColors = getSpellColors(section.scope)
@@ -351,14 +345,16 @@ local function buildSpellColorItems(section)
             enabled = function()
                 return not isInteractionDisabled()
             end,
-            onClick = function(_, rowFrame)
+            onClick = function()
                 if isInteractionDisabled() then
                     return
                 end
 
                 ns.OptionUtil.OpenColorPicker(spellColors:GetDefaultColor(), false, function(color)
                     spellColors:SetDefaultColor(color)
-                    applySpellColorChange(rowFrame, color)
+                    refreshSpellColors(function()
+                        doRefreshPage(refreshPage)
+                    end)
                 end)
             end,
         },
@@ -373,7 +369,7 @@ local function buildSpellColorItems(section)
                 enabled = function()
                     return not isInteractionDisabled()
                 end,
-                onClick = function(_, rowFrame)
+                onClick = function()
                     if isInteractionDisabled() then
                         return
                     end
@@ -381,7 +377,9 @@ local function buildSpellColorItems(section)
                     local current = spellColors:GetColorByKey(row.key) or spellColors:GetDefaultColor()
                     ns.OptionUtil.OpenColorPicker(current, false, function(color)
                         spellColors:SetColorByKey(row.key, color)
-                        applySpellColorChange(rowFrame, color)
+                        refreshSpellColors(function()
+                            doRefreshPage(refreshPage)
+                        end)
                     end)
                 end,
             },

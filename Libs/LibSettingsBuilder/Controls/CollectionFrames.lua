@@ -321,42 +321,6 @@ end
 local ACTION_BUTTON_ORDER = { "up", "down", "move", "delete" }
 local ACTION_BUTTON_SPACING = 2
 
-local function ensureActionButtonIcon(button)
-    if button._lsbActionIcon then
-        return button._lsbActionIcon
-    end
-
-    local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
-    icon:Hide()
-    button._lsbActionIcon = icon
-    return icon
-end
-
-local function applyActionButtonIcon(button, action, enabled)
-    local icon = button._lsbActionIcon
-    local iconTexture = action and action.iconTexture
-    if not iconTexture then
-        if icon then
-            setTextureValue(icon, nil)
-            icon:Hide()
-        end
-        return
-    end
-
-    icon = ensureActionButtonIcon(button)
-    icon:ClearAllPoints()
-    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
-    icon:SetSize(action.iconSize or 16, action.iconSize or 16)
-    icon:SetAlpha(enabled == false and (action.disabledIconAlpha or 0.35) or (action.iconAlpha or 1))
-    setTextureValue(icon, iconTexture)
-    icon:Show()
-
-    if button.SetText then
-        button:SetText("")
-    end
-end
-
 local function ensureActionsCollectionRow(row)
     if row._lsbActionsRow then
         return
@@ -415,7 +379,6 @@ local function refreshActionsCollectionRow(row, item)
                 enabled = true
             end
             applyActionButtonTextures(button, action, enabled)
-            applyActionButtonIcon(button, action, enabled)
             if button.SetEnabled then
                 button:SetEnabled(enabled)
             end

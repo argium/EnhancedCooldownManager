@@ -123,9 +123,9 @@ function Options:OnInitialize()
         sections = sections,
     })
 
-    if ns.ExtraIconsOptionsUtil then
-        ns.ExtraIconsOptionsUtil.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
-        ns.ExtraIconsOptionsUtil.EnsureItemLoadFrame()
+    if ns.ExtraIconsOptions and ns.ExtraIconsOptions.SetRegisteredPage then
+        ns.ExtraIconsOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
+        ns.ExtraIconsOptions.EnsureItemLoadFrame()
     end
     if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
         ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))

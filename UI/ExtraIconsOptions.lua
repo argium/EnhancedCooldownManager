@@ -56,9 +56,7 @@ for _, racial in pairs(RACIAL_ABILITIES) do
 end
 
 local ExtraIconsOptions = ns.ExtraIconsOptions or {}
-local Util = ns.ExtraIconsOptionsUtil or {}
 ns.ExtraIconsOptions = ExtraIconsOptions
-ns.ExtraIconsOptionsUtil = Util
 
 ExtraIconsOptions._pendingItemLoads = ExtraIconsOptions._pendingItemLoads or {}
 ExtraIconsOptions._draftStates = ExtraIconsOptions._draftStates or {}
@@ -70,9 +68,6 @@ local registeredPage
 for _, viewerKey in ipairs(VIEWER_ORDER) do
     draftStates[viewerKey] = draftStates[viewerKey] or { kind = "spell", idText = "" }
 end
-
-Util.IsDisabled = isDisabled
-Util.VIEWER_COLLECTION_HEIGHT = VIEWER_COLLECTION_HEIGHT
 
 local function getProfile() return ns.Addon.db.profile end
 local function getViewers() return getProfile().extraIcons.viewers end
@@ -219,7 +214,7 @@ local function showRowTooltip(owner, rowData)
     end
 
     local displayEntry = rowData.displayEntry
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:SetOwner(owner, "ANCHOR_CURSOR")
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
@@ -553,9 +548,9 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
     return rows
 end
 
-function Util.SetRegisteredPage(page) registeredPage = page end
+function ExtraIconsOptions.SetRegisteredPage(page) registeredPage = page end
 
-function Util.EnsureItemLoadFrame()
+function ExtraIconsOptions.EnsureItemLoadFrame()
     local itemLoadFrame = ExtraIconsOptions._itemLoadFrame
     if not itemLoadFrame then
         itemLoadFrame = CreateFrame("Frame")
@@ -767,7 +762,7 @@ local function buildModeInputTrailer(viewerKey)
     }
 end
 
-function Util.BuildSections()
+function ExtraIconsOptions.BuildSections()
     local viewers = getViewers()
     local sections = {}
     for _, viewerKey in ipairs(VIEWER_ORDER) do
@@ -787,7 +782,7 @@ function Util.BuildSections()
     return sections
 end
 
-function Util.ResetToDefaults()
+function ExtraIconsOptions.ResetToDefaults()
     local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
     if not (defaults and defaults.extraIcons) then
         return
@@ -809,7 +804,7 @@ ExtraIconsOptions.pages = {
         key = "main",
         onShow = function()
             ns.Runtime.SetLayoutPreview(true)
-            Util.EnsureItemLoadFrame()
+            ExtraIconsOptions.EnsureItemLoadFrame()
         end,
         onHide = function()
             ns.Runtime.SetLayoutPreview(false)
@@ -824,10 +819,10 @@ ExtraIconsOptions.pages = {
                 end,
             },
             {
-                id = "viewers", type = "sectionList", height = Util.VIEWER_COLLECTION_HEIGHT,
-                disabled = Util.IsDisabled,
-                sections = Util.BuildSections,
-                onDefault = Util.ResetToDefaults,
+                id = "viewers", type = "sectionList", height = VIEWER_COLLECTION_HEIGHT,
+                disabled = isDisabled,
+                sections = ExtraIconsOptions.BuildSections,
+                onDefault = ExtraIconsOptions.ResetToDefaults,
             },
         },
     },

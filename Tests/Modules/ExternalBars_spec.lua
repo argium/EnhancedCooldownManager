@@ -628,6 +628,11 @@ describe("ExternalBars real source", function()
         assert.are.equal(1, logEntry.payload.auraCount)
         assert.is_true(logEntry.payload.viewerShown)
         assert.are.equal("table", logEntry.payload.auraInfoType)
+        assert.is_table(logEntry.payload.diagnostics)
+        assert.is_true(logEntry.payload.diagnostics.viewerExists)
+        assert.is_true(logEntry.payload.diagnostics.viewerHooked)
+        assert.are.equal(1, logEntry.payload.diagnostics.auraInfoArrayCount)
+        assert.are.equal(1, logEntry.payload.diagnostics.auraFramesArrayCount)
         assert.are.equal(1, #logEntry.payload.auras)
         assert.same({
             index = 1,
@@ -641,6 +646,60 @@ describe("ExternalBars real source", function()
             canShowDurationText = true,
             hasRenderableDuration = true,
         }, logEntry.payload.auras[1])
+    end)
+
+    it("emits hook diagnostics when the Blizzard viewer is missing", function()
+        debugLoggingEnabled = true
+        _G.ExternalDefensivesFrame = nil
+
+        ExternalBars:HookViewer()
+
+        local logEntry = assert(findLogCall("HookViewer skipped"))
+        assert.are.equal("missing-viewer", logEntry.payload.reason)
+        assert.is_false(logEntry.payload.diagnostics.viewerExists)
+        assert.is_false(logEntry.payload.diagnostics.viewerHooked)
+    end)
+
+    it("emits rendered bar diagnostics during layout", function()
+        debugLoggingEnabled = true
+
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                timeMod = 1.5,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        assert.is_true(syncAndLayout("diagnostics"))
+
+        local logEntry = assert(findLogCall("UpdateLayout (diagnostics)"))
+        assert.is_table(logEntry.payload.diagnostics)
+        assert.is_true(logEntry.payload.diagnostics.frameCreated)
+        assert.is_true(logEntry.payload.diagnostics.viewerExists)
+        assert.are.equal(1, logEntry.payload.diagnostics.activeAuraCount)
+        assert.are.equal(1, #logEntry.payload.bars)
+        assert.same({
+            index = 1,
+            auraIndex = 1,
+            auraInstanceID = 11,
+            name = "Ironbark",
+            spellID = 102342,
+            texture = 5011,
+            durationIsSecret = false,
+            canShowDurationText = true,
+            hasRenderableDuration = true,
+            barExists = true,
+            barShown = true,
+            barWidth = 0,
+            barHeight = 18,
+            iconShown = true,
+            iconTexture = 5011,
+            cooldownSpellID = 102342,
+        }, logEntry.payload.bars[1])
     end)
 
     it("hides duration text but still configures cooldown and schedules the all-secret color retry path", function()

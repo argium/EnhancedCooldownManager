@@ -832,8 +832,8 @@ describe("ExtraIconsOptions settings page", function()
         capturedPage = ns.ExtraIconsOptions.pages[1]
         local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
         registeredPage = page
-        ns.ExtraIconsOptionsUtil.SetRegisteredPage(page)
-        ns.ExtraIconsOptionsUtil.EnsureItemLoadFrame()
+        ns.ExtraIconsOptions.SetRegisteredPage(page)
+        ns.ExtraIconsOptions.EnsureItemLoadFrame()
         registeredPage.Refresh = function()
             refreshCalls[#refreshCalls + 1] = registeredPage._category
         end
@@ -1197,6 +1197,7 @@ describe("ExtraIconsOptions settings page", function()
             return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
         end))
         placeholder.onEnter(CreateFrame("Frame"))
+        assert.are.equal("ANCHOR_CURSOR", _G.GameTooltip._anchor)
         assert.are.equal(ns.L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"], _G.GameTooltip._lines[1])
 
         local duplicateMove = assert(findItem("utility", function(item)

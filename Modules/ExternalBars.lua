@@ -51,6 +51,58 @@ local function getViewer()
     return _G["ExternalDefensivesFrame"]
 end
 
+---@param frame Frame|nil
+---@return boolean|nil
+local function getFrameShown(frame)
+    return frame and frame.IsShown and frame:IsShown() or nil
+end
+
+---@param frame Frame|nil
+---@return number|nil
+local function getFrameAlpha(frame)
+    return frame and frame.GetAlpha and frame:GetAlpha() or nil
+end
+
+---@param frame Frame|nil
+---@return number|nil
+local function getFrameWidth(frame)
+    return frame and frame.GetWidth and frame:GetWidth() or nil
+end
+
+---@param frame Frame|nil
+---@return number|nil
+local function getFrameHeight(frame)
+    return frame and frame.GetHeight and frame:GetHeight() or nil
+end
+
+---@param tbl table|nil
+---@return number|nil
+local function countAccessibleArray(tbl)
+    if type(tbl) ~= "table" or not canAccessTable(tbl) then
+        return nil
+    end
+
+    local count = 0
+    for index in ipairs(tbl) do
+        count = index
+    end
+    return count
+end
+
+---@param tbl table|nil
+---@return number|nil
+local function countAccessibleKeys(tbl)
+    if type(tbl) ~= "table" or not canAccessTable(tbl) then
+        return nil
+    end
+
+    local count = 0
+    for _ in pairs(tbl) do
+        count = count + 1
+    end
+    return count
+end
+
 ---@param point string|nil
 ---@return boolean
 local function pointGrowsUp(point)
@@ -139,6 +191,88 @@ end
 ---@return number
 function ExternalBars:_GetBarHeight(styleConfig, globalConfig)
     return (styleConfig and styleConfig.height) or (globalConfig and globalConfig.barHeight) or C.DEFAULT_BAR_HEIGHT
+end
+
+---@param viewer Frame|nil
+---@param auraInfo table|nil
+---@return table
+function ExternalBars:_GetDiagnostics(viewer, auraInfo)
+    viewer = viewer or getViewer()
+    if auraInfo == nil and viewer then
+        auraInfo = viewer.auraInfo
+    end
+
+    local moduleConfig = self:GetModuleConfig()
+    local frame = self.InnerFrame
+    local auraFrames = viewer and viewer.auraFrames or nil
+
+    local moduleConfigEnabled = nil
+    if moduleConfig then
+        moduleConfigEnabled = moduleConfig.enabled ~= false
+    end
+
+    local viewerHasUpdateAuras = false
+    if viewer then
+        viewerHasUpdateAuras = type(viewer.UpdateAuras) == "function"
+    end
+
+    return {
+        moduleEnabled = self.IsEnabled and self:IsEnabled() or nil,
+        moduleConfigEnabled = moduleConfigEnabled,
+        moduleHidden = self.IsHidden == true,
+        frameCreated = frame ~= nil,
+        frameShown = getFrameShown(frame),
+        frameWidth = getFrameWidth(frame),
+        frameHeight = getFrameHeight(frame),
+        viewerExists = viewer ~= nil,
+        viewerShown = getFrameShown(viewer),
+        viewerAlpha = getFrameAlpha(viewer),
+        viewerHooked = self._viewerHooked == true,
+        viewerHasUpdateAuras = viewerHasUpdateAuras,
+        originalIconsHidden = self._originalIconsHidden == true,
+        activeAuraCount = self._activeAuraCount or 0,
+        auraInfoType = type(auraInfo),
+        auraInfoArrayCount = countAccessibleArray(auraInfo),
+        auraInfoKeyCount = countAccessibleKeys(auraInfo),
+        auraFramesType = type(auraFrames),
+        auraFramesArrayCount = countAccessibleArray(auraFrames),
+        auraFramesKeyCount = countAccessibleKeys(auraFrames),
+    }
+end
+
+---@param index number
+---@param bar ECM_ExternalBarMixin|nil
+---@param auraState ECM_ExternalAuraState|nil
+---@return table
+function ExternalBars:_GetBarDiagnostics(index, bar, auraState)
+    local iconTexture = bar and bar._iconTexture or nil
+    local durationIsSecret = nil
+    local canShowDurationText = nil
+    local hasRenderableDuration = nil
+    if auraState then
+        durationIsSecret = auraState.durationIsSecret
+        canShowDurationText = auraState.canShowDurationText
+        hasRenderableDuration = auraState.hasRenderableDuration
+    end
+
+    return {
+        index = index,
+        auraIndex = auraState and auraState.index or nil,
+        auraInstanceID = auraState and auraState.auraInstanceID or nil,
+        name = auraState and auraState.name or nil,
+        spellID = auraState and auraState.spellID or nil,
+        texture = auraState and auraState.texture or nil,
+        durationIsSecret = durationIsSecret,
+        canShowDurationText = canShowDurationText,
+        hasRenderableDuration = hasRenderableDuration,
+        barExists = bar ~= nil,
+        barShown = getFrameShown(bar),
+        barWidth = getFrameWidth(bar),
+        barHeight = getFrameHeight(bar),
+        iconShown = bar and bar.Icon and getFrameShown(bar.Icon) or nil,
+        iconTexture = iconTexture and iconTexture.GetTexture and iconTexture:GetTexture() or nil,
+        cooldownSpellID = bar and bar.cooldownInfo and bar.cooldownInfo.spellID or nil,
+    }
 end
 
 ---@param hidden boolean
@@ -332,6 +466,13 @@ end
 ---@param activeCount number
 function ExternalBars:_hideExcessBars(activeCount)
     local barPool = self._barPool or {}
+    if ns.IsDebugEnabled() and #barPool > activeCount then
+        ns.Log(self.Name, "Hiding excess external bars", {
+            activeCount = activeCount,
+            pooledBars = #barPool,
+        })
+    end
+
     for index = activeCount + 1, #barPool do
         local bar = barPool[index]
         if bar then
@@ -416,12 +557,33 @@ function ExternalBars:CreateFrame()
     local frame = CreateFrame("Frame", "ECMExternalBars", UIParent)
     frame:SetFrameStrata("MEDIUM")
     frame:SetSize(1, 1)
+    ns.Log(self.Name, "Frame created", {
+        frameName = "ECMExternalBars",
+        frameWidth = frame:GetWidth(),
+        frameHeight = frame:GetHeight(),
+    })
     return frame
 end
 
 function ExternalBars:HookViewer()
     local viewer = getViewer()
-    if not viewer or self._viewerHooked then
+    if not viewer then
+        if ns.IsDebugEnabled() then
+            ns.Log(self.Name, "HookViewer skipped", {
+                reason = "missing-viewer",
+                diagnostics = self:_GetDiagnostics(viewer),
+            })
+        end
+        return
+    end
+
+    if self._viewerHooked then
+        if ns.IsDebugEnabled() then
+            ns.Log(self.Name, "HookViewer skipped", {
+                reason = "already-hooked",
+                diagnostics = self:_GetDiagnostics(viewer),
+            })
+        end
         return
     end
 
@@ -451,7 +613,7 @@ function ExternalBars:HookViewer()
         ns.Runtime.RequestLayout("ExternalBars:viewer:OnHide")
     end)
 
-    ns.Log(self.Name, "Hooked ExternalDefensivesFrame")
+    ns.Log(self.Name, "Hooked ExternalDefensivesFrame", self:_GetDiagnostics(viewer))
 end
 
 function ExternalBars:OnExternalAurasUpdated()
@@ -532,8 +694,10 @@ function ExternalBars:OnExternalAurasUpdated()
 
     if debugEnabled then
         ns.Log(self.Name, "OnExternalAurasUpdated", {
+            diagnostics = self:_GetDiagnostics(viewer, auraInfo),
             viewerShown = viewer ~= nil and viewer:IsShown() or false,
             viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+            viewerHooked = self._viewerHooked == true,
             hideOriginalIcons = self._originalIconsHidden == true,
             runtimeOriginalIconsHidden = self._originalIconsHidden == true,
             auraCount = activeAuraCount,
@@ -555,6 +719,7 @@ function ExternalBars:UpdateLayout(why)
             ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
                 applied = false,
                 reason = "no-frame",
+                diagnostics = self:_GetDiagnostics(),
                 activeAuraCount = self._activeAuraCount or 0,
             })
         end
@@ -581,6 +746,7 @@ function ExternalBars:UpdateLayout(why)
             ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
                 applied = false,
                 reason = "no-position",
+                diagnostics = self:_GetDiagnostics(),
                 activeAuraCount = self._activeAuraCount or 0,
             })
         end
@@ -599,6 +765,7 @@ function ExternalBars:UpdateLayout(why)
 
     local activeAuraCount = self._activeAuraCount or 0
     local auraStates = self._auraStates or {}
+    local barDiagnostics = debugEnabled and {} or nil
     local ok, err = pcall(function()
         for index = 1, activeAuraCount do
             local auraState = auraStates[index]
@@ -606,6 +773,9 @@ function ExternalBars:UpdateLayout(why)
                 local bar = self:_ensureBar(index)
                 self:_ConfigureBar(bar, auraState, moduleConfig, globalConfig, styleConfig, spellColors)
                 activeBars[#activeBars + 1] = bar
+                if barDiagnostics then
+                    barDiagnostics[#barDiagnostics + 1] = self:_GetBarDiagnostics(index, bar, auraState)
+                end
 
                 local textureFileID = FrameUtil.GetIconTextureFileID(bar)
                 local textureIsSecret = issecretvalue(textureFileID)
@@ -626,6 +796,14 @@ function ExternalBars:UpdateLayout(why)
     if not ok then
         self:_hideExcessBars(0)
         self:_StopDurationTicker()
+        if debugEnabled then
+            ns.Log(self.Name, "UpdateLayout error", {
+                error = tostring(err),
+                diagnostics = self:_GetDiagnostics(),
+                activeAuraCount = activeAuraCount,
+                bars = barDiagnostics,
+            })
+        end
         ns.DebugAssert(false, "Error styling external bars: " .. tostring(err))
         return false
     end
@@ -640,10 +818,13 @@ function ExternalBars:UpdateLayout(why)
 
     local viewer = getViewer()
     ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+        diagnostics = self:_GetDiagnostics(viewer),
         activeAuraCount = activeAuraCount,
         barCount = barCount,
+        bars = barDiagnostics,
         viewerShown = viewer ~= nil and viewer:IsShown() or false,
         viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+        viewerHooked = self._viewerHooked == true,
         hideOriginalIcons = self._originalIconsHidden == true,
         runtimeOriginalIconsHidden = self._originalIconsHidden == true,
         editLocked = self._editLocked == true,
@@ -667,6 +848,7 @@ function ExternalBars:OnEnable()
 
     self:EnsureFrame()
     ns.Runtime.RegisterFrame(self)
+    ns.Log(self.Name, "OnEnable", self:_GetDiagnostics())
 
     C_Timer.After(0.1, function()
         if not self:IsEnabled() then
