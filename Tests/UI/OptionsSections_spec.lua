@@ -73,6 +73,7 @@ describe("Options root assembly", function()
         }
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "OptionUtil")(nil, ns)
+        TestHelpers.LoadChunk("UI/AboutOptions.lua", "Unable to load UI/AboutOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
         local function placeholderSection(key, name)
@@ -133,6 +134,7 @@ describe("Options root assembly", function()
         local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
+        TestHelpers.LoadChunk("UI/AdvancedOptions.lua", "AdvancedOptions")(nil, ns)
 
         assert.are.equal("general", ns.GeneralOptions.key)
         assert.are.equal(ns.L["GENERAL"], ns.GeneralOptions.name)
@@ -146,7 +148,7 @@ describe("Options root assembly", function()
         assert.are.equal(ns.L["ADVANCED_OPTIONS"], ns.AdvancedOptions.name)
         assert.are.equal("global", ns.AdvancedOptions.path)
         assert.are.equal(1, #ns.AdvancedOptions.pages)
-        assert.are.equal(7, #ns.AdvancedOptions.pages[1].rows)
-        assert.are.equal("button", ns.AdvancedOptions.pages[1].rows[5].type)
+        assert.are.equal(5, #ns.AdvancedOptions.pages[1].rows)
+        assert.are.equal("slider", ns.AdvancedOptions.pages[1].rows[5].type)
     end)
 end)

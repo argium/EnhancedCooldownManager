@@ -641,6 +641,9 @@ local function createColorSwatch(parent)
     if swatch.RegisterForClicks then
         swatch:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     end
+    if swatch.SetPropagateMouseClicks then
+        swatch:SetPropagateMouseClicks(false)
+    end
     return swatch
 end
 internal.createColorSwatch = createColorSwatch

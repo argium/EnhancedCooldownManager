@@ -154,6 +154,11 @@
 ---@field text string|nil Gets the button label.
 ---@field width number|nil Gets the button width.
 ---@field height number|nil Gets the button height.
+---@field buttonTextures table|nil Gets optional full-button texture states.
+---@field iconTexture string|number|nil Gets the optional centered icon texture drawn over the default button chrome.
+---@field iconSize number|nil Gets the optional centered icon size.
+---@field iconAlpha number|nil Gets the optional enabled icon alpha.
+---@field disabledIconAlpha number|nil Gets the optional disabled icon alpha.
 ---@field enabled boolean|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): boolean|nil)|nil Gets the enabled predicate or static enabled flag.
 ---@field hidden boolean|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): boolean|nil)|nil Gets the hidden predicate or static hidden flag.
 ---@field tooltip string|(fun(action: LibSettingsBuilderPageActionConfig, frame: Frame): string|nil)|nil Gets the tooltip text or tooltip resolver.

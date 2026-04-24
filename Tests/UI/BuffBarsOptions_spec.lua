@@ -721,7 +721,51 @@ describe("BuffBarsOptions", function()
 
         assert.are.same(selectedColor, BuffSpellColors:GetDefaultColor())
         assert.are.equal("OptionsChanged", scheduledReason)
-        assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
+        assert.are.same({}, refreshCalls)
+    end)
+
+    it("does not refresh the spell colors page while applying repeated swatch color changes", function()
+        local buffKey = SpellColors.MakeKey("Repeat Click", 111, 222, 333)
+        local pickedColors = {
+            { r = 0.2, g = 0.3, b = 0.4, a = 1 },
+            { r = 0.7, g = 0.6, b = 0.5, a = 1 },
+        }
+        local pickerCalls, scheduledCalls = 0, 0
+        local appliedSwatchColors = {}
+        local rowFrame = {
+            _swatch = {
+                SetColorRGB = function(_, r, g, b)
+                    appliedSwatchColors[#appliedSwatchColors + 1] = { r = r, g = g, b = b }
+                end,
+            },
+        }
+
+        BuffSpellColors:SetColorByKey(buffKey, { r = 1, g = 1, b = 1, a = 1 })
+
+        ns.OptionUtil.OpenColorPicker = function(_, hasOpacity, onChange)
+            pickerCalls = pickerCalls + 1
+            assert.is_false(hasOpacity)
+            onChange(pickedColors[pickerCalls])
+        end
+        ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
+            scheduledCalls = scheduledCalls + 1
+            assert.are.equal("OptionsChanged", reason)
+        end
+
+        local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
+        local item = getSpellColorCollectionItems(spellColorsSpec, "buffBars")[2]
+
+        item.color.onClick(item, rowFrame)
+        item.color.onClick(item, rowFrame)
+
+        assert.are.equal(2, pickerCalls)
+        assert.are.equal(2, scheduledCalls)
+        assert.are.same(pickedColors[2], BuffSpellColors:GetColorByKey(buffKey))
+        assert.are.same({
+            { r = pickedColors[1].r, g = pickedColors[1].g, b = pickedColors[1].b },
+            { r = pickedColors[2].r, g = pickedColors[2].g, b = pickedColors[2].b },
+        }, appliedSwatchColors)
+        assert.are.same({}, refreshCalls)
     end)
 
     it("header actions disable reconcile and remove stale when every row is complete", function()

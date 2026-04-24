@@ -43,7 +43,6 @@ describe("ExtraIconsOptions data helpers", function()
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
         }
-        TestHelpers.LoadChunk("UI/ExtraIconsOptionsUtil.lua", "ExtraIconsOptionsUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
     end)
@@ -706,42 +705,30 @@ describe("ExtraIconsOptions data helpers", function()
             assert.are.equal("healthstones", rows[3].displayEntry.stackKey)
         end)
 
-        it("falls back to known racial spells when UnitRace lookup misses", function()
+        it("matches Shadowmeld from the UnitRace race file token", function()
             local viewers = {
                 utility = {},
                 main = {},
             }
 
-            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
-            _G.C_SpellBook = {
-                IsSpellKnown = function(spellId)
-                    return spellId == 59752
-                end,
-            }
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-
-            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
-            assert.are.equal(59752, rows[#rows].spellId)
-        end)
-
-        it("falls back to spellbook-known racials for Shadowmeld", function()
-            local viewers = {
-                utility = {},
-                main = {},
-            }
-
-            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
-            _G.C_SpellBook = {
-                IsSpellKnown = function(spellId)
-                    return spellId == 58984
-                end,
-            }
+            _G.UnitRace = function() return "Night Elf", "NightElf", 4 end
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
 
             assert.are.equal("racialPlaceholder", rows[#rows].rowType)
             assert.are.equal(58984, rows[#rows].spellId)
+        end)
+
+        it("does not synthesize a racial placeholder when UnitRace has no matching race file token", function()
+            local viewers = {
+                utility = {},
+                main = {},
+            }
+
+            _G.UnitRace = function() return "Night Elf", nil, 4 end
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+
+            assert.are_not.equal("racialPlaceholder", rows[#rows].rowType)
         end)
     end)
 end)
@@ -841,7 +828,6 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
-        TestHelpers.LoadChunk("UI/ExtraIconsOptionsUtil.lua", "ExtraIconsOptionsUtil")(nil, ns)
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         capturedPage = ns.ExtraIconsOptions.pages[1]
         local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
@@ -893,7 +879,7 @@ describe("ExtraIconsOptions settings page", function()
         end))
     end)
 
-    it("maps row actions to the addon icon button textures", function()
+    it("maps row actions to built-in button icons", function()
         _G.C_Spell = {
             GetSpellName = function(spellId)
                 return spellId == 12345 and "Test Spell" or nil
@@ -911,36 +897,37 @@ describe("ExtraIconsOptions settings page", function()
             return item.label == "Test Spell"
         end))
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_up_normal",
-            custom.actions.up.buttonTextures.normal
+            "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
+            custom.actions.up.iconTexture
         )
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\move_down_normal",
-            custom.actions.down.buttonTextures.normal
+            "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
+            custom.actions.down.iconTexture
         )
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\swap_normal",
-            custom.actions.move.buttonTextures.normal
+            "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
+            custom.actions.move.iconTexture
         )
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\delete_normal",
-            custom.actions.delete.buttonTextures.normal
+            "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+            custom.actions.delete.iconTexture
         )
+        assert.is_nil(custom.actions.delete.buttonTextures)
 
         local activeBuiltin = assert(findItem("utility", function(item)
             return item.label == "Healthstones"
         end))
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\hide_normal",
-            activeBuiltin.actions.delete.buttonTextures.normal
+            "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
+            activeBuiltin.actions.delete.iconTexture
         )
 
         local builtinPlaceholder = assert(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
         end))
         assert.are.equal(
-            "Interface\\AddOns\\EnhancedCooldownManager\\Media\\show_normal",
-            builtinPlaceholder.actions.delete.buttonTextures.normal
+            "Interface\\Buttons\\UI-PlusButton-Up",
+            builtinPlaceholder.actions.delete.iconTexture
         )
     end)
 

@@ -113,4 +113,29 @@ describe("LibSettingsBuilder Collections", function()
         assert.are.equal("SettingsListElementTemplate", sectionInit._template)
         assert.is_function(page.Refresh)
     end)
+
+    it("prevents embedded color swatch clicks from selecting the host settings row", function()
+        local created
+        _G.CreateFrame = function()
+            created = {
+                EnableMouse = function(self, enabled)
+                    self._mouseEnabled = enabled
+                end,
+                RegisterForClicks = function(self, ...)
+                    self._registeredClicks = { ... }
+                end,
+                SetPropagateMouseClicks = function(self, propagate)
+                    self._propagateMouseClicks = propagate
+                end,
+            }
+            return created
+        end
+
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local swatch = lsb._internal.createColorSwatch(TestHelpers.makeFrame())
+
+        assert.are.equal(created, swatch)
+        assert.is_true(swatch._mouseEnabled)
+        assert.is_false(swatch._propagateMouseClicks)
+    end)
 end)

@@ -254,8 +254,6 @@ L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"] = "Item ID"
 L["EXTRA_ICONS_ITEM_LOADING"] = "Loading item..."
 L["ADD_ENTRY"] = "Add"
 L["EXTRA_ICONS_NO_ENTRIES"] = "No icons configured for this viewer."
-L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"] =
-    "Special rows: built-ins use x to hide and + to enable. Custom rows use x to remove. Disabled rows stay listed but are hidden in the real viewers."
 L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"] = "The most powerful item in this set will be displayed:"
 L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"] = "Toggle between adding a spell ID or an item ID."
 L["EXTRA_ICONS_DUPLICATE_ENTRY"] = "Already in %s"

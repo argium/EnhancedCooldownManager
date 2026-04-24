@@ -49,15 +49,16 @@ Modules\RuneBar.lua
 Modules\ExtraIcons.lua
 
 UI\OptionUtil.lua
+UI\AboutOptions.lua
 UI\Options.lua
 UI\PowerBarTickMarksOptions.lua
 UI\GeneralOptions.lua
+UI\AdvancedOptions.lua
 UI\LayoutOptions.lua
 UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
-UI\ExtraIconsOptionsUtil.lua
 UI\ExtraIconsOptions.lua
 UI\SpellColorsPage.lua
 UI\BuffBarsOptions.lua

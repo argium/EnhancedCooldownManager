@@ -83,6 +83,7 @@ describe("OptionUtil", function()
         end
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/AboutOptions.lua", "Unable to load UI/AboutOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
         optionsModule = ns.Addon._modules.Options
     end)
@@ -98,7 +99,7 @@ describe("OptionUtil", function()
 
             assert.is_table(registeredPage)
             assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetId())
-            assert.are.equal(6, #rows)
+            assert.are.equal(8, #rows)
             assert.are.equal("info", rows[1].type)
             assert.are.equal("info", rows[2].type)
             assert.are.equal("info", rows[3].type)
@@ -106,6 +107,8 @@ describe("OptionUtil", function()
             assert.are.equal(ns.L["LINKS"], rows[4].name)
             assert.are.equal("button", rows[5].type)
             assert.are.equal("button", rows[6].type)
+            assert.are.equal("header", rows[7].type)
+            assert.are.equal("button", rows[8].type)
         end)
     end)
 
