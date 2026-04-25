@@ -14,7 +14,6 @@ local BUILTIN_STACK_ORDER = C.BUILTIN_STACK_ORDER
 local RACIAL_ABILITIES = C.RACIAL_ABILITIES
 
 local VIEWER_COLLECTION_HEIGHT = 448
-local VIEWER_SECTION_HEADER_HEIGHT = 50
 local ACTION_ICON_BUTTON_SIZE = 20
 local DEFAULT_SPECIAL_VIEWER = "utility"
 local VIEWER_ORDER = { "utility", "main" }
@@ -27,18 +26,43 @@ local VIEWER_SHORT_LABELS = {
     main = L["MAIN_VIEWER_SHORT"],
 }
 
-local ACTION_BUTTON_ICONS = {
-    delete = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-    hide = "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
-    moveDown = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
-    moveLeft = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
-    moveRight = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
-    moveUp = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
-    show = "Interface\\Buttons\\UI-PlusButton-Up",
+local ACTION_BUTTON_TEXTURES = {
+    delete = {
+        normal = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+        pushed = "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
+        disabled = "Interface\\Buttons\\UI-GroupLoot-Pass-Disabled",
+    },
+    hide = {
+        normal = "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
+        pushed = "Interface\\Buttons\\UI-Panel-MinimizeButton-Down",
+        disabled = "Interface\\Buttons\\UI-Panel-MinimizeButton-Disabled",
+    },
+    moveDown = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Disabled",
+    },
+    moveLeft = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Disabled",
+    },
+    moveRight = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Disabled",
+    },
+    moveUp = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Disabled",
+    },
+    show = {
+        normal = "Interface\\Buttons\\UI-PlusButton-Up",
+        pushed = "Interface\\Buttons\\UI-PlusButton-Down",
+        disabled = "Interface\\Buttons\\UI-PlusButton-Disabled",
+    },
 }
-local ENABLED_LABEL_COLOR = { 1, 0.82, 0, 1 }
-local DISABLED_LABEL_COLOR = { 0.65, 0.65, 0.65, 1 }
-local DISABLED_ICON_COLOR = { 0.6, 0.6, 0.6, 1 }
 
 local BUILTIN_STACK_SET = {}
 local BUILTIN_EQUIP_SLOTS = {}
@@ -598,12 +622,12 @@ local function addDraftEntry(viewerKey)
     return true
 end
 
-local function makeAction(text, iconTexture, enabled, tooltip, onClick)
+local function makeAction(text, buttonTextures, enabled, tooltip, onClick)
     return {
-        text = text,
+        text = buttonTextures and "" or text,
         width = ACTION_ICON_BUTTON_SIZE,
         height = ACTION_ICON_BUTTON_SIZE,
-        iconTexture = iconTexture,
+        buttonTextures = buttonTextures,
         enabled = enabled,
         tooltip = tooltip,
         onClick = onClick,
@@ -622,7 +646,7 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
     if rowData.isBuiltin then
         return makeAction(
             rowData.isDisabled and "+" or "x",
-            rowData.isDisabled and ACTION_BUTTON_ICONS.show or ACTION_BUTTON_ICONS.hide,
+            rowData.isDisabled and ACTION_BUTTON_TEXTURES.show or ACTION_BUTTON_TEXTURES.hide,
             not controlsDisabled,
             rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"],
             profileAction(function(profile)
@@ -637,12 +661,12 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
     end
 
     if rowData.isCurrentRacial and rowData.isPlaceholder then
-        return makeAction("+", ACTION_BUTTON_ICONS.show, not controlsDisabled, L["ADD_ENTRY"], profileAction(function(profile)
+        return makeAction("+", ACTION_BUTTON_TEXTURES.show, not controlsDisabled, L["ADD_ENTRY"], profileAction(function(profile)
             ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellId)
         end))
     end
 
-    return makeAction("x", ACTION_BUTTON_ICONS.delete, not controlsDisabled, L["REMOVE_TOOLTIP"], function()
+    return makeAction("x", ACTION_BUTTON_TEXTURES.delete, not controlsDisabled, L["REMOVE_TOOLTIP"], function()
         StaticPopup_Show("ECM_CONFIRM_REMOVE_EXTRA_ICON", ExtraIconsOptions._getEntryName(displayEntry), nil, {
             onAccept = profileAction(function(profile)
                 ExtraIconsOptions._removeEntry(profile, rowData.viewerKey, rowData.index)
@@ -651,8 +675,8 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
     end)
 end
 
-local function makeReorderAction(rowData, text, iconTexture, enabled, direction)
-    return makeAction(text, iconTexture, enabled, direction < 0 and L["MOVE_UP_TOOLTIP"] or L["MOVE_DOWN_TOOLTIP"],
+local function makeReorderAction(rowData, text, buttonTextures, enabled, direction)
+    return makeAction(text, buttonTextures, enabled, direction < 0 and L["MOVE_UP_TOOLTIP"] or L["MOVE_DOWN_TOOLTIP"],
         profileAction(function(profile)
             ExtraIconsOptions._reorderEntry(profile, rowData.viewerKey, rowData.index, direction)
         end))
@@ -678,16 +702,12 @@ local function buildActionItem(rowData)
     local posLocked = rowData.isBuiltin and rowData.isDisabled
     local canReorder = not controlsDisabled and rowData.activeIndex ~= nil and not posLocked
     local canMove = not controlsDisabled and rowData.index ~= nil and not posLocked and not hasMoveDup
-    local moveIcon = rowData.viewerKey == "utility" and ACTION_BUTTON_ICONS.moveRight or ACTION_BUTTON_ICONS.moveLeft
+    local moveTextures = rowData.viewerKey == "utility" and ACTION_BUTTON_TEXTURES.moveRight or ACTION_BUTTON_TEXTURES.moveLeft
 
     return {
         label = ExtraIconsOptions._getEntryName(displayEntry),
         icon = ExtraIconsOptions._getEntryIcon(displayEntry) or 134400,
-        alpha = rowData.isDisabled and 0.55 or 1,
-        labelFontObject = rowData.isDisabled and (_G.GameFontDisable or _G.GameFontNormal) or _G.GameFontNormal,
-        labelColor = rowData.isDisabled and DISABLED_LABEL_COLOR or ENABLED_LABEL_COLOR,
-        iconDesaturated = rowData.isDisabled == true,
-        iconVertexColor = rowData.isDisabled and DISABLED_ICON_COLOR or nil,
+        disabled = rowData.isDisabled,
         onEnter = function(owner)
             showRowTooltip(owner, rowData)
         end,
@@ -695,12 +715,12 @@ local function buildActionItem(rowData)
             GameTooltip_Hide()
         end,
         actions = {
-            up = makeReorderAction(rowData, "^", ACTION_BUTTON_ICONS.moveUp, canReorder and rowData.activeIndex > 1, -1),
-            down = makeReorderAction(rowData, "v", ACTION_BUTTON_ICONS.moveDown,
+            up = makeReorderAction(rowData, "^", ACTION_BUTTON_TEXTURES.moveUp, canReorder and rowData.activeIndex > 1, -1),
+            down = makeReorderAction(rowData, "v", ACTION_BUTTON_TEXTURES.moveDown,
                 canReorder and rowData.activeIndex < rowData.activeCount, 1),
             move = makeAction(
                 rowData.viewerKey == "utility" and ">" or "<",
-                moveIcon,
+                moveTextures,
                 canMove,
                 function()
                     return getMoveTooltip(hasMoveDup, posLocked, otherViewer)
@@ -773,7 +793,6 @@ function ExtraIconsOptions.BuildSections()
         sections[#sections + 1] = {
             key = viewerKey,
             title = VIEWER_LABELS[viewerKey],
-            headerHeight = VIEWER_SECTION_HEADER_HEIGHT,
             items = items,
             emptyText = L["EXTRA_ICONS_NO_ENTRIES"],
             footer = buildModeInputTrailer(viewerKey),
@@ -811,15 +830,20 @@ ExtraIconsOptions.pages = {
         end,
         rows = {
             {
-                id = "enabled", type = "checkbox", path = "enabled",
-                name = L["ENABLE_EXTRA_ICONS"], tooltip = L["ENABLE_EXTRA_ICONS_DESC"],
+                id = "enabled",
+                type = "checkbox",
+                path = "enabled",
+                name = L["ENABLE_EXTRA_ICONS"],
+                tooltip = L["ENABLE_EXTRA_ICONS_DESC"],
                 onSet = function(ctx, value)
                     ns.OptionUtil.CreateModuleEnabledHandler("ExtraIcons")(ctx, value)
                     ctx.page:Refresh()
                 end,
             },
             {
-                id = "viewers", type = "sectionList", height = VIEWER_COLLECTION_HEIGHT,
+                id = "viewers",
+                type = "sectionList",
+                height = VIEWER_COLLECTION_HEIGHT,
                 disabled = isDisabled,
                 sections = ExtraIconsOptions.BuildSections,
                 onDefault = ExtraIconsOptions.ResetToDefaults,

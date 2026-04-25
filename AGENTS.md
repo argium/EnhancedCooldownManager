@@ -94,6 +94,7 @@ All Lua files start with:
 - Libraries stay self-contained: no ECM internals; tests and docs live with the library; public API changes are intentional and documented.
 - Frame templates must be defined in `.xml`, not via Lua hooks on Blizzard functions like `Settings.CreateElementInitializer`. XML virtual templates with `mixin="GlobalMixinName"` are inherently multi-addon safe via LibStub.
 - Migrations in `Migration.lua` are frozen snapshots and must not depend on live production code.
+- A single style/metric must have a single owner. If a library renders a widget, the library owns its dimensions, padding, fonts, and colors — callers must not redeclare those values, even via "override" knobs that happen to match the default. If every caller would pass the same value, delete the knob and bake it into the library. Override hooks are only justified when callers genuinely need different values.
 
 ---
 

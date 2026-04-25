@@ -858,9 +858,8 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.is_table(opts._draftStates)
         assert.are.equal("checkbox", getRow("enabled").type)
-        assert.are.equal("info", getRow("specialRowsLegend").type)
         assert.are.equal("sectionList", getRow("viewers").type)
-        assert.are.equal(ns.L["EXTRA_ICONS_SPECIAL_ROWS_LEGEND"], getRow("specialRowsLegend").value)
+        assert.are.equal(2, #capturedPage.rows)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()
@@ -879,7 +878,7 @@ describe("ExtraIconsOptions settings page", function()
         end))
     end)
 
-    it("maps row actions to built-in button icons", function()
+    it("maps row actions to built-in button texture states", function()
         _G.C_Spell = {
             GetSpellName = function(spellId)
                 return spellId == 12345 and "Test Spell" or nil
@@ -898,28 +897,36 @@ describe("ExtraIconsOptions settings page", function()
         end))
         assert.are.equal(
             "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
-            custom.actions.up.iconTexture
+            custom.actions.up.buttonTextures.normal
+        )
+        assert.are.equal(
+            "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down",
+            custom.actions.up.buttonTextures.pushed
         )
         assert.are.equal(
             "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
-            custom.actions.down.iconTexture
+            custom.actions.down.buttonTextures.normal
         )
         assert.are.equal(
             "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
-            custom.actions.move.iconTexture
+            custom.actions.move.buttonTextures.normal
         )
         assert.are.equal(
             "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-            custom.actions.delete.iconTexture
+            custom.actions.delete.buttonTextures.normal
         )
-        assert.is_nil(custom.actions.delete.buttonTextures)
+        assert.is_nil(custom.actions.delete.iconTexture)
+        assert.are.equal("", custom.actions.up.text)
+        assert.are.equal("", custom.actions.down.text)
+        assert.are.equal("", custom.actions.move.text)
+        assert.are.equal("", custom.actions.delete.text)
 
         local activeBuiltin = assert(findItem("utility", function(item)
             return item.label == "Healthstones"
         end))
         assert.are.equal(
             "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
-            activeBuiltin.actions.delete.iconTexture
+            activeBuiltin.actions.delete.buttonTextures.normal
         )
 
         local builtinPlaceholder = assert(findItem("utility", function(item)
@@ -927,7 +934,7 @@ describe("ExtraIconsOptions settings page", function()
         end))
         assert.are.equal(
             "Interface\\Buttons\\UI-PlusButton-Up",
-            builtinPlaceholder.actions.delete.iconTexture
+            builtinPlaceholder.actions.delete.buttonTextures.normal
         )
     end)
 

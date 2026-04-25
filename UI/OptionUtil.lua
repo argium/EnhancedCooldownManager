@@ -237,13 +237,16 @@ function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
         opacity = currentColor.a,
         hasOpacity = hasOpacity,
         swatchFunc = function()
-            if isSettingUp then return end
+            if isSettingUp then
+                return
+            end
             local r, g, b = ColorPickerFrame:GetColorRGB()
             local a = hasOpacity and ColorPickerFrame:GetColorAlpha() or 1
             onChange({ r = r, g = g, b = b, a = a })
         end,
         cancelFunc = function(prev)
-            onChange({ r = prev.r, g = prev.g, b = prev.b, a = hasOpacity and prev.opacity or 1 })
+            local source = prev or currentColor
+            onChange({ r = source.r, g = source.g, b = source.b, a = hasOpacity and (source.opacity or source.a) or 1 })
         end,
     })
     isSettingUp = false

@@ -262,6 +262,28 @@ local function doRefreshPage(refreshPage)
     end
 end
 
+local function refreshChangedSpellColor()
+    ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+end
+
+local function updatePickerSwatch(row, color)
+    local swatch = row and row._swatch or nil
+    if swatch and swatch.SetColorRGB then
+        swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
+    end
+end
+
+---@param currentColor ECM_Color
+---@param applyColor fun(color: ECM_Color)
+---@param row Frame|table|nil
+local function openSpellColorPicker(currentColor, applyColor, row)
+    ns.OptionUtil.OpenColorPicker(currentColor, false, function(color)
+        applyColor(color)
+        updatePickerSwatch(row, color)
+        refreshChangedSpellColor()
+    end)
+end
+
 local combatRefreshCallback
 
 ---@param page Frame|table|nil
@@ -319,21 +341,20 @@ local function removeStaleSpellColorSection(section)
 end
 
 ---@param section table
----@param refreshPage fun()
+---@param _refreshPage fun()
 ---@return table[]
-local function buildSpellColorItems(section, refreshPage)
+local function buildSpellColorItems(section, _refreshPage)
     local items = {}
     local rows = getSectionSpellColorRows(section)
     local spellColors = getSpellColors(section.scope)
 
-    local function isInteractionDisabled()
-        return isSpellColorSectionInteractionDisabled(section)
+    local function isSwatchDisabled()
+        return isSpellColorSectionDisabled(section)
     end
 
     local function decorateItem(item)
         if isSpellColorSectionDisabled(section) then
-            item.alpha = 0.5
-            item.iconDesaturated = true
+            item.disabled = true
         end
         return item
     end
@@ -343,19 +364,16 @@ local function buildSpellColorItems(section, refreshPage)
         color = {
             value = spellColors:GetDefaultColor(),
             enabled = function()
-                return not isInteractionDisabled()
+                return not isSwatchDisabled()
             end,
-            onClick = function()
-                if isInteractionDisabled() then
+            onClick = function(_, row)
+                if isSwatchDisabled() then
                     return
                 end
 
-                ns.OptionUtil.OpenColorPicker(spellColors:GetDefaultColor(), false, function(color)
+                openSpellColorPicker(spellColors:GetDefaultColor(), function(color)
                     spellColors:SetDefaultColor(color)
-                    refreshSpellColors(function()
-                        doRefreshPage(refreshPage)
-                    end)
-                end)
+                end, row)
             end,
         },
     })
@@ -367,20 +385,17 @@ local function buildSpellColorItems(section, refreshPage)
             color = {
                 value = spellColors:GetColorByKey(row.key) or spellColors:GetDefaultColor(),
                 enabled = function()
-                    return not isInteractionDisabled()
+                    return not isSwatchDisabled()
                 end,
-                onClick = function()
-                    if isInteractionDisabled() then
+                onClick = function(_, rowFrame)
+                    if isSwatchDisabled() then
                         return
                     end
 
                     local current = spellColors:GetColorByKey(row.key) or spellColors:GetDefaultColor()
-                    ns.OptionUtil.OpenColorPicker(current, false, function(color)
+                    openSpellColorPicker(current, function(color)
                         spellColors:SetColorByKey(row.key, color)
-                        refreshSpellColors(function()
-                            doRefreshPage(refreshPage)
-                        end)
-                    end)
+                    end, rowFrame)
                 end,
             },
             onEnter = function(owner)
@@ -552,7 +567,6 @@ local function createSpellColorListRow(section, refreshPage)
         type = "list",
         variant = "swatch",
         height = 180,
-        rowHeight = C.SCROLL_ROW_HEIGHT_COMPACT,
         items = function()
             return buildSpellColorItems(section, refreshPage)
         end,
@@ -569,7 +583,7 @@ local function createSecretNameDescriptionRow(section)
         value = L["SPELL_COLORS_SECRET_NAMES_DESC"],
         wide = true,
         multiline = true,
-        height = C.SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT,
+        height = 40,
         hidden = function()
             return not getSectionSpellColorPageState(section).showSecretNameWarning
         end,

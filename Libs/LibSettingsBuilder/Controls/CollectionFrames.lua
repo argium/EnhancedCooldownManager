@@ -12,6 +12,7 @@ local ADD = _G.ADD
 local REMOVE = _G.REMOVE
 
 local internal = lib._internal
+local SECTION_HEADER_HEIGHT = 50
 local applyActionButtonTextures = internal.applyActionButtonTextures
 local configureInlineSlider = internal.configureInlineSlider
 local evaluateStaticOrFunction = internal.evaluateStaticOrFunction
@@ -20,11 +21,20 @@ local setSimpleTooltip = internal.setSimpleTooltip
 local setTextureValue = internal.setTextureValue
 local showFrame = internal.showFrame
 
-local function applyCollectionRowStyle(row, item)
-    local alpha = item and item.alpha or 1
+local DISABLED_ROW_ALPHA = 0.5
 
-    if row._label and row._label.SetFontObject and item and item.labelFontObject then
-        row._label:SetFontObject(item.labelFontObject)
+local function applyCollectionRowStyle(row, item)
+    local disabled = item and item.disabled == true
+    local alpha = item and item.alpha or (disabled and DISABLED_ROW_ALPHA or 1)
+    local labelFontObject = item and item.labelFontObject
+        or (disabled and (_G.GameFontDisable or _G.GameFontNormal) or nil)
+    local iconDesaturated = item and item.iconDesaturated
+    if iconDesaturated == nil then
+        iconDesaturated = disabled
+    end
+
+    if row._label and row._label.SetFontObject and labelFontObject then
+        row._label:SetFontObject(labelFontObject)
     end
     if row._label and row._label.SetTextColor and item and item.labelColor then
         row._label:SetTextColor(
@@ -41,7 +51,7 @@ local function applyCollectionRowStyle(row, item)
         row._icon:SetAlpha(alpha)
     end
     if row._icon and row._icon.SetDesaturated then
-        row._icon:SetDesaturated(item and item.iconDesaturated == true or false)
+        row._icon:SetDesaturated(iconDesaturated == true)
     end
     if row._icon and row._icon.SetVertexColor then
         local color = item and item.iconVertexColor
@@ -58,12 +68,20 @@ local function bindCollectionRowTooltip(row, item)
         return
     end
 
+    local label = row._label
     if row.EnableMouse then
         row:EnableMouse(item ~= nil)
     end
 
     row:SetScript("OnEnter", nil)
     row:SetScript("OnLeave", nil)
+    if label and label.SetScript then
+        label:SetScript("OnEnter", nil)
+        label:SetScript("OnLeave", nil)
+    end
+    if label and label.EnableMouse then
+        label:EnableMouse(false)
+    end
 
     if not item then
         return
@@ -73,23 +91,33 @@ local function bindCollectionRowTooltip(row, item)
         if self._highlight and self._highlight.Show then
             self._highlight:Show()
         end
-        if item.onEnter then
-            item.onEnter(self, item)
-        elseif item.tooltip then
-            if GameTooltip then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                if GameTooltip.ClearLines then
-                    GameTooltip:ClearLines()
-                end
-                setGameTooltipText(item.tooltip, true)
-                GameTooltip:Show()
-            end
-        end
     end)
     row:SetScript("OnLeave", function(self)
         if self._highlight and self._highlight.Hide then
             self._highlight:Hide()
         end
+    end)
+
+    if not label or not label.SetScript or (not item.onEnter and not item.tooltip) then
+        return
+    end
+
+    if label.EnableMouse then
+        label:EnableMouse(true)
+    end
+    label:SetScript("OnEnter", function(self)
+        if item.onEnter then
+            item.onEnter(self, item)
+        elseif GameTooltip then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            if GameTooltip.ClearLines then
+                GameTooltip:ClearLines()
+            end
+            setGameTooltipText(item.tooltip, true)
+            GameTooltip:Show()
+        end
+    end)
+    label:SetScript("OnLeave", function(self)
         if item.onLeave then
             item.onLeave(self, item)
         elseif GameTooltip_Hide then
@@ -167,10 +195,9 @@ local function refreshSwatchCollectionRow(row, item)
         end
     end)
     if row._swatch.SetEnabled then
-        row._swatch:SetEnabled(
-            evaluateStaticOrFunction(item.enabled, item, row) ~= false
-                and evaluateStaticOrFunction(color.enabled, item, row) ~= false
-        )
+        local enabled = evaluateStaticOrFunction(item.enabled, item, row) ~= false
+            and evaluateStaticOrFunction(color.enabled, item, row) ~= false
+        row._swatch:SetEnabled(enabled)
     end
 end
 
@@ -320,6 +347,96 @@ end
 
 local ACTION_BUTTON_ORDER = { "up", "down", "move", "delete" }
 local ACTION_BUTTON_SPACING = 2
+local DISABLED_ACTION_ICON_COLOR = { 0.55, 0.55, 0.55, 1 }
+
+local function ensureActionButtonIcon(button)
+    if button._lsbActionIcon then
+        return button._lsbActionIcon
+    end
+
+    local icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+    icon:Hide()
+    button._lsbActionIcon = icon
+    return icon
+end
+
+local function applyActionButtonIcon(button, action, enabled)
+    local icon = button._lsbActionIcon
+    local iconTexture = action and action.iconTexture
+    if not iconTexture then
+        if icon then
+            setTextureValue(icon, nil)
+            if icon.SetDesaturated then
+                icon:SetDesaturated(false)
+            end
+            if icon.SetVertexColor then
+                icon:SetVertexColor(1, 1, 1, 1)
+            end
+            icon:Hide()
+        end
+        return
+    end
+
+    local disabled = enabled == false
+    icon = ensureActionButtonIcon(button)
+    icon:ClearAllPoints()
+    icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+    icon:SetSize(action.iconSize or 16, action.iconSize or 16)
+    icon:SetAlpha(disabled and (action.disabledIconAlpha or action.iconAlpha or 1) or (action.iconAlpha or 1))
+    if icon.SetDesaturated then
+        icon:SetDesaturated(disabled)
+    end
+    if icon.SetVertexColor then
+        if disabled then
+            icon:SetVertexColor(
+                DISABLED_ACTION_ICON_COLOR[1],
+                DISABLED_ACTION_ICON_COLOR[2],
+                DISABLED_ACTION_ICON_COLOR[3],
+                DISABLED_ACTION_ICON_COLOR[4]
+            )
+        else
+            icon:SetVertexColor(1, 1, 1, 1)
+        end
+    end
+    setTextureValue(icon, iconTexture)
+    icon:Show()
+
+    if button.SetText then
+        button:SetText("")
+    end
+end
+
+local function applyActionButtonState(button, enabled)
+    local interactive = enabled ~= false
+    if button.EnableMouse then
+        button:EnableMouse(interactive)
+    end
+    if button.UnlockHighlight then
+        button:UnlockHighlight()
+    end
+
+    local highlight = button.GetHighlightTexture and button:GetHighlightTexture() or nil
+    if highlight and highlight.SetAlpha then
+        if interactive then
+            highlight:SetAlpha(button._lsbDisabledHighlightAlpha or 1)
+            button._lsbDisabledHighlightAlpha = nil
+        else
+            if button._lsbDisabledHighlightAlpha == nil and highlight.GetAlpha then
+                button._lsbDisabledHighlightAlpha = highlight:GetAlpha()
+            end
+            highlight:SetAlpha(0)
+        end
+    end
+end
+
+local function resetActionButton(button)
+    button:ClearAllPoints()
+    button:SetScript("OnClick", nil)
+    button:SetScript("OnEnter", nil)
+    button:SetScript("OnLeave", nil)
+    button:Hide()
+end
 
 local function ensureActionsCollectionRow(row)
     if row._lsbActionsRow then
@@ -340,12 +457,19 @@ local function ensureActionsCollectionRow(row)
     row._label:SetWordWrap(false)
 
     row._buttons = {}
+    row._textureButtons = {}
     for _, key in ipairs(ACTION_BUTTON_ORDER) do
         local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         if button.RegisterForClicks then
             button:RegisterForClicks("LeftButtonDown")
         end
         row._buttons[key] = button
+
+        button = CreateFrame("Button", nil, row)
+        if button.RegisterForClicks then
+            button:RegisterForClicks("LeftButtonDown")
+        end
+        row._textureButtons[key] = button
     end
 end
 
@@ -359,15 +483,15 @@ local function refreshActionsCollectionRow(row, item)
 
     local anchor = nil
     for _, key in ipairs(ACTION_BUTTON_ORDER) do
-        local button = row._buttons[key]
+        local templateButton = row._buttons[key]
+        local textureButton = row._textureButtons[key]
         local action = item.actions and item.actions[key] or nil
 
-        button:ClearAllPoints()
-        button:SetScript("OnClick", nil)
-        button:SetScript("OnEnter", nil)
-        button:SetScript("OnLeave", nil)
+        resetActionButton(templateButton)
+        resetActionButton(textureButton)
 
         if action and not evaluateStaticOrFunction(action.hidden, action, row, item) then
+            local button = action.buttonTextures and textureButton or templateButton
             if not anchor then
                 button:SetPoint("RIGHT", row, "RIGHT", -ACTION_BUTTON_SPACING, 0)
             else
@@ -379,9 +503,11 @@ local function refreshActionsCollectionRow(row, item)
                 enabled = true
             end
             applyActionButtonTextures(button, action, enabled)
+            applyActionButtonIcon(button, action, enabled)
             if button.SetEnabled then
                 button:SetEnabled(enabled)
             end
+            applyActionButtonState(button, enabled)
             setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, row, item))
             button:SetScript("OnClick", function()
                 if action.onClick then
@@ -390,8 +516,6 @@ local function refreshActionsCollectionRow(row, item)
             end)
             button:Show()
             anchor = button
-        else
-            button:Hide()
         end
     end
 
@@ -413,6 +537,11 @@ local function ensureModeInputRow(row)
 
     row._lsbModeInputRow = true
     row:SetHeight(28)
+
+    row._background = row:CreateTexture(nil, "BACKGROUND")
+    row._background:SetColorTexture(1, 1, 1, 0.05)
+    row._background:SetPoint("TOPLEFT", row, "TOPLEFT", -4, 2)
+    row._background:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 4, -2)
 
     row._modeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row._modeButton:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -697,7 +826,7 @@ local function ensureSectionHeaderRow(content, headers, sectionKey, title)
     end
 
     row = CreateFrame("Frame", nil, content)
-    row:SetHeight(28)
+    row:SetHeight(SECTION_HEADER_HEIGHT)
     row._title = internal.createHeaderTitle(row, title)
     headers[sectionKey] = row
     return row
@@ -757,7 +886,7 @@ local function refreshSectionedCollection(frame, data)
         header:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
         header:SetPoint("RIGHT", content, "RIGHT", 0, 0)
         header:Show()
-        y = y - (section.headerHeight or 28)
+        y = y - (section.headerHeight or SECTION_HEADER_HEIGHT)
 
         local items = section.items or {}
         local pool = rowPools[sectionKey] or {}

@@ -36,6 +36,7 @@ describe("OptionUtil", function()
             "LibStub",
             "CreateFromMixins",
             "SettingsListElementInitializer",
+            "ColorPickerFrame",
         })
     end)
 
@@ -86,6 +87,36 @@ describe("OptionUtil", function()
         TestHelpers.LoadChunk("UI/AboutOptions.lua", "Unable to load UI/AboutOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
         optionsModule = ns.Addon._modules.Options
+    end)
+
+    it("ignores setup swatch callbacks and tolerates missing cancel state", function()
+        local pickerConfig
+        local changes = {}
+
+        _G.ColorPickerFrame = {
+            SetupColorPickerAndShow = function(_, config)
+                pickerConfig = config
+                config.swatchFunc()
+            end,
+            GetColorRGB = function()
+                return 0.1, 0.2, 0.3
+            end,
+            GetColorAlpha = function()
+                return 0.4
+            end,
+        }
+
+        ns.OptionUtil.OpenColorPicker({ r = 0.7, g = 0.8, b = 0.9, a = 0.6 }, true, function(color)
+            changes[#changes + 1] = color
+        end)
+
+        assert.are.equal(0, #changes)
+
+        pickerConfig.swatchFunc()
+        assert.are.same({ r = 0.1, g = 0.2, b = 0.3, a = 0.4 }, changes[1])
+
+        pickerConfig.cancelFunc(nil)
+        assert.are.same({ r = 0.7, g = 0.8, b = 0.9, a = 0.6 }, changes[2])
     end)
 
     describe("About page spec", function()

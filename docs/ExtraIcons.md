@@ -62,7 +62,7 @@ Registers through the root/section/page API and exposes only native controls plu
 
 *Racials.* The current-player racial is synthesized as a disabled placeholder in the utility viewer when absent; racial lookup uses only the `UnitRace("player")` race file token, with no normalization, spellbook, or localized-name fallback. Adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables.
 
-*Lifecycle.* Special-row behavior is explained through a short legend plus row-specific tooltips. Section-list rows stay on the current lifecycle path so viewer switches do not lose or misplace embedded content.
+*Lifecycle.* Special-row behavior is explained through row-specific tooltips. Section-list rows stay on the current lifecycle path so viewer switches do not lose or misplace embedded content.
 
 ## Actor Diagram
 

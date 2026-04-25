@@ -303,7 +303,7 @@ PowerBarTickMarksOptions.rows = {
         type = "list",
         variant = "editor",
         height = 320,
-        rowHeight = C.SCROLL_ROW_HEIGHT_WITH_CONTROLS,
+        rowHeight = 34,
         items = buildTickCollectionItems,
     },
 }

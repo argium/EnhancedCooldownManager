@@ -666,10 +666,8 @@ describe("BuffBarsOptions", function()
         assert.is_true(externalHeader.disabled())
         assert.is_true(buffItems[1].color.enabled())
         assert.is_false(externalItems[1].color.enabled())
-        assert.are.equal(0.5, externalItems[1].alpha)
-        assert.is_true(externalItems[1].iconDesaturated)
-        assert.are.equal(0.5, externalItems[2].alpha)
-        assert.is_true(externalItems[2].iconDesaturated)
+        assert.is_true(externalItems[1].disabled)
+        assert.is_true(externalItems[2].disabled)
     end)
 
     it("ctrl-hovering a spell color collection row shows all keys for that row", function()
@@ -721,7 +719,46 @@ describe("BuffBarsOptions", function()
 
         assert.are.same(selectedColor, BuffSpellColors:GetDefaultColor())
         assert.are.equal("OptionsChanged", scheduledReason)
-        assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
+        assert.are.same({}, refreshCalls)
+    end)
+
+    it("regression: live spell color picker changes do not refresh the page or block reopening", function()
+        local firstColor = { r = 0.7, g = 0.6, b = 0.5, a = 1 }
+        local secondColor = { r = 0.1, g = 0.2, b = 0.3, a = 1 }
+        local pickedColors = { firstColor, secondColor }
+        local pickerCalls = 0
+        local scheduledReasons = {}
+        local rowColor
+
+        -- Regression guard: refreshing this options page from the live color-picker path
+        -- broke subsequent swatch clicks in-game. Do not weaken the empty refresh assertion.
+        ns.OptionUtil.OpenColorPicker = function(_, hasOpacity, onChange)
+            pickerCalls = pickerCalls + 1
+            assert.is_false(hasOpacity)
+            onChange(assert(pickedColors[pickerCalls], "unexpected color-picker reopen"))
+        end
+        ns.Runtime.ScheduleLayoutUpdate = function(_, reason)
+            scheduledReasons[#scheduledReasons + 1] = reason
+        end
+
+        local spellColorsSpec, refreshCalls = registerSpellColorsSpec()
+        local defaultItem = getSpellColorCollectionItems(spellColorsSpec, "buffBars")[1]
+        local rowFrame = {
+            _swatch = {
+                SetColorRGB = function(_, r, g, b)
+                    rowColor = { r = r, g = g, b = b }
+                end,
+            },
+        }
+
+        defaultItem.color.onClick(defaultItem, rowFrame)
+        defaultItem.color.onClick(defaultItem, rowFrame)
+
+        assert.are.equal(2, pickerCalls)
+        assert.are.same(secondColor, BuffSpellColors:GetDefaultColor())
+        assert.are.same({ r = secondColor.r, g = secondColor.g, b = secondColor.b }, rowColor)
+        assert.are.same({ "OptionsChanged", "OptionsChanged" }, scheduledReasons)
+        assert.are.same({}, refreshCalls)
     end)
 
     it("header actions disable reconcile and remove stale when every row is complete", function()
@@ -804,6 +841,35 @@ describe("BuffBarsOptions", function()
         assert.is_false(actions[1].enabled())
         assert.is_false(actions[2].enabled())
         assert.is_false(spellColorsSpec.onDefaultEnabled())
+    end)
+
+    it("keeps existing color swatches editable while the owner module is edit locked", function()
+        local key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001)
+        local pickedColor = { r = 0.7, g = 0.6, b = 0.5, a = 1 }
+        local pickerCalls = 0
+
+        BuffSpellColors:SetColorByKey(key, {
+            r = 0.2, g = 0.3, b = 0.4, a = 1,
+        })
+        ns.Addon.BuffBars.IsEditLocked = function()
+            return true, "secrets"
+        end
+        ns.OptionUtil.OpenColorPicker = function(_, hasOpacity, onChange)
+            pickerCalls = pickerCalls + 1
+            assert.is_false(hasOpacity)
+            onChange(pickedColor)
+        end
+
+        local spellColorsSpec = registerSpellColorsSpec()
+        local buffItems = getSpellColorCollectionItems(spellColorsSpec, "buffBars")
+
+        assert.is_true(buffItems[1].color.enabled())
+        assert.is_true(buffItems[2].color.enabled())
+
+        buffItems[2].color.onClick()
+
+        assert.are.equal(1, pickerCalls)
+        assert.are.same(pickedColor, BuffSpellColors:GetColorByKey(key))
     end)
 
     it("reconcile action uses ConfirmReloadUI for incomplete rows", function()
