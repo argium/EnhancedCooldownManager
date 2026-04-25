@@ -3,6 +3,57 @@
 EnhancedCooldownManager is an event-driven WoW addon built on AceAddon-3.0 / AceDB-3.0.
 `Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, lays out `ExtraIcons` first when it widens the main viewer, and then iterates the chained bar modules. `PowerBar`, `ResourceBar`, and `RuneBar` use `BarMixin.AddBarMixin()`. `BuffBars`, `ExternalBars`, and `ExtraIcons` use `BarMixin.AddFrameMixin()` and manage their own child content.
 
+## Modules
+
+Each module owns its own reference doc with a summary table, actor diagram, component-interaction diagram, and data model:
+
+| Module | Doc | Mixin |
+|---|---|---|
+| PowerBar | [docs/PowerBar.md](docs/PowerBar.md) | `AddBarMixin` |
+| ResourceBar | [docs/ResourceBar.md](docs/ResourceBar.md) | `AddBarMixin` |
+| RuneBar | [docs/RuneBar.md](docs/RuneBar.md) | `AddBarMixin` |
+| BuffBars | [docs/BuffBars.md](docs/BuffBars.md) | `AddFrameMixin` |
+| ExternalBars | [docs/ExternalBars.md](docs/ExternalBars.md) | `AddFrameMixin` |
+| ExtraIcons | [docs/ExtraIcons.md](docs/ExtraIcons.md) | `AddFrameMixin` |
+
+## Startup and the generic event pulse
+
+Cross-cutting view: addon startup, then the generic event → Runtime → module layout pulse. Per-scenario flows (profile change, Edit Mode, options, import/export, per-module data events) live in the module reference docs.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Game as Game (WoW client)
+    participant ACE as ACE (AceAddon / AceDB)
+    participant ECM as ECM (addon root)
+    participant Runtime as Runtime
+    participant Module as Module(s)
+
+    rect rgb(26,26,46)
+    note over Game,Module: Addon startup
+    Game->>ACE: ADDON_LOADED
+    ACE->>ECM: OnInitialize()
+    ECM->>ECM: Migration.PrepareDatabase() / Run(profile)
+    ECM->>ACE: AceDB-3.0:New(defaults)
+    ACE->>Module: OnInitialize() → BarMixin.Add*Mixin
+    Game->>ACE: PLAYER_LOGIN
+    ACE->>ECM: OnEnable()
+    ECM->>Runtime: Runtime.Enable(addon)
+    Runtime->>Module: EnableModule / EnsureFrame / RegisterFrame
+    Module->>Game: RegisterEvent(module-specific events)
+    Runtime->>Game: RegisterEvent(layout events) + watchdog ticker
+    Runtime->>Module: UpdateLayout("ModuleInit")
+    end
+
+    rect rgb(26,46,30)
+    note over Game,Module: Generic event pulse
+    Game->>Runtime: layout event fires
+    Runtime->>Runtime: handleLayoutEvent → RequestLayout / ScheduleLayoutUpdate
+    Runtime->>Runtime: executeLayout → updateFadeAndHiddenStates
+    Runtime->>Module: SetHidden / SetAlpha / UpdateLayout(reason)
+    end
+```
+
 ## Initialization Chain
 
 Six phases from TOC load through the first rendered frame.
@@ -187,13 +238,7 @@ flowchart TD
 
 ## Secondary Flows
 
-### Profile Change
-
-When a user switches, copies, or resets a profile, AceDB fires a callback → `ECM:OnProfileChangedHandler()` → re-runs migration → `Runtime.Enable()` re-enables/disables modules per new config → schedules a full layout with reason `"ProfileChanged"`. BuffBars and ExternalBars clear their scoped SpellColors discovered-key caches on this reason.
-
-### Edit Mode
-
-LibEditMode detects WoW's Edit Mode enter/exit. On enter, all modules are forced visible (alpha 1, not hidden). Dragging or resizing calls `UpdateLayoutImmediately()` for instant feedback. On exit, normal fade/hidden rules re-apply.
+Profile change, Edit Mode, and per-module reactions are documented in each [module reference doc](#modules). The flows below are cross-cutting concerns that don't belong to any single module.
 
 ### Options UI
 
@@ -214,59 +259,12 @@ ECM only consumes the documented public surface (`LSB.New`, `lsb:GetSection`, `l
 
 A 0.5s `C_Timer.NewTicker` handles deferred Blizzard frame hooking (stops retrying once setup completes), enforces hidden/alpha state against Blizzard re-shows, and syncs module alpha.
 
-### External Bars / `ExternalDefensivesFrame`
-
-`ExternalBars` is hook-driven rather than event-driven. It mirrors Blizzard's `ExternalDefensivesFrame` instead of scanning auras itself:
-
-1. `OnEnable()` defers `HookViewer()` by `C_Timer.After(0.1)` so the Blizzard frame exists before hooks are attached.
-2. `HookViewer()` post-hooks `ExternalDefensivesFrame:UpdateAuras()` and listens to the frame's `OnShow` / `OnHide` transitions.
-3. `OnExternalAurasUpdated()` copies `viewer.auraInfo[]` into `_auraStates[]`, enriches accessible spell metadata through `C_UnitAuras.GetAuraDataByAuraInstanceID()`, and requests a layout pass.
-4. `UpdateLayout()` maps `_auraStates[]` to pooled child bars, styles each row through `BarStyle.StyleChildBar(...)`, and routes spell-color discovery / lookup through the `ns.SpellColors.Get("externalBars")` store.
-5. Bar fill is rendered by a `Cooldown` overlay via `SetCooldownDuration(duration, timeMod)`. Lua only formats duration text when expiration data is safe to inspect directly.
-6. `hideOriginalIcons` uses `ExternalDefensivesFrame:SetAlpha(0)` plus `EnableMouse(false)` rather than `Hide()`, so Blizzard keeps driving `UpdateAuras()`.
-
 ```mermaid
 flowchart TD
-    subgraph PROFILE["Profile Change Flow"]
-        USER_SWITCH["User switches/copies/resets profile"]
-        ACE_CB["AceDB callback fires:<br/>OnProfileChanged / OnProfileCopied / OnProfileReset"]
-        PROF_HANDLER["ECM:OnProfileChangedHandler()"]
-        MIG["Migration.Run(new profile)"]
-        RT_EN2["Runtime.Enable(addon)<br/>→ Re-enable/disable modules per new config"]
-        SCHED_PC["ScheduleLayoutUpdate(0, 'ProfileChanged')"]
-        SPELL_CLEAR["BuffBars / ExternalBars:UpdateLayout('ProfileChanged')<br/>→ SpellColors.Get(scope):ClearDiscoveredKeys()"]
-
-        USER_SWITCH --> ACE_CB --> PROF_HANDLER --> MIG --> RT_EN2 --> SCHED_PC --> SPELL_CLEAR
-    end
-
-    subgraph EDITMODE["Edit Mode Flow"]
-        EM_ENTER["User enters WoW Edit Mode"]
-        EM_DETECT["LibEditMode callback → 'enter'"]
-        EM_LAYOUT["ScheduleLayoutUpdate(0, 'EditModeEnter')"]
-        EM_FORCE["updateFadeAndHiddenStates()<br/>→ hidden=false, alpha=1 (always visible)"]
-
-        EM_DRAG["User drags module frame"]
-        EM_SAVE["onPositionChanged callback<br/>→ EditMode.SavePosition(config, ...)"]
-        EM_IMMED["UpdateLayoutImmediately('EditModeDrag')"]
-
-        EM_SLIDER["User adjusts width/height slider"]
-        EM_WRITE["Direct config write: cfg.width = value"]
-        EM_IMMED2["UpdateLayoutImmediately('EditModeWidth')"]
-
-        EM_EXIT["User exits Edit Mode"]
-        EM_EXIT_LAY["ScheduleLayoutUpdate(0, 'EditModeExit')<br/>→ Re-apply fade/hidden per config"]
-
-        EM_ENTER --> EM_DETECT --> EM_LAYOUT --> EM_FORCE
-        EM_DRAG --> EM_SAVE --> EM_IMMED
-        EM_SLIDER --> EM_WRITE --> EM_IMMED2
-        EM_EXIT --> EM_EXIT_LAY
-    end
-
     subgraph OPTIONS["Options UI Flow"]
         OPT_CHANGE["User toggles setting in Options UI"]
         LSB_CB["LibSettingsBuilder onChange callback"]
         OPT_SCHED["Runtime.ScheduleLayoutUpdate(0, 'OptionsChanged')"]
-
         OPT_CHANGE --> LSB_CB --> OPT_SCHED
     end
 
@@ -276,49 +274,49 @@ flowchart TD
         WD_HOOK["hookBlizzardFrames()<br/>hookCooldownViewerSettings()"]
         WD_ENFORCE["enforceBlizzardFrameState()<br/>→ Correct Blizzard re-shows/alpha"]
         WD_ALPHA["Sync module alpha<br/>→ LazySetAlpha per module"]
-
         WD_TICK --> WD_SETUP
         WD_SETUP -->|no| WD_HOOK --> WD_ENFORCE
         WD_SETUP -->|yes| WD_ENFORCE --> WD_ALPHA
     end
-
-    style PROFILE fill:#1a1a2e,stroke:#f7a855,color:#e0e0e0
-    style EDITMODE fill:#1a1a2e,stroke:#7a84f7,color:#e0e0e0
-    style OPTIONS fill:#1a1a2e,stroke:#22c55e,color:#e0e0e0
-    style WATCHDOG fill:#1a1a2e,stroke:#f43f5e,color:#e0e0e0
 ```
 
 ## Event Reference
 
-Runtime registers the shared layout events; modules register their own data-driven events in `OnEnable`. Events with multiple registrants are intentional — Runtime handles visibility/positioning while the module handles its own data refresh.
+`ExternalBars` is hook-driven (mirrors `ExternalDefensivesFrame`) and does not register events directly.
 
-`ExternalBars` is intentionally absent from this table: it mirrors `ExternalDefensivesFrame` through hooks rather than registering its own aura event stream.
+### Runtime layout events
 
-| Event | Registrant(s) | Purpose |
-|-------|---------------|---------|
-| CVAR_UPDATE | Runtime | Schedules layout when `cooldownViewerEnabled` changes |
-| PLAYER_ENTERING_WORLD | Runtime, BuffBars, ExtraIcons | Runtime: full layout; BuffBars: refresh zone buffs; ExtraIcons: full refresh |
-| PLAYER_MOUNT_DISPLAY_CHANGED | Runtime | Immediate layout for mounted-state visibility |
-| PLAYER_REGEN_DISABLED | Runtime | Immediate layout; sets `_inCombat` flag |
-| PLAYER_REGEN_ENABLED | Runtime | Delayed layout (combat-end delay); clears `_inCombat` |
-| PLAYER_SPECIALIZATION_CHANGED | Runtime | Immediate layout for spec-dependent module visibility |
-| PLAYER_TARGET_CHANGED | Runtime | Immediate layout for target-frame positioning |
-| PLAYER_UPDATE_RESTING | Runtime | Immediate layout for resting-state visibility |
-| UNIT_ENTERED_VEHICLE | Runtime | Immediate layout to hide bars in vehicle |
-| UNIT_EXITED_VEHICLE | Runtime | Immediate layout to restore bars after vehicle |
-| UPDATE_SHAPESHIFT_FORM | Runtime | Immediate layout for form/stance changes |
-| VEHICLE_UPDATE | Runtime | Immediate layout for vehicle seat changes |
-| ZONE_CHANGED | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh zone-specific buffs |
-| ZONE_CHANGED_INDOORS | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh buff data |
-| ZONE_CHANGED_NEW_AREA | Runtime, BuffBars | Runtime: delayed layout; BuffBars: refresh area-specific buffs |
-| BAG_UPDATE_COOLDOWN | ExtraIcons | Throttled cooldown-state refresh |
-| BAG_UPDATE_DELAYED | ExtraIcons | Layout update after bag contents finalize |
-| PLAYER_EQUIPMENT_CHANGED | ExtraIcons | Refresh tracked equipment slot cooldowns on gear swap |
-| SPELLS_CHANGED | ExtraIcons | Layout update when known spells change (talent/level) |
-| SPELL_UPDATE_COOLDOWN | ExtraIcons | Throttled spell cooldown-state refresh |
+Registered in `Runtime.Enable` and dispatched through `handleLayoutEvent`. Modules can also register the same event for their own data refresh; that's noted under the per-module column.
+
+| Event | Co-listeners | Behavior |
+|---|---|---|
+| CVAR_UPDATE | — | Schedules layout when `cooldownViewerEnabled` changes |
+| PLAYER_ENTERING_WORLD | BuffBars, ExtraIcons | Full layout (delay 0.4s) |
+| PLAYER_MOUNT_DISPLAY_CHANGED | — | Immediate layout (mounted visibility) |
+| PLAYER_REGEN_DISABLED | — | Immediate layout; sets `_inCombat` |
+| PLAYER_REGEN_ENABLED | — | Delayed layout (combat-end delay); clears `_inCombat` |
+| PLAYER_SPECIALIZATION_CHANGED | — | Immediate layout (spec-dependent visibility) |
+| PLAYER_TARGET_CHANGED | — | Immediate layout (target-frame positioning) |
+| PLAYER_UPDATE_RESTING | — | Immediate layout (resting visibility) |
+| UNIT_ENTERED_VEHICLE / UNIT_EXITED_VEHICLE / VEHICLE_UPDATE | — | Immediate layout |
+| UPDATE_SHAPESHIFT_FORM | — | Immediate layout (form/stance changes) |
+| ZONE_CHANGED / ZONE_CHANGED_INDOORS / ZONE_CHANGED_NEW_AREA | BuffBars | Delayed layout (0.1s) |
+
+### Module data events
+
+Registered by each module in its own `OnEnable`. See the [module reference doc](#modules) for handler details.
+
+| Event | Module | Purpose |
+|---|---|---|
+| UNIT_POWER_UPDATE | PowerBar, ResourceBar | Power-bar value update |
+| UNIT_AURA | ResourceBar | Aura-driven resource refresh |
 | RUNE_POWER_UPDATE | RuneBar | Start rune animation ticker; request layout |
-| UNIT_AURA | ResourceBar | Layout update when player auras change |
-| UNIT_POWER_UPDATE | PowerBar, ResourceBar | PowerBar: primary power bar update; ResourceBar: resource tracking |
+| BAG_UPDATE_COOLDOWN | ExtraIcons | Throttled cooldown-state refresh |
+| BAG_UPDATE_DELAYED | ExtraIcons | Layout after bag contents finalize |
+| PLAYER_EQUIPMENT_CHANGED | ExtraIcons | Refresh tracked equipment-slot cooldowns |
+| SPELLS_CHANGED | ExtraIcons | Layout when known spells change |
+| SPELL_UPDATE_COOLDOWN | ExtraIcons | Throttled spell cooldown refresh |
+| ZONE_CHANGED* / PLAYER_ENTERING_WORLD | BuffBars | Refresh zone-specific buffs |
 
 ## Public Interfaces
 
@@ -393,63 +391,16 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | `StyleBarAnchors(frame, bar, iconFrame, config)` | Apply the shared text / icon anchor layout |
 | `StyleChildBar(module, frame, config, globalConfig, spellColors?)` | Run the complete shared BuffBars / ExternalBars child-bar styling pass |
 
-### ExternalBars (`Modules/ExternalBars.lua`)
+### Module reference docs
 
-Renders Blizzard external defensive auras as ECM-owned bar rows. `ExternalBars` inherits `FrameProto`, owns a pooled set of child bars, and shares the BuffBars row styling helpers from `BarStyle`.
+Per-module surface (config, events, hooks, internal state, options) lives with each module:
 
-- **Authoritative source:** `ExternalDefensivesFrame.auraInfo[]` populated by Blizzard `UpdateAuras()`.
-- **Viewer hook:** `HookViewer()` post-hooks `UpdateAuras()` and `OnShow` / `OnHide`.
-- **Internal state:** `OnExternalAurasUpdated()` copies current aura entries into `_auraStates[]` keyed by Blizzard's aura-array index, not by `auraInstanceID`.
-- **Rendering:** `UpdateLayout()` sizes the container, configures pooled child bars, and uses a `Cooldown` overlay per row for the draining fill.
-- **Color scope:** spell-color lookup and discovery run through `ns.SpellColors.Get("externalBars")`, so the shared Spell Colors page can manage it independently from BuffBars while the runtime avoids passing scope strings through every call.
-- **Original icon suppression:** `hideOriginalIcons` drives `SetAlpha(0)` / `EnableMouse(false)` on `ExternalDefensivesFrame`; it never calls `Hide()`.
-
-### ExtraIcons (`Modules/ExtraIcons.lua`)
-
-Displays cooldown-tracked icons alongside Blizzard's cooldown viewer frames. Uses a dual-viewer architecture with a stack-aware resolver.
-
-**Viewer Registry:** Maps abstract viewer keys to Blizzard frame globals. Current keys: `"utility"` → `UtilityCooldownViewer`, `"main"` → `EssentialCooldownViewer`. Each viewer has its own container frame, on-demand icon pool, and hook set. The main viewer's expanded footprint also drives a shared midpoint offset for the two-viewer layout; utility applies that pair offset first, then layers its own local centering so moving icons between viewers preserves the combined layout.
-
-**Entry Kinds and Resolution:**
-
-| Kind | Config Fields | Resolution | Cooldown Source |
-|------|--------------|------------|-----------------|
-| `equipSlot` | `slotId` | `GetInventoryItemID` + `C_Item.GetItemSpell` on-use check | `GetInventoryItemCooldown` |
-| `item` | `ids[]` (priority stack) | First with `C_Item.GetItemCount > 0` | `C_Item.GetItemCooldown` |
-| `spell` | `ids[]` (priority stack) | First known via `C_SpellBook.IsSpellKnown`, then `C_Spell.GetSpellTexture` | `C_Spell.GetSpellCooldown` (pass-through, no inspection) |
-
-Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`ids`/`slotId` from the constant at runtime. Built-in entries may also persist `disabled = true`, which keeps them in the settings list but skips them during runtime resolution. Custom and racial entries store fields directly in saved config.
-
-**Config Structure (`profile.extraIcons`):**
-
-```lua
-{
-    enabled = true,
-    viewers = {
-        utility = {                      -- ordered array
-            { stackKey = "trinket1" },   -- resolved from BUILTIN_STACKS
-            { stackKey = "trinket2", disabled = true },
-            { stackKey = "combatPotions" },
-            { kind = "spell", ids = { 59752 } },  -- racial (self-contained)
-        },
-        main = {},
-    },
-}
-```
-
-**Settings UI (`UI/ExtraIconsOptions.lua`):**
-
-Registers through the root/section/page API and exposes only native controls plus the single viewer-management section list. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) and page setup hooks (`SetRegisteredPage`, `EnsureItemLoadFrame`, `BuildSections`, `ResetToDefaults`) are exposed on `ns.ExtraIconsOptions` for testability and options bootstrap.
-
-*Row rendering and add flow.* Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the page as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows.
-
-*Built-in rows.* Built-in rows use the trailing button as an enable/disable toggle instead of removal, and disabled built-ins are normalized to the bottom of their viewer in `BUILTIN_STACK_ORDER` so they stay visually stable. Missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section.
-
-*Trinket and equip-slot filtering.* Trinket built-ins are only rendered when the currently equipped slot resolves to an on-use spell, so passive trinkets stay in saved variables but disappear from the table until they become usable again. Equip-slot placeholders follow the same on-use filter, and trinket-slot equipment changes refresh the page so the visible rows stay in sync.
-
-*Racials.* The current-player racial is synthesized as a disabled placeholder in the utility viewer when absent; racial lookup uses only the `UnitRace("player")` race file token, with no normalization, spellbook, or localized-name fallback. Adding it writes a normal spell entry, and removing it returns the UI to that placeholder state. Racials from other races are filtered out of the settings list even if they remain in saved variables.
-
-*Lifecycle.* Special-row behavior is explained through a short legend plus row-specific tooltips. Section-list rows stay on the current lifecycle path so viewer switches do not lose or misplace embedded content.
+- [docs/PowerBar.md](docs/PowerBar.md)
+- [docs/ResourceBar.md](docs/ResourceBar.md)
+- [docs/RuneBar.md](docs/RuneBar.md)
+- [docs/BuffBars.md](docs/BuffBars.md)
+- [docs/ExternalBars.md](docs/ExternalBars.md)
+- [docs/ExtraIcons.md](docs/ExtraIcons.md)
 
 ### FrameUtil (`ns.FrameUtil`)
 

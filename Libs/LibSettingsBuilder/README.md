@@ -31,18 +31,18 @@ The runtime returned by `LSB.New(...)` is intentionally narrow. Builder/helper c
 
 ## At a glance
 
-| Need | LibSettingsBuilder |
-|---|---|
-| Standard settings pages | `LSB.New({ name = ..., page = ..., sections = ... })` |
-| Root-owned landing page | `page = { key = ..., rows = ... }` inside the root spec |
-| Dynamic refresh | lookup the registered page with `lsb:GetRootPage()` / `lsb:GetPage(...)`, then call `page:Refresh()` |
-| Existing AceDB profiles | `store = db.profile`, `defaults = defaults.profile` |
-| Custom storage | handler mode with `get` / `set` / `key` (or `id`) |
-| Text entry / numeric ID fields | `type = "input"` |
-| Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"` |
-| Reusable settings groups | border, font override, and height override composites |
-| XML-backed bespoke widgets | `type = "custom"` |
-| Force visible rows to refresh | `page:Refresh()` |
+| Need                            | LibSettingsBuilder                                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Standard settings pages         | `LSB.New({ name = ..., page = ..., sections = ... })`                                                |
+| Root-owned landing page         | `page = { key = ..., rows = ... }` inside the root spec                                              |
+| Dynamic refresh                 | lookup the registered page with `lsb:GetRootPage()` / `lsb:GetPage(...)`, then call `page:Refresh()` |
+| Existing AceDB profiles         | `store = db.profile`, `defaults = defaults.profile`                                                  |
+| Custom storage                  | handler mode with `get` / `set` / `key` (or `id`)                                                    |
+| Text entry / numeric ID fields  | `type = "input"`                                                                                     |
+| Dynamic editors / ordered lists | `type = "list"` or `type = "sectionList"`                                                            |
+| Reusable settings groups        | border, font override, and height override composites                                                |
+| XML-backed bespoke widgets      | `type = "custom"`                                                                                    |
+| Force visible rows to refresh   | `page:Refresh()`                                                                                     |
 
 ## Quick start
 
@@ -102,27 +102,27 @@ For a registered category tree, `name` and `onChanged` are required. `store` ena
 
 Declarative pages accept canonical row types only.
 
-| Type | Meaning |
-|---|---|
-| `checkbox` | Boolean proxy setting |
-| `slider` | Numeric proxy setting |
-| `dropdown` | Deterministic menu proxy setting |
-| `input` | Built-in text input row with optional preview / debounce support |
-| `color` | Color swatch proxy setting |
-| `button` | Button row |
-| `header` | Blizzard-style section header |
-| `subheader` | Secondary text row |
-| `info` | Left-label / right-value informational row |
-| `canvas` | Embedded frame row for canvas content |
-| `pageActions` | Right-aligned page-header action row |
-| `list` | First-class dynamic flat list widget |
-| `sectionList` | First-class dynamic grouped list widget |
-| `custom` | Proxy setting backed by a custom XML template |
-| `colorList` | Expands `defs` into multiple color swatches |
-| `checkboxList` | Expands `defs` into multiple checkboxes |
-| `border` | Composite group for border enable / width / color |
-| `fontOverride` | Composite group for override toggle, font picker, and size slider |
-| `heightOverride` | Composite slider with nil/zero transforms |
+| Type             | Meaning                                                           |
+| ---------------- | ----------------------------------------------------------------- |
+| `checkbox`       | Boolean proxy setting                                             |
+| `slider`         | Numeric proxy setting                                             |
+| `dropdown`       | Deterministic menu proxy setting                                  |
+| `input`          | Built-in text input row with optional preview / debounce support  |
+| `color`          | Color swatch proxy setting                                        |
+| `button`         | Button row                                                        |
+| `header`         | Blizzard-style section header                                     |
+| `subheader`      | Secondary text row                                                |
+| `info`           | Left-label / right-value informational row                        |
+| `canvas`         | Embedded frame row for canvas content                             |
+| `pageActions`    | Right-aligned page-header action row                              |
+| `list`           | First-class dynamic flat list widget                              |
+| `sectionList`    | First-class dynamic grouped list widget                           |
+| `custom`         | Proxy setting backed by a custom XML template                     |
+| `colorList`      | Expands `defs` into multiple color swatches                       |
+| `checkboxList`   | Expands `defs` into multiple checkboxes                           |
+| `border`         | Composite group for border enable / width / color                 |
+| `fontOverride`   | Composite group for override toggle, font picker, and size slider |
+| `heightOverride` | Composite slider with nil/zero transforms                         |
 
 ## Input rows
 
