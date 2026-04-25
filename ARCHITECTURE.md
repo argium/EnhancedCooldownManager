@@ -197,36 +197,18 @@ LibEditMode detects WoW's Edit Mode enter/exit. On enter, all modules are forced
 
 ### Options UI
 
-Setting changes flow through LibSettingsBuilder's `onChange` → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`.
-The embedded library is loaded through `Libs/LibSettingsBuilder/embed.xml`, which guarantees `Core.lua`, the primitive helper modules, standard control modules, composite control modules, and `Utility.lua` initialize in order before options pages register.
+Setting changes flow through LibSettingsBuilder's `onChanged` callback → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`. The embedded library is loaded through `Libs/LibSettingsBuilder/embed.xml`, which guarantees `Core.lua`, the primitive helper modules, standard control modules, composite control modules, and `Utility.lua` initialize in order before options pages register. See [`Libs/LibSettingsBuilder/README.md`](Libs/LibSettingsBuilder/README.md) for the library's public surface, declarative schema, and canonical row types.
 
-Options pages now use LibSettingsBuilder as a single declarative registration tree:
+ECM uses LibSettingsBuilder as a single declarative registration tree:
 
-- `SB.GetRoot(L["ADDON_NAME"])` returns the singleton root handle,
+- `UI/Options.lua` owns the root assembly and calls `LSB.New({ name = ..., page = ns.AboutPage, sections = { ... } })` once,
 - each options page has a dedicated `UI/*Options.lua` or `UI/*Page.lua` owner (`UI/AboutOptions.lua`, `UI/AdvancedOptions.lua`, `UI/SpellColorsPage.lua`, etc.) that exports plain section/page spec tables instead of registering itself,
-- `UI/Options.lua` owns only the root SettingsBuilder assembly and calls `root:Register({ page = ns.AboutPage, sections = { ... } })` once,
-- `root:Register(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
+- `LSB.New(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
 - dynamic pages keep a registered page handle through `onRegistered(page)` and refresh via `page:Refresh()` when async or transient state changes.
 
-`UI/SpellColorsPage.lua` now owns the shared Spell Colors subcategory. `BuffBarsOptions` registers the page once, and both `BuffBars` and `ExternalBars` register scoped sections into it, so the two modules share one editor without sharing saved color pools.
+`UI/SpellColorsPage.lua` owns the shared Spell Colors subcategory. `BuffBarsOptions` registers the page once, and both `BuffBars` and `ExternalBars` register scoped sections into it, so the two modules share one editor without sharing saved color pools.
 
-LibSettingsBuilder v2 Phase 1 also freezes the intended replacement surface without switching ECM over to it yet:
-
-- target factory: `LSB.New(config)`
-- target runtime lookups: `lsb:GetSection(...)`, `lsb:GetRootPage()`, `lsb:GetPage(...)`, `lsb:HasCategory(...)`
-- target page handle API: `page:GetId()`, `page:Refresh()`
-- deprecated compatibility namespace: `LSBDeprecated`
-
-Phase 2 then makes raw declarative row tables the canonical registration schema and removes builder-level row helper constructors from the public `lsb` surface. ECM continues to register through plain row tables.
-
-Deprecated non-declarative page-construction APIs were removed from the builder surface. ECM settings pages are registered through the root tree only.
-
-Pages still use the same canonical row types:
-
-- standard persisted controls (`checkbox`, `slider`, `dropdown`, `color`, `input`) bind through path mode or handler mode,
-- layout rows (`header`, `subheader`, `info`, `button`, `pageActions`, `canvas`) handle structure and copy,
-- dynamic editors use `list` and `sectionList` rows with library-owned rendering,
-- `canvas` rows stay on the existing lifecycle path so page switches do not lose or misplace embedded content.
+ECM only consumes the documented public surface (`LSB.New`, `lsb:GetSection`, `lsb:GetRootPage`, `lsb:GetPage`, `lsb:HasCategory`, `page:GetId`, `page:Refresh`) and registers pages through raw declarative row tables — no builder-level helper constructors and no deprecated transition namespaces.
 
 ### Watchdog Ticker
 
