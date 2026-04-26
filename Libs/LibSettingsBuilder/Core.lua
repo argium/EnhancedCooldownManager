@@ -51,7 +51,7 @@
 ---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.
 ---@field sections LibSettingsBuilderSectionConfig[]|nil Gets the optional section definitions registered under the root category.
 
-local MAJOR, MINOR = "LibSettingsBuilder-1.0", 3
+local MAJOR, MINOR = "LibSettingsBuilder-1.0", 4
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then
     return
@@ -362,9 +362,9 @@ local function applyActionButtonTextures(button, action, enabled)
     end
 
     if textures and textures.normal then
-        setButtonTextureState(button, "SetNormalTexture", "GetNormalTexture", textures.normal)
-        setButtonTextureState(button, "SetPushedTexture", "GetPushedTexture", textures.pushed or textures.normal)
-        setButtonTextureState(button, "SetDisabledTexture", "GetDisabledTexture", textures.disabled or textures.normal)
+        setButtonTextureState(button, "SetNormalTexture", "GetNormalTexture", textures.normal, nil, 1)
+        setButtonTextureState(button, "SetPushedTexture", "GetPushedTexture", textures.pushed or textures.normal, nil, 1)
+        setButtonTextureState(button, "SetDisabledTexture", "GetDisabledTexture", textures.disabled or textures.normal, nil, 1)
 
         local highlight = textures.highlight
         if highlight == nil then

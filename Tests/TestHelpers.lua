@@ -900,10 +900,14 @@ function TestHelpers.SetupGameTooltipStub()
         _lines = {},
         _owner = nil,
         _anchor = nil,
+        _point = nil,
         _shown = false,
         SetOwner = function(self, owner, anchor)
             self._owner = owner
             self._anchor = anchor
+        end,
+        SetPoint = function(self, point, relativeTo, relativePoint, x, y)
+            self._point = { point, relativeTo, relativePoint, x, y }
         end,
         ClearLines = function(self)
             self._title = nil

@@ -32,11 +32,6 @@ local ACTION_BUTTON_TEXTURES = {
         pushed = "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
         disabled = "Interface\\Buttons\\UI-GroupLoot-Pass-Disabled",
     },
-    hide = {
-        normal = "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
-        pushed = "Interface\\Buttons\\UI-Panel-MinimizeButton-Down",
-        disabled = "Interface\\Buttons\\UI-Panel-MinimizeButton-Disabled",
-    },
     moveDown = {
         normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
         pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down",
@@ -238,7 +233,13 @@ local function showRowTooltip(owner, rowData)
     end
 
     local displayEntry = rowData.displayEntry
-    GameTooltip:SetOwner(owner, "ANCHOR_CURSOR")
+    GameTooltip:SetOwner(owner, "ANCHOR_NONE")
+    if GameTooltip.ClearAllPoints then
+        GameTooltip:ClearAllPoints()
+    end
+    if GameTooltip.SetPoint then
+        GameTooltip:SetPoint("BOTTOMLEFT", owner, "TOPRIGHT", 0, 0)
+    end
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
     end
@@ -646,7 +647,7 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
     if rowData.isBuiltin then
         return makeAction(
             rowData.isDisabled and "+" or "x",
-            rowData.isDisabled and ACTION_BUTTON_TEXTURES.show or ACTION_BUTTON_TEXTURES.hide,
+            rowData.isDisabled and ACTION_BUTTON_TEXTURES.show or ACTION_BUTTON_TEXTURES.delete,
             not controlsDisabled,
             rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"],
             profileAction(function(profile)
@@ -664,6 +665,13 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
         return makeAction("+", ACTION_BUTTON_TEXTURES.show, not controlsDisabled, L["ADD_ENTRY"], profileAction(function(profile)
             ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellId)
         end))
+    end
+
+    if rowData.isCurrentRacial then
+        return makeAction("x", ACTION_BUTTON_TEXTURES.delete, not controlsDisabled, L["REMOVE_TOOLTIP"],
+            profileAction(function(profile)
+                ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, rowData.index)
+            end))
     end
 
     return makeAction("x", ACTION_BUTTON_TEXTURES.delete, not controlsDisabled, L["REMOVE_TOOLTIP"], function()
@@ -689,7 +697,7 @@ local function getMoveTooltip(hasMoveDup, posLocked, otherViewer)
     if posLocked then
         return L["EXTRA_ICONS_BUILTIN_ORDER_TOOLTIP"]
     end
-    return L["MOVE_TO_VIEWER_TOOLTIP"]:format(VIEWER_SHORT_LABELS[otherViewer])
+    return L["MOVE_TO_VIEWER_TOOLTIP"]
 end
 
 local function buildActionItem(rowData)
@@ -844,6 +852,7 @@ ExtraIconsOptions.pages = {
                 id = "viewers",
                 type = "sectionList",
                 height = VIEWER_COLLECTION_HEIGHT,
+                footerSpacing = 4,
                 disabled = isDisabled,
                 sections = ExtraIconsOptions.BuildSections,
                 onDefault = ExtraIconsOptions.ResetToDefaults,

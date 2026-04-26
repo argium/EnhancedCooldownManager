@@ -859,6 +859,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.is_table(opts._draftStates)
         assert.are.equal("checkbox", getRow("enabled").type)
         assert.are.equal("sectionList", getRow("viewers").type)
+        assert.are.equal(4, getRow("viewers").footerSpacing)
         assert.are.equal(2, #capturedPage.rows)
     end)
 
@@ -876,6 +877,40 @@ describe("ExtraIconsOptions settings page", function()
         assert.is_not_nil(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ADD_ENTRY"]
         end))
+    end)
+
+    it("keeps active racial entries fully enabled after replacing the placeholder", function()
+        _G.UnitRace = function() return "Night Elf", "NightElf", 4 end
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return spellId == 58984 and "Shadowmeld" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return spellId == 58984 and "shadowmeld-tex" or nil
+            end,
+        }
+
+        local racialPlaceholder = assert(findItem("utility", function(item)
+            return item.actions.delete.tooltip == ns.L["ADD_ENTRY"]
+        end))
+        assert.is_true(racialPlaceholder.disabled)
+        racialPlaceholder.actions.delete.onClick()
+
+        local activeRacial = assert(findItem("utility", function(item)
+            return item.label == "Shadowmeld"
+        end))
+        assert.is_false(activeRacial.disabled)
+        assert.is_true(activeRacial.actions.delete.enabled)
+        assert.are.equal("Interface\\Buttons\\UI-GroupLoot-Pass-Up", activeRacial.actions.delete.buttonTextures.normal)
+
+        local popupShown = false
+        _G.StaticPopup_Show = function()
+            popupShown = true
+        end
+        activeRacial.actions.delete.onClick()
+
+        assert.is_false(popupShown)
+        assert.is_false(ns.ExtraIconsOptions._isRacialPresent(profile.extraIcons.viewers, 58984))
     end)
 
     it("maps row actions to built-in button texture states", function()
@@ -925,9 +960,10 @@ describe("ExtraIconsOptions settings page", function()
             return item.label == "Healthstones"
         end))
         assert.are.equal(
-            "Interface\\Buttons\\UI-Panel-MinimizeButton-Up",
+            "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
             activeBuiltin.actions.delete.buttonTextures.normal
         )
+        assert.are.equal(ns.L["EXTRA_ICONS_HIDE_TOOLTIP"], activeBuiltin.actions.delete.tooltip)
 
         local builtinPlaceholder = assert(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
@@ -1203,8 +1239,10 @@ describe("ExtraIconsOptions settings page", function()
         local placeholder = assert(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ENABLE_TOOLTIP"]
         end))
-        placeholder.onEnter(CreateFrame("Frame"))
-        assert.are.equal("ANCHOR_CURSOR", _G.GameTooltip._anchor)
+        local tooltipOwner = CreateFrame("Frame")
+        placeholder.onEnter(tooltipOwner)
+        assert.are.equal("ANCHOR_NONE", _G.GameTooltip._anchor)
+        assert.are.same({ "BOTTOMLEFT", tooltipOwner, "TOPRIGHT", 0, 0 }, _G.GameTooltip._point)
         assert.are.equal(ns.L["EXTRA_ICONS_BUILTIN_PLACEHOLDER_TOOLTIP"], _G.GameTooltip._lines[1])
 
         local duplicateMove = assert(findItem("utility", function(item)
@@ -1214,5 +1252,24 @@ describe("ExtraIconsOptions settings page", function()
             ns.L["EXTRA_ICONS_DUPLICATE_MOVE_TOOLTIP"]:format(ns.L["MAIN_VIEWER_SHORT"]),
             duplicateMove.actions.move.tooltip()
         )
+    end)
+
+    it("uses the generic move tooltip when the destination viewer can accept the row", function()
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return spellId == 12345 and "Test Spell" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return "spell-" .. tostring(spellId)
+            end,
+        }
+        profile.extraIcons.viewers.utility = {
+            { kind = "spell", ids = { 12345 } },
+        }
+
+        local row = assert(findItem("utility", function(item)
+            return item.label == "Test Spell"
+        end))
+        assert.are.equal(ns.L["MOVE_TO_VIEWER_TOOLTIP"], row.actions.move.tooltip())
     end)
 end)

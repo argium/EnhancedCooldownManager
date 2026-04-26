@@ -116,6 +116,39 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_nil(sb:GetPage("general", "missing"))
     end)
 
+    it("uses the section category for an unnamed page in a multi-page section", function()
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "power",
+                    name = "Power",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                { type = "info", name = "Enabled", value = "Yes" },
+                            },
+                        },
+                        {
+                            key = "ticks",
+                            name = "Ticks",
+                            rows = {
+                                { type = "info", name = "Count", value = "0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local mainPage = assert(sb:GetPage("power", "main"))
+        local ticksPage = assert(sb:GetPage("power", "ticks"))
+
+        assert.are.equal("Builder Spec.Power", mainPage:GetId())
+        assert.are.equal("Builder Spec.Power.Ticks", ticksPage:GetId())
+        assert.are.equal(mainPage._category, ticksPage._category._parent)
+    end)
+
     it("registers root-bound composite rows from an empty path", function()
         local sb, profile = createBuilder({
             sections = {

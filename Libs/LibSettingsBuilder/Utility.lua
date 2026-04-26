@@ -87,6 +87,7 @@
 ---@field disabled LibSettingsBuilderPredicate|nil Gets the page-level disabled predicate propagated to child rows.
 ---@field hidden LibSettingsBuilderPredicate|nil Gets the page-level hidden predicate propagated to child rows.
 ---@field order number|nil Gets the sort order used when a section declares multiple pages.
+---@field useSectionCategory boolean|nil Gets whether a multi-page section page is materialized on the section category instead of under a child category.
 
 --- Declarative section definition registered under `config.sections`.
 --- Example (section page):
@@ -720,6 +721,7 @@ local function createPage(owner, key, rows, opts)
         _operations = {},
         _rowIDs = {},
         _registered = false,
+        _useSectionCategory = opts.useSectionCategory == true,
         disabled = opts.disabled,
         hidden = opts.hidden,
         key = key,
@@ -767,10 +769,20 @@ local function registerSection(section)
     local builder = section._builder
     local nested = #section._pageList > 1
     local orderedPages = {}
+    local sectionCategoryPage
     for i = 1, #section._pageList do
         orderedPages[i] = section._pageList[i]
     end
     sortByOrder(orderedPages)
+
+    if nested then
+        for _, page in ipairs(orderedPages) do
+            if page._useSectionCategory then
+                assert(not sectionCategoryPage, "registerSection: only one nested page can use the section category")
+                sectionCategoryPage = page
+            end
+        end
+    end
 
     if nested then
         section._category = createManagedSubcategory(builder, section.name, section._root._category)
@@ -779,7 +791,11 @@ local function registerSection(section)
     for _, page in ipairs(orderedPages) do
         if nested then
             assert(page.name and page.name ~= "", "registerSection: nested pages require spec.name")
-            materializePage(page, createManagedSubcategory(builder, page.name, section._category))
+            if page == sectionCategoryPage then
+                materializePage(page, section._category)
+            else
+                materializePage(page, createManagedSubcategory(builder, page.name, section._category))
+            end
         else
             materializePage(page, createManagedSubcategory(builder, section.name, section._root._category))
         end
@@ -876,6 +892,7 @@ local function registerPageDefinition(owner, pageDef, defaultName)
         hidden = pageDef.hidden,
         order = pageDef.order,
         path = pageDef.path,
+        useSectionCategory = pageDef.useSectionCategory or (owner._root ~= nil and pageDef.name == nil),
     })
 end
 

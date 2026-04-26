@@ -22,12 +22,26 @@ local setTextureValue = internal.setTextureValue
 local showFrame = internal.showFrame
 
 local DISABLED_ROW_ALPHA = 0.5
+local DEFAULT_LABEL_COLOR = { 1, 1, 1, 1 }
+
+local function getFontObjectTextColor(fontObject)
+    if type(fontObject) == "string" then
+        fontObject = _G[fontObject]
+    end
+    if fontObject and fontObject.GetTextColor then
+        local r, g, b, a = fontObject:GetTextColor()
+        if r then
+            return r, g, b, a
+        end
+    end
+
+    return DEFAULT_LABEL_COLOR[1], DEFAULT_LABEL_COLOR[2], DEFAULT_LABEL_COLOR[3], DEFAULT_LABEL_COLOR[4]
+end
 
 local function applyCollectionRowStyle(row, item)
     local disabled = item and item.disabled == true
     local alpha = item and item.alpha or (disabled and DISABLED_ROW_ALPHA or 1)
-    local labelFontObject = item and item.labelFontObject
-        or (disabled and (_G.GameFontDisable or _G.GameFontNormal) or nil)
+    local labelFontObject = item and item.labelFontObject or (disabled and _G.GameFontDisable or _G.GameFontNormal)
     local iconDesaturated = item and item.iconDesaturated
     if iconDesaturated == nil then
         iconDesaturated = disabled
@@ -36,13 +50,17 @@ local function applyCollectionRowStyle(row, item)
     if row._label and row._label.SetFontObject and labelFontObject then
         row._label:SetFontObject(labelFontObject)
     end
-    if row._label and row._label.SetTextColor and item and item.labelColor then
-        row._label:SetTextColor(
-            item.labelColor[1] or 1,
-            item.labelColor[2] or 1,
-            item.labelColor[3] or 1,
-            item.labelColor[4] or 1
-        )
+    if row._label and row._label.SetTextColor then
+        if item and item.labelColor then
+            row._label:SetTextColor(
+                item.labelColor[1] or 1,
+                item.labelColor[2] or 1,
+                item.labelColor[3] or 1,
+                item.labelColor[4] or 1
+            )
+        else
+            row._label:SetTextColor(getFontObjectTextColor(labelFontObject))
+        end
     end
     if row._label and row._label.SetAlpha then
         row._label:SetAlpha(alpha)
@@ -63,12 +81,44 @@ local function applyCollectionRowStyle(row, item)
     end
 end
 
+local function setCollectionRowHighlight(row, shown)
+    local highlight = row and row._highlight
+    if shown then
+        if highlight and highlight.Show then
+            highlight:Show()
+        end
+    elseif highlight and highlight.Hide then
+        highlight:Hide()
+    end
+end
+
+local function getLabelHitBoxWidth(label)
+    local textWidth = label and label.GetStringWidth and label:GetStringWidth() or nil
+    local labelWidth = label and label.GetWidth and label:GetWidth() or nil
+    if textWidth and labelWidth and labelWidth > 0 then
+        textWidth = math.min(textWidth, labelWidth)
+    end
+    return math.max(1, math.ceil(textWidth or labelWidth or 1))
+end
+
+local function updateActionRowTooltipOwner(row)
+    local owner = row._tooltipOwner
+    if not owner then
+        return
+    end
+
+    owner:ClearAllPoints()
+    owner:SetPoint("LEFT", row._label, "LEFT", 0, 0)
+    owner:SetSize(getLabelHitBoxWidth(row._label), row:GetHeight() or 20)
+end
+
 local function bindCollectionRowTooltip(row, item)
     if not row or not row.SetScript then
         return
     end
 
     local label = row._label
+    local tooltipOwner = row._tooltipOwner or label
     if row.EnableMouse then
         row:EnableMouse(item ~= nil)
     end
@@ -82,30 +132,40 @@ local function bindCollectionRowTooltip(row, item)
     if label and label.EnableMouse then
         label:EnableMouse(false)
     end
+    if tooltipOwner and tooltipOwner ~= label then
+        tooltipOwner:SetScript("OnEnter", nil)
+        tooltipOwner:SetScript("OnLeave", nil)
+        if tooltipOwner.EnableMouse then
+            tooltipOwner:EnableMouse(false)
+        end
+        if tooltipOwner.Hide then
+            tooltipOwner:Hide()
+        end
+    end
 
     if not item then
         return
     end
 
     row:SetScript("OnEnter", function(self)
-        if self._highlight and self._highlight.Show then
-            self._highlight:Show()
-        end
+        setCollectionRowHighlight(self, true)
     end)
     row:SetScript("OnLeave", function(self)
-        if self._highlight and self._highlight.Hide then
-            self._highlight:Hide()
-        end
+        setCollectionRowHighlight(self, false)
     end)
 
-    if not label or not label.SetScript or (not item.onEnter and not item.tooltip) then
+    if not tooltipOwner or not tooltipOwner.SetScript or (not item.onEnter and not item.tooltip) then
         return
     end
 
-    if label.EnableMouse then
-        label:EnableMouse(true)
+    if tooltipOwner.EnableMouse then
+        tooltipOwner:EnableMouse(true)
     end
-    label:SetScript("OnEnter", function(self)
+    if tooltipOwner.Show then
+        tooltipOwner:Show()
+    end
+    tooltipOwner:SetScript("OnEnter", function(self)
+        setCollectionRowHighlight(row, true)
         if item.onEnter then
             item.onEnter(self, item)
         elseif GameTooltip then
@@ -117,7 +177,8 @@ local function bindCollectionRowTooltip(row, item)
             GameTooltip:Show()
         end
     end)
-    label:SetScript("OnLeave", function(self)
+    tooltipOwner:SetScript("OnLeave", function(self)
+        setCollectionRowHighlight(row, false)
         if item.onLeave then
             item.onLeave(self, item)
         elseif GameTooltip_Hide then
@@ -455,19 +516,21 @@ local function ensureActionsCollectionRow(row)
     row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
     row._label:SetJustifyH("LEFT")
     row._label:SetWordWrap(false)
+    row._tooltipOwner = CreateFrame("Frame", nil, row)
+    row._tooltipOwner:Hide()
 
     row._buttons = {}
     row._textureButtons = {}
     for _, key in ipairs(ACTION_BUTTON_ORDER) do
         local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         if button.RegisterForClicks then
-            button:RegisterForClicks("LeftButtonDown")
+            button:RegisterForClicks("LeftButtonUp")
         end
         row._buttons[key] = button
 
         button = CreateFrame("Button", nil, row)
         if button.RegisterForClicks then
-            button:RegisterForClicks("LeftButtonDown")
+            button:RegisterForClicks("LeftButtonUp")
         end
         row._textureButtons[key] = button
     end
@@ -479,7 +542,6 @@ local function refreshActionsCollectionRow(row, item)
     row._label:SetText(item.label or "")
     setTextureValue(row._icon, item.icon or 134400)
     applyCollectionRowStyle(row, item)
-    bindCollectionRowTooltip(row, item)
 
     local anchor = nil
     for _, key in ipairs(ACTION_BUTTON_ORDER) do
@@ -508,7 +570,7 @@ local function refreshActionsCollectionRow(row, item)
                 button:SetEnabled(enabled)
             end
             applyActionButtonState(button, enabled)
-            setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, row, item))
+            setSimpleTooltip(button, enabled ~= false and evaluateStaticOrFunction(action.tooltip, action, row, item) or nil)
             button:SetScript("OnClick", function()
                 if action.onClick then
                     action.onClick(item, row, action)
@@ -528,6 +590,8 @@ local function refreshActionsCollectionRow(row, item)
         row._label:SetPoint("LEFT", row._icon, "RIGHT", 6, 0)
         row._label:SetPoint("RIGHT", row, "RIGHT", -6, 0)
     end
+    updateActionRowTooltipOwner(row)
+    bindCollectionRowTooltip(row, item)
 end
 
 local function ensureModeInputRow(row)
@@ -612,6 +676,12 @@ local function ensureModeInputRow(row)
     row._editBox:SetScript("OnEnterPressed", function()
         local trailer = row._lsbTrailerData
         if trailer and trailer.onSubmit then
+            local disabled = evaluateStaticOrFunction(trailer.disabled, trailer, row, row._lsbSectionData) == true
+            local submitEnabled = evaluateStaticOrFunction(trailer.submitEnabled, trailer, row, row._lsbSectionData)
+            if disabled or submitEnabled == false then
+                return
+            end
+
             local keepFocus = trailer.onSubmit(trailer, row, row._lsbSectionData)
             if keepFocus then
                 row._editBox:SetFocus()
@@ -673,6 +743,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
         local previewText = getModeInputTrailerValue(currentTrailer, "previewText", activeRow, activeSectionData)
         local submitText = getModeInputTrailerValue(currentTrailer, "submitText", activeRow, activeSectionData)
         local submitTooltip = getModeInputTrailerValue(currentTrailer, "submitTooltip", activeRow, activeSectionData)
+        local canSubmit = not disabled and submitEnabled ~= false
 
         activeRow._modeButton:SetText(modeText or "")
         setSimpleTooltip(activeRow._modeButton, modeTooltip)
@@ -723,7 +794,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
         activeRow._submitButton:SetText(submitText or ADD or "Add")
         setSimpleTooltip(activeRow._submitButton, submitTooltip)
         activeRow._submitButton:SetScript("OnClick", function()
-            if currentTrailer.onSubmit then
+            if currentTrailer.onSubmit and canSubmit then
                 local keepFocus = currentTrailer.onSubmit(currentTrailer, activeRow, activeRow._lsbSectionData)
                 if keepFocus then
                     activeRow._editBox:SetFocus()
@@ -732,7 +803,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
             end
         end)
         if activeRow._submitButton.SetEnabled then
-            activeRow._submitButton:SetEnabled(not disabled and submitEnabled ~= false)
+            activeRow._submitButton:SetEnabled(canSubmit)
         end
     end
 
@@ -919,6 +990,7 @@ local function refreshSectionedCollection(frame, data)
         local footer = section.footer
         local footerType = footer and (footer.type or footer.preset)
         if footerType == "modeInput" then
+            y = y - (section.footerSpacing or data.footerSpacing or 0)
             local trailerRow = trailerRows[sectionKey]
             if not trailerRow then
                 trailerRow = CreateFrame("Frame", nil, content)

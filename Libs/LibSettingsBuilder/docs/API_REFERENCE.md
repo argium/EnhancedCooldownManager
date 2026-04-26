@@ -91,7 +91,7 @@ Section definition fields:
 Page definition fields inside `pages`:
 
 - `key`
-- `name` (required for nested/multi-page pages unless you want the section name as the default)
+- `name` (optional; in a multi-page section, omitting it makes that page use the visible section category)
 - `path`
 - `rows`
 - `onShow`
@@ -99,11 +99,13 @@ Page definition fields inside `pages`:
 - `disabled`
 - `hidden`
 - `order`
+- `useSectionCategory` (optional explicit form of the omitted-`name` multi-page behavior)
 
 Notes:
 
 - single-page sections flatten to a single leaf by default,
-- multi-page sections create a visible section node automatically.
+- multi-page sections create a visible section node automatically,
+- one multi-page section page can live directly on that section node; named pages are registered below it.
 - page `path` prefixes child `path` fields that do not already contain dots,
 - page-level `disabled` and `hidden` values propagate to child rows unless a row overrides them.
 
