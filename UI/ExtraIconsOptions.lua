@@ -885,6 +885,30 @@ ExtraIconsOptions.pages = {
                 end,
             },
             {
+                id = "showStackCount",
+                type = "checkbox",
+                path = "showStackCount",
+                name = L["SHOW_STACK_COUNT"],
+                tooltip = L["SHOW_STACK_COUNT_DESC"],
+                disabled = isDisabled,
+                onSet = function(ctx)
+                    ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                    ctx.page:Refresh()
+                end,
+            },
+            {
+                id = "showCharges",
+                type = "checkbox",
+                path = "showCharges",
+                name = L["SHOW_CHARGES"],
+                tooltip = L["SHOW_CHARGES_DESC"],
+                disabled = isDisabled,
+                onSet = function(ctx)
+                    ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                    ctx.page:Refresh()
+                end,
+            },
+            {
                 id = "viewers",
                 type = "sectionList",
                 height = VIEWER_COLLECTION_HEIGHT,

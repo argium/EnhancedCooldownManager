@@ -849,6 +849,8 @@ describe("ExtraIconsOptions settings page", function()
 
         profile.extraIcons = {
             enabled = true,
+            showStackCount = true,
+            showCharges = true,
             viewers = {
                 utility = {},
                 main = {},
@@ -893,9 +895,11 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.is_table(opts._draftStates)
         assert.are.equal("checkbox", getRow("enabled").type)
+        assert.are.equal("checkbox", getRow("showStackCount").type)
+        assert.are.equal("checkbox", getRow("showCharges").type)
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
-        assert.are.equal(2, #capturedPage.rows)
+        assert.are.equal(4, #capturedPage.rows)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()

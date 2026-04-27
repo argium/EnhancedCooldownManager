@@ -128,6 +128,8 @@ local _, ns = ...
 
 ---@class ECM_ExtraIconsConfig Extra icons configuration.
 ---@field enabled boolean Whether extra icons are enabled.
+---@field showStackCount boolean Whether to show item stack counts.
+---@field showCharges boolean Whether to show spell charges.
 ---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
 
 ---@class ECM_TickMark Tick mark definition.
@@ -320,6 +322,8 @@ local defaults = {
         },
         extraIcons = {
             enabled = true,
+            showStackCount = true,
+            showCharges = true,
             viewers = {
                 utility = {
                     { stackKey = "trinket1" },

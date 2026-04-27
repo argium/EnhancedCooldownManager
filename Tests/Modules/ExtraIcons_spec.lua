@@ -372,6 +372,25 @@ describe("ExtraIcons real source", function()
                 end
                 return texture
             end
+            frame.CreateFontString = function()
+                local fontString = TestHelpers.makeRegion("FontString")
+                fontString.SetPoint = function() end
+                fontString.SetJustifyH = function() end
+                fontString.SetJustifyV = function() end
+                fontString.SetText = function(self, text)
+                    self.__text = text
+                end
+                fontString.Show = function(self)
+                    self.__shown = true
+                end
+                fontString.Hide = function(self)
+                    self.__shown = false
+                end
+                fontString.IsShown = function(self)
+                    return self.__shown == true
+                end
+                return fontString
+            end
             frame.SetAllPoints = function() end
             frame.SetDrawEdge = function() end
             frame.SetDrawSwipe = function() end
@@ -1338,6 +1357,67 @@ describe("ExtraIcons real source", function()
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
         assert.same({ 100, 60 }, ExtraIcons._viewers.utility.iconPool[1].Cooldown.__cooldown)
+    end)
+
+    it("shows item stack counts when enabled", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 5
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        local config = makeViewersConfig({ { stackKey = "healthstones" } })
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return config
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local count = ExtraIcons._viewers.utility.iconPool[1].Count
+        assert.are.equal("5", count.__text)
+        assert.is_true(count:IsShown())
+
+        config.showStackCount = false
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        assert.is_nil(count.__text)
+        assert.is_false(count:IsShown())
+    end)
+
+    it("shows spell charges when enabled and refreshes them", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        knownSpells[59752] = true
+        spellTextures[59752] = "racial-icon"
+        spellCharges[59752] = { currentCharges = 2, maxCharges = 3 }
+
+        local config = makeViewersConfig({ { kind = "spell", ids = { { spellId = 59752 } } } })
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return config
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local count = ExtraIcons._viewers.utility.iconPool[1].Count
+        assert.are.equal("2", count.__text)
+        assert.is_true(count:IsShown())
+
+        spellCharges[59752] = { currentCharges = 1, maxCharges = 3 }
+        assert.is_true(ExtraIcons:Refresh("test"))
+        assert.are.equal("1", count.__text)
+
+        config.showCharges = false
+        assert.is_true(ExtraIcons:Refresh("test"))
+        assert.is_nil(count.__text)
+        assert.is_false(count:IsShown())
     end)
 
     it("refreshes cooldowns for visible icons across viewers", function()

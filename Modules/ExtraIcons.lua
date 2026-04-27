@@ -217,6 +217,12 @@ local function createIcon(parent, size, borderScale)
     icon.Border:SetPoint("CENTER")
     icon.Border:SetSize(size * borderScale[1], size * borderScale[2])
 
+    icon.Count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    icon.Count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
+    icon.Count:SetJustifyH("RIGHT")
+    icon.Count:SetJustifyV("BOTTOM")
+    icon.Count:Hide()
+
     icon.Shadow = icon:CreateTexture(nil, "OVERLAY")
     icon.Shadow:SetAtlas("UI-CooldownManager-OORshadow")
     icon.Shadow:SetAllPoints()
@@ -260,6 +266,38 @@ local function updateIconCooldown(icon)
             icon.Cooldown:Clear()
         end
     end
+end
+
+local function setIconCountText(icon, text)
+    if text ~= nil then
+        icon.Count:SetText(tostring(text))
+        icon.Count:Show()
+    else
+        icon.Count:SetText(nil)
+        icon.Count:Hide()
+    end
+end
+
+local function updateIconCountText(icon, config)
+    if not icon.Count then return end
+
+    if icon.itemId and (not config or config.showStackCount ~= false) then
+        local count = C_Item.GetItemCount(icon.itemId)
+        if count and count > 1 then
+            setIconCountText(icon, count)
+            return
+        end
+    end
+
+    if icon.spellId and (not config or config.showCharges ~= false) then
+        local charges = C_Spell.GetSpellCharges(icon.spellId)
+        if charges and charges.maxCharges and charges.maxCharges > 1 and charges.currentCharges ~= nil then
+            setIconCountText(icon, charges.currentCharges)
+            return
+        end
+    end
+
+    setIconCountText(icon, nil)
 end
 
 --- Caches and returns the cooldown number font from a sibling Blizzard icon.
@@ -351,7 +389,7 @@ function ExtraIcons:GetMainViewerAnchor()
     return _G[BLIZZ_KEY.main]
 end
 
-function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX)
+function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX, moduleConfig)
     local blizzFrame = _G[BLIZZ_KEY[viewerKey]]
     local vs = self._viewers[viewerKey]
     if not vs then return false end
@@ -427,6 +465,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         icon:Show()
 
         updateIconCooldown(icon)
+        updateIconCountText(icon, moduleConfig)
 
         if fontPath and fontSize then
             local region = icon.Cooldown:GetRegions()
@@ -465,7 +504,7 @@ function ExtraIcons:UpdateLayout(why)
 
     for _, v in ipairs(VIEWERS) do
         local entries = viewers and viewers[v.key] or {}
-        if self:_updateSingleViewer(v.key, entries, isEditing, offsets[v.key]) then
+        if self:_updateSingleViewer(v.key, entries, isEditing, offsets[v.key], moduleConfig) then
             anyPlaced = true
         end
     end
@@ -491,11 +530,13 @@ function ExtraIcons:Refresh(why, force)
     if not self._viewers then return false end
 
     local refreshed = false
+    local moduleConfig = self.GetModuleConfig and self:GetModuleConfig() or nil
     for _, vs in pairs(self._viewers) do
         if vs.container and vs.container:IsShown() then
             for _, icon in ipairs(vs.iconPool) do
                 if icon:IsShown() and (icon.slotId or icon.itemId or icon.spellId) then
                     updateIconCooldown(icon)
+                    updateIconCountText(icon, moduleConfig)
                 end
             end
             refreshed = true
