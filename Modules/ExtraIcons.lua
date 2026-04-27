@@ -8,13 +8,29 @@ local ExtraIcons = ns.Addon:NewModule("ExtraIcons")
 ns.Addon.ExtraIcons = ExtraIcons
 
 local BUILTIN_STACKS = ns.Constants.BUILTIN_STACKS
+local RACIAL_ABILITIES = ns.Constants.RACIAL_ABILITIES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
-local BORDER_SCALE = ns.Constants.EXTRA_ICON_BORDER_SCALE
+local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
+local UTILITY_BORDER_SCALE = ns.Constants.EXTRA_ICON_UTILITY_BORDER_SCALE
+
+local BORDER_SCALE_BY_VIEWER = {
+    main = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE },
+    -- Utility icon frames render square; keep the overlay square so extras do not look short.
+    utility = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE },
+}
 
 local SUPPRESS_IN_RATED_PVP = {
     combatPotions = true,
     healthPotions = true,
 }
+
+local RACIAL_SPELL_ALIASES = {}
+for _, racial in pairs(RACIAL_ABILITIES) do
+    local spellIds = racial.spellIds or { racial.spellId }
+    for _, spellId in ipairs(spellIds) do
+        RACIAL_SPELL_ALIASES[spellId] = spellIds
+    end
+end
 
 -- Ordered viewer keys mapped to their Blizzard frame globals.
 local VIEWERS = {
@@ -118,12 +134,27 @@ local function resolveItem(ids)
     end
 end
 
+local function resolveKnownSpell(spellId)
+    if spellId and C_SpellBook.IsSpellKnown(spellId) then
+        local texture = C_Spell.GetSpellTexture(spellId)
+        if texture then return { spellId = spellId, texture = texture } end
+    end
+end
+
 local function resolveSpell(ids)
     for _, entry in ipairs(ids) do
         local spellId = type(entry) == "table" and entry.spellId or entry
-        if spellId and C_SpellBook.IsSpellKnown(spellId) then
-            local texture = C_Spell.GetSpellTexture(spellId)
-            if texture then return { spellId = spellId, texture = texture } end
+        local data = resolveKnownSpell(spellId)
+        if data then return data end
+
+        local aliases = RACIAL_SPELL_ALIASES[spellId]
+        if aliases then
+            for _, aliasSpellId in ipairs(aliases) do
+                if aliasSpellId ~= spellId then
+                    data = resolveKnownSpell(aliasSpellId)
+                    if data then return data end
+                end
+            end
         end
     end
 end
@@ -159,7 +190,7 @@ end
 -- Icon creation and cooldown
 --------------------------------------------------------------------------------
 
-local function createIcon(parent, size)
+local function createIcon(parent, size, borderScale)
     local icon = CreateFrame("Button", nil, parent)
     icon:SetSize(size, size)
 
@@ -184,7 +215,7 @@ local function createIcon(parent, size)
     icon.Border = icon:CreateTexture(nil, "OVERLAY")
     icon.Border:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
     icon.Border:SetPoint("CENTER")
-    icon.Border:SetSize(size * BORDER_SCALE, size * BORDER_SCALE)
+    icon.Border:SetSize(size * borderScale[1], size * borderScale[2])
 
     icon.Shadow = icon:CreateTexture(nil, "OVERLAY")
     icon.Shadow:SetAtlas("UI-CooldownManager-OORshadow")
@@ -340,8 +371,9 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     end
 
     for _, icon in ipairs(vs.iconPool) do icon:Hide() end
+    local borderScale = BORDER_SCALE_BY_VIEWER[viewerKey] or BORDER_SCALE_BY_VIEWER.main
     for i = #vs.iconPool + 1, #items do
-        vs.iconPool[i] = createIcon(container, DEFAULT_SIZE)
+        vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, borderScale)
     end
 
     local fontPath, fontSize, fontFlags = getSiblingFont(blizzFrame)
@@ -384,7 +416,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
-        icon.Border:SetSize(iconSize * BORDER_SCALE, iconSize * BORDER_SCALE)
+        icon.Border:SetSize(iconSize * borderScale[1], iconSize * borderScale[2])
         icon.slotId = data.slotId
         icon.itemId = data.itemId
         icon.spellId = data.spellId

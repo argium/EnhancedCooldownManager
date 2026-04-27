@@ -345,7 +345,16 @@ describe("ExtraIcons real source", function()
             frame.CreateTexture = function()
                 local texture = TestHelpers.makeTexture()
                 texture.SetPoint = function() end
-                texture.SetSize = function() end
+                texture.SetSize = function(self, width, height)
+                    self.__width = width
+                    self.__height = height
+                end
+                texture.GetWidth = function(self)
+                    return self.__width
+                end
+                texture.GetHeight = function(self)
+                    return self.__height
+                end
                 texture.SetAtlas = function() end
                 texture.AddMaskTexture = function() end
                 texture.Hide = function(self)
@@ -357,7 +366,10 @@ describe("ExtraIcons real source", function()
                 local texture = TestHelpers.makeTexture()
                 texture.SetAtlas = function() end
                 texture.SetPoint = function() end
-                texture.SetSize = function() end
+                texture.SetSize = function(self, width, height)
+                    self.__width = width
+                    self.__height = height
+                end
                 return texture
             end
             frame.SetAllPoints = function() end
@@ -906,6 +918,31 @@ describe("ExtraIcons real source", function()
         assert.are.equal(87, x)
     end)
 
+    it("matches the utility viewer's square overlay footprint", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 30, height = 30 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(30)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { stackKey = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local icon = ExtraIcons._viewers.utility.iconPool[1]
+        assert.are.equal(42, icon.Border.__width)
+        assert.are.equal(42, icon.Border.__height)
+    end)
+
     it("skips disabled entries during layout resolution", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end
@@ -1380,6 +1417,28 @@ describe("ExtraIcons real source", function()
         local vs = ExtraIcons._viewers.utility
         assert.are.equal(59752, vs.iconPool[1].spellId)
         assert.are.equal("racial-icon", vs.iconPool[1].Icon:GetTexture())
+    end)
+
+    it("resolves saved racial spell ids through alternate racial ids", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        knownSpells[357214] = true
+        spellTextures[357214] = "tail-swipe-icon"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "spell", ids = { { spellId = 368970 } } } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local vs = ExtraIcons._viewers.utility
+        assert.are.equal(357214, vs.iconPool[1].spellId)
+        assert.are.equal("tail-swipe-icon", vs.iconPool[1].Icon:GetTexture())
     end)
 
     it("skips spell cooldown swipe when only on GCD", function()

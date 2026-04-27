@@ -62,6 +62,8 @@ local ACTION_BUTTON_TEXTURES = {
 local BUILTIN_STACK_SET = {}
 local BUILTIN_EQUIP_SLOTS = {}
 local RACIAL_SPELL_IDS = {}
+local function getRacialSpellIds(racial) return racial.spellIds or { racial.spellId } end
+local function getSpellId(id) return type(id) == "table" and id.spellId or id end
 for _, key in ipairs(BUILTIN_STACK_ORDER) do
     BUILTIN_STACK_SET[key] = true
 end
@@ -71,7 +73,9 @@ for _, stack in pairs(BUILTIN_STACKS) do
     end
 end
 for _, racial in pairs(RACIAL_ABILITIES) do
-    RACIAL_SPELL_IDS[racial.spellId] = true
+    for _, spellId in ipairs(getRacialSpellIds(racial)) do
+        RACIAL_SPELL_IDS[spellId] = true
+    end
 end
 
 local ExtraIconsOptions = ns.ExtraIconsOptions or {}
@@ -121,8 +125,25 @@ local function getEntrySpellId(entry)
     if not (entry and entry.kind == "spell" and entry.ids and entry.ids[1]) then
         return nil
     end
-    local first = entry.ids[1]
-    return type(first) == "table" and first.spellId or first
+    return getSpellId(entry.ids[1])
+end
+
+local function entryHasSpellId(entry, spellId)
+    if not (spellId and entry and entry.kind == "spell" and entry.ids) then
+        return false
+    end
+    for _, id in ipairs(entry.ids) do
+        if getSpellId(id) == spellId then return true end
+    end
+    return false
+end
+
+local function entryHasAnySpellId(entry, spellIds)
+    if type(spellIds) ~= "table" then return entryHasSpellId(entry, spellIds) end
+    for _, spellId in ipairs(spellIds) do
+        if entryHasSpellId(entry, spellId) then return true end
+    end
+    return false
 end
 
 local function getItemIdFromEntry(entry) return type(entry) == "table" and (entry.itemID or entry.itemId) or entry end
@@ -150,10 +171,10 @@ local function appendViewerEntry(viewers, viewerKey, entry)
     entries[#entries + 1] = entry
 end
 
-local function getCurrentRacialSpellId()
+local function getCurrentRacialSpellIds()
     local _, raceFile = UnitRace("player")
     local racial = raceFile and RACIAL_ABILITIES[raceFile] or nil
-    return racial and racial.spellId or nil
+    return racial and getRacialSpellIds(racial) or nil
 end
 
 local function getItemDisplayName(itemId)
@@ -297,18 +318,30 @@ function ExtraIconsOptions._shouldShowBuiltinStackRow(stackKey)
     return spellId ~= nil
 end
 
-function ExtraIconsOptions._isRacialPresent(viewers, spellId) return ExtraIconsOptions._findDuplicateEntry(viewers, buildEntry("spell", { spellId })) ~= nil end
+function ExtraIconsOptions._isRacialPresent(viewers, spellIds)
+    return findViewerEntry(viewers, function(entry)
+        return entryHasAnySpellId(entry, spellIds)
+    end) ~= nil
+end
 
-function ExtraIconsOptions._isCurrentRacialEntry(entry) return getEntrySpellId(entry) == getCurrentRacialSpellId() end
+function ExtraIconsOptions._isCurrentRacialEntry(entry) return entryHasAnySpellId(entry, getCurrentRacialSpellIds()) end
 
 function ExtraIconsOptions._isRacialForCurrentPlayer(entry)
-    local spellId = getEntrySpellId(entry)
-    if not spellId then
+    if not (entry and entry.kind == "spell" and entry.ids) then
         return true
     end
 
-    local currentSpellId = getCurrentRacialSpellId()
-    return not currentSpellId or spellId == currentSpellId or not RACIAL_SPELL_IDS[spellId]
+    local hasRacialSpell = false
+    for _, id in ipairs(entry.ids) do
+        local spellId = getSpellId(id)
+        if RACIAL_SPELL_IDS[spellId] then
+            hasRacialSpell = true
+            break
+        end
+    end
+
+    local currentSpellIds = getCurrentRacialSpellIds()
+    return not currentSpellIds or entryHasAnySpellId(entry, currentSpellIds) or not hasRacialSpell
 end
 
 local function shouldShowEntryRow(entry) return ExtraIconsOptions._isRacialForCurrentPlayer(entry) and (not entry.stackKey or ExtraIconsOptions._shouldShowBuiltinStackRow(entry.stackKey)) end
@@ -374,9 +407,11 @@ function ExtraIconsOptions._addStackKey(profile, viewerKey, stackKey)
     if not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then appendViewerEntry(viewers, viewerKey, { stackKey = stackKey }) end
 end
 
-function ExtraIconsOptions._addRacial(profile, viewerKey, spellId)
+function ExtraIconsOptions._addRacial(profile, viewerKey, spellIds)
     local viewers = profile.extraIcons.viewers
-    if not ExtraIconsOptions._isRacialPresent(viewers, spellId) then appendViewerEntry(viewers, viewerKey, buildEntry("spell", { spellId })) end
+    if not ExtraIconsOptions._isRacialPresent(viewers, spellIds) then
+        appendViewerEntry(viewers, viewerKey, buildEntry("spell", type(spellIds) == "table" and spellIds or { spellIds }))
+    end
 end
 
 function ExtraIconsOptions._addCustomEntry(profile, viewerKey, kind, ids)
@@ -406,13 +441,13 @@ function ExtraIconsOptions._toggleBuiltinRow(profile, viewerKey, index, stackKey
     if entry then entry.disabled = not entry.disabled and true or nil end
 end
 
-function ExtraIconsOptions._toggleCurrentRacialRow(profile, viewerKey, index, spellId)
+function ExtraIconsOptions._toggleCurrentRacialRow(profile, viewerKey, index, spellIds)
     if index then
         ExtraIconsOptions._removeEntry(profile, viewerKey, index)
         return
     end
-    if spellId then
-        ExtraIconsOptions._addRacial(profile, viewerKey, spellId)
+    if spellIds then
+        ExtraIconsOptions._addRacial(profile, viewerKey, spellIds)
     end
 end
 
@@ -521,6 +556,7 @@ local function makeRowData(rowType, viewerKey, displayEntry, index)
         index = index,
         stackKey = displayEntry.stackKey,
         spellId = getEntrySpellId(displayEntry),
+        spellIds = displayEntry.kind == "spell" and displayEntry.ids or nil,
         displayEntry = displayEntry,
         isBuiltin = displayEntry.stackKey ~= nil,
         isCurrentRacial = rowType == "racialPlaceholder" or ExtraIconsOptions._isCurrentRacialEntry(displayEntry),
@@ -564,9 +600,9 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
     end
 
     if viewerKey == DEFAULT_SPECIAL_VIEWER then
-        local racialSpellId = getCurrentRacialSpellId()
-        if racialSpellId and not ExtraIconsOptions._isRacialPresent(viewers, racialSpellId) then
-            rows[#rows + 1] = makeRowData("racialPlaceholder", viewerKey, buildEntry("spell", { racialSpellId }))
+        local racialSpellIds = getCurrentRacialSpellIds()
+        if racialSpellIds and not ExtraIconsOptions._isRacialPresent(viewers, racialSpellIds) then
+            rows[#rows + 1] = makeRowData("racialPlaceholder", viewerKey, buildEntry("spell", racialSpellIds))
         end
     end
 
@@ -663,7 +699,7 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
 
     if rowData.isCurrentRacial and rowData.isPlaceholder then
         return makeAction("+", ACTION_BUTTON_TEXTURES.show, not controlsDisabled, L["ADD_ENTRY"], profileAction(function(profile)
-            ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellId)
+            ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellIds)
         end))
     end
 

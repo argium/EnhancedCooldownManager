@@ -105,7 +105,8 @@ local constants = {
 
     -- Extra icons
     DEFAULT_EXTRA_ICON_SIZE = 32,
-    EXTRA_ICON_BORDER_SCALE = 1.35,
+    EXTRA_ICON_MAIN_BORDER_SCALE = 1.35,
+    EXTRA_ICON_UTILITY_BORDER_SCALE = 1.4,
 
     -- Consumables and equipment slots
     COMBAT_POTIONS = {
@@ -227,7 +228,7 @@ local RACIAL_ABILITIES = {
     Vulpera            = { spellId = 312411 }, -- Bag of Tricks
     MagharOrc          = { spellId = 274738 }, -- Ancestral Call
     Mechagnome         = { spellId = 312924 }, -- Hyper Organic Light Originator
-    Dracthyr           = { spellId = 368970 }, -- Tail Swipe
+    Dracthyr           = { spellIds = { 357214, 368970 } }, -- Tail Swipe
     EarthenDwarf       = { spellId = 436717 }, -- Azerite Surge
 }
 

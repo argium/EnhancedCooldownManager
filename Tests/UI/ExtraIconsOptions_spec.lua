@@ -79,6 +79,11 @@ describe("ExtraIconsOptions data helpers", function()
             assert.is_true(ExtraIconsOptions._isRacialPresent(viewers, 33697))
         end)
 
+        it("finds racial by any candidate id", function()
+            local viewers = { utility = { { kind = "spell", ids = { 368970 } } }, main = {} }
+            assert.is_true(ExtraIconsOptions._isRacialPresent(viewers, { 357214, 368970 }))
+        end)
+
         it("returns false when absent", function()
             local viewers = { utility = { { kind = "spell", ids = { 59752 } } }, main = {} }
             assert.is_false(ExtraIconsOptions._isRacialPresent(viewers, 33697))
@@ -267,6 +272,15 @@ describe("ExtraIconsOptions data helpers", function()
 
             assert.are.equal(1, #profile.extraIcons.viewers.utility)
             assert.are.same({ 59752 }, profile.extraIcons.viewers.utility[1].ids)
+        end)
+
+        it("adds all candidate ids for racials with alternate spell ids", function()
+            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
+
+            ExtraIconsOptions._toggleCurrentRacialRow(profile, "utility", nil, { 357214, 368970 })
+
+            assert.are.equal(1, #profile.extraIcons.viewers.utility)
+            assert.are.same({ 357214, 368970 }, profile.extraIcons.viewers.utility[1].ids)
         end)
 
         it("removes a persisted racial row when toggled", function()
@@ -586,6 +600,12 @@ describe("ExtraIconsOptions data helpers", function()
             assert.is_true(ExtraIconsOptions._isCurrentRacialEntry({ kind = "spell", ids = { 59752 } }))
         end)
 
+        it("returns true for alternate ids of the current player's racial", function()
+            _G.UnitRace = function() return "Dracthyr", "Dracthyr", 70 end
+
+            assert.is_true(ExtraIconsOptions._isCurrentRacialEntry({ kind = "spell", ids = { 368970 } }))
+        end)
+
         it("returns false for non-racial entries", function()
             assert.is_false(ExtraIconsOptions._isCurrentRacialEntry({ stackKey = "trinket1" }))
         end)
@@ -717,6 +737,21 @@ describe("ExtraIconsOptions data helpers", function()
 
             assert.are.equal("racialPlaceholder", rows[#rows].rowType)
             assert.are.equal(58984, rows[#rows].spellId)
+        end)
+
+        it("matches Tail Swipe from the Dracthyr race file token", function()
+            local viewers = {
+                utility = {},
+                main = {},
+            }
+
+            _G.UnitRace = function() return "Dracthyr", "Dracthyr", 70 end
+
+            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+
+            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
+            assert.are.equal(357214, rows[#rows].spellId)
+            assert.are.same({ 357214, 368970 }, rows[#rows].displayEntry.ids)
         end)
 
         it("does not synthesize a racial placeholder when UnitRace has no matching race file token", function()
