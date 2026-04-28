@@ -78,11 +78,11 @@ describe("PowerBarTickMarksOptions", function()
         assert.is_nil(ns.PowerBarTickMarksStore)
     end)
 
-    it("exports a page with page actions and list-based tick editors", function()
+    it("exports a page with list-based tick editors", function()
         local captured = registerPageSpec()
 
         assert.are.equal("Tick Marks", captured.name)
-        assert.are.equal("pageActions", getRow(captured, "tickMarksPageActions").type)
+        assert.is_nil(getRow(captured, "tickMarksPageActions"))
         assert.are.equal("list", getRow(captured, "tickCollection").type)
         assert.are.equal("editor", getRow(captured, "tickCollection").variant)
         assert.are.equal(320, getRow(captured, "tickCollection").height)
@@ -93,11 +93,9 @@ describe("PowerBarTickMarksOptions", function()
         currentSpecIndex = nil
 
         local captured = registerPageSpec()
-        local defaultsAction = getRow(captured, "tickMarksPageActions").actions[1]
         local tickCollection = getRow(captured, "tickCollection")
 
         assert.are.same({}, tickCollection.items())
-        assert.is_false(defaultsAction.enabled())
     end)
 
     it("add button appends a tick using the current defaults", function()
@@ -122,53 +120,6 @@ describe("PowerBarTickMarksOptions", function()
         assert.are.equal(50, items[1].fields[1].value)
         assert.are.equal(3, items[1].fields[2].value)
         assert.are.same(defaultColor, items[1].color.value)
-        assert.are.equal("OptionsChanged", scheduledReason)
-        assert.are.same({ true }, refreshCalls)
-    end)
-
-    it("defaults action clears only the current spec ticks after confirmation", function()
-        local shownPopup
-        local scheduledReason
-
-        setTickMappings({
-            [1] = {
-                [2] = {
-                    { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
-                },
-            },
-            [2] = {
-                [1] = {
-                    { value = 30, width = 1, color = { r = 0, g = 1, b = 0, a = 1 } },
-                },
-            },
-        })
-
-        _G.StaticPopup_Show = function(name, _, _, data)
-            shownPopup = name
-            local dialog = _G.StaticPopupDialogs[name]
-            dialog.OnAccept(nil, data)
-        end
-        ns.Runtime = {
-            ScheduleLayoutUpdate = function(_, reason)
-                scheduledReason = reason
-            end,
-        }
-
-        local captured, refreshCalls = registerPageSpec()
-        local defaultsAction = getRow(captured, "tickMarksPageActions").actions[1]
-        local tickCollection = getRow(captured, "tickCollection")
-
-        defaultsAction.onClick()
-
-        assert.are.equal("ECM_CONFIRM_CLEAR_TICKS", shownPopup)
-        assert.are.same({}, tickCollection.items())
-
-        currentClassID = 2
-        currentSpecIndex = 1
-
-        local otherSpecItems = tickCollection.items()
-        assert.are.equal(1, #otherSpecItems)
-        assert.are.equal(30, otherSpecItems[1].fields[1].value)
         assert.are.equal("OptionsChanged", scheduledReason)
         assert.are.same({ true }, refreshCalls)
     end)

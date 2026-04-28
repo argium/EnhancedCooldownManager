@@ -223,14 +223,11 @@ L["DEFAULT_COLOR"] = "Default color"
 --------------------------------------------------------------------------------
 
 L["TICK_MARKS_DESC"] = "Customize tick marks for the power bar. Marks are saved per class and specialization."
-L["TICK_MARKS_CLEAR_CONFIRM"] = "Are you sure you want to remove all tick marks for this spec?"
 L["DEFAULT_WIDTH"] = "Default width"
 L["ADD_TICK_MARK"] = "Add Tick Mark"
 L["ADD"] = "Add"
 L["REMOVE"] = "Remove"
 L["TICK_N"] = "Tick %d"
-L["NO_TICK_MARKS"] = "%s - no tick marks configured."
-L["TICK_COUNT"] = "%s - %d tick mark(s) configured."
 
 --------------------------------------------------------------------------------
 -- Extra Icons Options

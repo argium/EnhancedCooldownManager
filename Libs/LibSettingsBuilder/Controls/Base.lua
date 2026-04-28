@@ -63,15 +63,16 @@ function lib.Dropdown(self, spec)
     setting._optionsGen = optionsGenerator
 
     local initializer = Settings.CreateDropdown(category, setting, optionsGenerator, spec.tooltip)
+    initializer._lsbData = {
+        _lsbKind = "dropdown",
+        setting = setting,
+        values = spec.values,
+        name = spec.name,
+        tooltip = spec.tooltip,
+    }
     if spec.scrollHeight then
-        initializer._lsbData = {
-            _lsbKind = "scrollDropdown",
-            setting = setting,
-            values = spec.values,
-            scrollHeight = spec.scrollHeight,
-            name = spec.name,
-            tooltip = spec.tooltip,
-        }
+        initializer._lsbData._lsbKind = "scrollDropdown"
+        initializer._lsbData.scrollHeight = spec.scrollHeight
         if initializer.SetSetting then
             initializer:SetSetting(setting)
         end
@@ -89,8 +90,10 @@ function lib.Dropdown(self, spec)
 
     if type(spec.values) == "function" and not initializer._lsbRefreshFrame then
         initializer._lsbRefreshFrame = function(frame)
-            if frame and frame.InitDropdown then
+            if frame and frame.InitDropdown and frame.lsbData and frame.lsbData._lsbKind == "scrollDropdown" then
                 frame:InitDropdown(initializer)
+            elseif frame and frame.RefreshDropdownText then
+                frame:RefreshDropdownText()
             elseif frame and frame.SetValue and setting.GetValue then
                 frame:SetValue(setting:GetValue())
             end
@@ -213,6 +216,7 @@ function lib.Custom(self, spec)
     local setting, category = internal.makeProxySetting(self, spec, spec.varType or Settings.VarType.String, "")
     local initializer = Settings.CreateElementInitializer(spec.template, {
         name = spec.name,
+        setting = setting,
         tooltip = spec.tooltip,
     })
 

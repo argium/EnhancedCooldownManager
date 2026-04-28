@@ -21,6 +21,7 @@ describe("ExternalBars real source", function()
     local registerFrameCalls
     local unregisterFrameCalls
     local auraDataByInstanceID
+    local auraDurationByInstanceID
     local colorLookupScopes
     local discoveredScopes
     local spellColorStores
@@ -38,6 +39,12 @@ describe("ExternalBars real source", function()
 
         function fontString:SetText(text)
             self.__text = text
+        end
+
+        function fontString:SetFormattedText(formatText, ...)
+            self.__formatText = formatText
+            self.__formatArgs = { ... }
+            self.__text = string.format(formatText, ...)
         end
 
         function fontString:GetText()
@@ -190,54 +197,17 @@ describe("ExternalBars real source", function()
             return self.__value
         end
 
+        function bar:SetTimerDuration(durationObject, interpolation, direction)
+            self.__timerDuration = durationObject
+            self.__timerInterpolation = interpolation
+            self.__timerDirection = direction
+        end
+
+        function bar:SetToTargetValue()
+            self.__setToTargetValueCalls = (self.__setToTargetValueCalls or 0) + 1
+        end
+
         return bar
-    end
-
-    local function makeCooldownFrame(parent)
-        local cooldown = addFrameFeatures(makeFrame({ shown = true }), parent)
-        cooldown.__setCooldownDurationCalls = {}
-        cooldown.__clearCalls = 0
-
-        function cooldown:SetDrawSwipe(value)
-            self.__drawSwipe = value
-        end
-
-        function cooldown:SetDrawEdge(value)
-            self.__drawEdge = value
-        end
-
-        function cooldown:SetDrawBling(value)
-            self.__drawBling = value
-        end
-
-        function cooldown:SetReverse(value)
-            self.__reverse = value
-        end
-
-        function cooldown:SetHideCountdownNumbers(value)
-            self.__hideCountdownNumbers = value
-        end
-
-        function cooldown:SetSwipeColor(r, g, b, a)
-            self.__swipeColor = { r, g, b, a }
-        end
-
-        function cooldown:SetCooldownDuration(duration, timeMod)
-            self.__lastDuration = duration
-            self.__lastTimeMod = timeMod
-            self.__setCooldownDurationCalls[#self.__setCooldownDurationCalls + 1] = {
-                duration = duration,
-                timeMod = timeMod,
-            }
-        end
-
-        function cooldown:Clear()
-            self.__clearCalls = self.__clearCalls + 1
-            self.__lastDuration = nil
-            self.__lastTimeMod = nil
-        end
-
-        return cooldown
     end
 
     local function createFrameStub(frameType, _, parent)
@@ -245,17 +215,32 @@ describe("ExternalBars real source", function()
             return makeStatusBarFrame(parent)
         end
 
-        if frameType == "Cooldown" then
-            return makeCooldownFrame(parent)
+        return addFrameFeatures(makeFrame({ shown = true }), parent)
+    end
+
+    local function makeDurationObject(aura)
+        if aura.durationObject == false then
+            return nil
+        end
+        if aura.durationObject ~= nil then
+            return aura.durationObject
         end
 
-        return addFrameFeatures(makeFrame({ shown = true }), parent)
+        return {
+            GetRemainingDuration = function()
+                if aura.remaining ~= nil then
+                    return aura.remaining
+                end
+                return aura.expirationTime - fakeTime
+            end,
+        }
     end
 
     local function setViewerAuras(auraDefs)
         viewer.auraInfo = {}
         viewer.auraFrames = {}
         auraDataByInstanceID = {}
+        auraDurationByInstanceID = {}
 
         for index, aura in ipairs(auraDefs or {}) do
             viewer.auraInfo[index] = {
@@ -270,6 +255,7 @@ describe("ExternalBars real source", function()
                 icon = aura.texture,
             }
             auraDataByInstanceID[aura.auraInstanceID] = aura.auraData
+            auraDurationByInstanceID[aura.auraInstanceID] = makeDurationObject(aura)
         end
     end
 
@@ -310,6 +296,7 @@ describe("ExternalBars real source", function()
             "CreateFrame",
             "LibStub",
             "SecondsToTimeAbbrev",
+            "Enum",
             "wipe",
         })
     end)
@@ -327,6 +314,7 @@ describe("ExternalBars real source", function()
         registerFrameCalls = 0
         unregisterFrameCalls = 0
         auraDataByInstanceID = {}
+        auraDurationByInstanceID = {}
         colorLookupScopes = {}
         discoveredScopes = {}
         spellColorStores = {}
@@ -511,13 +499,28 @@ describe("ExternalBars real source", function()
             GetAuraDataByAuraInstanceID = function(_, auraInstanceID)
                 return auraDataByInstanceID[auraInstanceID]
             end,
+            GetAuraDuration = function(_, auraInstanceID)
+                return auraDurationByInstanceID[auraInstanceID]
+            end,
+        }
+        _G.Enum = {
+            StatusBarInterpolation = {
+                ExponentialEaseOut = "ExponentialEaseOut",
+                None = "None",
+            },
+            StatusBarTimerDirection = {
+                RemainingTime = "RemainingTime",
+                ElapsedTime = "ElapsedTime",
+            },
         }
         _G.wipe = function(tbl)
             for key in pairs(tbl) do
                 tbl[key] = nil
             end
         end
-        _G.SecondsToTimeAbbrev = nil
+        _G.SecondsToTimeAbbrev = function()
+            return "%d"
+        end
         _G.C_Timer = {
             After = function(_, callback)
                 afterCallbacks[#afterCallbacks + 1] = callback
@@ -578,7 +581,7 @@ describe("ExternalBars real source", function()
         ExternalBars:OnInitialize()
     end)
 
-    it("creates bars from external aura updates and configures cooldown duration", function()
+    it("creates bars from external aura updates and refreshes duration progress", function()
         setViewerAuras({
             {
                 auraInstanceID = 11,
@@ -598,12 +601,47 @@ describe("ExternalBars real source", function()
         assert.are.equal("Ironbark", bar.Bar.Name:GetText())
         assert.are.equal("12", bar.Bar.Duration:GetText())
         assert.is_true(bar.Bar.Duration:IsShown())
-        assert.same({ duration = 12, timeMod = 1.5 }, bar.Cooldown.__setCooldownDurationCalls[1])
+        assert.are.equal(0, bar.Bar.__minValue)
+        assert.are.equal(1, bar.Bar.__maxValue)
+        assert.are.equal(auraDurationByInstanceID[11], bar.Bar.__timerDuration)
+        assert.are.equal("ExponentialEaseOut", bar.Bar.__timerInterpolation)
+        assert.are.equal("RemainingTime", bar.Bar.__timerDirection)
+        assert.are.equal(1, bar.Bar.__setToTargetValueCalls)
+        assert.is_nil(bar.Cooldown)
         assert.same({ "ExternalBars:UpdateAuras" }, requestLayoutReasons)
         assert.same({ ns.Constants.SCOPE_EXTERNALBARS }, colorLookupScopes)
         assert.same({ ns.Constants.SCOPE_EXTERNALBARS }, discoveredScopes)
         assert.same({ 0.40, 0.78, 0.95, 1.0 }, { bar.Bar:GetStatusBarColor() })
         assert.are.equal(1, #durationTickers)
+
+        fakeTime = 103
+        durationTickers[1].callback()
+
+        assert.are.equal("9.0", bar.Bar.Duration:GetText())
+    end)
+
+    it("configures duration bar progress when duration text is hidden", function()
+        profile.externalBars.showDuration = false
+
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                timeMod = 1,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        assert.is_true(syncAndLayout("test-hidden-text"))
+
+        local bar = assert(ExternalBars._barPool[1])
+        assert.is_false(bar.Bar.Duration:IsShown())
+        assert.is_nil(bar.Bar.Duration:GetText())
+        assert.are.equal(auraDurationByInstanceID[11], bar.Bar.__timerDuration)
+        assert.are.equal("RemainingTime", bar.Bar.__timerDirection)
+        assert.are.equal(0, #durationTickers)
     end)
 
     it("emits detailed aura diagnostics when debug logging is enabled", function()
@@ -644,7 +682,7 @@ describe("ExternalBars real source", function()
             durationIsSecret = false,
             expirationTimeIsSecret = false,
             canShowDurationText = true,
-            hasRenderableDuration = true,
+            canUpdateDurationBar = true,
         }, logEntry.payload.auras[1])
     end)
 
@@ -691,7 +729,7 @@ describe("ExternalBars real source", function()
             texture = 5011,
             durationIsSecret = false,
             canShowDurationText = true,
-            hasRenderableDuration = true,
+            canUpdateDurationBar = true,
             barExists = true,
             barShown = true,
             barWidth = 0,
@@ -702,7 +740,7 @@ describe("ExternalBars real source", function()
         }, logEntry.payload.bars[1])
     end)
 
-    it("hides duration text but still configures cooldown and schedules the all-secret color retry path", function()
+    it("formats secret duration text through engine formatting and schedules the color retry path", function()
         _G.issecretvalue = function()
             return true
         end
@@ -714,6 +752,7 @@ describe("ExternalBars real source", function()
                 duration = "secret-duration",
                 expirationTime = "secret-expiration",
                 timeMod = "secret-mod",
+                remaining = 8,
                 auraData = { name = "secret-name", spellId = 987654 },
             },
         })
@@ -722,12 +761,16 @@ describe("ExternalBars real source", function()
 
         local bar = assert(ExternalBars._barPool[1])
         assert.is_true(bar:IsShown())
-        assert.is_false(bar.Bar.Duration:IsShown())
-        assert.is_nil(bar.Bar.Duration:GetText())
-        assert.same({ duration = "secret-duration", timeMod = "secret-mod" }, bar.Cooldown.__setCooldownDurationCalls[1])
+        assert.is_true(bar.Bar.Duration:IsShown())
+        assert.are.equal("8", bar.Bar.Duration:GetText())
+        assert.are.equal("%.0f", bar.Bar.Duration.__formatText)
+        assert.are.equal(0, bar.Bar.__minValue)
+        assert.are.equal(1, bar.Bar.__maxValue)
+        assert.are.equal(auraDurationByInstanceID[22], bar.Bar.__timerDuration)
+        assert.is_nil(bar.Cooldown)
         assert.are.equal(1, #retryTimers)
         assert.same({ true, "secrets" }, { ExternalBars:IsEditLocked() })
-        assert.are.equal(0, #durationTickers)
+        assert.are.equal(1, #durationTickers)
     end)
 
     it("reuses pooled bars and hides excess bars when aura count shrinks", function()

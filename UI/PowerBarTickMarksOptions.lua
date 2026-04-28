@@ -101,8 +101,6 @@ local function setDefaultWidth(width)
     getTicksConfig().defaultWidth = width
 end
 
-StaticPopupDialogs["ECM_CONFIRM_CLEAR_TICKS"] = ns.OptionUtil.MakeConfirmDialog(L["TICK_MARKS_CLEAR_CONFIRM"])
-
 local registeredPage
 function PowerBarTickMarksOptions.SetRegisteredPage(page)
     registeredPage = page
@@ -126,24 +124,6 @@ end
 
 local function scheduleUpdate()
     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-end
-
-local function clearAllTicks()
-    setCurrentTicks({})
-    scheduleUpdate()
-    refreshPage()
-end
-
-local function getTickSummary()
-    local _, _, localisedClassName, specName, className = ns.OptionUtil.GetCurrentClassSpec()
-    local color = C.CLASS_COLORS[className] or C.COLOR_WHITE_HEX
-    local classSpecLabel = "|cff" .. color .. (localisedClassName or "Unknown") .. "|r " .. (specName or "Unknown")
-    local ticks = getCurrentTicks()
-    local count = #ticks
-    if count == 0 then
-        return string.format(L["NO_TICK_MARKS"], classSpecLabel)
-    end
-    return string.format(L["TICK_COUNT"], classSpecLabel, count)
 end
 
 local function buildTickCollectionItems()
@@ -216,25 +196,6 @@ PowerBarTickMarksOptions.key = "tickMarks"
 PowerBarTickMarksOptions.name = "Tick Marks"
 PowerBarTickMarksOptions.rows = {
     {
-        id = "tickMarksPageActions",
-        type = "pageActions",
-        name = PowerBarTickMarksOptions.name,
-        actions = {
-            {
-                text = SETTINGS_DEFAULTS,
-                width = 100,
-                enabled = function()
-                    return #getCurrentTicks() > 0
-                end,
-                onClick = function()
-                    StaticPopup_Show("ECM_CONFIRM_CLEAR_TICKS", nil, nil, {
-                        onAccept = clearAllTicks,
-                    })
-                end,
-            },
-        },
-    },
-    {
         id = "description",
         type = "info",
         name = "",
@@ -242,15 +203,6 @@ PowerBarTickMarksOptions.rows = {
         wide = true,
         multiline = true,
         height = 36,
-    },
-    {
-        id = "summary",
-        type = "info",
-        name = "",
-        value = getTickSummary,
-        wide = true,
-        multiline = true,
-        height = 28,
     },
     {
         id = "defaultColor",

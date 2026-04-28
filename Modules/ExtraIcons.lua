@@ -218,7 +218,7 @@ local function createIcon(parent, size, borderScale)
     icon.Border:SetPoint("CENTER")
     icon.Border:SetSize(size * borderScale[1], size * borderScale[2])
 
-    icon.Count = icon:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    icon.Count = icon:CreateFontString(nil, "OVERLAY")
     icon.Count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
     icon.Count:SetJustifyH("RIGHT")
     icon.Count:SetJustifyV("BOTTOM")
@@ -279,9 +279,9 @@ local function setIconCountText(icon, text)
     end
 end
 
-local function updateIconCountText(icon, config)
+local function updateIconCountText(icon, globalConfig, config)
     if not icon.Count then return end
-    FrameUtil.ApplyFont(icon.Count, nil, config)
+    FrameUtil.ApplyFont(icon.Count, globalConfig, config)
 
     if icon.itemId and (not config or config.showStackCount ~= false) then
         local count = C_Item.GetItemCount(icon.itemId)
@@ -417,6 +417,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     end
 
     local fontPath, fontSize, fontFlags = getSiblingFont(blizzFrame)
+    local globalConfig = self:GetGlobalConfig()
     local iconSize = DEFAULT_SIZE
     local viewerScale = blizzFrame.iconScale or 1.0
     local spacing = blizzFrame.childXPadding or 0
@@ -467,7 +468,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         icon:Show()
 
         updateIconCooldown(icon)
-        updateIconCountText(icon, moduleConfig)
+        updateIconCountText(icon, globalConfig, moduleConfig)
 
         if fontPath and fontSize then
             local region = icon.Cooldown:GetRegions()
@@ -533,12 +534,13 @@ function ExtraIcons:Refresh(why, force)
 
     local refreshed = false
     local moduleConfig = self.GetModuleConfig and self:GetModuleConfig() or nil
+    local globalConfig = self:GetGlobalConfig()
     for _, vs in pairs(self._viewers) do
         if vs.container and vs.container:IsShown() then
             for _, icon in ipairs(vs.iconPool) do
                 if icon:IsShown() and (icon.slotId or icon.itemId or icon.spellId) then
                     updateIconCooldown(icon)
-                    updateIconCountText(icon, moduleConfig)
+                    updateIconCountText(icon, globalConfig, moduleConfig)
                 end
             end
             refreshed = true

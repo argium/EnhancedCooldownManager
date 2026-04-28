@@ -14,7 +14,6 @@ ns.Addon.ExternalBars = ExternalBars
 local PLAYER_UNIT = "player"
 local SPELL_COLOR_SCOPE = C.SCOPE_EXTERNALBARS
 local canAccessTable = _G.canaccesstable
-local secondsToTimeAbbrev = _G.SecondsToTimeAbbrev
 
 local function getSpellColors()
     return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
@@ -26,12 +25,12 @@ end
 ---@field name string|nil Non-secret aura name used for color lookup and optional display.
 ---@field spellID number|nil Non-secret spell ID used for spell-color lookup.
 ---@field texture string|number|nil Aura icon texture forwarded to widget APIs.
----@field duration number|nil Aura duration forwarded to the cooldown widget.
----@field expirationTime number|nil Aura expiration time used only when non-secret duration text is allowed.
----@field timeMod number|nil Aura time modifier forwarded to the cooldown widget.
+---@field duration number|nil Aura duration retained only for diagnostics.
+---@field expirationTime number|nil Aura expiration time retained only for diagnostics.
+---@field durationObject table|nil Aura duration object consumed by StatusBar timer APIs.
 ---@field durationIsSecret boolean Whether the packed aura duration is secret.
----@field canShowDurationText boolean Whether duration text can be refreshed safely in Lua.
----@field hasRenderableDuration boolean Whether the cooldown widget can be configured for this aura.
+---@field canShowDurationText boolean Whether duration text can be refreshed through engine formatting.
+---@field canUpdateDurationBar boolean Whether duration progress can be refreshed through the StatusBar timer.
 
 ---@class ECM_ExternalBarStatusBar : StatusBar Shared-status bar surface for one external aura row.
 ---@field Name FontString Spell name text.
@@ -41,7 +40,6 @@ end
 ---@class ECM_ExternalBarMixin : Frame Reusable bar row styled by the shared BuffBars helpers.
 ---@field __ecmHooked boolean Whether the shared child-bar styling is allowed to target this frame.
 ---@field Bar ECM_ExternalBarStatusBar Inner status bar surface.
----@field Cooldown Cooldown Cooldown overlay rendering the draining fill.
 ---@field Icon Frame Icon frame containing the texture regions expected by `FrameUtil`.
 ---@field cooldownInfo { spellID: number|nil } Spell metadata consumed by `SpellColors`.
 ---@field _ecmAuraIndex number Aura array position currently bound to this pooled bar.
@@ -116,11 +114,6 @@ local function formatDurationText(remaining)
         return ""
     end
 
-    if type(secondsToTimeAbbrev) == "function" then
-        local text = secondsToTimeAbbrev(remaining)
-        return text or ""
-    end
-
     if remaining >= 60 then
         local minutes = math.floor(remaining / 60)
         local seconds = math.floor(remaining % 60)
@@ -132,6 +125,27 @@ local function formatDurationText(remaining)
     end
 
     return string.format("%.1f", remaining)
+end
+
+---@param auraState ECM_ExternalAuraState|nil
+---@return number|nil
+local function getRemainingDuration(auraState)
+    if auraState == nil or auraState.durationObject == nil then
+        return nil
+    end
+
+    return auraState.durationObject:GetRemainingDuration()
+end
+
+---@param durationText FontString
+---@param remaining number
+local function setDurationText(durationText, remaining)
+    if issecretvalue(remaining) then
+        durationText:SetFormattedText("%.0f", remaining)
+        return
+    end
+
+    durationText:SetText(formatDurationText(remaining))
 end
 
 ---@param bars ECM_ExternalBarMixin[]
@@ -248,11 +262,11 @@ function ExternalBars:_GetBarDiagnostics(index, bar, auraState)
     local iconTexture = bar and bar._iconTexture or nil
     local durationIsSecret = nil
     local canShowDurationText = nil
-    local hasRenderableDuration = nil
+    local canUpdateDurationBar = nil
     if auraState then
         durationIsSecret = auraState.durationIsSecret
         canShowDurationText = auraState.canShowDurationText
-        hasRenderableDuration = auraState.hasRenderableDuration
+        canUpdateDurationBar = auraState.canUpdateDurationBar
     end
 
     return {
@@ -264,7 +278,7 @@ function ExternalBars:_GetBarDiagnostics(index, bar, auraState)
         texture = auraState and auraState.texture or nil,
         durationIsSecret = durationIsSecret,
         canShowDurationText = canShowDurationText,
-        hasRenderableDuration = hasRenderableDuration,
+        canUpdateDurationBar = canUpdateDurationBar,
         barExists = bar ~= nil,
         barShown = getFrameShown(bar),
         barWidth = getFrameWidth(bar),
@@ -317,35 +331,64 @@ end
 ---@param bar ECM_ExternalBarMixin
 ---@param auraState ECM_ExternalAuraState|nil
 ---@param showDuration boolean|nil
-function ExternalBars:_RefreshBarDurationText(bar, auraState, showDuration)
+---@param remaining number|nil
+function ExternalBars:_RefreshBarDurationText(bar, auraState, showDuration, remaining)
     local durationText = bar and bar.Bar and bar.Bar.Duration
     if not durationText then
         return
     end
 
-    if showDuration == false or not auraState or not auraState.canShowDurationText then
+    if showDuration == false or auraState == nil or not auraState.canShowDurationText then
         durationText:SetText(nil)
         durationText:Hide()
         return
     end
 
-    local remaining = auraState.expirationTime - GetTime()
-    if remaining < 0 then
-        remaining = 0
+    remaining = remaining or getRemainingDuration(auraState)
+    if remaining == nil then
+        durationText:SetText(nil)
+        durationText:Hide()
+        return
     end
 
-    durationText:SetText(formatDurationText(remaining))
+    setDurationText(durationText, remaining)
     durationText:Show()
 end
 
-function ExternalBars:_RefreshDurationTexts()
+---@param bar ECM_ExternalBarMixin
+---@param auraState ECM_ExternalAuraState|nil
+---@return number|nil
+function ExternalBars:_RefreshBarDurationProgress(bar, auraState)
+    local statusBar = bar and bar.Bar
+    if not statusBar then
+        return nil
+    end
+
+    if auraState == nil or auraState.durationObject == nil then
+        statusBar:SetMinMaxValues(0, 1)
+        statusBar:SetValue(1)
+        return nil
+    end
+
+    statusBar:SetMinMaxValues(0, 1)
+    statusBar:SetTimerDuration(
+        auraState.durationObject,
+        Enum.StatusBarInterpolation.ExponentialEaseOut,
+        Enum.StatusBarTimerDirection.RemainingTime
+    )
+    statusBar:SetToTargetValue()
+    return getRemainingDuration(auraState)
+end
+
+function ExternalBars:_RefreshDurationDisplays()
     local moduleConfig = self:GetModuleConfig()
-    if not moduleConfig or moduleConfig.showDuration == false then
+    if not moduleConfig then
         self:_StopDurationTicker()
         return
     end
 
     local hasEligibleBars = false
+    local showDuration = moduleConfig.showDuration ~= false
     local barPool = self._barPool or {}
     local auraStates = self._auraStates or {}
     local activeAuraCount = self._activeAuraCount or 0
@@ -353,11 +396,11 @@ function ExternalBars:_RefreshDurationTexts()
     for index = 1, activeAuraCount do
         local bar = barPool[index]
         local auraState = auraStates[index]
-        if bar and bar:IsShown() and auraState and auraState.canShowDurationText then
+        if bar and bar:IsShown() and auraState and auraState.canUpdateDurationBar then
             hasEligibleBars = true
         end
         if bar then
-            self:_RefreshBarDurationText(bar, auraState, true)
+            self:_RefreshBarDurationText(bar, auraState, showDuration)
         end
     end
 
@@ -378,9 +421,9 @@ function ExternalBars:_RestartDurationTicker()
     local activeAuraCount = self._activeAuraCount or 0
     for index = 1, activeAuraCount do
         local auraState = auraStates[index]
-        if auraState and auraState.canShowDurationText then
+        if auraState and auraState.canUpdateDurationBar then
             self._durationTicker = C_Timer.NewTicker(0.1, function()
-                self:_RefreshDurationTexts()
+                self:_RefreshDurationDisplays()
             end)
             return
         end
@@ -448,16 +491,6 @@ function ExternalBars:_ensureBar(index)
     bar.Bar.Duration:SetJustifyV("MIDDLE")
     bar.Bar.Duration:SetWordWrap(false)
 
-    bar.Cooldown = CreateFrame("Cooldown", nil, bar.Bar, "CooldownFrameTemplate")
-    bar.Cooldown:SetAllPoints(bar.Bar)
-    bar.Cooldown:SetFrameLevel(bar.Bar:GetFrameLevel() + 2)
-    bar.Cooldown:SetDrawSwipe(true)
-    bar.Cooldown:SetDrawEdge(false)
-    bar.Cooldown:SetDrawBling(false)
-    bar.Cooldown:SetReverse(true)
-    bar.Cooldown:SetHideCountdownNumbers(true)
-    bar.Cooldown:SetSwipeColor(0, 0, 0, 1)
-
     bar:Hide()
     self._barPool[index] = bar
     return bar
@@ -484,7 +517,8 @@ function ExternalBars:_hideExcessBars(activeCount)
             bar.Bar.Name:SetText(nil)
             bar.Bar.Duration:SetText(nil)
             bar.Bar.Duration:Hide()
-            bar.Cooldown:Clear()
+            bar.Bar:SetMinMaxValues(0, 1)
+            bar.Bar:SetValue(1)
             bar:Hide()
         end
     end
@@ -505,13 +539,12 @@ function ExternalBars:_ConfigureBar(bar, auraState, moduleConfig, globalConfig, 
     StyleChildBar(self, bar, styleConfig, globalConfig, spellColors)
     spellColors:DiscoverBar(bar)
 
-    self:_RefreshBarDurationText(bar, auraState, moduleConfig and moduleConfig.showDuration ~= false)
-
-    if auraState.hasRenderableDuration then
-        bar.Cooldown:SetCooldownDuration(auraState.duration, auraState.timeMod)
-    else
-        bar.Cooldown:Clear()
-    end
+    self:_RefreshBarDurationText(
+        bar,
+        auraState,
+        moduleConfig and moduleConfig.showDuration ~= false,
+        self:_RefreshBarDurationProgress(bar, auraState)
+    )
 
     bar:Show()
 end
@@ -656,6 +689,8 @@ function ExternalBars:OnExternalAurasUpdated()
             local expirationTime = info.expirationTime
             local durationIsSecret = issecretvalue(duration)
             local expirationTimeIsSecret = issecretvalue(expirationTime)
+            local durationObject = C_UnitAuras.GetAuraDuration(PLAYER_UNIT, auraInstanceID)
+            local canUpdateDurationBar = durationObject ~= nil
 
             auraState.index = index
             auraState.auraInstanceID = auraInstanceID
@@ -664,14 +699,10 @@ function ExternalBars:OnExternalAurasUpdated()
             auraState.texture = info.texture
             auraState.duration = duration
             auraState.expirationTime = expirationTime
-            auraState.timeMod = info.timeMod
+            auraState.durationObject = durationObject
             auraState.durationIsSecret = durationIsSecret
-            auraState.canShowDurationText = not durationIsSecret
-                and not expirationTimeIsSecret
-                and type(duration) == "number"
-                and duration > 0
-                and type(expirationTime) == "number"
-            auraState.hasRenderableDuration = durationIsSecret or (type(duration) == "number" and duration > 0)
+            auraState.canShowDurationText = canUpdateDurationBar
+            auraState.canUpdateDurationBar = canUpdateDurationBar
 
             if auraDiagnostics then
                 auraDiagnostics[#auraDiagnostics + 1] = {
@@ -684,7 +715,7 @@ function ExternalBars:OnExternalAurasUpdated()
                     durationIsSecret = durationIsSecret,
                     expirationTimeIsSecret = expirationTimeIsSecret,
                     canShowDurationText = auraState.canShowDurationText,
-                    hasRenderableDuration = auraState.hasRenderableDuration,
+                    canUpdateDurationBar = auraState.canUpdateDurationBar,
                 }
             end
         end

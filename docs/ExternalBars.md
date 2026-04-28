@@ -14,7 +14,7 @@ This module is intentionally absent from the `ARCHITECTURE.md` Event Reference t
 | **Mixin** | `BarMixin.AddFrameMixin`; inherits [`FrameProto`](../BarMixin.lua) |
 | **Events listened to** | None for aura data. `ExternalBars` does not call `RegisterEvent()` in `Modules/ExternalBars.lua`; aura refresh is driven by hooks on `ExternalDefensivesFrame:UpdateAuras()` plus the frame's `OnShow` / `OnHide`. `OnDisable()` still calls `UnregisterAllEvents()` as defensive cleanup. |
 | **Hooks** | - Post-hook `ExternalDefensivesFrame:UpdateAuras()` → `OnExternalAurasUpdated()`<br>- `ExternalDefensivesFrame:HookScript("OnShow")` → refresh original-icon state, then resync aura state<br>- `ExternalDefensivesFrame:HookScript("OnHide")` → clear active rows, stop duration ticker, request layout<br>- `hideOriginalIcons` uses `ExternalDefensivesFrame:SetAlpha(0)` and `EnableMouse(false)` instead of `Hide()` so Blizzard keeps driving `UpdateAuras()` |
-| **Dependencies** | - `ns.SpellColors.Get("externalBars")` scoped color store<br>- `BarStyle.StyleChildBar(...)` shared BuffBars / ExternalBars row styling<br>- `Cooldown` overlays via `SetCooldownDuration(duration, timeMod)` for draining fill<br>- `C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)` for accessible aura metadata<br>- `FrameUtil` lazy setters and icon helpers<br>- `ns.Runtime.RequestLayout(...)` / runtime layout passes |
+| **Dependencies** | - `ns.SpellColors.Get("externalBars")` scoped color store<br>- `BarStyle.StyleChildBar(...)` shared BuffBars / ExternalBars row styling<br>- `C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)` for accessible aura metadata<br>- `C_UnitAuras.GetAuraDuration("player", auraInstanceID)` duration objects for secret-safe bar timers and text<br>- `FrameUtil` lazy setters and icon helpers<br>- `ns.Runtime.RequestLayout(...)` / runtime layout passes |
 | **Options file(s)** | [`UI/ExternalBarsOptions.lua`](../UI/ExternalBarsOptions.lua), shared section registration in [`UI/SpellColorsPage.lua`](../UI/SpellColorsPage.lua) |
 | **Options dependencies** | - `ns.OptionUtil` for disabled predicates, default-value transforms, module toggle handling, and layout breadcrumbs<br>- `LibSettingsBuilder` for the declarative Settings rows consumed by the root options tree<br>- `ns.SpellColors` for the scoped color store edited by the shared page<br>- `ns.SpellColorsPage` for `RegisterSection(...)` and the shared spell-colors editor |
 
@@ -123,7 +123,7 @@ flowchart TD
     subgraph BLIZZARD["Blizzard frames mirrored"]
         Viewer["ExternalDefensivesFrame\n(authoritative aura source)"]
         AuraInfo["viewer.auraInfo[]"]
-        AuraAPI["C_UnitAuras\nGetAuraDataByAuraInstanceID"]
+        AuraAPI["C_UnitAuras\nGetAuraDataByAuraInstanceID\nGetAuraDuration"]
     end
 
     subgraph ECM["ECM internals"]
@@ -133,7 +133,7 @@ flowchart TD
     end
 
     subgraph HELPERS["Shared helpers"]
-        Cooldown["Cooldown overlays"]
+        DurationObjects["Aura DurationObjects"]
         BarStyle["BarStyle.StyleChildBar"]
         FrameUtil["FrameUtil"]
         SpellColors["SpellColors store\nscope = \"externalBars\""]
@@ -151,7 +151,7 @@ flowchart TD
     ExternalBars -->|StyleChildBar(...)| BarStyle
     ExternalBars -->|LazySetWidth / Height / Anchors| FrameUtil
     ExternalBars -->|Get + DiscoverBar + ClearDiscoveredKeys| SpellColors
-    ExternalBars -->|SetCooldownDuration / Clear| Cooldown
+    ExternalBars -->|StatusBar:SetTimerDuration| DurationObjects
     BarStyle --> FrameUtil
     BarStyle --> SpellColors
 
@@ -222,15 +222,14 @@ classDiagram
         +texture: string|number
         +duration: number
         +expirationTime: number
-        +timeMod: number
+        +durationObject: DurationObject
         +durationIsSecret: boolean
         +canShowDurationText: boolean
-        +hasRenderableDuration: boolean
+        +canUpdateDurationBar: boolean
     }
 
     class ECM_ExternalBarMixin {
         +Bar: ECM_ExternalBarStatusBar
-        +Cooldown: Cooldown
         +Icon: Frame
         +cooldownSpellID: number
         +_ecmAuraIndex: number
@@ -241,11 +240,6 @@ classDiagram
         +Name: FontString
         +Duration: FontString
         +Pip: Texture
-    }
-
-    class Cooldown {
-        +SetCooldownDuration(duration, timeMod)
-        +Clear()
     }
 
     class BarStyle {
@@ -265,7 +259,6 @@ classDiagram
     ExternalBars *-- ECM_ExternalAuraState : _auraStates[index]
     ExternalBars *-- ECM_ExternalBarMixin : _barPool[index]
     ECM_ExternalBarMixin *-- ECM_ExternalBarStatusBar
-    ECM_ExternalBarMixin *-- Cooldown
     ExternalBars ..> BarStyle : styles rows
     ExternalBars ..> ECM_SpellColorStore : scope "externalBars"
 ```
@@ -275,4 +268,4 @@ classDiagram
 - `_auraStates[]` is keyed by Blizzard's `viewer.auraInfo` array index, not by `auraInstanceID`. `auraInstanceID` is preserved only for Blizzard aura API lookups.
 - `hideOriginalIcons` is deliberately implemented as alpha and mouse suppression, not `Hide()`, so Blizzard continues to execute `ExternalDefensivesFrame:UpdateAuras()`.
 - `UpdateLayout("PLAYER_SPECIALIZATION_CHANGED")` and `UpdateLayout("ProfileChanged")` both clear discovered spell-color keys for the `externalBars` scope before restyling rows.
-- Duration fill and duration text are separate paths: the `Cooldown` widget can render secret durations, while Lua text refresh only runs when expiration data is safe to inspect directly.
+- Duration fill is engine-rendered through `StatusBar:SetTimerDuration(durationObject, ..., RemainingTime)`. Duration text uses `SetFormattedText()` when remaining time is secret, so secret values are passed to Blizzard formatting APIs instead of Lua string formatting.

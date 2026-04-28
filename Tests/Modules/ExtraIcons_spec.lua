@@ -197,6 +197,7 @@ describe("ExtraIcons real source", function()
     local spellCooldownInfos
     local spellCharges
     local applyFontCalls
+    local globalConfig
     local ratedMap
 
     setup(function()
@@ -239,6 +240,7 @@ describe("ExtraIcons real source", function()
         spellCooldownInfos = {}
         spellCharges = {}
         applyFontCalls = {}
+        globalConfig = { font = "Global Font", fontSize = 11, fontOutline = "OUTLINE", fontShadow = false }
         ratedMap = false
         _G.C_SpellBook = {
             IsSpellKnown = function(spellId)
@@ -270,14 +272,17 @@ describe("ExtraIcons real source", function()
                 RequestLayout = function() end,
             },
             FrameUtil = {
-                ApplyFont = function(fontString, globalConfig, moduleConfig)
+                ApplyFont = function(fontString, appliedGlobalConfig, moduleConfig)
                     applyFontCalls[#applyFontCalls + 1] = {
                         fontString = fontString,
-                        globalConfig = globalConfig,
+                        globalConfig = appliedGlobalConfig,
                         moduleConfig = moduleConfig,
                     }
                 end,
             },
+            GetGlobalConfig = function()
+                return globalConfig
+            end,
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
@@ -383,8 +388,11 @@ describe("ExtraIcons real source", function()
                 end
                 return texture
             end
-            frame.CreateFontString = function()
+            frame.CreateFontString = function(_, name, drawLayer, template)
                 local fontString = TestHelpers.makeRegion("FontString")
+                fontString.__name = name
+                fontString.__drawLayer = drawLayer
+                fontString.__template = template
                 fontString.SetPoint = function() end
                 fontString.SetJustifyH = function() end
                 fontString.SetJustifyV = function() end
@@ -448,6 +456,7 @@ describe("ExtraIcons real source", function()
 
         TestHelpers.LoadChunk("Modules/ExtraIcons.lua", "Unable to load Modules/ExtraIcons.lua")(nil, ns)
         ExtraIcons = assert(ns.Addon.ExtraIcons, "ExtraIcons module did not initialize")
+        ExtraIcons.GetGlobalConfig = ns.GetGlobalConfig
         function ExtraIcons:IsEnabled()
             return true
         end
@@ -1392,7 +1401,9 @@ describe("ExtraIcons real source", function()
         assert.are.equal("5", count.__text)
         assert.is_true(count:IsShown())
         assert.are.equal(count, applyFontCalls[#applyFontCalls].fontString)
+        assert.are.equal(globalConfig, applyFontCalls[#applyFontCalls].globalConfig)
         assert.are.equal(config, applyFontCalls[#applyFontCalls].moduleConfig)
+        assert.is_nil(count.__template)
 
         config.showStackCount = false
         assert.is_true(ExtraIcons:UpdateLayout("test"))
@@ -1428,6 +1439,7 @@ describe("ExtraIcons real source", function()
 
         assert.is_true(#applyFontCalls > previousApplyCount)
         assert.are.equal(count, applyFontCalls[#applyFontCalls].fontString)
+        assert.are.equal(globalConfig, applyFontCalls[#applyFontCalls].globalConfig)
         assert.are.equal(config, applyFontCalls[#applyFontCalls].moduleConfig)
         assert.is_true(applyFontCalls[#applyFontCalls].moduleConfig.overrideFont)
         assert.are.equal("Expressway", applyFontCalls[#applyFontCalls].moduleConfig.font)

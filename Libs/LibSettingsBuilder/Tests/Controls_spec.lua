@@ -78,4 +78,150 @@ describe("LibSettingsBuilder Controls", function()
         assert.is_function(hooks[_G.SettingsDropdownControlMixin].Init)
         assert.is_function(hooks[_G.SettingsSliderControlMixin].Init)
     end)
+
+    it("refreshes standard dropdown text through the label map after Blizzard init", function()
+        local dropdownHook
+
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function(target, method, fn)
+            if target == _G.SettingsDropdownControlMixin and method == "Init" then
+                dropdownHook = fn
+            end
+        end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local profile = { general = { mode = "chain" } }
+        local defaults = { general = { mode = "chain" } }
+        local originalCreateDropdown = Settings.CreateDropdown
+        local initializer
+        rawset(Settings, "CreateDropdown", function(...)
+            initializer = originalCreateDropdown(...)
+            return initializer
+        end)
+
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Dropdown Labels",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "dropdown",
+                                    path = "mode",
+                                    name = "Mode",
+                                    values = {
+                                        chain = "Attached",
+                                        detached = "Detached",
+                                        free = "Free",
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        assert.is_table(builder:GetPage("general", "main"))
+        initializer.GetSetting = function()
+            return {
+                GetValue = function()
+                    return "OUTLINE"
+                end,
+            }
+        end
+        local displayedText, originalValue
+        local frame = {
+            Control = {
+                Dropdown = {
+                    OverrideText = function(_, text)
+                        displayedText = text
+                    end,
+                },
+            },
+            SetValue = function(_, value)
+                originalValue = value
+            end,
+        }
+
+        dropdownHook(frame, initializer)
+
+        assert.are.equal("Attached", displayedText)
+
+        frame:SetValue("free")
+
+        assert.are.equal("free", originalValue)
+        assert.are.equal("Free", displayedText)
+    end)
+
+    it("passes custom row settings through initializer data", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local profile = { general = { font = "Expressway" } }
+        local defaults = { general = { font = "Expressway" } }
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Custom Setting Data",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "custom",
+                                    path = "font",
+                                    name = "Font",
+                                    template = "TestFontPickerTemplate",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local data = initializer:GetData()
+
+        assert.is_table(data.setting)
+        assert.are.equal("Expressway", data.setting:GetValue())
+    end)
 end)

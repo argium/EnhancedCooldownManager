@@ -13,16 +13,19 @@ local copyMixin = internal.copyMixin
 local getInitializerData = internal.getInitializerData
 local getOrderedValueEntries = internal.getOrderedValueEntries
 
-local ScrollDropdownMethods = {}
+local DropdownMethods = {}
 
-function ScrollDropdownMethods:GetSetting()
+function DropdownMethods:GetSetting()
+    if self.lsbData and self.lsbData.setting then
+        return self.lsbData.setting
+    end
     if self.initializer and self.initializer.GetSetting then
         return self.initializer:GetSetting()
     end
-    return self.lsbData and self.lsbData.setting or nil
+    return nil
 end
 
-function ScrollDropdownMethods:RefreshDropdownText(value)
+function DropdownMethods:RefreshDropdownText(value)
     local dropdown = self.Control and self.Control.Dropdown
     if not dropdown then
         return
@@ -47,11 +50,14 @@ function ScrollDropdownMethods:RefreshDropdownText(value)
     end
 end
 
-function ScrollDropdownMethods:SetValue(value)
+function DropdownMethods:SetValue(value)
+    if self._lsbOriginalSetValue then
+        self:_lsbOriginalSetValue(value)
+    end
     self:RefreshDropdownText(value)
 end
 
-function ScrollDropdownMethods:InitDropdown()
+function DropdownMethods:InitDropdown()
     local setting = self:GetSetting()
     local data = self.lsbData or {}
     local scrollHeight = data.scrollHeight or 200
@@ -85,22 +91,26 @@ function ScrollDropdownMethods:InitDropdown()
     self:RefreshDropdownText()
 end
 
-local function configureScrollDropdownFrame(frame, initializer)
+local function configureDropdownFrame(frame, initializer, data)
     if not frame._lsbOriginalSetValue then
         frame._lsbOriginalSetValue = frame.SetValue
     end
 
-    copyMixin(frame, ScrollDropdownMethods)
+    copyMixin(frame, DropdownMethods)
     frame.initializer = initializer
-    frame.lsbData = getInitializerData(initializer) or {}
+    frame.lsbData = data or {}
     initializer._lsbActiveFrame = frame
-    frame:InitDropdown()
+    if frame.lsbData._lsbKind == "scrollDropdown" then
+        frame:InitDropdown()
+    else
+        frame:RefreshDropdownText()
+    end
 end
 
 if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownControlMixin then
     hooksecurefunc(SettingsDropdownControlMixin, "Init", function(frame, initializer)
         local data = getInitializerData(initializer)
-        if not data or data._lsbKind ~= "scrollDropdown" then
+        if not data or (data._lsbKind ~= "dropdown" and data._lsbKind ~= "scrollDropdown") then
             if frame._lsbOriginalSetValue then
                 frame.SetValue = frame._lsbOriginalSetValue
             end
@@ -109,7 +119,7 @@ if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownC
             return
         end
 
-        configureScrollDropdownFrame(frame, initializer)
+        configureDropdownFrame(frame, initializer, data)
     end)
 
     lib._scrollDropdownHookInstalled = true
