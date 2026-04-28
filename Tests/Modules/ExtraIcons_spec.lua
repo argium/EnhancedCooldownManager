@@ -196,6 +196,7 @@ describe("ExtraIcons real source", function()
     local spellCooldowns
     local spellCooldownInfos
     local spellCharges
+    local applyFontCalls
     local ratedMap
 
     setup(function()
@@ -237,6 +238,7 @@ describe("ExtraIcons real source", function()
         spellCooldowns = {}
         spellCooldownInfos = {}
         spellCharges = {}
+        applyFontCalls = {}
         ratedMap = false
         _G.C_SpellBook = {
             IsSpellKnown = function(spellId)
@@ -266,6 +268,15 @@ describe("ExtraIcons real source", function()
                 end,
                 UnregisterFrame = function() end,
                 RequestLayout = function() end,
+            },
+            FrameUtil = {
+                ApplyFont = function(fontString, globalConfig, moduleConfig)
+                    applyFontCalls[#applyFontCalls + 1] = {
+                        fontString = fontString,
+                        globalConfig = globalConfig,
+                        moduleConfig = moduleConfig,
+                    }
+                end,
             },
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
@@ -1380,11 +1391,48 @@ describe("ExtraIcons real source", function()
         local count = ExtraIcons._viewers.utility.iconPool[1].Count
         assert.are.equal("5", count.__text)
         assert.is_true(count:IsShown())
+        assert.are.equal(count, applyFontCalls[#applyFontCalls].fontString)
+        assert.are.equal(config, applyFontCalls[#applyFontCalls].moduleConfig)
 
         config.showStackCount = false
         assert.is_true(ExtraIcons:UpdateLayout("test"))
         assert.is_nil(count.__text)
         assert.is_false(count:IsShown())
+    end)
+
+    it("reapplies count font config during layout updates", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 5
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        local config = makeViewersConfig({ { stackKey = "healthstones" } })
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return config
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("initial"))
+        local count = ExtraIcons._viewers.utility.iconPool[1].Count
+        local previousApplyCount = #applyFontCalls
+
+        config.overrideFont = true
+        config.font = "Expressway"
+        config.fontSize = 18
+        assert.is_true(ExtraIcons:UpdateLayout("OptionsChanged"))
+
+        assert.is_true(#applyFontCalls > previousApplyCount)
+        assert.are.equal(count, applyFontCalls[#applyFontCalls].fontString)
+        assert.are.equal(config, applyFontCalls[#applyFontCalls].moduleConfig)
+        assert.is_true(applyFontCalls[#applyFontCalls].moduleConfig.overrideFont)
+        assert.are.equal("Expressway", applyFontCalls[#applyFontCalls].moduleConfig.font)
+        assert.are.equal(18, applyFontCalls[#applyFontCalls].moduleConfig.fontSize)
+        assert.are.equal("5", count.__text)
     end)
 
     it("shows spell charges when enabled and refreshes them", function()

@@ -4,6 +4,7 @@
 
 local _, ns = ...
 local BarMixin = ns.BarMixin
+local FrameUtil = ns.FrameUtil
 local ExtraIcons = ns.Addon:NewModule("ExtraIcons")
 ns.Addon.ExtraIcons = ExtraIcons
 
@@ -280,6 +281,7 @@ end
 
 local function updateIconCountText(icon, config)
     if not icon.Count then return end
+    FrameUtil.ApplyFont(icon.Count, nil, config)
 
     if icon.itemId and (not config or config.showStackCount ~= false) then
         local count = C_Item.GetItemCount(icon.itemId)

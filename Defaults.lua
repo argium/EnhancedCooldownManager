@@ -130,6 +130,9 @@ local _, ns = ...
 ---@field enabled boolean Whether extra icons are enabled.
 ---@field showStackCount boolean Whether to show item stack counts.
 ---@field showCharges boolean Whether to show spell charges.
+---@field overrideFont boolean|nil Whether stack/charge counts override global font settings.
+---@field font string|nil Font face override for stack/charge counts.
+---@field fontSize number|nil Font size override for stack/charge counts.
 ---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
 
 ---@class ECM_TickMark Tick mark definition.
@@ -324,6 +327,7 @@ local defaults = {
             enabled = true,
             showStackCount = true,
             showCharges = true,
+            overrideFont = false,
             viewers = {
                 utility = {
                     { stackKey = "trinket1" },

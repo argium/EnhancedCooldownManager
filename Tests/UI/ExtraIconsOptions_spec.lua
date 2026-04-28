@@ -42,6 +42,9 @@ describe("ExtraIconsOptions data helpers", function()
             GetIsDisabledDelegate = function() return function() return false end end,
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
+            CreateFontOverrideRow = function()
+                return { type = "fontOverride" }
+            end,
         }
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
@@ -774,7 +777,7 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns, capturedPage, registeredPage, refreshCalls, scheduledReasons, previewCalls
+    local profile, defaults, SB, ns, capturedPage, registeredPage, refreshCalls, scheduledReasons, previewCalls, settings
 
     local function getRow(rowId)
         local rows = assert(capturedPage and capturedPage.rows)
@@ -851,6 +854,7 @@ describe("ExtraIconsOptions settings page", function()
             enabled = true,
             showStackCount = true,
             showCharges = true,
+            overrideFont = false,
             viewers = {
                 utility = {},
                 main = {},
@@ -865,11 +869,13 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
-        TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
-        capturedPage = ns.ExtraIconsOptions.pages[1]
-        local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
-        registeredPage = page
-        ns.ExtraIconsOptions.SetRegisteredPage(page)
+        settings = TestHelpers.CollectSettings(function()
+            TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
+            capturedPage = ns.ExtraIconsOptions.pages[1]
+            local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
+            registeredPage = page
+            ns.ExtraIconsOptions.SetRegisteredPage(page)
+        end)
         ns.ExtraIconsOptions.EnsureItemLoadFrame()
         registeredPage.Refresh = function()
             refreshCalls[#refreshCalls + 1] = registeredPage._category
@@ -897,9 +903,24 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("checkbox", getRow("enabled").type)
         assert.are.equal("checkbox", getRow("showStackCount").type)
         assert.are.equal("checkbox", getRow("showCharges").type)
+        assert.are.equal("fontOverride", getRow("fontOverride").type)
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
-        assert.are.equal(4, #capturedPage.rows)
+        assert.are.equal(5, #capturedPage.rows)
+        assert.are.equal("showCharges", capturedPage.rows[3].id)
+        assert.are.equal("fontOverride", capturedPage.rows[4].id)
+        assert.are.equal("viewers", capturedPage.rows[5].id)
+    end)
+
+    it("schedules layout when count font settings change", function()
+        settings["ECM_extraIcons_overrideFont"]:SetValue(true)
+        settings["ECM_extraIcons_font"]:SetValue("Expressway")
+        settings["ECM_extraIcons_fontSize"]:SetValue(18)
+
+        assert.is_true(profile.extraIcons.overrideFont)
+        assert.are.equal("Expressway", profile.extraIcons.font)
+        assert.are.equal(18, profile.extraIcons.fontSize)
+        assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()
@@ -1064,6 +1085,32 @@ describe("ExtraIconsOptions settings page", function()
         local category = registeredPage._category
         assert.are.same({ category }, refreshCalls)
         assert.are.same({ "OptionsChanged" }, scheduledReasons)
+    end)
+
+    it("keeps footer add disabled until the draft ID resolves", function()
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return spellId == 12345 and "Test Spell" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return spellId == 12345 and "spell-tex" or nil
+            end,
+        }
+
+        local footer = assert(getSection("main")).footer
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
+        assert.is_false(footer.onSubmit())
+        assert.are.equal(0, #profile.extraIcons.viewers.main)
+
+        footer.onTextChanged("99999")
+        footer = assert(getSection("main")).footer
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
+        assert.is_false(footer.onSubmit())
+        assert.are.equal(0, #profile.extraIcons.viewers.main)
+
+        footer.onTextChanged("12345")
+        footer = assert(getSection("main")).footer
+        assert.is_true(getTrailerValue(footer, "submitEnabled"))
     end)
 
     it("shows pending item previews and refreshes when item data arrives", function()

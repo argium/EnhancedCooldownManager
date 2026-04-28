@@ -908,6 +908,11 @@ ExtraIconsOptions.pages = {
                     ctx.page:Refresh()
                 end,
             },
+            (function()
+                local row = ns.OptionUtil.CreateFontOverrideRow(isDisabled)
+                row.id = "fontOverride"
+                return row
+            end)(),
             {
                 id = "viewers",
                 type = "sectionList",
