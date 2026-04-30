@@ -46,6 +46,7 @@
 ---@field onChanged LibSettingsBuilderChangedCallback Gets the callback fired after a row setter completes.
 ---@field store table|(fun(): table)|nil Gets the store table or lazy provider used by path-bound rows.
 ---@field defaults table|(fun(): table)|nil Gets the defaults table or lazy provider used by path-bound rows.
+---@field defaultsConfirmation fun(pageName: string, onAccept: fun())|nil Gets the optional confirmation hook shown before any category-header `Defaults` reset.
 ---@field getNestedValue LibSettingsBuilderGetNestedValue|nil Gets the custom nested-path reader used by path-bound rows.
 ---@field setNestedValue LibSettingsBuilderSetNestedValue|nil Gets the custom nested-path writer used by path-bound rows.
 ---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.
@@ -77,7 +78,7 @@ end
 --- long as the override is active. Returns a restore function the caller must
 --- invoke when the page is hidden so other categories keep Blizzard's default
 --- behavior.
-function internal.installCategoryDefaultsOverride(onClick, enabledPredicate)
+function internal.installCategoryDefaultsOverride(onClick, enabledPredicate, confirmDefaults, pageName)
     local button = getCategoryDefaultsButton()
     if not button then
         return function() end
@@ -89,17 +90,32 @@ function internal.installCategoryDefaultsOverride(onClick, enabledPredicate)
     local function applyEnabled()
         if enabledPredicate then
             button:SetEnabled(enabledPredicate() and true or false)
+        elseif not onClick then
+            button:SetEnabled(originalEnabled)
         else
             button:SetEnabled(true)
         end
     end
 
-    button:SetScript("OnClick", function()
+    button:SetScript("OnClick", function(self)
         if enabledPredicate and not enabledPredicate() then
             return
         end
-        onClick()
-        applyEnabled()
+
+        local function reset()
+            if onClick then
+                onClick()
+                applyEnabled()
+            elseif originalOnClick then
+                originalOnClick(self)
+            end
+        end
+
+        if confirmDefaults then
+            confirmDefaults(pageName, reset)
+        else
+            reset()
+        end
     end)
     applyEnabled()
 
@@ -163,8 +179,8 @@ local function installPageLifecycleHooks()    if lib._pageLifecycleHooked then
         if category then
             local cbs = lib._pageLifecycleCallbacks[category]
             if cbs then
-                if cbs.onDefault then
-                    cbs._defaultsRestore = internal.installCategoryDefaultsOverride(cbs.onDefault, cbs.onDefaultEnabled)
+                if cbs.onDefault or cbs.confirmDefaults then
+                    cbs._defaultsRestore = internal.installCategoryDefaultsOverride(cbs.onDefault, cbs.onDefaultEnabled, cbs.confirmDefaults, cbs.pageName)
                 end
                 if cbs.onShow then
                     cbs.onShow()

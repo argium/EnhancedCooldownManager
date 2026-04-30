@@ -24,6 +24,9 @@ ns.Settings = LSB:New({
             ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
     end,
+    defaultsConfirmation = function(pageName, onAccept)
+        ns.OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
+    end,
 })
 ns.SettingsBuilder = ns.Settings
 

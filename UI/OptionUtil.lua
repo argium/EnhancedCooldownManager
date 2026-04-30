@@ -491,3 +491,30 @@ function OptionUtil.MakeConfirmDialog(text)
         hideOnEscape = true,
     }
 end
+
+local function formatResetPageButton(pageName)
+    local format = L["RESET_PAGE_SETTINGS"]
+    if type(format) ~= "string" or not format:find("%%s") then
+        format = "Reset %s settings"
+    end
+    return format:format(pageName or "")
+end
+
+function OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
+    local addon = ns.Addon
+    if addon and addon.ShowConfirmDialog then
+        addon:ShowConfirmDialog(
+            "ECM_CONFIRM_RESET_SETTINGS_PAGE",
+            L["RESET_PAGE_CONFIRM"],
+            formatResetPageButton(pageName),
+            L["DONT_RESET"],
+            onAccept
+        )
+        return
+    end
+
+    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"] = OptionUtil.MakeConfirmDialog(L["RESET_PAGE_CONFIRM"])
+    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"].button1 = formatResetPageButton(pageName)
+    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"].button2 = L["DONT_RESET"]
+    StaticPopup_Show("ECM_CONFIRM_RESET_SETTINGS_PAGE", nil, nil, { onAccept = onAccept })
+end

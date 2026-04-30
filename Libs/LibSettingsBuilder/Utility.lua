@@ -651,12 +651,15 @@ local function assertPageMutable(page, sourceName)
 end
 
 local function bindPageLifecycle(page)
-    if page._onShow or page._onHide or page._onDefault then
+    local confirmDefaults = page._builder._config.defaultsConfirmation
+    if page._onShow or page._onHide or page._onDefault or confirmDefaults then
         lib._pageLifecycleCallbacks[page._category] = {
             onShow = page._onShow,
             onHide = page._onHide,
             onDefault = page._onDefault,
             onDefaultEnabled = page._onDefaultEnabled,
+            confirmDefaults = confirmDefaults,
+            pageName = page._name,
         }
         installPageLifecycleHooks()
     end

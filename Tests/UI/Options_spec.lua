@@ -449,5 +449,57 @@ describe("OptionUtil", function()
 
             assert.are.equal(profileCategory:GetID(), openedCategory)
         end)
+
+        it("confirms native page defaults before invoking the header reset", function()
+            local nativeResetCalls = 0
+            local popupKey
+            local popupText
+            local acceptText
+            local cancelText
+            local acceptFn
+            local button = {
+                _script = function()
+                    nativeResetCalls = nativeResetCalls + 1
+                end,
+                _enabled = true,
+                GetScript = function(self)
+                    return self._script
+                end,
+                SetScript = function(self, _, script)
+                    self._script = script
+                end,
+                IsEnabled = function(self)
+                    return self._enabled
+                end,
+                SetEnabled = function(self, enabled)
+                    self._enabled = enabled
+                end,
+            }
+
+            rawset(SettingsPanel, "GetSettingsList", function()
+                return { Header = { DefaultsButton = button } }
+            end)
+            ns.Addon.ShowConfirmDialog = function(_, key, text, button1, button2, onAccept)
+                popupKey = key
+                popupText = text
+                acceptText = button1
+                cancelText = button2
+                acceptFn = onAccept
+            end
+
+            SettingsPanel:SetCurrentCategory(generalCategory)
+            SettingsPanel:DisplayCategory(generalCategory)
+            button:GetScript("OnClick")(button)
+
+            assert.are.equal(0, nativeResetCalls)
+            assert.are.equal("ECM_CONFIRM_RESET_SETTINGS_PAGE", popupKey)
+            assert.are.equal("Are you sure you want to reset settings on this page?", popupText)
+            assert.are.equal("Reset General settings", acceptText)
+            assert.are.equal("Don't reset", cancelText)
+
+            acceptFn()
+
+            assert.are.equal(1, nativeResetCalls)
+        end)
     end)
 end)
