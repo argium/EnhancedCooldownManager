@@ -106,6 +106,9 @@ local function createInstance(target)
         instance = { _events = {}, _stats = {} }
     end
 
+    instance._events = instance._events or {}
+    instance._stats = instance._stats or {}
+
     instance.frame = instance.frame or CreateFrame("Frame")
 
     -- Dispatch without snapshot: use index-based iteration that tolerates
