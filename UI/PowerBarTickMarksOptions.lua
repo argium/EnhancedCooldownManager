@@ -126,6 +126,13 @@ local function scheduleUpdate()
     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
 end
 
+local function updatePickerSwatch(row, color)
+    local swatch = row and row._swatch or nil
+    if swatch and swatch.SetColorRGB then
+        swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
+    end
+end
+
 local function buildTickCollectionItems()
     local ticks = getCurrentTicks()
     local items = {}
@@ -149,7 +156,6 @@ local function buildTickCollectionItems()
                     onValueChanged = function(rounded)
                         updateTick(index, "value", rounded)
                         scheduleUpdate()
-                        refreshPage()
                     end,
                 },
                 {
@@ -163,18 +169,17 @@ local function buildTickCollectionItems()
                     onValueChanged = function(rounded)
                         updateTick(index, "width", rounded)
                         scheduleUpdate()
-                        refreshPage()
                     end,
                 },
             },
             color = {
                 value = tick.color or getDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR,
-                onClick = function()
+                onClick = function(_, row)
                     local current = tick.color or getDefaultColor() or C.DEFAULT_POWERBAR_TICK_COLOR
                     ns.OptionUtil.OpenColorPicker(current, true, function(color)
                         updateTick(index, "color", color)
+                        updatePickerSwatch(row, color)
                         scheduleUpdate()
-                        refreshPage()
                     end)
                 end,
             },

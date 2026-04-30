@@ -154,10 +154,18 @@ describe("PowerBarTickMarksOptions", function()
         local captured, refreshCalls = registerPageSpec()
         local tickCollection = getRow(captured, "tickCollection")
         local item = tickCollection.items()[1]
+        local swatchColor
 
-        item.color.onClick()
+        item.color.onClick(item, {
+            _swatch = {
+                SetColorRGB = function(_, r, g, b)
+                    swatchColor = { r = r, g = g, b = b }
+                end,
+            },
+        })
         local items = tickCollection.items()
         assert.are.same(pickedColor, items[1].color.value)
+        assert.are.same({ r = 0.25, g = 0.5, b = 0.75 }, swatchColor)
 
         item = items[1]
 
@@ -181,7 +189,7 @@ describe("PowerBarTickMarksOptions", function()
         assert.are.equal(1, #items)
         assert.are.equal(20, items[1].fields[1].value)
         assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
-        assert.are.equal(4, #refreshCalls)
+        assert.are.equal(1, #refreshCalls)
     end)
 
     it("rescales the value field range for large resource values", function()

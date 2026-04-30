@@ -201,6 +201,9 @@ local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
 
     local valueButton = CreateFrame("Button", nil, slider)
     valueButton:RegisterForClicks("LeftButtonDown")
+    if valueButton.SetPropagateMouseClicks then
+        valueButton:SetPropagateMouseClicks(false)
+    end
     valueButton:SetAllPoints(textLabel)
     slider._lsbValueButton = valueButton
 

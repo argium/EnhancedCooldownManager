@@ -51,7 +51,7 @@
 ---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.
 ---@field sections LibSettingsBuilderSectionConfig[]|nil Gets the optional section definitions registered under the root category.
 
-local MAJOR, MINOR = "LibSettingsBuilder-1.0", 5
+local MAJOR, MINOR = "LibSettingsBuilder-1.0", 6
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then
     return

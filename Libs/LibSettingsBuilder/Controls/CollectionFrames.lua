@@ -24,6 +24,21 @@ local showFrame = internal.showFrame
 local DISABLED_ROW_ALPHA = 0.5
 local DEFAULT_LABEL_COLOR = { 1, 1, 1, 1 }
 
+local function preventMouseClickPropagation(frame)
+    if not frame then
+        return
+    end
+    if frame.SetPropagateMouseClicks then
+        frame:SetPropagateMouseClicks(false)
+    end
+    if frame.GetChildren then
+        local children = { frame:GetChildren() }
+        for i = 1, #children do
+            preventMouseClickPropagation(children[i])
+        end
+    end
+end
+
 local function getFontObjectTextColor(fontObject)
     if type(fontObject) == "string" then
         fontObject = _G[fontObject]
@@ -279,6 +294,10 @@ local function ensureEditorCollectionRow(row)
     row._fieldWidgets = {}
     row._swatch = internal.createColorSwatch(row)
     row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    preventMouseClickPropagation(row._removeButton)
+    if row._removeButton.RegisterForClicks then
+        row._removeButton:RegisterForClicks("LeftButtonUp")
+    end
     row._removeButton:SetSize(70, 22)
 end
 
@@ -289,6 +308,7 @@ local function ensureEditorFieldWidgets(row, index)
     end
 
     local slider = CreateFrame("Slider", nil, row, "MinimalSliderWithSteppersTemplate")
+    preventMouseClickPropagation(slider)
     local valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     valueText:SetJustifyH("LEFT")
 
@@ -305,7 +325,7 @@ local function refreshEditorCollectionRow(row, item)
 
     row._label:SetText(item.label or "")
     applyCollectionRowStyle(row, item)
-    bindCollectionRowTooltip(row, item)
+    bindCollectionRowTooltip(row, nil)
 
     local previousValueText = nil
     local fields = item.fields or {}
@@ -354,6 +374,7 @@ local function refreshEditorCollectionRow(row, item)
                 field.onValueChanged(rounded, item, row)
             end
         end)
+        preventMouseClickPropagation(slider)
 
         previousValueText = valueText
     end

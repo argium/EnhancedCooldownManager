@@ -69,14 +69,27 @@ describe("LibSettingsBuilder Collections", function()
             }
         end
         _G.ScrollUtil = {
-            InitScrollBoxListWithScrollBar = function() end,
+            InitScrollBoxListWithScrollBar = function(scrollBox, _, view)
+                scrollBox._scrollView = view
+            end,
         }
         TestHelpers.LoadLibSettingsBuilder()
     end)
 
     local function makeCollectionControl(clickedButtons)
         local control = TestHelpers.makeFrame()
+        control._children = {}
         local textColor = { 1, 1, 1, 1 }
+        control.SetShown = function(self, shown)
+            if shown then
+                self:Show()
+            else
+                self:Hide()
+            end
+        end
+        control.GetChildren = function(self)
+            return (table.unpack or unpack)(self._children)
+        end
         control.SetText = function(self, text)
             self._text = text
         end
@@ -120,6 +133,40 @@ describe("LibSettingsBuilder Collections", function()
             self._registeredClicks = { ... }
             if clickedButtons then
                 clickedButtons[#clickedButtons + 1] = self
+            end
+        end
+        control.SetPropagateMouseClicks = function(self, propagate)
+            self._propagateMouseClicks = propagate
+        end
+        control.SetMinMaxValues = function(self, minValue, maxValue)
+            self._minValue = minValue
+            self._maxValue = maxValue
+        end
+        control.SetValueStep = function(self, step)
+            self._valueStep = step
+        end
+        control.SetObeyStepOnDrag = function(self, obey)
+            self._obeyStepOnDrag = obey
+        end
+        control.SetValue = function(self, value)
+            self._value = value
+        end
+        control.SetColorRGB = function(self, r, g, b)
+            self._color = { r, g, b }
+        end
+        control.SetDataProvider = function(self, dataProvider)
+            self._dataProvider = dataProvider
+            if self._scrollView and self._scrollView._initializer then
+                self._rows = self._rows or {}
+                for index, item in ipairs(dataProvider.items or {}) do
+                    local row = self._rows[index] or makeCollectionControl(clickedButtons)
+                    self._rows[index] = row
+                    if not row._testParented then
+                        self._children[#self._children + 1] = row
+                        row._testParented = true
+                    end
+                    self._scrollView._initializer(row, item)
+                end
             end
         end
         control.CreateFontString = function()
@@ -318,6 +365,123 @@ describe("LibSettingsBuilder Collections", function()
         row._tooltipOwner:GetScript("OnEnter")(row._tooltipOwner)
         assert.is_true(row._highlight:IsShown())
         assert.is_function(row._textureButtons.delete:GetScript("OnEnter"))
+    end)
+
+    it("prevents editor row controls from selecting the host settings row", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local item = {
+            label = "Tick 1",
+            fields = {
+                {
+                    value = 50,
+                    min = 1,
+                    max = 100,
+                    step = 1,
+                },
+            },
+            color = {
+                value = { r = 1, g = 1, b = 1, a = 1 },
+            },
+            remove = {
+                text = "Remove",
+            },
+        }
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb._internal.applyCollectionFrame(host, {
+            preset = "editor",
+            rowHeight = 34,
+            items = function()
+                return { item }
+            end,
+        })
+
+        local row = makeCollectionControl()
+        host._lsbCollectionView._initializer(row, assert(host._lsbCollectionDataProvider.items[1]))
+
+        local slider = row._fieldWidgets[1].slider
+        assert.is_false(row._mouseEnabled)
+        assert.is_nil(row:GetScript("OnEnter"))
+        assert.is_nil(row:GetScript("OnLeave"))
+        assert.is_false(slider._propagateMouseClicks)
+        assert.is_false(slider._lsbValueButton._propagateMouseClicks)
+        assert.is_false(row._swatch._propagateMouseClicks)
+        assert.is_false(row._removeButton._propagateMouseClicks)
+        assert.are.same({ "LeftButtonUp" }, row._removeButton._registeredClicks)
+    end)
+
+    it("does not re-enable editor row mouse targets during initializer state evaluation", function()
+        _G.CreateFrame = function(_, _, parent)
+            local frame = makeCollectionControl()
+            if parent and parent._children then
+                parent._children[#parent._children + 1] = frame
+            end
+            return frame
+        end
+
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local SB = lsb.New({
+            name = "Collections",
+            store = function()
+                return { root = {} }
+            end,
+            defaults = function()
+                return { root = {} }
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "rows",
+                    name = "Rows",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    id = "listRow",
+                                    type = "list",
+                                    height = 120,
+                                    variant = "editor",
+                                    items = function()
+                                        return {
+                                            {
+                                                label = "Tick 1",
+                                                fields = {
+                                                    { value = 50, min = 1, max = 100, step = 1 },
+                                                },
+                                                color = {
+                                                    value = { r = 1, g = 1, b = 1, a = 1 },
+                                                },
+                                                remove = {
+                                                    text = "Remove",
+                                                },
+                                            },
+                                        }
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+        local initializer = SB:GetPage("rows", "main")._category:GetLayout()._initializers[1]
+        local host = makeCollectionControl()
+
+        initializer:InitFrame(host)
+
+        local row = host._lsbCollectionScrollBox._rows[1]
+        local slider = row._fieldWidgets[1].slider
+        assert.is_false(row._mouseEnabled)
+        assert.is_false(slider._propagateMouseClicks)
+        assert.is_false(slider._lsbValueButton._propagateMouseClicks)
+        assert.is_false(row._removeButton._propagateMouseClicks)
+        assert.is_true(host:IsShown())
+        assert.are.equal(1, host:GetAlpha())
     end)
 
     it("keeps mode-input submit disabled until the footer reports a valid value", function()
