@@ -184,12 +184,15 @@ end
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
-    if cmd == "help" then
+    if cmd == "help" or cmd == "h" then
         ns.Print(L["CMD_HELP_CLEARSEEN"])
         ns.Print(L["CMD_HELP_DEBUG"])
         ns.Print(L["CMD_HELP_EVENTS"])
+        ns.Print(L["CMD_HELP_EVENTS_RESET"])
         ns.Print(L["CMD_HELP_HELP"])
         ns.Print(L["CMD_HELP_MIGRATION"])
+        ns.Print(L["CMD_HELP_MIGRATION_LOG"])
+        ns.Print(L["CMD_HELP_MIGRATION_ROLLBACK"])
         ns.Print(L["CMD_HELP_OPTIONS"])
         ns.Print(L["CMD_HELP_REFRESH"])
         return
@@ -285,6 +288,7 @@ function mod:ChatCommand(input)
     if cmd == "clearseen" then
         gc.releasePopupSeenVersion = nil
         ns.Print(L["SEEN_CLEARED"])
+        ReloadUI()
         return
     end
 end

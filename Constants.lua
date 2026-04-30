@@ -9,7 +9,7 @@ local constants = {
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
-    RELEASE_POPUP_VERSION = "v0.7.1",
+    RELEASE_POPUP_VERSION = "v0.8",
     VERSION_TAG_BETA = "beta",
 
     -- Module identifiers

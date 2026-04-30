@@ -20,6 +20,15 @@ Styles the default aura bars to match power and resource bars.
 
 Customise their colours **on a per-spell basis** to quickly identify their remaining duration mid-combat.
 
+#### Add Icons for Any Spell or Item
+
+Add an icon to either the main or utility bars for **any** item or spell ID: healthstones, potions, jumper cables, racials — anything.
+
+
+#### External Defensives
+
+Display external defensives cast on you as a bar inline or anywhere on the screen.
+
 #### Auto-hide and Fade
 
 Reduce screen clutter based on context:
@@ -30,9 +39,6 @@ Reduce screen clutter based on context:
 - Optionally stay visible in instances: raids, M+, and PvP
 - Optionally stay visible when you have an attackable target
 
-#### Add Icons for Any Spell or Item
-
-Add an icon to either the main or utility bars for **any** item or spell ID: healthstones, potions, jumper cables, racials — anything.
 
 #### Automatic or Free Positioning
 

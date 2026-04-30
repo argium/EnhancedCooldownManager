@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 ---@class LibEvent
----@field embeds table<table, { frame: Frame, _events: table<string, function[]>, _stats: table<string, number> }> Stores embedded event instances by target table.
+---@field embeds table<table, { frame: Frame, _events: table<string, function[]>, _stats: table<string, number>|nil }> Stores embedded event instances by target table.
 
 local MAJOR, MINOR = "LibEvent-1.0", 3
 local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
@@ -16,6 +16,9 @@ local ipairs = ipairs
 local pairs = pairs
 local type = type
 local wipe = wipe
+
+local METRICS_DEBUG_ENABLED = false
+local EMPTY_STATS = {}
 
 LibEvent.embeds = LibEvent.embeds or {}
 
@@ -92,18 +95,23 @@ end
 ---Gets the event invocation stats for this embedded target.
 ---@return table<string, number> A table mapping event names to their fire counts.
 function LibEvent:GetEventStats()
-    return getInstance(self)._stats
+    return getInstance(self)._stats or EMPTY_STATS
 end
 
 ---Resets the event invocation stats for this embedded target.
 function LibEvent:ResetEventStats()
-    wipe(getInstance(self)._stats)
+    local stats = getInstance(self)._stats
+    if stats then wipe(stats) end
 end
 
 local function createInstance(target)
     local instance = LibEvent.embeds[target]
     if type(instance) ~= "table" then
-        instance = { _events = {}, _stats = {} }
+        instance = { _events = {} }
+    end
+
+    if METRICS_DEBUG_ENABLED and not instance._stats then
+        instance._stats = {}
     end
 
     instance._events = instance._events or {}
@@ -119,7 +127,9 @@ local function createInstance(target)
         if not cbs then
             return
         end
-        instance._stats[event] = (instance._stats[event] or 0) + 1
+        if METRICS_DEBUG_ENABLED then
+            instance._stats[event] = (instance._stats[event] or 0) + 1
+        end
         instance._dispatching = true
         local i = 1
         while i <= #cbs do
