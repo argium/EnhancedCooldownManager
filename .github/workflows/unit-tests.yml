@@ -24,9 +24,6 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v6
 
-            - name: Fetch external libraries
-              run: pwsh scripts/fetch-libs.ps1
-
             - name: Install Lua 5.1 and LuaRocks
               run: |
                   sudo apt-get update
