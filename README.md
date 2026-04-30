@@ -1,31 +1,24 @@
 # Enhanced Cooldown Manager by Argium
 
-Enhanced Cooldown Manager creates a clean combat HUD around Blizzard's built-in cooldown manager that **looks and works great out of the box** and is **straightforward to customise.** It adds a mana/power bar and resource bar, extra icons for potions, and supports per-spell color and customisation for aura bars. Its modular design allows each part to be attached to the CDM or detached and freely placed.
+ECM enriches the built-in Cooldown Manager with new features including power and resource bars, customisable-per-spell aura bars, and extra spell and item icons. It designed to be reminscent of the pre-Midnight WeakAura HUDs, and it **looks and works great out of the box** while being **straightforward to customise.** Each set of bars can be enabled or disabled, and detached and moved independently from others. Icons for health and combat potions are included by default and new ones can be added for racials, equipment, jumper cables - anything you want.
 
-Made with ❤️, with little features you won't want to live without.
+Made with ❤️.
 
-##  Features
+###  Features
 
-### ⚔️ Inline Resources
+#### Power and Resources Bars
 
-Adds essential combat bars directly below Blizzard's cooldown manager.
+Adds bars for resources: mana, rage, energy, focus, fury, runic power
+Or special class resources such as holy power, runes, and souls.
 
-- `Power Bar` for mana, rage, energy, focus, and runic power
-- `Resource Bar` for class resources
-- `Rune Bar` for Death Knight rune tracking
-- `Aura Bars` with unified style and color control
+#### Aura Bars
 
-![](docs/images/inline-resources.gif)
+Style the default aura bars to match power and resource bars.
+Customise their colours **on a per-spell basis** to quickly idenify their remaining duration mid-combat.
 
-### 🎨 Aura Bars
+#### Auto-hide and fade
 
-Automatically position aura bars and style them to match. Change their colors for different spells so you can see their remaining duration at a glance.
-
-![](docs/images/aura-bars.gif)
-
-### 🙈 Smart Visibility and Fade Rules
-
-Reduce screen clutter automatically based on gameplay context:
+Reduce screen clutter based based on context:
 
 - Hide while mounted or in a vehicle
 - Hide in rest areas
@@ -33,35 +26,21 @@ Reduce screen clutter automatically based on gameplay context:
 - Optionally stay visible in instances (raids, M+, PVP)
 - Optionally stay visible when you have an attackable target
 
+![](docs/images/aura-bars.gif)
 ![](docs/images/fade.gif)
+![](docs/images/inline-resources.gif)
 
-### 🟥 Death Knight Runes
+#### Add Icons for any Spell or Item
 
-Track each rune independently as it recharges inline with other resources and cooldowns.
+Add and icon to either the main or utility bars for **any** item or spell id: healthstones, potions, jumper cables, racials, anything!
 
-![](docs/images/dk-runes.gif)
+### Automatic or free positioning
 
-### 🧪 Add Icons for Trinkets, Potions, and Healthstones
-
-Extend the utility cooldown bar with essential combat icons to save you a glance at the action bar.
-
-- Equipped trinket cooldowns
-- Health potion cooldown
-- Combat potion cooldown
-- Healthstone cooldown
-
-### 📌 Automatic positioning or free movement
-
-Use the layout mode that fits your setup.
+Use the layout mode that fits your setup:
 
 - Auto-position directly under Blizzard's Cooldown Manager
 - Detach modules and move them independently
 - Mix and match layouts depending on preference
-
-## Installation
-
-1. Download and extract this addon into `World of Warcraft/_retail_/Interface/AddOns`.
-2. Reload your UI or restart the game.
 
 ## Configuration
 
