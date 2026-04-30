@@ -145,6 +145,10 @@ ProfileOptions.name = L["PROFILES"]
 ProfileOptions.pages = {
     {
         key = "main",
+        onDefault = function() end,
+        onDefaultEnabled = function()
+            return false
+        end,
         rows = {
     { type = "header", name = L["ACTIVE_PROFILE"] },
     {

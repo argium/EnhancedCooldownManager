@@ -231,15 +231,16 @@ local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
     end)
 end
 
-local function configureInlineSlider(slider, textLabel, field, onValueChanged)
+local function configureInlineSlider(slider, textLabel, field, onValueChanged, rangeResolver)
     local minValue = field.min or 0
     local maxValue = field.max or 1
     local step = field.step or 1
 
+    slider._lsbOnValueChanged = onValueChanged
     slider._lsbMinValue = minValue
     slider._lsbMaxValue = maxValue
     slider._lsbStep = step
-    slider._lsbRangeResolver = field.getRange
+    slider._lsbRangeResolver = rangeResolver or field.getRange
 
     if slider.MinText then
         slider.MinText:Hide()
@@ -252,9 +253,17 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged)
     end
 
     if slider.Init then
-        slider:Init(minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createInlineSliderFormatters())
-        if slider.Slider and slider.Slider.SetValueStep then
-            slider.Slider:SetValueStep(step)
+        local wasSuppressed = slider._lsbSuppressValueChanged
+        slider._lsbSuppressValueChanged = true
+        local ok, err = pcall(function()
+            slider:Init(field.value or minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createInlineSliderFormatters())
+            if slider.Slider and slider.Slider.SetValueStep then
+                slider.Slider:SetValueStep(step)
+            end
+        end)
+        slider._lsbSuppressValueChanged = wasSuppressed
+        if not ok then
+            error(err, 0)
         end
     else
         slider:SetMinMaxValues(minValue, maxValue)
@@ -270,8 +279,8 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged)
             if textLabel and textLabel.SetText then
                 textLabel:SetText(tostring(rounded))
             end
-            if onValueChanged then
-                onValueChanged(rounded)
+            if not slider._lsbSuppressValueChanged and slider._lsbOnValueChanged then
+                slider._lsbOnValueChanged(rounded)
             end
         end
 

@@ -192,6 +192,93 @@ describe("PowerBarTickMarksOptions", function()
         assert.are.equal(1, #refreshCalls)
     end)
 
+    it("defaults button restores the current spec's default tick marks", function()
+        local scheduledReasons = {}
+        local defaultColor = { r = 0.9, g = 0.8, b = 0.7, a = 0.6 }
+
+        currentClassID = 12
+        currentSpecIndex = 3
+        ns.Addon.db.defaults.profile.powerBar = {
+            ticks = {
+                mappings = {
+                    [12] = {
+                        [3] = {
+                            { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
+                            { value = 100 },
+                        },
+                    },
+                },
+                defaultColor = defaultColor,
+                defaultWidth = 2,
+            },
+        }
+        setTickMappings({
+            [12] = {
+                [3] = {
+                    { value = 30, width = 5, color = { r = 1, g = 0, b = 0, a = 1 } },
+                },
+            },
+        })
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReasons[#scheduledReasons + 1] = reason
+            end,
+        }
+
+        local captured, refreshCalls = registerPageSpec()
+
+        captured.onDefault()
+
+        local items = getRow(captured, "tickCollection").items()
+        assert.are.equal(2, #items)
+        assert.are.equal(90, items[1].fields[1].value)
+        assert.are.same({ r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 }, items[1].color.value)
+        assert.are.equal(2, items[1].fields[2].value)
+        assert.are.equal(100, items[2].fields[1].value)
+        assert.are.same(defaultColor, getRow(captured, "defaultColor").get())
+        assert.are.equal(2, getRow(captured, "defaultWidth").get())
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ true }, refreshCalls)
+    end)
+
+    it("defaults button clears custom ticks when the current spec has no defaults", function()
+        local scheduledReasons = {}
+
+        ns.Addon.db.defaults.profile.powerBar = {
+            ticks = {
+                mappings = {
+                    [12] = {
+                        [3] = {
+                            { value = 90 },
+                        },
+                    },
+                },
+                defaultColor = ns.Constants.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultWidth = 1,
+            },
+        }
+        setTickMappings({
+            [1] = {
+                [2] = {
+                    { value = 60, width = 4, color = { r = 1, g = 0, b = 0, a = 1 } },
+                },
+            },
+        })
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReasons[#scheduledReasons + 1] = reason
+            end,
+        }
+
+        local captured, refreshCalls = registerPageSpec()
+
+        captured.onDefault()
+
+        assert.are.same({}, getRow(captured, "tickCollection").items())
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ true }, refreshCalls)
+    end)
+
     it("rescales the value field range for large resource values", function()
         setTickMappings({
             [1] = {

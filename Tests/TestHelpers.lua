@@ -1680,6 +1680,9 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
         Addon = {
             db = {
                 profile = opts.profile or {},
+                defaults = {
+                    profile = opts.defaults or {},
+                },
             },
         },
     }
@@ -1702,6 +1705,9 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
         return k
     end })
     ns.CloneValue = TestHelpers.deepClone
+    ns.Runtime = ns.Runtime or {
+        ScheduleLayoutUpdate = function() end,
+    }
     ns.OptionUtil = {
         GetCurrentClassSpec = opts.getCurrentClassSpec or function()
             return 1, 2, "Warrior", "Fury", "WARRIOR"

@@ -366,6 +366,13 @@ local function refreshEditorCollectionRow(row, item)
         valueText:SetPoint("LEFT", slider, "RIGHT", 6, 0)
         valueText:SetWidth(field.valueWidth or 40)
 
+        local rangeResolver
+        if field.getRange then
+            rangeResolver = function(targetValue)
+                return field.getRange(item, targetValue)
+            end
+        end
+
         configureInlineSlider(slider, valueText, field, function(rounded)
             if row._lsbRefreshing then
                 return
@@ -373,7 +380,7 @@ local function refreshEditorCollectionRow(row, item)
             if field.onValueChanged then
                 field.onValueChanged(rounded, item, row)
             end
-        end)
+        end, rangeResolver)
         preventMouseClickPropagation(slider)
 
         previousValueText = valueText

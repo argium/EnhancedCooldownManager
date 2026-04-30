@@ -33,6 +33,11 @@ local function getTicksConfig()
     return ticks
 end
 
+local function getDefaultTicksConfig()
+    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    return defaults and defaults.powerBar and defaults.powerBar.ticks or nil
+end
+
 local function getCurrentTicks()
     local classID, specIndex = ns.OptionUtil.GetCurrentClassSpec()
     if not classID or not specIndex then
@@ -133,6 +138,24 @@ local function updatePickerSwatch(row, color)
     end
 end
 
+local function resetToDefaults()
+    local ticksCfg = getTicksConfig()
+    local defaultTicksCfg = getDefaultTicksConfig()
+
+    ticksCfg.defaultColor = ns.CloneValue((defaultTicksCfg and defaultTicksCfg.defaultColor) or C.DEFAULT_POWERBAR_TICK_COLOR)
+    ticksCfg.defaultWidth = (defaultTicksCfg and defaultTicksCfg.defaultWidth) or 1
+
+    local classID, specIndex = ns.OptionUtil.GetCurrentClassSpec()
+    if classID and specIndex then
+        local classDefaults = defaultTicksCfg and defaultTicksCfg.mappings and defaultTicksCfg.mappings[classID]
+        local specDefaults = classDefaults and classDefaults[specIndex] or {}
+        setCurrentTicks(ns.CloneValue(specDefaults))
+    end
+
+    scheduleUpdate()
+    refreshPage()
+end
+
 local function buildTickCollectionItems()
     local ticks = getCurrentTicks()
     local items = {}
@@ -199,6 +222,7 @@ end
 
 PowerBarTickMarksOptions.key = "tickMarks"
 PowerBarTickMarksOptions.name = "Tick Marks"
+PowerBarTickMarksOptions.onDefault = resetToDefaults
 PowerBarTickMarksOptions.rows = {
     {
         id = "description",

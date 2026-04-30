@@ -859,12 +859,19 @@ function ExtraIconsOptions.ResetToDefaults()
     doAction()
 end
 
+local function canResetToDefaults()
+    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    return defaults and defaults.extraIcons ~= nil
+end
+
 ExtraIconsOptions.key = "extraIcons"
 ExtraIconsOptions.name = L["EXTRA_ICONS"]
 
 ExtraIconsOptions.pages = {
     {
         key = "main",
+        onDefault = ExtraIconsOptions.ResetToDefaults,
+        onDefaultEnabled = canResetToDefaults,
         onShow = function()
             ns.Runtime.SetLayoutPreview(true)
             ExtraIconsOptions.EnsureItemLoadFrame()

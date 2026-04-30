@@ -42,9 +42,6 @@ describe("ExtraIconsOptions data helpers", function()
             GetIsDisabledDelegate = function() return function() return false end end,
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
-            CreateFontOverrideRow = function()
-                return { type = "fontOverride" }
-            end,
         }
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
@@ -777,7 +774,7 @@ end)
 
 describe("ExtraIconsOptions settings page", function()
     local originalGlobals
-    local profile, defaults, SB, ns, capturedPage, registeredPage, refreshCalls, scheduledReasons, previewCalls, settings
+    local profile, defaults, SB, ns, capturedPage, registeredPage, refreshCalls, scheduledReasons, previewCalls
 
     local function getRow(rowId)
         local rows = assert(capturedPage and capturedPage.rows)
@@ -854,7 +851,6 @@ describe("ExtraIconsOptions settings page", function()
             enabled = true,
             showStackCount = true,
             showCharges = true,
-            overrideFont = false,
             viewers = {
                 utility = {},
                 main = {},
@@ -869,7 +865,7 @@ describe("ExtraIconsOptions settings page", function()
             previewCalls[#previewCalls + 1] = active
         end
 
-        settings = TestHelpers.CollectSettings(function()
+        TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
             capturedPage = ns.ExtraIconsOptions.pages[1]
             local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
@@ -896,6 +892,12 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.same({ true, false }, previewCalls)
     end)
 
+    it("registers page-level defaults for the section list state", function()
+        assert.is_function(capturedPage.onDefault)
+        assert.is_function(capturedPage.onDefaultEnabled)
+        assert.is_true(capturedPage.onDefaultEnabled())
+    end)
+
     it("registers canonical rows and a section list instead of a canvas", function()
         local opts = ns.ExtraIconsOptions
 
@@ -903,24 +905,14 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("checkbox", getRow("enabled").type)
         assert.are.equal("checkbox", getRow("showStackCount").type)
         assert.are.equal("checkbox", getRow("showCharges").type)
-        assert.are.equal("fontOverride", getRow("fontOverride").type)
+        assert.is_nil(getRow("fontOverride"))
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
-        assert.are.equal(5, #capturedPage.rows)
+        assert.are.equal(4, #capturedPage.rows)
+        assert.are.equal("enabled", capturedPage.rows[1].id)
+        assert.are.equal("showStackCount", capturedPage.rows[2].id)
         assert.are.equal("showCharges", capturedPage.rows[3].id)
-        assert.are.equal("fontOverride", capturedPage.rows[4].id)
-        assert.are.equal("viewers", capturedPage.rows[5].id)
-    end)
-
-    it("schedules layout when count font settings change", function()
-        settings["ECM_extraIcons_overrideFont"]:SetValue(true)
-        settings["ECM_extraIcons_font"]:SetValue("Expressway")
-        settings["ECM_extraIcons_fontSize"]:SetValue(18)
-
-        assert.is_true(profile.extraIcons.overrideFont)
-        assert.are.equal("Expressway", profile.extraIcons.font)
-        assert.are.equal(18, profile.extraIcons.fontSize)
-        assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
+        assert.are.equal("viewers", capturedPage.rows[4].id)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()
@@ -937,6 +929,31 @@ describe("ExtraIconsOptions settings page", function()
         assert.is_not_nil(findItem("utility", function(item)
             return item.actions.delete.tooltip == ns.L["ADD_ENTRY"]
         end))
+    end)
+
+    it("defaults button restores extra icon settings and clears draft input", function()
+        profile.extraIcons.showStackCount = false
+        profile.extraIcons.viewers.utility = {
+            { kind = "spell", ids = { 12345 } },
+        }
+        defaults.extraIcons.showStackCount = true
+        defaults.extraIcons.viewers.utility = {
+            { stackKey = "trinket1" },
+        }
+
+        local utilityFooter = assert(getSection("utility").footer)
+        utilityFooter.onTextChanged("98765")
+        utilityFooter.onToggleMode()
+
+        capturedPage.onDefault()
+
+        assert.is_true(profile.extraIcons.showStackCount)
+        assert.are.same({ { stackKey = "trinket1" } }, profile.extraIcons.viewers.utility)
+        utilityFooter = assert(getSection("utility").footer)
+        assert.are.equal("Spell", utilityFooter.modeText())
+        assert.are.equal("", utilityFooter.inputText())
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ registeredPage._category }, refreshCalls)
     end)
 
     it("keeps active racial entries fully enabled after replacing the placeholder", function()

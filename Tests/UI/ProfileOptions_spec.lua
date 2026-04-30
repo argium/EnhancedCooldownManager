@@ -41,6 +41,8 @@ describe("ProfileOptions getters/setters/defaults", function()
         assert.are.equal("profile", ns.ProfileOptions.key)
         assert.are.equal("Other", settings.ECM_ProfileCopy:GetValue())
         assert.is_not_nil(profileCategory)
+        assert.is_function(ns.ProfileOptions.pages[1].onDefault)
+        assert.is_false(ns.ProfileOptions.pages[1].onDefaultEnabled())
     end)
 
     before_each(function()
@@ -74,6 +76,11 @@ describe("ProfileOptions getters/setters/defaults", function()
     end
 
     describe("switch profile", function()
+        it("disables the category defaults button for profile actions", function()
+            assert.is_function(ns.ProfileOptions.pages[1].onDefault)
+            assert.is_false(ns.ProfileOptions.pages[1].onDefaultEnabled())
+        end)
+
         it("getter returns current profile", function()
             assert.are.equal("Default", getSetting("ProfileSwitch"):GetValue())
         end)

@@ -79,7 +79,13 @@ describe("LibSettingsBuilder Collections", function()
     local function makeCollectionControl(clickedButtons)
         local control = TestHelpers.makeFrame()
         control._children = {}
+        local callbacks = {}
         local textColor = { 1, 1, 1, 1 }
+        local function fireValueChanged(self, value)
+            for _, callback in ipairs(callbacks.OnValueChanged or {}) do
+                callback.fn(callback.owner or self, value)
+            end
+        end
         control.SetShown = function(self, shown)
             if shown then
                 self:Show()
@@ -148,9 +154,25 @@ describe("LibSettingsBuilder Collections", function()
         control.SetObeyStepOnDrag = function(self, obey)
             self._obeyStepOnDrag = obey
         end
+        control.RegisterCallback = function(self, event, fn, owner)
+            callbacks[event] = callbacks[event] or {}
+            callbacks[event][#callbacks[event] + 1] = { fn = fn, owner = owner }
+        end
+        control.Init = function(self, initialValue, minValue, maxValue)
+            self._value = initialValue
+            self._minValue = minValue
+            self._maxValue = maxValue
+            fireValueChanged(self, initialValue)
+        end
         control.SetValue = function(self, value)
             self._value = value
+            fireValueChanged(self, value)
         end
+        control.Slider = {
+            SetValueStep = function(_, step)
+                control._valueStep = step
+            end,
+        }
         control.SetColorRGB = function(self, r, g, b)
             self._color = { r, g, b }
         end
@@ -412,6 +434,102 @@ describe("LibSettingsBuilder Collections", function()
         assert.is_false(row._swatch._propagateMouseClicks)
         assert.is_false(row._removeButton._propagateMouseClicks)
         assert.are.same({ "LeftButtonUp" }, row._removeButton._registeredClicks)
+    end)
+
+    it("keeps editor slider callbacks current across recycled row refreshes", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local calls = {}
+        local items = {
+            {
+                label = "Tick 1",
+                fields = {
+                    {
+                        value = 10,
+                        min = 1,
+                        max = 100,
+                        step = 1,
+                        onValueChanged = function(value)
+                            calls[#calls + 1] = "first:" .. value
+                        end,
+                    },
+                },
+            },
+        }
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local data = {
+            preset = "editor",
+            rowHeight = 34,
+            items = function()
+                return items
+            end,
+        }
+
+        lsb._internal.applyCollectionFrame(host, data)
+        items = {
+            {
+                label = "Tick 2",
+                fields = {
+                    {
+                        value = 20,
+                        min = 1,
+                        max = 100,
+                        step = 1,
+                        onValueChanged = function(value)
+                            calls[#calls + 1] = "second:" .. value
+                        end,
+                    },
+                },
+            },
+        }
+        lsb._internal.applyCollectionFrame(host, data)
+
+        host._lsbCollectionScrollBox._rows[1]._fieldWidgets[1].slider:SetValue(42)
+
+        assert.are.same({ "second:42" }, calls)
+    end)
+
+    it("resolves editor slider text entry ranges against the current item", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local resolvedItem
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local item = {
+            label = "Tick 1",
+            fields = {
+                {
+                    value = 50,
+                    min = 1,
+                    max = 100,
+                    step = 1,
+                    getRange = function(currentItem, targetValue)
+                        resolvedItem = currentItem
+                        return 1, targetValue, 5
+                    end,
+                },
+            },
+        }
+
+        lsb._internal.applyCollectionFrame(host, {
+            preset = "editor",
+            rowHeight = 34,
+            items = function()
+                return { item }
+            end,
+        })
+
+        local minValue, maxValue, step = host._lsbCollectionScrollBox._rows[1]._fieldWidgets[1].slider._lsbRangeResolver(500)
+
+        assert.are.equal(item, resolvedItem)
+        assert.are.equal(1, minValue)
+        assert.are.equal(500, maxValue)
+        assert.are.equal(5, step)
     end)
 
     it("does not re-enable editor row mouse targets during initializer state evaluation", function()
