@@ -24,20 +24,14 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v6
 
-            - name: Install Lua 5.1 and LuaRocks
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
+            - name: Set up test environment
+              run: bash scripts/setup-unit-test-env.sh
 
-            - name: Install test dependencies
-              run: |
-                  luarocks --lua-version=5.1 install --local moonscript
-                  luarocks --lua-version=5.1 install --local busted
-                  luarocks --lua-version=5.1 install --local luacov
+            - name: Run Luacheck
+              run: luacheck . -q
 
             - name: Run Busted tests with LuaCov (JUnit output)
               run: |
-                  eval "$(luarocks --lua-version=5.1 path --local)"
                   mkdir -p test-results
                   rm -f luacov.stats.out luacov.report.out luacov.report.html
                   busted -r coverage Tests --output=junit > test-results/busted-junit.xml
