@@ -115,7 +115,6 @@ local function createInstance(target)
     end
 
     instance._events = instance._events or {}
-    instance._stats = instance._stats or {}
 
     instance.frame = instance.frame or CreateFrame("Frame")
 
