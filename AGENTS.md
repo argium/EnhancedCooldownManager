@@ -1,3 +1,5 @@
+IMPORTANT: Run initialize serena tool, if it's available.
+
 # Documentation Map
 
 Authoritative source for repo-wide agent rules. Topic-specific docs own their own surface — do not duplicate their content here.

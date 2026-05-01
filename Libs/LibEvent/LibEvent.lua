@@ -92,13 +92,13 @@ function LibEvent:UnregisterAllEvents()
     end
 end
 
----Gets the event invocation stats for this embedded target.
----@return table<string, number> A table mapping event names to their fire counts.
+---Gets event invocation stats when metrics are enabled.
+---@return table<string, number> A table mapping event names to their fire counts, or an empty table when metrics are disabled.
 function LibEvent:GetEventStats()
     return getInstance(self)._stats or EMPTY_STATS
 end
 
----Resets the event invocation stats for this embedded target.
+---Resets event invocation stats when metrics are enabled.
 function LibEvent:ResetEventStats()
     local stats = getInstance(self)._stats
     if stats then wipe(stats) end
@@ -115,7 +115,6 @@ local function createInstance(target)
     end
 
     instance._events = instance._events or {}
-    instance._stats = instance._stats or {}
 
     instance.frame = instance.frame or CreateFrame("Frame")
 
