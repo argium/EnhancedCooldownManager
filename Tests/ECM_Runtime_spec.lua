@@ -929,7 +929,7 @@ describe("ECM.Runtime layout system", function()
                 "CooldownViewerSettings should still be hooked once after second tick")
         end)
 
-        it("does not re-show externally hidden Blizzard frames after setup is complete", function()
+        it("still enforces Blizzard frame state after setup is complete", function()
             local frames = createAllBlizzardFrames()
             ns.Runtime.Enable(fakeAddon)
 
@@ -941,8 +941,8 @@ describe("ECM.Runtime layout system", function()
             assert.is_false(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown())
 
             ticker.callback()
-            assert.is_false(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
-                "Enforcement should not re-show externally hidden Blizzard frame")
+            assert.is_true(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
+                "Enforcement should re-show externally hidden Blizzard frame")
         end)
 
         it("continues setup when frames appear late", function()

@@ -84,6 +84,7 @@ All Lua files start with:
 ## Tests
 
 - Be skeptical when changing tests to satisfy failures — the failure may be real.
+- Existing tests are behavioral specifications. Do not invert, weaken, or rewrite a test to match a production change unless the original behavior is explicitly obsolete and the test's semantics no longer apply.
 - Test load order mirrors TOC load order. Test files mirror source paths; library tests live under `Libs/<Name>/Tests/`.
 - Test production code directly. Don't mirror or reimplement production logic in specs.
 - Stub the canonical function, not a wrapper or alias. If a stub diverges from real behavior, fix the stub — don't add fallbacks to live code.
