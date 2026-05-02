@@ -210,6 +210,14 @@ jobs:
                     exit 1
                   fi
 
+            - name: Stage packaged artifacts
+              run: |
+                  set -euo pipefail
+
+                  rm -rf "$RUNNER_TEMP/release-packages"
+                  mkdir -p "$RUNNER_TEMP/release-packages"
+                  cp .release/*.zip "$RUNNER_TEMP/release-packages/"
+
             - name: Push release tag
               env:
                   VERSION: ${{ steps.release.outputs.version }}
@@ -246,7 +254,7 @@ jobs:
               uses: actions/upload-artifact@v6
               with:
                   name: release-packages-${{ steps.release.outputs.version }}
-                  path: .release/*.zip
+                  path: ${{ runner.temp }}/release-packages/*.zip
                   if-no-files-found: error
 
             - name: Create GitHub Release
@@ -254,10 +262,11 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   VERSION: ${{ steps.release.outputs.version }}
                   IS_PRERELEASE: ${{ steps.release.outputs.is_prerelease }}
+                  PACKAGE_DIR: ${{ runner.temp }}/release-packages
               run: |
                   set -euo pipefail
 
-                  release_args=(release create "$VERSION" .release/*.zip --verify-tag --notes-file .github/release-notes.md)
+                  release_args=(release create "$VERSION" "$PACKAGE_DIR"/*.zip --verify-tag --notes-file .github/release-notes.md)
                   if [ "$IS_PRERELEASE" = "true" ]; then
                     release_args+=(--prerelease --latest=false)
                   fi
