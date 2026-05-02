@@ -1,12 +1,12 @@
 name: Package Release
-run-name: Package Release ${{ inputs.version }}
+run-name: Package Release ${{ inputs.version || github.ref_name }}
 
 on:
     workflow_dispatch:
         inputs:
             version:
-                description: Release version from EnhancedCooldownManager.toc.
-                required: true
+                description: Optional display version; must match EnhancedCooldownManager.toc when provided.
+                required: false
                 type: string
             release_notes:
                 description: Release notes for the packager changelog and GitHub Release.
@@ -71,7 +71,7 @@ jobs:
                   fi
 
                   INPUT_VERSION=$(printf '%s' "$INPUT_VERSION" | tr -d '[:space:]')
-                  if [ "$INPUT_VERSION" != "$VERSION" ]; then
+                  if [ -n "$INPUT_VERSION" ] && [ "$INPUT_VERSION" != "$VERSION" ]; then
                     echo "::error::Release input version '$INPUT_VERSION' must match ${ADDON_NAME}.toc version '$VERSION'."
                     exit 1
                   fi
