@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("LayoutOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -28,26 +28,21 @@ describe("LayoutOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/LayoutOptions.lua", "LayoutOptions")(nil, ns)
-            ns.OptionsSections.Layout.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.LayoutOptions)
+            capturedPage = ns.LayoutOptions.pages[1]
         end)
     end)
 
     it("registers the explainer and overview rows", function()
-        assert.is_table(capturedTable.args.positioningExamples)
-        assert.are.equal("canvas", capturedTable.args.positioningExamples.type)
+        assert.is_table(capturedPage.rows)
+        assert.are.equal("canvas", capturedPage.rows[1].type)
     end)
 
     it("registers page-level onShow and onHide callbacks", function()
-        assert.is_function(capturedTable.onShow)
-        assert.is_function(capturedTable.onHide)
+        assert.is_function(capturedPage.onShow)
+        assert.is_function(capturedPage.onHide)
     end)
 
     it("updates attached stack settings", function()
@@ -84,7 +79,7 @@ describe("LayoutOptions getters/setters/defaults", function()
 
     it("does not register aura-bar free grow direction", function()
         assert.is_nil(settings["ECM_buffBars_freeGrowDirection"])
-        assert.is_nil(capturedTable.args.freeGrowDirection)
+        assert.is_nil(settings["ECM_global_freeGrowDirection"])
     end)
 
     it("registers shared attached-stack settings only once when General is also loaded", function()
@@ -102,9 +97,16 @@ describe("LayoutOptions getters/setters/defaults", function()
         end
         _G.Settings = proxiedSettings
 
-        TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
-        ns.OptionsSections.General.RegisterSettings(SB)
-        ns.OptionsSections.Layout.RegisterSettings(SB)
+        local profile2, defaults2 = TestHelpers.MakeOptionsProfile()
+        local SB2, ns2 = TestHelpers.SetupOptionsEnv(profile2, defaults2)
+        TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns2)
+        TestHelpers.LoadChunk("UI/LayoutOptions.lua", "LayoutOptions")(nil, ns2)
+        TestHelpers.RegisterSettingsTree(SB2, {
+            sections = {
+                ns2.GeneralOptions,
+                ns2.LayoutOptions,
+            },
+        })
 
         _G.Settings = originalSettings
 

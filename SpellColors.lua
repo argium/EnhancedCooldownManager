@@ -9,9 +9,21 @@
 
 local _, ns = ...
 
+local C = ns.Constants
+
+---@class ECM_SpellColorStore
+---@field _scope string
+---@field _configAccessor (fun(): table|nil)|nil
+---@field _discoveredKeys ECM_SpellColorKey[]
+---@field _SetConfigAccessor fun(self: ECM_SpellColorStore, accessor: fun(): table|nil)
+
 local SpellColors = {}
 ns.SpellColors = SpellColors
+local SpellColorStore = {}
+SpellColorStore.__index = SpellColorStore
 local FrameUtil = ns.FrameUtil
+local DEFAULT_SCOPE = C.SCOPE_BUFFBARS
+local _storesByScope = {}
 
 local KEY_DEFS = { "byName", "bySpellID", "byCooldownID", "byTexture" }
 local KEY_TYPE_TO_STORE = {
@@ -26,6 +38,10 @@ local KEY_TYPES = {
     cooldownID = true,
     textureFileID = true,
 }
+
+local function normalizeScope(scope)
+    return type(scope) == "string" and scope or DEFAULT_SCOPE
+end
 
 ---------------------------------------------------------------------------
 -- Key validation
@@ -44,7 +60,7 @@ end
 -- SpellColorKeyType class
 ---------------------------------------------------------------------------
 
----@class ECM_SpellColorKeyType
+---@class ECM_SpellColorKeyType : ECM_SpellColorKey
 local SpellColorKeyType = {}
 SpellColorKeyType.__index = SpellColorKeyType
 
@@ -272,7 +288,7 @@ function SpellColors.MergeKeys(base, other)
 end
 
 -- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
-local unpack = unpack or table.unpack
+local unpack = _G.unpack or table.unpack
 
 ---------------------------------------------------------------------------
 -- Entry metadata helpers
@@ -408,14 +424,32 @@ end
 --- Runtime cache of keys discovered from active bars during layout.
 --- Merged into GetAllColorEntries so the options UI sees all visible bars
 --- without reaching into BuffBars directly.
-local _discoveredKeys = {}
+---@param store ECM_SpellColorStore
+---@return ECM_SpellColorKey[]
+local function getDiscoveredKeys(store)
+    local discoveredKeys = store._discoveredKeys
+    if not discoveredKeys then
+        discoveredKeys = {}
+        store._discoveredKeys = discoveredKeys
+    end
+    return discoveredKeys
+end
 
 ---------------------------------------------------------------------------
 -- Profile helpers
 ---------------------------------------------------------------------------
 
+--- Returns the scope-specific default color fallback.
+---@param scope string|nil
+---@return ECM_Color
+local function getScopeDefaultColor(scope)
+    local defaults = ns.defaults and ns.defaults.profile and ns.defaults.profile[normalizeScope(scope)]
+    local color = defaults and defaults.colors and defaults.colors.defaultColor
+    return color or ns.Constants.BUFFBARS_DEFAULT_COLOR
+end
+
 --- Ensures the color storage tables exist for the current class/spec.
----@param cfg table  buffBars config table
+---@param cfg table  scope config table
 ---@return table|nil classSpecStores  Keyed by KEY_DEFS field names; each value is the current class/spec storage table.
 local function getCurrentClassSpecStores(cfg)
     local _, _, classID = UnitClass("player")
@@ -439,8 +473,9 @@ local function getCurrentClassSpecStores(cfg)
 end
 
 --- Ensures nested tables exist for color storage.
----@param cfg table  buffBars config table
-local function ensureProfileIsSetup(cfg)
+---@param cfg table  scope config table
+---@param scope string|nil
+local function ensureProfileIsSetup(cfg, scope)
     if not cfg.colors then
         cfg.colors = {
             byName = {},
@@ -448,7 +483,7 @@ local function ensureProfileIsSetup(cfg)
             byCooldownID = {},
             byTexture = {},
             cache = {},
-            defaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR,
+            defaultColor = getScopeDefaultColor(scope),
         }
     end
     for _, def in ipairs(KEY_DEFS) do
@@ -460,35 +495,79 @@ local function ensureProfileIsSetup(cfg)
         cfg.colors.cache = {}
     end
     if type(cfg.colors.defaultColor) ~= "table" then
-        cfg.colors.defaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR
+        cfg.colors.defaultColor = getScopeDefaultColor(scope)
     end
 end
 
---- Config accessor — defaults to reading from the addon's profile, but can be
---- overridden via SetConfigAccessor for testing or decoupling.
-local _configAccessor
-
---- Allows callers (e.g., BuffBars module) to inject a config accessor,
---- decoupling SpellColors from direct db.profile access.
----@param accessor fun(): table|nil
-function SpellColors.SetConfigAccessor(accessor)
-    _configAccessor = accessor
+--- Creates a spell-colour store bound to a single scope.
+---@param scope string|nil
+---@param configAccessor (fun(): table|nil)|nil
+---@return ECM_SpellColorStore
+function SpellColors.New(scope, configAccessor)
+    return setmetatable({
+        _scope = normalizeScope(scope),
+        _configAccessor = configAccessor,
+        _discoveredKeys = {},
+    }, SpellColorStore)
 end
 
---- Returns the buffBars config table, or nil if unavailable.
----@return table|nil cfg
-local function config()
-    local cfg
-    if _configAccessor then
-        cfg = _configAccessor()
+--- Returns the shared spell-colour store for a scope.
+---@param scope string|nil
+---@return ECM_SpellColorStore
+function SpellColors.Get(scope)
+    local resolvedScope = normalizeScope(scope)
+    local store = _storesByScope[resolvedScope]
+    if not store then
+        store = SpellColors.New(resolvedScope)
+        _storesByScope[resolvedScope] = store
+    end
+    return store
+end
+
+-- Not used by production code; retained for tests that need to swap config sources after construction.
+function SpellColorStore:_SetConfigAccessor(accessor)
+    self._configAccessor = accessor
+end
+
+--- Returns the profile or scope config source table for a store, or nil if unavailable.
+---@param store ECM_SpellColorStore
+---@return table|nil source
+local function configSource(store)
+    local source
+    if store._configAccessor then
+        source = store._configAccessor()
     else
-        cfg = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.buffBars or nil
+        source = ns.Addon and ns.Addon.db and ns.Addon.db.profile or nil
     end
+    if type(source) == "table" and type(source.profile) == "table" then
+        source = source.profile
+    end
+    return source
+end
+
+--- Returns the scoped config table for a store, or nil if unavailable.
+---@param store ECM_SpellColorStore
+---@return table|nil cfg
+local function config(store)
+    local resolvedScope = store._scope
+    local source = configSource(store)
+    local cfg
+
+    if type(source) == "table" then
+        -- Treat the requested scope table as a valid profile signal so New(scope, accessor) works when tests seed only that scope.
+        local looksLikeProfile = type(source[resolvedScope]) == "table" or type(source[DEFAULT_SCOPE]) == "table"
+        if looksLikeProfile then
+            cfg = source[resolvedScope]
+        elseif resolvedScope == DEFAULT_SCOPE then
+            cfg = source
+        end
+    end
+
     if type(cfg) ~= "table" then
-        ns.DebugAssert(false, "SpellColors.config - missing or invalid buffBars config")
+        ns.DebugAssert(false, "SpellColors.config - missing or invalid scope config", { scope = resolvedScope })
         return nil
     end
-    ensureProfileIsSetup(cfg)
+    ensureProfileIsSetup(cfg, resolvedScope)
     return cfg
 end
 
@@ -519,8 +598,9 @@ end
 ---------------------------------------------------------------------------
 
 --- Returns the 4 tier sub-tables for the current class/spec, or nil.
-local function scopeTables()
-    local cfg = config()
+---@param store ECM_SpellColorStore
+local function scopeTables(store)
+    local cfg = config(store)
     if not cfg then
         return nil
     end
@@ -541,8 +621,9 @@ local function validateKeys(keys)
 end
 
 --- Looks up a value by trying keys in priority order (index 1 first).
-local function storeGet(keys)
-    local tables = scopeTables()
+---@param store ECM_SpellColorStore
+local function storeGet(store, keys)
+    local tables = scopeTables(store)
     if not tables then
         return nil
     end
@@ -560,8 +641,9 @@ end
 
 --- Stores a value under all valid keys. Reuses the oldest existing stamped
 --- wrapper to keep all tier references pointing to the same table.
-local function storeSet(keys, value, meta)
-    local tables = scopeTables()
+---@param store ECM_SpellColorStore
+local function storeSet(store, keys, value, meta)
+    local tables = scopeTables(store)
     if not tables then
         return
     end
@@ -598,8 +680,9 @@ local function storeSet(keys, value, meta)
 end
 
 --- Removes entries from all tier tables.
-local function storeRemove(keys)
-    local tables = scopeTables()
+---@param store ECM_SpellColorStore
+local function storeRemove(store, keys)
+    local tables = scopeTables(store)
     local cleared = {}
     for i = 1, #KEY_DEFS do
         cleared[i] = false
@@ -615,8 +698,9 @@ end
 --- Reconciles a single key set: finds the most-recently-written entry
 --- across all tiers and propagates it to every valid tier that is missing
 --- or outdated.
-local function reconcile(keys)
-    local tables = scopeTables()
+---@param store ECM_SpellColorStore
+local function reconcile(store, keys)
+    local tables = scopeTables(store)
     if not tables then
         return false
     end
@@ -660,19 +744,21 @@ local function reconcile(keys)
 end
 
 --- Reconciles a batch of key arrays.
-local function reconcileAll(keysList)
+---@param store ECM_SpellColorStore
+local function reconcileAll(store, keysList)
     local changed = 0
     for _, keys in ipairs(keysList) do
-        if reconcile(keys) then
+        if reconcile(store, keys) then
             changed = changed + 1
         end
     end
     return changed
 end
 
+---@param store ECM_SpellColorStore
 ---@return number changed
-local function repairCurrentSpecStoreMetadata()
-    local cfg = config()
+local function repairCurrentSpecStoreMetadata(store)
+    local cfg = config(store)
     if not cfg then
         return 0
     end
@@ -704,6 +790,83 @@ local function repairCurrentSpecStoreMetadata()
     return changed
 end
 
+---@param storeTable table|nil
+---@param tierKeyType "spellName"|"spellID"|"cooldownID"|"textureFileID"
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingStoreEntries(storeTable, tierKeyType, target)
+    if type(storeTable) ~= "table" or not target then
+        return false
+    end
+
+    local keysToRemove = nil
+    for rawKey, entry in pairs(storeTable) do
+        local candidate = buildKeyFromEntry(entry, tierKeyType, rawKey)
+        if candidate and keysMatch(candidate, target) then
+            keysToRemove = keysToRemove or {}
+            keysToRemove[#keysToRemove + 1] = rawKey
+        end
+    end
+
+    if not keysToRemove then
+        return false
+    end
+
+    for _, rawKey in ipairs(keysToRemove) do
+        storeTable[rawKey] = nil
+    end
+
+    return true
+end
+
+---@param store ECM_SpellColorStore
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingPersistedEntries(store, target)
+    local tables = scopeTables(store)
+    if not tables or not target then
+        return false
+    end
+
+    local removed = false
+    for _, scopeKey in ipairs(KEY_DEFS) do
+        if removeMatchingStoreEntries(tables[scopeKey], KEY_TYPE_TO_STORE[scopeKey], target) then
+            removed = true
+        end
+    end
+
+    return removed
+end
+
+---@param store ECM_SpellColorStore
+---@param target ECM_SpellColorKey|nil
+---@return boolean removed
+local function removeMatchingDiscoveredEntries(store, target)
+    if not target then
+        return false
+    end
+
+    local discoveredKeys = getDiscoveredKeys(store)
+    local removed = false
+    local nextIndex = 1
+
+    for index = 1, #discoveredKeys do
+        local key = discoveredKeys[index]
+        if key and keysMatch(key, target) then
+            removed = true
+        else
+            discoveredKeys[nextIndex] = key
+            nextIndex = nextIndex + 1
+        end
+    end
+
+    for index = nextIndex, #discoveredKeys do
+        discoveredKeys[index] = nil
+    end
+
+    return removed
+end
+
 ---------------------------------------------------------------------------
 -- Public store API
 ---------------------------------------------------------------------------
@@ -711,12 +874,12 @@ end
 --- Gets the custom color for a spell by a normalized key object.
 ---@param key ECM_SpellColorKey|table|nil
 ---@return ECM_Color|nil
-function SpellColors.GetColorByKey(key)
+function SpellColorStore:GetColorByKey(key)
     local normalized = normalizeKey(key)
     if not normalized then
         return nil
     end
-    return storeGet(normalized:ToArray())
+    return storeGet(self, normalized:ToArray())
 end
 
 --- Extracts identifying values from a bar frame and returns a normalized key.
@@ -734,7 +897,7 @@ end
 --- Gets the custom color for a bar frame.
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_Color|nil
-function SpellColors.GetColorForBar(frame)
+function SpellColorStore:GetColorForBar(frame)
     ns.DebugAssert(frame, "Expected bar frame")
 
     if not (frame and frame.__ecmHooked) then
@@ -746,13 +909,13 @@ function SpellColors.GetColorForBar(frame)
         return nil
     end
 
-    return SpellColors.GetColorByKey(makeKeyFromBar(frame))
+    return self:GetColorByKey(makeKeyFromBar(frame))
 end
 
 --- Returns deduplicated color entries for the current class/spec.
 ---@return { key: ECM_SpellColorKey, color: ECM_Color }[]
-function SpellColors.GetAllColorEntries()
-    local cfg = config()
+function SpellColorStore:GetAllColorEntries()
+    local cfg = config(self)
     if not cfg then
         return {}
     end
@@ -821,7 +984,7 @@ function SpellColors.GetAllColorEntries()
 
     -- Merge runtime-discovered keys so the UI shows all visible bars
     -- without BuffBarsOptions reaching into BuffBars directly.
-    for _, dKey in ipairs(_discoveredKeys) do
+    for _, dKey in ipairs(getDiscoveredKeys(self)) do
         local merged = false
         for _, row in ipairs(result) do
             if row.key:Matches(dKey) then
@@ -846,7 +1009,7 @@ end
 --- Sets a custom color for a spell by normalized key object.
 ---@param key ECM_SpellColorKey|table|nil
 ---@param color ECM_Color
-function SpellColors.SetColorByKey(key, color)
+function SpellColorStore:SetColorByKey(key, color)
     ns.DebugAssert(type(color) == "table", "Expected color to be a table")
 
     local normalized = normalizeKey(key)
@@ -855,23 +1018,23 @@ function SpellColors.SetColorByKey(key, color)
     end
 
     local storedColor = hasLegacyColorMetadata(color) and sanitizeColorValue(color) or color
-    storeSet(normalized:ToArray(), storedColor, buildEntryMeta(normalized))
+    storeSet(self, normalized:ToArray(), storedColor, buildEntryMeta(normalized))
 end
 
 --- Returns the default bar color.
 ---@return ECM_Color
-function SpellColors.GetDefaultColor()
-    local cfg = config()
+function SpellColorStore:GetDefaultColor()
+    local cfg = config(self)
     if not cfg then
-        return ns.Constants.BUFFBARS_DEFAULT_COLOR
+        return getScopeDefaultColor(self._scope)
     end
     return cfg.colors.defaultColor
 end
 
 --- Sets the default bar color.
 ---@param color ECM_Color
-function SpellColors.SetDefaultColor(color)
-    local cfg = config()
+function SpellColorStore:SetDefaultColor(color)
+    local cfg = config(self)
     if not cfg then
         return
     end
@@ -884,18 +1047,18 @@ end
 ---@return boolean spellIDCleared
 ---@return boolean cooldownIDCleared
 ---@return boolean textureCleared
-function SpellColors.ResetColorByKey(key)
+function SpellColorStore:ResetColorByKey(key)
     local normalized = normalizeKey(key)
     if not normalized then
         return false, false, false, false
     end
-    return storeRemove(normalized:ToArray())
+    return storeRemove(self, normalized:ToArray())
 end
 
 --- Reconciles color entries for a list of normalized keys and repairs metadata.
 ---@param keys ECM_SpellColorKey[]|nil
 ---@return number changed
-function SpellColors.ReconcileAllKeys(keys)
+function SpellColorStore:ReconcileAllKeys(keys)
     local keys_list = {}
     if type(keys) == "table" then
         for _, key in ipairs(keys) do
@@ -908,37 +1071,62 @@ function SpellColors.ReconcileAllKeys(keys)
 
     local changed = 0
     if #keys_list > 0 then
-        changed = reconcileAll(keys_list)
+        changed = reconcileAll(self, keys_list)
     end
-    return changed + repairCurrentSpecStoreMetadata()
+    return changed + repairCurrentSpecStoreMetadata(self)
+end
+
+--- Removes persisted and discovered entries matching the given keys.
+---@param keys (ECM_SpellColorKey|table)[]
+---@return ECM_SpellColorKey[] removedKeys
+function SpellColorStore:RemoveEntriesByKeys(keys)
+    local removedKeys = {}
+
+    if type(keys) ~= "table" then
+        return removedKeys
+    end
+
+    for _, key in ipairs(keys) do
+        local normalized = normalizeKey(key)
+        if normalized then
+            local removedPersisted = removeMatchingPersistedEntries(self, normalized)
+            local removedDiscovered = removeMatchingDiscoveredEntries(self, normalized)
+            if removedPersisted or removedDiscovered then
+                removedKeys[#removedKeys + 1] = normalized
+            end
+        end
+    end
+
+    return removedKeys
 end
 
 --- Registers a bar frame's identifying values in the runtime discovered cache.
 --- Called during layout so values are captured before they become secret.
 ---@param frame ECM_BuffBarMixin
-function SpellColors.DiscoverBar(frame)
+function SpellColorStore:DiscoverBar(frame)
     local key = makeKeyFromBar(frame)
     if not key then
         return
     end
-    for i, existing in ipairs(_discoveredKeys) do
+    local discoveredKeys = getDiscoveredKeys(self)
+    for i, existing in ipairs(discoveredKeys) do
         if keysMatch(existing, key) then
-            _discoveredKeys[i] = mergeKeys(existing, key) or existing
+            discoveredKeys[i] = mergeKeys(existing, key) or existing
             return
         end
     end
-    _discoveredKeys[#_discoveredKeys + 1] = key
+    discoveredKeys[#discoveredKeys + 1] = key
 end
 
 --- Wipes the runtime discovered keys cache.
-function SpellColors.ClearDiscoveredKeys()
-    wipe(_discoveredKeys)
+function SpellColorStore:ClearDiscoveredKeys()
+    wipe(getDiscoveredKeys(self))
 end
 
 --- Wipes all persisted spell color entries for the current class/spec.
 ---@return number cleared  Total entries removed across all tiers.
-function SpellColors.ClearCurrentSpecColors()
-    local cfg = config()
+function SpellColorStore:ClearCurrentSpecColors()
+    local cfg = config(self)
     if not cfg then
         return 0
     end

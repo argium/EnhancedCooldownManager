@@ -26,7 +26,7 @@ describe("GeneralOptions getters/setters/defaults", function()
 
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
-            ns.OptionsSections.General.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.GeneralOptions)
         end)
     end)
 

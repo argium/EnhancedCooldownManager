@@ -1,19 +1,20 @@
 # Task Completion Checklist
 
-When completing a task, perform these steps:
+## Required Validation
+- For changes to `Modules/`, `UI/`, or root-level `*.lua`: run `busted Tests` and `luacheck . -q`.
+- For changes under `Libs/<Name>/`: also run the matching library suite: `busted --run libsettingsbuilder`, `busted --run libconsole`, `busted --run libevent`, or `busted --run liblsmsettingswidgets`.
 
-1. **Verify constants**: Any new constants must be in `ECM_Constants.lua`
-2. **Copyright header**: All new/modified .lua files must have the standard header
-3. **Run tests**: `busted Tests`
-4. **Run linter**: `luacheck . -q`
-5. **Code review** (for anything beyond a small targeted fix):
-   - Check for unused variables
-   - Check for unnecessary assignments, guards, boilerplate
-   - Verify no code duplication
-   - Ensure complex sections have comments
-   - Verify test coverage for changes in Modules/, UI/, ECM.lua
-   - Ensure loose coupling between components
-   - Remove dead code and trivial wrappers
-6. **Config access**: Modules using ModuleMixin use `self:GetGlobalConfig()` / `self:GetModuleConfig()` only
-7. **No OnUpdate**: Never use the OnUpdate event
-8. **No forward declarations**
+## Before Finishing
+- Keep the standard GPL header intact on every new or modified Lua file.
+- Keep `ARCHITECTURE.md` current for addon-level design changes.
+- Keep the relevant library README current for library API/schema/test changes.
+- Verify new constants live in `Constants.lua`; defaults live in `Defaults.lua`.
+- Review for duplication, dead code, stale fields, redundant guards/fallbacks, unused locale strings, avoidable allocations, and needless abstractions.
+- Preserve loose coupling and single-source-of-truth ownership.
+- Do not introduce `OnUpdate`, frame-rate tickers, forward declarations, Lua post-5.1 syntax, deprecated Blizzard APIs, or invalid handling of secret values.
+- For UI/library widgets, keep style metrics with the component/library owner; do not redeclare matching defaults from callers.
+
+## Testing Judgment
+- Treat validation as a pre-commit step, not something to run after every small iteration unless a specific failure is being debugged.
+- Be skeptical about editing tests just to satisfy failures; production behavior may be wrong.
+- If validation cannot be run, report that and explain the blocker.

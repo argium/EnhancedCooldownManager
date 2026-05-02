@@ -1,0 +1,13 @@
+<Ui>
+    <Script file="Core.lua"/>
+    <Script file="Primitives/Rows.lua"/>
+    <Script file="Primitives/BlizzardControls.lua"/>
+    <Script file="Controls/CollectionFrames.lua"/>
+    <Script file="Primitives/Layout.lua"/>
+    <Script file="Controls/Base.lua"/>
+    <Script file="Controls/Collections.lua"/>
+    <Script file="Controls/Rows.lua"/>
+    <Script file="CompositeControls/Groups.lua"/>
+    <Script file="CompositeControls/Lists.lua"/>
+    <Script file="Utility.lua"/>
+</Ui>

@@ -237,6 +237,46 @@ local copyTextFrame
 local migrationLogFrame
 local importFrame
 
+--- Shows a generic static confirmation popup with custom button labels.
+---@param popupKey string
+---@param text string
+---@param button1 string|nil
+---@param button2 string|nil
+---@param onAccept fun()|nil
+---@param onCancel fun()|nil
+function mod:ShowConfirmDialog(popupKey, text, button1, button2, onAccept, onCancel)
+    if not popupKey or popupKey == "" then
+        return
+    end
+
+    if not StaticPopupDialogs[popupKey] then
+        StaticPopupDialogs[popupKey] = {
+            text = text or "",
+            button1 = button1 or YES or "Yes",
+            button2 = button2 or NO or "No",
+            OnAccept = function(_, data)
+                if data and data.onAccept then
+                    data.onAccept()
+                end
+            end,
+            OnCancel = function(_, data)
+                if data and data.onCancel then
+                    data.onCancel()
+                end
+            end,
+            timeout = 0,
+            whileDead = 1,
+            hideOnEscape = 1,
+            preferredIndex = C.POPUP_PREFERRED_INDEX,
+        }
+    end
+
+    StaticPopupDialogs[popupKey].text = text or ""
+    StaticPopupDialogs[popupKey].button1 = button1 or YES or "Yes"
+    StaticPopupDialogs[popupKey].button2 = button2 or NO or "No"
+    StaticPopup_Show(popupKey, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+end
+
 function mod:ShowReleasePopup(force)
     local popupVersion = C.RELEASE_POPUP_VERSION
     local body = L["WHATS_NEW_BODY"]

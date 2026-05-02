@@ -88,10 +88,14 @@ describe("LibLSMSettingsWidgets", function()
                 GetValue = function() return "TestFont" end,
                 SetValue = function() end,
             }
+            local staleSetting = {
+                GetValue = function() return "chain" end,
+                SetValue = function() end,
+            }
 
             local initializer = {
                 GetData = function() return { name = "Test", setting = setting } end,
-                GetSetting = function() return setting end,
+                GetSetting = function() return staleSetting end,
             }
 
             local picker = {
@@ -119,6 +123,8 @@ describe("LibLSMSettingsWidgets", function()
             local mixin = _G[case.global]
             picker.SetEnabled = mixin.SetEnabled
             mixin.Init(picker, initializer)
+
+            assert.are.same(setting, picker.setting)
 
             -- Init should have bridged SetEnabled onto the initializer
             assert.is_function(initializer.SetEnabled)

@@ -1,0 +1,3 @@
+- `Runtime` owns the current fade alpha via `Runtime.GetDesiredAlpha()`.
+- `Modules/ExternalBars.lua` must restore `ExternalDefensivesFrame` using that runtime alpha instead of hardcoding `1`, otherwise aura/layout refreshes can pop the Blizzard external viewer back to full opacity.
+- When restoring original icons, keep mouse enabled only when the restored alpha is greater than 0.

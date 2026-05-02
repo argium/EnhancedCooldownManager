@@ -43,9 +43,7 @@ function ns.IsDeathKnight()
 end
 
 local function getAddonVersion()
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
+    return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
 end
 
 local function safeStrTostring(x)
@@ -186,12 +184,15 @@ end
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
-    if cmd == "help" then
+    if cmd == "help" or cmd == "h" then
         ns.Print(L["CMD_HELP_CLEARSEEN"])
         ns.Print(L["CMD_HELP_DEBUG"])
         ns.Print(L["CMD_HELP_EVENTS"])
+        ns.Print(L["CMD_HELP_EVENTS_RESET"])
         ns.Print(L["CMD_HELP_HELP"])
         ns.Print(L["CMD_HELP_MIGRATION"])
+        ns.Print(L["CMD_HELP_MIGRATION_LOG"])
+        ns.Print(L["CMD_HELP_MIGRATION_ROLLBACK"])
         ns.Print(L["CMD_HELP_OPTIONS"])
         ns.Print(L["CMD_HELP_REFRESH"])
         return
@@ -287,6 +288,7 @@ function mod:ChatCommand(input)
     if cmd == "clearseen" then
         gc.releasePopupSeenVersion = nil
         ns.Print(L["SEEN_CLEARED"])
+        ReloadUI()
         return
     end
 end
@@ -368,7 +370,7 @@ function mod:OnInitialize()
 
     ns.Migration.FlushLog()
 
-    -- Register bundled font with LibSharedMedia if present.
+    -- Register bundled fonts with LibSharedMedia
     if LSM then
         pcall(
             LSM.Register,
@@ -376,6 +378,13 @@ function mod:OnInitialize()
             "font",
             "Expressway",
             "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+        )
+        pcall(
+            LSM.Register,
+            LSM,
+            "font",
+            "Cabin",
+            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Cabin.ttf"
         )
     end
 

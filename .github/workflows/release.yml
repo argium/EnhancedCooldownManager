@@ -1,25 +1,41 @@
 name: Package Release
+run-name: Package Release ${{ inputs.version }}
 
 on:
     workflow_dispatch:
-    push:
-        tags:
-            - "v*"
+        inputs:
+            version:
+                description: Release version from EnhancedCooldownManager.toc.
+                required: true
+                type: string
+            release_notes:
+                description: Release notes for the packager changelog and GitHub Release.
+                required: true
+                type: string
 
 concurrency:
-    group: release-${{ github.ref }}
+    group: release
     cancel-in-progress: false
 
 env:
     ADDON_NAME: EnhancedCooldownManager
 
 jobs:
-    package:
+    validate:
+        name: Validate
+        uses: ./.github/workflows/unit-tests.yml
+        permissions:
+            contents: read
+            checks: write
+            pull-requests: write
+
+    publish:
+        name: Publish
+        needs: validate
         runs-on: ubuntu-latest
         environment: release
         permissions:
             contents: write
-            checks: write
 
         steps:
             - name: Checkout repository
@@ -27,110 +43,223 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Install Lua 5.1 and LuaRocks
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
-
-            - name: Install test dependencies
-              run: |
-                  luarocks --lua-version=5.1 install --local moonscript
-                  luarocks --lua-version=5.1 install --local busted
-                  luarocks --lua-version=5.1 install --local luacov
-
-            - name: Run Busted tests with LuaCov (JUnit output)
-              run: |
-                  eval "$(luarocks --lua-version=5.1 path --local)"
-                  mkdir -p test-results
-                  rm -f luacov.stats.out luacov.report.out luacov.report.html
-                  busted -r coverage Tests --output=junit > test-results/busted-junit.xml
-                  busted -r coverage --run libsettingsbuilder --output=junit > test-results/lsb-junit.xml
-                  busted -r coverage --run libconsole --output=junit > test-results/libconsole-junit.xml
-                  busted -r coverage --run libevent --output=junit > test-results/libevent-junit.xml
-                  busted -r coverage --run liblsmsettingswidgets --output=junit > test-results/liblsm-junit.xml
-                  luacov
-                  luacov --config .luacov-html
-                  mv luacov.report.out test-results/luacov.report.out
-                  mv luacov.report.html test-results/luacov.report.html
-
-            - name: Show coverage report
-              run: cat test-results/luacov.report.out
-
-            - name: Upload coverage report
-              uses: actions/upload-artifact@v6
-              with:
-                  name: luacov-report
-                  path: test-results/luacov.report.out
-
-            - name: Upload HTML coverage report
-              uses: actions/upload-artifact@v6
-              with:
-                  name: luacov-html-report
-                  path: test-results/luacov.report.html
-
-            - name: Publish Test Results
-              uses: EnricoMi/publish-unit-test-result-action@v2.23.0
-              with:
-                  action_fail: true
-                  action_fail_on_inconclusive: true
-                  comment_mode: off
-                  files: |
-                      test-results/busted-junit.xml
-                      test-results/lsb-junit.xml
-                      test-results/libconsole-junit.xml
-                      test-results/libevent-junit.xml
-                      test-results/liblsm-junit.xml
-
-            - name: Validate tag matches TOC version
+            - name: Validate release inputs
+              id: release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  INPUT_VERSION: ${{ inputs.version }}
+                  RELEASE_NOTES: ${{ inputs.release_notes }}
+                  REF_NAME: ${{ github.ref_name }}
+                  REF_TYPE: ${{ github.ref_type }}
               run: |
                   set -euo pipefail
 
-                  VERSION="${{ github.ref_name }}"
-                  TOC_VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
-
-                  echo "Tag version: $VERSION"
-                  echo "TOC version: $TOC_VERSION"
-
-                  if [ "$VERSION" != "$TOC_VERSION" ]; then
-                    echo "::error::Version mismatch! Tag is '$VERSION' but TOC file has '$TOC_VERSION'. Please update the TOC file version before releasing."
+                  if [ "$REF_TYPE" != "branch" ]; then
+                    echo "::error::Release workflow must be dispatched from a branch, not '$REF_TYPE'."
                     exit 1
                   fi
 
-            - name: Prepare packager release notes
+                  if [ -z "$(printf '%s' "$RELEASE_NOTES" | tr -d '[:space:]')" ]; then
+                    echo "::error::Release notes are required."
+                    exit 1
+                  fi
+
+                  VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
+                  if [ -z "$VERSION" ]; then
+                    echo "::error::Could not read a non-empty Version field from ${ADDON_NAME}.toc."
+                    exit 1
+                  fi
+
+                  INPUT_VERSION=$(printf '%s' "$INPUT_VERSION" | tr -d '[:space:]')
+                  if [ "$INPUT_VERSION" != "$VERSION" ]; then
+                    echo "::error::Release input version '$INPUT_VERSION' must match ${ADDON_NAME}.toc version '$VERSION'."
+                    exit 1
+                  fi
+
+                  if [[ "$VERSION" != v* ]]; then
+                    echo "::error::TOC version '$VERSION' must start with 'v'."
+                    exit 1
+                  fi
+
+                  IS_PRERELEASE=false
+                  if [[ "$VERSION" == *-* ]]; then
+                    IS_PRERELEASE=true
+                    VERSION_LOWER=${VERSION,,}
+                    if [[ "$VERSION_LOWER" != *alpha* && "$VERSION_LOWER" != *beta* ]]; then
+                      echo "::error::Prerelease TOC version '$VERSION' must include 'alpha' or 'beta' so external uploads are not marked stable."
+                      exit 1
+                    fi
+                  elif [ "$REF_NAME" != "main" ]; then
+                    echo "::error::Stable releases must be dispatched from main. '$VERSION' was dispatched from '$REF_NAME'."
+                    exit 1
+                  fi
+
+                  REMOTE_TAG_LINES=$(git ls-remote --tags origin "refs/tags/$VERSION" "refs/tags/$VERSION^{}")
+                  if [ -n "$(printf '%s' "$REMOTE_TAG_LINES" | tr -d '[:space:]')" ]; then
+                    REMOTE_TARGET=$(printf '%s\n' "$REMOTE_TAG_LINES" | awk -v ref="refs/tags/$VERSION^{}" '$2 == ref { print $1; exit }')
+                    if [ -z "$REMOTE_TARGET" ]; then
+                      REMOTE_TARGET=$(printf '%s\n' "$REMOTE_TAG_LINES" | awk -v ref="refs/tags/$VERSION" '$2 == ref { print $1; exit }')
+                    fi
+
+                    if [ "$REMOTE_TARGET" != "$GITHUB_SHA" ]; then
+                      echo "::error::Remote tag '$VERSION' already exists but points to '$REMOTE_TARGET', not '$GITHUB_SHA'."
+                      exit 1
+                    fi
+
+                    echo "Remote tag '$VERSION' already points at this commit; continuing retry."
+                  fi
+
+                  set +e
+                  RELEASE_QUERY=$(gh release view "$VERSION" --json tagName 2>&1)
+                  RELEASE_STATUS=$?
+                  set -e
+
+                  if [ "$RELEASE_STATUS" -eq 0 ]; then
+                    echo "::error::GitHub Release '$VERSION' already exists."
+                    exit 1
+                  fi
+
+                  if ! printf '%s' "$RELEASE_QUERY" | grep -qi 'not found'; then
+                    echo "::error::Failed checking GitHub Release '$VERSION': $RELEASE_QUERY"
+                    exit 1
+                  fi
+
+                  {
+                    echo "version=$VERSION"
+                    echo "is_prerelease=$IS_PRERELEASE"
+                  } >> "$GITHUB_OUTPUT"
+
+                  echo "Release version: $VERSION"
+                  echo "Release ref: $REF_NAME"
+                  echo "Prerelease: $IS_PRERELEASE"
+
+            - name: Prepare release notes
+              env:
+                  RELEASE_NOTES: ${{ inputs.release_notes }}
               run: |
                   set -euo pipefail
 
-                  TAG_NAME="${{ github.ref_name }}"
-                  TAG_MESSAGE=$(git for-each-ref --format='%(contents)' "refs/tags/$TAG_NAME")
+                  cp .pkgmeta .github/release.pkgmeta
+                  printf '%s\n' "$RELEASE_NOTES" > .github/release-notes.md
+                  printf '\n%s\n' 'manual-changelog:' >> .github/release.pkgmeta
+                  printf '%s\n' \
+                    '  filename: .github/release-notes.md' \
+                    '  markup-type: markdown' \
+                    >> .github/release.pkgmeta
 
-                  if [ -f .pkgmeta ]; then
-                    cp .pkgmeta .github/release.pkgmeta
+            - name: Create local release tag
+              env:
+                  RELEASE_NOTES: ${{ inputs.release_notes }}
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  set -euo pipefail
+
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  if git show-ref --verify --quiet "refs/tags/$VERSION"; then
+                    TAG_TARGET=$(git rev-parse "refs/tags/$VERSION^{}")
+                    if [ "$TAG_TARGET" != "$GITHUB_SHA" ]; then
+                      echo "::error::Local tag '$VERSION' points to '$TAG_TARGET', not '$GITHUB_SHA'."
+                      exit 1
+                    fi
                   else
-                    : > .github/release.pkgmeta
+                    git tag -a "$VERSION" -m "$RELEASE_NOTES" "$GITHUB_SHA"
                   fi
 
-                  if [ -n "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
-                    printf '%s\n' "$TAG_MESSAGE" > .github/release-notes.md
-                    printf '\n%s\n' 'manual-changelog:' >> .github/release.pkgmeta
-                    printf '%s\n' \
-                      '  filename: .github/release-notes.md' \
-                      '  markup-type: markdown' \
-                      >> .github/release.pkgmeta
-                    echo "Using annotated tag message for release notes."
+                  TAGS_AT_HEAD=$(git tag --points-at "$GITHUB_SHA")
+                  if [ "$TAGS_AT_HEAD" != "$VERSION" ]; then
+                    echo "::error::Expected '$VERSION' to be the only tag at HEAD; found:"
+                    printf '%s\n' "$TAGS_AT_HEAD"
+                    exit 1
                   fi
 
-                  echo "PACKAGER_ARGS=-m .github/release.pkgmeta -p 1427906 -w 27051" >> "$GITHUB_ENV"
-
-                  if [ -z "$(printf '%s' "$TAG_MESSAGE" | tr -d '[:space:]')" ]; then
-                    echo "No annotated tag message found; using generated changelog."
-                  fi
-
-            - name: Package and release
+            - name: Package release artifact
               uses: BigWigsMods/packager@v2
               with:
-                  args: ${{ env.PACKAGER_ARGS }}
+                  args: -m .github/release.pkgmeta -d
               env:
                   CF_API_KEY: ${{ secrets.CF_TOKEN }}
                   WOWI_API_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
                   WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
-                  GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Verify packaged artifact
+              env:
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  set -euo pipefail
+                  shopt -s nullglob
+
+                  packages=(.release/*.zip)
+                  if [ "${#packages[@]}" -eq 0 ]; then
+                    echo "::error::Packager did not create any release zip files."
+                    exit 1
+                  fi
+
+                  matching=()
+                  for package in "${packages[@]}"; do
+                    name=$(basename "$package")
+                    echo "Found package: $name"
+                    if [[ "$name" == "${ADDON_NAME}-${VERSION}"*.zip ]]; then
+                      matching+=("$package")
+                    fi
+                  done
+
+                  if [ "${#matching[@]}" -eq 0 ]; then
+                    echo "::error::No package zip matched expected version '$VERSION'."
+                    exit 1
+                  fi
+
+            - name: Push release tag
+              env:
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  set -euo pipefail
+
+                  REMOTE_TAG_LINES=$(git ls-remote --tags origin "refs/tags/$VERSION" "refs/tags/$VERSION^{}")
+                  if [ -n "$(printf '%s' "$REMOTE_TAG_LINES" | tr -d '[:space:]')" ]; then
+                    REMOTE_TARGET=$(printf '%s\n' "$REMOTE_TAG_LINES" | awk -v ref="refs/tags/$VERSION^{}" '$2 == ref { print $1; exit }')
+                    if [ -z "$REMOTE_TARGET" ]; then
+                      REMOTE_TARGET=$(printf '%s\n' "$REMOTE_TAG_LINES" | awk -v ref="refs/tags/$VERSION" '$2 == ref { print $1; exit }')
+                    fi
+
+                    if [ "$REMOTE_TARGET" != "$GITHUB_SHA" ]; then
+                      echo "::error::Remote tag '$VERSION' already exists but points to '$REMOTE_TARGET', not '$GITHUB_SHA'."
+                      exit 1
+                    fi
+
+                    echo "Remote tag '$VERSION' already points at this commit; not pushing."
+                  else
+                    git push origin "refs/tags/$VERSION"
+                  fi
+
+            - name: Upload external releases
+              uses: BigWigsMods/packager@v2
+              with:
+                  args: -m .github/release.pkgmeta
+              env:
+                  CF_API_KEY: ${{ secrets.CF_TOKEN }}
+                  WOWI_API_TOKEN: ${{ secrets.WOWINTF_TOKEN }}
+                  WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+
+            - name: Upload packaged artifacts
+              uses: actions/upload-artifact@v6
+              with:
+                  name: release-packages-${{ steps.release.outputs.version }}
+                  path: .release/*.zip
+                  if-no-files-found: error
+
+            - name: Create GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  VERSION: ${{ steps.release.outputs.version }}
+                  IS_PRERELEASE: ${{ steps.release.outputs.is_prerelease }}
+              run: |
+                  set -euo pipefail
+
+                  release_args=(release create "$VERSION" .release/*.zip --verify-tag --notes-file .github/release-notes.md)
+                  if [ "$IS_PRERELEASE" = "true" ]; then
+                    release_args+=(--prerelease --latest=false)
+                  fi
+
+                  gh "${release_args[@]}"

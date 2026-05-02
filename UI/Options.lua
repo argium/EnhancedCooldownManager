@@ -4,21 +4,6 @@
 
 local _, ns = ...
 local L = ns.L
-local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
-
-local OU = ns.OptionUtil
-local getGlobalConfig = ns.GetGlobalConfig or function()
-    local db = ns.Addon and ns.Addon.db
-    local profile = db and db.profile
-    return profile and profile.global
-end
-
-local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/enhanced-cooldown-manager"
-local GITHUB_URL = "https://github.com/argium/EnhancedCooldownManager"
-
-local BUTTON_X = 37 -- matches the settings info-row title anchor
-local BUTTON_HEIGHT = 26
-local BUTTON_WIDTH = 200
 
 --------------------------------------------------------------------------------
 -- SettingsBuilder instance
@@ -26,126 +11,31 @@ local BUTTON_WIDTH = 200
 
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
-ns.SettingsBuilder = LSB:New({
-    pathAdapter = LSB.PathAdapter({
-        getStore = function()
-            return ns.Addon.db and ns.Addon.db.profile
-        end,
-        getDefaults = function()
-            return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
-        end,
-        getNestedValue = OU.GetNestedValue,
-        setNestedValue = OU.SetNestedValue,
-    }),
-    varPrefix = "ECM",
-    onChanged = function(spec)
-        if spec.layout ~= false then
+ns.Settings = LSB:New({
+    name = L["ADDON_NAME"],
+    store = function()
+        return ns.Addon.db and ns.Addon.db.profile
+    end,
+    defaults = function()
+        return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    end,
+    onChanged = function(ctx)
+        if ctx.spec.layout ~= false then
             ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
     end,
-    compositeDefaults = {
-        FontOverrideGroup = {
-            fontValues = LSMW.GetFontValues,
-            fontFallback = function()
-                local gc = getGlobalConfig()
-                return gc and gc.font
-            end,
-            fontSizeFallback = function()
-                local gc = getGlobalConfig()
-                return gc and gc.fontSize
-            end,
-            fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
-        },
-    },
+    defaultsConfirmation = function(pageName, onAccept)
+        ns.OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
+    end,
 })
+ns.SettingsBuilder = ns.Settings
 
---------------------------------------------------------------------------------
--- About section
---------------------------------------------------------------------------------
-
-local About = {}
-
-local function createLinksCanvas()
-    local frame = CreateFrame("Frame")
-    frame:SetHeight(BUTTON_HEIGHT * 2)
-
-    local curseforge = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    curseforge:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-    curseforge:SetPoint("TOPLEFT", BUTTON_X, 0)
-    curseforge:SetText(L["CURSEFORGE"])
-    curseforge:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(CURSEFORGE_URL, L["CURSEFORGE"])
-    end)
-
-    local github = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    github:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
-    github:SetPoint("TOPLEFT", BUTTON_X, -BUTTON_HEIGHT)
-    github:SetText(L["GITHUB"])
-    github:SetScript("OnClick", function()
-        ns.Addon:ShowCopyTextDialog(GITHUB_URL, L["GITHUB"])
-    end)
-
-    frame._curseforge = curseforge
-    frame._github = github
-
-    return frame
-end
-
-function About.RegisterSettings(SB)
-    local version = (C_AddOns.GetAddOnMetadata("EnhancedCooldownManager", "Version") or "Unknown"):gsub("^v", "")
-    local authorText = ns.ColorUtil.Sparkle("Argi")
-
-    local linksCanvas = createLinksCanvas()
-
-    SB.RegisterFromTable({
-        name = L["ADDON_NAME"],
-        rootCategory = true,
-        args = {
-            author = {
-                type = "info",
-                name = L["AUTHOR"],
-                value = authorText,
-                order = 1,
-            },
-            contributors = {
-                type = "info",
-                name = L["CONTRIBUTORS"],
-                value = "kayti-wow",
-                order = 2,
-            },
-            version = {
-                type = "info",
-                name = L["VERSION"],
-                value = version,
-                order = 3,
-            },
-            linksHeader = {
-                type = "description",
-                name = L["LINKS"],
-                order = 9,
-            },
-            links = {
-                type = "canvas",
-                canvas = linksCanvas,
-                height = BUTTON_HEIGHT * 2,
-                order = 10,
-            },
-        },
-    })
-end
-
---------------------------------------------------------------------------------
--- Options module
---------------------------------------------------------------------------------
-
-ns.OptionsSections = ns.OptionsSections or {}
-ns.OptionsSections["About"] = About
 
 local Options = ns.Addon:NewModule("Options")
 
 local function isTrackedECMCategory(category)
-    local SB = ns.SettingsBuilder
-    return SB ~= nil and SB.HasCategory(category)
+    local root = ns.Settings
+    return root ~= nil and root:HasCategory(category)
 end
 
 local function getCategoryOpenToken(category)
@@ -166,9 +56,13 @@ local function rememberTrackedCategory(module, category)
 end
 
 local function getDefaultOptionsCategoryToken()
-    local SB = ns.SettingsBuilder
-    local category = SB.GetSubcategory(L["GENERAL"]) or SB.GetRootCategory()
-    return getCategoryOpenToken(category)
+    local root = ns.Settings
+    local page = root and root:GetPage("general", "main")
+    if page then
+        return page:GetId()
+    end
+
+    return nil
 end
 
 function Options:InstallCategoryTracking()
@@ -204,33 +98,45 @@ function Options:InstallCategoryTracking()
 end
 
 function Options:OnInitialize()
-    local SB = ns.SettingsBuilder
-    SB.CreateRootCategory(L["ADDON_NAME"])
-
-    -- About section renders on the root category (no subcategory entry)
-    ns.OptionsSections["About"].RegisterSettings(SB)
-
-    -- Register subcategory sections in display order
-    local sectionOrder = {
-        "General",
-        "Layout",
-        "PowerBar",
-        "ResourceBar",
-        "RuneBar",
-        "BuffBars",
-        "ItemIcons",
-        "Profile",
-        "Advanced Options",
+    local sections = {
+        ns.GeneralOptions,
+        ns.LayoutOptions,
+        ns.PowerBarOptions,
+        ns.ResourceBarOptions,
+        ns.RuneBarOptions,
+        ns.BuffBarsOptions,
+        ns.ExtraIconsOptions,
     }
 
-    for _, key in ipairs(sectionOrder) do
-        local section = ns.OptionsSections[key]
-        if section and section.RegisterSettings then
-            section.RegisterSettings(SB)
-        end
+    if ns.ExternalBarsOptions then
+        sections[#sections + 1] = ns.ExternalBarsOptions
     end
 
-    SB.RegisterCategories()
+    sections[#sections + 1] = {
+        key = "spellColors",
+        name = L["SPELL_COLORS_SUBCAT"],
+        pages = { ns.SpellColorsPage.CreatePage(L["SPELL_COLORS_SUBCAT"]) },
+    }
+
+    sections[#sections + 1] = ns.ProfileOptions
+    sections[#sections + 1] = ns.AdvancedOptions
+
+    ns.Settings:_registerTree({
+        page = ns.AboutPage,
+        sections = sections,
+    })
+
+    if ns.ExtraIconsOptions and ns.ExtraIconsOptions.SetRegisteredPage then
+        ns.ExtraIconsOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
+        ns.ExtraIconsOptions.EnsureItemLoadFrame()
+    end
+    if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
+        ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))
+    end
+    if ns.SpellColorsPage and ns.SpellColorsPage.SetRegisteredPage then
+        ns.SpellColorsPage.SetRegisteredPage(ns.Settings:GetPage("spellColors", "spellColors"))
+    end
+
     self:InstallCategoryTracking()
 end
 

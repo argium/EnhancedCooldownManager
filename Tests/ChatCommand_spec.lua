@@ -16,6 +16,7 @@ describe("ChatCommand migration", function()
     local shownMigrationLog
     local openOptionsCalls
     local scheduleLayoutCalls
+    local reloadUICalls
     local ns
 
     setup(function()
@@ -71,6 +72,7 @@ describe("ChatCommand migration", function()
         shownMigrationLog = nil
         openOptionsCalls = 0
         scheduleLayoutCalls = {}
+        reloadUICalls = 0
 
         _G.strtrim = function(s)
             return tostring(s):match("^%s*(.-)%s*$")
@@ -115,7 +117,9 @@ describe("ChatCommand migration", function()
         _G.StaticPopup_Show = function() end
         _G.YES = "Yes"
         _G.NO = "No"
-        _G.ReloadUI = function() end
+        _G.ReloadUI = function()
+            reloadUICalls = reloadUICalls + 1
+        end
         _G.GetTime = function()
             return 0
         end
@@ -440,6 +444,30 @@ describe("ChatCommand migration", function()
         end
     end)
 
+    it("/ecm help includes every slash command and spaced alias separators", function()
+        mod:ChatCommand("help")
+
+        local helpText = table.concat(printedMessages, "\n")
+        local expectedCommands = {
+            "/ecm clearseen",
+            "/ecm debug [on | off | toggle]",
+            "/ecm events -",
+            "/ecm events reset",
+            "/ecm help",
+            "/ecm migration -",
+            "/ecm migration log",
+            "/ecm migration rollback <version>",
+            "/ecm options | config | settings | o",
+            "/ecm rl | reload | refresh",
+        }
+
+        for _, command in ipairs(expectedCommands) do
+            assert.is_not_nil(string.find(helpText, command, 1, true), "Expected help to include " .. command)
+        end
+        assert.is_nil(string.find(helpText, "options|", 1, true))
+        assert.is_nil(string.find(helpText, "rl|", 1, true))
+    end)
+
     it("/ecm settings defers opening options during combat", function()
         _G.InCombatLockdown = function()
             return true
@@ -449,7 +477,7 @@ describe("ChatCommand migration", function()
 
         assert.are.equal(0, openOptionsCalls)
         assert.are.equal(1, #printedMessages)
-        assert.are.equal("Options cannot be opened during combat. They will open when combat ends.", printedMessages[1])
+        assert.are.equal("Options cannot be opened during combat. It will open when combat ends.", printedMessages[1])
         assert.is_true(mod._openOptionsAfterCombat)
     end)
 
@@ -471,16 +499,14 @@ describe("ChatCommand migration", function()
         assert.are.equal("Refreshing all modules.", printedMessages[1])
     end)
 
-    it("/ecm clearseen clears the persisted What's New version and prints reload guidance", function()
+    it("/ecm clearseen clears the persisted What's New version and reloads the UI", function()
         fakeAddon.db.profile.global.releasePopupSeenVersion = "v1.2.3"
 
         mod:ChatCommand("clearseen")
 
         assert.is_nil(fakeAddon.db.profile.global.releasePopupSeenVersion)
-        assert.are.equal(
-            "What's New seen flag cleared. Reload or relog to show the popup again.",
-            printedMessages[1]
-        )
+        assert.are.equal("What's New seen flag cleared. Reloading UI.", printedMessages[1])
+        assert.are.equal(1, reloadUICalls)
     end)
 
     describe("events command", function()

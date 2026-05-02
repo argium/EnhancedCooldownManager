@@ -1,0 +1,2 @@
+- In ExtraIcons specs, do not capture `UIParent`, `EssentialCooldownViewer`, or `UtilityCooldownViewer` in parameter tables at file load time; they are initialized in `before_each`.
+- Store symbolic targets like `"UIParent"`/`"main"` and resolve them inside the helper right before `SetPoint`/assertions, otherwise regressions silently use `nil` anchors and test the wrong geometry.

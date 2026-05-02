@@ -1,12 +1,13 @@
-## Interface: 120000, 120001, 120005, 110207
+## Interface: 120000, 120001, 120005
 ## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7A|r|cff7a84f7r|r|cff4cc9f0g|r|cff22c55ei|r
-## Notes: Standalone resource bars anchored to Blizzard's Cooldown Manager.
+## Notes: Add resource, power and buff bars, new spells and item icons to the built-in Cooldown Manager.
 ## Author: Argi
-## Version: v0.7.8
+## Version: v0.8.0-beta1
 ## SavedVariables: EnhancedCooldownManagerDB
-## OptionalDeps: Ace3, LibSharedMedia-3.0
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
+## X-Curse-Project-ID: 1427906
+## X-WoWI-ID: 27051
 ## X-Wago-ID: qGZOwbNd
 
 Libs\LibStub\LibStub.lua
@@ -20,7 +21,7 @@ Libs\LibSerialize\lib.xml
 Libs\LibDeflate\lib.xml
 Libs\LibEditMode\embed.xml
 Libs\LibSharedMedia-3.0\lib.xml
-Libs\LibSettingsBuilder\LibSettingsBuilder.lua
+Libs\LibSettingsBuilder\embed.xml
 Libs\LibLSMSettingsWidgets\LibLSMSettingsWidgets.xml
 
 Constants.lua
@@ -35,25 +36,31 @@ Migration.lua
 ImportExport.lua
 
 BarMixin.lua
+BarStyle.lua
 
 ECM.lua
 Runtime.lua
 UI\Dialogs.lua
 
 Modules\BuffBars.lua
+Modules\ExternalBars.lua
 Modules\PowerBar.lua
 Modules\ResourceBar.lua
 Modules\RuneBar.lua
-Modules\ItemIcons.lua
+Modules\ExtraIcons.lua
 
 UI\OptionUtil.lua
+UI\AboutOptions.lua
 UI\Options.lua
 UI\PowerBarTickMarksOptions.lua
 UI\GeneralOptions.lua
+UI\AdvancedOptions.lua
 UI\LayoutOptions.lua
 UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
-UI\ItemIconsOptions.lua
+UI\ExtraIconsOptions.lua
+UI\SpellColorsPage.lua
 UI\BuffBarsOptions.lua
+UI\ExternalBarsOptions.lua

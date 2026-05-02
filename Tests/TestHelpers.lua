@@ -100,36 +100,52 @@ local function makeInitializer(setting)
 end
 
 --- Create a minimal stub setting returned by Settings.RegisterProxySetting.
-local function makeSetting(getter, setter, default, name)
-    return {
-        GetValue = function()
-            return getter()
-        end,
-        SetValue = function(_, value)
-            setter(value)
-        end,
+local function makeSetting(getter, setter, default, name, variable)
+    local setting = {
         _default = default,
+        _lsbCallbacks = {},
+        _lsbVariable = variable,
         _name = name,
     }
+
+    function setting:GetValue()
+        return getter()
+    end
+
+    function setting:_lsbNotifyValueChanged(value)
+        for _, handle in ipairs(self._lsbCallbacks) do
+            handle.callback(handle.owner or self, value, self)
+        end
+    end
+
+    function setting:SetValue(value)
+        setter(value)
+        self:_lsbNotifyValueChanged(self:GetValue())
+    end
+
+    return setting
 end
 
 --- Setup a minimal LibStub stub for tests.
 function TestHelpers.SetupLibStub()
     local libs = {}
+    local minors = {}
     local LibStub = {
         NewLibrary = function(self, major, minor)
-            if not libs[major] or libs[major].minor < minor then
-                libs[major] = { minor = minor, lib = {} }
-                return libs[major].lib
+            local oldMinor = minors[major]
+            if oldMinor and oldMinor >= minor then
+                return nil
             end
-            return nil
+            minors[major] = minor
+            libs[major] = libs[major] or {}
+            return libs[major], oldMinor
         end,
     }
     setmetatable(LibStub, {
         __call = function(self, major, silent)
-            local entry = libs[major]
-            if entry then
-                return entry.lib
+            local lib = libs[major]
+            if lib then
+                return lib
             end
             if not silent then
                 error("Library not found: " .. major)
@@ -202,6 +218,8 @@ function TestHelpers.SetupSettingsStubs()
         return layout
     end
 
+    local proxySettingsByVariable = {}
+
     _G.Settings = {
         VarType = { Boolean = "boolean", Number = "number", String = "string" },
 
@@ -250,8 +268,12 @@ function TestHelpers.SetupSettingsStubs()
                 layout
         end,
 
-        RegisterAddOnCategory = function() end,
-        OpenToCategory = function() end,
+        RegisterAddOnCategory = function(category)
+            return category
+        end,
+        OpenToCategory = function(category)
+            return category
+        end,
 
         RegisterInitializer = function(category, initializer)
             local layout = category and category.GetLayout and category:GetLayout()
@@ -267,8 +289,10 @@ function TestHelpers.SetupSettingsStubs()
             return init
         end,
 
-        RegisterProxySetting = function(_, _, _, name, default, getter, setter)
-            return makeSetting(getter, setter, default, name)
+        RegisterProxySetting = function(_, variable, _, name, default, getter, setter)
+            local setting = makeSetting(getter, setter, default, name, variable)
+            proxySettingsByVariable[variable] = setting
+            return setting
         end,
 
         CreateCheckbox = function(cat, setting)
@@ -307,9 +331,25 @@ function TestHelpers.SetupSettingsStubs()
                     self._handles[#self._handles + 1] = handle
                 end,
                 SetOnValueChangedCallback = function(self, variable, callback, owner)
-                    self:AddHandle({ variable = variable, callback = callback, owner = owner })
+                    local handle = { variable = variable, callback = callback, owner = owner }
+                    self:AddHandle(handle)
+                    local setting = proxySettingsByVariable[variable]
+                    if setting then
+                        handle.setting = setting
+                        setting._lsbCallbacks[#setting._lsbCallbacks + 1] = handle
+                    end
                 end,
                 Unregister = function(self)
+                    for _, handle in ipairs(self._handles) do
+                        local setting = handle.setting
+                        if setting and setting._lsbCallbacks then
+                            for i = #setting._lsbCallbacks, 1, -1 do
+                                if setting._lsbCallbacks[i] == handle then
+                                    table.remove(setting._lsbCallbacks, i)
+                                end
+                            end
+                        end
+                    end
                     self._handles = {}
                     self._unregistered = true
                 end,
@@ -330,7 +370,10 @@ function TestHelpers.SetupSettingsStubs()
     }
 
     _G.CreateSettingsListSectionHeaderInitializer = function(text)
-        return { _type = "header", _text = text }
+        local init = makeInitializer(nil)
+        init._type = "header"
+        init._text = text
+        return init
     end
 
     _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
@@ -792,6 +835,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "SettingsListElementInitializer",
     "GameFontHighlightSmall",
     "GameFontNormal",
+    "GameFontDisable",
     "SETTINGS_DEFAULTS",
     "InCombatLockdown",
     "UnitName",
@@ -809,8 +853,18 @@ TestHelpers.OPTIONS_GLOBALS = {
     "canaccessvalue",
     "canaccesstable",
     "time",
+    "C_Timer",
     "C_PartyInfo",
     "IsInInstance",
+    "GetInventoryItemID",
+    "GetInventoryItemTexture",
+    "C_Item",
+    "C_Spell",
+    "C_SpellBook",
+    "CreateTextureMarkup",
+    "CreateAtlasMarkup",
+    "GameTooltip",
+    "GameTooltip_Hide",
 }
 
 --- Load the live Constants.lua and Locales/en.lua to populate ECM.Constants and ECM.L.
@@ -837,6 +891,97 @@ function TestHelpers.MakeOptionsProfile()
     return deepClone(ns.defaults.profile), deepClone(ns.defaults.profile)
 end
 
+function TestHelpers.SetupGameTooltipStub()
+    _G.GameTooltip = {
+        _title = nil,
+        _titleColor = nil,
+        _titleAlpha = nil,
+        _titleWrap = nil,
+        _lines = {},
+        _owner = nil,
+        _anchor = nil,
+        _point = nil,
+        _shown = false,
+        SetOwner = function(self, owner, anchor)
+            self._owner = owner
+            self._anchor = anchor
+        end,
+        SetPoint = function(self, point, relativeTo, relativePoint, x, y)
+            self._point = { point, relativeTo, relativePoint, x, y }
+        end,
+        ClearLines = function(self)
+            self._title = nil
+            self._titleColor = nil
+            self._titleAlpha = nil
+            self._titleWrap = nil
+            self._lines = {}
+        end,
+        SetText = function(self, text, r, g, b, a, wrap, ...)
+            if select("#", ...) > 0 then
+                error("GameTooltip:SetText expects text, r, g, b, alpha, wrap", 2)
+            end
+
+            if r ~= nil and type(r) ~= "number" then
+                error("GameTooltip:SetText expects numeric red channel", 2)
+            end
+            if g ~= nil and type(g) ~= "number" then
+                error("GameTooltip:SetText expects numeric green channel", 2)
+            end
+            if b ~= nil and type(b) ~= "number" then
+                error("GameTooltip:SetText expects numeric blue channel", 2)
+            end
+            if a ~= nil and type(a) ~= "number" then
+                error("GameTooltip:SetText expects numeric alpha channel", 2)
+            end
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("GameTooltip:SetText expects boolean wrap flag", 2)
+            end
+
+            self._title = text
+            if r ~= nil or g ~= nil or b ~= nil then
+                self._titleColor = { r = r, g = g, b = b, a = a }
+            else
+                self._titleColor = nil
+            end
+            self._titleAlpha = a
+            self._titleWrap = wrap
+            self._lines = {}
+        end,
+        AddLine = function(self, text, r, g, b, wrap, ...)
+            if select("#", ...) > 0 then
+                error("GameTooltip:AddLine expects text, r, g, b, wrap", 2)
+            end
+
+            if r ~= nil and type(r) ~= "number" then
+                error("GameTooltip:AddLine expects numeric red channel", 2)
+            end
+            if g ~= nil and type(g) ~= "number" then
+                error("GameTooltip:AddLine expects numeric green channel", 2)
+            end
+            if b ~= nil and type(b) ~= "number" then
+                error("GameTooltip:AddLine expects numeric blue channel", 2)
+            end
+            if wrap ~= nil and type(wrap) ~= "boolean" then
+                error("GameTooltip:AddLine expects boolean wrap flag", 2)
+            end
+            self._lines[#self._lines + 1] = text
+        end,
+        Show = function(self)
+            self._shown = true
+        end,
+        Hide = function(self)
+            self._shown = false
+        end,
+    }
+    _G.GameTooltip_Hide = function()
+        if _G.GameTooltip and _G.GameTooltip.Hide then
+            _G.GameTooltip:Hide()
+        end
+    end
+
+    return _G.GameTooltip
+end
+
 --- Install common WoW globals for option tests.
 function TestHelpers.SetupOptionsGlobals()
     TestHelpers.SetupLibStub()
@@ -845,6 +990,7 @@ function TestHelpers.SetupOptionsGlobals()
     _G.ECM_DeepEquals = deepEquals
     _G.GameFontHighlightSmall = "GameFontHighlightSmall"
     _G.GameFontNormal = "GameFontNormal"
+    _G.GameFontDisable = "GameFontDisable"
     _G.SETTINGS_DEFAULTS = "Defaults"
     _G.InCombatLockdown = function()
         return false
@@ -857,6 +1003,47 @@ function TestHelpers.SetupOptionsGlobals()
     _G.IsInInstance = function()
         return false
     end
+    _G.GetInventoryItemID = function()
+        return nil
+    end
+    _G.GetInventoryItemTexture = function()
+        return nil
+    end
+    _G.C_Item = {
+        GetItemIconByID = function()
+            return nil
+        end,
+        GetItemNameByID = function()
+            return nil
+        end,
+        GetItemSpell = function()
+            return nil, nil
+        end,
+        DoesItemExistByID = function()
+            return true
+        end,
+        RequestLoadItemDataByID = function() end,
+    }
+    _G.C_Spell = {
+        GetSpellName = function()
+            return nil
+        end,
+        GetSpellTexture = function()
+            return nil
+        end,
+    }
+    _G.C_SpellBook = {
+        IsSpellKnown = function()
+            return false
+        end,
+    }
+    _G.CreateTextureMarkup = function(texture)
+        return "|T" .. tostring(texture) .. "|t"
+    end
+    _G.CreateAtlasMarkup = function(atlas)
+        return "|A" .. tostring(atlas) .. "|a"
+    end
+    TestHelpers.SetupGameTooltipStub()
     _G.UnitName = function()
         return "TestPlayer"
     end
@@ -866,6 +1053,21 @@ function TestHelpers.SetupOptionsGlobals()
     _G.time = function()
         return 1000
     end
+    local pendingTimers = {}
+    TestHelpers._pendingCTimers = pendingTimers
+    _G.C_Timer = {
+        After = function(delay, callback)
+            pendingTimers[#pendingTimers + 1] = { delay = delay, callback = callback }
+        end,
+        NewTimer = function(delay, callback)
+            local timer = { delay = delay, callback = callback, cancelled = false }
+            function timer:Cancel()
+                self.cancelled = true
+            end
+            pendingTimers[#pendingTimers + 1] = timer
+            return timer
+        end,
+    }
     _G.C_AddOns = {
         GetAddOnMetadata = function()
             return nil
@@ -904,10 +1106,25 @@ function TestHelpers.SetupOptionsGlobals()
     end
 
     -- Minimal CreateFrame stub for canvas layouts
+    local focusedFrame = nil
     local function makeFrameStub()
         local f = { scripts = {}, hooks = {}, callbacks = {}, _children = {} }
         local noop = function() end
         local value, minValue, maxValue, stepValue = nil, 0, 0, 1
+        local shown = false
+        local mouseEnabled = false
+        local enabled = true
+        local text = ""
+        local fontObject = nil
+        local highlighted = false
+        local hasFocus = false
+        local anchors = {}
+        local registeredEvents = {}
+        local alpha = 1
+        local desaturated = false
+        local vertexColor = { 1, 1, 1, 1 }
+        local textColor = { 1, 1, 1, 1 }
+        local texture = nil
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
@@ -924,38 +1141,135 @@ function TestHelpers.SetupOptionsGlobals()
         f.SetHeight = noop
         f.SetWidth = noop
         f.SetSize = noop
-        f.SetPoint = noop
-        f.SetAllPoints = noop
-        f.ClearAllPoints = noop
-        f.Show = noop
-        f.Hide = noop
-        f.IsShown = function()
-            return false
+        f.SetPoint = function(_, point, relativeTo, relativePoint, x, y)
+            anchors[#anchors + 1] = { point, relativeTo, relativePoint, x, y }
         end
-        f.SetAlpha = noop
-        f.EnableMouse = noop
+        f.SetAllPoints = noop
+        f.ClearAllPoints = function()
+            anchors = {}
+        end
+        f.GetPoint = function(_, index)
+            local anchor = anchors[index or 1]
+            if anchor then
+                return anchor[1], anchor[2], anchor[3], anchor[4], anchor[5]
+            end
+        end
+        f.GetNumPoints = function()
+            return #anchors
+        end
+        f.Show = function()
+            shown = true
+        end
+        f.Hide = function()
+            shown = false
+        end
+        f.IsShown = function()
+            return shown
+        end
+        f.SetAlpha = function(_, newAlpha)
+            alpha = newAlpha
+        end
+        f.GetAlpha = function()
+            return alpha
+        end
+        f.EnableMouse = function(_, isEnabled)
+            mouseEnabled = not not isEnabled
+        end
+        f.IsMouseEnabled = function()
+            return mouseEnabled
+        end
         f.GetChildren = function()
             return
         end
-        f.SetEnabled = noop
+        f.SetEnabled = function(_, isEnabled)
+            enabled = not not isEnabled
+        end
+        f.IsEnabled = function()
+            return enabled
+        end
+        f.RegisterEvent = function(_, event)
+            registeredEvents[event] = true
+        end
+        f.UnregisterEvent = function(_, event)
+            registeredEvents[event] = nil
+        end
+        f.IsEventRegistered = function(_, event)
+            return registeredEvents[event] == true
+        end
         f.RegisterForClicks = noop
         f.SetAutoFocus = noop
         f.SetNumeric = noop
-        f.SetText = noop
+        f.SetText = function(_, newText)
+            text = newText
+            highlighted = false
+        end
         f.GetText = function()
-            return ""
+            return text
         end
         f.SetWordWrap = noop
         f.SetJustifyH = noop
-        f.SetColorRGB = noop
-        f.SetFocus = noop
-        f.ClearFocus = noop
-        f.HighlightText = noop
+        f.SetJustifyV = noop
+        f.SetColorRGB = function(_, r, g, b, a)
+            textColor = { r, g, b, a or 1 }
+        end
+        f.SetColorTexture = noop
+        f.SetTexture = function(_, newTexture)
+            texture = newTexture
+        end
+        f.GetTexture = function()
+            return texture
+        end
+        f.SetDesaturated = function(_, isDesaturated)
+            desaturated = not not isDesaturated
+        end
+        f.IsDesaturated = function()
+            return desaturated
+        end
+        f.SetVertexColor = function(_, r, g, b, a)
+            vertexColor = { r, g, b, a or 1 }
+        end
+        f.GetVertexColor = function()
+            return vertexColor[1], vertexColor[2], vertexColor[3], vertexColor[4]
+        end
+        f.SetFontObject = function(_, newFontObject)
+            fontObject = newFontObject
+        end
+        f.GetFontObject = function()
+            return fontObject
+        end
+        f.SetFocus = function(self)
+            if focusedFrame and focusedFrame ~= self and focusedFrame.ClearFocus then
+                focusedFrame:ClearFocus()
+            end
+            focusedFrame = self
+            hasFocus = true
+        end
+        f.ClearFocus = function(self)
+            if focusedFrame == self then
+                focusedFrame = nil
+            end
+            hasFocus = false
+        end
+        f.HasFocus = function()
+            return hasFocus
+        end
+        f.HighlightText = function()
+            highlighted = true
+        end
+        f.IsTextHighlighted = function()
+            return highlighted
+        end
         f.SetBackdrop = noop
         f.SetBackdropBorderColor = noop
         f.SetMinMaxValues = noop
         f.SetValueStep = noop
         f.SetObeyStepOnDrag = noop
+        f.SetTextColor = function(_, r, g, b, a)
+            textColor = { r, g, b, a or 1 }
+        end
+        f.GetTextColor = function()
+            return textColor[1], textColor[2], textColor[3], textColor[4]
+        end
         f.RegisterCallback = function(self, event, fn, owner)
             self.callbacks[event] = self.callbacks[event] or {}
             self.callbacks[event][#self.callbacks[event] + 1] = { fn = fn, owner = owner }
@@ -1090,11 +1404,48 @@ function TestHelpers.SetupOptionsGlobals()
     }
 end
 
+function TestHelpers.RunNextTimer()
+    local pending = TestHelpers._pendingCTimers or {}
+    while #pending > 0 do
+        local timer = table.remove(pending, 1)
+        if not timer.cancelled and timer.callback then
+            timer.callback()
+            return true
+        end
+    end
+    return false
+end
+
+function TestHelpers.RunAllTimers()
+    while TestHelpers.RunNextTimer() do
+    end
+end
+
+local LIB_SETTINGS_BUILDER_SOURCE_FILES = {
+    "Libs/LibSettingsBuilder/Core.lua",
+    "Libs/LibSettingsBuilder/Primitives/Rows.lua",
+    "Libs/LibSettingsBuilder/Primitives/BlizzardControls.lua",
+    "Libs/LibSettingsBuilder/Controls/CollectionFrames.lua",
+    "Libs/LibSettingsBuilder/Primitives/Layout.lua",
+    "Libs/LibSettingsBuilder/Controls/Base.lua",
+    "Libs/LibSettingsBuilder/Controls/Collections.lua",
+    "Libs/LibSettingsBuilder/Controls/Rows.lua",
+    "Libs/LibSettingsBuilder/CompositeControls/Groups.lua",
+    "Libs/LibSettingsBuilder/CompositeControls/Lists.lua",
+    "Libs/LibSettingsBuilder/Utility.lua",
+}
+
+function TestHelpers.LoadLibSettingsBuilder()
+    for _, path in ipairs(LIB_SETTINGS_BUILDER_SOURCE_FILES) do
+        TestHelpers.LoadChunk(path, "Unable to load " .. path)()
+    end
+end
+
 --- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.
 function TestHelpers.SetupLibSettingsBuilder()
-    TestHelpers.LoadChunk("Libs/LibSettingsBuilder/LibSettingsBuilder.lua", "Unable to load LibSettingsBuilder.lua")()
+    TestHelpers.LoadLibSettingsBuilder()
 
-    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1)
+    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1) or LibStub("LibLSMSettingsWidgets-1.0")
     lsmw.GetFontValues = function()
         return { Expressway = "Expressway" }
     end
@@ -1138,23 +1489,80 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
         DisableModule = function() end,
     }
 
-    local ns = { Addon = mod, OptionsSections = {} }
+    local ns = { Addon = mod }
     TestHelpers.LoadLiveConstants(ns)
     ns.CloneValue = deepClone
     ns.Runtime = ns.Runtime or {}
     ns.Runtime.ScheduleLayoutUpdate = function() end
+    ns.GetGlobalConfig = function()
+        return mod.db.profile and mod.db.profile.global
+    end
     ns.IsDeathKnight = function()
-        return false
+        local _, classToken = UnitClass("player")
+        return classToken == "DEATHKNIGHT"
     end
     ns.ClassUtil = {}
 
     TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
+    TestHelpers.LoadChunk("UI/AboutOptions.lua", "Unable to load UI/AboutOptions.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
 
-    local SB = ns.SettingsBuilder
-    SB.CreateRootCategory("Test")
-
+    local SB = ns.Settings
     return SB, ns
+end
+
+--- Register a declarative settings tree into a fresh root handle.
+--- @param SB table SettingsBuilder instance
+--- @param spec table Declarative root spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+function TestHelpers.RegisterSettingsTree(SB, spec, rootName)
+    local resolvedRootName = rootName or SB.name or "Test"
+
+    if not SB.name then
+        assert(type(SB._initializeRoot) == "function", "RegisterSettingsTree expected an initialized settings root")
+        SB:_initializeRoot(resolvedRootName)
+    elseif rootName ~= nil and rootName ~= SB.name then
+        error(("RegisterSettingsTree: root already exists with name '%s'"):format(tostring(SB.name)))
+    end
+
+    SB:_registerTree(spec)
+    return SB
+end
+
+--- Register a single declarative section spec.
+--- @param SB table SettingsBuilder instance
+--- @param sectionSpec table Declarative section spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+--- @return table section Registered section handle
+--- @return table|nil page Registered default page handle
+function TestHelpers.RegisterSectionSpec(SB, sectionSpec, rootName)
+    local root = TestHelpers.RegisterSettingsTree(SB, { sections = { sectionSpec } }, rootName)
+    local section = root:GetSection(sectionSpec.key)
+    local page
+
+    if section then
+        if sectionSpec.pages then
+            local firstPage = sectionSpec.pages[1]
+            page = firstPage and root:GetPage(sectionSpec.key, firstPage.key) or nil
+        else
+            page = root:GetPage(sectionSpec.key, sectionSpec.pageKey or "main")
+        end
+    end
+
+    return root, section, page
+end
+
+--- Register a declarative root page spec.
+--- @param SB table SettingsBuilder instance
+--- @param pageSpec table Declarative root page spec
+--- @param rootName string|nil Optional root display name
+--- @return table root Root handle
+--- @return table|nil page Registered root page handle
+function TestHelpers.RegisterRootPageSpec(SB, pageSpec, rootName)
+    local root = TestHelpers.RegisterSettingsTree(SB, { page = pageSpec }, rootName)
+    return root, root:GetRootPage()
 end
 
 --- Collect all proxy settings created during a function call.
@@ -1257,7 +1665,7 @@ function TestHelpers.InstallPopupRecorder()
     end
 end
 
---- Set up the PowerBar tick marks options/store environment and load the live module.
+--- Set up the PowerBar tick marks options environment and load the live module.
 --- @param opts table|nil Optional overrides for constants, profile, or GetCurrentClassSpec
 --- @return table addonNS
 function TestHelpers.SetupPowerBarTickMarksEnv(opts)
@@ -1272,6 +1680,9 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
         Addon = {
             db = {
                 profile = opts.profile or {},
+                defaults = {
+                    profile = opts.defaults or {},
+                },
             },
         },
     }
@@ -1294,6 +1705,9 @@ function TestHelpers.SetupPowerBarTickMarksEnv(opts)
         return k
     end })
     ns.CloneValue = TestHelpers.deepClone
+    ns.Runtime = ns.Runtime or {
+        ScheduleLayoutUpdate = function() end,
+    }
     ns.OptionUtil = {
         GetCurrentClassSpec = opts.getCurrentClassSpec or function()
             return 1, 2, "Warrior", "Fury", "WARRIOR"

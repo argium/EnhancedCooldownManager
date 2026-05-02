@@ -15,6 +15,10 @@ local _, ns = ...
 ---@field x number X offset from anchor.
 ---@field y number Y offset from anchor.
 
+---@alias ns.Constants.ANCHORMODE_CHAIN "chain"
+---@alias ns.Constants.ANCHORMODE_DETACHED "detached"
+---@alias ns.Constants.ANCHORMODE_FREE "free"
+
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
 ---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
@@ -85,7 +89,7 @@ local _, ns = ...
 ---@field byCooldownID table<number, table<number, table<number, table>>> Per-cooldownID colors by class/spec/cooldownID.
 ---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
----@field defaultColor ECM_Color Default color for buff bars.
+---@field defaultColor ECM_Color Default color when no per-spell override applies.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
@@ -99,13 +103,37 @@ local _, ns = ...
 ---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
----@class ECM_ItemIconsConfig Item icons configuration.
----@field enabled boolean Whether item icons are enabled.
----@field showTrinket1 boolean Whether to show trinket slot 1 (if on-use).
----@field showTrinket2 boolean Whether to show trinket slot 2 (if on-use).
----@field showCombatPotion boolean Whether to show combat potions.
----@field showHealthPotion boolean Whether to show health potions.
----@field showHealthstone boolean Whether to show healthstone.
+---@class ECM_ExternalBarsConfig External cooldown bars configuration.
+---@field enabled boolean Whether external cooldown bars are enabled.
+---@field hideOriginalIcons boolean Whether Blizzard's original external cooldown icons are hidden.
+---@field anchorMode ns.Constants.ANCHORMODE_CHAIN|ns.Constants.ANCHORMODE_DETACHED|ns.Constants.ANCHORMODE_FREE|nil Anchor behavior for external cooldown bars.
+---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
+---@field width number|nil Bar width override.
+---@field height number|nil Bar height override.
+---@field verticalSpacing number|nil Vertical gap between bars (pixels).
+---@field showIcon boolean|nil Whether to show external cooldown icons.
+---@field showSpellName boolean|nil Whether to show spell names.
+---@field showDuration boolean|nil Whether to show durations.
+---@field overrideFont boolean|nil Whether external cooldown bars override global font settings.
+---@field font string|nil Font face override for bar text.
+---@field fontSize number|nil Font size override for bar text.
+---@field colors ECM_SpellColorsConfig Per-spell color settings.
+
+---@class ECM_ExtraIconEntry
+---@field stackKey string|nil Built-in stack key resolved via `BUILTIN_STACKS`.
+---@field kind string|nil Entry kind for custom or racial rows.
+---@field ids table|nil Entry spell/item priority list.
+---@field slotId number|nil Slot ID for equip-slot entries.
+---@field disabled boolean|nil When true, the entry stays in settings but is skipped at runtime.
+
+---@class ECM_ExtraIconsConfig Extra icons configuration.
+---@field enabled boolean Whether extra icons are enabled.
+---@field showStackCount boolean Whether to show item stack counts.
+---@field showCharges boolean Whether to show spell charges.
+---@field overrideFont boolean|nil Whether stack/charge counts override global font settings.
+---@field font string|nil Font face override for stack/charge counts.
+---@field fontSize number|nil Font size override for stack/charge counts.
+---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -131,7 +159,8 @@ local _, ns = ...
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
----@field itemIcons ECM_ItemIconsConfig Item icons configuration.
+---@field externalBars ECM_ExternalBarsConfig External cooldown bars configuration.
+---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
 
 local C = ns.Constants
 
@@ -273,13 +302,42 @@ local defaults = {
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
             },
         },
-        itemIcons = {
+        externalBars = {
+            enabled = false,
+            hideOriginalIcons = false,
+            anchorMode = C.ANCHORMODE_CHAIN,
+            editModePositions = {},
+            width = C.DEFAULT_BAR_WIDTH,
+            height = 0,
+            verticalSpacing = 0,
+            showIcon = true,
+            showSpellName = true,
+            showDuration = true,
+            overrideFont = false,
+            colors = {
+                byName = {},
+                bySpellID = {},
+                byCooldownID = {},
+                byTexture = {},
+                cache = {},
+                defaultColor = { r = 0.40, g = 0.78, b = 0.95, a = 1 },
+            },
+        },
+        extraIcons = {
             enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
+            showStackCount = true,
+            showCharges = true,
+            overrideFont = false,
+            viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "trinket2" },
+                    { stackKey = "combatPotions" },
+                    { stackKey = "healthPotions" },
+                    { stackKey = "healthstones" },
+                },
+                main = {},
+            },
         },
     },
 }

@@ -9,240 +9,51 @@ local TestHelpers = assert(
 
 describe("PowerBarTickMarksOptions", function()
     local originalGlobals
+    local currentClassID
+    local currentSpecIndex
     local ns
 
-    local function makeFontString()
-        local text = ""
-        local width = 0
-        local shown = true
-        return {
-            SetPoint = function() end,
-            ClearAllPoints = function() end,
-            SetWidth = function(_, value)
-                width = value
-            end,
-            GetWidth = function()
-                return width
-            end,
-            SetJustifyH = function() end,
-            SetWordWrap = function() end,
-            SetText = function(_, value)
-                text = value
-            end,
-            GetText = function()
-                return text
-            end,
-            Show = function()
-                shown = true
-            end,
-            Hide = function()
-                shown = false
-            end,
-            IsShown = function()
-                return shown
-            end,
-        }
-    end
-
-    local function makeTexture()
-        return {
-            SetAllPoints = function() end,
-            SetColorTexture = function() end,
-            Show = function() end,
-            Hide = function() end,
-        }
-    end
-
-    local function makeFrame()
-        local scripts = {}
-        local shown = true
-        local text = ""
-        return {
-            SetHeight = function() end,
-            SetWidth = function() end,
-            SetSize = function() end,
-            SetPoint = function() end,
-            SetAllPoints = function() end,
-            ClearAllPoints = function() end,
-            Show = function()
-                shown = true
-            end,
-            Hide = function()
-                shown = false
-            end,
-            IsShown = function()
-                return shown
-            end,
-            EnableMouse = function() end,
-            SetEnabled = function() end,
-            RegisterForClicks = function() end,
-            SetAutoFocus = function() end,
-            SetNumeric = function() end,
-            SetText = function(_, value)
-                text = value
-            end,
-            GetText = function()
-                return text
-            end,
-            SetColorRGB = function() end,
-            SetDataProvider = function() end,
-            SetWordWrap = function() end,
-            SetJustifyH = function() end,
-            SetFocus = function(self)
-                self._focused = true
-            end,
-            ClearFocus = function(self)
-                self._focused = false
-            end,
-            HighlightText = function(self)
-                self._highlighted = true
-            end,
-            SetScript = function(_, event, fn)
-                scripts[event] = fn
-            end,
-            GetScript = function(_, event)
-                return scripts[event]
-            end,
-            CreateFontString = function()
-                return makeFontString()
-            end,
-            CreateTexture = function()
-                return makeTexture()
-            end,
-        }
-    end
-
-    local function makeSlider()
-        local value
-        local callbacks = {}
-        local slider = makeFrame()
-        local minValue = 0
-        local maxValue = 0
-        local stepValue = 1
-        slider.RightText = makeFontString()
-        slider.MinText = makeFontString()
-        slider.MaxText = makeFontString()
-        slider.Slider = {
-            SetValueStep = function(_, step)
-                stepValue = step
-            end,
-            GetValueStep = function()
-                return stepValue
-            end,
-            GetMinMaxValues = function()
-                return minValue, maxValue
-            end,
-        }
-
-        slider.Init = function(_, initialValue, initialMin, initialMax, _, _)
-            value = initialValue
-            minValue = initialMin
-            maxValue = initialMax
-        end
-        slider.RegisterCallback = function(_, event, fn, owner)
-            callbacks[event] = callbacks[event] or {}
-            callbacks[event][#callbacks[event] + 1] = { fn = fn, owner = owner }
-        end
-        slider.SetValue = function(self, newValue)
-            value = newValue
-            for _, callback in ipairs(callbacks.OnValueChanged or {}) do
-                callback.fn(callback.owner or self, newValue)
+    local function getRow(page, rowId)
+        for _, row in ipairs(assert(page.rows)) do
+            if row.id == rowId then
+                return row
             end
         end
-        slider.GetValue = function()
-            return value
-        end
-
-        return slider
     end
 
-    local function registerSettingsWithHarness()
-        local defaultWidthSlider
-        local defaultWidthText
-        local viewInitializer
-
-        _G.MinimalSliderWithSteppersMixin = {
-            Label = { Right = 1 },
-            Event = { OnValueChanged = "OnValueChanged" },
+    local function setTickMappings(mappings)
+        ns.Addon.db.profile.powerBar = {
+            ticks = {
+                mappings = mappings,
+                defaultColor = ns.Constants.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultWidth = 1,
+            },
         }
+    end
 
-        _G.CreateFrame = function(frameType)
-            if frameType == "Slider" then
-                return makeSlider()
-            end
-            return makeFrame()
-        end
-        _G.CreateDataProvider = function()
-            return {
-                Flush = function() end,
-                Insert = function() end,
-            }
-        end
-
-        local SB = {
-            CreateColorSwatch = function()
-                return makeFrame()
-            end,
-            CreateCanvasLayout = function()
-                local layout = { frame = makeFrame() }
-
-                function layout:AddHeader()
-                    local row = makeFrame()
-                    row._defaultsButton = makeFrame()
-                    return row
-                end
-
-                function layout:AddSpacer() end
-
-                function layout:AddDescription(text)
-                    local row = makeFrame()
-                    row._text = makeFontString()
-                    row._text:SetText(text)
-                    return row
-                end
-
-                function layout:AddColorSwatch()
-                    local row = makeFrame()
-                    local swatch = makeFrame()
-                    return row, swatch
-                end
-
-                function layout:AddSlider()
-                    local row = makeFrame()
-                    local slider = makeSlider()
-                    local valueText = makeFontString()
-                    defaultWidthSlider = slider
-                    defaultWidthText = valueText
-                    return row, slider, valueText
-                end
-
-                function layout:AddButton()
-                    local row = makeFrame()
-                    local button = makeFrame()
-                    return row, button
-                end
-
-                function layout:AddScrollList()
-                    local view = {}
-                    view.SetElementInitializer = function(_, _, fn)
-                        viewInitializer = fn
-                    end
-                    return makeFrame(), makeFrame(), view
-                end
-
-                return layout
+    local function registerPageSpec()
+        local captured = assert(ns.PowerBarTickMarksOptions)
+        local refreshCalls = {}
+        local fakePage = {
+            Refresh = function()
+                refreshCalls[#refreshCalls + 1] = true
             end,
         }
 
-        ns.PowerBarTickMarksOptions.RegisterSettings(SB, {})
+        if captured.SetRegisteredPage then
+            captured.SetRegisteredPage(fakePage)
+        end
 
-        return defaultWidthSlider, defaultWidthText, viewInitializer
+        return captured, refreshCalls, fakePage
     end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
-            "MinimalSliderWithSteppersMixin",
-            "StaticPopupDialogs", "YES", "NO", "SETTINGS_DEFAULTS",
+            "StaticPopupDialogs",
+            "StaticPopup_Show",
+            "YES",
+            "NO",
+            "SETTINGS_DEFAULTS",
         })
     end)
 
@@ -250,101 +61,243 @@ describe("PowerBarTickMarksOptions", function()
         TestHelpers.RestoreGlobals(originalGlobals)
     end)
 
-    it("module loads and exposes RegisterSettings and Store", function()
-        ns = TestHelpers.SetupPowerBarTickMarksEnv()
+    before_each(function()
+        currentClassID = 1
+        currentSpecIndex = 2
 
+        ns = TestHelpers.SetupPowerBarTickMarksEnv({
+            getCurrentClassSpec = function()
+                return currentClassID, currentSpecIndex, "Warrior", "Fury", "WARRIOR"
+            end,
+        })
+    end)
+
+    it("module loads and exposes only the page spec", function()
         assert.is_table(ns.PowerBarTickMarksOptions)
-        assert.is_function(ns.PowerBarTickMarksOptions.RegisterSettings)
-
-        assert.is_table(ns.PowerBarTickMarksStore)
-        assert.is_function(ns.PowerBarTickMarksStore.GetCurrentTicks)
-        assert.is_function(ns.PowerBarTickMarksStore.AddTick)
+        assert.are.equal("tickMarks", ns.PowerBarTickMarksOptions.key)
+        assert.is_nil(ns.PowerBarTickMarksStore)
     end)
 
-    it("supports drag and manual entry for default and per-tick sliders", function()
-        ns = TestHelpers.SetupPowerBarTickMarksEnv()
-        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+    it("exports a page with list-based tick editors", function()
+        local captured = registerPageSpec()
 
-        local defaultWidthSlider, defaultWidthText, viewInitializer = registerSettingsWithHarness()
-
-        defaultWidthSlider:SetValue(4)
-        assert.are.equal(4, ns.PowerBarTickMarksStore.GetDefaultWidth())
-        assert.are.equal("4", defaultWidthText:GetText())
-
-        defaultWidthSlider._ecmValueButton:GetScript("OnClick")()
-        assert.is_true(defaultWidthSlider._ecmEditBox:IsShown())
-        defaultWidthSlider._ecmEditBox:SetText("5")
-        defaultWidthSlider._ecmEditBox:GetScript("OnEnterPressed")()
-        assert.are.equal(5, ns.PowerBarTickMarksStore.GetDefaultWidth())
-        assert.are.equal("5", defaultWidthText:GetText())
-        assert.is_false(defaultWidthSlider._ecmEditBox:IsShown())
-
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
-        })
-
-        local rowFrame = makeFrame()
-        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
-        viewInitializer(rowFrame, { index = 1, tick = tick })
-
-        rowFrame._valueSlider:SetValue(75)
-
-        rowFrame._widthSlider._ecmValueButton:GetScript("OnClick")()
-        rowFrame._widthSlider._ecmEditBox:SetText("4")
-        rowFrame._widthSlider._ecmEditBox:GetScript("OnEnterPressed")()
-
-        tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
-        assert.are.equal(75, tick.value)
-        assert.are.equal(4, tick.width)
-        assert.are.equal("75", rowFrame._valueText:GetText())
-        assert.are.equal("4", rowFrame._widthText:GetText())
-        assert.is_false(rowFrame._widthSlider._ecmEditBox:IsShown())
+        assert.are.equal("Tick Marks", captured.name)
+        assert.is_nil(getRow(captured, "tickMarksPageActions"))
+        assert.are.equal("list", getRow(captured, "tickCollection").type)
+        assert.are.equal("editor", getRow(captured, "tickCollection").variant)
+        assert.are.equal(320, getRow(captured, "tickCollection").height)
     end)
 
-    it("rescales value slider for large resource values", function()
-        ns = TestHelpers.SetupPowerBarTickMarksEnv()
-        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+    it("shows an empty collection when class/spec is unavailable", function()
+        currentClassID = nil
+        currentSpecIndex = nil
 
-        local _, _, viewInitializer = registerSettingsWithHarness()
+        local captured = registerPageSpec()
+        local tickCollection = getRow(captured, "tickCollection")
 
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 50000, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
-        })
-
-        local rowFrame = makeFrame()
-        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
-        viewInitializer(rowFrame, { index = 1, tick = tick })
-
-        -- Slider should have rescaled to accommodate 50000
-        assert.are.equal("50000", rowFrame._valueText:GetText())
-        assert.are.equal(50000, rowFrame._valueSlider._ecmMaxValue)
-        assert.are.equal(250, rowFrame._valueSlider._ecmStep)
-
-        -- Typing a value in a higher tier should rescale further
-        rowFrame._valueSlider._ecmValueButton:GetScript("OnClick")()
-        rowFrame._valueSlider._ecmEditBox:SetText("120000")
-        rowFrame._isRefreshing = false
-        rowFrame._valueSlider._ecmEditBox:GetScript("OnEnterPressed")()
-        assert.are.equal(500000, rowFrame._valueSlider._ecmMaxValue)
-        assert.are.equal(2500, rowFrame._valueSlider._ecmStep)
+        assert.are.same({}, tickCollection.items())
     end)
 
-    it("keeps small values in the default 1-200 tier", function()
-        ns = TestHelpers.SetupPowerBarTickMarksEnv()
-        ns.Runtime = { ScheduleLayoutUpdate = function() end }
+    it("add button appends a tick using the current defaults", function()
+        local scheduledReason
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReason = reason
+            end,
+        }
 
-        local _, _, viewInitializer = registerSettingsWithHarness()
+        local captured, refreshCalls, fakePage = registerPageSpec()
+        local defaultColor = { r = 0.1, g = 0.2, b = 0.3, a = 0.4 }
+        local tickCollection = getRow(captured, "tickCollection")
 
-        ns.PowerBarTickMarksStore.SetCurrentTicks({
-            { value = 30, width = 1, color = { r = 1, g = 1, b = 1, a = 1 } },
+        getRow(captured, "defaultWidth").set(3)
+        getRow(captured, "defaultColor").set(defaultColor)
+
+        getRow(captured, "addTick").onClick({ page = fakePage })
+
+        local items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(50, items[1].fields[1].value)
+        assert.are.equal(3, items[1].fields[2].value)
+        assert.are.same(defaultColor, items[1].color.value)
+        assert.are.equal("OptionsChanged", scheduledReason)
+        assert.are.same({ true }, refreshCalls)
+    end)
+
+    it("collection editor callbacks update color, values, widths, and removal without touching another spec", function()
+        local scheduledReasons = {}
+        local pickedColor = { r = 0.25, g = 0.5, b = 0.75, a = 1 }
+
+        setTickMappings({
+            [1] = {
+                [1] = {
+                    { value = 20, width = 1, color = { r = 0.5, g = 0.5, b = 0.5, a = 1 } },
+                },
+                [2] = {
+                    { value = 50, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+                    { value = 80, width = 3, color = { r = 0, g = 0, b = 0, a = 1 } },
+                },
+            },
         })
 
-        local rowFrame = makeFrame()
-        local tick = ns.PowerBarTickMarksStore.GetCurrentTicks()[1]
-        viewInitializer(rowFrame, { index = 1, tick = tick })
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReasons[#scheduledReasons + 1] = reason
+            end,
+        }
+        ns.OptionUtil.OpenColorPicker = function(current, withAlpha, onChanged)
+            assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, current)
+            assert.is_true(withAlpha)
+            onChanged(pickedColor)
+        end
 
-        assert.are.equal("30", rowFrame._valueText:GetText())
-        assert.are.equal(200, rowFrame._valueSlider._ecmMaxValue)
-        assert.are.equal(1, rowFrame._valueSlider._ecmStep)
+        local captured, refreshCalls = registerPageSpec()
+        local tickCollection = getRow(captured, "tickCollection")
+        local item = tickCollection.items()[1]
+        local swatchColor
+
+        item.color.onClick(item, {
+            _swatch = {
+                SetColorRGB = function(_, r, g, b)
+                    swatchColor = { r = r, g = g, b = b }
+                end,
+            },
+        })
+        local items = tickCollection.items()
+        assert.are.same(pickedColor, items[1].color.value)
+        assert.are.same({ r = 0.25, g = 0.5, b = 0.75 }, swatchColor)
+
+        item = items[1]
+
+        item.fields[1].onValueChanged(75)
+        item.fields[2].onValueChanged(4)
+
+        items = tickCollection.items()
+        assert.are.equal(75, items[1].fields[1].value)
+        assert.are.equal(4, items[1].fields[2].value)
+
+        item = items[1]
+
+        item.remove.onClick()
+
+        items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(80, items[1].fields[1].value)
+
+        currentSpecIndex = 1
+        items = tickCollection.items()
+        assert.are.equal(1, #items)
+        assert.are.equal(20, items[1].fields[1].value)
+        assert.are.same({ "OptionsChanged", "OptionsChanged", "OptionsChanged", "OptionsChanged" }, scheduledReasons)
+        assert.are.equal(1, #refreshCalls)
+    end)
+
+    it("defaults button restores the current spec's default tick marks", function()
+        local scheduledReasons = {}
+        local defaultColor = { r = 0.9, g = 0.8, b = 0.7, a = 0.6 }
+
+        currentClassID = 12
+        currentSpecIndex = 3
+        ns.Addon.db.defaults.profile.powerBar = {
+            ticks = {
+                mappings = {
+                    [12] = {
+                        [3] = {
+                            { value = 90, color = { r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 } },
+                            { value = 100 },
+                        },
+                    },
+                },
+                defaultColor = defaultColor,
+                defaultWidth = 2,
+            },
+        }
+        setTickMappings({
+            [12] = {
+                [3] = {
+                    { value = 30, width = 5, color = { r = 1, g = 0, b = 0, a = 1 } },
+                },
+            },
+        })
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReasons[#scheduledReasons + 1] = reason
+            end,
+        }
+
+        local captured, refreshCalls = registerPageSpec()
+
+        captured.onDefault()
+
+        local items = getRow(captured, "tickCollection").items()
+        assert.are.equal(2, #items)
+        assert.are.equal(90, items[1].fields[1].value)
+        assert.are.same({ r = 2 / 3, g = 2 / 3, b = 2 / 3, a = 0.8 }, items[1].color.value)
+        assert.are.equal(2, items[1].fields[2].value)
+        assert.are.equal(100, items[2].fields[1].value)
+        assert.are.same(defaultColor, getRow(captured, "defaultColor").get())
+        assert.are.equal(2, getRow(captured, "defaultWidth").get())
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ true }, refreshCalls)
+    end)
+
+    it("defaults button clears custom ticks when the current spec has no defaults", function()
+        local scheduledReasons = {}
+
+        ns.Addon.db.defaults.profile.powerBar = {
+            ticks = {
+                mappings = {
+                    [12] = {
+                        [3] = {
+                            { value = 90 },
+                        },
+                    },
+                },
+                defaultColor = ns.Constants.DEFAULT_POWERBAR_TICK_COLOR,
+                defaultWidth = 1,
+            },
+        }
+        setTickMappings({
+            [1] = {
+                [2] = {
+                    { value = 60, width = 4, color = { r = 1, g = 0, b = 0, a = 1 } },
+                },
+            },
+        })
+        ns.Runtime = {
+            ScheduleLayoutUpdate = function(_, reason)
+                scheduledReasons[#scheduledReasons + 1] = reason
+            end,
+        }
+
+        local captured, refreshCalls = registerPageSpec()
+
+        captured.onDefault()
+
+        assert.are.same({}, getRow(captured, "tickCollection").items())
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ true }, refreshCalls)
+    end)
+
+    it("rescales the value field range for large resource values", function()
+        setTickMappings({
+            [1] = {
+                [2] = {
+                    { value = 50000, width = 2, color = { r = 1, g = 1, b = 1, a = 1 } },
+                },
+            },
+        })
+
+        local captured = registerPageSpec()
+        local item = getRow(captured, "tickCollection").items()[1]
+        local minValue, maxValue, step = item.fields[1].getRange(item, 50000)
+        local nextMin, nextMax, nextStep = item.fields[1].getRange(item, 120000)
+
+        assert.are.equal(1, minValue)
+        assert.are.equal(50000, maxValue)
+        assert.are.equal(250, step)
+        assert.are.equal(1, nextMin)
+        assert.are.equal(500000, nextMax)
+        assert.are.equal(2500, nextStep)
     end)
 end)

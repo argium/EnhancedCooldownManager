@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("RuneBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -26,15 +26,10 @@ describe("RuneBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
-            ns.OptionsSections.RuneBar.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.RuneBarOptions)
+            capturedPage = ns.RuneBarOptions.pages[1]
         end)
     end)
 
@@ -107,9 +102,10 @@ describe("RuneBarOptions getters/setters/defaults", function()
         it("removes anchorMode from the module page", function()
             assert.is_nil(settings["ECM_runeBar_anchorMode"])
         end)
-        it("adds a breadcrumb to the Layout page", function()
-            assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+        it("adds an inline layout button row to the page", function()
+            assert.are.equal("button", capturedPage.rows[2].type)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[2].name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[2].buttonText)
         end)
     end)
 
@@ -159,7 +155,6 @@ describe("RuneBarOptions class gating (non-DK)", function()
         local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/RuneBarOptions.lua", "RuneBarOptions")(nil, ns)
-        assert.is_not_nil(ns.OptionsSections.RuneBar)
-        assert.is_function(ns.OptionsSections.RuneBar.RegisterSettings)
+        assert.is_true(ns.RuneBarOptions.disabled())
     end)
 end)
