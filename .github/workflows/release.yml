@@ -1,8 +1,13 @@
 name: Package Release
+run-name: Package Release ${{ inputs.version }}
 
 on:
     workflow_dispatch:
         inputs:
+            version:
+                description: Release version from EnhancedCooldownManager.toc.
+                required: true
+                type: string
             release_notes:
                 description: Release notes for the packager changelog and GitHub Release.
                 required: true
@@ -42,6 +47,7 @@ jobs:
               id: release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  INPUT_VERSION: ${{ inputs.version }}
                   RELEASE_NOTES: ${{ inputs.release_notes }}
                   REF_NAME: ${{ github.ref_name }}
                   REF_TYPE: ${{ github.ref_type }}
@@ -61,6 +67,12 @@ jobs:
                   VERSION=$(grep -oP '## Version: \K.*' "${ADDON_NAME}.toc" | tr -d '[:space:]')
                   if [ -z "$VERSION" ]; then
                     echo "::error::Could not read a non-empty Version field from ${ADDON_NAME}.toc."
+                    exit 1
+                  fi
+
+                  INPUT_VERSION=$(printf '%s' "$INPUT_VERSION" | tr -d '[:space:]')
+                  if [ "$INPUT_VERSION" != "$VERSION" ]; then
+                    echo "::error::Release input version '$INPUT_VERSION' must match ${ADDON_NAME}.toc version '$VERSION'."
                     exit 1
                   fi
 
