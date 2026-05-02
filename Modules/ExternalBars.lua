@@ -661,7 +661,7 @@ function ExternalBars:OnExternalAurasUpdated()
     local auraDiagnostics = debugEnabled and {} or nil
 
     local activeAuraCount = 0
-    if type(auraInfo) == "table" then
+    if type(auraInfo) == "table" and canAccessTable(auraInfo) then
         for index, info in ipairs(auraInfo) do
             activeAuraCount = index
 

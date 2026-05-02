@@ -6,6 +6,8 @@
 ## SavedVariables: EnhancedCooldownManagerDB
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
+## X-Curse-Project-ID: 1427906
+## X-WoWI-ID: 27051
 ## X-Wago-ID: qGZOwbNd
 
 Libs\LibStub\LibStub.lua

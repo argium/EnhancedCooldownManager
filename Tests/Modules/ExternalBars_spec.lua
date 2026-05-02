@@ -493,7 +493,7 @@ describe("ExternalBars real source", function()
             return false
         end
         _G.canaccesstable = function(value)
-            return type(value) == "table"
+            return type(value) == "table" and not rawget(value, "__inaccessible")
         end
         _G.C_UnitAuras = {
             GetAuraDataByAuraInstanceID = function(_, auraInstanceID)
@@ -684,6 +684,24 @@ describe("ExternalBars real source", function()
             canShowDurationText = true,
             canUpdateDurationBar = true,
         }, logEntry.payload.auras[1])
+    end)
+
+    it("skips inaccessible Blizzard aura info tables", function()
+        local inaccessibleAuraInfo = setmetatable({}, {
+            __index = function()
+                error("attempted to iterate inaccessible auraInfo")
+            end,
+        })
+        inaccessibleAuraInfo.__inaccessible = true
+
+        viewer.auraInfo = inaccessibleAuraInfo
+
+        assert.has_no.errors(function()
+            ExternalBars:OnExternalAurasUpdated()
+        end)
+
+        assert.are.equal(0, ExternalBars._activeAuraCount)
+        assert.same({ "ExternalBars:UpdateAuras" }, requestLayoutReasons)
     end)
 
     it("emits hook diagnostics when the Blizzard viewer is missing", function()

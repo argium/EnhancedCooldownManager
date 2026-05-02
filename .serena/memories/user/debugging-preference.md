@@ -1,0 +1,1 @@
+User prefers being asked to take concrete debugging/reproduction steps over speculative fixes when evidence is incomplete. For runtime bugs without a stack trace or clear failing line, avoid guessing; propose targeted diagnostics, module isolation, and evidence collection before patching.

@@ -66,8 +66,9 @@ local function applyBlizzardFrameState(frame)
         return
     end
 
-    if not frame:IsShown() then frame:Show() end
-    ns.FrameUtil.LazySetAlpha(frame, _desiredAlpha)
+    if frame:IsShown() then
+        ns.FrameUtil.LazySetAlpha(frame, _desiredAlpha)
+    end
 end
 
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
