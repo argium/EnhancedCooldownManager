@@ -73,9 +73,7 @@ function lib.Dropdown(self, spec)
     if spec.scrollHeight then
         initializer._lsbData._lsbKind = "scrollDropdown"
         initializer._lsbData.scrollHeight = spec.scrollHeight
-        if initializer.SetSetting then
-            initializer:SetSetting(setting)
-        end
+        initializer:SetSetting(setting)
         initializer._lsbRefreshFrame = function(frame)
             if frame and frame.RefreshDropdownText then
                 frame:RefreshDropdownText()
@@ -84,7 +82,7 @@ function lib.Dropdown(self, spec)
         internal.registerCategoryRefreshable(self, category, initializer)
     end
 
-    if initializer.SetSetting and (not initializer.GetSetting or not initializer:GetSetting()) then
+    if not initializer:GetSetting() then
         initializer:SetSetting(setting)
     end
 
@@ -99,12 +97,6 @@ function lib.Dropdown(self, spec)
             end
         end
         internal.registerCategoryRefreshable(self, category, initializer)
-    end
-
-    if not initializer.GetSetting then
-        initializer.GetSetting = function()
-            return setting
-        end
     end
 
     internal.applyModifiers(self, initializer, spec)
@@ -188,9 +180,7 @@ function lib.Input(self, spec)
     initializer.Resetter = function(controlInitializer, frame)
         cancelInputPreviewTimer(frame)
         if frame and frame._lsbInputEditBox then
-            if frame._lsbInputEditBox.ClearFocus then
-                frame._lsbInputEditBox:ClearFocus()
-            end
+            frame._lsbInputEditBox:ClearFocus()
             frame._lsbInputEditBox._lsbOwnerFrame = nil
         end
         frame._lsbInputData = nil
@@ -220,9 +210,7 @@ function lib.Custom(self, spec)
         tooltip = spec.tooltip,
     })
 
-    if initializer.SetSetting then
-        initializer:SetSetting(setting)
-    end
+    initializer:SetSetting(setting)
 
     Settings.RegisterInitializer(category, initializer)
     internal.applyModifiers(self, initializer, spec)

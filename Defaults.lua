@@ -55,6 +55,7 @@ local _, ns = ...
 
 ---@class ECM_GlobalConfig Global configuration.
 ---@field debug boolean Whether debug logging is enabled.
+---@field errorLogging boolean Whether targeted error logging is enabled.
 ---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
 ---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
 ---@field updateFrequency number Update frequency in seconds.
@@ -178,6 +179,7 @@ local defaults = {
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             debug = false,
+            errorLogging = true,
             debugToChat = false,
             releasePopupSeenVersion = "",
             hideWhenMounted = true,

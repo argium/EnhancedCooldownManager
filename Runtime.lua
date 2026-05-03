@@ -35,6 +35,12 @@ local LAYOUT_EVENTS = {
     UPDATE_SHAPESHIFT_FORM = { delay = 0 },
 }
 
+local CHAT_TAINT_ZONE_EVENTS = {
+    ZONE_CHANGED_NEW_AREA = true,
+    ZONE_CHANGED = true,
+    ZONE_CHANGED_INDOORS = true,
+}
+
 local _modules = {}
 local _globallyHidden = false
 local _desiredAlpha = 1
@@ -441,6 +447,26 @@ end
 local _requestPending = false
 local _requestReason = nil
 local _requestSecondPass = false
+local _layoutStorms = {}
+
+local function recordLayoutRequest(reason)
+    local now = GetTime()
+    local key = reason or "nil"
+    local storm = _layoutStorms[key]
+    if not storm or now - storm.startedAt > C.LAYOUT_STORM_WINDOW then
+        _layoutStorms[key] = { startedAt = now, count = 1 }
+        return
+    end
+
+    storm.count = storm.count + 1
+    if storm.count == C.LAYOUT_STORM_COUNT then
+        ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected", {
+            reason = key,
+            count = storm.count,
+            window = C.LAYOUT_STORM_WINDOW,
+        })
+    end
+end
 
 --- Requests a deferred layout pass for all registered modules.
 --- Coalesces multiple requests within the same frame into one pass.
@@ -453,6 +479,7 @@ function Runtime.RequestLayout(reason, opts)
     if _requestPending then
         return
     end
+    recordLayoutRequest(reason)
     _requestReason = reason
     _requestPending = true
     C_Timer.After(0, function()
@@ -566,6 +593,10 @@ local function handleLayoutEvent(_addon, event, arg1)
     local config = LAYOUT_EVENTS[event]
     if not config then
         return
+    end
+
+    if CHAT_TAINT_ZONE_EVENTS[event] then
+        ns._CheckChatTaint(event)
     end
 
     if config.combatChange then

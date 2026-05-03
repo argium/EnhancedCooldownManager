@@ -74,31 +74,91 @@ local function getFrameHeight(frame)
 end
 
 ---@param tbl table|nil
+---@param logKey string|nil
+---@param reason string|nil
 ---@return number|nil
-local function countAccessibleArray(tbl)
+local function countAccessibleArray(tbl, logKey, reason)
     if type(tbl) ~= "table" or not canAccessTable(tbl) then
         return nil
     end
 
     local count = 0
-    for index in ipairs(tbl) do
-        count = index
+    local ok, err = pcall(function()
+        for index in ipairs(tbl) do
+            count = index
+        end
+    end)
+    if ok then
+        return count
     end
-    return count
+
+    if logKey then
+        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate a Blizzard table", {
+            reason = reason,
+            operation = "ipairs",
+            error = tostring(err),
+            inCombatLockdown = InCombatLockdown(),
+        })
+    end
+    return nil
 end
 
 ---@param tbl table|nil
+---@param logKey string|nil
+---@param reason string|nil
 ---@return number|nil
-local function countAccessibleKeys(tbl)
+local function countAccessibleKeys(tbl, logKey, reason)
     if type(tbl) ~= "table" or not canAccessTable(tbl) then
         return nil
     end
 
     local count = 0
-    for _ in pairs(tbl) do
-        count = count + 1
+    local ok, err = pcall(function()
+        for _ in pairs(tbl) do
+            count = count + 1
+        end
+    end)
+    if ok then
+        return count
     end
-    return count
+
+    if logKey then
+        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate a Blizzard table", {
+            reason = reason,
+            operation = "pairs",
+            error = tostring(err),
+            inCombatLockdown = InCombatLockdown(),
+        })
+    end
+    return nil
+end
+
+---@param reason string|nil
+---@param viewer Frame|nil
+---@param auraInfo table|nil
+---@return table
+local function getAuraInfoErrorData(reason, viewer, auraInfo)
+    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = _G.GetInstanceInfo()
+    local canAccessAuraInfo = nil
+    if type(auraInfo) == "table" then
+        canAccessAuraInfo = canAccessTable(auraInfo)
+    end
+
+    return {
+        reason = reason,
+        auraInfoType = type(auraInfo),
+        canAccessAuraInfo = canAccessAuraInfo,
+        viewerExists = viewer ~= nil,
+        viewerShown = getFrameShown(viewer),
+        viewerAlpha = getFrameAlpha(viewer),
+        inCombatLockdown = InCombatLockdown(),
+        instanceName = instanceName,
+        instanceType = instanceType,
+        instanceID = instanceID,
+        difficultyID = difficultyID,
+        difficultyName = difficultyName,
+        maxPlayers = maxPlayers,
+    }
 end
 
 ---@param point string|nil
@@ -209,8 +269,9 @@ end
 
 ---@param viewer Frame|nil
 ---@param auraInfo table|nil
+---@param reason string|nil
 ---@return table
-function ExternalBars:_GetDiagnostics(viewer, auraInfo)
+function ExternalBars:_GetDiagnostics(viewer, auraInfo, reason)
     viewer = viewer or getViewer()
     if auraInfo == nil and viewer then
         auraInfo = viewer.auraInfo
@@ -246,11 +307,11 @@ function ExternalBars:_GetDiagnostics(viewer, auraInfo)
         originalIconsHidden = self._originalIconsHidden == true,
         activeAuraCount = self._activeAuraCount or 0,
         auraInfoType = type(auraInfo),
-        auraInfoArrayCount = countAccessibleArray(auraInfo),
-        auraInfoKeyCount = countAccessibleKeys(auraInfo),
+        auraInfoArrayCount = countAccessibleArray(auraInfo, "AuraInfoDiagnosticsFailed", reason),
+        auraInfoKeyCount = countAccessibleKeys(auraInfo, "AuraInfoDiagnosticsFailed", reason),
         auraFramesType = type(auraFrames),
-        auraFramesArrayCount = countAccessibleArray(auraFrames),
-        auraFramesKeyCount = countAccessibleKeys(auraFrames),
+        auraFramesArrayCount = countAccessibleArray(auraFrames, "AuraFramesDiagnosticsFailed", reason),
+        auraFramesKeyCount = countAccessibleKeys(auraFrames, "AuraFramesDiagnosticsFailed", reason),
     }
 end
 
@@ -604,7 +665,7 @@ function ExternalBars:HookViewer()
         if ns.IsDebugEnabled() then
             ns.Log(self.Name, "HookViewer skipped", {
                 reason = "missing-viewer",
-                diagnostics = self:_GetDiagnostics(viewer),
+                diagnostics = self:_GetDiagnostics(viewer, nil, "HookViewer:missing-viewer"),
             })
         end
         return
@@ -614,7 +675,7 @@ function ExternalBars:HookViewer()
         if ns.IsDebugEnabled() then
             ns.Log(self.Name, "HookViewer skipped", {
                 reason = "already-hooked",
-                diagnostics = self:_GetDiagnostics(viewer),
+                diagnostics = self:_GetDiagnostics(viewer, nil, "HookViewer:already-hooked"),
             })
         end
         return
@@ -624,7 +685,7 @@ function ExternalBars:HookViewer()
 
     hooksecurefunc(viewer, "UpdateAuras", function()
         if self:IsEnabled() then
-            self:OnExternalAurasUpdated()
+            self:OnExternalAurasUpdated("viewer:UpdateAuras")
         end
     end)
 
@@ -633,7 +694,7 @@ function ExternalBars:HookViewer()
             return
         end
         self:_RefreshOriginalIconsState()
-        self:OnExternalAurasUpdated()
+        self:OnExternalAurasUpdated("viewer:OnShow")
     end)
 
     viewer:HookScript("OnHide", function()
@@ -646,10 +707,13 @@ function ExternalBars:HookViewer()
         ns.Runtime.RequestLayout("ExternalBars:viewer:OnHide")
     end)
 
-    ns.Log(self.Name, "Hooked ExternalDefensivesFrame", self:_GetDiagnostics(viewer))
+    if ns.IsDebugEnabled() then
+        ns.Log(self.Name, "Hooked ExternalDefensivesFrame", self:_GetDiagnostics(viewer, nil, "HookViewer:hooked"))
+    end
 end
 
-function ExternalBars:OnExternalAurasUpdated()
+---@param reason string|nil
+function ExternalBars:OnExternalAurasUpdated(reason)
     self:HookViewer()
     self:_RefreshOriginalIconsState()
 
@@ -661,63 +725,86 @@ function ExternalBars:OnExternalAurasUpdated()
     local auraDiagnostics = debugEnabled and {} or nil
 
     local activeAuraCount = 0
-    if type(auraInfo) == "table" and canAccessTable(auraInfo) then
-        for index, info in ipairs(auraInfo) do
-            activeAuraCount = index
-
-            local auraState = auraStates[index] or {}
-            auraStates[index] = auraState
-
-            local auraInstanceID = info.auraInstanceID
-            local auraName = nil
-            local spellID = nil
-            local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID(PLAYER_UNIT, auraInstanceID)
-            local accessibleAuraData = canAccessTable(auraData) and auraData or nil
-            if accessibleAuraData then
-                local auraDataName = accessibleAuraData.name
-                if not issecretvalue(auraDataName) and auraDataName ~= nil and auraDataName ~= "" then
-                    auraName = auraDataName
+    if type(auraInfo) == "table" and not canAccessTable(auraInfo) then
+        wipe(auraStates)
+        self:_hideExcessBars(0)
+        self:_StopDurationTicker()
+        local data = getAuraInfoErrorData(reason, viewer, auraInfo)
+        data.activeAuraCountBefore = self._activeAuraCount or 0
+        ns.ErrorLogOnce("ExternalBars", "AuraInfoInaccessible", "Blizzard external aura info is inaccessible", data)
+    elseif type(auraInfo) == "table" then
+        local ok, err = pcall(function()
+            for index, info in ipairs(auraInfo) do
+                if type(info) ~= "table" or not canAccessTable(info) then
+                    error("inaccessible external aura info entry at index " .. tostring(index))
                 end
 
-                local auraSpellID = accessibleAuraData.spellId
-                if not issecretvalue(auraSpellID) and auraSpellID ~= nil then
-                    spellID = auraSpellID
+                activeAuraCount = index
+
+                local auraState = auraStates[index] or {}
+                auraStates[index] = auraState
+
+                local auraInstanceID = info.auraInstanceID
+                local auraName = nil
+                local spellID = nil
+                local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID(PLAYER_UNIT, auraInstanceID)
+                local accessibleAuraData = canAccessTable(auraData) and auraData or nil
+                if accessibleAuraData then
+                    local auraDataName = accessibleAuraData.name
+                    if not issecretvalue(auraDataName) and auraDataName ~= nil and auraDataName ~= "" then
+                        auraName = auraDataName
+                    end
+
+                    local auraSpellID = accessibleAuraData.spellId
+                    if not issecretvalue(auraSpellID) and auraSpellID ~= nil then
+                        spellID = auraSpellID
+                    end
+                end
+
+                local duration = info.duration
+                local expirationTime = info.expirationTime
+                local durationIsSecret = issecretvalue(duration)
+                local expirationTimeIsSecret = issecretvalue(expirationTime)
+                local durationObject = C_UnitAuras.GetAuraDuration(PLAYER_UNIT, auraInstanceID)
+                local canUpdateDurationBar = durationObject ~= nil
+
+                auraState.index = index
+                auraState.auraInstanceID = auraInstanceID
+                auraState.name = auraName
+                auraState.spellID = spellID
+                auraState.texture = info.texture
+                auraState.duration = duration
+                auraState.expirationTime = expirationTime
+                auraState.durationObject = durationObject
+                auraState.durationIsSecret = durationIsSecret
+                auraState.canShowDurationText = canUpdateDurationBar
+                auraState.canUpdateDurationBar = canUpdateDurationBar
+
+                if auraDiagnostics then
+                    auraDiagnostics[#auraDiagnostics + 1] = {
+                        index = index,
+                        auraInstanceID = auraInstanceID,
+                        name = auraName,
+                        spellID = spellID,
+                        texture = info.texture,
+                        hasAuraData = accessibleAuraData ~= nil,
+                        durationIsSecret = durationIsSecret,
+                        expirationTimeIsSecret = expirationTimeIsSecret,
+                        canShowDurationText = auraState.canShowDurationText,
+                        canUpdateDurationBar = auraState.canUpdateDurationBar,
+                    }
                 end
             end
-
-            local duration = info.duration
-            local expirationTime = info.expirationTime
-            local durationIsSecret = issecretvalue(duration)
-            local expirationTimeIsSecret = issecretvalue(expirationTime)
-            local durationObject = C_UnitAuras.GetAuraDuration(PLAYER_UNIT, auraInstanceID)
-            local canUpdateDurationBar = durationObject ~= nil
-
-            auraState.index = index
-            auraState.auraInstanceID = auraInstanceID
-            auraState.name = auraName
-            auraState.spellID = spellID
-            auraState.texture = info.texture
-            auraState.duration = duration
-            auraState.expirationTime = expirationTime
-            auraState.durationObject = durationObject
-            auraState.durationIsSecret = durationIsSecret
-            auraState.canShowDurationText = canUpdateDurationBar
-            auraState.canUpdateDurationBar = canUpdateDurationBar
-
-            if auraDiagnostics then
-                auraDiagnostics[#auraDiagnostics + 1] = {
-                    index = index,
-                    auraInstanceID = auraInstanceID,
-                    name = auraName,
-                    spellID = spellID,
-                    texture = info.texture,
-                    hasAuraData = accessibleAuraData ~= nil,
-                    durationIsSecret = durationIsSecret,
-                    expirationTimeIsSecret = expirationTimeIsSecret,
-                    canShowDurationText = auraState.canShowDurationText,
-                    canUpdateDurationBar = auraState.canUpdateDurationBar,
-                }
-            end
+        end)
+        if not ok then
+            activeAuraCount = 0
+            wipe(auraStates)
+            self:_hideExcessBars(0)
+            self:_StopDurationTicker()
+            local data = getAuraInfoErrorData(reason, viewer, auraInfo)
+            data.activeAuraCountBefore = self._activeAuraCount or 0
+            data.error = tostring(err)
+            ns.ErrorLogOnce("ExternalBars", "AuraInfoIterateFailed", "Blizzard external aura info could not be iterated", data)
         end
     end
 
@@ -725,7 +812,8 @@ function ExternalBars:OnExternalAurasUpdated()
 
     if debugEnabled then
         ns.Log(self.Name, "OnExternalAurasUpdated", {
-            diagnostics = self:_GetDiagnostics(viewer, auraInfo),
+            reason = reason,
+            diagnostics = self:_GetDiagnostics(viewer, auraInfo, reason),
             viewerShown = viewer ~= nil and viewer:IsShown() or false,
             viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
             viewerHooked = self._viewerHooked == true,
@@ -737,7 +825,7 @@ function ExternalBars:OnExternalAurasUpdated()
         })
     end
 
-    ns.Runtime.RequestLayout("ExternalBars:UpdateAuras")
+    ns.Runtime.RequestLayout("ExternalBars:" .. (reason or "UpdateAuras"))
 end
 
 ---@param why string|nil
@@ -847,22 +935,24 @@ function ExternalBars:UpdateLayout(why)
 
     self:_RestartDurationTicker()
 
-    local viewer = getViewer()
-    ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
-        diagnostics = self:_GetDiagnostics(viewer),
-        activeAuraCount = activeAuraCount,
-        barCount = barCount,
-        bars = barDiagnostics,
-        viewerShown = viewer ~= nil and viewer:IsShown() or false,
-        viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
-        viewerHooked = self._viewerHooked == true,
-        hideOriginalIcons = self._originalIconsHidden == true,
-        runtimeOriginalIconsHidden = self._originalIconsHidden == true,
-        editLocked = self._editLocked == true,
-        anchorPoint = params.anchorPoint,
-        offsetX = params.offsetX,
-        offsetY = params.offsetY,
-    })
+    if debugEnabled then
+        local viewer = getViewer()
+        ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")", {
+            diagnostics = self:_GetDiagnostics(viewer, nil, why),
+            activeAuraCount = activeAuraCount,
+            barCount = barCount,
+            bars = barDiagnostics,
+            viewerShown = viewer ~= nil and viewer:IsShown() or false,
+            viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+            viewerHooked = self._viewerHooked == true,
+            hideOriginalIcons = self._originalIconsHidden == true,
+            runtimeOriginalIconsHidden = self._originalIconsHidden == true,
+            editLocked = self._editLocked == true,
+            anchorPoint = params.anchorPoint,
+            offsetX = params.offsetX,
+            offsetY = params.offsetY,
+        })
+    end
     return true
 end
 
@@ -879,7 +969,9 @@ function ExternalBars:OnEnable()
 
     self:EnsureFrame()
     ns.Runtime.RegisterFrame(self)
-    ns.Log(self.Name, "OnEnable", self:_GetDiagnostics())
+    if ns.IsDebugEnabled() then
+        ns.Log(self.Name, "OnEnable", self:_GetDiagnostics(nil, nil, "OnEnable"))
+    end
 
     C_Timer.After(0.1, function()
         if not self:IsEnabled() then
@@ -888,7 +980,7 @@ function ExternalBars:OnEnable()
 
         self:HookViewer()
         self:_RefreshOriginalIconsState()
-        self:OnExternalAurasUpdated()
+        self:OnExternalAurasUpdated("OnEnable")
         ns.Runtime.RequestLayout("ExternalBars:OnEnable")
     end)
 end

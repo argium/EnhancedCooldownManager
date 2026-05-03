@@ -192,9 +192,7 @@ local function maybeShowSpellColorKeyTooltip(owner, data, scope)
     end
 
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
+    GameTooltip:ClearLines()
     GameTooltip:SetText(L["SPELL_COLORS_KEYS_TOOLTIP_TITLE"], 1, 1, 1, 1)
 
     for _, line in ipairs(lines) do
@@ -268,7 +266,7 @@ end
 
 local function updatePickerSwatch(row, color)
     local swatch = row and row._swatch or nil
-    if swatch and swatch.SetColorRGB then
+    if swatch then
         swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
     end
 end

@@ -9,6 +9,7 @@ local constants = {
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
+    ERROR_COLOR = "ff4040",
     RELEASE_POPUP_VERSION = "v0.8",
     VERSION_TAG_BETA = "beta",
 
@@ -139,6 +140,8 @@ local constants = {
     -- Runtime timing and debug limits
     LAYOUT_COMBAT_END_DELAY = 0.1,
     LAYOUT_ENTERING_WORLD_DELAY = 0.4,
+    LAYOUT_STORM_COUNT = 20,
+    LAYOUT_STORM_WINDOW = 2,
     LAYOUT_ZONE_CHANGE_DELAY = 0.1,
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
     TOSTRING_MAX_DEPTH = 3,

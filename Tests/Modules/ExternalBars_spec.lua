@@ -27,6 +27,7 @@ describe("ExternalBars real source", function()
     local spellColorStores
     local debugLoggingEnabled
     local logCalls
+    local errorLogs
 
     local makeFrame = TestHelpers.makeFrame
     local makeHookableFrame = TestHelpers.makeHookableFrame
@@ -282,6 +283,17 @@ describe("ExternalBars real source", function()
         return nil
     end
 
+    local function findErrorLog(key)
+        for index = #errorLogs, 1, -1 do
+            local entry = errorLogs[index]
+            if entry.key == key then
+                return entry
+            end
+        end
+
+        return nil
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "UIParent",
@@ -293,11 +305,14 @@ describe("ExternalBars real source", function()
             "canaccesstable",
             "C_Timer",
             "GetTime",
+            "GetInstanceInfo",
             "CreateFrame",
             "LibStub",
             "SecondsToTimeAbbrev",
             "Enum",
             "wipe",
+            "ipairs",
+            "pairs",
         })
     end)
 
@@ -320,6 +335,7 @@ describe("ExternalBars real source", function()
         spellColorStores = {}
         debugLoggingEnabled = false
         logCalls = {}
+        errorLogs = {}
 
         ns = {
             DebugAssert = function() end,
@@ -422,6 +438,14 @@ describe("ExternalBars real source", function()
                 payload = payload,
             }
         end
+        ns.ErrorLogOnce = function(module, key, message, payload)
+            errorLogs[#errorLogs + 1] = {
+                module = module,
+                key = key,
+                message = message,
+                payload = payload,
+            }
+        end
 
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
@@ -485,6 +509,9 @@ describe("ExternalBars real source", function()
 
         _G.GetTime = function()
             return fakeTime
+        end
+        _G.GetInstanceInfo = function()
+            return "Warsong Gulch", "pvp", 7, "Rated Battleground", 10, false, false, 489
         end
         _G.InCombatLockdown = function()
             return false
@@ -702,6 +729,88 @@ describe("ExternalBars real source", function()
 
         assert.are.equal(0, ExternalBars._activeAuraCount)
         assert.same({ "ExternalBars:UpdateAuras" }, requestLayoutReasons)
+
+        local errorLog = assert(findErrorLog("AuraInfoInaccessible"))
+        assert.are.equal("ExternalBars", errorLog.module)
+        assert.are.equal("Blizzard external aura info is inaccessible", errorLog.message)
+        assert.are.equal("table", errorLog.payload.auraInfoType)
+        assert.is_false(errorLog.payload.canAccessAuraInfo)
+        assert.are.equal("pvp", errorLog.payload.instanceType)
+        assert.are.equal(7, errorLog.payload.difficultyID)
+    end)
+
+    it("logs once and clears external aura state when Blizzard aura info iteration fails", function()
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        local originalIpairs = _G.ipairs
+        _G.ipairs = function(value)
+            if value == viewer.auraInfo then
+                error("attempted to iterate a table that cannot be accessed while tainted")
+            end
+            return originalIpairs(value)
+        end
+
+        local ok, err = pcall(function()
+            ExternalBars:OnExternalAurasUpdated("viewer:UpdateAuras")
+        end)
+        _G.ipairs = originalIpairs
+
+        assert.is_true(ok, err)
+        assert.are.equal(0, ExternalBars._activeAuraCount)
+        assert.same({ "ExternalBars:viewer:UpdateAuras" }, requestLayoutReasons)
+
+        local errorLog = assert(findErrorLog("AuraInfoIterateFailed"))
+        assert.are.equal("ExternalBars", errorLog.module)
+        assert.are.equal("Blizzard external aura info could not be iterated", errorLog.message)
+        assert.are.equal("viewer:UpdateAuras", errorLog.payload.reason)
+        assert.are.equal("table", errorLog.payload.auraInfoType)
+        assert.is_true(errorLog.payload.canAccessAuraInfo)
+        assert.matches("attempted to iterate", errorLog.payload.error)
+    end)
+
+    it("keeps Blizzard table diagnostics behind debug logging", function()
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        local originalPairs = _G.pairs
+        _G.pairs = function(value)
+            if value == viewer.auraFrames then
+                error("attempted to iterate inaccessible auraFrames")
+            end
+            return originalPairs(value)
+        end
+
+        local diagnosticsDisabledOk, diagnosticsDisabledErr = pcall(function()
+            ExternalBars:OnExternalAurasUpdated("diagnostics-disabled")
+        end)
+        assert.is_true(diagnosticsDisabledOk, diagnosticsDisabledErr)
+        assert.is_nil(findErrorLog("AuraFramesDiagnosticsFailed"))
+
+        debugLoggingEnabled = true
+        local diagnosticsEnabledOk, diagnosticsEnabledErr = pcall(function()
+            ExternalBars:OnExternalAurasUpdated("diagnostics-enabled")
+        end)
+        _G.pairs = originalPairs
+        assert.is_true(diagnosticsEnabledOk, diagnosticsEnabledErr)
+
+        local errorLog = assert(findErrorLog("AuraFramesDiagnosticsFailed"))
+        assert.are.equal("pairs", errorLog.payload.operation)
+        assert.are.equal("diagnostics-enabled", errorLog.payload.reason)
     end)
 
     it("emits hook diagnostics when the Blizzard viewer is missing", function()

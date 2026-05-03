@@ -29,9 +29,7 @@ function internal.createCollectionInitializer(self, spec, errorPrefix)
         local activeFrame = controlInitializer._lsbActiveFrame
         if activeFrame then
             applyCollectionFrame(activeFrame, data, controlInitializer)
-            if activeFrame.SetAlpha then
-                activeFrame:SetAlpha(enabled and 1 or 0.5)
-            end
+            activeFrame:SetAlpha(enabled and 1 or 0.5)
             if enabled == false then
                 internal.setCanvasInteractive(self, activeFrame, false)
             end

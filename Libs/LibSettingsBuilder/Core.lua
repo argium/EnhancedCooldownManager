@@ -373,9 +373,7 @@ local function applyActionButtonTextures(button, action, enabled)
     local defaults = ensureActionButtonTextureDefaults(button)
     local textures = action and action.buttonTextures
 
-    if button.SetText then
-        button:SetText(textures and textures.normal and "" or (action and action.text or ""))
-    end
+    button:SetText(textures and textures.normal and "" or (action and action.text or ""))
 
     if textures and textures.normal then
         setButtonTextureState(button, "SetNormalTexture", "GetNormalTexture", textures.normal, nil, 1)
@@ -395,9 +393,7 @@ local function applyActionButtonTextures(button, action, enabled)
             textures.highlightAlpha or 0.25
         )
 
-        if button.SetAlpha then
-            button:SetAlpha(enabled == false and (textures.disabledAlpha or DEFAULT_ACTION_BUTTON_DISABLED_ALPHA) or 1)
-        end
+        button:SetAlpha(enabled == false and (textures.disabledAlpha or DEFAULT_ACTION_BUTTON_DISABLED_ALPHA) or 1)
 
         button._lsbUsesActionButtonTextures = true
         return
@@ -411,9 +407,7 @@ local function applyActionButtonTextures(button, action, enabled)
         button._lsbUsesActionButtonTextures = nil
     end
 
-    if button.SetAlpha then
-        button:SetAlpha(1)
-    end
+    button:SetAlpha(1)
 end
 
 local function setGameTooltipText(text, wrap)
@@ -421,7 +415,7 @@ local function setGameTooltipText(text, wrap)
 end
 
 local function setSimpleTooltip(owner, text)
-    if not owner or not owner.SetScript then
+    if not owner then
         return
     end
 
@@ -438,9 +432,7 @@ local function setSimpleTooltip(owner, text)
         end
 
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if GameTooltip.ClearLines then
-            GameTooltip:ClearLines()
-        end
+        GameTooltip:ClearLines()
         setGameTooltipText(text, true)
         GameTooltip:Show()
     end)
@@ -651,15 +643,9 @@ end
 local function createColorSwatch(parent)
     local swatch = CreateFrame("Button", nil, parent, "SettingsColorSwatchTemplate")
     swatch._tex = swatch.Color
-    if swatch.EnableMouse then
-        swatch:EnableMouse(true)
-    end
-    if swatch.RegisterForClicks then
-        swatch:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    end
-    if swatch.SetPropagateMouseClicks then
-        swatch:SetPropagateMouseClicks(false)
-    end
+    swatch:EnableMouse(true)
+    swatch:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    swatch:SetPropagateMouseClicks(false)
     return swatch
 end
 internal.createColorSwatch = createColorSwatch
@@ -1002,9 +988,7 @@ function internal.isControlEnabled(self, spec)
 end
 
 function internal.applyCanvasState(self, canvas, enabled)
-    if canvas.SetAlpha then
-        canvas:SetAlpha(enabled and 1 or 0.5)
-    end
+    canvas:SetAlpha(enabled and 1 or 0.5)
     internal.setCanvasInteractive(self, canvas, enabled)
 end
 

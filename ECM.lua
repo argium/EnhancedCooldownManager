@@ -36,6 +36,12 @@ function ns.IsDebugEnabled()
     return gc and gc.debug
 end
 
+--- Returns whether targeted error logging is enabled.
+function ns.IsErrorLoggingEnabled()
+    local gc = ns.GetGlobalConfig()
+    return not gc or gc.errorLogging ~= false
+end
+
 --- Returns whether the player is a Death Knight.
 function ns.IsDeathKnight()
     local _, class = UnitClass("player")
@@ -118,6 +124,42 @@ ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
+function ns.ErrorLog(module, message, data)
+    if not ns.IsErrorLoggingEnabled() then
+        return
+    end
+
+    local messageStr = ns.ToString(message)
+    local coloredPrefix = "|cff" .. C.ERROR_COLOR .. "[" .. L["ADDON_ABRV"] .. " Error"
+        .. (module and (" " .. module) or "") .. "]|r "
+
+    print(coloredPrefix .. messageStr)
+
+    if DevTool and DevTool.AddData then
+        pcall(DevTool.AddData, DevTool, {
+            module = module or "nil",
+            message = messageStr,
+            timestamp = GetTime(),
+            data = data and ns.ToString(data),
+        }, coloredPrefix .. messageStr)
+    end
+end
+
+function ns.ErrorLogOnce(module, key, message, data)
+    if not ns.IsErrorLoggingEnabled() then
+        return
+    end
+
+    mod._errorLogOnceKeys = mod._errorLogOnceKeys or {}
+    local onceKey = (module or "nil") .. ":" .. ns.ToString(key)
+    if mod._errorLogOnceKeys[onceKey] then
+        return
+    end
+
+    mod._errorLogOnceKeys[onceKey] = true
+    ns.ErrorLog(module, message, data)
+end
+
 function ns.Log(module, message, data)
     if not ns.IsDebugEnabled() then
         return
@@ -138,6 +180,45 @@ function ns.Log(module, message, data)
     local cfg = ns.GetGlobalConfig()
     if cfg and cfg.debugToChat then
         print(coloredPrefix .. message)
+    end
+end
+
+local function getSecureVariableStatus(owner, key)
+    local ok, secure, taint
+    if key == nil then
+        ok, secure, taint = pcall(_G.issecurevariable, owner)
+    else
+        ok, secure, taint = pcall(_G.issecurevariable, owner, key)
+    end
+    if not ok then
+        return nil
+    end
+    return secure, taint
+end
+
+function ns._CheckChatTaint(reason)
+    local secure, taint = getSecureVariableStatus("ChatFrameUtil")
+    if secure == false then
+        ns.ErrorLogOnce("Taint", "ChatFrameUtil", "ChatFrameUtil is tainted", {
+            reason = reason,
+            source = taint or "unknown",
+        })
+    end
+
+    secure, taint = getSecureVariableStatus(_G.ChatFrameUtil, "SetLastTellTarget")
+    if secure == false then
+        ns.ErrorLogOnce("Taint", "ChatFrameUtil.SetLastTellTarget", "ChatFrameUtil.SetLastTellTarget is tainted", {
+            reason = reason,
+            source = taint or "unknown",
+        })
+    end
+
+    secure, taint = getSecureVariableStatus(_G.ChatFrameMixin, "MessageEventHandler")
+    if secure == false then
+        ns.ErrorLogOnce("Taint", "ChatFrameMixin.MessageEventHandler", "ChatFrameMixin.MessageEventHandler is tainted", {
+            reason = reason,
+            source = taint or "unknown",
+        })
     end
 end
 
@@ -254,6 +335,7 @@ function mod:ChatCommand(input)
         local optionsModule = self:GetModule("Options", true)
         if optionsModule then
             optionsModule:OpenOptions()
+            ns._CheckChatTaint("ChatCommand:options")
         end
         return
     end
@@ -426,6 +508,7 @@ function mod:OnEnable()
     end
 
     self:ShowReleasePopup()
+    ns._CheckChatTaint("OnEnable")
 end
 
 --- Re-evaluates module enable/disable states after a profile change and refreshes layout.

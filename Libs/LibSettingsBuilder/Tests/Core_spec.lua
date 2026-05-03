@@ -167,6 +167,58 @@ describe("LibSettingsBuilder Core", function()
         end)
     end)
 
+    it("does not require standard initializers to expose SetEnabled", function()
+        local originalCreateSlider = Settings.CreateSlider
+        local initializer
+
+        rawset(Settings, "CreateSlider", function(...)
+            initializer = originalCreateSlider(...)
+            initializer.SetEnabled = nil
+            return initializer
+        end)
+
+        local profile = { general = { threshold = 5 } }
+        local defaults = { general = { threshold = 0 } }
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb.New({
+            name = "Predicate Only",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "slider",
+                                    path = "general.threshold",
+                                    name = "Threshold",
+                                    min = 0,
+                                    max = 10,
+                                    disabled = function()
+                                        return true
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        assert.is_nil(initializer.SetEnabled)
+        assert.is_false(initializer:EvaluateModifyPredicates())
+    end)
+
     it("fails early when a raw path-bound row is registered without a path adapter", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
         local ok, err = pcall(function()

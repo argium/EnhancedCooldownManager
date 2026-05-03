@@ -255,15 +255,9 @@ local function showRowTooltip(owner, rowData)
 
     local displayEntry = rowData.displayEntry
     GameTooltip:SetOwner(owner, "ANCHOR_NONE")
-    if GameTooltip.ClearAllPoints then
-        GameTooltip:ClearAllPoints()
-    end
-    if GameTooltip.SetPoint then
-        GameTooltip:SetPoint("BOTTOMLEFT", owner, "TOPRIGHT", 0, 0)
-    end
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint("BOTTOMLEFT", owner, "TOPRIGHT", 0, 0)
+    GameTooltip:ClearLines()
     GameTooltip:SetText(getEntryTooltipTitle(displayEntry), 1, 1, 1, 1, false)
 
     local function tip(text)

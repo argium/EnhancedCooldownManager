@@ -13,6 +13,7 @@ local RACIAL_ABILITIES = ns.Constants.RACIAL_ABILITIES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
 local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
 local UTILITY_BORDER_SCALE = ns.Constants.EXTRA_ICON_UTILITY_BORDER_SCALE
+local canAccessTable = _G.canaccesstable
 
 local BORDER_SCALE_BY_VIEWER = {
     main = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE },
@@ -322,6 +323,32 @@ local function getSiblingFont(viewer)
     end
 end
 
+local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
+    local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
+    if not ok then
+        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey, "Unable to read cooldown viewer item frames", {
+            viewerKey = viewerKey,
+            reason = why,
+            error = itemFrames,
+        })
+        return nil
+    end
+
+    if type(itemFrames) ~= "table" then
+        return nil
+    end
+
+    if not canAccessTable(itemFrames) then
+        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey, "Cooldown viewer item frames are inaccessible", {
+            viewerKey = viewerKey,
+            reason = why,
+        })
+        return nil
+    end
+
+    return itemFrames
+end
+
 --------------------------------------------------------------------------------
 -- Module methods
 --------------------------------------------------------------------------------
@@ -391,7 +418,7 @@ function ExtraIcons:GetMainViewerAnchor()
     return _G[BLIZZ_KEY.main]
 end
 
-function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX, moduleConfig)
+function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOffsetX, moduleConfig, why)
     local blizzFrame = _G[BLIZZ_KEY[viewerKey]]
     local vs = self._viewers[viewerKey]
     if not vs then return false end
@@ -423,19 +450,24 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     local spacing = blizzFrame.childXPadding or 0
     local lastActive = nil
 
-    if blizzFrame.GetItemFrames then
-        for _, itemFrame in ipairs(blizzFrame:GetItemFrames()) do
-            if itemFrame.isActive then
-                iconSize = itemFrame:GetWidth() or iconSize
-                lastActive = itemFrame
+    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerKey, why)
+    if itemFrames then
+        local ok, err = pcall(function()
+            for _, itemFrame in ipairs(itemFrames) do
+                if itemFrame.isActive then
+                    iconSize = itemFrame:GetWidth() or iconSize
+                    lastActive = itemFrame
+                end
             end
-        end
-    else
-        for _, child in ipairs({ blizzFrame:GetChildren() }) do
-            if child and child:IsShown() and child.GetSpellID then
-                iconSize = child:GetWidth() or iconSize
-                break
-            end
+        end)
+        if not ok then
+            iconSize = DEFAULT_SIZE
+            lastActive = nil
+            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerKey, "Unable to iterate cooldown viewer item frames", {
+                viewerKey = viewerKey,
+                reason = why,
+                error = err,
+            })
         end
     end
 
@@ -507,7 +539,7 @@ function ExtraIcons:UpdateLayout(why)
 
     for _, v in ipairs(VIEWERS) do
         local entries = viewers and viewers[v.key] or {}
-        if self:_updateSingleViewer(v.key, entries, isEditing, offsets[v.key], moduleConfig) then
+        if self:_updateSingleViewer(v.key, entries, isEditing, offsets[v.key], moduleConfig, why) then
             anyPlaced = true
         end
     end
@@ -625,6 +657,9 @@ function ExtraIcons:_hookViewer(viewerKey)
     vs.hooked = true
 
     blizzFrame:HookScript("OnShow", function()
+        if not self:IsEnabled() then
+            return
+        end
         ns.Runtime.RequestLayout("ExtraIcons:OnShow")
     end)
     blizzFrame:HookScript("OnHide", function()
@@ -633,6 +668,9 @@ function ExtraIcons:_hookViewer(viewerKey)
         if self:IsEnabled() then ns.Runtime.RequestLayout("ExtraIcons:OnHide") end
     end)
     blizzFrame:HookScript("OnSizeChanged", function()
+        if not self:IsEnabled() then
+            return
+        end
         ns.Runtime.RequestLayout("ExtraIcons:OnSizeChanged")
     end)
 

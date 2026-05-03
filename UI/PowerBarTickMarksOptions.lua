@@ -133,7 +133,7 @@ end
 
 local function updatePickerSwatch(row, color)
     local swatch = row and row._swatch or nil
-    if swatch and swatch.SetColorRGB then
+    if swatch then
         swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
     end
 end

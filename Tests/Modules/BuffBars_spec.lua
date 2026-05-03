@@ -18,6 +18,7 @@ describe("BuffBars real source", function()
     local spellColorStore
     local spellColorGetScopes
     local timerCallbacks
+    local errorLogs
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -135,6 +136,7 @@ describe("BuffBars real source", function()
         addMixinCalls = 0
         spellColorGetScopes = {}
         timerCallbacks = {}
+        errorLogs = {}
         spellColorStore = {
             GetColorForBar = function()
                 return nil
@@ -147,6 +149,9 @@ describe("BuffBars real source", function()
         }
         ns = {
             Log = function() end,
+            ErrorLogOnce = function(module, key, message, data)
+                errorLogs[#errorLogs + 1] = { module = module, key = key, message = message, data = data }
+            end,
             DebugAssert = function() end,
             IsDebugEnabled = function() return false end,
             Constants = nil,
@@ -457,6 +462,28 @@ describe("BuffBars real source", function()
         assert.is_false(BuffBars:IsReady())
     end)
 
+    it("logs and returns false when layout cannot enumerate viewer children", function()
+        function BuffBars:GetGlobalConfig()
+            return {}
+        end
+        function BuffBars:GetModuleConfig()
+            return {}
+        end
+        function BuffBarCooldownViewer:GetChildren()
+            error("attempted to iterate a table that cannot be accessed while tainted")
+        end
+
+        assert.has_no.errors(function()
+            assert.is_false(BuffBars:UpdateLayout("rated-bg"))
+        end)
+
+        assert.are.equal(1, #errorLogs)
+        assert.are.equal("BuffBars", errorLogs[1].module)
+        assert.are.equal("GetChildren", errorLogs[1].key)
+        assert.are.equal("rated-bg", errorLogs[1].data.reason)
+        assert.is_truthy(errorLogs[1].data.error:find("attempted to iterate", 1, true))
+    end)
+
     it("uses FrameMixin positioning for detached mode", function()
         local detachedAnchor = makeHookableFrame({ name = "ECMDetachedAnchor" })
         ns.Runtime.DetachedAnchor = detachedAnchor
@@ -634,8 +661,12 @@ describe("BuffBars real source", function()
 
     it("viewer hooks defer layout and respect the layout-running guard", function()
         local reasons = {}
+        local enabled = true
         ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
+        end
+        function BuffBars:IsEnabled()
+            return enabled
         end
 
         BuffBars:HookViewer()
@@ -643,6 +674,9 @@ describe("BuffBars real source", function()
         BuffBars._layoutRunning = true
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
         BuffBars._layoutRunning = nil
+        BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
+        enabled = false
+        BuffBarCooldownViewer._hooks.OnShow[1]()
         BuffBarCooldownViewer._hooks.OnSizeChanged[1]()
 
         assert.same({ "BuffBars:viewer:OnShow", "BuffBars:viewer:OnSizeChanged" }, reasons)

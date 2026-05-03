@@ -73,11 +73,15 @@ local function makeInitializer(setting)
         _modifyPredicates = {},
         _shownPredicates = {},
         _enabled = true,
+        _setting = setting,
         SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
         end,
         SetEnabled = function(self, enabled)
             self._enabled = enabled
+        end,
+        SetSetting = function(self, newSetting)
+            self._setting = newSetting
         end,
         AddModifyPredicate = function(self, fn)
             self._modifyPredicates[#self._modifyPredicates + 1] = fn
@@ -85,8 +89,8 @@ local function makeInitializer(setting)
         AddShownPredicate = function(self, fn)
             self._shownPredicates[#self._shownPredicates + 1] = fn
         end,
-        GetSetting = function()
-            return setting
+        GetSetting = function(self)
+            return self._setting
         end,
         EvaluateModifyPredicates = function(self)
             for _, fn in ipairs(self._modifyPredicates) do
@@ -456,6 +460,9 @@ function TestHelpers.SetupSettingsStubs()
             self.data = self.data or {}
             self.data.setting = setting
         end,
+        SetEnabled = function(self, enabled)
+            self._enabled = enabled
+        end,
         SetParentInitializer = function(self, parent, _)
             self._parentInit = parent
         end,
@@ -496,11 +503,90 @@ function TestHelpers.color(r, g, b, a)
 end
 
 function TestHelpers.makeRegion(regionType)
-    local region = { __objectType = regionType or "Texture", __calls = {} }
+    local region = {
+        __objectType = regionType or "Texture",
+        __calls = {},
+        __shown = true,
+        __anchors = {},
+        __alpha = 1,
+        __height = 0,
+        __width = 0,
+        __scripts = {},
+        __mouseEnabled = false,
+    }
     function region:IsObjectType(expected)
         return self.__objectType == expected
     end
+    function region:Show()
+        TestHelpers.incCalls(self, "Show")
+        self.__shown = true
+    end
+    function region:Hide()
+        TestHelpers.incCalls(self, "Hide")
+        self.__shown = false
+    end
+    function region:IsShown()
+        return self.__shown
+    end
+    function region:SetShown(shown)
+        if shown then
+            self:Show()
+        else
+            self:Hide()
+        end
+    end
     function region:SetAllPoints() end
+    function region:ClearAllPoints()
+        TestHelpers.incCalls(self, "ClearAllPoints")
+        self.__anchors = {}
+    end
+    function region:SetPoint(point, relativeTo, relativePoint, x, y)
+        TestHelpers.incCalls(self, "SetPoint")
+        self.__anchors[#self.__anchors + 1] = { point, relativeTo, relativePoint, x or 0, y or 0 }
+    end
+    function region:GetPoint(index)
+        local anchor = self.__anchors[index or 1]
+        if anchor then
+            return anchor[1], anchor[2], anchor[3], anchor[4], anchor[5]
+        end
+    end
+    function region:SetSize(width, height)
+        self.__width = width
+        self.__height = height
+    end
+    function region:GetSize()
+        return self.__width, self.__height
+    end
+    function region:SetWidth(width)
+        self.__width = width
+    end
+    function region:GetWidth()
+        return self.__width
+    end
+    function region:SetHeight(height)
+        self.__height = height
+    end
+    function region:GetHeight()
+        return self.__height
+    end
+    function region:SetAlpha(alpha)
+        self.__alpha = alpha
+    end
+    function region:GetAlpha()
+        return self.__alpha
+    end
+    function region:SetScript(event, callback)
+        self.__scripts[event] = callback
+    end
+    function region:GetScript(event)
+        return self.__scripts[event]
+    end
+    function region:EnableMouse(enabled)
+        self.__mouseEnabled = enabled == true
+    end
+    function region:IsMouseEnabled()
+        return self.__mouseEnabled
+    end
     return region
 end
 
@@ -544,6 +630,17 @@ function TestHelpers.makeTexture(opts)
     function texture:GetTexture()
         return self.__texture
     end
+    function texture:SetAtlas(atlas)
+        incCalls(self, "SetAtlas")
+        self.__atlas = atlas
+    end
+    function texture:SetDesaturated(desaturated)
+        incCalls(self, "SetDesaturated")
+        self.__desaturated = desaturated
+    end
+    function texture:IsDesaturated()
+        return self.__desaturated == true
+    end
 
     return texture
 end
@@ -565,8 +662,13 @@ function TestHelpers.makeFrame(opts)
         __frameStrata = opts.frameStrata,
         __anchors = anchors,
         __regions = opts.regions or {},
+        _children = opts.children or {},
         __scripts = opts.scripts or {},
         __calls = {},
+        __enabled = opts.enabled ~= false,
+        __mouseEnabled = false,
+        __scale = opts.scale or 1,
+        __text = opts.text,
     }
 
     function frame:GetName()
@@ -590,6 +692,12 @@ function TestHelpers.makeFrame(opts)
     function frame:GetSize()
         return self.__width, self.__height
     end
+    function frame:SetScale(scale)
+        self.__scale = scale
+    end
+    function frame:GetScale()
+        return self.__scale
+    end
     function frame:SetFrameStrata(strata)
         self.__frameStrata = strata
     end
@@ -607,6 +715,101 @@ function TestHelpers.makeFrame(opts)
     end
     function frame:IsShown()
         return self.__shown
+    end
+    function frame:SetShown(shown)
+        if shown then
+            self:Show()
+        else
+            self:Hide()
+        end
+    end
+    function frame:EnableMouse(enabled)
+        incCalls(self, "EnableMouse")
+        self.__mouseEnabled = enabled == true
+    end
+    function frame:IsMouseEnabled()
+        return self.__mouseEnabled
+    end
+    function frame:SetEnabled(enabled)
+        incCalls(self, "SetEnabled")
+        self.__enabled = enabled ~= false
+    end
+    function frame:IsEnabled()
+        return self.__enabled
+    end
+    function frame:RegisterForClicks(...)
+        incCalls(self, "RegisterForClicks")
+        self.__registeredClicks = { ... }
+    end
+    function frame:SetPropagateMouseClicks(propagate)
+        incCalls(self, "SetPropagateMouseClicks")
+        self.__propagateMouseClicks = propagate
+    end
+    function frame:SetText(text)
+        incCalls(self, "SetText")
+        self.__text = text
+    end
+    function frame:GetText()
+        return self.__text
+    end
+    function frame:SetAutoFocus(autoFocus)
+        self.__autoFocus = autoFocus
+    end
+    function frame:SetNumeric(numeric)
+        self.__numeric = numeric
+    end
+    function frame:SetMaxLetters(maxLetters)
+        self.__maxLetters = maxLetters
+    end
+    function frame:SetTextInsets(left, right, top, bottom)
+        self.__textInsets = { left, right, top, bottom }
+    end
+    function frame:SetFocus()
+        self.__hasFocus = true
+    end
+    function frame:ClearFocus()
+        self.__hasFocus = false
+    end
+    function frame:HasFocus()
+        return self.__hasFocus == true
+    end
+    function frame:LockHighlight()
+        self.__highlightLocked = true
+    end
+    function frame:UnlockHighlight()
+        self.__highlightLocked = false
+    end
+    local function setButtonTexture(self, key, textureValue)
+        if type(textureValue) == "table" and textureValue.SetTexture then
+            self[key] = textureValue
+            return
+        end
+        self[key] = self[key] or TestHelpers.makeTexture()
+        self[key]:SetTexture(textureValue)
+    end
+    function frame:SetNormalTexture(texture)
+        setButtonTexture(self, "__normalTexture", texture)
+    end
+    function frame:GetNormalTexture()
+        return self.__normalTexture
+    end
+    function frame:SetPushedTexture(texture)
+        setButtonTexture(self, "__pushedTexture", texture)
+    end
+    function frame:GetPushedTexture()
+        return self.__pushedTexture
+    end
+    function frame:SetDisabledTexture(texture)
+        setButtonTexture(self, "__disabledTexture", texture)
+    end
+    function frame:GetDisabledTexture()
+        return self.__disabledTexture
+    end
+    function frame:SetHighlightTexture(texture)
+        setButtonTexture(self, "__highlightTexture", texture)
+    end
+    function frame:GetHighlightTexture()
+        return self.__highlightTexture
     end
     function frame:SetAllPoints() end
     function frame:ClearAllPoints()
@@ -629,6 +832,9 @@ function TestHelpers.makeFrame(opts)
     function frame:GetRegions()
         return unpack_fn(self.__regions)
     end
+    function frame:GetChildren()
+        return unpack_fn(self._children)
+    end
     function frame:SetScript(event, callback)
         self.__scripts[event] = callback
     end
@@ -645,6 +851,10 @@ function TestHelpers.makeFrame(opts)
         if self.__registeredEvents then
             self.__registeredEvents[event] = nil
         end
+    end
+    function frame:UnregisterAllEvents()
+        self.__unregisteredAllEvents = true
+        self.__registeredEvents = {}
     end
     function frame:HookScript() end
     function frame:GetEffectiveScale()
@@ -665,6 +875,52 @@ function TestHelpers.makeFrame(opts)
     end
     function frame:IsObjectType()
         return false
+    end
+    function frame:CreateTexture()
+        local texture = TestHelpers.makeTexture()
+        texture.__parent = self
+        return texture
+    end
+    function frame:CreateFontString()
+        local fontString = TestHelpers.makeRegion("FontString")
+        fontString.__parent = self
+        fontString.SetText = function(region, text)
+            region.__text = text
+        end
+        fontString.GetText = function(region)
+            return region.__text
+        end
+        fontString.SetFont = function(region, path, size, flags)
+            region.__font = { path, size, flags }
+        end
+        fontString.GetFont = function(region)
+            if region.__font then
+                return region.__font[1], region.__font[2], region.__font[3]
+            end
+        end
+        fontString.SetFontObject = function(region, fontObject)
+            region.__fontObject = fontObject
+        end
+        fontString.GetFontObject = function(region)
+            return region.__fontObject
+        end
+        fontString.SetTextColor = function(region, r, g, b, a)
+            region.__textColor = { r, g, b, a or 1 }
+        end
+        fontString.GetTextColor = function(region)
+            local color = region.__textColor or { 1, 1, 1, 1 }
+            return color[1], color[2], color[3], color[4]
+        end
+        fontString.SetWordWrap = function(region, wordWrap)
+            region.__wordWrap = wordWrap
+        end
+        fontString.SetJustifyH = function(region, justify)
+            region.__justifyH = justify
+        end
+        fontString.SetJustifyV = function(region, justify)
+            region.__justifyV = justify
+        end
+        return fontString
     end
 
     return frame
@@ -909,6 +1165,9 @@ function TestHelpers.SetupGameTooltipStub()
         SetPoint = function(self, point, relativeTo, relativePoint, x, y)
             self._point = { point, relativeTo, relativePoint, x, y }
         end,
+        ClearAllPoints = function(self)
+            self._point = nil
+        end,
         ClearLines = function(self)
             self._title = nil
             self._titleColor = nil
@@ -1125,6 +1384,8 @@ function TestHelpers.SetupOptionsGlobals()
         local vertexColor = { 1, 1, 1, 1 }
         local textColor = { 1, 1, 1, 1 }
         local texture = nil
+        local propagateMouseClicks = nil
+        local scale = 1
         f.SetScript = function(self, event, fn)
             self.scripts[event] = fn
         end
@@ -1166,6 +1427,13 @@ function TestHelpers.SetupOptionsGlobals()
         f.IsShown = function()
             return shown
         end
+        f.SetShown = function(self, isShown)
+            if isShown then
+                self:Show()
+            else
+                self:Hide()
+            end
+        end
         f.SetAlpha = function(_, newAlpha)
             alpha = newAlpha
         end
@@ -1177,6 +1445,12 @@ function TestHelpers.SetupOptionsGlobals()
         end
         f.IsMouseEnabled = function()
             return mouseEnabled
+        end
+        f.SetPropagateMouseClicks = function(_, propagate)
+            propagateMouseClicks = propagate
+        end
+        f.GetPropagateMouseClicks = function()
+            return propagateMouseClicks
         end
         f.GetChildren = function()
             return
@@ -1193,12 +1467,17 @@ function TestHelpers.SetupOptionsGlobals()
         f.UnregisterEvent = function(_, event)
             registeredEvents[event] = nil
         end
+        f.UnregisterAllEvents = function()
+            registeredEvents = {}
+        end
         f.IsEventRegistered = function(_, event)
             return registeredEvents[event] == true
         end
         f.RegisterForClicks = noop
         f.SetAutoFocus = noop
         f.SetNumeric = noop
+        f.SetMaxLetters = noop
+        f.SetTextInsets = noop
         f.SetText = function(_, newText)
             text = newText
             highlighted = false
@@ -1219,6 +1498,34 @@ function TestHelpers.SetupOptionsGlobals()
         f.GetTexture = function()
             return texture
         end
+        local function setButtonTexture(self, key, newTexture)
+            self[key] = self[key] or makeFrameStub()
+            self[key]:SetTexture(newTexture)
+        end
+        f.SetNormalTexture = function(self, newTexture)
+            setButtonTexture(self, "_normalTexture", newTexture)
+        end
+        f.GetNormalTexture = function(self)
+            return self._normalTexture
+        end
+        f.SetPushedTexture = function(self, newTexture)
+            setButtonTexture(self, "_pushedTexture", newTexture)
+        end
+        f.GetPushedTexture = function(self)
+            return self._pushedTexture
+        end
+        f.SetDisabledTexture = function(self, newTexture)
+            setButtonTexture(self, "_disabledTexture", newTexture)
+        end
+        f.GetDisabledTexture = function(self)
+            return self._disabledTexture
+        end
+        f.SetHighlightTexture = function(self, newTexture)
+            setButtonTexture(self, "_highlightTexture", newTexture)
+        end
+        f.GetHighlightTexture = function(self)
+            return self._highlightTexture
+        end
         f.SetDesaturated = function(_, isDesaturated)
             desaturated = not not isDesaturated
         end
@@ -1236,6 +1543,12 @@ function TestHelpers.SetupOptionsGlobals()
         end
         f.GetFontObject = function()
             return fontObject
+        end
+        f.SetScale = function(_, newScale)
+            scale = newScale
+        end
+        f.GetScale = function()
+            return scale
         end
         f.SetFocus = function(self)
             if focusedFrame and focusedFrame ~= self and focusedFrame.ClearFocus then
@@ -1255,6 +1568,12 @@ function TestHelpers.SetupOptionsGlobals()
         end
         f.HighlightText = function()
             highlighted = true
+        end
+        f.LockHighlight = function()
+            highlighted = true
+        end
+        f.UnlockHighlight = function()
+            highlighted = false
         end
         f.IsTextHighlighted = function()
             return highlighted

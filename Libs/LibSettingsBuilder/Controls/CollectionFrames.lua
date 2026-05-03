@@ -28,14 +28,10 @@ local function preventMouseClickPropagation(frame)
     if not frame then
         return
     end
-    if frame.SetPropagateMouseClicks then
-        frame:SetPropagateMouseClicks(false)
-    end
-    if frame.GetChildren then
-        local children = { frame:GetChildren() }
-        for i = 1, #children do
-            preventMouseClickPropagation(children[i])
-        end
+    frame:SetPropagateMouseClicks(false)
+    local children = { frame:GetChildren() }
+    for i = 1, #children do
+        preventMouseClickPropagation(children[i])
     end
 end
 
@@ -62,10 +58,10 @@ local function applyCollectionRowStyle(row, item)
         iconDesaturated = disabled
     end
 
-    if row._label and row._label.SetFontObject and labelFontObject then
+    if row._label and labelFontObject then
         row._label:SetFontObject(labelFontObject)
     end
-    if row._label and row._label.SetTextColor then
+    if row._label then
         if item and item.labelColor then
             row._label:SetTextColor(
                 item.labelColor[1] or 1,
@@ -77,16 +73,16 @@ local function applyCollectionRowStyle(row, item)
             row._label:SetTextColor(getFontObjectTextColor(labelFontObject))
         end
     end
-    if row._label and row._label.SetAlpha then
+    if row._label then
         row._label:SetAlpha(alpha)
     end
-    if row._icon and row._icon.SetAlpha then
+    if row._icon then
         row._icon:SetAlpha(alpha)
     end
-    if row._icon and row._icon.SetDesaturated then
+    if row._icon then
         row._icon:SetDesaturated(iconDesaturated == true)
     end
-    if row._icon and row._icon.SetVertexColor then
+    if row._icon then
         local color = item and item.iconVertexColor
         if color then
             row._icon:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
@@ -99,10 +95,10 @@ end
 local function setCollectionRowHighlight(row, shown)
     local highlight = row and row._highlight
     if shown then
-        if highlight and highlight.Show then
+        if highlight then
             highlight:Show()
         end
-    elseif highlight and highlight.Hide then
+    elseif highlight then
         highlight:Hide()
     end
 end
@@ -128,34 +124,28 @@ local function updateActionRowTooltipOwner(row)
 end
 
 local function bindCollectionRowTooltip(row, item)
-    if not row or not row.SetScript then
+    if not row then
         return
     end
 
     local label = row._label
     local tooltipOwner = row._tooltipOwner or label
-    if row.EnableMouse then
-        row:EnableMouse(item ~= nil)
-    end
+    row:EnableMouse(item ~= nil)
 
     row:SetScript("OnEnter", nil)
     row:SetScript("OnLeave", nil)
-    if label and label.SetScript then
+    if label then
         label:SetScript("OnEnter", nil)
         label:SetScript("OnLeave", nil)
     end
-    if label and label.EnableMouse then
+    if label then
         label:EnableMouse(false)
     end
     if tooltipOwner and tooltipOwner ~= label then
         tooltipOwner:SetScript("OnEnter", nil)
         tooltipOwner:SetScript("OnLeave", nil)
-        if tooltipOwner.EnableMouse then
-            tooltipOwner:EnableMouse(false)
-        end
-        if tooltipOwner.Hide then
-            tooltipOwner:Hide()
-        end
+        tooltipOwner:EnableMouse(false)
+        tooltipOwner:Hide()
     end
 
     if not item then
@@ -169,25 +159,19 @@ local function bindCollectionRowTooltip(row, item)
         setCollectionRowHighlight(self, false)
     end)
 
-    if not tooltipOwner or not tooltipOwner.SetScript or (not item.onEnter and not item.tooltip) then
+    if not tooltipOwner or (not item.onEnter and not item.tooltip) then
         return
     end
 
-    if tooltipOwner.EnableMouse then
-        tooltipOwner:EnableMouse(true)
-    end
-    if tooltipOwner.Show then
-        tooltipOwner:Show()
-    end
+    tooltipOwner:EnableMouse(true)
+    tooltipOwner:Show()
     tooltipOwner:SetScript("OnEnter", function(self)
         setCollectionRowHighlight(row, true)
         if item.onEnter then
             item.onEnter(self, item)
         elseif GameTooltip then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            if GameTooltip.ClearLines then
-                GameTooltip:ClearLines()
-            end
+            GameTooltip:ClearLines()
             setGameTooltipText(item.tooltip, true)
             GameTooltip:Show()
         end
@@ -270,11 +254,9 @@ local function refreshSwatchCollectionRow(row, item)
             onClick(item, row)
         end
     end)
-    if row._swatch.SetEnabled then
-        local enabled = evaluateStaticOrFunction(item.enabled, item, row) ~= false
-            and evaluateStaticOrFunction(color.enabled, item, row) ~= false
-        row._swatch:SetEnabled(enabled)
-    end
+    local enabled = evaluateStaticOrFunction(item.enabled, item, row) ~= false
+        and evaluateStaticOrFunction(color.enabled, item, row) ~= false
+    row._swatch:SetEnabled(enabled)
 end
 
 local function ensureEditorCollectionRow(row)
@@ -295,9 +277,7 @@ local function ensureEditorCollectionRow(row)
     row._swatch = internal.createColorSwatch(row)
     row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     preventMouseClickPropagation(row._removeButton)
-    if row._removeButton.RegisterForClicks then
-        row._removeButton:RegisterForClicks("LeftButtonUp")
-    end
+    row._removeButton:RegisterForClicks("LeftButtonUp")
     row._removeButton:SetSize(70, 22)
 end
 
@@ -403,9 +383,7 @@ local function refreshEditorCollectionRow(row, item)
             item.remove.onClick(item, row)
         end
     end)
-    if row._removeButton.SetEnabled then
-        row._removeButton:SetEnabled(item.remove == nil or item.remove.enabled ~= false)
-    end
+    row._removeButton:SetEnabled(item.remove == nil or item.remove.enabled ~= false)
     setSimpleTooltip(row._removeButton, item.remove and item.remove.tooltip)
 
     row._lsbRefreshing = true
@@ -415,9 +393,7 @@ local function refreshEditorCollectionRow(row, item)
         widgets.slider._lsbMinValue = field.min or 0
         widgets.slider._lsbMaxValue = field.max or 1
         widgets.slider._lsbStep = field.step or 1
-        if widgets.slider.SetValue then
-            widgets.slider:SetValue(field.value or 0)
-        end
+        widgets.slider:SetValue(field.value or 0)
         widgets.valueText:SetText(tostring(field.value or 0))
     end
     row._lsbRefreshing = nil
@@ -429,9 +405,7 @@ local function refreshEditorCollectionRow(row, item)
         end
     end)
     setSimpleTooltip(row._swatch, color.tooltip)
-    if row._swatch.SetEnabled then
-        row._swatch:SetEnabled(color.enabled ~= false)
-    end
+    row._swatch:SetEnabled(color.enabled ~= false)
 end
 
 local ACTION_BUTTON_ORDER = { "up", "down", "move", "delete" }
@@ -456,12 +430,8 @@ local function applyActionButtonIcon(button, action, enabled)
     if not iconTexture then
         if icon then
             setTextureValue(icon, nil)
-            if icon.SetDesaturated then
-                icon:SetDesaturated(false)
-            end
-            if icon.SetVertexColor then
-                icon:SetVertexColor(1, 1, 1, 1)
-            end
+            icon:SetDesaturated(false)
+            icon:SetVertexColor(1, 1, 1, 1)
             icon:Hide()
         end
         return
@@ -473,45 +443,35 @@ local function applyActionButtonIcon(button, action, enabled)
     icon:SetPoint("CENTER", button, "CENTER", 0, 0)
     icon:SetSize(action.iconSize or 16, action.iconSize or 16)
     icon:SetAlpha(disabled and (action.disabledIconAlpha or action.iconAlpha or 1) or (action.iconAlpha or 1))
-    if icon.SetDesaturated then
-        icon:SetDesaturated(disabled)
-    end
-    if icon.SetVertexColor then
-        if disabled then
-            icon:SetVertexColor(
-                DISABLED_ACTION_ICON_COLOR[1],
-                DISABLED_ACTION_ICON_COLOR[2],
-                DISABLED_ACTION_ICON_COLOR[3],
-                DISABLED_ACTION_ICON_COLOR[4]
-            )
-        else
-            icon:SetVertexColor(1, 1, 1, 1)
-        end
+    icon:SetDesaturated(disabled)
+    if disabled then
+        icon:SetVertexColor(
+            DISABLED_ACTION_ICON_COLOR[1],
+            DISABLED_ACTION_ICON_COLOR[2],
+            DISABLED_ACTION_ICON_COLOR[3],
+            DISABLED_ACTION_ICON_COLOR[4]
+        )
+    else
+        icon:SetVertexColor(1, 1, 1, 1)
     end
     setTextureValue(icon, iconTexture)
     icon:Show()
 
-    if button.SetText then
-        button:SetText("")
-    end
+    button:SetText("")
 end
 
 local function applyActionButtonState(button, enabled)
     local interactive = enabled ~= false
-    if button.EnableMouse then
-        button:EnableMouse(interactive)
-    end
-    if button.UnlockHighlight then
-        button:UnlockHighlight()
-    end
+    button:EnableMouse(interactive)
+    button:UnlockHighlight()
 
-    local highlight = button.GetHighlightTexture and button:GetHighlightTexture() or nil
-    if highlight and highlight.SetAlpha then
+    local highlight = button:GetHighlightTexture()
+    if highlight then
         if interactive then
             highlight:SetAlpha(button._lsbDisabledHighlightAlpha or 1)
             button._lsbDisabledHighlightAlpha = nil
         else
-            if button._lsbDisabledHighlightAlpha == nil and highlight.GetAlpha then
+            if button._lsbDisabledHighlightAlpha == nil then
                 button._lsbDisabledHighlightAlpha = highlight:GetAlpha()
             end
             highlight:SetAlpha(0)
@@ -551,15 +511,11 @@ local function ensureActionsCollectionRow(row)
     row._textureButtons = {}
     for _, key in ipairs(ACTION_BUTTON_ORDER) do
         local button = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        if button.RegisterForClicks then
-            button:RegisterForClicks("LeftButtonUp")
-        end
+        button:RegisterForClicks("LeftButtonUp")
         row._buttons[key] = button
 
         button = CreateFrame("Button", nil, row)
-        if button.RegisterForClicks then
-            button:RegisterForClicks("LeftButtonUp")
-        end
+        button:RegisterForClicks("LeftButtonUp")
         row._textureButtons[key] = button
     end
 end
@@ -594,9 +550,7 @@ local function refreshActionsCollectionRow(row, item)
             end
             applyActionButtonTextures(button, action, enabled)
             applyActionButtonIcon(button, action, enabled)
-            if button.SetEnabled then
-                button:SetEnabled(enabled)
-            end
+            button:SetEnabled(enabled)
             applyActionButtonState(button, enabled)
             setSimpleTooltip(button, enabled ~= false and evaluateStaticOrFunction(action.tooltip, action, row, item) or nil)
             button:SetScript("OnClick", function()
@@ -643,15 +597,9 @@ local function ensureModeInputRow(row)
     row._editBox:SetPoint("LEFT", row._modeButton, "RIGHT", 6, 0)
     row._editBox:SetSize(120, 20)
     row._editBox:SetAutoFocus(false)
-    if row._editBox.SetNumeric then
-        row._editBox:SetNumeric(true)
-    end
-    if row._editBox.SetMaxLetters then
-        row._editBox:SetMaxLetters(10)
-    end
-    if row._editBox.SetTextInsets then
-        row._editBox:SetTextInsets(6, 6, 0, 0)
-    end
+    row._editBox:SetNumeric(true)
+    row._editBox:SetMaxLetters(10)
+    row._editBox:SetTextInsets(6, 6, 0, 0)
 
     row._placeholder = row._editBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     row._placeholder:SetPoint("LEFT", row._editBox, "LEFT", 6, 0)
@@ -736,9 +684,7 @@ local function ensureModeInputRow(row)
         if trailer and trailer.onEscapePressed then
             trailer.onEscapePressed(trailer, row, row._lsbSectionData)
         end
-        if self.ClearFocus then
-            self:ClearFocus()
-        end
+        self:ClearFocus()
         row._lsbHasFocus = false
         if row._lsbTrailerRefresh then
             row._lsbTrailerRefresh(row)
@@ -783,18 +729,14 @@ local function refreshModeInputRow(row, trailer, sectionData)
                 activeRow._lsbTrailerRefresh(activeRow)
             end
         end)
-        if activeRow._modeButton.SetEnabled then
-            activeRow._modeButton:SetEnabled(not disabled and modeEnabled ~= false)
-        end
+        activeRow._modeButton:SetEnabled(not disabled and modeEnabled ~= false)
 
-        if activeRow._editBox.GetText and activeRow._editBox:GetText() ~= text then
+        if activeRow._editBox:GetText() ~= text then
             activeRow._lsbSyncingText = true
             activeRow._editBox:SetText(text)
             activeRow._lsbSyncingText = nil
         end
-        if activeRow._editBox.SetEnabled then
-            activeRow._editBox:SetEnabled(not disabled and inputEnabled ~= false)
-        end
+        activeRow._editBox:SetEnabled(not disabled and inputEnabled ~= false)
 
         activeRow._placeholder:SetText(placeholder or "")
         if activeRow._lsbHasFocus or text ~= "" then
@@ -830,9 +772,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
                 end
             end
         end)
-        if activeRow._submitButton.SetEnabled then
-            activeRow._submitButton:SetEnabled(canSubmit)
-        end
+        activeRow._submitButton:SetEnabled(canSubmit)
     end
 
     row._lsbTrailerRefresh(row)

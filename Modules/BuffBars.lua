@@ -16,6 +16,21 @@ local function getSpellColors()
     return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
 end
 
+local function collectViewerChildren(viewer, why)
+    local ok, children = pcall(function()
+        return { viewer:GetChildren() }
+    end)
+    if not ok then
+        ns.ErrorLogOnce("BuffBars", "GetChildren", "Unable to read buff bar children", {
+            reason = why,
+            error = children,
+        })
+        return nil
+    end
+
+    return children
+end
+
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
 ---@field Bar StatusBar
@@ -26,9 +41,14 @@ end
 ---@field cooldownID number|nil
 ---@field cooldownInfo { spellID: number|nil }|nil
 
-local function getChildrenOrdered(viewer)
+local function getChildrenOrdered(viewer, why)
+    local children = collectViewerChildren(viewer, why)
+    if not children then
+        return nil
+    end
+
     local result = {}
-    for insertOrder, child in ipairs({ viewer:GetChildren() }) do
+    for insertOrder, child in ipairs(children) do
         if child and not child.ignoreInLayout then
             result[#result + 1] = {
                 frame = child,
@@ -193,7 +213,11 @@ function BuffBars:UpdateLayout(why)
 
     -- Discover bars regardless of visibility so the spell colours options
     -- panel has the full list even when hidden (e.g. resting).
-    local visibleChildren = getChildrenOrdered(viewer)
+    local visibleChildren = getChildrenOrdered(viewer, why)
+    if not visibleChildren then
+        return false
+    end
+
     for _, entry in ipairs(visibleChildren) do
         spellColors:DiscoverBar(entry.frame)
     end
@@ -288,7 +312,11 @@ function BuffBars:GetActiveSpellData()
         return {}
     end
 
-    local ordered = getChildrenOrdered(viewer)
+    local ordered = getChildrenOrdered(viewer, "GetActiveSpellData")
+    if not ordered then
+        return {}
+    end
+
     local result = {}
     for _, entry in ipairs(ordered) do
         local frame = entry.frame
@@ -315,12 +343,15 @@ function BuffBars:HookViewer()
     self._viewerHooked = true
 
     viewer:HookScript("OnShow", function()
+        if not self:IsEnabled() then
+            return
+        end
         ns.Runtime.RequestLayout("BuffBars:viewer:OnShow")
     end)
 
     -- Hook OnSizeChanged for responsive layout
     viewer:HookScript("OnSizeChanged", function()
-        if self._layoutRunning then
+        if not self:IsEnabled() or self._layoutRunning then
             return
         end
         ns.Runtime.RequestLayout("BuffBars:viewer:OnSizeChanged", { secondPass = true })

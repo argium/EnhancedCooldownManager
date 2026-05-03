@@ -22,6 +22,12 @@ local AdvancedOptions = {
                 },
                 {
                     type = "checkbox",
+                    path = "errorLogging",
+                    name = L["ERROR_LOGGING"],
+                    tooltip = L["ERROR_LOGGING_DESC"],
+                },
+                {
+                    type = "checkbox",
                     path = "debugToChat",
                     name = L["DEBUG_TO_CHAT"],
                     tooltip = L["DEBUG_TO_CHAT_DESC"],

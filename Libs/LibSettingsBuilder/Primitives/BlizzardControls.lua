@@ -160,13 +160,13 @@ local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
     end
 
     local function hideEditBox()
-        if slider._lsbEditBox and slider._lsbEditBox.ClearFocus then
+        if slider._lsbEditBox then
             slider._lsbEditBox:ClearFocus()
         end
         if slider._lsbEditBox then
             slider._lsbEditBox:Hide()
         end
-        if textLabel and textLabel.Show then
+        if textLabel then
             textLabel:Show()
         end
     end
@@ -201,9 +201,7 @@ local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
 
     local valueButton = CreateFrame("Button", nil, slider)
     valueButton:RegisterForClicks("LeftButtonDown")
-    if valueButton.SetPropagateMouseClicks then
-        valueButton:SetPropagateMouseClicks(false)
-    end
+    valueButton:SetPropagateMouseClicks(false)
     valueButton:SetAllPoints(textLabel)
     slider._lsbValueButton = valueButton
 
@@ -257,7 +255,7 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged, r
         slider._lsbSuppressValueChanged = true
         local ok, err = pcall(function()
             slider:Init(field.value or minValue, minValue, maxValue, getSliderStepCount(minValue, maxValue, step), createInlineSliderFormatters())
-            if slider.Slider and slider.Slider.SetValueStep then
+            if slider.Slider then
                 slider.Slider:SetValueStep(step)
             end
         end)
@@ -276,7 +274,7 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged, r
     if not slider._lsbValueChangedBound then
         local function handleValueChanged(_, value)
             local rounded = roundSliderValue(value, slider._lsbStep, slider._lsbMinValue, slider._lsbMaxValue)
-            if textLabel and textLabel.SetText then
+            if textLabel then
                 textLabel:SetText(tostring(rounded))
             end
             if not slider._lsbSuppressValueChanged and slider._lsbOnValueChanged then
@@ -370,9 +368,7 @@ if not lib._sliderHookInstalled then
                 return
             end
 
-            if valueButton.ClearAllPoints then
-                valueButton:ClearAllPoints()
-            end
+            valueButton:ClearAllPoints()
             valueButton:SetAllPoints(valueLabel)
         end
 
@@ -432,7 +428,7 @@ if not lib._sliderHookInstalled then
 
             anchorSliderValueButton(self)
 
-            if self._lsbEditBox and self._lsbEditBox.ClearFocus then
+            if self._lsbEditBox then
                 self._lsbEditBox:ClearFocus()
                 self._lsbEditBox:Hide()
             end

@@ -144,13 +144,11 @@ local function applyHeaderActionButtons(frame, actions, actionParent, rightAncho
             end
             button:SetSize(action.width or 100, action.height or 22)
             button:SetText(action.text or action.name or "")
-            if button.SetEnabled then
-                local enabled = evaluateStaticOrFunction(action.enabled, action, frame)
-                if enabled == nil then
-                    enabled = true
-                end
-                button:SetEnabled(enabled)
+            local enabled = evaluateStaticOrFunction(action.enabled, action, frame)
+            if enabled == nil then
+                enabled = true
             end
+            button:SetEnabled(enabled)
             internal.setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
             button:SetScript("OnClick", function()
                 if action.onClick then
@@ -233,15 +231,9 @@ local function applyInfoRowFrame(frame, data)
         value:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
     end
 
-    if value.SetWordWrap then
-        value:SetWordWrap(isMultiline)
-    end
-    if value.SetJustifyV then
-        value:SetJustifyV(isMultiline and "TOP" or "MIDDLE")
-    end
-    if value.SetJustifyH then
-        value:SetJustifyH("LEFT")
-    end
+    value:SetWordWrap(isMultiline)
+    value:SetJustifyV(isMultiline and "TOP" or "MIDDLE")
+    value:SetJustifyH("LEFT")
     value:SetText(resolvedValue or "")
     if not isWide then
         title:Show()
@@ -356,21 +348,15 @@ local function applyInputRowEnabledState(frame, enabled)
         return
     end
 
-    if frame.SetAlpha then
-        frame:SetAlpha(enabled and 1 or 0.5)
-    end
+    frame:SetAlpha(enabled and 1 or 0.5)
 
     local editBox = frame._lsbInputEditBox
     if not editBox then
         return
     end
 
-    if editBox.SetEnabled then
-        editBox:SetEnabled(enabled)
-    end
-    if editBox.EnableMouse then
-        editBox:EnableMouse(enabled)
-    end
+    editBox:SetEnabled(enabled)
+    editBox:EnableMouse(enabled)
 end
 
 local function applyInputRowFrame(frame, data)
@@ -387,15 +373,11 @@ local function applyInputRowFrame(frame, data)
     editBox:ClearAllPoints()
     editBox:SetPoint(hasPreview and "TOPLEFT" or "LEFT", frame, "CENTER", -80, hasPreview and -2 or 0)
     editBox:SetSize(data.width or 140, 20)
-    if editBox.SetNumeric then
-        editBox:SetNumeric(data.numeric == true)
-    end
-    if editBox.SetMaxLetters and data.maxLetters then
+    editBox:SetNumeric(data.numeric == true)
+    if data.maxLetters then
         editBox:SetMaxLetters(data.maxLetters)
     end
-    if editBox.SetTextInsets then
-        editBox:SetTextInsets(6, 6, 0, 0)
-    end
+    editBox:SetTextInsets(6, 6, 0, 0)
     editBox:Show()
 
     preview:ClearAllPoints()
@@ -432,9 +414,7 @@ local function applyInputRowFrame(frame, data)
             scheduleInputPreview(owner, false)
         end)
         editBox:SetScript("OnEnterPressed", function(self)
-            if self.ClearFocus then
-                self:ClearFocus()
-            end
+            self:ClearFocus()
         end)
         editBox:SetScript("OnEscapePressed", function(self)
             local owner = self._lsbOwnerFrame
@@ -444,9 +424,7 @@ local function applyInputRowFrame(frame, data)
                 syncInputRowText(owner, value)
                 scheduleInputPreview(owner, true)
             end
-            if self.ClearFocus then
-                self:ClearFocus()
-            end
+            self:ClearFocus()
         end)
         editBox._lsbInputScriptsBound = true
     end
@@ -551,7 +529,7 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
             frame.EvaluateState = function(control)
                 local currentInitializer = control.GetElementData and control:GetElementData()
                     or control._lsbInitializer
-                if currentInitializer and currentInitializer.SetEnabled then
+                if currentInitializer then
                     currentInitializer:SetEnabled(initializerIsEnabled(currentInitializer))
                 end
                 control:SetShown(initializerShouldShow(currentInitializer))

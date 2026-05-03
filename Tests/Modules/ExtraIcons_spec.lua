@@ -199,6 +199,19 @@ describe("ExtraIcons real source", function()
     local applyFontCalls
     local globalConfig
     local ratedMap
+    local errorLogs
+    local inaccessibleTables
+
+    local function installCooldownViewerItemFrameStub(viewer)
+        function viewer:GetItemFrames()
+            for _, child in ipairs(self._children or {}) do
+                if child.isActive == nil and child.IsShown then
+                    child.isActive = child:IsShown()
+                end
+            end
+            return self._children
+        end
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
@@ -215,6 +228,8 @@ describe("ExtraIcons real source", function()
             "GetInventoryItemCooldown",
             "C_Item",
             "C_PvP",
+            "canaccesstable",
+            "ipairs",
         })
     end)
 
@@ -242,6 +257,8 @@ describe("ExtraIcons real source", function()
         applyFontCalls = {}
         globalConfig = { font = "Global Font", fontSize = 11, fontOutline = "OUTLINE", fontShadow = false }
         ratedMap = false
+        errorLogs = {}
+        inaccessibleTables = {}
         _G.C_SpellBook = {
             IsSpellKnown = function(spellId)
                 return knownSpells[spellId] or false
@@ -249,6 +266,9 @@ describe("ExtraIcons real source", function()
         }
         ns = {
             Log = function() end,
+            ErrorLogOnce = function(module, key, message, data)
+                errorLogs[#errorLogs + 1] = { module = module, key = key, message = message, data = data }
+            end,
             IsDebugEnabled = function() return false end,
             BarMixin = {
                 FrameProto = {
@@ -290,6 +310,8 @@ describe("ExtraIcons real source", function()
         EditModeManagerFrame = TestHelpers.makeHookableFrame(false)
         UtilityCooldownViewer = TestHelpers.makeHookableFrame(true)
         EssentialCooldownViewer = TestHelpers.makeHookableFrame(true)
+        installCooldownViewerItemFrameStub(UtilityCooldownViewer)
+        installCooldownViewerItemFrameStub(EssentialCooldownViewer)
         _G.EditModeManagerFrame = EditModeManagerFrame
         _G.UtilityCooldownViewer = UtilityCooldownViewer
         _G.EssentialCooldownViewer = EssentialCooldownViewer
@@ -345,6 +367,9 @@ describe("ExtraIcons real source", function()
                 return ratedMap
             end,
         }
+        _G.canaccesstable = function(value)
+            return inaccessibleTables[value] ~= true
+        end
         _G.CreateFrame = function(frameType)
             local frame = TestHelpers.makeFrame({ shown = true })
             frame.SetFrameStrata = function() end
@@ -718,12 +743,20 @@ describe("ExtraIcons real source", function()
 
     it("viewer callbacks hide the container and defer layout", function()
         local reasons = {}
+        local enabled = true
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ns.Runtime.RequestLayout = function(reason)
             reasons[#reasons + 1] = reason
         end
+        function ExtraIcons:IsEnabled()
+            return enabled
+        end
 
         ExtraIcons:_hookViewer("utility")
+        UtilityCooldownViewer._hooks.OnShow[1]()
+        UtilityCooldownViewer._hooks.OnHide[1]()
+        UtilityCooldownViewer._hooks.OnSizeChanged[1]()
+        enabled = false
         UtilityCooldownViewer._hooks.OnShow[1]()
         UtilityCooldownViewer._hooks.OnHide[1]()
         UtilityCooldownViewer._hooks.OnSizeChanged[1]()
@@ -955,6 +988,79 @@ describe("ExtraIcons real source", function()
         assert.are.equal(activeFrame, anchorFrame)
         local _, _, _, x = UtilityCooldownViewer:GetPoint(1)
         assert.are.equal(87, x)
+    end)
+
+    it("does not iterate inaccessible GetItemFrames results", function()
+        local inaccessibleFrames = {}
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return inaccessibleFrames
+        end
+        inaccessibleTables[inaccessibleFrames] = true
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { stackKey = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("rated-bg"))
+
+        local vs = ExtraIcons._viewers.utility
+        assert.is_true(vs.container:IsShown())
+        local _, anchorFrame = vs.container:GetPoint(1)
+        assert.are.equal(UtilityCooldownViewer, anchorFrame)
+        assert.are.equal(1, #errorLogs)
+        assert.are.equal("ExtraIcons", errorLogs[1].module)
+        assert.are.equal("InaccessibleItemFrames:utility", errorLogs[1].key)
+        assert.are.equal("rated-bg", errorLogs[1].data.reason)
+    end)
+
+    it("continues conservatively when GetItemFrames iteration fails", function()
+        local taintedFrames = {}
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return taintedFrames
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { stackKey = "healthstones" } })
+        end
+
+        local originalIpairs = _G.ipairs
+        _G.ipairs = function(value)
+            if value == taintedFrames then
+                error("attempted to iterate a table that cannot be accessed while tainted")
+            end
+            return originalIpairs(value)
+        end
+
+        local ok, err = pcall(function()
+            return ExtraIcons:UpdateLayout("rated-bg")
+        end)
+        _G.ipairs = originalIpairs
+
+        assert.is_true(ok, err)
+        local vs = ExtraIcons._viewers.utility
+        assert.is_true(vs.container:IsShown())
+        local _, anchorFrame = vs.container:GetPoint(1)
+        assert.are.equal(UtilityCooldownViewer, anchorFrame)
+        assert.are.equal(1, #errorLogs)
+        assert.are.equal("ExtraIcons", errorLogs[1].module)
+        assert.are.equal("IterateItemFrames:utility", errorLogs[1].key)
+        assert.are.equal("rated-bg", errorLogs[1].data.reason)
     end)
 
     it("matches the utility viewer's square overlay footprint", function()

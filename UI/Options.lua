@@ -82,9 +82,7 @@ function Options:InstallCategoryTracking()
             if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
                 self._categoryTrackingDeferred = nil
                 self:InstallCategoryTracking()
-                if frame.UnregisterAllEvents then
-                    frame:UnregisterAllEvents()
-                end
+                frame:UnregisterAllEvents()
             end
         end)
         return

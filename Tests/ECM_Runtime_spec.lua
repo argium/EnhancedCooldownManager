@@ -158,6 +158,9 @@ describe("ECM.Runtime layout system", function()
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
+        "issecurevariable",
+        "ChatFrameUtil",
+        "ChatFrameMixin",
         "Enum",
         "print",
         "StaticPopupDialogs",
@@ -239,6 +242,11 @@ describe("ECM.Runtime layout system", function()
         _G.issecrettable = function()
             return false
         end
+        _G.issecurevariable = function()
+            return true
+        end
+        _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+        _G.ChatFrameMixin = { MessageEventHandler = function() end }
         _G.tinsert = table.insert
         _G.strtrim = function(s)
             return (s:gsub("^%s+", ""):gsub("%s+$", ""))
@@ -525,6 +533,37 @@ describe("ECM.Runtime layout system", function()
             assert.same({ "First" }, reasons)
         end)
 
+        it("does not count coalesced layout requests as a layout storm", function()
+            local logs = {}
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("BuffBars:OnShow:child")
+            end
+
+            assert.are.equal(1, #timerQueue)
+            assert.are.equal(0, #logs)
+        end)
+
+        it("logs repeated accepted layout batches without enabling debug mode", function()
+            local logs = {}
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("BuffBars:OnShow:child")
+                timerQueue[#timerQueue].callback()
+            end
+
+            assert.are.equal(1, #logs)
+            assert.are.equal("Runtime", logs[1].module)
+            assert.are.equal("LayoutStorm:BuffBars:OnShow:child", logs[1].key)
+            assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
+        end)
+
         it("updates ExtraIcons before the chain so attached bars see the final viewer footprint", function()
             local callOrder = {}
             local extraIcons = makeRegisteredModule(ns.Constants.EXTRAICONS)
@@ -614,6 +653,25 @@ describe("ECM.Runtime layout system", function()
             timerQueue[1].callback()
 
             assert.same({ "ZONE_CHANGED" }, reasons)
+        end)
+
+        it("checks chat taint immediately on zone change events", function()
+            local taintReasons = {}
+            local libEvent = LibStub("LibEvent-1.0")
+            ns._CheckChatTaint = function(reason)
+                taintReasons[#taintReasons + 1] = reason
+            end
+
+            ns.Runtime.Enable(fakeAddon)
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
+
+            handler(addonFrame, "ZONE_CHANGED")
+            handler(addonFrame, "ZONE_CHANGED_INDOORS")
+            handler(addonFrame, "PLAYER_ENTERING_WORLD")
+
+            assert.same({ "ZONE_CHANGED", "ZONE_CHANGED_INDOORS" }, taintReasons)
         end)
 
         it("ScheduleLayoutUpdate with a shorter delay supersedes a pending longer-delay timer", function()

@@ -529,10 +529,13 @@ Top-level namespace utilities and addon methods available globally.
 |--------|-------------|
 | `ns.GetGlobalConfig()` | Return global config section from database |
 | `ns.IsDebugEnabled()` | Check if debug mode is enabled |
+| `ns.IsErrorLoggingEnabled()` | Check if targeted error logging is enabled |
 | `ns.IsDeathKnight()` | Check if player is a Death Knight |
 | `ns.ToString(v)` | Convert value to safe string (handles taint) |
 | `ns.CloneValue(value)` | Deep-clone a value |
 | `ns.Log(module, message, data)` | Log to debug chat and DevTool |
+| `ns.ErrorLog(module, message, data?)` | Log targeted errors to chat and DevTool |
+| `ns.ErrorLogOnce(module, key, message, data?)` | Log targeted errors once per module/key |
 | `mod:GetECMModule(name, silent?)` | Get ECM module by name |
 | `mod:ConfirmReloadUI(text, onAccept?, onCancel?)` | Show confirm popup, reload on accept |
 | `mod:ShowImportDialog()` | Show import string input dialog |
