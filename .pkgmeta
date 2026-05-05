@@ -21,8 +21,8 @@ externals:
 ignore:
   - AGENTS.md
   - ARCHITECTURE.md
-  - README.md
   - Tests
+  - docs
   - TODO.md
   - '**/Tests'
   - '*.code-workspace'
