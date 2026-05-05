@@ -463,16 +463,6 @@ describe("ExtraIconsOptions data helpers", function()
         end)
     end)
 
-    describe("_otherViewer", function()
-        it("utility returns main", function()
-            assert.are.equal("main", ExtraIconsOptions._otherViewer("utility"))
-        end)
-
-        it("main returns utility", function()
-            assert.are.equal("utility", ExtraIconsOptions._otherViewer("main"))
-        end)
-    end)
-
     describe("_getEntryIcon", function()
         local savedTexture, savedCItem, savedCSpell
 

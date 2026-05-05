@@ -765,6 +765,22 @@ describe("ExtraIcons real source", function()
         assert.same({ "ExtraIcons:OnShow", "ExtraIcons:OnHide", "ExtraIcons:OnSizeChanged" }, reasons)
     end)
 
+    it("edit mode callbacks do nothing while disabled", function()
+        local reasons = {}
+        function ExtraIcons:IsEnabled() return false end
+        ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        ExtraIcons:HookEditMode()
+        ExtraIcons._isEditModeActive = nil
+        EditModeManagerFrame._hooks.OnShow[1]()
+        EditModeManagerFrame._hooks.OnHide[1]()
+
+        assert.is_nil(ExtraIcons._isEditModeActive)
+        assert.same({}, reasons)
+    end)
+
     it("returns false from UpdateLayout when frame or config is missing", function()
         ExtraIcons.InnerFrame = nil
         assert.is_false(ExtraIcons:UpdateLayout("test"))
@@ -887,6 +903,28 @@ describe("ExtraIcons real source", function()
         assert.is_true(ExtraIcons._editModeHooked)
         assert.is_true(ExtraIcons._viewers.utility.hooked)
         assert.is_true(ExtraIcons._viewers.main.hooked)
+    end)
+
+    it("skips delayed initial hooks when disabled before the callback runs", function()
+        local reasons = {}
+        function ExtraIcons:RegisterEvent() end
+        function ExtraIcons:GetModuleConfig() return makeViewersConfig() end
+        function ExtraIcons:IsEnabled() return false end
+        ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        ExtraIcons:OnInitialize()
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons:OnEnable()
+
+        assert.are.equal(1, #timerCallbacks)
+        timerCallbacks[1]()
+
+        assert.same({}, reasons)
+        assert.is_nil(ExtraIcons._editModeHooked)
+        assert.is_false(ExtraIcons._viewers.utility.hooked)
+        assert.is_false(ExtraIcons._viewers.main.hooked)
     end)
 
     it("lays out display items using utility viewer sizing and copies cooldown fonts", function()

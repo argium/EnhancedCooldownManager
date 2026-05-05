@@ -636,16 +636,22 @@ function ExtraIcons:HookEditMode()
     self._isEditModeActive = mgr:IsShown()
 
     mgr:HookScript("OnShow", function()
+        if not self:IsEnabled() then
+            return
+        end
         self._isEditModeActive = true
         if self._viewers then
             for _, vs in pairs(self._viewers) do vs.container:Hide() end
         end
-        if self:IsEnabled() then ns.Runtime.RequestLayout("ExtraIcons:EnterEditMode") end
+        ns.Runtime.RequestLayout("ExtraIcons:EnterEditMode")
     end)
 
     mgr:HookScript("OnHide", function()
+        if not self:IsEnabled() then
+            return
+        end
         self._isEditModeActive = false
-        if self:IsEnabled() then ns.Runtime.RequestLayout("ExtraIcons:ExitEditMode") end
+        ns.Runtime.RequestLayout("ExtraIcons:ExitEditMode")
     end)
 end
 
@@ -663,9 +669,12 @@ function ExtraIcons:_hookViewer(viewerKey)
         ns.Runtime.RequestLayout("ExtraIcons:OnShow")
     end)
     blizzFrame:HookScript("OnHide", function()
+        if not self:IsEnabled() then
+            return
+        end
         if vs.container then vs.container:Hide() end
         if vs.anchorFrame then vs.anchorFrame:Hide() end
-        if self:IsEnabled() then ns.Runtime.RequestLayout("ExtraIcons:OnHide") end
+        ns.Runtime.RequestLayout("ExtraIcons:OnHide")
     end)
     blizzFrame:HookScript("OnSizeChanged", function()
         if not self:IsEnabled() then
@@ -701,6 +710,10 @@ function ExtraIcons:OnEnable()
 
     -- Hook viewers after a short delay to ensure Blizzard frames are loaded.
     C_Timer.After(0.1, function()
+        if not self:IsEnabled() then
+            return
+        end
+
         self:HookEditMode()
         for _, v in ipairs(VIEWERS) do self:_hookViewer(v.key) end
         ns.Runtime.RequestLayout("ExtraIcons:OnEnable")

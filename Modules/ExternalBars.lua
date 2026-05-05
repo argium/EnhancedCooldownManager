@@ -199,13 +199,15 @@ end
 
 ---@param durationText FontString
 ---@param remaining number
+---@return boolean
 local function setDurationText(durationText, remaining)
     if issecretvalue(remaining) then
-        durationText:SetFormattedText("%.0f", remaining)
-        return
+        durationText:SetText(nil)
+        return false
     end
 
     durationText:SetText(formatDurationText(remaining))
+    return true
 end
 
 ---@param bars ECM_ExternalBarMixin[]
@@ -245,18 +247,38 @@ end
 ---@return ECM_ExternalBarsConfig|nil
 function ExternalBars:_GetStyleConfig(moduleConfig, globalConfig)
     if not moduleConfig or moduleConfig.height ~= 0 then
+        self._styleConfig = nil
+        self._styleConfigSource = nil
+        self._styleConfigHeight = nil
         return moduleConfig
     end
 
-    local styleConfig = self._styleConfig or {}
+    local height = (globalConfig and globalConfig.barHeight) or C.DEFAULT_BAR_HEIGHT
+    local styleConfig = self._styleConfig
+    if styleConfig
+        and self._styleConfigSource == moduleConfig
+        and self._styleConfigHeight == height
+        and styleConfig.showIcon == moduleConfig.showIcon
+        and styleConfig.showSpellName == moduleConfig.showSpellName
+        and styleConfig.showDuration == moduleConfig.showDuration
+        and styleConfig.overrideFont == moduleConfig.overrideFont
+        and styleConfig.font == moduleConfig.font
+        and styleConfig.fontSize == moduleConfig.fontSize then
+        return styleConfig
+    end
+
+    styleConfig = styleConfig or {}
+    self._styleConfig = styleConfig
+    self._styleConfigSource = moduleConfig
+    self._styleConfigHeight = height
+
     wipe(styleConfig)
 
     for key, value in pairs(moduleConfig) do
         styleConfig[key] = value
     end
 
-    styleConfig.height = (globalConfig and globalConfig.barHeight) or C.DEFAULT_BAR_HEIGHT
-    self._styleConfig = styleConfig
+    styleConfig.height = height
     return styleConfig
 end
 
@@ -373,6 +395,7 @@ function ExternalBars:_SetOriginalIconsHidden(hidden)
     end
 
     self._originalIconsHidden = nil
+    -- ExternalDefensivesFrame is intentionally show/hide only; global fade does not apply.
     viewer:SetAlpha(1)
     viewer:EnableMouse(true)
 end
@@ -412,8 +435,7 @@ function ExternalBars:_RefreshBarDurationText(bar, auraState, showDuration, rema
         return
     end
 
-    setDurationText(durationText, remaining)
-    durationText:Show()
+    durationText:SetShown(setDurationText(durationText, remaining))
 end
 
 ---@param bar ECM_ExternalBarMixin

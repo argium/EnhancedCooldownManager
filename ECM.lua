@@ -370,6 +370,10 @@ function mod:ChatCommand(input)
     if cmd == "clearseen" then
         gc.releasePopupSeenVersion = nil
         ns.Print(L["SEEN_CLEARED"])
+        if InCombatLockdown() then
+            ns.Print(L["RELOAD_BLOCKED_COMBAT"])
+            return
+        end
         ReloadUI()
         return
     end

@@ -485,8 +485,6 @@ function ExtraIconsOptions._moveEntry(profile, fromViewer, toViewer, index)
     appendViewerEntry(viewers, toViewer, entry)
 end
 
-function ExtraIconsOptions._otherViewer(viewerKey) return viewerKey == "utility" and "main" or "utility" end
-
 function ExtraIconsOptions._parseSingleId(text)
     if not text or text == "" then
         return nil
@@ -733,7 +731,7 @@ end
 local function buildActionItem(rowData)
     local controlsDisabled = isDisabled()
     local displayEntry = rowData.displayEntry
-    local otherViewer = ExtraIconsOptions._otherViewer(rowData.viewerKey)
+    local otherViewer = rowData.viewerKey == "utility" and "main" or "utility"
     local dupViewer = rowData.index ~= nil
         and ExtraIconsOptions._findDuplicateEntry(getViewers(), displayEntry, rowData.viewerKey, rowData.index) or nil
     local hasMoveDup = dupViewer == otherViewer

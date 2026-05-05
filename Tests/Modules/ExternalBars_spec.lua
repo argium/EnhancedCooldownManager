@@ -867,7 +867,7 @@ describe("ExternalBars real source", function()
         }, logEntry.payload.bars[1])
     end)
 
-    it("formats secret duration text through engine formatting and schedules the color retry path", function()
+    it("suppresses secret duration text and schedules the color retry path", function()
         _G.issecretvalue = function()
             return true
         end
@@ -888,9 +888,9 @@ describe("ExternalBars real source", function()
 
         local bar = assert(ExternalBars._barPool[1])
         assert.is_true(bar:IsShown())
-        assert.is_true(bar.Bar.Duration:IsShown())
-        assert.are.equal("8", bar.Bar.Duration:GetText())
-        assert.are.equal("%.0f", bar.Bar.Duration.__formatText)
+        assert.is_false(bar.Bar.Duration:IsShown())
+        assert.is_nil(bar.Bar.Duration:GetText())
+        assert.is_nil(bar.Bar.Duration.__formatText)
         assert.are.equal(0, bar.Bar.__minValue)
         assert.are.equal(1, bar.Bar.__maxValue)
         assert.are.equal(auraDurationByInstanceID[22], bar.Bar.__timerDuration)
@@ -951,6 +951,26 @@ describe("ExternalBars real source", function()
         assert.is_false(secondBar:IsShown())
         assert.is_false(thirdBar:IsShown())
         assert.are.equal(3, #ExternalBars._barPool)
+    end)
+
+    it("caches resolved global-height style config until source style inputs change", function()
+        local first = ExternalBars:_GetStyleConfig(profile.externalBars, profile.global)
+        local second = ExternalBars:_GetStyleConfig(profile.externalBars, profile.global)
+
+        assert.are.equal(first, second)
+        assert.are.equal(18, first.height)
+
+        profile.externalBars.showIcon = false
+        local styleChanged = ExternalBars:_GetStyleConfig(profile.externalBars, profile.global)
+
+        assert.are.equal(first, styleChanged)
+        assert.is_false(styleChanged.showIcon)
+
+        profile.global.barHeight = 24
+        local heightChanged = ExternalBars:_GetStyleConfig(profile.externalBars, profile.global)
+
+        assert.are.equal(first, heightChanged)
+        assert.are.equal(24, heightChanged.height)
     end)
 
     it("hides the original icons on enable and restores the viewer on disable", function()

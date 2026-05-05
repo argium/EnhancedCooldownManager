@@ -509,6 +509,20 @@ describe("ChatCommand migration", function()
         assert.are.equal(1, reloadUICalls)
     end)
 
+    it("/ecm clearseen clears the persisted What's New version without reloading during combat", function()
+        fakeAddon.db.profile.global.releasePopupSeenVersion = "v1.2.3"
+        _G.InCombatLockdown = function()
+            return true
+        end
+
+        mod:ChatCommand("clearseen")
+
+        assert.is_nil(fakeAddon.db.profile.global.releasePopupSeenVersion)
+        assert.are.equal("What's New seen flag cleared. Reloading UI.", printedMessages[1])
+        assert.are.equal("Cannot reload the UI right now: UI reload is blocked during combat.", printedMessages[2])
+        assert.are.equal(0, reloadUICalls)
+    end)
+
     describe("events command", function()
         local addonStats
         local moduleStats
