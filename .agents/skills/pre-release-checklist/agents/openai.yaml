@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pre-Release Checklist"
+  short_description: "Run release-readiness checks"
+  default_prompt: "Use $pre-release-checklist to verify release readiness before publishing."

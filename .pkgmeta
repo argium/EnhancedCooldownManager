@@ -1,3 +1,5 @@
+package-as: EnhancedCooldownManager
+
 externals:
   Libs/LibStub:
     url: https://repos.wowace.com/wow/libstub/trunk
@@ -21,8 +23,8 @@ externals:
 ignore:
   - AGENTS.md
   - ARCHITECTURE.md
-  - README.md
   - Tests
+  - docs
   - TODO.md
   - '**/Tests'
   - '*.code-workspace'

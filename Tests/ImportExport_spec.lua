@@ -137,23 +137,23 @@ describe("ImportExport", function()
 
         data, errorMessage = ImportExport.DecodeData("WrongPrefix:1:ENC:CMP:SERIALIZED")
         assert.is_nil(data)
-        assert.is_true(errorMessage:find("not for Enhanced Cooldown Manager", 1, true) ~= nil)
+        assert.are.equal("Provided string is not a valid ECM import string (prefix: WrongPrefix)", errorMessage)
 
         data, errorMessage = ImportExport.DecodeData("EnhancedCooldownManager:99:ENC:CMP:SERIALIZED")
         assert.is_nil(data)
-        assert.is_true(errorMessage:find("Incompatible import string version", 1, true) ~= nil)
+        assert.are.equal("Provided string is not a valid ECM import string (expected 1, got 99)", errorMessage)
 
         data, errorMessage = ImportExport.DecodeData("EnhancedCooldownManager:1:bad")
         assert.is_nil(data)
-        assert.are.equal("Failed to decode string - it may be corrupted or incomplete", errorMessage)
+        assert.are.equal("Provided string is not a valid ECM import string - it may be corrupted or incomplete", errorMessage)
 
         data, errorMessage = ImportExport.DecodeData("EnhancedCooldownManager:1:ENC:badcmp")
         assert.is_nil(data)
-        assert.are.equal("Failed to decompress data - the string may be corrupted", errorMessage)
+        assert.are.equal("Provided string is not a valid ECM import string - it may be corrupted or incomplete", errorMessage)
 
         data, errorMessage = ImportExport.DecodeData("EnhancedCooldownManager:1:ENC:CMP:BROKEN")
         assert.is_nil(data)
-        assert.are.equal("Failed to deserialize data - the string may be corrupted", errorMessage)
+        assert.are.equal("Provided string is not a valid ECM import string - it may be corrupted or incomplete", errorMessage)
     end)
 
     it("ExportCurrentProfile excludes runtime cache data", function()
@@ -179,7 +179,7 @@ describe("ImportExport", function()
 
         local data, errorMessage = ImportExport.ValidateImportString("EnhancedCooldownManager:1:ENC:CMP:SERIALIZED")
         assert.is_nil(data)
-        assert.are.equal("Import string does not contain profile data", errorMessage)
+        assert.are.equal("Provided string is not a valid ECM import string (profile data missing)", errorMessage)
     end)
 
     it("ApplyImportData preserves cache and runs migrations for older schemas", function()
@@ -204,11 +204,11 @@ describe("ImportExport", function()
     it("ApplyImportData validates input and active profile availability", function()
         local success, errorMessage = ImportExport.ApplyImportData({})
         assert.is_false(success)
-        assert.are.equal("Invalid import data", errorMessage)
+        assert.are.equal("Provided string is not a valid ECM import string (profile data missing)", errorMessage)
 
         ns.Addon.db = nil
         success, errorMessage = ImportExport.ApplyImportData({ profile = { schemaVersion = 10 } })
         assert.is_false(success)
-        assert.are.equal("No active profile to import into", errorMessage)
+        assert.are.equal("Internal error: no active profile to import into - please report this", errorMessage)
     end)
 end)

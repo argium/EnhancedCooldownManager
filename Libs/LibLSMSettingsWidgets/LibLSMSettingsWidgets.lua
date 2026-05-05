@@ -1,7 +1,7 @@
 -- LibLSMSettingsWidgets: LibSharedMedia picker widgets for the WoW Settings API.
 -- Provides font and texture picker templates with live previews.
 
-local MAJOR, MINOR = "LibLSMSettingsWidgets-1.0", 1
+local MAJOR, MINOR = "LibLSMSettingsWidgets-1.0", 2
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
@@ -92,7 +92,7 @@ local function initPicker(self, initializer)
     SettingsListElementMixin.Init(self, initializer)
 
     local data = initializer:GetData() or {}
-    self.setting = initializer:GetSetting() or data.setting
+    self.setting = data.setting or (initializer.GetSetting and initializer:GetSetting()) or nil
 
     if data.name and self.Text then
         self.Text:SetText(data.name)

@@ -1,34 +1,42 @@
 # Suggested Commands
 
-## Testing
+## Addon Validation
 ```sh
 busted Tests
-```
-Runs the full Busted test suite from the project root.
-
-## Linting
-```sh
 luacheck . -q
 ```
-Runs luacheck with quiet output. Config in `.luacheckrc` (std=lua51, excludes libs/ and Tests/).
 
-## Git (Windows/PowerShell)
+## Library Validation
+```sh
+busted --run libsettingsbuilder
+busted --run libconsole
+busted --run libevent
+busted --run liblsmsettingswidgets
+```
+
+## When They Apply
+- Changes to `Modules/`, `UI/`, or any root-level `*.lua` must pass `busted Tests` and `luacheck . -q`.
+- Changes under `Libs/<Name>/` must additionally pass that library's suite.
+
+## Useful Git Commands (PowerShell)
 ```powershell
 git status
 git diff
 git log --oneline -10
 git add -A; git commit -m "message"
-git push   # aliased as 'gp' in user's shell
+git push
 ```
 
-## File Operations (PowerShell)
+## Useful File Commands (PowerShell)
 ```powershell
+rg "pattern"
+rg --files
 Get-ChildItem -Recurse -Filter "*.lua"
 Get-Content <file>
 Test-Path <path>
 ```
 
 ## Notes
-- The addon runs inside WoW; there is no standalone entry point to execute
-- Tests run via `busted` which is a Lua test framework (must be installed on system)
-- No formatter configured; style is enforced via code review conventions
+- The addon runs inside WoW; there is no standalone runtime entry point.
+- Tests run via `busted` and lint via `luacheck`; both must be available on the system.
+- No formatter is configured; style is enforced by repo conventions and review.

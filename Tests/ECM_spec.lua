@@ -41,6 +41,9 @@ describe("ECM layout system", function()
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
+        "issecurevariable",
+        "ChatFrameUtil",
+        "ChatFrameMixin",
         "Enum",
         "print",
         "StaticPopupDialogs",
@@ -124,6 +127,11 @@ describe("ECM layout system", function()
         _G.issecrettable = function()
             return false
         end
+        _G.issecurevariable = function()
+            return true
+        end
+        _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+        _G.ChatFrameMixin = { MessageEventHandler = function() end }
         _G.tinsert = table.insert
         _G.strtrim = function(s)
             return (s:gsub("^%s+", ""):gsub("%s+$", ""))
@@ -379,6 +387,76 @@ describe("ECM layout system", function()
             for _, message in ipairs(printedMessages) do
                 assert.is_nil(message:find(ns.L["BETA_LOGIN_MESSAGE"], 1, true))
             end
+        end)
+    end)
+
+    describe("error logging", function()
+        it("is enabled by default", function()
+            assert.is_true(ns.IsErrorLoggingEnabled())
+        end)
+
+        it("prints targeted errors to chat and DevTool", function()
+            local devToolCalls = {}
+            _G.DevTool = {
+                AddData = function(_, data, title)
+                    devToolCalls[#devToolCalls + 1] = { data = data, title = title }
+                end,
+            }
+
+            ns.ErrorLog("Taint", "ChatFrameUtil.SetLastTellTarget is tainted", { source = "EnhancedCooldownManager" })
+
+            assert.are.equal(1, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("%[ECM Error Taint%]"))
+            assert.is_truthy(printedMessages[1]:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true))
+            assert.are.equal(1, #devToolCalls)
+            assert.are.equal("Taint", devToolCalls[1].data.module)
+            assert.are.equal("ChatFrameUtil.SetLastTellTarget is tainted", devToolCalls[1].data.message)
+            assert.is_truthy(devToolCalls[1].data.data:find("source=EnhancedCooldownManager", 1, true))
+        end)
+
+        it("does not log when disabled", function()
+            _G._testDB.profile.global.errorLogging = false
+            _G.DevTool = {
+                AddData = function()
+                    error("expected DevTool not to be called")
+                end,
+            }
+
+            ns.ErrorLog("Taint", "hidden")
+            ns.ErrorLogOnce("Taint", "hidden-key", "hidden once")
+
+            assert.same({}, printedMessages)
+        end)
+
+        it("suppresses repeated once-per-key errors", function()
+            ns.ErrorLogOnce("Taint", "same-key", "first")
+            ns.ErrorLogOnce("Taint", "same-key", "second")
+            ns.ErrorLogOnce("Taint", "other-key", "third")
+
+            assert.are.equal(2, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("first", 1, true))
+            assert.is_truthy(printedMessages[2]:find("third", 1, true))
+        end)
+
+        it("reports tainted chat reply helpers once during enable", function()
+            _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+            _G.issecurevariable = function(owner, key)
+                if owner == _G.ChatFrameUtil and key == "SetLastTellTarget" then
+                    return false, "EnhancedCooldownManager"
+                end
+                return true
+            end
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            local taintMessages = 0
+            for _, message in ipairs(printedMessages) do
+                if message:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true) then
+                    taintMessages = taintMessages + 1
+                end
+            end
+            assert.are.equal(1, taintMessages)
         end)
     end)
 

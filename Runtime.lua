@@ -35,6 +35,12 @@ local LAYOUT_EVENTS = {
     UPDATE_SHAPESHIFT_FORM = { delay = 0 },
 }
 
+local CHAT_TAINT_ZONE_EVENTS = {
+    ZONE_CHANGED_NEW_AREA = true,
+    ZONE_CHANGED = true,
+    ZONE_CHANGED_INDOORS = true,
+}
+
 local _modules = {}
 local _globallyHidden = false
 local _desiredAlpha = 1
@@ -57,20 +63,27 @@ end
 local _detachedAnchor = nil
 local _detachedAnchorMetrics = nil
 
+--- Applies the current Runtime-owned visibility and alpha to one
+--- Blizzard-managed cooldown viewer frame.
+---@param frame Frame
+local function applyBlizzardFrameState(frame)
+    if _globallyHidden then
+        if frame:IsShown() then frame:Hide() end
+        return
+    end
+
+    if not frame:IsShown() then frame:Show() end
+    ns.FrameUtil.LazySetAlpha(frame, _desiredAlpha)
+end
+
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
 local function enforceBlizzardFrameState()
-    local alpha = _desiredAlpha
     for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
-            if _globallyHidden then
-                if frame:IsShown() then frame:Hide() end
-            else
-                if not frame:IsShown() then frame:Show() end
-                ns.FrameUtil.LazySetAlpha(frame, alpha)
-            end
+            applyBlizzardFrameState(frame)
         end
     end
 end
@@ -85,11 +98,7 @@ local function hookBlizzardFrame(frame, name)
     end
 
     frame:HookScript("OnShow", function(self)
-        if _globallyHidden then
-            self:Hide()
-        else
-            ns.FrameUtil.LazySetAlpha(self, _desiredAlpha)
-        end
+        applyBlizzardFrameState(self)
     end)
 
     _hookedBlizzardFrames[name] = true
@@ -151,8 +160,8 @@ local function updateFadeAndHiddenStates()
         return
     end
 
-    -- Force-show while edit mode or the Layout options preview is active so the
-    -- user can see and position modules without hide/fade interference.
+    -- Force-show while edit mode or an options preview is active so the user
+    -- can see and position modules without hide/fade interference.
     if LibEditMode:IsInEditMode() or _layoutPreviewActive then
         setGloballyHidden(false)
         setAlpha(1)
@@ -355,6 +364,14 @@ local function updateAllLayouts(reason)
     invalidateDetachedAnchorMetrics()
     updateDetachedAnchorLayout()
 
+    -- ExtraIcons can widen the main viewer's effective footprint. Update it
+    -- before chained modules so attached bars compute width-dependent layout
+    -- (ticks, fragments, etc.) against the final combined anchor.
+    local extraIcons = _modules[C.EXTRAICONS]
+    if extraIcons and extraIcons:IsReady() then
+        extraIcons:UpdateLayout(reason)
+    end
+
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
@@ -365,7 +382,7 @@ local function updateAllLayouts(reason)
     end
 
     for frameName, module in pairs(_modules) do
-        if not _chainSet[frameName] and module:IsReady() then
+        if frameName ~= C.EXTRAICONS and not _chainSet[frameName] and module:IsReady() then
             module:UpdateLayout(reason)
         end
     end
@@ -395,7 +412,7 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 
---- Sets or clears the layout preview override.
+--- Sets or clears the options preview override.
 --- When active, hide-when-mounted, hide-in-rest, and out-of-combat fade are bypassed.
 ---@param active boolean
 function Runtime.SetLayoutPreview(active)
@@ -430,6 +447,26 @@ end
 local _requestPending = false
 local _requestReason = nil
 local _requestSecondPass = false
+local _layoutStorms = {}
+
+local function recordLayoutRequest(reason)
+    local now = GetTime()
+    local key = reason or "nil"
+    local storm = _layoutStorms[key]
+    if not storm or now - storm.startedAt > C.LAYOUT_STORM_WINDOW then
+        _layoutStorms[key] = { startedAt = now, count = 1 }
+        return
+    end
+
+    storm.count = storm.count + 1
+    if storm.count == C.LAYOUT_STORM_COUNT then
+        ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected", {
+            reason = key,
+            count = storm.count,
+            window = C.LAYOUT_STORM_WINDOW,
+        })
+    end
+end
 
 --- Requests a deferred layout pass for all registered modules.
 --- Coalesces multiple requests within the same frame into one pass.
@@ -442,6 +479,7 @@ function Runtime.RequestLayout(reason, opts)
     if _requestPending then
         return
     end
+    recordLayoutRequest(reason)
     _requestReason = reason
     _requestPending = true
     C_Timer.After(0, function()
@@ -555,6 +593,10 @@ local function handleLayoutEvent(_addon, event, arg1)
     local config = LAYOUT_EVENTS[event]
     if not config then
         return
+    end
+
+    if CHAT_TAINT_ZONE_EVENTS[event] then
+        ns._CheckChatTaint(event)
     end
 
     if config.combatChange then

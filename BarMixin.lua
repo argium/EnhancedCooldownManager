@@ -123,6 +123,24 @@ end)
 
 local FrameProto = {}
 
+--- Returns the effective root anchor for chained modules.
+--- When ExtraIcons extends the main viewer with additional icons, the chain
+--- should anchor to the combined visual width rather than the Blizzard frame
+--- alone so attached modules inherit the widened footprint.
+---@return Frame
+local function getPrimaryChainAnchor()
+    local addon = ns.Addon
+    local extraIcons = addon and addon.GetECMModule and addon:GetECMModule(C.EXTRAICONS, true)
+    if extraIcons and extraIcons.IsEnabled and extraIcons:IsEnabled() and extraIcons.GetMainViewerAnchor then
+        local anchor = extraIcons:GetMainViewerAnchor()
+        if anchor then
+            return anchor
+        end
+    end
+
+    return _G["EssentialCooldownViewer"] or UIParent
+end
+
 --- Determine the correct anchor for this specific frame in the fixed order.
 --- @param frameName string|nil The name of the current frame, or nil if first in chain.
 --- @param anchorMode string|nil The anchor mode to filter by (defaults to ANCHORMODE_CHAIN).
@@ -161,7 +179,7 @@ function FrameProto:GetNextChainAnchor(frameName, anchorMode)
         return ns.Runtime.DetachedAnchor or UIParent, true
     end
 
-    return _G["EssentialCooldownViewer"] or UIParent, true
+    return getPrimaryChainAnchor(), true
 end
 
 function FrameProto:SetHidden(hide)
@@ -788,7 +806,7 @@ function BarMixin.AssertValid(target)
 end
 
 --- Applies frame-only mixin (positioning, visibility, edit mode, config access).
---- Used by modules that manage their own inner content (e.g. BuffBars, ItemIcons).
+--- Used by modules that manage their own inner content (e.g. BuffBars, ExtraIcons).
 --- Idempotent — safe to call more than once (no-op after first application).
 --- @param target table table to apply the mixin to.
 --- @param name string the module name. must be unique.
