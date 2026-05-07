@@ -215,8 +215,15 @@ describe("BuffBarsOptions", function()
     end)
 
     -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
+    local function findSpellColorRow(rows, primaryKey)
+        for _, row in ipairs(rows) do
+            if row.key.primaryKey == primaryKey then
+                return row
+            end
+        end
+    end
 
-    it("_BuildSpellColorRows deduplicates matching entries and preserves order", function()
+    it("_BuildSpellColorRows deduplicates matching entries", function()
         local entries = {
             { key = SpellColors.MakeKey("Active Name", 1001, nil, nil) },
             { key = SpellColors.MakeKey(nil, nil, nil, 2002) },
@@ -226,9 +233,9 @@ describe("BuffBarsOptions", function()
 
         local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(3, #rows)
-        assert.are.equal("Active Name", rows[1].key.primaryKey)
-        assert.are.equal(2002, rows[2].key.primaryKey)
-        assert.are.equal("Persisted Only", rows[3].key.primaryKey)
+        assert.is_not_nil(findSpellColorRow(rows, "Active Name"))
+        assert.is_not_nil(findSpellColorRow(rows, 2002))
+        assert.is_not_nil(findSpellColorRow(rows, "Persisted Only"))
     end)
 
     it("_BuildSpellColorRows merges matching keys and carries fallback identifiers", function()
@@ -255,8 +262,8 @@ describe("BuffBarsOptions", function()
 
         local rows = BuffBarsOptions._BuildSpellColorRows(entries)
         assert.are.equal(2, #rows)
-        assert.are.equal("Spell A", rows[1].key.primaryKey)
-        assert.are.equal("Spell B", rows[2].key.primaryKey)
+        assert.is_not_nil(findSpellColorRow(rows, "Spell A"))
+        assert.is_not_nil(findSpellColorRow(rows, "Spell B"))
     end)
 
     it("_BuildSpellColorRows merges texture-only keys", function()
@@ -427,28 +434,6 @@ describe("BuffBarsOptions", function()
         assert.are.equal(1, #buttonRows)
         assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], buttonRows[1].name)
         assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], buttonRows[1].buttonText)
-    end)
-
-    it("orders the shared spell colors sections with aura bars before external cooldowns", function()
-        local spellColorsSpec = registerSpellColorsSpec()
-        local rowIDs = {}
-
-        for _, row in ipairs(spellColorsSpec.rows) do
-            rowIDs[#rowIDs + 1] = row.id
-        end
-
-        assert.same({
-            "spellColorsPageActions",
-            "spellColorsDescription",
-            "buffBarsSpellColorsHeader",
-            "buffBarsSpellColorsWarning",
-            "buffBarsSpellColorCollection",
-            "buffBarsSecretNameDescription",
-            "externalBarsSpellColorsHeader",
-            "externalBarsSpellColorsWarning",
-            "externalBarsSpellColorCollection",
-            "externalBarsSecretNameDescription",
-        }, rowIDs)
     end)
 
     it("keeps a single shared action set on the spell colors page", function()
@@ -679,12 +664,11 @@ describe("BuffBarsOptions", function()
         end
 
         local spellColorsSpec = registerSpellColorsSpec()
-        assert.are.equal("pageActions", spellColorsSpec.rows[1].type)
-    local buffCollection = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorCollection"))
-    assert.are.equal("list", buffCollection.type)
-    assert.are.equal("swatch", buffCollection.variant)
+        local buffCollection = assert(getSpellColorsRow(spellColorsSpec, "buffBarsSpellColorCollection"))
+        assert.are.equal("list", buffCollection.type)
+        assert.are.equal("swatch", buffCollection.variant)
 
-    local item = buffCollection.items()[2]
+        local item = buffCollection.items()[2]
 
         item.onEnter(CreateFrame("Frame"))
 

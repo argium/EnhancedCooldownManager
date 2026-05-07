@@ -16,15 +16,15 @@ local AdvancedOptions = {
                 { type = "header", name = L["TROUBLESHOOTING"] },
                 {
                     type = "checkbox",
-                    path = "debug",
-                    name = L["DEBUG_MODE"],
-                    tooltip = L["DEBUG_MODE_DESC"],
-                },
-                {
-                    type = "checkbox",
                     path = "errorLogging",
                     name = L["ERROR_LOGGING"],
                     tooltip = L["ERROR_LOGGING_DESC"],
+                },
+                {
+                    type = "checkbox",
+                    path = "debug",
+                    name = L["DEBUG_MODE"],
+                    tooltip = L["DEBUG_MODE_DESC"],
                 },
                 {
                     type = "checkbox",

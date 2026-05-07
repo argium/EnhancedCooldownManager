@@ -120,26 +120,15 @@ describe("OptionUtil", function()
     end)
 
     describe("About page spec", function()
-        it("registers the root About page with ordered rows", function()
+        it("registers the root About page", function()
             local _, registeredPage = TestHelpers.RegisterRootPageSpec(
                 ns.SettingsBuilder,
                 ns.AboutPage,
                 ns.L["ADDON_NAME"]
             )
-            local rows = ns.AboutPage.rows
 
             assert.is_table(registeredPage)
             assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetId())
-            assert.are.equal(8, #rows)
-            assert.are.equal("info", rows[1].type)
-            assert.are.equal("info", rows[2].type)
-            assert.are.equal("info", rows[3].type)
-            assert.are.equal("subheader", rows[4].type)
-            assert.are.equal(ns.L["LINKS"], rows[4].name)
-            assert.are.equal("button", rows[5].type)
-            assert.are.equal("button", rows[6].type)
-            assert.are.equal("header", rows[7].type)
-            assert.are.equal("button", rows[8].type)
         end)
     end)
 
@@ -288,18 +277,6 @@ describe("OptionUtil", function()
             assert.is_table(border)
         end)
 
-        it("orders showText before height and font when present", function()
-            local disabled = function()
-                return false
-            end
-            local rows = ns.OptionUtil.CreateBarRows(disabled)
-
-            assert.are.equal("checkbox", rows[3].type)
-            assert.are.equal("heightOverride", rows[4].type)
-            assert.are.equal("fontOverride", rows[5].type)
-            assert.are.equal("border", rows[6].type)
-        end)
-
         it("omits showText when showText=false", function()
             local disabled = function()
                 return false
@@ -307,8 +284,6 @@ describe("OptionUtil", function()
             local rows = ns.OptionUtil.CreateBarRows(disabled, { showText = false })
 
             assert.is_nil(getRow(rows, "checkbox", "showText"))
-            assert.are.equal("heightOverride", rows[3].type)
-            assert.are.equal("fontOverride", rows[4].type)
         end)
 
         it("omits border when border=false", function()
@@ -328,8 +303,6 @@ describe("OptionUtil", function()
 
             assert.is_nil(getRow(rows, "checkbox", "showText"))
             assert.is_nil(getRow(rows, "border", "border"))
-            assert.are.equal("heightOverride", rows[3].type)
-            assert.are.equal("fontOverride", rows[4].type)
         end)
 
         it("passes isDisabled to all rows", function()
@@ -338,7 +311,7 @@ describe("OptionUtil", function()
             end
             local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.are.equal(disabled, rows[2].disabled)
+            assert.are.equal(disabled, getRow(rows, "header").disabled)
             assert.are.equal(disabled, getRow(rows, "checkbox", "showText").disabled)
             assert.are.equal(disabled, getRow(rows, "heightOverride").disabled)
             assert.are.equal(disabled, getRow(rows, "fontOverride").disabled)

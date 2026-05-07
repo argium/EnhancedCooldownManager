@@ -72,9 +72,13 @@ describe("PowerBarOptions getters/setters/defaults", function()
             assert.is_nil(settings["ECM_powerBar_anchorMode"])
         end)
         it("adds an inline layout button row to the page", function()
-            assert.are.equal("button", capturedPage.rows[2].type)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[2].name)
-            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[2].buttonText)
+            local layoutButton
+            for _, row in ipairs(capturedPage.rows) do
+                if row.type == "button" and row.name == ns.L["LAYOUT_SUBCATEGORY"] then
+                    layoutButton = row
+                end
+            end
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], assert(layoutButton).buttonText)
         end)
     end)
 

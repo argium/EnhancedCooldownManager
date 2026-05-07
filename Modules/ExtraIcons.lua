@@ -326,7 +326,9 @@ end
 local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
     if not ok then
-        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey, "Unable to read cooldown viewer item frames", {
+        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey,
+            "Unable to read cooldown viewer item frames for " .. viewerKey .. " during "
+            .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), {
             viewerKey = viewerKey,
             reason = why,
             error = itemFrames,
@@ -339,7 +341,9 @@ local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     end
 
     if not canAccessTable(itemFrames) then
-        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey, "Cooldown viewer item frames are inaccessible", {
+        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey,
+            "Cooldown viewer item frames are inaccessible for " .. viewerKey .. " during "
+            .. tostring(why or "unknown"), {
             viewerKey = viewerKey,
             reason = why,
         })
@@ -463,7 +467,9 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         if not ok then
             iconSize = DEFAULT_SIZE
             lastActive = nil
-            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerKey, "Unable to iterate cooldown viewer item frames", {
+            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerKey,
+                "Unable to iterate cooldown viewer item frames for " .. viewerKey .. " during "
+                .. tostring(why or "unknown") .. ": " .. tostring(err), {
                 viewerKey = viewerKey,
                 reason = why,
                 error = err,

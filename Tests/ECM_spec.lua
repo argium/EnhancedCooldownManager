@@ -391,12 +391,13 @@ describe("ECM layout system", function()
     end)
 
     describe("error logging", function()
-        it("is enabled by default", function()
-            assert.is_true(ns.IsErrorLoggingEnabled())
+        it("is disabled by default", function()
+            assert.is_false(ns.IsErrorLoggingEnabled())
         end)
 
         it("prints targeted errors to chat and DevTool", function()
             local devToolCalls = {}
+            _G._testDB.profile.global.errorLogging = true
             _G.DevTool = {
                 AddData = function(_, data, title)
                     devToolCalls[#devToolCalls + 1] = { data = data, title = title }
@@ -429,6 +430,7 @@ describe("ECM layout system", function()
         end)
 
         it("suppresses repeated once-per-key errors", function()
+            _G._testDB.profile.global.errorLogging = true
             ns.ErrorLogOnce("Taint", "same-key", "first")
             ns.ErrorLogOnce("Taint", "same-key", "second")
             ns.ErrorLogOnce("Taint", "other-key", "third")
@@ -439,6 +441,7 @@ describe("ECM layout system", function()
         end)
 
         it("reports tainted chat reply helpers once during enable", function()
+            _G._testDB.profile.global.errorLogging = true
             _G.ChatFrameUtil = { SetLastTellTarget = function() end }
             _G.issecurevariable = function(owner, key)
                 if owner == _G.ChatFrameUtil and key == "SetLastTellTarget" then
@@ -453,6 +456,7 @@ describe("ECM layout system", function()
             local taintMessages = 0
             for _, message in ipairs(printedMessages) do
                 if message:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true) then
+                    assert.is_truthy(message:find("by EnhancedCooldownManager during OnEnable", 1, true))
                     taintMessages = taintMessages + 1
                 end
             end

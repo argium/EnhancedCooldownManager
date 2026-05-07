@@ -1056,6 +1056,7 @@ describe("ExtraIcons real source", function()
         assert.are.equal(1, #errorLogs)
         assert.are.equal("ExtraIcons", errorLogs[1].module)
         assert.are.equal("InaccessibleItemFrames:utility", errorLogs[1].key)
+        assert.are.equal("Cooldown viewer item frames are inaccessible for utility during rated-bg", errorLogs[1].message)
         assert.are.equal("rated-bg", errorLogs[1].data.reason)
     end)
 
@@ -1098,6 +1099,9 @@ describe("ExtraIcons real source", function()
         assert.are.equal(1, #errorLogs)
         assert.are.equal("ExtraIcons", errorLogs[1].module)
         assert.are.equal("IterateItemFrames:utility", errorLogs[1].key)
+        assert.is_truthy(errorLogs[1].message:find(
+            "Unable to iterate cooldown viewer item frames for utility during rated-bg:", 1, true))
+        assert.is_truthy(errorLogs[1].message:find("attempted to iterate", 1, true))
         assert.are.equal("rated-bg", errorLogs[1].data.reason)
     end)
 

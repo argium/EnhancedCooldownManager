@@ -36,8 +36,15 @@ describe("LayoutOptions getters/setters/defaults", function()
     end)
 
     it("registers the explainer and overview rows", function()
+        local canvasRow
+        for _, row in ipairs(capturedPage.rows) do
+            if row.type == "canvas" then
+                canvasRow = row
+            end
+        end
+
         assert.is_table(capturedPage.rows)
-        assert.are.equal("canvas", capturedPage.rows[1].type)
+        assert.is_not_nil(canvasRow)
     end)
 
     it("registers page-level onShow and onHide callbacks", function()

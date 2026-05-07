@@ -93,7 +93,8 @@ local function countAccessibleArray(tbl, logKey, reason)
     end
 
     if logKey then
-        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate a Blizzard table", {
+        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate " .. logKey
+            .. " with ipairs during " .. tostring(reason or "unknown") .. ": " .. tostring(err), {
             reason = reason,
             operation = "ipairs",
             error = tostring(err),
@@ -123,7 +124,8 @@ local function countAccessibleKeys(tbl, logKey, reason)
     end
 
     if logKey then
-        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate a Blizzard table", {
+        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate " .. logKey
+            .. " with pairs during " .. tostring(reason or "unknown") .. ": " .. tostring(err), {
             reason = reason,
             operation = "pairs",
             error = tostring(err),
@@ -753,7 +755,8 @@ function ExternalBars:OnExternalAurasUpdated(reason)
         self:_StopDurationTicker()
         local data = getAuraInfoErrorData(reason, viewer, auraInfo)
         data.activeAuraCountBefore = self._activeAuraCount or 0
-        ns.ErrorLogOnce("ExternalBars", "AuraInfoInaccessible", "Blizzard external aura info is inaccessible", data)
+        ns.ErrorLogOnce("ExternalBars", "AuraInfoInaccessible", "Blizzard external aura info is inaccessible during "
+            .. tostring(reason or "unknown"), data)
     elseif type(auraInfo) == "table" then
         local ok, err = pcall(function()
             for index, info in ipairs(auraInfo) do
@@ -826,7 +829,9 @@ function ExternalBars:OnExternalAurasUpdated(reason)
             local data = getAuraInfoErrorData(reason, viewer, auraInfo)
             data.activeAuraCountBefore = self._activeAuraCount or 0
             data.error = tostring(err)
-            ns.ErrorLogOnce("ExternalBars", "AuraInfoIterateFailed", "Blizzard external aura info could not be iterated", data)
+            ns.ErrorLogOnce("ExternalBars", "AuraInfoIterateFailed",
+                "Blizzard external aura info could not be iterated during "
+                .. tostring(reason or "unknown") .. ": " .. tostring(err), data)
         end
     end
 

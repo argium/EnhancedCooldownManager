@@ -732,7 +732,7 @@ describe("ExternalBars real source", function()
 
         local errorLog = assert(findErrorLog("AuraInfoInaccessible"))
         assert.are.equal("ExternalBars", errorLog.module)
-        assert.are.equal("Blizzard external aura info is inaccessible", errorLog.message)
+        assert.are.equal("Blizzard external aura info is inaccessible during unknown", errorLog.message)
         assert.are.equal("table", errorLog.payload.auraInfoType)
         assert.is_false(errorLog.payload.canAccessAuraInfo)
         assert.are.equal("pvp", errorLog.payload.instanceType)
@@ -769,7 +769,9 @@ describe("ExternalBars real source", function()
 
         local errorLog = assert(findErrorLog("AuraInfoIterateFailed"))
         assert.are.equal("ExternalBars", errorLog.module)
-        assert.are.equal("Blizzard external aura info could not be iterated", errorLog.message)
+        assert.is_truthy(errorLog.message:find(
+            "Blizzard external aura info could not be iterated during viewer:UpdateAuras:", 1, true))
+        assert.is_truthy(errorLog.message:find("attempted to iterate", 1, true))
         assert.are.equal("viewer:UpdateAuras", errorLog.payload.reason)
         assert.are.equal("table", errorLog.payload.auraInfoType)
         assert.is_true(errorLog.payload.canAccessAuraInfo)
@@ -809,6 +811,10 @@ describe("ExternalBars real source", function()
         assert.is_true(diagnosticsEnabledOk, diagnosticsEnabledErr)
 
         local errorLog = assert(findErrorLog("AuraFramesDiagnosticsFailed"))
+        assert.is_truthy(errorLog.message:find(
+            "ExternalBars diagnostics could not iterate AuraFramesDiagnosticsFailed with pairs during diagnostics-enabled:",
+            1, true))
+        assert.is_truthy(errorLog.message:find("attempted to iterate", 1, true))
         assert.are.equal("pairs", errorLog.payload.operation)
         assert.are.equal("diagnostics-enabled", errorLog.payload.reason)
     end)

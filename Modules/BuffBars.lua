@@ -21,7 +21,8 @@ local function collectViewerChildren(viewer, why)
         return { viewer:GetChildren() }
     end)
     if not ok then
-        ns.ErrorLogOnce("BuffBars", "GetChildren", "Unable to read buff bar children", {
+        ns.ErrorLogOnce("BuffBars", "GetChildren", "Unable to read buff bar children during "
+            .. tostring(why or "unknown") .. ": " .. tostring(children), {
             reason = why,
             error = children,
         })

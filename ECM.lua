@@ -196,29 +196,29 @@ local function getSecureVariableStatus(owner, key)
     return secure, taint
 end
 
+local function logTaint(key, reason, source)
+    local sourceName = source or "unknown"
+    ns.ErrorLogOnce("Taint", key, key .. " is tainted by " .. tostring(sourceName)
+        .. " during " .. tostring(reason or "unknown"), {
+        reason = reason,
+        source = sourceName,
+    })
+end
+
 function ns._CheckChatTaint(reason)
     local secure, taint = getSecureVariableStatus("ChatFrameUtil")
     if secure == false then
-        ns.ErrorLogOnce("Taint", "ChatFrameUtil", "ChatFrameUtil is tainted", {
-            reason = reason,
-            source = taint or "unknown",
-        })
+        logTaint("ChatFrameUtil", reason, taint)
     end
 
     secure, taint = getSecureVariableStatus(_G.ChatFrameUtil, "SetLastTellTarget")
     if secure == false then
-        ns.ErrorLogOnce("Taint", "ChatFrameUtil.SetLastTellTarget", "ChatFrameUtil.SetLastTellTarget is tainted", {
-            reason = reason,
-            source = taint or "unknown",
-        })
+        logTaint("ChatFrameUtil.SetLastTellTarget", reason, taint)
     end
 
     secure, taint = getSecureVariableStatus(_G.ChatFrameMixin, "MessageEventHandler")
     if secure == false then
-        ns.ErrorLogOnce("Taint", "ChatFrameMixin.MessageEventHandler", "ChatFrameMixin.MessageEventHandler is tainted", {
-            reason = reason,
-            source = taint or "unknown",
-        })
+        logTaint("ChatFrameMixin.MessageEventHandler", reason, taint)
     end
 end
 

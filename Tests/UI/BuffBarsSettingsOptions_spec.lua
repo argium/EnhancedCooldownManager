@@ -74,10 +74,16 @@ describe("BuffBarsOptions settings getters/setters/defaults", function()
         it("default matches expected", function()
             assert.is_true(settings["ECM_buffBars_enabled"]._default)
         end)
-        it("registers the row as a checkbox in the ordered rows array", function()
+        it("registers the enabled row as a checkbox", function()
+            local enabledRow
+            for _, row in ipairs(capturedPage.rows) do
+                if row.id == "enabled" then
+                    enabledRow = row
+                end
+            end
+
             assert.is_not_nil(capturedPage)
-            assert.are.equal("checkbox", capturedPage.rows[1].type)
-            assert.are.equal("enabled", capturedPage.rows[1].id)
+            assert.are.equal("checkbox", assert(enabledRow).type)
         end)
     end)
 

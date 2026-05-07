@@ -9,6 +9,14 @@ describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
     local profile, defaults, SB, ns, settings, capturedPage
 
+    local function getPageRow(path)
+        for _, row in ipairs(capturedPage.rows) do
+            if row.path == path then
+                return row
+            end
+        end
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
     end)
@@ -57,9 +65,13 @@ describe("ResourceBarOptions getters/setters/defaults", function()
             assert.is_nil(settings["ECM_resourceBar_anchorMode"])
         end)
         it("adds an inline layout button row to the page", function()
-            assert.are.equal("button", capturedPage.rows[2].type)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedPage.rows[2].name)
-            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], capturedPage.rows[2].buttonText)
+            local layoutButton
+            for _, row in ipairs(capturedPage.rows) do
+                if row.type == "button" and row.name == ns.L["LAYOUT_SUBCATEGORY"] then
+                    layoutButton = row
+                end
+            end
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], assert(layoutButton).buttonText)
         end)
     end)
 
@@ -145,7 +157,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("prefixes each resource label with its class icon and color", function()
             local defsByKey = {}
-            for _, def in ipairs(capturedPage.rows[9].defs) do
+            for _, def in ipairs(assert(getPageRow("colors")).defs) do
                 defsByKey[def.key] = def.name
             end
 
@@ -197,7 +209,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("reuses the icon-prefixed names for capped resource rows", function()
             local defsByKey = {}
-            for _, def in ipairs(capturedPage.rows[11].defs) do
+            for _, def in ipairs(assert(getPageRow("maxColors")).defs) do
                 defsByKey[def.key] = def.name
             end
 

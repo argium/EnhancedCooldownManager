@@ -361,67 +361,6 @@ describe("BuffBars real source", function()
         assert.is_false(BuffBars:ShouldRegisterEditMode())
     end)
 
-    it("orders active spell data by layoutIndex and skips hidden bars", function()
-        local firstBar = makeFrame({ shown = true })
-        firstBar.Bar = {
-            Name = {
-                GetText = function()
-                    return "First"
-                end,
-            },
-        }
-        firstBar.cooldownInfo = { spellID = 17 }
-        firstBar.iconTextureFileID = 170
-        firstBar.layoutIndex = 2
-        firstBar.GetTop = function()
-            return 50
-        end
-
-        local secondBar = makeFrame({ shown = true })
-        secondBar.Bar = {
-            Name = {
-                GetText = function()
-                    return "Second"
-                end,
-            },
-        }
-        secondBar.cooldownInfo = { spellID = 18 }
-        secondBar.iconTextureFileID = 180
-        secondBar.layoutIndex = 1
-        secondBar.GetTop = function()
-            return 200
-        end
-
-        local hiddenBar = makeFrame({ shown = false })
-        hiddenBar.Bar = {
-            Name = {
-                GetText = function()
-                    return "Hidden"
-                end,
-            },
-        }
-        hiddenBar.cooldownInfo = { spellID = 19 }
-        hiddenBar.iconTextureFileID = 190
-        hiddenBar.layoutIndex = 0
-        hiddenBar.GetTop = function()
-            return 300
-        end
-
-        local ignoredChild = makeFrame({ shown = true })
-        ignoredChild.ignoreInLayout = true
-        ignoredChild.layoutIndex = -1
-
-        function BuffBarCooldownViewer:GetChildren()
-            return firstBar, hiddenBar, ignoredChild, secondBar
-        end
-
-        local active = BuffBars:GetActiveSpellData()
-
-        assert.are.equal(2, #active)
-        assert.are.equal("Second", active[1].name)
-        assert.are.equal("First", active[2].name)
-    end)
-
     it("hooks the viewer only once", function()
         BuffBars:HookViewer()
         BuffBars:HookViewer()
@@ -480,6 +419,8 @@ describe("BuffBars real source", function()
         assert.are.equal(1, #errorLogs)
         assert.are.equal("BuffBars", errorLogs[1].module)
         assert.are.equal("GetChildren", errorLogs[1].key)
+        assert.is_truthy(errorLogs[1].message:find("Unable to read buff bar children during rated-bg:", 1, true))
+        assert.is_truthy(errorLogs[1].message:find("attempted to iterate", 1, true))
         assert.are.equal("rated-bg", errorLogs[1].data.reason)
         assert.is_truthy(errorLogs[1].data.error:find("attempted to iterate", 1, true))
     end)

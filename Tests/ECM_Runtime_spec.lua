@@ -561,6 +561,8 @@ describe("ECM.Runtime layout system", function()
             assert.are.equal(1, #logs)
             assert.are.equal("Runtime", logs[1].module)
             assert.are.equal("LayoutStorm:BuffBars:OnShow:child", logs[1].key)
+            assert.are.equal("Repeated layout requests detected for BuffBars:OnShow:child ("
+                .. ns.Constants.LAYOUT_STORM_COUNT .. " in " .. ns.Constants.LAYOUT_STORM_WINDOW .. "s)", logs[1].message)
             assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
         end)
 

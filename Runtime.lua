@@ -460,7 +460,8 @@ local function recordLayoutRequest(reason)
 
     storm.count = storm.count + 1
     if storm.count == C.LAYOUT_STORM_COUNT then
-        ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected", {
+        ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected for " .. key
+            .. " (" .. storm.count .. " in " .. C.LAYOUT_STORM_WINDOW .. "s)", {
             reason = key,
             count = storm.count,
             window = C.LAYOUT_STORM_WINDOW,

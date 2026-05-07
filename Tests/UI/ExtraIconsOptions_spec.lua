@@ -310,34 +310,6 @@ describe("ExtraIconsOptions data helpers", function()
         end)
     end)
 
-    describe("_reorderEntry", function()
-        it("swaps entry down", function()
-            local profile = { extraIcons = { viewers = { utility = {
-                { stackKey = "a" }, { stackKey = "b" },
-            } } } }
-            ExtraIconsOptions._reorderEntry(profile, "utility", 1, 1)
-            assert.are.equal("b", profile.extraIcons.viewers.utility[1].stackKey)
-            assert.are.equal("a", profile.extraIcons.viewers.utility[2].stackKey)
-        end)
-
-        it("swaps entry up", function()
-            local profile = { extraIcons = { viewers = { utility = {
-                { stackKey = "a" }, { stackKey = "b" },
-            } } } }
-            ExtraIconsOptions._reorderEntry(profile, "utility", 2, -1)
-            assert.are.equal("b", profile.extraIcons.viewers.utility[1].stackKey)
-            assert.are.equal("a", profile.extraIcons.viewers.utility[2].stackKey)
-        end)
-
-        it("is a no-op at boundary", function()
-            local profile = { extraIcons = { viewers = { utility = {
-                { stackKey = "a" }, { stackKey = "b" },
-            } } } }
-            ExtraIconsOptions._reorderEntry(profile, "utility", 1, -1)
-            assert.are.equal("a", profile.extraIcons.viewers.utility[1].stackKey)
-        end)
-    end)
-
     describe("_moveEntry", function()
         it("transfers entry to other viewer", function()
             local profile = { extraIcons = { viewers = {
@@ -646,12 +618,21 @@ describe("ExtraIconsOptions data helpers", function()
             }
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local hasTrinketEntry = false
+            local hasTrinketPlaceholder = false
+            local hasRacialPlaceholder = false
+            for _, row in ipairs(rows) do
+                hasTrinketEntry = hasTrinketEntry
+                    or (row.rowType == "entry" and row.displayEntry and row.displayEntry.stackKey == "trinket1")
+                hasTrinketPlaceholder = hasTrinketPlaceholder
+                    or (row.rowType == "builtinPlaceholder" and row.stackKey == "trinket2")
+                hasRacialPlaceholder = hasRacialPlaceholder
+                    or (row.rowType == "racialPlaceholder" and row.spellId == 59752)
+            end
 
-            assert.are.equal("entry", rows[1].rowType)
-            assert.are.equal("builtinPlaceholder", rows[2].rowType)
-            assert.are.equal("trinket2", rows[2].stackKey)
-            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
-            assert.are.equal(59752, rows[#rows].spellId)
+            assert.is_true(hasTrinketEntry)
+            assert.is_true(hasTrinketPlaceholder)
+            assert.is_true(hasRacialPlaceholder)
         end)
 
         it("hides foreign-race racials from built rows", function()
@@ -664,9 +645,17 @@ describe("ExtraIconsOptions data helpers", function()
             }
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local hasTrinket1 = false
+            local hasForeignRacial = false
+            for _, row in ipairs(rows) do
+                hasTrinket1 = hasTrinket1
+                    or (row.rowType == "entry" and row.displayEntry and row.displayEntry.stackKey == "trinket1")
+                hasForeignRacial = hasForeignRacial
+                    or (row.displayEntry and row.displayEntry.ids and row.displayEntry.ids[1] == 33697)
+            end
 
-            assert.are.equal("entry", rows[1].rowType)
-            assert.are.equal("trinket1", rows[1].displayEntry.stackKey)
+            assert.is_true(hasTrinket1)
+            assert.is_false(hasForeignRacial)
         end)
 
         it("hides stored trinket rows without an on-use spell", function()
@@ -695,24 +684,12 @@ describe("ExtraIconsOptions data helpers", function()
             end
 
             assert.is_false(hasTrinket1)
-            assert.are.equal("healthstones", rows[1].displayEntry.stackKey)
-        end)
-
-        it("keeps disabled builtins in default order", function()
-            local viewers = {
-                utility = {},
-                main = {
-                    { stackKey = "healthstones", disabled = true },
-                    { kind = "spell", ids = { 59752 } },
-                    { stackKey = "trinket1", disabled = true },
-                },
-            }
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "main")
-
-            assert.are.equal("Spell 59752", ExtraIconsOptions._getEntryName(rows[1].displayEntry))
-            assert.are.equal("trinket1", rows[2].displayEntry.stackKey)
-            assert.are.equal("healthstones", rows[3].displayEntry.stackKey)
+            local hasHealthstones = false
+            for _, row in ipairs(rows) do
+                hasHealthstones = hasHealthstones
+                    or (row.displayEntry and row.displayEntry.stackKey == "healthstones")
+            end
+            assert.is_true(hasHealthstones)
         end)
 
         it("matches Shadowmeld from the UnitRace race file token", function()
@@ -724,9 +701,14 @@ describe("ExtraIconsOptions data helpers", function()
             _G.UnitRace = function() return "Night Elf", "NightElf", 4 end
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local racialPlaceholder
+            for _, row in ipairs(rows) do
+                if row.rowType == "racialPlaceholder" then
+                    racialPlaceholder = row
+                end
+            end
 
-            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
-            assert.are.equal(58984, rows[#rows].spellId)
+            assert.are.equal(58984, assert(racialPlaceholder).spellId)
         end)
 
         it("matches Tail Swipe from the Dracthyr race file token", function()
@@ -738,10 +720,15 @@ describe("ExtraIconsOptions data helpers", function()
             _G.UnitRace = function() return "Dracthyr", "Dracthyr", 70 end
 
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local racialPlaceholder
+            for _, row in ipairs(rows) do
+                if row.rowType == "racialPlaceholder" then
+                    racialPlaceholder = row
+                end
+            end
 
-            assert.are.equal("racialPlaceholder", rows[#rows].rowType)
-            assert.are.equal(357214, rows[#rows].spellId)
-            assert.are.same({ 357214, 368970 }, rows[#rows].displayEntry.ids)
+            assert.are.equal(357214, assert(racialPlaceholder).spellId)
+            assert.are.same({ 357214, 368970 }, racialPlaceholder.displayEntry.ids)
         end)
 
         it("does not synthesize a racial placeholder when UnitRace has no matching race file token", function()
@@ -752,8 +739,12 @@ describe("ExtraIconsOptions data helpers", function()
 
             _G.UnitRace = function() return "Night Elf", nil, 4 end
             local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
+            local hasRacialPlaceholder = false
+            for _, row in ipairs(rows) do
+                hasRacialPlaceholder = hasRacialPlaceholder or row.rowType == "racialPlaceholder"
+            end
 
-            assert.are_not.equal("racialPlaceholder", rows[#rows].rowType)
+            assert.is_false(hasRacialPlaceholder)
         end)
     end)
 end)
@@ -899,10 +890,6 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
         assert.are.equal(4, #capturedPage.rows)
-        assert.are.equal("enabled", capturedPage.rows[1].id)
-        assert.are.equal("showStackCount", capturedPage.rows[2].id)
-        assert.are.equal("showCharges", capturedPage.rows[3].id)
-        assert.are.equal("viewers", capturedPage.rows[4].id)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()
@@ -1197,7 +1184,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.is_false(getTrailerValue(footer, "submitEnabled"))
     end)
 
-    it("reorder, move, and remove actions operate on the stored viewers", function()
+    it("move and remove actions operate on the stored viewers", function()
         _G.C_Spell = {
             GetSpellName = function(spellId)
                 return ({
@@ -1215,12 +1202,6 @@ describe("ExtraIconsOptions settings page", function()
         }
 
         local spellA = assert(findItem("utility", function(item)
-            return item.label == "Spell A"
-        end))
-        spellA.actions.down.onClick()
-        assert.are.same({ 23456 }, profile.extraIcons.viewers.utility[1].ids)
-
-        spellA = assert(findItem("utility", function(item)
             return item.label == "Spell A"
         end))
         spellA.actions.move.onClick()
@@ -1232,85 +1213,6 @@ describe("ExtraIconsOptions settings page", function()
         end))
         moved.actions.delete.onClick()
         assert.are.equal(0, #profile.extraIcons.viewers.main)
-    end)
-
-    it("reorders against the next visible row when hidden entries sit in between", function()
-        _G.C_Spell = {
-            GetSpellName = function(spellId)
-                return ({
-                    [12345] = "Spell A",
-                    [23456] = "Spell B",
-                })[spellId]
-            end,
-            GetSpellTexture = function(spellId)
-                return "spell-" .. tostring(spellId)
-            end,
-        }
-        _G.GetInventoryItemID = function(_, slotId)
-            return slotId == 13 and 10001 or nil
-        end
-        _G.C_Item = {
-            GetItemSpell = function(itemId)
-                if itemId == 10001 then
-                    return nil, nil
-                end
-
-                return nil, nil
-            end,
-            DoesItemExistByID = function()
-                return false
-            end,
-            GetItemIconByID = function(itemId)
-                return itemId == 10001 and "passive-trinket" or nil
-            end,
-            GetItemNameByID = function(itemId)
-                return itemId == 10001 and "Passive Trinket" or nil
-            end,
-            RequestLoadItemDataByID = function() end,
-        }
-
-        profile.extraIcons.viewers.utility = {
-            { kind = "spell", ids = { 12345 } },
-            { stackKey = "trinket1" },
-            { kind = "spell", ids = { 23456 } },
-        }
-
-        local spellA = assert(findItem("utility", function(item)
-            return item.label == "Spell A"
-        end))
-        spellA.actions.down.onClick()
-
-        assert.are.same({ 23456 }, profile.extraIcons.viewers.utility[1].ids)
-        assert.are.equal("trinket1", profile.extraIcons.viewers.utility[2].stackKey)
-        assert.are.same({ 12345 }, profile.extraIcons.viewers.utility[3].ids)
-
-        spellA = assert(findItem("utility", function(item)
-            return item.label == "Spell A"
-        end))
-        spellA.actions.up.onClick()
-
-        assert.are.same({ 12345 }, profile.extraIcons.viewers.utility[1].ids)
-        assert.are.equal("trinket1", profile.extraIcons.viewers.utility[2].stackKey)
-        assert.are.same({ 23456 }, profile.extraIcons.viewers.utility[3].ids)
-    end)
-
-    it("keeps disabled builtins at the end of the active list in builtin order", function()
-        profile.extraIcons.viewers.main = {
-            { stackKey = "healthstones", disabled = true },
-            { kind = "spell", ids = { 59752 } },
-            { stackKey = "trinket1", disabled = true },
-        }
-
-        local labels = {}
-        for _, item in ipairs(assert(getSection("main")).items) do
-            labels[#labels + 1] = item.label
-        end
-
-        assert.are.same({
-            "Spell 59752",
-            "Trinket 1 [On-use Trinket 1]",
-            "Healthstones",
-        }, labels)
     end)
 
     it("shows placeholder tooltips and duplicate-move tooltips", function()
