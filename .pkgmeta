@@ -24,9 +24,12 @@ ignore:
   - AGENTS.md
   - ARCHITECTURE.md
   - Tests
-  - docs
   - TODO.md
+  - '**/*.html'
+  - '**/docs'
   - '**/Tests'
+  - 'Libs/**/archive'
+  - 'Libs/**/examples'
   - '*.code-workspace'
   - '*.rockspec'
   - package
