@@ -17,13 +17,14 @@ end
 
 local function formatWhatsNewText(text)
     local lines = {}
-    for line in (text .. "\n"):gmatch("(.-)\n") do
-        if line:find("^### ") then
-            line = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, line:sub(5))
-        elseif line:find("^%- ") then
-            line = C.WHATS_NEW_LIST_BULLET .. " " .. line:sub(3)
+    for textLine in (text .. "\n"):gmatch("(.-)\n") do
+        local renderedLine = textLine
+        if renderedLine:find("^### ") then
+            renderedLine = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, renderedLine:sub(5))
+        elseif renderedLine:find("^%- ") then
+            renderedLine = C.WHATS_NEW_LIST_BULLET .. " " .. renderedLine:sub(3)
         end
-        lines[#lines + 1] = line
+        lines[#lines + 1] = renderedLine
     end
     return table.concat(lines, "\n")
 end

@@ -389,6 +389,53 @@ describe("LibSettingsBuilder Collections", function()
         assert.is_function(row._textureButtons.delete:GetScript("OnEnter"))
     end)
 
+    it("clears recycled action row buttons when the next item has no action", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local sections = {
+            {
+                key = "utility",
+                title = "Utility",
+                items = {
+                    {
+                        label = "With action",
+                        actions = {
+                            delete = {
+                                text = "Remove",
+                                tooltip = "Remove row",
+                            },
+                        },
+                    },
+                },
+            },
+        }
+        local data = {
+            sections = function()
+                return sections
+            end,
+        }
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb._internal.applyCollectionFrame(host, data)
+        local row = assert(host._lsbSectionRowPools.utility[1])
+        assert.is_true(row._buttons.delete:IsShown())
+        assert.is_function(row._buttons.delete:GetScript("OnClick"))
+        assert.is_function(row._buttons.delete:GetScript("OnEnter"))
+
+        sections[1].items[1] = {
+            label = "Without action",
+            actions = {},
+        }
+        lsb._internal.applyCollectionFrame(host, data)
+
+        assert.is_false(row._buttons.delete:IsShown())
+        assert.is_nil(row._buttons.delete:GetScript("OnClick"))
+        assert.is_nil(row._buttons.delete:GetScript("OnEnter"))
+    end)
+
     it("prevents editor row controls from selecting the host settings row", function()
         _G.CreateFrame = function()
             return makeCollectionControl()

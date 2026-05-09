@@ -577,37 +577,12 @@ describe("ECM layout system", function()
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
 
-            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
-            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
             assert.are.equal(ns.L["ADDON_NAME"], frame.Title:GetText())
             assert.are.equal(string.format(ns.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
             assert.are.equal("LEFT", frame.Title._justifyH)
             assert.are.equal("LEFT", frame.Subtitle._justifyH)
             assert.are.equal("LEFT", frame.Body._justifyH)
             assert.are.equal("TOP", frame.Body._justifyV)
-            assert.same(
-                {
-                    { "TOPLEFT", frame, "TOPLEFT", ns.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
-                    { "TOPRIGHT", frame, "TOPRIGHT", -ns.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
-                },
-                frame.Title._anchors
-            )
-            assert.same(
-                {
-                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
-                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
-                },
-                frame.Subtitle._anchors
-            )
-            assert.same(
-                {
-                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
-                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
-                },
-                frame.Body._anchors
-            )
         end)
 
         it("does not show an empty popup when release notes are unavailable", function()

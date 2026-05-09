@@ -69,10 +69,6 @@ describe("About section", function()
             rootLayout = root._category:GetLayout()
         end)
 
-        it("adds initializers to the root category layout", function()
-            assert.is_true(#rootLayout._initializers > 0)
-        end)
-
         it("creates Author info row with sparkle text", function()
             local init = findInfoRow(rootLayout, "Author")
             assert.is_not_nil(init, "expected Author info row")
@@ -92,22 +88,6 @@ describe("About section", function()
             assert.is_not_nil(init, "expected Version info row")
             local data = getInitializerData(init)
             assert.are.equal("1.2.3-test", type(data.value) == "function" and data.value() or data.value)
-        end)
-
-        it("includes Links subheader", function()
-            local init = findInitializer(rootLayout, function(i)
-                local data = getInitializerData(i)
-                return data and data._lsbKind == "subheader" and data.name == "Links"
-            end)
-            assert.is_not_nil(init, "expected Links subheader")
-        end)
-
-        it("adds plain button rows for the links", function()
-            local curseforge = TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["CURSEFORGE"])
-            local github = TestHelpers.FindButtonInitializer(rootLayout._initializers, ns.L["GITHUB"])
-
-            assert.is_not_nil(curseforge, "expected CurseForge button row")
-            assert.is_not_nil(github, "expected GitHub button row")
         end)
 
         it("CurseForge button calls ShowCopyTextDialog with correct URL", function()

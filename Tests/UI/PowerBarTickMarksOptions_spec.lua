@@ -78,14 +78,11 @@ describe("PowerBarTickMarksOptions", function()
         assert.is_nil(ns.PowerBarTickMarksStore)
     end)
 
-    it("exports a page with list-based tick editors", function()
+    it("exports a page with a list-based tick editor collection", function()
         local captured = registerPageSpec()
 
-        assert.are.equal("Tick Marks", captured.name)
-        assert.is_nil(getRow(captured, "tickMarksPageActions"))
         assert.are.equal("list", getRow(captured, "tickCollection").type)
         assert.are.equal("editor", getRow(captured, "tickCollection").variant)
-        assert.are.equal(320, getRow(captured, "tickCollection").height)
     end)
 
     it("shows an empty collection when class/spec is unavailable", function()

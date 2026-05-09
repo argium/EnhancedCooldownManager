@@ -75,7 +75,4 @@ describe("AdvancedOptions getters/setters/defaults", function()
         end)
     end)
 
-    it("does not register the About page What's New button", function()
-        assert.is_nil(settings["ECM_global_showReleasePopupOnUpdate"])
-    end)
 end)

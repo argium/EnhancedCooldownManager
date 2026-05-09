@@ -24,6 +24,10 @@ describe("LibSettingsBuilder Controls", function()
         end
         frame.SetText = function(self, text)
             self._text = text
+            local onTextChanged = self.GetScript and self:GetScript("OnTextChanged") or nil
+            if onTextChanged then
+                onTextChanged(self)
+            end
         end
         frame.GetText = function(self)
             return self._text
@@ -223,5 +227,188 @@ describe("LibSettingsBuilder Controls", function()
 
         assert.is_table(data.setting)
         assert.are.equal("Expressway", data.setting:GetValue())
+    end)
+
+    it("renders page action buttons from live hidden, enabled, and tooltip callbacks", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local clickedAction, clickedFrame
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Action Rows",
+            store = function() return { general = {} } end,
+            defaults = function() return { general = {} } end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "pageActions",
+                                    actions = {
+                                        {
+                                            text = "Hidden",
+                                            hidden = function() return true end,
+                                        },
+                                        {
+                                            text = "Run",
+                                            enabled = function() return false end,
+                                            tooltip = function() return "Cannot run" end,
+                                            onClick = function(action, frame)
+                                                clickedAction = action
+                                                clickedFrame = frame
+                                            end,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+
+        local button = assert(frame._lsbHeaderActionButtons[1])
+        assert.are.equal("Run", button:GetText())
+        assert.is_false(button:IsEnabled())
+        assert.is_function(button:GetScript("OnEnter"))
+        assert.is_nil(frame._lsbHeaderActionButtons[2])
+
+        button:GetScript("OnClick")(button)
+
+        assert.are.equal(initializer:GetData().actions[2], clickedAction)
+        assert.are.equal(frame, clickedFrame)
+    end)
+
+    it("renders dynamic info rows without freezing display text or multiline state", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local nameText, valueText = "Current", "Ready"
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Info Rows",
+            store = function() return { general = {} } end,
+            defaults = function() return { general = {} } end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "info",
+                                    name = function() return nameText end,
+                                    value = function() return valueText end,
+                                    multiline = true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+
+        assert.are.equal("Current", frame._lsbInfoTitle:GetText())
+        assert.are.equal("Ready", frame._lsbInfoValue:GetText())
+        assert.is_true(frame._lsbInfoValue.__wordWrap)
+
+        nameText, valueText = "Changed", "Done"
+        initializer._lsbRefreshFrame(frame)
+
+        assert.are.equal("Changed", frame._lsbInfoTitle:GetText())
+        assert.are.equal("Done", frame._lsbInfoValue:GetText())
+    end)
+
+    it("keeps input row preview and text-change callbacks bound to the active setting", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local changedText
+        local profile = { general = { code = "abc" } }
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Input Rows",
+            store = function() return profile end,
+            defaults = function() return { general = { code = "abc" } } end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "input",
+                                    path = "code",
+                                    name = "Code",
+                                    resolveText = function(value)
+                                        return "preview:" .. value
+                                    end,
+                                    onTextChanged = function(text)
+                                        changedText = text
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+
+        assert.are.equal("abc", frame._lsbInputEditBox:GetText())
+        assert.are.equal("preview:abc", frame._lsbInputPreview:GetText())
+
+        frame._lsbInputEditBox:SetText("xyz")
+
+        assert.are.equal("xyz", profile.general.code)
+        assert.are.equal("xyz", changedText)
+        assert.are.equal("preview:xyz", frame._lsbInputPreview:GetText())
     end)
 end)
