@@ -178,6 +178,7 @@ describe("ECM.Runtime layout system", function()
         "CooldownViewerSettings",
         "SlashCmdList",
         "hash_SlashCmdList",
+        "debugstack",
     }
 
     setup(function()
@@ -264,6 +265,7 @@ describe("ECM.Runtime layout system", function()
         _G.CLOSE = "Close"
         _G.CANCEL = "Cancel"
         _G.OKAY = "Okay"
+        _G.debugstack = nil
         _G.CooldownViewerSettings = nil
         _G.EssentialCooldownViewer = nil
         _G.UtilityCooldownViewer = nil
@@ -564,6 +566,41 @@ describe("ECM.Runtime layout system", function()
             assert.are.equal("Repeated layout requests detected for BuffBars:OnShow:child ("
                 .. ns.Constants.LAYOUT_STORM_COUNT .. " in " .. ns.Constants.LAYOUT_STORM_WINDOW .. "s)", logs[1].message)
             assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
+        end)
+
+        it("includes request diagnostics and stack data in layout storm logs", function()
+            local logs = {}
+            local diagnosticCalls = 0
+            _G.debugstack = function()
+                return "runtime storm stack"
+            end
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("ExternalBars:viewer:UpdateAuras", {
+                    diagnostics = function()
+                        diagnosticCalls = diagnosticCalls + 1
+                        return {
+                            viewerExists = true,
+                            activeAuraCount = 2,
+                        }
+                    end,
+                })
+                timerQueue[#timerQueue].callback()
+            end
+
+            assert.are.equal(1, #logs)
+            assert.are.equal(1, diagnosticCalls)
+            assert.are.equal("runtime storm stack", logs[1].data.debugStack)
+            assert.are.equal("ExternalBars:viewer:UpdateAuras", logs[1].data.reason)
+            assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
+            assert.are.equal(0, logs[1].data.elapsed)
+            assert.is_false(logs[1].data.requestPending)
+            assert.is_false(logs[1].data.layoutPending)
+            assert.is_false(logs[1].data.secondPassPending)
+            assert.same({ viewerExists = true, activeAuraCount = 2 }, logs[1].data.diagnostics)
         end)
 
         it("updates ExtraIcons before the chain so attached bars see the final viewer footprint", function()

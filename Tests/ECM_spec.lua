@@ -61,6 +61,7 @@ describe("ECM layout system", function()
         "CooldownViewerSettings",
         "SlashCmdList",
         "hash_SlashCmdList",
+        "debugstack",
     }
 
     setup(function()
@@ -149,6 +150,7 @@ describe("ECM layout system", function()
         _G.CLOSE = "Close"
         _G.CANCEL = "Cancel"
         _G.OKAY = "Okay"
+        _G.debugstack = nil
         _G.CooldownViewerSettings = nil
 
         _G.C_CVar = {
@@ -409,10 +411,25 @@ describe("ECM layout system", function()
             assert.are.equal(1, #printedMessages)
             assert.is_truthy(printedMessages[1]:find("%[ECM Error Taint%]"))
             assert.is_truthy(printedMessages[1]:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true))
+            assert.is_truthy(printedMessages[1]:find("source=EnhancedCooldownManager", 1, true))
+            assert.is_truthy(printedMessages[1]:find("module=Taint", 1, true))
+            assert.is_truthy(printedMessages[1]:find("timestamp=100", 1, true))
+            assert.is_truthy(printedMessages[1]:find("inCombatLockdown=false", 1, true))
             assert.are.equal(1, #devToolCalls)
             assert.are.equal("Taint", devToolCalls[1].data.module)
             assert.are.equal("ChatFrameUtil.SetLastTellTarget is tainted", devToolCalls[1].data.message)
             assert.is_truthy(devToolCalls[1].data.data:find("source=EnhancedCooldownManager", 1, true))
+        end)
+
+        it("prints error data without requiring DevTool", function()
+            _G._testDB.profile.global.errorLogging = true
+            _G.DevTool = nil
+
+            ns.ErrorLog("Runtime", "Repeated layout requests detected", { reason = "ExternalBars:viewer:UpdateAuras" })
+
+            assert.are.equal(1, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("Repeated layout requests detected", 1, true))
+            assert.is_truthy(printedMessages[1]:find("reason=ExternalBars:viewer:UpdateAuras", 1, true))
         end)
 
         it("does not log when disabled", function()
@@ -437,7 +454,9 @@ describe("ECM layout system", function()
 
             assert.are.equal(2, #printedMessages)
             assert.is_truthy(printedMessages[1]:find("first", 1, true))
+            assert.is_truthy(printedMessages[1]:find("errorKey=same-key", 1, true))
             assert.is_truthy(printedMessages[2]:find("third", 1, true))
+            assert.is_truthy(printedMessages[2]:find("errorKey=other-key", 1, true))
         end)
 
         it("reports tainted chat reply helpers once during enable", function()
