@@ -313,55 +313,39 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local copyMixin = internal.copyMixin
-local installPageLifecycleHooks = internal.installPageLifecycleHooks
+local interop = internal.interop
+local schema = internal.schema
+local builders = internal.builders
+local registry = internal.registry
 
-local PROXY_ROW_TYPES = {
-    checkbox = true,
-    slider = true,
-    dropdown = true,
-    color = true,
-    input = true,
-    custom = true,
+local ROW_BUILDERS = {
+    button = function(builder, spec)
+        return builders.button(builder, spec)
+    end,
+    canvas = function(builder, spec)
+        return builders.canvas(builder, spec.canvas, spec.height, spec)
+    end,
+    checkbox = builders.checkbox,
+    dropdown = builders.dropdown,
+    header = builders.header,
+    info = builders.info,
+    list = builders.list,
+    pageActions = builders.pageActions,
+    sectionList = builders.sectionList,
+    slider = builders.slider,
+    subheader = builders.subheader,
+    color = builders.color,
+    input = builders.input,
+    custom = builders.custom,
 }
-
-local COMPOSITE_ROW_TYPES = {
-    border = true,
-    checkboxList = true,
-    colorList = true,
-    fontOverride = true,
-    heightOverride = true,
-}
-
-local VALID_ROW_TYPES = {
-    border = true,
-    button = true,
-    canvas = true,
-    checkbox = true,
-    checkboxList = true,
-    color = true,
-    colorList = true,
-    custom = true,
-    dropdown = true,
-    fontOverride = true,
-    header = true,
-    heightOverride = true,
-    info = true,
-    input = true,
-    list = true,
-    pageActions = true,
-    sectionList = true,
-    slider = true,
-    subheader = true,
-}
+local PROXY_ROW_TYPES = schema.PROXY_ROW_TYPES
 
 local function refreshCategory(builder, category)
     if not category then
         return
     end
 
-    local currentCategory = SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
-    local isVisible = SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown() and currentCategory == category
+    local isVisible = interop.isSettingsPanelShown() and interop.getCurrentSettingsCategory() == category
 
     local refreshables = builder._categoryRefreshables[category] or {}
     for _, initializer in ipairs(refreshables) do
@@ -374,162 +358,21 @@ local function refreshCategory(builder, category)
         return
     end
 
-    local settingsList = SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
-    local scrollBox = settingsList and settingsList.ScrollBox
-    if scrollBox and scrollBox.ForEachFrame then
-        scrollBox:ForEachFrame(function(frame)
-            local initializer = frame.GetElementData and frame:GetElementData() or frame._lsbInitializer
-            if frame.EvaluateState then
-                frame:EvaluateState()
-            end
-            if initializer and initializer._lsbRefreshFrame then
-                initializer._lsbRefreshFrame(frame, initializer)
-            end
-        end)
-    end
-end
-
-local function resolvePagePath(pagePath, rowPath)
-    if rowPath == nil or rowPath == "" or rowPath:find("%.") or pagePath == "" then
-        return (rowPath ~= nil and rowPath ~= "") and rowPath or pagePath
-    end
-    return pagePath .. "." .. rowPath
-end
-
-local function assertBooleanOrCallback(sourceName, fieldName, value)
-    local valueType = type(value)
-    assert(
-        value == nil or valueType == "boolean" or valueType == "function",
-        sourceName .. ": " .. fieldName .. " must be a boolean or function"
-    )
-end
-
-local function getRowLabel(row)
-    return tostring(row.id or row.key or row.path or row.name or row.type)
-end
-
-local function normalizeDeclarativeRowSpec(sourceName, row)
-    assert(type(row) == "table", sourceName .. ": each row must be a table")
-
-    local spec = copyMixin({}, row)
-    assert(spec.desc == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses deprecated field 'desc'; use 'tooltip'")
-    assert(spec.condition == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'condition'")
-    assert(spec.parent == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parent'")
-    assert(spec.parentCheck == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parentCheck'")
-
-    local rowType = spec.type
-    assert(type(rowType) == "string" and VALID_ROW_TYPES[rowType], sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
-
-    if rowType == "button" and spec.buttonText == nil and spec.value ~= nil then
-        spec.buttonText = spec.value
-    end
-    spec.value = rowType == "button" and nil or spec.value
-
-    if rowType == "dropdown" and spec.scrollHeight == nil and spec.maxScrollDisplayHeight ~= nil then
-        spec.scrollHeight = spec.maxScrollDisplayHeight
-    end
-    spec.maxScrollDisplayHeight = nil
-
-    if rowType == "info" and spec.values ~= nil then
-        assert(spec.value == nil, sourceName .. ": info row '" .. getRowLabel(spec) .. "' cannot define both value and values")
-        assert(type(spec.values) == "table", sourceName .. ": info row '" .. getRowLabel(spec) .. "' values must be a table")
-        spec.value = table.concat(spec.values, "\n")
-        spec.multiline = true
-        spec.values = nil
-    end
-
-    if rowType == "input" and spec.debounce == nil and spec.debounceMilliseconds ~= nil then
-        spec.debounce = spec.debounceMilliseconds / 1000
-    end
-    spec.debounceMilliseconds = nil
-
-    if rowType == "slider" and spec.formatter == nil and spec.formatValue ~= nil then
-        spec.formatter = spec.formatValue
-    end
-    spec.formatValue = nil
-
-    spec.id = row.id
-
-    return spec
-end
-
-local function validateDeclarativeRow(sourceName, builder, row)
-    local rowType = row.type
-    local rowLabel = getRowLabel(row)
-    local hasHandler = row.get ~= nil or row.set ~= nil
-
-    assertBooleanOrCallback(sourceName, "disabled", row.disabled)
-    assertBooleanOrCallback(sourceName, "hidden", row.hidden)
-
-    if PROXY_ROW_TYPES[rowType] then
-        if hasHandler then
-            assert(row.get, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires get")
-            assert(row.set, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires set")
-            assert(row.key or row.id, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires key or id")
-        else
-            assert(row.path ~= nil, sourceName .. ": path-bound row '" .. rowLabel .. "' requires path")
-            assert(builder._adapter, sourceName .. ": path-bound row '" .. rowLabel .. "' requires store/defaults on the builder")
+    interop.forEachVisibleSettingsFrame(function(frame)
+        local initializer = frame.GetElementData and frame:GetElementData() or frame._lsbInitializer
+        if frame.EvaluateState then
+            frame:EvaluateState()
         end
-    end
-
-    if rowType == "button" then
-        assert(type(row.onClick) == "function", sourceName .. ": button row '" .. rowLabel .. "' requires onClick")
-    elseif rowType == "canvas" then
-        assert(row.canvas, sourceName .. ": canvas row '" .. rowLabel .. "' requires canvas")
-    elseif rowType == "custom" then
-        assert(row.template, sourceName .. ": custom row '" .. rowLabel .. "' requires template")
-    elseif rowType == "dropdown" then
-        assert(row.values ~= nil, sourceName .. ": dropdown row '" .. rowLabel .. "' requires values")
-    elseif rowType == "list" then
-        assert(type(row.items) == "function", sourceName .. ": list row '" .. rowLabel .. "' requires items")
-        assert(row.height, sourceName .. ": list row '" .. rowLabel .. "' requires height")
-    elseif rowType == "pageActions" then
-        assert(type(row.actions) == "table", sourceName .. ": pageActions row '" .. rowLabel .. "' requires actions")
-    elseif rowType == "sectionList" then
-        assert(type(row.sections) == "function", sourceName .. ": sectionList row '" .. rowLabel .. "' requires sections")
-        assert(row.height, sourceName .. ": sectionList row '" .. rowLabel .. "' requires height")
-    elseif rowType == "slider" then
-        assert(row.min ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires min")
-        assert(row.max ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires max")
-    elseif COMPOSITE_ROW_TYPES[rowType] then
-        assert(row.path ~= nil, sourceName .. ": composite row '" .. rowLabel .. "' requires path")
-        if rowType == "checkboxList" or rowType == "colorList" then
-            assert(type(row.defs) == "table", sourceName .. ": composite row '" .. rowLabel .. "' requires defs")
+        if initializer and initializer._lsbRefreshFrame then
+            initializer._lsbRefreshFrame(frame, initializer)
         end
-    elseif rowType == "info" then
-        assert(
-            row.value ~= nil or row.values ~= nil or row.name ~= nil,
-            sourceName .. ": info row '" .. rowLabel .. "' requires value, values, or name"
-        )
-    elseif rowType == "header" or rowType == "subheader" then
-        assert(row.name ~= nil, sourceName .. ": " .. rowType .. " row '" .. rowLabel .. "' requires name")
-    end
-end
-
-local function validateDeclarativeRows(sourceName, builder, rows, seenRowIDs)
-    assert(type(rows) == "table", sourceName .. ": rows must be a table")
-
-    for _, row in ipairs(rows) do
-        local normalized = normalizeDeclarativeRowSpec(sourceName, row)
-        local rowID = normalized.id
-        if rowID ~= nil then
-            assert(not seenRowIDs[rowID], sourceName .. ": duplicate row id '" .. tostring(rowID) .. "'")
-            seenRowIDs[rowID] = true
-        end
-        validateDeclarativeRow(sourceName, builder, normalized)
-    end
-end
-
-local function validatePageDefinition(sourceName, pageDef)
-    assert(type(pageDef) == "table", sourceName .. ": page definition must be a table")
-    assert(pageDef.key, sourceName .. ": page definition requires key")
-    assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
+    end)
 end
 
 local function registerLabeledList(page, spec, builderMethod)
     local builder = page._builder
     if spec.label then
-        local labelInit = lib.Subheader(builder, {
+        local labelInit = builders.subheader(builder, {
             name = spec.label,
             disabled = spec.disabled,
             hidden = spec.hidden,
@@ -538,12 +381,12 @@ local function registerLabeledList(page, spec, builderMethod)
         spec._parentInitializer = spec._parentInitializer or labelInit
     end
 
-    local results = builderMethod(builder, resolvePagePath(page.path or "", spec.path), spec.defs or {}, spec)
+    local results = builderMethod(builder, schema.resolvePagePath(page.path or "", spec.path), spec.defs or {}, spec)
     return results[1] and results[1].initializer, results[1] and results[1].setting
 end
 
 local function registerDeclarativeRow(sourceName, page, row, created)
-    local spec = normalizeDeclarativeRowSpec(sourceName, row)
+    local spec = schema.normalizeRow(sourceName, row)
     local rowType = spec.type
 
     local builder = page._builder
@@ -560,35 +403,19 @@ local function registerDeclarativeRow(sourceName, page, row, created)
     spec._page = page
 
     local initializer, setting
-    local path = resolvePagePath(page.path or "", spec.path)
-    if rowType == "button" then
-        initializer = lib.Button(builder, spec)
-    elseif rowType == "canvas" then
-        initializer = lib.EmbedCanvas(builder, spec.canvas, spec.height, spec)
-    elseif rowType == "checkboxList" then
-        initializer, setting = registerLabeledList(page, spec, lib.CheckboxList)
+    local path = schema.resolvePagePath(page.path or "", spec.path)
+    if rowType == "checkboxList" then
+        initializer, setting = registerLabeledList(page, spec, builders.checkboxList)
     elseif rowType == "colorList" then
-        initializer, setting = registerLabeledList(page, spec, lib.ColorPickerList)
-    elseif rowType == "header" then
-        initializer = lib.Header(builder, spec)
-    elseif rowType == "info" then
-        initializer = lib.InfoRow(builder, spec)
-    elseif rowType == "list" then
-        initializer = lib.List(builder, spec)
-    elseif rowType == "pageActions" then
-        initializer = lib.PageActions(builder, spec)
-    elseif rowType == "sectionList" then
-        initializer = lib.SectionList(builder, spec)
-    elseif rowType == "subheader" then
-        initializer = lib.Subheader(builder, spec)
+        initializer, setting = registerLabeledList(page, spec, builders.colorList)
     elseif rowType == "border" then
-        local result = lib.BorderGroup(builder, path, spec)
+        local result = builders.border(builder, path, spec)
         initializer, setting = result.enabledInit, result.enabledSetting
     elseif rowType == "fontOverride" then
-        local result = lib.FontOverrideGroup(builder, path, spec)
+        local result = builders.fontOverride(builder, path, spec)
         initializer, setting = result.enabledInit, result.enabledSetting
     elseif rowType == "heightOverride" then
-        initializer, setting = lib.HeightOverrideSlider(builder, path, spec)
+        initializer, setting = builders.heightOverride(builder, path, spec)
     elseif PROXY_ROW_TYPES[rowType] then
         if not spec.get then
             spec.path = path
@@ -598,19 +425,9 @@ local function registerDeclarativeRow(sourceName, page, row, created)
         if spec.get and not spec.key then
             error(sourceName .. ": handler-mode row '" .. tostring(row.id or spec.name) .. "' requires key or id")
         end
-        if rowType == "checkbox" then
-            initializer, setting = lib.Checkbox(builder, spec)
-        elseif rowType == "slider" then
-            initializer, setting = lib.Slider(builder, spec)
-        elseif rowType == "dropdown" then
-            initializer, setting = lib.Dropdown(builder, spec)
-        elseif rowType == "color" then
-            initializer, setting = lib.Color(builder, spec)
-        elseif rowType == "input" then
-            initializer, setting = lib.Input(builder, spec)
-        elseif rowType == "custom" then
-            initializer, setting = lib.Custom(builder, spec)
-        end
+        initializer, setting = ROW_BUILDERS[rowType](builder, spec)
+    elseif ROW_BUILDERS[rowType] then
+        initializer, setting = ROW_BUILDERS[rowType](builder, spec)
     else
         error(sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
     end
@@ -622,7 +439,10 @@ end
 
 local function createManagedSubcategory(builder, name, parentCategory)
     local previous = builder._currentSubcategory
-    local category = internal.createSubcategory(builder, name, parentCategory)
+    local parent = parentCategory or builder._rootCategory
+    local category, layout = interop.createSubcategory(parent, name)
+    registry.storeCategory(builder, name, category, layout)
+    builder._currentSubcategory = category
     builder._currentSubcategory = previous
     return category
 end
@@ -661,7 +481,7 @@ local function bindPageLifecycle(page)
             confirmDefaults = confirmDefaults,
             pageName = page._name,
         }
-        installPageLifecycleHooks()
+        interop.installPageLifecycleHooks()
     end
 end
 
@@ -697,7 +517,7 @@ local function materializePage(page, category)
 end
 
 local function appendDeclarativeRows(page, sourceName, rows)
-    validateDeclarativeRows(sourceName, page._builder, rows, page._rowIDs)
+    schema.validateRows(sourceName, page._builder, rows, page._rowIDs)
     queuePageOperation(page, sourceName, function(created)
         for _, row in ipairs(rows) do
             registerDeclarativeRow(sourceName, page, row, created)
@@ -882,7 +702,7 @@ function lib:HasCategory(category)
 end
 
 local function registerPageDefinition(owner, pageDef, defaultName)
-    validatePageDefinition("registerPageDefinition", pageDef)
+    schema.validatePageDefinition("registerPageDefinition", pageDef)
 
     local creator = owner._root and createSectionPage or createRootPage
     return creator(owner, pageDef.key, pageDef.rows, {
@@ -899,7 +719,7 @@ local function registerPageDefinition(owner, pageDef, defaultName)
     })
 end
 
-function internal.registerTree(self, spec)
+function registry.registerTree(self, spec)
     assertRootConfigured(self, "Register")
     assert(type(spec) == "table", "Register: spec must be a table")
     assert(spec.page or spec.sections, "Register: spec requires page or sections")
@@ -929,16 +749,20 @@ function internal.registerTree(self, spec)
     return self
 end
 
-function internal.initializeRoot(self, name)
+function registry.initializeRoot(self, name)
     if not self._rootCategory then
         assert(name, "_initializeRoot: name is required")
-        internal.createRootCategory(self, name)
+        local category, layout = interop.createRootCategory(name)
+        self._rootCategory = category
+        self._rootCategoryName = name
+        self._layouts[category] = layout
+        self._currentSubcategory = nil
     elseif name and self._rootCategoryName ~= name then
         error("_initializeRoot: root already exists with name '" .. tostring(self._rootCategoryName) .. "'")
     end
 
     if not self._rootRegistered and self._rootCategory then
-        Settings.RegisterAddOnCategory(self._rootCategory)
+        interop.registerAddOnCategory(self._rootCategory)
         self._rootRegistered = true
     end
 
@@ -952,8 +776,8 @@ lib._publicApi = {
     GetRootPage = lib.GetRootPage,
     GetPage = lib.GetPage,
     HasCategory = lib.HasCategory,
-    _registerTree = internal.registerTree,
-    _initializeRoot = internal.initializeRoot,
+    _registerTree = registry.registerTree,
+    _initializeRoot = registry.initializeRoot,
 }
 
 lib._loadState.open = nil

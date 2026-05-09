@@ -9,52 +9,54 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local createCustomListRowInitializer = internal.createCustomListRowInitializer
-local getOrderedValueEntries = internal.getOrderedValueEntries
-local getSettingVariable = internal.getSettingVariable
-local applyInputRowEnabledState = internal.applyInputRowEnabledState
-local applyInputRowFrame = internal.applyInputRowFrame
-local cancelInputPreviewTimer = internal.cancelInputPreviewTimer
-function lib.Checkbox(self, spec)
-    internal.validateSpecFields(self, "checkbox", spec)
-    local setting, category = internal.makeProxySetting(self, spec, Settings.VarType.Boolean, false)
-    local initializer = Settings.CreateCheckbox(category, setting, spec.tooltip)
-    internal.applyModifiers(self, initializer, spec)
+local foundation = internal.foundation
+local interop = internal.interop
+local registry = internal.registry
+local builders = internal.builders
+
+function builders.checkbox(self, spec)
+    registry.validateSpecFields(self, "checkbox", spec)
+    local setting, category = registry.makeProxySetting(self, spec, interop.getVarTypeBoolean(), false)
+    local initializer = interop.createCheckbox(category, setting, spec.tooltip)
+    registry.applyModifiers(self, initializer, spec)
     return initializer, setting
 end
 
-function lib.Slider(self, spec)
-    internal.validateSpecFields(self, "slider", spec)
-    local setting, category = internal.makeProxySetting(self, spec, Settings.VarType.Number, 0)
-
-    local options = Settings.CreateSliderOptions(spec.min, spec.max, spec.step or 1)
-    options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, spec.formatter or internal.defaultSliderFormatter)
-
-    local initializer = Settings.CreateSlider(category, setting, options, spec.tooltip)
-    internal.applyModifiers(self, initializer, spec)
-
+function builders.slider(self, spec)
+    registry.validateSpecFields(self, "slider", spec)
+    local setting, category = registry.makeProxySetting(self, spec, interop.getVarTypeNumber(), 0)
+    local initializer = interop.createSlider(
+        category,
+        setting,
+        spec.min,
+        spec.max,
+        spec.step,
+        spec.formatter or foundation.defaultSliderFormatter,
+        spec.tooltip
+    )
+    registry.applyModifiers(self, initializer, spec)
     return initializer, setting
 end
 
-function lib.Dropdown(self, spec)
-    internal.validateSpecFields(self, "dropdown", spec)
+function builders.dropdown(self, spec)
+    registry.validateSpecFields(self, "dropdown", spec)
 
-    local binding = internal.resolveBinding(self, spec)
+    local binding = registry.resolveBinding(self, spec)
     local defaultValue = binding.default
     if spec.getTransform then
         defaultValue = spec.getTransform(defaultValue)
     end
 
     local varType = spec.varType
-        or (type(defaultValue) == "number" and Settings.VarType.Number)
-        or Settings.VarType.String
+        or (type(defaultValue) == "number" and interop.getVarTypeNumber())
+        or interop.getVarTypeString()
 
-    local setting, category = internal.makeProxySetting(self, spec, varType, "", binding)
+    local setting, category = registry.makeProxySetting(self, spec, varType, "", binding)
     local function optionsGenerator()
-        local container = Settings.CreateControlTextContainer()
+        local container = interop.createDropdownOptionsContainer()
         local values = type(spec.values) == "function" and spec.values() or spec.values
         if values then
-            for _, entry in ipairs(getOrderedValueEntries(values)) do
+            for _, entry in ipairs(foundation.getOrderedValueEntries(values)) do
                 container:Add(entry.value, entry.label)
             end
         end
@@ -62,7 +64,7 @@ function lib.Dropdown(self, spec)
     end
     setting._optionsGen = optionsGenerator
 
-    local initializer = Settings.CreateDropdown(category, setting, optionsGenerator, spec.tooltip)
+    local initializer = interop.createDropdown(category, setting, optionsGenerator, spec.tooltip)
     initializer._lsbData = {
         _lsbKind = "dropdown",
         setting = setting,
@@ -79,7 +81,7 @@ function lib.Dropdown(self, spec)
                 frame:RefreshDropdownText()
             end
         end
-        internal.registerCategoryRefreshable(self, category, initializer)
+        registry.registerCategoryRefreshable(self, category, initializer)
     end
 
     if not initializer:GetSetting() then
@@ -96,38 +98,38 @@ function lib.Dropdown(self, spec)
                 frame:SetValue(setting:GetValue())
             end
         end
-        internal.registerCategoryRefreshable(self, category, initializer)
+        registry.registerCategoryRefreshable(self, category, initializer)
     end
 
-    internal.applyModifiers(self, initializer, spec)
+    registry.applyModifiers(self, initializer, spec)
 
     return initializer, setting
 end
 
-function lib.Color(self, spec)
-    internal.validateSpecFields(self, "color", spec)
+function builders.color(self, spec)
+    registry.validateSpecFields(self, "color", spec)
 
-    local variable = internal.makeVarName(self, spec)
-    local category = internal.resolveCategory(self, spec)
-    local binding = internal.resolveBinding(self, spec)
+    local variable = registry.makeVarName(self, spec)
+    local category = registry.resolveCategory(self, spec)
+    local binding = registry.resolveBinding(self, spec)
 
     local function getter()
-        return internal.colorTableToHex(self, binding.get())
+        return foundation.colorTableToHex(binding.get())
     end
 
     local settingRef
     local function setter(hexValue)
-        local color = CreateColorFromHexString(hexValue)
+        local color = interop.createColorFromHexString(hexValue)
         local value = { r = color.r, g = color.g, b = color.b, a = color.a }
         binding.set(value)
-        internal.postSet(self, spec, value, settingRef)
+        registry.postSet(self, spec, value, settingRef)
     end
 
-    local defaultHex = internal.colorTableToHex(self, binding.default or {})
-    local setting = Settings.RegisterProxySetting(
+    local defaultHex = foundation.colorTableToHex(binding.default or {})
+    local setting = interop.registerProxySetting(
         category,
         variable,
-        Settings.VarType.String,
+        interop.getVarTypeString(),
         spec.name,
         defaultHex,
         getter,
@@ -135,16 +137,16 @@ function lib.Color(self, spec)
     )
     settingRef = setting
 
-    local initializer = Settings.CreateColorSwatch(category, setting, spec.tooltip)
-    internal.applyModifiers(self, initializer, spec)
+    local initializer = interop.createColorSwatchInitializer(category, setting, spec.tooltip)
+    registry.applyModifiers(self, initializer, spec)
 
     return initializer, setting
 end
 
-function lib.Input(self, spec)
-    internal.validateSpecFields(self, "input", spec)
+function builders.input(self, spec)
+    registry.validateSpecFields(self, "input", spec)
 
-    local setting, category = internal.makeProxySetting(self, spec, Settings.VarType.String, "")
+    local setting, category = registry.makeProxySetting(self, spec, interop.getVarTypeString(), "")
     local data = {
         debounce = spec.debounce,
         maxLetters = spec.maxLetters,
@@ -153,13 +155,13 @@ function lib.Input(self, spec)
         onTextChanged = spec.onTextChanged,
         resolveText = spec.resolveText,
         setting = setting,
-        settingVariable = getSettingVariable(setting),
+        settingVariable = interop.getSettingVariable(setting),
         tooltip = spec.tooltip,
         width = spec.width,
     }
 
     local extent = spec.resolveText and 46 or 26
-    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", data, extent, applyInputRowFrame)
+    local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", data, extent, interop.applyInputRowFrame)
     local originalInitFrame = initializer.InitFrame
     local originalResetter = initializer.Resetter
 
@@ -167,18 +169,18 @@ function lib.Input(self, spec)
     initializer.SetEnabled = function(controlInitializer, enabled)
         controlInitializer._lsbEnabled = enabled
         if controlInitializer._lsbActiveFrame then
-            applyInputRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+            interop.applyInputRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
         end
     end
 
     initializer.InitFrame = function(controlInitializer, frame)
         controlInitializer._lsbActiveFrame = frame
         originalInitFrame(controlInitializer, frame)
-        applyInputRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+        interop.applyInputRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
     end
 
     initializer.Resetter = function(controlInitializer, frame)
-        cancelInputPreviewTimer(frame)
+        interop.cancelInputPreviewTimer(frame)
         if frame and frame._lsbInputEditBox then
             frame._lsbInputEditBox:ClearFocus()
             frame._lsbInputEditBox._lsbOwnerFrame = nil
@@ -191,20 +193,20 @@ function lib.Input(self, spec)
         originalResetter(controlInitializer, frame)
     end
 
-    Settings.RegisterInitializer(category, initializer)
-    internal.applyModifiers(self, initializer, spec)
+    interop.registerInitializer(category, initializer)
+    registry.applyModifiers(self, initializer, spec)
 
     return initializer, setting
 end
 
 --- Creates a proxy setting backed by a custom frame template.
 --- The template's Init receives initializer data containing {setting, name, tooltip}.
-function lib.Custom(self, spec)
-    internal.validateSpecFields(self, "custom", spec)
+function builders.custom(self, spec)
+    registry.validateSpecFields(self, "custom", spec)
     assert(spec.template, "Custom: spec.template is required")
 
-    local setting, category = internal.makeProxySetting(self, spec, spec.varType or Settings.VarType.String, "")
-    local initializer = Settings.CreateElementInitializer(spec.template, {
+    local setting, category = registry.makeProxySetting(self, spec, spec.varType or interop.getVarTypeString(), "")
+    local initializer = interop.createElementInitializer(spec.template, {
         name = spec.name,
         setting = setting,
         tooltip = spec.tooltip,
@@ -212,8 +214,8 @@ function lib.Custom(self, spec)
 
     initializer:SetSetting(setting)
 
-    Settings.RegisterInitializer(category, initializer)
-    internal.applyModifiers(self, initializer, spec)
+    interop.registerInitializer(category, initializer)
+    registry.applyModifiers(self, initializer, spec)
 
     return initializer, setting
 end

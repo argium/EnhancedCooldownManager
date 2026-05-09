@@ -467,9 +467,16 @@ Declarative pages are normally supplied through `LSB.New({ page = ..., sections 
 
 ## Implementation model
 
-The library has three main families of row builders:
+The public API is declarative and intentionally narrow. Internally, the library is structured as a thin translation pipeline:
 
-- **proxy controls** — persisted values backed by `Settings.RegisterProxySetting` (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
+- **Schema** normalizes and validates raw row tables.
+- **Registry** materializes root pages, sections, page handles, refresh behavior, and lifecycle callbacks.
+- **Builders** translate normalized row specs into simple primitive operations.
+- **Interop** is the only layer that calls Blizzard Settings/UI APIs, creates frames, installs hooks, or renders custom row widgets.
+
+Row builders still fall into the same public families:
+
+- **proxy controls** — persisted values backed by proxy settings (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
 - **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`, `pageActions`),
 - **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
 

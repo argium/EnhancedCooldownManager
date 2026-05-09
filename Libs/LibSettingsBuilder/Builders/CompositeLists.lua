@@ -9,8 +9,10 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
+local registry = internal.registry
+local builders = internal.builders
 
-local function buildControlList(builder, basePath, defs, spec, methodName)
+local function buildControlList(builder, basePath, defs, spec, build)
     local results = {}
     spec = spec or {}
     for _, def in ipairs(defs) do
@@ -19,17 +21,17 @@ local function buildControlList(builder, basePath, defs, spec, methodName)
             name = def.name,
             tooltip = def.tooltip,
         }
-        internal.propagateModifiers(builder, childSpec, spec)
-        local initializer, setting = lib[methodName](builder, childSpec)
+        registry.propagateModifiers(builder, childSpec, spec)
+        local initializer, setting = build(builder, childSpec)
         results[#results + 1] = { key = def.key, initializer = initializer, setting = setting }
     end
     return results
 end
 
-function lib.ColorPickerList(self, basePath, defs, spec)
-    return buildControlList(self, basePath, defs, spec, "Color")
+function builders.colorList(self, basePath, defs, spec)
+    return buildControlList(self, basePath, defs, spec, builders.color)
 end
 
-function lib.CheckboxList(self, basePath, defs, spec)
-    return buildControlList(self, basePath, defs, spec, "Checkbox")
+function builders.checkboxList(self, basePath, defs, spec)
+    return buildControlList(self, basePath, defs, spec, builders.checkbox)
 end

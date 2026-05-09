@@ -9,9 +9,11 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local evaluateStaticOrFunction = internal.evaluateStaticOrFunction
-local registerValueChangedCallback = internal.registerValueChangedCallback
-local setInitializerExtent = internal.setInitializerExtent
+local foundation = internal.foundation
+local interop = internal.interop
+local evaluateStaticOrFunction = foundation.evaluateStaticOrFunction
+local registerValueChangedCallback = interop.registerValueChangedCallback
+local setInitializerExtent = interop.setInitializerExtent
 
 local listElementKeysToHide = {
     "_lsbSubheaderTitle",
@@ -57,7 +59,7 @@ local function ensureSubheaderTitle(frame)
         return frame._lsbSubheaderTitle
     end
 
-    local title = internal.createSubheaderTitle(frame)
+    local title = interop.createSubheaderTitle(frame)
     frame._lsbSubheaderTitle = title
     frame.Title = title
     return title
@@ -90,7 +92,7 @@ local function ensureHeaderRowWidgets(frame)
         return frame
     end
 
-    frame._lsbHeaderTitle = internal.createHeaderTitle(frame)
+    frame._lsbHeaderTitle = interop.createHeaderTitle(frame)
     frame._lsbHeaderActionButtons = frame._lsbHeaderActionButtons or {}
 
     return frame
@@ -149,7 +151,7 @@ local function applyHeaderActionButtons(frame, actions, actionParent, rightAncho
                 enabled = true
             end
             button:SetEnabled(enabled)
-            internal.setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
+            interop.setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
             button:SetScript("OnClick", function()
                 if action.onClick then
                     action.onClick(action, frame)
@@ -467,11 +469,11 @@ local function applyEmbedCanvasFrame(frame, data, initializer)
 end
 
 local function ensureListElementCallbackHandles(frame)
-    if frame.cbrHandles or not (Settings and Settings.CreateCallbackHandleContainer) then
+    if frame.cbrHandles then
         return
     end
 
-    frame.cbrHandles = Settings.CreateCallbackHandleContainer()
+    frame.cbrHandles = interop.createCallbackHandleContainer()
 end
 
 local function initializerShouldShow(initializer)
@@ -507,7 +509,7 @@ local function initializerIsEnabled(initializer)
 end
 
 local function createCustomListRowInitializer(template, data, extent, initFrame)
-    local initializer = Settings.CreateElementInitializer(template, data)
+    local initializer = interop.createElementInitializer(template, data)
     setInitializerExtent(initializer, extent)
 
     initializer.InitFrame = function(self, frame)
@@ -573,12 +575,12 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
     return initializer
 end
 
-internal.hideHeaderActionButtons = hideHeaderActionButtons
-internal.applyHeaderFrame = applyHeaderFrame
-internal.applySubheaderFrame = applySubheaderFrame
-internal.applyInfoRowFrame = applyInfoRowFrame
-internal.applyInputRowFrame = applyInputRowFrame
-internal.applyInputRowEnabledState = applyInputRowEnabledState
-internal.cancelInputPreviewTimer = cancelInputPreviewTimer
-internal.applyEmbedCanvasFrame = applyEmbedCanvasFrame
-internal.createCustomListRowInitializer = createCustomListRowInitializer
+interop.hideHeaderActionButtons = hideHeaderActionButtons
+interop.applyHeaderFrame = applyHeaderFrame
+interop.applySubheaderFrame = applySubheaderFrame
+interop.applyInfoRowFrame = applyInfoRowFrame
+interop.applyInputRowFrame = applyInputRowFrame
+interop.applyInputRowEnabledState = applyInputRowEnabledState
+interop.cancelInputPreviewTimer = cancelInputPreviewTimer
+interop.applyEmbedCanvasFrame = applyEmbedCanvasFrame
+interop.createCustomListRowInitializer = createCustomListRowInitializer

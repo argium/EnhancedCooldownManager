@@ -1,13 +1,17 @@
 <Ui>
     <Script file="Core.lua"/>
-    <Script file="Primitives/Rows.lua"/>
-    <Script file="Primitives/BlizzardControls.lua"/>
-    <Script file="Controls/CollectionFrames.lua"/>
-    <Script file="Primitives/Layout.lua"/>
-    <Script file="Controls/Base.lua"/>
-    <Script file="Controls/Collections.lua"/>
-    <Script file="Controls/Rows.lua"/>
-    <Script file="CompositeControls/Groups.lua"/>
-    <Script file="CompositeControls/Lists.lua"/>
-    <Script file="Utility.lua"/>
+    <Script file="Foundation/Helpers.lua"/>
+    <Script file="Schema/Rows.lua"/>
+    <Script file="Interop/Settings.lua"/>
+    <Script file="Interop/Widgets.lua"/>
+    <Script file="Interop/Enhancements.lua"/>
+    <Script file="Interop/ListRows.lua"/>
+    <Script file="Interop/CollectionFrames.lua"/>
+    <Script file="Registry/CoreState.lua"/>
+    <Script file="Builders/Rows.lua"/>
+    <Script file="Builders/LayoutRows.lua"/>
+    <Script file="Builders/Collections.lua"/>
+    <Script file="Builders/Composites.lua"/>
+    <Script file="Builders/CompositeLists.lua"/>
+    <Script file="Registry/Runtime.lua"/>
 </Ui>

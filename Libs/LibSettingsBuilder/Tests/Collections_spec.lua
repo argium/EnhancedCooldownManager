@@ -296,7 +296,7 @@ describe("LibSettingsBuilder Collections", function()
         end
 
         local lsb = LibStub("LibSettingsBuilder-1.0")
-        lsb._internal.applyCollectionFrame(makeCollectionControl(clickedButtons), {
+        lsb._internal.interop.applyCollectionFrame(makeCollectionControl(clickedButtons), {
             sections = function()
                 return {
                     {
@@ -357,7 +357,7 @@ describe("LibSettingsBuilder Collections", function()
         local host = makeCollectionControl()
         local lsb = LibStub("LibSettingsBuilder-1.0")
 
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
         local row = assert(host._lsbSectionRowPools.utility[1])
         assert.are.same({ 0.5, 0.5, 0.5, 1 }, { row._label:GetTextColor() })
         assert.are.equal(0.5, row._label:GetAlpha())
@@ -377,7 +377,7 @@ describe("LibSettingsBuilder Collections", function()
                 },
             },
         }
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
 
         assert.are.same({ 1, 0.82, 0, 1 }, { row._label:GetTextColor() })
         assert.are.equal(1, row._label:GetAlpha())
@@ -419,7 +419,7 @@ describe("LibSettingsBuilder Collections", function()
         local host = makeCollectionControl()
         local lsb = LibStub("LibSettingsBuilder-1.0")
 
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
         local row = assert(host._lsbSectionRowPools.utility[1])
         assert.is_true(row._buttons.delete:IsShown())
         assert.is_function(row._buttons.delete:GetScript("OnClick"))
@@ -429,7 +429,7 @@ describe("LibSettingsBuilder Collections", function()
             label = "Without action",
             actions = {},
         }
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
 
         assert.is_false(row._buttons.delete:IsShown())
         assert.is_nil(row._buttons.delete:GetScript("OnClick"))
@@ -461,7 +461,7 @@ describe("LibSettingsBuilder Collections", function()
         local host = makeCollectionControl()
         local lsb = LibStub("LibSettingsBuilder-1.0")
 
-        lsb._internal.applyCollectionFrame(host, {
+        lsb._internal.interop.applyCollectionFrame(host, {
             preset = "editor",
             rowHeight = 34,
             items = function()
@@ -515,7 +515,7 @@ describe("LibSettingsBuilder Collections", function()
             end,
         }
 
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
         items = {
             {
                 label = "Tick 2",
@@ -532,7 +532,7 @@ describe("LibSettingsBuilder Collections", function()
                 },
             },
         }
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
 
         host._lsbCollectionScrollBox._rows[1]._fieldWidgets[1].slider:SetValue(42)
 
@@ -563,7 +563,7 @@ describe("LibSettingsBuilder Collections", function()
             },
         }
 
-        lsb._internal.applyCollectionFrame(host, {
+        lsb._internal.interop.applyCollectionFrame(host, {
             preset = "editor",
             rowHeight = 34,
             items = function()
@@ -683,14 +683,14 @@ describe("LibSettingsBuilder Collections", function()
         local host = makeCollectionControl()
         local lsb = LibStub("LibSettingsBuilder-1.0")
 
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
         local footer = assert(host._lsbSectionTrailerRows.utility)
         assert.is_false(footer._submitButton._enabled)
         footer._submitButton:GetScript("OnClick")()
         assert.are.equal(0, submitCalls)
 
         valid = true
-        lsb._internal.applyCollectionFrame(host, data)
+        lsb._internal.interop.applyCollectionFrame(host, data)
         assert.is_true(footer._submitButton._enabled)
         footer._submitButton:GetScript("OnClick")()
         assert.are.equal(1, submitCalls)
@@ -714,7 +714,7 @@ describe("LibSettingsBuilder Collections", function()
         end
 
         local lsb = LibStub("LibSettingsBuilder-1.0")
-        local swatch = lsb._internal.createColorSwatch(TestHelpers.makeFrame())
+        local swatch = lsb._internal.interop.createColorSwatch(TestHelpers.makeFrame())
 
         assert.are.equal(created, swatch)
         assert.is_true(swatch._mouseEnabled)

@@ -9,8 +9,10 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
+local registry = internal.registry
+local builders = internal.builders
 
-function lib.HeightOverrideSlider(self, sectionPath, spec)
+function builders.heightOverride(self, sectionPath, spec)
     spec = spec or {}
     local childSpec = {
         path = sectionPath .. ".height",
@@ -26,8 +28,8 @@ function lib.HeightOverrideSlider(self, sectionPath, spec)
             return value > 0 and value or nil
         end,
     }
-    internal.propagateModifiers(self, childSpec, spec)
-    return lib.Slider(self, childSpec)
+    registry.propagateModifiers(self, childSpec, spec)
+    return builders.slider(self, childSpec)
 end
 
 --- Font override group.
@@ -36,7 +38,7 @@ end
 ---   fontFallback      function() -> string    (fallback font name)
 ---   fontSizeFallback  function() -> number    (fallback font size)
 ---   fontTemplate      string                  (custom template for the font picker)
-function lib.FontOverrideGroup(self, sectionPath, spec)
+function builders.fontOverride(self, sectionPath, spec)
     spec = spec or {}
     local overridePath = sectionPath .. ".overrideFont"
 
@@ -48,8 +50,8 @@ function lib.FontOverrideGroup(self, sectionPath, spec)
             return value == true
         end,
     }
-    internal.propagateModifiers(self, enabledSpec, spec)
-    local enabledInit, enabledSetting = lib.Checkbox(self, enabledSpec)
+    registry.propagateModifiers(self, enabledSpec, spec)
+    local enabledInit, enabledSetting = builders.checkbox(self, enabledSpec)
 
     local outerDisabled = spec.disabled
     local function isOverrideDisabled()
@@ -75,14 +77,14 @@ function lib.FontOverrideGroup(self, sectionPath, spec)
             return nil
         end,
     }
-    internal.propagateModifiers(self, fontSpec, spec)
+    registry.propagateModifiers(self, fontSpec, spec)
 
     local fontInit
     if spec.fontTemplate then
         fontSpec.template = spec.fontTemplate
-        fontInit = lib.Custom(self, fontSpec)
+        fontInit = builders.custom(self, fontSpec)
     else
-        fontInit = lib.Dropdown(self, fontSpec)
+        fontInit = builders.dropdown(self, fontSpec)
     end
 
     local sizeSpec = {
@@ -103,8 +105,8 @@ function lib.FontOverrideGroup(self, sectionPath, spec)
             return 11
         end,
     }
-    internal.propagateModifiers(self, sizeSpec, spec)
-    local sizeInit = lib.Slider(self, sizeSpec)
+    registry.propagateModifiers(self, sizeSpec, spec)
+    local sizeInit = builders.slider(self, sizeSpec)
 
     return {
         enabledInit = enabledInit,
@@ -114,7 +116,7 @@ function lib.FontOverrideGroup(self, sectionPath, spec)
     }
 end
 
-function lib.BorderGroup(self, borderPath, spec)
+function builders.border(self, borderPath, spec)
     spec = spec or {}
 
     local enabledSpec = {
@@ -122,8 +124,8 @@ function lib.BorderGroup(self, borderPath, spec)
         name = spec.enabledName or "Show border",
         tooltip = spec.enabledTooltip,
     }
-    internal.propagateModifiers(self, enabledSpec, spec)
-    local enabledInit, enabledSetting = lib.Checkbox(self, enabledSpec)
+    registry.propagateModifiers(self, enabledSpec, spec)
+    local enabledInit, enabledSetting = builders.checkbox(self, enabledSpec)
 
     local thicknessSpec = {
         path = borderPath .. ".thickness",
@@ -137,8 +139,8 @@ function lib.BorderGroup(self, borderPath, spec)
             return enabledSetting:GetValue()
         end,
     }
-    internal.propagateModifiers(self, thicknessSpec, spec)
-    local thicknessInit = lib.Slider(self, thicknessSpec)
+    registry.propagateModifiers(self, thicknessSpec, spec)
+    local thicknessInit = builders.slider(self, thicknessSpec)
 
     local colorSpec = {
         path = borderPath .. ".color",
@@ -149,8 +151,8 @@ function lib.BorderGroup(self, borderPath, spec)
             return enabledSetting:GetValue()
         end,
     }
-    internal.propagateModifiers(self, colorSpec, spec)
-    local colorInit = lib.Color(self, colorSpec)
+    registry.propagateModifiers(self, colorSpec, spec)
+    local colorInit = builders.color(self, colorSpec)
 
     return {
         enabledInit = enabledInit,

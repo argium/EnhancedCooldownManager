@@ -9,29 +9,31 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local applyCollectionFrame = internal.applyCollectionFrame
-local createCustomListRowInitializer = internal.createCustomListRowInitializer
-local copyMixin = internal.copyMixin
-function internal.createCollectionInitializer(self, spec, errorPrefix)
+local foundation = internal.foundation
+local interop = internal.interop
+local registry = internal.registry
+local builders = internal.builders
+
+local function createCollectionInitializer(self, spec, errorPrefix)
     assert(spec.height, errorPrefix .. ": spec.height is required")
 
-    local category = internal.resolveCategory(self, spec)
-    local data = copyMixin({}, spec)
+    local category = registry.resolveCategory(self, spec)
+    local data = foundation.copyMixin({}, spec)
     if data.variant and data.preset == nil then
         data.preset = data.variant
     end
 
-    local initializer = createCustomListRowInitializer("SettingsListElementTemplate", data, spec.height, applyCollectionFrame)
+    local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", data, spec.height, interop.applyCollectionFrame)
 
     initializer._lsbEnabled = true
     initializer.SetEnabled = function(controlInitializer, enabled)
         controlInitializer._lsbEnabled = enabled
         local activeFrame = controlInitializer._lsbActiveFrame
         if activeFrame then
-            applyCollectionFrame(activeFrame, data, controlInitializer)
+            interop.applyCollectionFrame(activeFrame, data, controlInitializer)
             activeFrame:SetAlpha(enabled and 1 or 0.5)
             if enabled == false then
-                internal.setCanvasInteractive(self, activeFrame, false)
+                registry.setCanvasInteractive(self, activeFrame, false)
             end
         end
     end
@@ -41,20 +43,20 @@ function internal.createCollectionInitializer(self, spec, errorPrefix)
         initializer:SetEnabled(initializer._lsbEnabled ~= false)
     end
 
-    Settings.RegisterInitializer(category, initializer)
-    internal.registerCategoryRefreshable(self, category, initializer)
-    internal.applyModifiers(self, initializer, spec)
+    interop.registerInitializer(category, initializer)
+    registry.registerCategoryRefreshable(self, category, initializer)
+    registry.applyModifiers(self, initializer, spec)
 
     return initializer
 end
 
-function lib.List(self, spec)
+function builders.list(self, spec)
     assert(spec.items, "List: spec.items is required")
     assert(not spec.sections, "List: spec.sections is not supported")
-    return internal.createCollectionInitializer(self, spec, "List")
+    return createCollectionInitializer(self, spec, "List")
 end
 
-function lib.SectionList(self, spec)
+function builders.sectionList(self, spec)
     assert(spec.sections, "SectionList: spec.sections is required")
-    return internal.createCollectionInitializer(self, spec, "SectionList")
+    return createCollectionInitializer(self, spec, "SectionList")
 end

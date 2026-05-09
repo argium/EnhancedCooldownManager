@@ -8,10 +8,11 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local internal = lib._internal
-local copyMixin = internal.copyMixin
-local getInitializerData = internal.getInitializerData
-local getOrderedValueEntries = internal.getOrderedValueEntries
+local foundation = lib._internal.foundation
+local interop = lib._internal.interop
+local copyMixin = foundation.copyMixin
+local getInitializerData = interop.getInitializerData
+local getOrderedValueEntries = foundation.getOrderedValueEntries
 
 local DropdownMethods = {}
 
@@ -291,7 +292,7 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged, r
     end
 end
 
-internal.configureInlineSlider = configureInlineSlider
+interop.configureInlineSlider = configureInlineSlider
 
 if not lib._sliderHookInstalled then
     local function setupSliderEditableValue()
@@ -438,4 +439,167 @@ if not lib._sliderHookInstalled then
 
     setupSliderEditableValue()
     lib._sliderHookInstalled = true
+end
+
+local function getCategoryDefaultsButton()
+    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local header = settingsList and settingsList.Header
+    return header and header.DefaultsButton or nil
+end
+
+function interop.installCategoryDefaultsOverride(onClick, enabledPredicate, confirmDefaults, pageName)
+    local button = getCategoryDefaultsButton()
+    if not button then
+        return function() end
+    end
+
+    local originalOnClick = button:GetScript("OnClick")
+    local originalEnabled = button:IsEnabled()
+
+    local function applyEnabled()
+        if enabledPredicate then
+            button:SetEnabled(enabledPredicate() and true or false)
+        elseif not onClick then
+            button:SetEnabled(originalEnabled)
+        else
+            button:SetEnabled(true)
+        end
+    end
+
+    button:SetScript("OnClick", function(self)
+        if enabledPredicate and not enabledPredicate() then
+            return
+        end
+
+        local function reset()
+            if onClick then
+                onClick()
+                applyEnabled()
+            elseif originalOnClick then
+                originalOnClick(self)
+            end
+        end
+
+        if confirmDefaults then
+            confirmDefaults(pageName, reset)
+        else
+            reset()
+        end
+    end)
+    applyEnabled()
+
+    return function()
+        if button:GetScript("OnClick") then
+            button:SetScript("OnClick", originalOnClick)
+        end
+        button:SetEnabled(originalEnabled)
+    end
+end
+
+local function notifyLifecycleHidden(category)
+    local cbs = category and lib._pageLifecycleCallbacks[category] or nil
+    if not cbs then
+        return
+    end
+    if cbs._defaultsRestore then
+        cbs._defaultsRestore()
+        cbs._defaultsRestore = nil
+    end
+    if cbs.onHide then
+        cbs.onHide()
+    end
+end
+
+function interop.installPageLifecycleHooks()
+    if lib._pageLifecycleHooked then
+        return
+    end
+
+    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
+        if lib._pageLifecycleDeferred or type(CreateFrame) ~= "function" then
+            return
+        end
+        lib._pageLifecycleDeferred = true
+        local f = CreateFrame("Frame")
+        f:RegisterEvent("ADDON_LOADED")
+        f:SetScript("OnEvent", function(self)
+            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
+                self:UnregisterAllEvents()
+                interop.installPageLifecycleHooks()
+            end
+        end)
+        return
+    end
+
+    lib._pageLifecycleHooked = true
+
+    hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
+        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        local old = lib._activeLifecycleCategory
+        if old == category then
+            return
+        end
+
+        notifyLifecycleHidden(old)
+
+        lib._activeLifecycleCategory = category
+        local cbs = category and lib._pageLifecycleCallbacks[category] or nil
+        if cbs then
+            if cbs.onDefault or cbs.confirmDefaults then
+                cbs._defaultsRestore = interop.installCategoryDefaultsOverride(
+                    cbs.onDefault,
+                    cbs.onDefaultEnabled,
+                    cbs.confirmDefaults,
+                    cbs.pageName
+                )
+            end
+            if cbs.onShow then
+                cbs.onShow()
+            end
+        end
+    end)
+
+    SettingsPanel:HookScript("OnHide", function()
+        notifyLifecycleHidden(lib._activeLifecycleCategory)
+        lib._activeLifecycleCategory = nil
+    end)
+end
+
+function interop.getCurrentSettingsCategory()
+    return SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
+end
+
+function interop.isSettingsPanelShown()
+    return SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown()
+end
+
+function interop.forEachVisibleSettingsFrame(callback)
+    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local scrollBox = settingsList and settingsList.ScrollBox
+    if scrollBox and scrollBox.ForEachFrame then
+        scrollBox:ForEachFrame(callback)
+    end
+end
+
+function interop.ensureConfirmDialog(name)
+    if not StaticPopupDialogs[name] then
+        StaticPopupDialogs[name] = {
+            text = "%s",
+            button1 = YES,
+            button2 = NO,
+            OnAccept = function(_, data)
+                if data and data.onAccept then
+                    data.onAccept()
+                end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+        }
+    end
+    return name
+end
+
+function interop.showConfirmDialog(name, text, data)
+    StaticPopup_Show(name, text, nil, data)
 end

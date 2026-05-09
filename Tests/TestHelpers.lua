@@ -259,19 +259,6 @@ function TestHelpers.SetupSettingsStubs()
                 layout
         end,
 
-        RegisterCanvasLayoutSubcategory = function(parent, frame, name)
-            local layout = makeLayout()
-            return {
-                _name = name,
-                _parent = parent,
-                _frame = frame,
-                GetLayout = function()
-                    return layout
-                end,
-            },
-                layout
-        end,
-
         RegisterAddOnCategory = function(category)
             return category
         end,
@@ -1742,16 +1729,20 @@ end
 
 local LIB_SETTINGS_BUILDER_SOURCE_FILES = {
     "Libs/LibSettingsBuilder/Core.lua",
-    "Libs/LibSettingsBuilder/Primitives/Rows.lua",
-    "Libs/LibSettingsBuilder/Primitives/BlizzardControls.lua",
-    "Libs/LibSettingsBuilder/Controls/CollectionFrames.lua",
-    "Libs/LibSettingsBuilder/Primitives/Layout.lua",
-    "Libs/LibSettingsBuilder/Controls/Base.lua",
-    "Libs/LibSettingsBuilder/Controls/Collections.lua",
-    "Libs/LibSettingsBuilder/Controls/Rows.lua",
-    "Libs/LibSettingsBuilder/CompositeControls/Groups.lua",
-    "Libs/LibSettingsBuilder/CompositeControls/Lists.lua",
-    "Libs/LibSettingsBuilder/Utility.lua",
+    "Libs/LibSettingsBuilder/Foundation/Helpers.lua",
+    "Libs/LibSettingsBuilder/Schema/Rows.lua",
+    "Libs/LibSettingsBuilder/Interop/Settings.lua",
+    "Libs/LibSettingsBuilder/Interop/Widgets.lua",
+    "Libs/LibSettingsBuilder/Interop/Enhancements.lua",
+    "Libs/LibSettingsBuilder/Interop/ListRows.lua",
+    "Libs/LibSettingsBuilder/Interop/CollectionFrames.lua",
+    "Libs/LibSettingsBuilder/Registry/CoreState.lua",
+    "Libs/LibSettingsBuilder/Builders/Rows.lua",
+    "Libs/LibSettingsBuilder/Builders/LayoutRows.lua",
+    "Libs/LibSettingsBuilder/Builders/Collections.lua",
+    "Libs/LibSettingsBuilder/Builders/Composites.lua",
+    "Libs/LibSettingsBuilder/Builders/CompositeLists.lua",
+    "Libs/LibSettingsBuilder/Registry/Runtime.lua",
 }
 
 function TestHelpers.LoadLibSettingsBuilder()
