@@ -124,23 +124,98 @@ ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
+local function getErrorDebugStack()
+    if type(debugstack) ~= "function" then
+        return nil
+    end
+
+    local ok, stack = pcall(debugstack, 3, 8, 8)
+    if ok then
+        return stack
+    end
+
+    return "debugstack failed: " .. tostring(stack)
+end
+
+local function getErrorCombatState()
+    if type(InCombatLockdown) ~= "function" then
+        return nil
+    end
+
+    local ok, inCombat = pcall(InCombatLockdown)
+    if ok then
+        return inCombat == true
+    end
+
+    return nil
+end
+
+local function getErrorTimestamp()
+    if type(GetTime) ~= "function" then
+        return nil
+    end
+
+    local ok, timestamp = pcall(GetTime)
+    if ok then
+        return timestamp
+    end
+
+    return nil
+end
+
+local function makeErrorData(module, key, data)
+    local payload = {}
+    if type(data) == "table" then
+        local ok, err = pcall(function()
+            for dataKey, value in pairs(data) do
+                payload[dataKey] = value
+            end
+        end)
+        if not ok then
+            payload.dataError = "error data could not be copied: " .. tostring(err)
+        end
+    elseif data ~= nil then
+        payload.detail = data
+    end
+
+    if payload.module == nil then
+        payload.module = module or "nil"
+    end
+    if key ~= nil and payload.errorKey == nil then
+        payload.errorKey = key
+    end
+    if payload.timestamp == nil then
+        payload.timestamp = getErrorTimestamp()
+    end
+    if payload.inCombatLockdown == nil then
+        payload.inCombatLockdown = getErrorCombatState()
+    end
+    if payload.debugStack == nil then
+        payload.debugStack = getErrorDebugStack()
+    end
+
+    return payload
+end
+
 function ns.ErrorLog(module, message, data)
     if not ns.IsErrorLoggingEnabled() then
         return
     end
 
     local messageStr = ns.ToString(message)
+    local payload = makeErrorData(module, nil, data)
+    local dataStr = ns.ToString(payload)
     local coloredPrefix = "|cff" .. C.ERROR_COLOR .. "[" .. L["ADDON_ABRV"] .. " Error"
         .. (module and (" " .. module) or "") .. "]|r "
 
-    print(coloredPrefix .. messageStr)
+    print(coloredPrefix .. messageStr .. "\n" .. dataStr)
 
     if DevTool and DevTool.AddData then
         pcall(DevTool.AddData, DevTool, {
             module = module or "nil",
             message = messageStr,
-            timestamp = GetTime(),
-            data = data and ns.ToString(data),
+            timestamp = payload.timestamp,
+            data = dataStr,
         }, coloredPrefix .. messageStr)
     end
 end
@@ -157,7 +232,7 @@ function ns.ErrorLogOnce(module, key, message, data)
     end
 
     mod._errorLogOnceKeys[onceKey] = true
-    ns.ErrorLog(module, message, data)
+    ns.ErrorLog(module, message, makeErrorData(module, key, data))
 end
 
 function ns.Log(module, message, data)

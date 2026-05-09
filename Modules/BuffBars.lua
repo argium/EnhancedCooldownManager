@@ -16,16 +16,43 @@ local function getSpellColors()
     return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
 end
 
+local function getFrameValue(frame, methodName)
+    if not frame or type(frame[methodName]) ~= "function" then
+        return nil
+    end
+
+    local ok, value = pcall(frame[methodName], frame)
+    if ok then
+        return value
+    end
+
+    return nil
+end
+
+local function getViewerDiagnostics(viewer, why)
+    return {
+        reason = why,
+        viewerExists = viewer ~= nil,
+        viewerName = getFrameValue(viewer, "GetName"),
+        viewerShown = getFrameValue(viewer, "IsShown"),
+        viewerWidth = getFrameValue(viewer, "GetWidth"),
+        viewerHeight = getFrameValue(viewer, "GetHeight"),
+        viewerAlpha = getFrameValue(viewer, "GetAlpha"),
+        viewerNumPoints = getFrameValue(viewer, "GetNumPoints"),
+        viewerHasGetChildren = viewer ~= nil and type(viewer.GetChildren) == "function",
+        inCombatLockdown = InCombatLockdown(),
+    }
+end
+
 local function collectViewerChildren(viewer, why)
     local ok, children = pcall(function()
         return { viewer:GetChildren() }
     end)
     if not ok then
+        local data = getViewerDiagnostics(viewer, why)
+        data.error = tostring(children)
         ns.ErrorLogOnce("BuffBars", "GetChildren", "Unable to read buff bar children during "
-            .. tostring(why or "unknown") .. ": " .. tostring(children), {
-            reason = why,
-            error = children,
-        })
+            .. tostring(why or "unknown") .. ": " .. tostring(children), data)
         return nil
     end
 

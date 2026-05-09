@@ -18,6 +18,7 @@ describe("ExternalBars real source", function()
     local retryTimers
     local durationTickers
     local requestLayoutReasons
+    local requestLayoutOptions
     local registerFrameCalls
     local unregisterFrameCalls
     local auraDataByInstanceID
@@ -326,6 +327,7 @@ describe("ExternalBars real source", function()
         retryTimers = {}
         durationTickers = {}
         requestLayoutReasons = {}
+        requestLayoutOptions = {}
         registerFrameCalls = 0
         unregisterFrameCalls = 0
         auraDataByInstanceID = {}
@@ -350,8 +352,9 @@ describe("ExternalBars real source", function()
                 UnregisterFrame = function()
                     unregisterFrameCalls = unregisterFrameCalls + 1
                 end,
-                RequestLayout = function(reason)
+                RequestLayout = function(reason, opts)
                     requestLayoutReasons[#requestLayoutReasons + 1] = reason
+                    requestLayoutOptions[#requestLayoutOptions + 1] = opts
                 end,
             },
             FrameUtil = {
@@ -645,6 +648,42 @@ describe("ExternalBars real source", function()
         durationTickers[1].callback()
 
         assert.are.equal("9.0", bar.Bar.Duration:GetText())
+    end)
+
+    it("attaches viewer and aura diagnostics to external aura layout requests", function()
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+
+        ExternalBars:OnExternalAurasUpdated("viewer:UpdateAuras")
+
+        assert.same({ "ExternalBars:viewer:UpdateAuras" }, requestLayoutReasons)
+        local opts = assert(requestLayoutOptions[1])
+        assert.is_function(opts.diagnostics)
+
+        local diagnostics = opts.diagnostics()
+        assert.are.equal("viewer:UpdateAuras", diagnostics.requestReason)
+        assert.are.equal(1, diagnostics.activeAuraCountAfterSync)
+        assert.are.equal(1, diagnostics.cachedAuraStateCount)
+        assert.is_true(diagnostics.viewerExists)
+        assert.is_true(diagnostics.viewerShown)
+        assert.is_true(diagnostics.viewerHooked)
+        assert.are.equal(1, diagnostics.auraInfoArrayCount)
+        assert.are.equal(1, diagnostics.auraFramesArrayCount)
+        assert.are.equal("pvp", diagnostics.instanceType)
+        assert.are.equal(489, diagnostics.instanceID)
+        assert.is_true(diagnostics.configEnabled)
+        assert.is_false(diagnostics.configHideOriginalIcons)
+        assert.are.equal(ns.Constants.ANCHORMODE_CHAIN, diagnostics.configAnchorMode)
+        assert.is_true(diagnostics.configShowDuration)
+        assert.are.equal(240, diagnostics.globalBarWidth)
+        assert.are.equal(18, diagnostics.globalBarHeight)
     end)
 
     it("configures duration bar progress when duration text is hidden", function()
