@@ -229,6 +229,78 @@ describe("LibSettingsBuilder Controls", function()
         assert.are.equal("Expressway", data.setting:GetValue())
     end)
 
+    it("evaluates native custom row predicates without requiring SetEnabled", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local originalCreateElementInitializer = Settings.CreateElementInitializer
+        rawset(Settings, "CreateElementInitializer", function(frameTemplate, data)
+            local initializer = originalCreateElementInitializer(frameTemplate, data)
+            initializer.SetEnabled = nil
+            initializer.EvaluateModifyPredicates = nil
+            initializer.modifyPredicates = {}
+            initializer.shownPredicates = {}
+            initializer._modifyPredicates = nil
+            initializer._shownPredicates = nil
+            initializer.AddModifyPredicate = function(self, predicate)
+                self.modifyPredicates[#self.modifyPredicates + 1] = predicate
+            end
+            initializer.AddShownPredicate = function(self, predicate)
+                self.shownPredicates[#self.shownPredicates + 1] = predicate
+            end
+            return initializer
+        end)
+
+        local enabled = true
+        local shown = true
+        local modifyCalls = 0
+        local shownCalls = 0
+        local interop = LibStub("LibSettingsBuilder-1.0")._internal.interop
+        local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", {
+            _lsbKind = "nativeCustomRow",
+        }, 24, function() end)
+        local frame = TestHelpers.makeFrame()
+
+        initializer:AddModifyPredicate(function()
+            modifyCalls = modifyCalls + 1
+            return enabled
+        end)
+        initializer:AddShownPredicate(function()
+            shownCalls = shownCalls + 1
+            return shown
+        end)
+        frame.GetElementData = function()
+            return initializer
+        end
+
+        assert.is_nil(initializer.SetEnabled)
+        assert.has_no.errors(function()
+            initializer:InitFrame(frame)
+        end)
+        assert.is_true(frame:IsShown())
+        assert.are.equal(1, modifyCalls)
+        assert.are.equal(1, shownCalls)
+
+        enabled = false
+        shown = false
+
+        assert.has_no.errors(function()
+            frame:EvaluateState()
+        end)
+        assert.is_false(frame:IsShown())
+        assert.are.equal(2, modifyCalls)
+        assert.are.equal(2, shownCalls)
+    end)
+
     it("renders page action buttons from live hidden, enabled, and tooltip callbacks", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()

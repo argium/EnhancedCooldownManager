@@ -478,7 +478,9 @@ end
 
 local function initializerShouldShow(initializer)
     if initializer and initializer.ShouldShow then
-        return initializer:ShouldShow()
+        if not initializer:ShouldShow() then
+            return false
+        end
     end
 
     if initializer and initializer._shownPredicates then
@@ -489,16 +491,37 @@ local function initializerShouldShow(initializer)
         end
     end
 
+    if initializer and initializer.shownPredicates and initializer.shownPredicates ~= initializer._shownPredicates then
+        for _, predicate in ipairs(initializer.shownPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
     return true
 end
 
 local function initializerIsEnabled(initializer)
+    local evaluatedModifyPredicates = false
+
     if initializer and initializer.EvaluateModifyPredicates then
-        return initializer:EvaluateModifyPredicates()
+        evaluatedModifyPredicates = true
+        if not initializer:EvaluateModifyPredicates() then
+            return false
+        end
     end
 
-    if initializer and initializer._modifyPredicates then
+    if initializer and initializer._modifyPredicates and not evaluatedModifyPredicates then
         for _, predicate in ipairs(initializer._modifyPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
+    if initializer and initializer.modifyPredicates and initializer.modifyPredicates ~= initializer._modifyPredicates then
+        for _, predicate in ipairs(initializer.modifyPredicates) do
             if not predicate() then
                 return false
             end
@@ -532,7 +555,10 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
                 local currentInitializer = control.GetElementData and control:GetElementData()
                     or control._lsbInitializer
                 if currentInitializer then
-                    currentInitializer:SetEnabled(initializerIsEnabled(currentInitializer))
+                    local enabled = initializerIsEnabled(currentInitializer)
+                    if currentInitializer.SetEnabled then
+                        currentInitializer:SetEnabled(enabled)
+                    end
                 end
                 control:SetShown(initializerShouldShow(currentInitializer))
             end
