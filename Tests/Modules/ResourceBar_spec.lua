@@ -11,19 +11,13 @@ describe("ResourceBar real source", function()
     local ns
     local currentResourceType
     local currentValues
-    local usableSpells
     local addMixinCalls
     local registerFrameCalls
     local unregisterFrameCalls
 
     setup(function()
-        originalGlobals = TestHelpers.CaptureGlobals({ "C_Spell", "issecretvalue" })
+        originalGlobals = TestHelpers.CaptureGlobals({ "issecretvalue" })
         _G.issecretvalue = function() return false end
-        _G.C_Spell = {
-            IsSpellUsable = function(spellID)
-                return usableSpells and usableSpells[spellID] == true
-            end,
-        }
     end)
 
     teardown(function()
@@ -33,7 +27,6 @@ describe("ResourceBar real source", function()
     before_each(function()
         currentResourceType = "icicles"
         currentValues = { 5, 2, 5 }
-        usableSpells = {}
         addMixinCalls = 0
         registerFrameCalls = 0
         unregisterFrameCalls = 0
@@ -203,10 +196,9 @@ describe("ResourceBar real source", function()
         assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
     end)
 
-    it("returns max color for devourer meta when Collapsing Star is usable before stacks are full", function()
+    it("returns max color for devourer meta when the tracked value is capped", function()
         currentResourceType = ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META
-        currentValues = { 6, 0, 6 }
-        usableSpells[ns.Constants.SPELLID_COLLAPSING_STAR] = true
+        currentValues = { 6, 6, 6 }
         function ResourceBar:GetModuleConfig()
             return {
                 colors = {

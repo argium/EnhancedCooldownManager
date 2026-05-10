@@ -14,7 +14,8 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             local voidMeta = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_VOID_META)
-            if voidMeta then
+            local collapsingStar = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_COLLAPSING_STAR)
+            if voidMeta or collapsingStar then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
                 return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL

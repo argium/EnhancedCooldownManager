@@ -36,11 +36,6 @@ function ResourceBar:GetStatusBarColor()
         and cfg.maxColorsEnabled
         and cfg.maxColorsEnabled[resourceType]
     then
-        local spellId = C.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS[resourceType]
-        if spellId and C_Spell.IsSpellUsable(spellId) then
-            return cfg.maxColors and cfg.maxColors[resourceType] or C.COLOR_WHITE
-        end
-
         local _, current, safeMax = ClassUtil.GetCurrentMaxResourceValues(resourceType)
         if safeMax and not issecretvalue(current) and current == safeMax then
             return cfg.maxColors and cfg.maxColors[resourceType] or C.COLOR_WHITE

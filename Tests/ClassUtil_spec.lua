@@ -131,6 +131,15 @@ describe("ClassUtil", function()
             )
         end)
 
+        it("returns devourerMeta for devourer demon hunters when collapsing star aura is present", function()
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_COLLAPSING_STAR, { applications = 30 })
+            assertResourceType(
+                "DEMONHUNTER",
+                ns.Constants.DEMONHUNTER_DEVOURER_SPEC_INDEX,
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META
+            )
+        end)
+
         it("returns combo points for feral druids in cat form", function()
             setAvailablePowerType(Enum.PowerType.ComboPoints)
             assertResourceType("DRUID", 2, Enum.PowerType.ComboPoints, ns.Constants.DRUID_CAT_FORM_INDEX)
