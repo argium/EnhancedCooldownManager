@@ -330,16 +330,77 @@ local function getSiblingFont(viewer)
     end
 end
 
+local function getFrameValue(frame, methodName)
+    if not frame or type(frame[methodName]) ~= "function" then
+        return nil
+    end
+
+    local ok, value = pcall(frame[methodName], frame)
+    if ok then
+        return value
+    end
+
+    return nil
+end
+
+local function getItemFramesCount(itemFrames)
+    if type(itemFrames) ~= "table" or not canAccessTable(itemFrames) then
+        return nil
+    end
+
+    local count = 0
+    local ok = pcall(function()
+        for index in ipairs(itemFrames) do
+            count = index
+        end
+    end)
+    return ok and count or nil
+end
+
+local function getCombatState()
+    if type(InCombatLockdown) ~= "function" then
+        return nil
+    end
+
+    local ok, inCombat = pcall(InCombatLockdown)
+    return ok and inCombat == true or nil
+end
+
+local function getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames)
+    local itemFramesAccessible = nil
+    if type(itemFrames) == "table" then
+        itemFramesAccessible = canAccessTable(itemFrames)
+    end
+
+    return {
+        viewerKey = viewerKey,
+        blizzardFrameKey = BLIZZ_KEY[viewerKey],
+        reason = why,
+        viewerExists = blizzFrame ~= nil,
+        viewerName = getFrameValue(blizzFrame, "GetName"),
+        viewerShown = getFrameValue(blizzFrame, "IsShown"),
+        viewerWidth = getFrameValue(blizzFrame, "GetWidth"),
+        viewerHeight = getFrameValue(blizzFrame, "GetHeight"),
+        viewerAlpha = getFrameValue(blizzFrame, "GetAlpha"),
+        viewerNumPoints = getFrameValue(blizzFrame, "GetNumPoints"),
+        viewerIconScale = blizzFrame and blizzFrame.iconScale or nil,
+        viewerChildXPadding = blizzFrame and blizzFrame.childXPadding or nil,
+        viewerHasGetItemFrames = blizzFrame ~= nil and type(blizzFrame.GetItemFrames) == "function",
+        itemFramesType = type(itemFrames),
+        itemFramesAccessible = itemFramesAccessible,
+        itemFramesArrayCount = getItemFramesCount(itemFrames),
+        inCombatLockdown = getCombatState(),
+    }
+end
+
 local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
     if not ok then
+        local data = getViewerDiagnostics(blizzFrame, viewerKey, why, nil)
+        data.error = tostring(itemFrames)
         ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey,
             "Unable to read cooldown viewer item frames for " .. viewerKey .. " during "
-            .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), {
-            viewerKey = viewerKey,
-            reason = why,
-            error = itemFrames,
-        })
+            .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), data)
         return nil
     end
 
@@ -350,10 +411,7 @@ local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     if not canAccessTable(itemFrames) then
         ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey,
             "Cooldown viewer item frames are inaccessible for " .. viewerKey .. " during "
-            .. tostring(why or "unknown"), {
-            viewerKey = viewerKey,
-            reason = why,
-        })
+            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames))
         return nil
     end
 
@@ -474,13 +532,11 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         if not ok then
             iconSize = DEFAULT_SIZE
             lastActive = nil
+            local data = getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames)
+            data.error = tostring(err)
             ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerKey,
                 "Unable to iterate cooldown viewer item frames for " .. viewerKey .. " during "
-                .. tostring(why or "unknown") .. ": " .. tostring(err), {
-                viewerKey = viewerKey,
-                reason = why,
-                error = err,
-            })
+                .. tostring(why or "unknown") .. ": " .. tostring(err), data)
         end
     end
 

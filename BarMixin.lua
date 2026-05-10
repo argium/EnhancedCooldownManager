@@ -416,13 +416,14 @@ function FrameProto:Refresh(why, force)
     return force or self:ShouldShow()
 end
 
---- Rate-limited refresh. Skips if called within updateFrequency window.
+--- Rate-limited refresh. Skips if called within updateFrequency window unless immediate is true.
 --- @param why string|nil Optional debug string for why the refresh was triggered.
+--- @param immediate boolean|nil Whether to bypass the rate limit without bypassing ShouldShow.
 --- @return boolean refreshed True if Refresh() was called
-function FrameProto:ThrottledRefresh(why)
+function FrameProto:ThrottledRefresh(why, immediate)
     local globalConfig = self:GetGlobalConfig()
     local freq = (globalConfig and globalConfig.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
-    if GetTime() - (self._lastUpdate or 0) < freq then
+    if not immediate and GetTime() - (self._lastUpdate or 0) < freq then
         return false
     end
     self:Refresh(why)

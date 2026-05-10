@@ -449,7 +449,37 @@ local _requestReason = nil
 local _requestSecondPass = false
 local _layoutStorms = {}
 
-local function recordLayoutRequest(reason)
+local function getRequestDiagnostics(opts)
+    if type(opts) ~= "table" or opts.diagnostics == nil then
+        return nil, nil
+    end
+
+    if type(opts.diagnostics) ~= "function" then
+        return opts.diagnostics, nil
+    end
+
+    local ok, data = pcall(opts.diagnostics)
+    if ok then
+        return data, nil
+    end
+
+    return nil, tostring(data)
+end
+
+local function getRequestDebugStack()
+    if type(debugstack) ~= "function" then
+        return nil
+    end
+
+    local ok, stack = pcall(debugstack, 3, 8, 8)
+    if ok then
+        return stack
+    end
+
+    return "debugstack failed: " .. tostring(stack)
+end
+
+local function recordLayoutRequest(reason, opts)
     local now = GetTime()
     local key = reason or "nil"
     local storm = _layoutStorms[key]
@@ -460,11 +490,19 @@ local function recordLayoutRequest(reason)
 
     storm.count = storm.count + 1
     if storm.count == C.LAYOUT_STORM_COUNT then
+        local diagnostics, diagnosticsError = getRequestDiagnostics(opts)
         ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected for " .. key
             .. " (" .. storm.count .. " in " .. C.LAYOUT_STORM_WINDOW .. "s)", {
             reason = key,
             count = storm.count,
             window = C.LAYOUT_STORM_WINDOW,
+            elapsed = now - storm.startedAt,
+            requestPending = _requestPending == true,
+            layoutPending = _layoutPending == true,
+            secondPassPending = _requestSecondPass == true,
+            debugStack = getRequestDebugStack(),
+            diagnostics = diagnostics,
+            diagnosticsError = diagnosticsError,
         })
     end
 end
@@ -472,7 +510,7 @@ end
 --- Requests a deferred layout pass for all registered modules.
 --- Coalesces multiple requests within the same frame into one pass.
 --- @param reason string Debug trace string identifying the caller.
---- @param opts table|nil Optional parameters: { secondPass = boolean }
+--- @param opts table|nil Optional parameters: { secondPass = boolean, diagnostics = table|function }
 function Runtime.RequestLayout(reason, opts)
     if opts and opts.secondPass then
         _requestSecondPass = true
@@ -480,7 +518,7 @@ function Runtime.RequestLayout(reason, opts)
     if _requestPending then
         return
     end
-    recordLayoutRequest(reason)
+    recordLayoutRequest(reason, opts)
     _requestReason = reason
     _requestPending = true
     C_Timer.After(0, function()
@@ -504,9 +542,10 @@ end
 --- Requests a refresh (values only, no geometry) for a single module.
 --- @param module table The module to refresh.
 --- @param reason string Debug trace string.
-function Runtime.RequestRefresh(module, reason)
+--- @param immediate boolean|nil Whether to bypass refresh rate limiting.
+function Runtime.RequestRefresh(module, reason, immediate)
     if module and module.ThrottledRefresh then
-        module:ThrottledRefresh(reason)
+        module:ThrottledRefresh(reason, immediate)
     end
 end
 

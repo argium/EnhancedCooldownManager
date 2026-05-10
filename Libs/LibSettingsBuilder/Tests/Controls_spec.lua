@@ -18,9 +18,17 @@ describe("LibSettingsBuilder Controls", function()
         frame.SetAutoFocus = function() end
         frame.SetNumeric = function() end
         frame.SetJustifyH = function() end
+        frame.SetJustifyV = function() end
         frame.SetSize = function(self, width, height)
             self:SetWidth(width)
             self:SetHeight(height)
+        end
+        frame.SetColorRGB = function(self, r, g, b, a)
+            self._color = { r = r, g = g, b = b, a = a or 1 }
+        end
+        frame.GetColorRGB = function(self)
+            local color = self._color or { r = 1, g = 1, b = 1, a = 1 }
+            return color.r, color.g, color.b, color.a
         end
         frame.SetText = function(self, text)
             self._text = text
@@ -54,11 +62,228 @@ describe("LibSettingsBuilder Controls", function()
             "SettingsSliderControlMixin",
             "SettingsListElementMixin",
             "MinimalSliderWithSteppersMixin",
+            "ColorPickerFrame",
+            "C_Timer",
         })
     end)
 
     teardown(function()
         TestHelpers.RestoreGlobals(originalGlobals)
+    end)
+
+    local function makeHookableControl()
+        local control = createScriptableFrame()
+        control._hooks = {}
+        control.HookScript = function(self, scriptName, callback)
+            self._hooks[scriptName] = self._hooks[scriptName] or {}
+            self._hooks[scriptName][#self._hooks[scriptName] + 1] = callback
+        end
+        control.FireScript = function(self, scriptName)
+            local script = self:GetScript(scriptName)
+            if script then
+                script(self)
+            end
+            for _, callback in ipairs(self._hooks[scriptName] or {}) do
+                callback(self)
+            end
+        end
+        return control
+    end
+
+    local function installColorPickerStub()
+        local picker = makeHookableControl()
+        local hexBox = createScriptableFrame()
+        local okayButton = makeHookableControl()
+        local cancelButton = makeHookableControl()
+
+        picker._setupCalls = 0
+        picker._r, picker._g, picker._b, picker._a = 1, 1, 1, 1
+        picker.Content = {
+            HexBox = hexBox,
+            ColorPicker = {
+                SetColorRGB = function(_, r, g, b)
+                    picker:SetColorRGB(r, g, b)
+                end,
+                GetColorRGB = function()
+                    return picker:GetColorRGB()
+                end,
+            },
+        }
+        picker.Footer = {
+            OkayButton = okayButton,
+            CancelButton = cancelButton,
+        }
+        picker.SetupColorPickerAndShow = function(self, config)
+            self._setupCalls = self._setupCalls + 1
+            self._config = config
+            self._r, self._g, self._b, self._a = config.r, config.g, config.b, config.opacity or 1
+            self:Show()
+        end
+        picker.GetColorRGB = function(self)
+            return self._r, self._g, self._b
+        end
+        picker.GetColorAlpha = function(self)
+            return self._a
+        end
+        picker.SetColorRGB = function(self, r, g, b)
+            self._r, self._g, self._b = r, g, b
+            if self._config and self._config.swatchFunc then
+                self._config.swatchFunc()
+            end
+        end
+        picker.SetColorAlpha = function(self, a)
+            self._a = a
+            if self._config and self._config.opacityFunc then
+                self._config.opacityFunc()
+            end
+        end
+        picker.Hide = function(self)
+            self.__shown = false
+            for _, callback in ipairs(self._hooks.OnHide or {}) do
+                callback(self)
+            end
+        end
+        okayButton.Click = function(self)
+            self:FireScript("OnClick")
+        end
+        cancelButton.Click = function(self)
+            self:FireScript("OnClick")
+        end
+
+        _G.ColorPickerFrame = picker
+        return picker
+    end
+
+    local function setupColorRow(initialColor)
+        TestHelpers._pendingCTimers = {}
+        _G.C_Timer = {
+            After = function(delay, callback)
+                TestHelpers._pendingCTimers[#TestHelpers._pendingCTimers + 1] = { delay = delay, callback = callback }
+            end,
+        }
+
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        local picker = installColorPickerStub()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function(_, _, _, template)
+            local frame = createScriptableFrame()
+            if template == "SettingsColorSwatchTemplate" then
+                frame.Color = TestHelpers.makeTexture()
+            end
+            return frame
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local profile = { general = { color = initialColor or { r = 1, g = 0, b = 0, a = 1 } } }
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Color Rows",
+            store = function() return profile end,
+            defaults = function() return { general = { color = { r = 1, g = 0, b = 0, a = 1 } } } end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                { type = "color", path = "color", name = "Color" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+        return profile, picker, frame
+    end
+
+    it("keeps the color picker open on click-away without committing pending color", function()
+        local profile, picker, frame = setupColorRow()
+        local swatch = frame._lsbColorSwatch
+
+        swatch:GetScript("OnClick")(swatch)
+        picker:SetColorRGB(0, 1, 0)
+        picker:Hide()
+
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, profile.general.color)
+        assert.are.equal(1, picker._setupCalls)
+
+        TestHelpers.RunNextTimer()
+
+        assert.are.equal(2, picker._setupCalls)
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, profile.general.color)
+        assert.are.same({ r = 0, g = 1, b = 0, a = 1 }, swatch._color)
+    end)
+
+    it("commits color picker pending color only from the okay button", function()
+        local profile, picker, frame = setupColorRow()
+        local swatch = frame._lsbColorSwatch
+
+        swatch:GetScript("OnClick")(swatch)
+        picker:SetColorRGB(0, 0, 1)
+        picker:SetColorAlpha(0.5)
+
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, profile.general.color)
+
+        picker.Footer.OkayButton:Click()
+
+        assert.are.equal(0, profile.general.color.r)
+        assert.are.equal(0, profile.general.color.g)
+        assert.are.equal(1, profile.general.color.b)
+        assert.is_true(math.abs(profile.general.color.a - 0.5) < 0.01)
+    end)
+
+    it("cancels color picker pending color without changing the setting", function()
+        local profile, picker, frame = setupColorRow()
+        local swatch = frame._lsbColorSwatch
+
+        swatch:GetScript("OnClick")(swatch)
+        picker:SetColorRGB(0, 1, 0)
+
+        assert.are.same({ r = 0, g = 1, b = 0, a = 1 }, swatch._color)
+
+        picker.Footer.CancelButton:Click()
+
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, profile.general.color)
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, swatch._color)
+    end)
+
+    it("applies six typed or pasted hex chars immediately without enter", function()
+        local profile, picker, frame = setupColorRow()
+        local swatch = frame._lsbColorSwatch
+
+        swatch:GetScript("OnClick")(swatch)
+        picker.Content.HexBox:SetText("00ff80")
+
+        assert.are.equal(0, picker._r)
+        assert.are.equal(1, picker._g)
+        assert.is_true(math.abs(picker._b - 128 / 255) < 0.001)
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, profile.general.color)
+        assert.is_true(math.abs(swatch._color.b - 128 / 255) < 0.001)
+    end)
+
+    it("ignores incomplete or invalid color picker hex text", function()
+        local _, picker, frame = setupColorRow()
+        local swatch = frame._lsbColorSwatch
+
+        swatch:GetScript("OnClick")(swatch)
+        picker.Content.HexBox:SetText("00ff8")
+        picker.Content.HexBox:SetText("zzzzzz")
+
+        assert.are.equal(1, picker._r)
+        assert.are.equal(0, picker._g)
+        assert.are.equal(0, picker._b)
+        assert.are.same({ r = 1, g = 0, b = 0, a = 1 }, swatch._color)
     end)
 
     it("installs dropdown and slider hooks when the mixins are available before load", function()
@@ -227,6 +452,78 @@ describe("LibSettingsBuilder Controls", function()
 
         assert.is_table(data.setting)
         assert.are.equal("Expressway", data.setting:GetValue())
+    end)
+
+    it("evaluates native custom row predicates without requiring SetEnabled", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local originalCreateElementInitializer = Settings.CreateElementInitializer
+        rawset(Settings, "CreateElementInitializer", function(frameTemplate, data)
+            local initializer = originalCreateElementInitializer(frameTemplate, data)
+            initializer.SetEnabled = nil
+            initializer.EvaluateModifyPredicates = nil
+            initializer.modifyPredicates = {}
+            initializer.shownPredicates = {}
+            initializer._modifyPredicates = nil
+            initializer._shownPredicates = nil
+            initializer.AddModifyPredicate = function(self, predicate)
+                self.modifyPredicates[#self.modifyPredicates + 1] = predicate
+            end
+            initializer.AddShownPredicate = function(self, predicate)
+                self.shownPredicates[#self.shownPredicates + 1] = predicate
+            end
+            return initializer
+        end)
+
+        local enabled = true
+        local shown = true
+        local modifyCalls = 0
+        local shownCalls = 0
+        local interop = LibStub("LibSettingsBuilder-1.0")._internal.interop
+        local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", {
+            _lsbKind = "nativeCustomRow",
+        }, 24, function() end)
+        local frame = TestHelpers.makeFrame()
+
+        initializer:AddModifyPredicate(function()
+            modifyCalls = modifyCalls + 1
+            return enabled
+        end)
+        initializer:AddShownPredicate(function()
+            shownCalls = shownCalls + 1
+            return shown
+        end)
+        frame.GetElementData = function()
+            return initializer
+        end
+
+        assert.is_nil(initializer.SetEnabled)
+        assert.has_no.errors(function()
+            initializer:InitFrame(frame)
+        end)
+        assert.is_true(frame:IsShown())
+        assert.are.equal(1, modifyCalls)
+        assert.are.equal(1, shownCalls)
+
+        enabled = false
+        shown = false
+
+        assert.has_no.errors(function()
+            frame:EvaluateState()
+        end)
+        assert.is_false(frame:IsShown())
+        assert.are.equal(2, modifyCalls)
+        assert.are.equal(2, shownCalls)
     end)
 
     it("renders page action buttons from live hidden, enabled, and tooltip callbacks", function()

@@ -1059,6 +1059,50 @@ describe("ExtraIcons real source", function()
         assert.are.equal("InaccessibleItemFrames:utility", errorLogs[1].key)
         assert.are.equal("Cooldown viewer item frames are inaccessible for utility during rated-bg", errorLogs[1].message)
         assert.are.equal("rated-bg", errorLogs[1].data.reason)
+        assert.are.equal("utility", errorLogs[1].data.viewerKey)
+        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
+        assert.is_true(errorLogs[1].data.viewerExists)
+        assert.is_true(errorLogs[1].data.viewerShown)
+        assert.are.equal(22, errorLogs[1].data.viewerWidth)
+        assert.are.equal(1.0, errorLogs[1].data.viewerIconScale)
+        assert.are.equal("table", errorLogs[1].data.itemFramesType)
+        assert.is_false(errorLogs[1].data.itemFramesAccessible)
+    end)
+
+    it("logs viewer diagnostics when GetItemFrames fails", function()
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            error("GetItemFrames blocked")
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
+        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { stackKey = "healthstones" } })
+        end
+
+        assert.has_no.errors(function()
+            ExtraIcons:UpdateLayout("rated-bg")
+        end)
+
+        assert.are.equal(1, #errorLogs)
+        assert.are.equal("ExtraIcons", errorLogs[1].module)
+        assert.are.equal("GetItemFrames:utility", errorLogs[1].key)
+        assert.is_truthy(errorLogs[1].message:find(
+            "Unable to read cooldown viewer item frames for utility during rated-bg:", 1, true))
+        assert.are.equal("rated-bg", errorLogs[1].data.reason)
+        assert.are.equal("utility", errorLogs[1].data.viewerKey)
+        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
+        assert.is_true(errorLogs[1].data.viewerExists)
+        assert.is_true(errorLogs[1].data.viewerShown)
+        assert.are.equal(22, errorLogs[1].data.viewerWidth)
+        assert.are.equal(1.0, errorLogs[1].data.viewerIconScale)
+        assert.is_truthy(errorLogs[1].data.error:find("GetItemFrames blocked", 1, true))
     end)
 
     it("continues conservatively when GetItemFrames iteration fails", function()
@@ -1104,6 +1148,14 @@ describe("ExtraIcons real source", function()
             "Unable to iterate cooldown viewer item frames for utility during rated-bg:", 1, true))
         assert.is_truthy(errorLogs[1].message:find("attempted to iterate", 1, true))
         assert.are.equal("rated-bg", errorLogs[1].data.reason)
+        assert.are.equal("utility", errorLogs[1].data.viewerKey)
+        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
+        assert.is_true(errorLogs[1].data.viewerExists)
+        assert.is_true(errorLogs[1].data.viewerShown)
+        assert.are.equal(22, errorLogs[1].data.viewerWidth)
+        assert.are.equal("table", errorLogs[1].data.itemFramesType)
+        assert.is_true(errorLogs[1].data.itemFramesAccessible)
+        assert.is_truthy(errorLogs[1].data.error:find("attempted to iterate", 1, true))
     end)
 
     it("matches the utility viewer's square overlay footprint", function()

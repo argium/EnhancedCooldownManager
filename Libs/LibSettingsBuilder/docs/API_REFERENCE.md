@@ -468,11 +468,18 @@ Declarative pages are normally supplied through `LSB.New({ page = ..., sections 
 
 ## Implementation model
 
-The library has three main families of row builders:
+The public API is declarative and intentionally narrow. Internally, the library is structured as a thin translation pipeline:
 
-- **proxy controls** — persisted values backed by `Settings.RegisterProxySetting` (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
+- **Schema** normalizes and validates raw row tables.
+- **Registry** materializes root pages, sections, page handles, refresh behavior, lifecycle callbacks, store/default bindings, callback contexts, and composite child rows.
+- **Builders** translate prepared row specs into simple primitive operations. Builders do not receive the runtime object or call Registry.
+- **Interop** is the only layer that calls Blizzard Settings/UI APIs, creates frames, installs hooks, or renders custom row widgets.
+
+Row builders still fall into the same public families:
+
+- **proxy controls** — persisted values backed by proxy settings (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
 - **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`, `pageActions`),
-- **composites** — helpers that emit multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
+- **composites** — declarative specs expanded by Registry into multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
 
 `input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
 `canvas` rows stay on the current lifecycle path. The documented public canvas API is the `canvas` row type; older canvas-layout helpers live under internal implementation details and are not part of the public surface documented here.
