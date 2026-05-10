@@ -832,6 +832,7 @@ describe("ExtraIconsOptions settings page", function()
             enabled = true,
             showStackCount = true,
             showCharges = true,
+            itemSets = { nextId = 2, order = { 1 }, byId = { [1] = { name = "Potions", ids = { { itemID = 777 } } } } },
             viewers = {
                 utility = {},
                 main = {},
@@ -886,10 +887,11 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("checkbox", getRow("enabled").type)
         assert.are.equal("checkbox", getRow("showStackCount").type)
         assert.are.equal("checkbox", getRow("showCharges").type)
+        assert.are.equal("dropdown", getRow("selectedItemSet").type)
         assert.is_nil(getRow("fontOverride"))
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
-        assert.are.equal(4, #capturedPage.rows)
+        assert.are.equal(5, #capturedPage.rows)
     end)
 
     it("builds utility and main sections with placeholder rows and footers", function()
@@ -1179,6 +1181,40 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.are.equal(
             ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["UTILITY_VIEWER_SHORT"]),
+            getTrailerValue(footer, "previewText")
+        )
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
+    end)
+
+    it("adds selected item sets through the Set footer mode and blocks duplicates", function()
+        _G.C_Item.GetItemIconByID = function(itemId)
+            return itemId == 777 and "potion-icon" or nil
+        end
+
+        local picker = assert(getRow("selectedItemSet"))
+        assert.are.equal(1, picker.get())
+        picker.set(1)
+
+        local footer = assert(getSection("main")).footer
+        footer.onToggleMode()
+        footer.onToggleMode()
+        footer = assert(getSection("main")).footer
+
+        assert.are.equal(ns.L["ITEM_SET"], getTrailerValue(footer, "modeText"))
+        assert.are.equal("Potions", getTrailerValue(footer, "inputText"))
+        assert.are.equal("Potions", getTrailerValue(footer, "previewText"))
+        assert.are.equal("potion-icon", getTrailerValue(footer, "previewIcon"))
+        assert.is_true(getTrailerValue(footer, "submitEnabled"))
+        assert.is_true(footer.onSubmit())
+        assert.same({ { kind = "itemSet", itemSetId = 1 } }, profile.extraIcons.viewers.main)
+
+        footer = assert(getSection("utility")).footer
+        footer.onToggleMode()
+        footer.onToggleMode()
+        footer = assert(getSection("utility")).footer
+
+        assert.are.equal(
+            ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["MAIN_VIEWER_SHORT"]),
             getTrailerValue(footer, "previewText")
         )
         assert.is_false(getTrailerValue(footer, "submitEnabled"))

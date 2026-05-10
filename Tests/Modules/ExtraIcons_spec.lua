@@ -488,8 +488,9 @@ describe("ExtraIcons real source", function()
         function ExtraIcons:ThrottledRefresh() end
     end)
 
-    local function makeViewersConfig(utilityStacks, mainStacks)
+    local function makeViewersConfig(utilityStacks, mainStacks, itemSets)
         return {
+            itemSets = itemSets or { nextId = 1, order = {}, byId = {} },
             viewers = {
                 utility = utilityStacks or {},
                 main = mainStacks or {},
@@ -1420,6 +1421,64 @@ describe("ExtraIcons real source", function()
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
         assert.are.equal(ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+    end)
+
+    it("resolves item set entries through their priority list", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[202] = 3
+        itemIconsByID[101] = "missing-potion"
+        itemIconsByID[202] = "owned-potion"
+        itemCooldownByID[202] = { 20, 40, true }
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemSet", itemSetId = 1 } }, nil, {
+                nextId = 2,
+                order = { 1 },
+                byId = {
+                    [1] = { name = "Potions", ids = { { itemID = 101 }, { itemID = 202 } } },
+                },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local icon = ExtraIcons._viewers.utility.iconPool[1]
+        assert.are.equal(202, icon.itemId)
+        assert.are.equal("owned-potion", icon.Icon.__texture)
+        assert.same({ 20, 40 }, icon.Cooldown.__cooldown)
+        assert.are.equal("3", icon.Count.__text)
+    end)
+
+    it("skips missing and empty item set entries", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { kind = "itemSet", itemSetId = 1 },
+                { kind = "itemSet", itemSetId = 2 },
+            }, nil, {
+                nextId = 3,
+                order = { 1 },
+                byId = {
+                    [1] = { name = "Empty", ids = {} },
+                },
+            })
+        end
+
+        assert.is_false(ExtraIcons:UpdateLayout("test"))
+        assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
     end)
 
     it("suppresses combat and health potions on rated maps while still showing healthstones", function()

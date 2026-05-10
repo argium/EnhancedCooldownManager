@@ -124,8 +124,18 @@ local _, ns = ...
 ---@field stackKey string|nil Built-in stack key resolved via `BUILTIN_STACKS`.
 ---@field kind string|nil Entry kind for custom or racial rows.
 ---@field ids table|nil Entry spell/item priority list.
+---@field itemSetId number|string|nil Stable item set ID for `kind == "itemSet"` rows.
 ---@field slotId number|nil Slot ID for equip-slot entries.
 ---@field disabled boolean|nil When true, the entry stays in settings but is skipped at runtime.
+
+---@class ECM_ItemSetConfig Named item priority list.
+---@field name string Display name.
+---@field ids table Ordered item priority list.
+
+---@class ECM_ItemSetsConfig Item set collection.
+---@field nextId number Next stable item set ID.
+---@field order table Ordered item set IDs.
+---@field byId table<number, ECM_ItemSetConfig> Item sets by stable ID.
 
 ---@class ECM_ExtraIconsConfig Extra icons configuration.
 ---@field enabled boolean Whether extra icons are enabled.
@@ -135,6 +145,7 @@ local _, ns = ...
 ---@field font string|nil Font face override for stack/charge counts.
 ---@field fontSize number|nil Font size override for stack/charge counts.
 ---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
+---@field itemSets ECM_ItemSetsConfig Named item sets that can be referenced by viewer entries.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -330,6 +341,11 @@ local defaults = {
             showStackCount = true,
             showCharges = true,
             overrideFont = false,
+            itemSets = {
+                nextId = 1,
+                order = {},
+                byId = {},
+            },
             viewers = {
                 utility = {
                     { stackKey = "trinket1" },

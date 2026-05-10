@@ -711,6 +711,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
         local submitEnabled = getModeInputTrailerValue(currentTrailer, "submitEnabled", activeRow, activeSectionData)
         local modeText = getModeInputTrailerValue(currentTrailer, "modeText", activeRow, activeSectionData)
         local modeTooltip = getModeInputTrailerValue(currentTrailer, "modeTooltip", activeRow, activeSectionData)
+        local modeHidden = getModeInputTrailerValue(currentTrailer, "modeHidden", activeRow, activeSectionData) == true
         local text = getModeInputTrailerValue(currentTrailer, "inputText", activeRow, activeSectionData) or ""
         local placeholder = getModeInputTrailerValue(currentTrailer, "placeholder", activeRow, activeSectionData)
         local previewIcon = getModeInputTrailerValue(currentTrailer, "previewIcon", activeRow, activeSectionData)
@@ -719,17 +720,25 @@ local function refreshModeInputRow(row, trailer, sectionData)
         local submitTooltip = getModeInputTrailerValue(currentTrailer, "submitTooltip", activeRow, activeSectionData)
         local canSubmit = not disabled and submitEnabled ~= false
 
-        activeRow._modeButton:SetText(modeText or "")
-        setSimpleTooltip(activeRow._modeButton, modeTooltip)
-        activeRow._modeButton:SetScript("OnClick", function()
-            if currentTrailer.onToggleMode then
-                currentTrailer.onToggleMode(currentTrailer, activeRow, activeRow._lsbSectionData)
-            end
-            if activeRow._lsbTrailerRefresh then
-                activeRow._lsbTrailerRefresh(activeRow)
-            end
-        end)
-        activeRow._modeButton:SetEnabled(not disabled and modeEnabled ~= false)
+        activeRow._editBox:ClearAllPoints()
+        if modeHidden then
+            activeRow._modeButton:Hide()
+            activeRow._editBox:SetPoint("LEFT", activeRow, "LEFT", 0, 0)
+        else
+            activeRow._modeButton:SetText(modeText or "")
+            setSimpleTooltip(activeRow._modeButton, modeTooltip)
+            activeRow._modeButton:SetScript("OnClick", function()
+                if currentTrailer.onToggleMode then
+                    currentTrailer.onToggleMode(currentTrailer, activeRow, activeRow._lsbSectionData)
+                end
+                if activeRow._lsbTrailerRefresh then
+                    activeRow._lsbTrailerRefresh(activeRow)
+                end
+            end)
+            activeRow._modeButton:SetEnabled(not disabled and modeEnabled ~= false)
+            activeRow._modeButton:Show()
+            activeRow._editBox:SetPoint("LEFT", activeRow._modeButton, "RIGHT", 6, 0)
+        end
 
         if activeRow._editBox:GetText() ~= text then
             activeRow._lsbSyncingText = true

@@ -14,7 +14,6 @@ local BUILTIN_STACK_ORDER = C.BUILTIN_STACK_ORDER
 local RACIAL_ABILITIES = C.RACIAL_ABILITIES
 
 local VIEWER_COLLECTION_HEIGHT = 448
-local ACTION_ICON_BUTTON_SIZE = 20
 local DEFAULT_SPECIAL_VIEWER = "utility"
 local VIEWER_ORDER = { "utility", "main" }
 local VIEWER_LABELS = {
@@ -26,38 +25,7 @@ local VIEWER_SHORT_LABELS = {
     main = L["MAIN_VIEWER_SHORT"],
 }
 
-local ACTION_BUTTON_TEXTURES = {
-    delete = {
-        normal = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-        pushed = "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
-        disabled = "Interface\\Buttons\\UI-GroupLoot-Pass-Disabled",
-    },
-    moveDown = {
-        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
-        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down",
-        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Disabled",
-    },
-    moveLeft = {
-        normal = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
-        pushed = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down",
-        disabled = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Disabled",
-    },
-    moveRight = {
-        normal = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
-        pushed = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down",
-        disabled = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Disabled",
-    },
-    moveUp = {
-        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
-        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down",
-        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Disabled",
-    },
-    show = {
-        normal = "Interface\\Buttons\\UI-PlusButton-Up",
-        pushed = "Interface\\Buttons\\UI-PlusButton-Down",
-        disabled = "Interface\\Buttons\\UI-PlusButton-Disabled",
-    },
-}
+local ACTION_BUTTON_TEXTURES = ns.OptionUtil.ACTION_BUTTON_TEXTURES
 
 local BUILTIN_STACK_SET = {}
 local BUILTIN_EQUIP_SLOTS = {}
@@ -94,6 +62,37 @@ end
 
 local function getProfile() return ns.Addon.db.profile end
 local function getViewers() return getProfile().extraIcons.viewers end
+
+local function getItemSets()
+    local extraIcons = getProfile().extraIcons
+    extraIcons.itemSets = extraIcons.itemSets or { nextId = 1, order = {}, byId = {} }
+    extraIcons.itemSets.order = extraIcons.itemSets.order or {}
+    extraIcons.itemSets.byId = extraIcons.itemSets.byId or {}
+    extraIcons.itemSets.nextId = extraIcons.itemSets.nextId or 1
+    return extraIcons.itemSets
+end
+
+local function getItemSet(setId)
+    return setId and getItemSets().byId[setId] or nil
+end
+
+local function getItemSetName(setId)
+    local itemSet = getItemSet(setId)
+    return itemSet and itemSet.name or nil
+end
+
+local function ensureSelectedItemSetId()
+    local itemSets = getItemSets()
+    local selected = ExtraIconsOptions._selectedItemSetId
+    if selected and itemSets.byId[selected] then
+        return selected
+    end
+    selected = itemSets.order[1]
+    ExtraIconsOptions._selectedItemSetId = selected
+    return selected
+end
+
+local function getSelectedItemSetName() return getItemSetName(ensureSelectedItemSetId()) end
 
 local function refreshPage()
     if registeredPage then
@@ -211,6 +210,9 @@ local function getEntryTooltipTitle(entry)
             return ("%s (item ID %s)"):format(name, id)
         end
     end
+    if entry.kind == "itemSet" then
+        return ("%s (%s)"):format(name, L["ITEM_SET"])
+    end
     return name
 end
 
@@ -220,6 +222,9 @@ local function getEntryIdentityKey(entry)
     end
     if entry.stackKey then
         return "stack:" .. entry.stackKey
+    end
+    if entry.kind == "itemSet" and entry.itemSetId then
+        return "itemSet:" .. tostring(entry.itemSetId)
     end
     if not (entry.kind and entry.ids and #entry.ids > 0) then
         return nil
@@ -365,6 +370,10 @@ function ExtraIconsOptions._getEntryName(entry)
         return getItemDisplayName(getItemIdFromEntry(entry.ids[1]))
     end
 
+    if entry.kind == "itemSet" then
+        return getItemSetName(entry.itemSetId) or L["ITEM_SET_MISSING"]
+    end
+
     return "Unknown"
 end
 
@@ -393,6 +402,13 @@ function ExtraIconsOptions._getEntryIcon(entry)
         return itemId and C_Item.GetItemIconByID(itemId)
     end
 
+    if entry.kind == "itemSet" then
+        local itemSet = getItemSet(entry.itemSetId)
+        local first = itemSet and itemSet.ids and itemSet.ids[1]
+        local itemId = getItemIdFromEntry(first)
+        return itemId and C_Item.GetItemIconByID(itemId)
+    end
+
     return nil
 end
 
@@ -411,6 +427,12 @@ end
 function ExtraIconsOptions._addCustomEntry(profile, viewerKey, kind, ids)
     local viewers = profile.extraIcons.viewers
     local entry = buildEntry(kind, ids)
+    if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
+end
+
+function ExtraIconsOptions._addItemSetEntry(profile, viewerKey, itemSetId)
+    local viewers = profile.extraIcons.viewers
+    local entry = { kind = "itemSet", itemSetId = itemSetId }
     if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
 end
 
@@ -497,6 +519,17 @@ function ExtraIconsOptions._parseSingleId(text)
 end
 
 function ExtraIconsOptions._resolveDraftEntryPreview(kind, text)
+    if kind == "itemSet" then
+        local itemSetId = ensureSelectedItemSetId()
+        local itemSet = itemSetId and getItemSet(itemSetId)
+        if not itemSet then
+            return "invalid", nil, nil
+        end
+        local first = itemSet.ids and itemSet.ids[1]
+        local itemId = getItemIdFromEntry(first)
+        return "resolved", itemSet.name, itemId and C_Item.GetItemIconByID(itemId) or nil
+    end
+
     local id = ExtraIconsOptions._parseSingleId(text)
     if not id then
         return "invalid", nil, nil
@@ -628,6 +661,15 @@ end
 
 local function getDraftDuplicateInfo(viewerKey)
     local ds = draftStates[viewerKey]
+    if ds.kind == "itemSet" then
+        local selected = ensureSelectedItemSetId()
+        if not selected then
+            return false, nil
+        end
+        local dupViewer = ExtraIconsOptions._findDuplicateEntry(getViewers(), { kind = "itemSet", itemSetId = selected })
+        return dupViewer ~= nil, dupViewer
+    end
+
     local id = ExtraIconsOptions._parseSingleId(ds.idText)
     if not id then
         return false, nil
@@ -638,6 +680,17 @@ end
 
 local function addDraftEntry(viewerKey)
     local ds = draftStates[viewerKey]
+    if ds.kind == "itemSet" then
+        local itemSetId = ensureSelectedItemSetId()
+        local isDuplicate = getDraftDuplicateInfo(viewerKey)
+        if not itemSetId or isDuplicate then
+            return false
+        end
+        ExtraIconsOptions._addItemSetEntry(getProfile(), viewerKey, itemSetId)
+        doAction()
+        return true
+    end
+
     local status = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText)
     local isDuplicate = getDraftDuplicateInfo(viewerKey)
     if status ~= "resolved" or isDuplicate then
@@ -652,15 +705,7 @@ local function addDraftEntry(viewerKey)
 end
 
 local function makeAction(text, buttonTextures, enabled, tooltip, onClick)
-    return {
-        text = buttonTextures and "" or text,
-        width = ACTION_ICON_BUTTON_SIZE,
-        height = ACTION_ICON_BUTTON_SIZE,
-        buttonTextures = buttonTextures,
-        enabled = enabled,
-        tooltip = tooltip,
-        onClick = onClick,
-    }
+    return ns.OptionUtil.CreateIconAction(text, buttonTextures, enabled, tooltip, onClick)
 end
 
 local function profileAction(fn)
@@ -781,16 +826,33 @@ local function buildModeInputTrailer(viewerKey)
 
     local function toggleKind()
         if isDisabled() then return false end
-        ds.kind = ds.kind == "spell" and "item" or "spell"; return true
+        if ds.kind == "spell" then
+            ds.kind = "item"
+        elseif ds.kind == "item" then
+            ds.kind = "itemSet"
+            ensureSelectedItemSetId()
+        else
+            ds.kind = "spell"
+        end
+        return true
     end
 
     return {
         type = "modeInput",
         disabled = isDisabled,
-        modeText = function() return ds.kind == "spell" and L["ADD_SPELL"] or L["ADD_ITEM"] end,
+        modeText = function()
+            if ds.kind == "spell" then return L["ADD_SPELL"] end
+            if ds.kind == "item" then return L["ADD_ITEM"] end
+            return L["ITEM_SET"]
+        end,
         modeTooltip = L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"],
-        inputText = function() return ds.idText end,
-        placeholder = function() return ds.kind == "spell" and L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"] or L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"] end,
+        inputEnabled = function() return ds.kind ~= "itemSet" end,
+        inputText = function() return ds.kind == "itemSet" and (getSelectedItemSetName() or "") or ds.idText end,
+        placeholder = function()
+            if ds.kind == "spell" then return L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"] end
+            if ds.kind == "item" then return L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"] end
+            return L["ITEM_SET_SELECT_PLACEHOLDER"]
+        end,
         previewIcon = function() local _, _, icon = getPreviewState(); return icon end,
         previewText = function()
             local status, name, _, isDup, dupViewer = getPreviewState()
@@ -812,7 +874,7 @@ local function buildModeInputTrailer(viewerKey)
             return status == "resolved" and not isDup
         end,
         onToggleMode = toggleKind,
-        onTextChanged = function(text) ds.idText = text or "" end,
+        onTextChanged = function(text) if ds.kind ~= "itemSet" then ds.idText = text or "" end end,
         onSubmit = function() return not isDisabled() and addDraftEntry(viewerKey) or false end,
         onTabPressed = toggleKind,
     }
@@ -837,6 +899,18 @@ function ExtraIconsOptions.BuildSections()
     return sections
 end
 
+function ExtraIconsOptions.BuildItemSetValues()
+    local itemSets = getItemSets()
+    local values = {}
+    for _, setId in ipairs(itemSets.order) do
+        local itemSet = itemSets.byId[setId]
+        if itemSet then
+            values[setId] = itemSet.name
+        end
+    end
+    return values
+end
+
 function ExtraIconsOptions.ResetToDefaults()
     local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
     if not (defaults and defaults.extraIcons) then
@@ -848,6 +922,7 @@ function ExtraIconsOptions.ResetToDefaults()
         draftStates[viewerKey].kind = "spell"
         draftStates[viewerKey].idText = ""
     end
+    ExtraIconsOptions._selectedItemSetId = nil
     doAction()
 end
 
@@ -904,6 +979,27 @@ ExtraIconsOptions.pages = {
                 disabled = isDisabled,
                 onSet = function(ctx)
                     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                    ctx.page:Refresh()
+                end,
+            },
+            {
+                id = "selectedItemSet",
+                type = "dropdown",
+                key = "selectedItemSet",
+                name = L["ITEM_SET"],
+                tooltip = L["EXTRA_ICONS_ITEM_SET_SELECT_DESC"],
+                layout = false,
+                values = ExtraIconsOptions.BuildItemSetValues,
+                get = function()
+                    return ensureSelectedItemSetId() or ""
+                end,
+                set = function(value)
+                    ExtraIconsOptions._selectedItemSetId = tonumber(value) or value
+                end,
+                disabled = function()
+                    return isDisabled() or ensureSelectedItemSetId() == nil
+                end,
+                onSet = function(ctx)
                     ctx.page:Refresh()
                 end,
             },

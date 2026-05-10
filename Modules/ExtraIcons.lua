@@ -161,7 +161,13 @@ local function resolveSpell(ids)
     end
 end
 
-local function resolveEntry(entry)
+local function resolveItemSet(entry, moduleConfig)
+    local itemSets = moduleConfig and moduleConfig.itemSets
+    local itemSet = itemSets and itemSets.byId and itemSets.byId[entry.itemSetId]
+    return itemSet and itemSet.ids and resolveItem(itemSet.ids) or nil
+end
+
+local function resolveEntry(entry, moduleConfig)
     local kind, slotId, ids
     if entry.stackKey then
         local stack = BUILTIN_STACKS[entry.stackKey]
@@ -175,14 +181,15 @@ local function resolveEntry(entry)
     end
     if kind == "equipSlot" then return resolveEquipSlot(slotId) end
     if kind == "item" then return ids and resolveItem(ids) end
+    if kind == "itemSet" then return resolveItemSet(entry, moduleConfig) end
     if kind == "spell" then return ids and resolveSpell(ids) end
 end
 
 local _resolved = {}
-local function resolveEntries(entries)
+local function resolveEntries(entries, moduleConfig)
     wipe(_resolved)
     for _, entry in ipairs(entries) do
-        local data = not entry.disabled and resolveEntry(entry) or nil
+        local data = not entry.disabled and resolveEntry(entry, moduleConfig) or nil
         if data then _resolved[#_resolved + 1] = data end
     end
     return _resolved
@@ -431,7 +438,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     cachePoint(vs, blizzFrame)
 
     local items = (not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0)
-        and {} or resolveEntries(entries)
+        and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
         applyPoint(vs, blizzFrame, sharedOffsetX)

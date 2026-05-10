@@ -1,5 +1,5 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
+-- Handles versioned SavedVariable namespacing and profile migrations.
 
 local _, ns = ...
 local Migration = {}
@@ -1216,6 +1216,42 @@ _migrations[12] = function(profile)
     log("V12 migrated itemIcons -> extraIcons.viewers.utility: [" .. table.concat(migrated, ", ") .. "]")
 
     profile.itemIcons = nil
+end
+
+-- V12 → V13: add named item sets referenced by Extra Icons viewer rows.
+_migrations[13] = function(profile)
+    profile.extraIcons = profile.extraIcons or {}
+    local itemSets = profile.extraIcons.itemSets
+    if type(itemSets) ~= "table" then
+        profile.extraIcons.itemSets = {
+            nextId = 1,
+            order = {},
+            byId = {},
+        }
+        log("V13 initialized extraIcons.itemSets")
+        return
+    end
+
+    if type(itemSets.byId) ~= "table" then
+        itemSets.byId = {}
+    end
+    if type(itemSets.order) ~= "table" then
+        itemSets.order = {}
+        for setId in pairs(itemSets.byId) do
+            itemSets.order[#itemSets.order + 1] = setId
+        end
+        table.sort(itemSets.order, function(a, b) return tostring(a) < tostring(b) end)
+    end
+    if type(itemSets.nextId) ~= "number" then
+        local nextId = 1
+        for setId in pairs(itemSets.byId) do
+            if type(setId) == "number" and setId >= nextId then
+                nextId = setId + 1
+            end
+        end
+        itemSets.nextId = nextId
+    end
+    log("V13 preserved extraIcons.itemSets")
 end
 
 --- Runs all schema migrations on a profile from its current version to CURRENT_SCHEMA_VERSION.

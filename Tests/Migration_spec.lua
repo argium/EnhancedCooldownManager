@@ -62,6 +62,7 @@ describe("Migration", function()
     local SCHEMA_V10 = 10
     local SCHEMA_V11 = 11
     local SCHEMA_V12 = 12
+    local SCHEMA_V13 = 13
 
     local function runMigrationToVersion(profile, targetVersion)
         local previousVersion = ns.Constants.CURRENT_SCHEMA_VERSION
@@ -1110,6 +1111,43 @@ describe("Migration", function()
         assert.is_not_nil(string.find(logMsg, "healthstones", 1, true))
         assert.is_nil(string.find(logMsg, "trinket2", 1, true))
         assert.is_nil(string.find(logMsg, "healthPotions", 1, true))
+    end)
+
+    it("V13 initializes extraIcons item sets", function()
+        local profile = {
+            schemaVersion = 12,
+            extraIcons = {
+                enabled = true,
+                viewers = { utility = {}, main = {} },
+            },
+        }
+
+        runMigrationToVersion(profile, SCHEMA_V13)
+
+        assert.are.equal(13, profile.schemaVersion)
+        assert.same({ nextId = 1, order = {}, byId = {} }, profile.extraIcons.itemSets)
+    end)
+
+    it("V13 preserves existing item sets and repairs missing metadata", function()
+        local profile = {
+            schemaVersion = 12,
+            extraIcons = {
+                itemSets = {
+                    byId = {
+                        [3] = { name = "Potions", ids = { { itemID = 123 } } },
+                    },
+                },
+                viewers = { utility = { { kind = "itemSet", itemSetId = 3 } }, main = {} },
+            },
+        }
+
+        runMigrationToVersion(profile, SCHEMA_V13)
+
+        assert.are.equal(13, profile.schemaVersion)
+        assert.are.equal(4, profile.extraIcons.itemSets.nextId)
+        assert.same({ 3 }, profile.extraIcons.itemSets.order)
+        assert.are.equal("Potions", profile.extraIcons.itemSets.byId[3].name)
+        assert.same({ { kind = "itemSet", itemSetId = 3 } }, profile.extraIcons.viewers.utility)
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

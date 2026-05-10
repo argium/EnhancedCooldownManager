@@ -130,7 +130,7 @@ local constants = {
 
     -- Saved variables and migration
     ACTIVE_SV_KEY = "_ECM_DB",
-    CURRENT_SCHEMA_VERSION = 12,
+    CURRENT_SCHEMA_VERSION = 13,
     SV_NAME = "EnhancedCooldownManagerDB",
 
     -- Import and export
