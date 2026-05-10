@@ -9,14 +9,18 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local evaluateStaticOrFunction = internal.evaluateStaticOrFunction
-local registerValueChangedCallback = internal.registerValueChangedCallback
-local setInitializerExtent = internal.setInitializerExtent
+local foundation = internal.foundation
+local interop = internal.interop
+local evaluateStaticOrFunction = foundation.evaluateStaticOrFunction
+local registerValueChangedCallback = interop.registerValueChangedCallback
+local setInitializerExtent = interop.setInitializerExtent
 
 local listElementKeysToHide = {
     "_lsbSubheaderTitle",
     "_lsbInfoTitle",
     "_lsbInfoValue",
+    "_lsbColorTitle",
+    "_lsbColorSwatch",
     "_lsbCanvas",
     "_lsbInputTitle",
     "_lsbInputEditBox",
@@ -57,7 +61,7 @@ local function ensureSubheaderTitle(frame)
         return frame._lsbSubheaderTitle
     end
 
-    local title = internal.createSubheaderTitle(frame)
+    local title = interop.createSubheaderTitle(frame)
     frame._lsbSubheaderTitle = title
     frame.Title = title
     return title
@@ -90,7 +94,7 @@ local function ensureHeaderRowWidgets(frame)
         return frame
     end
 
-    frame._lsbHeaderTitle = internal.createHeaderTitle(frame)
+    frame._lsbHeaderTitle = interop.createHeaderTitle(frame)
     frame._lsbHeaderActionButtons = frame._lsbHeaderActionButtons or {}
 
     return frame
@@ -149,7 +153,7 @@ local function applyHeaderActionButtons(frame, actions, actionParent, rightAncho
                 enabled = true
             end
             button:SetEnabled(enabled)
-            internal.setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
+            interop.setSimpleTooltip(button, evaluateStaticOrFunction(action.tooltip, action, frame))
             button:SetScript("OnClick", function()
                 if action.onClick then
                     action.onClick(action, frame)
@@ -359,6 +363,326 @@ local function applyInputRowEnabledState(frame, enabled)
     editBox:EnableMouse(enabled)
 end
 
+local function ensureColorRowWidgets(frame)
+    if frame._lsbColorTitle and frame._lsbColorSwatch then
+        return frame._lsbColorTitle, frame._lsbColorSwatch
+    end
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetJustifyH("LEFT")
+    title:SetWordWrap(false)
+
+    local swatch = interop.createColorSwatch(frame)
+
+    frame._lsbColorTitle = title
+    frame._lsbColorSwatch = swatch
+    frame.Title = title
+    frame.Swatch = swatch
+
+    return title, swatch
+end
+
+local function parseHexColor(hexValue)
+    hexValue = type(hexValue) == "string" and hexValue or "FFFFFFFF"
+    if not hexValue:match("^%x%x%x%x%x%x%x%x$") then
+        hexValue = "FFFFFFFF"
+    end
+
+    local color = interop.createColorFromHexString(hexValue)
+    return { r = color.r, g = color.g, b = color.b, a = color.a }
+end
+
+local function applyColorSwatchValue(swatch, color)
+    if not swatch or not color then
+        return
+    end
+
+    if swatch.SetColorRGB then
+        swatch:SetColorRGB(color.r, color.g, color.b, color.a)
+    end
+
+    local texture = swatch._tex or swatch.Color
+    if texture and texture.SetColorTexture then
+        texture:SetColorTexture(color.r, color.g, color.b, color.a)
+    elseif texture and texture.SetVertexColor then
+        texture:SetVertexColor(color.r, color.g, color.b, color.a)
+    end
+end
+
+local function getPickerRGB()
+    if ColorPickerFrame and ColorPickerFrame.GetColorRGB then
+        return ColorPickerFrame:GetColorRGB()
+    end
+
+    local picker = ColorPickerFrame and ColorPickerFrame.Content and ColorPickerFrame.Content.ColorPicker
+    if picker and picker.GetColorRGB then
+        return picker:GetColorRGB()
+    end
+
+    return 1, 1, 1
+end
+
+local function getPickerAlpha()
+    if ColorPickerFrame and ColorPickerFrame.GetColorAlpha then
+        return ColorPickerFrame:GetColorAlpha()
+    end
+
+    return 1
+end
+
+local function setPickerRGB(r, g, b)
+    if ColorPickerFrame and ColorPickerFrame.SetColorRGB then
+        ColorPickerFrame:SetColorRGB(r, g, b)
+        return
+    end
+
+    local picker = ColorPickerFrame and ColorPickerFrame.Content and ColorPickerFrame.Content.ColorPicker
+    if picker and picker.SetColorRGB then
+        picker:SetColorRGB(r, g, b)
+    end
+end
+
+local function getNormalizedSixDigitHex(text)
+    text = tostring(text or ""):match("^%s*(.-)%s*$")
+    if text:sub(1, 1) == "#" then
+        text = text:sub(2)
+    end
+
+    return #text == 6 and text:match("^%x%x%x%x%x%x$") and text or nil
+end
+
+local colorPickerSession = nil
+local colorPickerHooksInstalled = false
+
+local function findFirstEditBox(...)
+    for i = 1, select("#", ...) do
+        local editBox = select(i, ...)
+        if editBox and editBox.GetText and editBox.SetScript then
+            return editBox
+        end
+    end
+
+    return nil
+end
+
+local function findColorPickerHexEditBox()
+    if not ColorPickerFrame then
+        return nil
+    end
+
+    local content = ColorPickerFrame.Content
+    local picker = content and content.ColorPicker
+    return findFirstEditBox(
+        ColorPickerFrame.HexBox,
+        ColorPickerFrame.HexEditBox,
+        ColorPickerFrame.HexInput,
+        ColorPickerFrame.EditBox,
+        content and content.HexBox,
+        content and content.HexEditBox,
+        content and content.HexInput,
+        content and content.HexColor,
+        content and content.HexColorBox,
+        content and content.HexColorEditBox,
+        picker and picker.HexBox,
+        picker and picker.HexEditBox,
+        picker and picker.HexInput
+    )
+end
+
+local function bindColorPickerHexEditBox()
+    local editBox = findColorPickerHexEditBox()
+    if not editBox or editBox._lsbColorPickerHexBound then
+        return
+    end
+
+    local originalOnTextChanged = editBox.GetScript and editBox:GetScript("OnTextChanged") or nil
+    editBox:SetScript("OnTextChanged", function(self, userInput)
+        if originalOnTextChanged then
+            originalOnTextChanged(self, userInput)
+        end
+        if userInput == false then
+            return
+        end
+
+        local hex = getNormalizedSixDigitHex(self:GetText())
+        if not hex then
+            return
+        end
+
+        setPickerRGB(
+            tonumber(hex:sub(1, 2), 16) / 255,
+            tonumber(hex:sub(3, 4), 16) / 255,
+            tonumber(hex:sub(5, 6), 16) / 255
+        )
+    end)
+    editBox._lsbColorPickerHexBound = true
+end
+
+local function commitColorPickerSession()
+    local session = colorPickerSession
+    if not session then
+        return
+    end
+
+    session.committed = true
+    if session.setting and session.setting.SetValue then
+        session.setting:SetValue(foundation.colorTableToHex(session.pendingColor))
+    end
+    colorPickerSession = nil
+end
+
+local function cancelColorPickerSession()
+    local session = colorPickerSession
+    if not session then
+        return
+    end
+
+    session.cancelled = true
+    applyColorSwatchValue(session.swatch, session.originalColor)
+    colorPickerSession = nil
+end
+
+local function showColorPickerSession(session)
+    if not ColorPickerFrame or not ColorPickerFrame.SetupColorPickerAndShow then
+        return
+    end
+
+    session.settingUp = true
+    ColorPickerFrame:SetupColorPickerAndShow({
+        r = session.pendingColor.r,
+        g = session.pendingColor.g,
+        b = session.pendingColor.b,
+        opacity = session.pendingColor.a,
+        hasOpacity = true,
+        swatchFunc = function()
+            if colorPickerSession ~= session or session.settingUp then
+                return
+            end
+            local r, g, b = getPickerRGB()
+            session.pendingColor.r = r
+            session.pendingColor.g = g
+            session.pendingColor.b = b
+            applyColorSwatchValue(session.swatch, session.pendingColor)
+        end,
+        opacityFunc = function()
+            if colorPickerSession ~= session or session.settingUp then
+                return
+            end
+            session.pendingColor.a = getPickerAlpha()
+            applyColorSwatchValue(session.swatch, session.pendingColor)
+        end,
+        cancelFunc = function() end,
+    })
+    session.settingUp = nil
+    bindColorPickerHexEditBox()
+end
+
+local function installColorPickerHooks()
+    if colorPickerHooksInstalled or not ColorPickerFrame then
+        return
+    end
+
+    local footer = ColorPickerFrame.Footer
+    local okayButton = footer and footer.OkayButton
+    local cancelButton = footer and footer.CancelButton
+    if okayButton and okayButton.HookScript then
+        okayButton:HookScript("OnClick", commitColorPickerSession)
+    end
+    if cancelButton and cancelButton.HookScript then
+        cancelButton:HookScript("OnClick", cancelColorPickerSession)
+    end
+    if ColorPickerFrame.HookScript then
+        ColorPickerFrame:HookScript("OnHide", function()
+            local session = colorPickerSession
+            if not session or session.committed or session.cancelled or session.reopening then
+                return
+            end
+
+            session.reopening = true
+            if C_Timer and C_Timer.After then
+                C_Timer.After(0, function()
+                    session.reopening = nil
+                    if colorPickerSession == session and not session.committed and not session.cancelled then
+                        showColorPickerSession(session)
+                    end
+                end)
+            else
+                session.reopening = nil
+                showColorPickerSession(session)
+            end
+        end)
+    end
+
+    colorPickerHooksInstalled = true
+end
+
+local function openColorPicker(frame)
+    local setting = frame and frame._lsbColorSetting
+    if not setting or not setting.GetValue then
+        return
+    end
+
+    installColorPickerHooks()
+
+    local originalColor = parseHexColor(setting:GetValue())
+    colorPickerSession = {
+        frame = frame,
+        setting = setting,
+        swatch = frame._lsbColorSwatch,
+        originalColor = originalColor,
+        pendingColor = { r = originalColor.r, g = originalColor.g, b = originalColor.b, a = originalColor.a },
+    }
+    showColorPickerSession(colorPickerSession)
+end
+
+local function applyColorRowEnabledState(frame, enabled)
+    if not frame then
+        return
+    end
+
+    frame:SetAlpha(enabled and 1 or 0.5)
+
+    local swatch = frame._lsbColorSwatch
+    if not swatch then
+        return
+    end
+
+    swatch:SetEnabled(enabled)
+    swatch:EnableMouse(enabled)
+end
+
+local function applyColorRowFrame(frame, data)
+    local title, swatch = ensureColorRowWidgets(frame)
+
+    title:ClearAllPoints()
+    title:SetPoint("LEFT", frame, "LEFT", 37, 0)
+    title:SetPoint("RIGHT", swatch, "LEFT", -8, 0)
+    title:SetJustifyV("MIDDLE")
+    title:SetText(data.name)
+    title:Show()
+
+    swatch:ClearAllPoints()
+    swatch:SetPoint("LEFT", frame, "CENTER", interop.defaultSwatchCenterX, 0)
+    swatch:Show()
+    interop.setSimpleTooltip(swatch, data.tooltip)
+
+    frame._lsbColorSetting = data.setting
+    swatch._lsbOwnerFrame = frame
+    if not swatch._lsbColorScriptsBound then
+        swatch:SetScript("OnClick", function(self)
+            openColorPicker(self._lsbOwnerFrame)
+        end)
+        swatch._lsbColorScriptsBound = true
+    end
+
+    applyColorSwatchValue(swatch, parseHexColor(data.setting and data.setting.GetValue and data.setting:GetValue()))
+
+    registerValueChangedCallback(frame, data.settingVariable, function()
+        local currentSetting = frame._lsbColorSetting
+        applyColorSwatchValue(frame._lsbColorSwatch, parseHexColor(currentSetting and currentSetting.GetValue and currentSetting:GetValue()))
+    end, frame)
+end
+
 local function applyInputRowFrame(frame, data)
     local title, editBox, preview = ensureInputRowWidgets(frame)
     local hasPreview = data.resolveText ~= nil
@@ -467,16 +791,18 @@ local function applyEmbedCanvasFrame(frame, data, initializer)
 end
 
 local function ensureListElementCallbackHandles(frame)
-    if frame.cbrHandles or not (Settings and Settings.CreateCallbackHandleContainer) then
+    if frame.cbrHandles then
         return
     end
 
-    frame.cbrHandles = Settings.CreateCallbackHandleContainer()
+    frame.cbrHandles = interop.createCallbackHandleContainer()
 end
 
 local function initializerShouldShow(initializer)
     if initializer and initializer.ShouldShow then
-        return initializer:ShouldShow()
+        if not initializer:ShouldShow() then
+            return false
+        end
     end
 
     if initializer and initializer._shownPredicates then
@@ -487,16 +813,37 @@ local function initializerShouldShow(initializer)
         end
     end
 
+    if initializer and initializer.shownPredicates and initializer.shownPredicates ~= initializer._shownPredicates then
+        for _, predicate in ipairs(initializer.shownPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
     return true
 end
 
 local function initializerIsEnabled(initializer)
+    local evaluatedModifyPredicates = false
+
     if initializer and initializer.EvaluateModifyPredicates then
-        return initializer:EvaluateModifyPredicates()
+        evaluatedModifyPredicates = true
+        if not initializer:EvaluateModifyPredicates() then
+            return false
+        end
     end
 
-    if initializer and initializer._modifyPredicates then
+    if initializer and initializer._modifyPredicates and not evaluatedModifyPredicates then
         for _, predicate in ipairs(initializer._modifyPredicates) do
+            if not predicate() then
+                return false
+            end
+        end
+    end
+
+    if initializer and initializer.modifyPredicates and initializer.modifyPredicates ~= initializer._modifyPredicates then
+        for _, predicate in ipairs(initializer.modifyPredicates) do
             if not predicate() then
                 return false
             end
@@ -507,7 +854,7 @@ local function initializerIsEnabled(initializer)
 end
 
 local function createCustomListRowInitializer(template, data, extent, initFrame)
-    local initializer = Settings.CreateElementInitializer(template, data)
+    local initializer = interop.createElementInitializer(template, data)
     setInitializerExtent(initializer, extent)
 
     initializer.InitFrame = function(self, frame)
@@ -530,7 +877,10 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
                 local currentInitializer = control.GetElementData and control:GetElementData()
                     or control._lsbInitializer
                 if currentInitializer then
-                    currentInitializer:SetEnabled(initializerIsEnabled(currentInitializer))
+                    local enabled = initializerIsEnabled(currentInitializer)
+                    if currentInitializer.SetEnabled then
+                        currentInitializer:SetEnabled(enabled)
+                    end
                 end
                 control:SetShown(initializerShouldShow(currentInitializer))
             end
@@ -573,12 +923,118 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
     return initializer
 end
 
-internal.hideHeaderActionButtons = hideHeaderActionButtons
-internal.applyHeaderFrame = applyHeaderFrame
-internal.applySubheaderFrame = applySubheaderFrame
-internal.applyInfoRowFrame = applyInfoRowFrame
-internal.applyInputRowFrame = applyInputRowFrame
-internal.applyInputRowEnabledState = applyInputRowEnabledState
-internal.cancelInputPreviewTimer = cancelInputPreviewTimer
-internal.applyEmbedCanvasFrame = applyEmbedCanvasFrame
-internal.createCustomListRowInitializer = createCustomListRowInitializer
+function interop.configureDropdownInitializer(initializer, setting, spec)
+    initializer._lsbData = {
+        _lsbKind = "dropdown",
+        setting = setting,
+        values = spec.values,
+        name = spec.name,
+        tooltip = spec.tooltip,
+    }
+
+    if spec.scrollHeight then
+        initializer._lsbData._lsbKind = "scrollDropdown"
+        initializer._lsbData.scrollHeight = spec.scrollHeight
+        interop.setInitializerSetting(initializer, setting)
+        initializer._lsbRefreshFrame = function(frame)
+            if frame and frame.RefreshDropdownText then
+                frame:RefreshDropdownText()
+            end
+        end
+    end
+
+    if not initializer:GetSetting() then
+        interop.setInitializerSetting(initializer, setting)
+    end
+
+    if type(spec.values) == "function" and not initializer._lsbRefreshFrame then
+        initializer._lsbRefreshFrame = function(frame)
+            if frame and frame.InitDropdown and frame.lsbData and frame.lsbData._lsbKind == "scrollDropdown" then
+                frame:InitDropdown(initializer)
+            elseif frame and frame.RefreshDropdownText then
+                frame:RefreshDropdownText()
+            elseif frame and frame.SetValue and setting.GetValue then
+                frame:SetValue(setting:GetValue())
+            end
+        end
+    end
+end
+
+function interop.configureColorInitializer(initializer, setting)
+    interop.setInitializerSetting(initializer, setting)
+
+    local originalInitFrame = initializer.InitFrame
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if controlInitializer._lsbActiveFrame then
+            interop.applyColorRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+    initializer.InitFrame = function(controlInitializer, frame)
+        originalInitFrame(controlInitializer, frame)
+        interop.applyColorRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+    end
+end
+
+function interop.configureInputInitializer(initializer)
+    local originalInitFrame = initializer.InitFrame
+    local originalResetter = initializer.Resetter
+
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if controlInitializer._lsbActiveFrame then
+            interop.applyInputRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+
+    initializer.InitFrame = function(controlInitializer, frame)
+        controlInitializer._lsbActiveFrame = frame
+        originalInitFrame(controlInitializer, frame)
+        interop.applyInputRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+    end
+
+    initializer.Resetter = function(controlInitializer, frame)
+        interop.cancelInputPreviewTimer(frame)
+        if frame and frame._lsbInputEditBox then
+            frame._lsbInputEditBox:ClearFocus()
+            frame._lsbInputEditBox._lsbOwnerFrame = nil
+        end
+        frame._lsbInputData = nil
+        frame._lsbInputSetting = nil
+        if controlInitializer._lsbActiveFrame == frame then
+            controlInitializer._lsbActiveFrame = nil
+        end
+        originalResetter(controlInitializer, frame)
+    end
+end
+
+function interop.configurePageActionsInitializer(initializer)
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            interop.applyCanvasState(activeFrame, enabled)
+        end
+    end
+
+    initializer._lsbRefreshFrame = function(frame)
+        interop.applyHeaderFrame(frame, initializer:GetData())
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
+    end
+    initializer._lsbResetFrame = interop.hideHeaderActionButtons
+end
+
+interop.hideHeaderActionButtons = hideHeaderActionButtons
+interop.applyHeaderFrame = applyHeaderFrame
+interop.applySubheaderFrame = applySubheaderFrame
+interop.applyInfoRowFrame = applyInfoRowFrame
+interop.applyColorRowFrame = applyColorRowFrame
+interop.applyColorRowEnabledState = applyColorRowEnabledState
+interop.applyInputRowFrame = applyInputRowFrame
+interop.applyInputRowEnabledState = applyInputRowEnabledState
+interop.cancelInputPreviewTimer = cancelInputPreviewTimer
+interop.applyEmbedCanvasFrame = applyEmbedCanvasFrame
+interop.createCustomListRowInitializer = createCustomListRowInitializer

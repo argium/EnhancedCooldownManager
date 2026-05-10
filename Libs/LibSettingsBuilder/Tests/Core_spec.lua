@@ -39,7 +39,6 @@ describe("LibSettingsBuilder Core", function()
     it("initializes implementation internals on load", function()
         local lsb = LibStub("LibSettingsBuilder-1.0")
         assert.is_table(lsb._internal)
-        assert.are.equal(26, lsb._internal.CanvasLayoutDefaults.elementHeight)
         assert.is_table(lsb._pageLifecycleCallbacks)
         assert.is_false(lsb._pageLifecycleHooked)
     end)
@@ -217,6 +216,68 @@ describe("LibSettingsBuilder Core", function()
 
         assert.is_nil(initializer.SetEnabled)
         assert.is_false(initializer:EvaluateModifyPredicates())
+    end)
+
+    it("normalizes boolean page and row modifiers before runtime predicates evaluate", function()
+        local originalCreateSlider = Settings.CreateSlider
+        local initializers = {}
+
+        rawset(Settings, "CreateSlider", function(...)
+            local initializer = originalCreateSlider(...)
+            initializers[#initializers + 1] = initializer
+            return initializer
+        end)
+
+        local profile = { general = { inherited = 5, override = 5 } }
+        local defaults = { general = { inherited = 0, override = 0 } }
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb.New({
+            name = "Boolean Modifiers",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            disabled = true,
+                            hidden = true,
+                            rows = {
+                                {
+                                    type = "slider",
+                                    path = "general.inherited",
+                                    name = "Inherited",
+                                    min = 0,
+                                    max = 10,
+                                },
+                                {
+                                    type = "slider",
+                                    path = "general.override",
+                                    name = "Override",
+                                    min = 0,
+                                    max = 10,
+                                    disabled = false,
+                                    hidden = false,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        assert.is_false(initializers[1]:EvaluateModifyPredicates())
+        assert.is_false(initializers[1]._shownPredicates[1]())
+        assert.is_true(initializers[2]:EvaluateModifyPredicates())
+        assert.is_true(initializers[2]._shownPredicates[1]())
     end)
 
     it("fails early when a raw path-bound row is registered without a path adapter", function()

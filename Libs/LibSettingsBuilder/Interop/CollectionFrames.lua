@@ -12,14 +12,16 @@ local ADD = _G.ADD
 local REMOVE = _G.REMOVE
 
 local internal = lib._internal
+local foundation = internal.foundation
+local interop = internal.interop
 local SECTION_HEADER_HEIGHT = 50
-local applyActionButtonTextures = internal.applyActionButtonTextures
-local configureInlineSlider = internal.configureInlineSlider
-local evaluateStaticOrFunction = internal.evaluateStaticOrFunction
-local setGameTooltipText = internal.setGameTooltipText
-local setSimpleTooltip = internal.setSimpleTooltip
-local setTextureValue = internal.setTextureValue
-local showFrame = internal.showFrame
+local applyActionButtonTextures = interop.applyActionButtonTextures
+local configureInlineSlider = interop.configureInlineSlider
+local evaluateStaticOrFunction = foundation.evaluateStaticOrFunction
+local setGameTooltipText = interop.setGameTooltipText
+local setSimpleTooltip = interop.setSimpleTooltip
+local setTextureValue = interop.setTextureValue
+local showFrame = interop.showFrame
 
 local DISABLED_ROW_ALPHA = 0.5
 local DEFAULT_LABEL_COLOR = { 1, 1, 1, 1 }
@@ -199,7 +201,7 @@ local function ensureHighlight(row)
     return highlight
 end
 
-local DEFAULT_SWATCH_CENTER_X = internal.defaultSwatchCenterX or -73
+local DEFAULT_SWATCH_CENTER_X = interop.defaultSwatchCenterX or -73
 
 local function ensureSwatchCollectionRow(row)
     if row._lsbSwatchRow then
@@ -220,7 +222,7 @@ local function ensureSwatchCollectionRow(row)
     row._label:SetJustifyH("LEFT")
     row._label:SetWordWrap(false)
 
-    row._swatch = internal.createColorSwatch(row)
+    row._swatch = interop.createColorSwatch(row)
     row._swatch:SetPoint("LEFT", row, "CENTER", DEFAULT_SWATCH_CENTER_X, 0)
 end
 
@@ -274,7 +276,7 @@ local function ensureEditorCollectionRow(row)
     row._label:SetJustifyH("LEFT")
 
     row._fieldWidgets = {}
-    row._swatch = internal.createColorSwatch(row)
+    row._swatch = interop.createColorSwatch(row)
     row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     preventMouseClickPropagation(row._removeButton)
     row._removeButton:RegisterForClicks("LeftButtonUp")
@@ -866,7 +868,7 @@ local function ensureSectionHeaderRow(content, headers, sectionKey, title)
 
     row = CreateFrame("Frame", nil, content)
     row:SetHeight(SECTION_HEADER_HEIGHT)
-    row._title = internal.createHeaderTitle(row, title)
+    row._title = interop.createHeaderTitle(row, title)
     headers[sectionKey] = row
     return row
 end
@@ -990,4 +992,24 @@ local function applyCollectionFrame(frame, data, initializer)
     end
 end
 
-internal.applyCollectionFrame = applyCollectionFrame
+interop.applyCollectionFrame = applyCollectionFrame
+
+function interop.configureCollectionInitializer(initializer, data)
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            interop.applyCollectionFrame(activeFrame, data, controlInitializer)
+            activeFrame:SetAlpha(enabled and 1 or 0.5)
+            if enabled == false then
+                interop.setCanvasInteractive(activeFrame, false)
+            end
+        end
+    end
+
+    initializer._lsbRefreshFrame = function(frame)
+        initializer._lsbActiveFrame = frame
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
+    end
+end

@@ -98,6 +98,8 @@ local function countAccessibleArray(tbl, logKey, reason)
             reason = reason,
             operation = "ipairs",
             error = tostring(err),
+            tableType = type(tbl),
+            tableAccessible = type(tbl) == "table" and canAccessTable(tbl) or nil,
             inCombatLockdown = InCombatLockdown(),
         })
     end
@@ -129,6 +131,8 @@ local function countAccessibleKeys(tbl, logKey, reason)
             reason = reason,
             operation = "pairs",
             error = tostring(err),
+            tableType = type(tbl),
+            tableAccessible = type(tbl) == "table" and canAccessTable(tbl) or nil,
             inCombatLockdown = InCombatLockdown(),
         })
     end
@@ -337,6 +341,52 @@ function ExternalBars:_GetDiagnostics(viewer, auraInfo, reason)
         auraFramesArrayCount = countAccessibleArray(auraFrames, "AuraFramesDiagnosticsFailed", reason),
         auraFramesKeyCount = countAccessibleKeys(auraFrames, "AuraFramesDiagnosticsFailed", reason),
     }
+end
+
+---@param reason string|nil
+---@param viewer Frame|nil
+---@param auraInfo table|nil
+---@param activeAuraCount number
+---@return table
+function ExternalBars:_GetLayoutRequestDiagnostics(reason, viewer, auraInfo, activeAuraCount)
+    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = _G.GetInstanceInfo()
+    local moduleConfig = self:GetModuleConfig()
+    local globalConfig = self:GetGlobalConfig()
+    local diagnostics = self:_GetDiagnostics(viewer, auraInfo, reason)
+
+    diagnostics.requestReason = reason
+    diagnostics.activeAuraCountAfterSync = activeAuraCount
+    diagnostics.cachedAuraStateCount = #(self._auraStates or {})
+    diagnostics.durationTickerActive = self._durationTicker ~= nil
+    diagnostics.inCombatLockdown = InCombatLockdown()
+    diagnostics.instanceName = instanceName
+    diagnostics.instanceType = instanceType
+    diagnostics.instanceID = instanceID
+    diagnostics.difficultyID = difficultyID
+    diagnostics.difficultyName = difficultyName
+    diagnostics.maxPlayers = maxPlayers
+
+    if moduleConfig then
+        diagnostics.configEnabled = moduleConfig.enabled ~= false
+        diagnostics.configHideOriginalIcons = moduleConfig.hideOriginalIcons == true
+        diagnostics.configAnchorMode = moduleConfig.anchorMode
+        diagnostics.configShowDuration = moduleConfig.showDuration ~= false
+        diagnostics.configShowIcon = moduleConfig.showIcon ~= false
+        diagnostics.configShowSpellName = moduleConfig.showSpellName ~= false
+        diagnostics.configWidth = moduleConfig.width
+        diagnostics.configHeight = moduleConfig.height
+        diagnostics.configVerticalSpacing = moduleConfig.verticalSpacing
+    end
+
+    if globalConfig then
+        diagnostics.globalUpdateFrequency = globalConfig.updateFrequency
+        diagnostics.globalBarWidth = globalConfig.barWidth
+        diagnostics.globalBarHeight = globalConfig.barHeight
+        diagnostics.globalModuleSpacing = globalConfig.moduleSpacing
+        diagnostics.globalGrowDirection = globalConfig.moduleGrowDirection
+    end
+
+    return diagnostics
 end
 
 ---@param index number
@@ -852,7 +902,11 @@ function ExternalBars:OnExternalAurasUpdated(reason)
         })
     end
 
-    ns.Runtime.RequestLayout("ExternalBars:" .. (reason or "UpdateAuras"))
+    ns.Runtime.RequestLayout("ExternalBars:" .. (reason or "UpdateAuras"), {
+        diagnostics = function()
+            return self:_GetLayoutRequestDiagnostics(reason, viewer, auraInfo, activeAuraCount)
+        end,
+    })
 end
 
 ---@param why string|nil

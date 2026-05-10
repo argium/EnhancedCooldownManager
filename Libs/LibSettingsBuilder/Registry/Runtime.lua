@@ -313,240 +313,126 @@ if not lib or not lib._loadState or not lib._loadState.open then
 end
 
 local internal = lib._internal
-local copyMixin = internal.copyMixin
-local installPageLifecycleHooks = internal.installPageLifecycleHooks
+local interop = internal.interop
+local schema = internal.schema
+local builders = internal.builders
+local registry = internal.registry
 
-local PROXY_ROW_TYPES = {
-    checkbox = true,
-    slider = true,
-    dropdown = true,
-    color = true,
-    input = true,
-    custom = true,
+local ROW_BUILDERS = {
+    button = builders.button,
+    canvas = function(spec)
+        return builders.canvas(spec.canvas, spec.height, spec)
+    end,
+    checkbox = builders.checkbox,
+    dropdown = builders.dropdown,
+    header = builders.header,
+    info = builders.info,
+    list = builders.list,
+    pageActions = builders.pageActions,
+    sectionList = builders.sectionList,
+    slider = builders.slider,
+    subheader = builders.subheader,
+    color = builders.color,
+    input = builders.input,
+    custom = builders.custom,
 }
-
-local COMPOSITE_ROW_TYPES = {
-    border = true,
-    checkboxList = true,
-    colorList = true,
-    fontOverride = true,
-    heightOverride = true,
-}
-
-local VALID_ROW_TYPES = {
-    border = true,
-    button = true,
-    canvas = true,
-    checkbox = true,
-    checkboxList = true,
-    color = true,
-    colorList = true,
-    custom = true,
-    dropdown = true,
-    fontOverride = true,
-    header = true,
-    heightOverride = true,
-    info = true,
-    input = true,
-    list = true,
-    pageActions = true,
-    sectionList = true,
-    slider = true,
-    subheader = true,
-}
+local PROXY_ROW_TYPES = schema.PROXY_ROW_TYPES
 
 local function refreshCategory(builder, category)
     if not category then
         return
     end
 
-    local currentCategory = SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
-    local isVisible = SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown() and currentCategory == category
+    local isVisible = interop.isSettingsPanelShown() and interop.getCurrentSettingsCategory() == category
 
     local refreshables = builder._categoryRefreshables[category] or {}
     for _, initializer in ipairs(refreshables) do
-        if initializer._lsbActiveFrame and initializer._lsbRefreshFrame then
-            initializer._lsbRefreshFrame(initializer._lsbActiveFrame, initializer)
-        end
+        interop.refreshInitializer(initializer)
     end
 
     if not isVisible then
         return
     end
 
-    local settingsList = SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
-    local scrollBox = settingsList and settingsList.ScrollBox
-    if scrollBox and scrollBox.ForEachFrame then
-        scrollBox:ForEachFrame(function(frame)
-            local initializer = frame.GetElementData and frame:GetElementData() or frame._lsbInitializer
-            if frame.EvaluateState then
-                frame:EvaluateState()
-            end
-            if initializer and initializer._lsbRefreshFrame then
-                initializer._lsbRefreshFrame(frame, initializer)
-            end
-        end)
-    end
+    interop.refreshVisibleSettingsFrames()
 end
 
-local function resolvePagePath(pagePath, rowPath)
-    if rowPath == nil or rowPath == "" or rowPath:find("%.") or pagePath == "" then
-        return (rowPath ~= nil and rowPath ~= "") and rowPath or pagePath
-    end
-    return pagePath .. "." .. rowPath
+local function getCategoryName(builder, category)
+    return builder._subcategoryNames[category]
+        or (category == builder._rootCategory and builder._rootCategoryName)
+        or ""
 end
 
-local function assertBooleanOrCallback(sourceName, fieldName, value)
-    local valueType = type(value)
-    assert(
-        value == nil or valueType == "boolean" or valueType == "function",
-        sourceName .. ": " .. fieldName .. " must be a boolean or function"
-    )
+local function ensureConfirmDialog(builder)
+    if builder._confirmDialogName then
+        return builder._confirmDialogName
+    end
+
+    builder._confirmDialogName = builder._config.varPrefix .. "_" .. MAJOR:gsub("[%-%.]", "_") .. "_SettingsConfirm"
+    return interop.ensureConfirmDialog(builder._confirmDialogName)
 end
 
-local function getRowLabel(row)
-    return tostring(row.id or row.key or row.path or row.name or row.type)
-end
-
-local function normalizeDeclarativeRowSpec(sourceName, row)
-    assert(type(row) == "table", sourceName .. ": each row must be a table")
-
-    local spec = copyMixin({}, row)
-    assert(spec.desc == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses deprecated field 'desc'; use 'tooltip'")
-    assert(spec.condition == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'condition'")
-    assert(spec.parent == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parent'")
-    assert(spec.parentCheck == nil, sourceName .. ": row '" .. getRowLabel(spec) .. "' uses removed field 'parentCheck'")
-
-    local rowType = spec.type
-    assert(type(rowType) == "string" and VALID_ROW_TYPES[rowType], sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
-
-    if rowType == "button" and spec.buttonText == nil and spec.value ~= nil then
-        spec.buttonText = spec.value
-    end
-    spec.value = rowType == "button" and nil or spec.value
-
-    if rowType == "dropdown" and spec.scrollHeight == nil and spec.maxScrollDisplayHeight ~= nil then
-        spec.scrollHeight = spec.maxScrollDisplayHeight
-    end
-    spec.maxScrollDisplayHeight = nil
-
-    if rowType == "info" and spec.values ~= nil then
-        assert(spec.value == nil, sourceName .. ": info row '" .. getRowLabel(spec) .. "' cannot define both value and values")
-        assert(type(spec.values) == "table", sourceName .. ": info row '" .. getRowLabel(spec) .. "' values must be a table")
-        spec.value = table.concat(spec.values, "\n")
-        spec.multiline = true
-        spec.values = nil
-    end
-
-    if rowType == "input" and spec.debounce == nil and spec.debounceMilliseconds ~= nil then
-        spec.debounce = spec.debounceMilliseconds / 1000
-    end
-    spec.debounceMilliseconds = nil
-
-    if rowType == "slider" and spec.formatter == nil and spec.formatValue ~= nil then
-        spec.formatter = spec.formatValue
-    end
-    spec.formatValue = nil
-
-    spec.id = row.id
-
-    return spec
-end
-
-local function validateDeclarativeRow(sourceName, builder, row)
-    local rowType = row.type
-    local rowLabel = getRowLabel(row)
-    local hasHandler = row.get ~= nil or row.set ~= nil
-
-    assertBooleanOrCallback(sourceName, "disabled", row.disabled)
-    assertBooleanOrCallback(sourceName, "hidden", row.hidden)
-
-    if PROXY_ROW_TYPES[rowType] then
-        if hasHandler then
-            assert(row.get, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires get")
-            assert(row.set, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires set")
-            assert(row.key or row.id, sourceName .. ": handler-mode row '" .. rowLabel .. "' requires key or id")
-        else
-            assert(row.path ~= nil, sourceName .. ": path-bound row '" .. rowLabel .. "' requires path")
-            assert(builder._adapter, sourceName .. ": path-bound row '" .. rowLabel .. "' requires store/defaults on the builder")
+local function prepareButtonClick(builder, spec)
+    local callbackContext = registry.createCallbackContext(builder, spec)
+    local originalClick = spec.onClick
+    if spec.confirm then
+        local confirmDialogName = ensureConfirmDialog(builder)
+        local confirmText = type(spec.confirm) == "string" and spec.confirm or "Are you sure?"
+        spec._onClick = function()
+            interop.showConfirmDialog(confirmDialogName, confirmText, {
+                onAccept = function()
+                    originalClick(callbackContext)
+                end,
+            })
         end
+        return
     end
 
-    if rowType == "button" then
-        assert(type(row.onClick) == "function", sourceName .. ": button row '" .. rowLabel .. "' requires onClick")
-    elseif rowType == "canvas" then
-        assert(row.canvas, sourceName .. ": canvas row '" .. rowLabel .. "' requires canvas")
-    elseif rowType == "custom" then
-        assert(row.template, sourceName .. ": custom row '" .. rowLabel .. "' requires template")
-    elseif rowType == "dropdown" then
-        assert(row.values ~= nil, sourceName .. ": dropdown row '" .. rowLabel .. "' requires values")
-    elseif rowType == "list" then
-        assert(type(row.items) == "function", sourceName .. ": list row '" .. rowLabel .. "' requires items")
-        assert(row.height, sourceName .. ": list row '" .. rowLabel .. "' requires height")
-    elseif rowType == "pageActions" then
-        assert(type(row.actions) == "table", sourceName .. ": pageActions row '" .. rowLabel .. "' requires actions")
-    elseif rowType == "sectionList" then
-        assert(type(row.sections) == "function", sourceName .. ": sectionList row '" .. rowLabel .. "' requires sections")
-        assert(row.height, sourceName .. ": sectionList row '" .. rowLabel .. "' requires height")
+    spec._onClick = function()
+        originalClick(callbackContext)
+    end
+end
+
+local function prepareProxyRow(builder, rowType, spec)
+    registry.validateSpecFields(builder, rowType, spec)
+
+    local setting, category
+    if rowType == "checkbox" then
+        setting, category = registry.makeProxySetting(builder, spec, interop.getVarTypeBoolean(), false)
     elseif rowType == "slider" then
-        assert(row.min ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires min")
-        assert(row.max ~= nil, sourceName .. ": slider row '" .. rowLabel .. "' requires max")
-    elseif COMPOSITE_ROW_TYPES[rowType] then
-        assert(row.path ~= nil, sourceName .. ": composite row '" .. rowLabel .. "' requires path")
-        if rowType == "checkboxList" or rowType == "colorList" then
-            assert(type(row.defs) == "table", sourceName .. ": composite row '" .. rowLabel .. "' requires defs")
+        setting, category = registry.makeProxySetting(builder, spec, interop.getVarTypeNumber(), 0)
+    elseif rowType == "dropdown" then
+        local binding = registry.resolveBinding(builder, spec)
+        local defaultValue = binding.default
+        if spec.getTransform then
+            defaultValue = spec.getTransform(defaultValue)
         end
-    elseif rowType == "info" then
-        assert(
-            row.value ~= nil or row.values ~= nil or row.name ~= nil,
-            sourceName .. ": info row '" .. rowLabel .. "' requires value, values, or name"
+        setting, category = registry.makeProxySetting(
+            builder,
+            spec,
+            spec.varType or (type(defaultValue) == "number" and interop.getVarTypeNumber()) or interop.getVarTypeString(),
+            "",
+            binding
         )
-    elseif rowType == "header" or rowType == "subheader" then
-        assert(row.name ~= nil, sourceName .. ": " .. rowType .. " row '" .. rowLabel .. "' requires name")
-    end
-end
-
-local function validateDeclarativeRows(sourceName, builder, rows, seenRowIDs)
-    assert(type(rows) == "table", sourceName .. ": rows must be a table")
-
-    for _, row in ipairs(rows) do
-        local normalized = normalizeDeclarativeRowSpec(sourceName, row)
-        local rowID = normalized.id
-        if rowID ~= nil then
-            assert(not seenRowIDs[rowID], sourceName .. ": duplicate row id '" .. tostring(rowID) .. "'")
-            seenRowIDs[rowID] = true
-        end
-        validateDeclarativeRow(sourceName, builder, normalized)
-    end
-end
-
-local function validatePageDefinition(sourceName, pageDef)
-    assert(type(pageDef) == "table", sourceName .. ": page definition must be a table")
-    assert(pageDef.key, sourceName .. ": page definition requires key")
-    assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
-end
-
-local function registerLabeledList(page, spec, builderMethod)
-    local builder = page._builder
-    if spec.label then
-        local labelInit = lib.Subheader(builder, {
-            name = spec.label,
-            disabled = spec.disabled,
-            hidden = spec.hidden,
-            category = page._category,
-        })
-        spec._parentInitializer = spec._parentInitializer or labelInit
+    elseif rowType == "color" then
+        setting, category = registry.makeColorSetting(builder, spec)
+    elseif rowType == "input" then
+        setting, category = registry.makeProxySetting(builder, spec, interop.getVarTypeString(), "")
+    elseif rowType == "custom" then
+        setting, category = registry.makeProxySetting(builder, spec, spec.varType or interop.getVarTypeString(), "")
     end
 
-    local results = builderMethod(builder, resolvePagePath(page.path or "", spec.path), spec.defs or {}, spec)
-    return results[1] and results[1].initializer, results[1] and results[1].setting
+    spec.setting = setting
+    spec.category = category
 end
 
-local function registerDeclarativeRow(sourceName, page, row, created)
-    local spec = normalizeDeclarativeRowSpec(sourceName, row)
+local function prepareRow(sourceName, page, row)
+    local spec = schema.normalizeRow(sourceName, row)
     local rowType = spec.type
-
     local builder = page._builder
+
+    schema.validateRow(sourceName, builder, spec)
+
     if page.disabled and spec.disabled == nil then
         spec.disabled = page.disabled
     end
@@ -559,70 +445,245 @@ local function registerDeclarativeRow(sourceName, page, row, created)
 
     spec._page = page
 
-    local initializer, setting
-    local path = resolvePagePath(page.path or "", spec.path)
-    if rowType == "button" then
-        initializer = lib.Button(builder, spec)
-    elseif rowType == "canvas" then
-        initializer = lib.EmbedCanvas(builder, spec.canvas, spec.height, spec)
-    elseif rowType == "checkboxList" then
-        initializer, setting = registerLabeledList(page, spec, lib.CheckboxList)
-    elseif rowType == "colorList" then
-        initializer, setting = registerLabeledList(page, spec, lib.ColorPickerList)
-    elseif rowType == "header" then
-        initializer = lib.Header(builder, spec)
-    elseif rowType == "info" then
-        initializer = lib.InfoRow(builder, spec)
-    elseif rowType == "list" then
-        initializer = lib.List(builder, spec)
-    elseif rowType == "pageActions" then
-        initializer = lib.PageActions(builder, spec)
-    elseif rowType == "sectionList" then
-        initializer = lib.SectionList(builder, spec)
-    elseif rowType == "subheader" then
-        initializer = lib.Subheader(builder, spec)
-    elseif rowType == "border" then
-        local result = lib.BorderGroup(builder, path, spec)
-        initializer, setting = result.enabledInit, result.enabledSetting
-    elseif rowType == "fontOverride" then
-        local result = lib.FontOverrideGroup(builder, path, spec)
-        initializer, setting = result.enabledInit, result.enabledSetting
-    elseif rowType == "heightOverride" then
-        initializer, setting = lib.HeightOverrideSlider(builder, path, spec)
-    elseif PROXY_ROW_TYPES[rowType] then
+    if PROXY_ROW_TYPES[rowType] then
         if not spec.get then
-            spec.path = path
+            spec.path = schema.resolvePagePath(page.path or "", spec.path)
         elseif not spec.key then
             spec.key = row.id
         end
         if spec.get and not spec.key then
             error(sourceName .. ": handler-mode row '" .. tostring(row.id or spec.name) .. "' requires key or id")
         end
-        if rowType == "checkbox" then
-            initializer, setting = lib.Checkbox(builder, spec)
-        elseif rowType == "slider" then
-            initializer, setting = lib.Slider(builder, spec)
-        elseif rowType == "dropdown" then
-            initializer, setting = lib.Dropdown(builder, spec)
-        elseif rowType == "color" then
-            initializer, setting = lib.Color(builder, spec)
-        elseif rowType == "input" then
-            initializer, setting = lib.Input(builder, spec)
-        elseif rowType == "custom" then
-            initializer, setting = lib.Custom(builder, spec)
-        end
-    else
+        prepareProxyRow(builder, rowType, spec)
+    elseif rowType == "button" then
+        prepareButtonClick(builder, spec)
+    elseif rowType == "pageActions" then
+        spec.categoryName = getCategoryName(builder, spec.category)
+    end
+
+    return spec
+end
+
+local rowRegistration = {}
+
+local function registerBuiltRow(sourceName, page, row, created)
+    local spec = prepareRow(sourceName, page, row)
+    local builder = page._builder
+    local rowType = spec.type
+    local build = ROW_BUILDERS[rowType]
+    if not build then
         error(sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
     end
 
+    local initializer, setting = registry.applyBuildResult(builder, spec, build(spec))
     if row.id then
         created[row.id] = { initializer = initializer, setting = setting }
     end
+    return initializer, setting
+end
+
+local function registerCompositeList(sourceName, page, row, created, childType)
+    local spec = prepareRow(sourceName, page, row)
+    local basePath = schema.resolvePagePath(page.path or "", spec.path)
+    local firstInitializer, firstSetting
+
+    if spec.label then
+        rowRegistration.register(sourceName, page, {
+            type = "subheader",
+            name = spec.label,
+            disabled = spec.disabled,
+            hidden = spec.hidden,
+        }, created)
+    end
+
+    for _, def in ipairs(spec.defs) do
+        local child = {
+            type = childType,
+            path = basePath .. "." .. tostring(def.key),
+            name = def.name,
+            tooltip = def.tooltip,
+        }
+        schema.propagateModifiers(child, spec)
+        local initializer, setting = rowRegistration.register(sourceName, page, child, created)
+        firstInitializer = firstInitializer or initializer
+        firstSetting = firstSetting or setting
+    end
+
+    if row.id then
+        created[row.id] = { initializer = firstInitializer, setting = firstSetting }
+    end
+    return firstInitializer, firstSetting
+end
+
+local function registerHeightOverride(sourceName, page, row, created)
+    local spec = prepareRow(sourceName, page, row)
+    local sectionPath = schema.resolvePagePath(page.path or "", spec.path)
+    local child = {
+        type = "slider",
+        path = sectionPath .. ".height",
+        name = spec.name or "Height Override",
+        tooltip = spec.tooltip or "Override the default bar height. Set to 0 to use the global default.",
+        min = spec.min or 0,
+        max = spec.max or 40,
+        step = spec.step or 1,
+        getTransform = function(value)
+            return value or 0
+        end,
+        setTransform = function(value)
+            return value > 0 and value or nil
+        end,
+    }
+    schema.propagateModifiers(child, spec)
+
+    local initializer, setting = rowRegistration.register(sourceName, page, child, created)
+    if row.id then
+        created[row.id] = { initializer = initializer, setting = setting }
+    end
+    return initializer, setting
+end
+
+local function registerFontOverride(sourceName, page, row, created)
+    local spec = prepareRow(sourceName, page, row)
+    local sectionPath = schema.resolvePagePath(page.path or "", spec.path)
+    local enabledSpec = {
+        type = "checkbox",
+        path = sectionPath .. ".overrideFont",
+        name = spec.enabledName or "Override font",
+        tooltip = spec.enabledTooltip or "Override the global font settings for this module.",
+        getTransform = function(value)
+            return value == true
+        end,
+    }
+    schema.propagateModifiers(enabledSpec, spec)
+    local enabledInit, enabledSetting = rowRegistration.register(sourceName, page, enabledSpec, created)
+
+    local outerDisabled = spec.disabled
+    local function isOverrideDisabled()
+        if outerDisabled and outerDisabled() then
+            return true
+        end
+        return not enabledSetting:GetValue()
+    end
+
+    local fontSpec = {
+        type = spec.fontTemplate and "custom" or "dropdown",
+        path = sectionPath .. ".font",
+        name = spec.fontName or "Font",
+        tooltip = spec.fontTooltip,
+        values = spec.fontValues,
+        template = spec.fontTemplate,
+        disabled = isOverrideDisabled,
+        getTransform = function(value)
+            if value then
+                return value
+            end
+            if spec.fontFallback then
+                return spec.fontFallback()
+            end
+            return nil
+        end,
+    }
+    schema.propagateModifiers(fontSpec, spec)
+    rowRegistration.register(sourceName, page, fontSpec, created)
+
+    local sizeSpec = {
+        type = "slider",
+        path = sectionPath .. ".fontSize",
+        name = spec.sizeName or "Font Size",
+        tooltip = spec.sizeTooltip,
+        min = spec.sizeMin or 6,
+        max = spec.sizeMax or 32,
+        step = spec.sizeStep or 1,
+        disabled = isOverrideDisabled,
+        getTransform = function(value)
+            if value then
+                return value
+            end
+            if spec.fontSizeFallback then
+                return spec.fontSizeFallback()
+            end
+            return 11
+        end,
+    }
+    schema.propagateModifiers(sizeSpec, spec)
+    rowRegistration.register(sourceName, page, sizeSpec, created)
+
+    if row.id then
+        created[row.id] = { initializer = enabledInit, setting = enabledSetting }
+    end
+    return enabledInit, enabledSetting
+end
+
+local function registerBorder(sourceName, page, row, created)
+    local spec = prepareRow(sourceName, page, row)
+    local borderPath = schema.resolvePagePath(page.path or "", spec.path)
+    local enabledSpec = {
+        type = "checkbox",
+        path = borderPath .. ".enabled",
+        name = spec.enabledName or "Show border",
+        tooltip = spec.enabledTooltip,
+    }
+    schema.propagateModifiers(enabledSpec, spec)
+    local enabledInit, enabledSetting = rowRegistration.register(sourceName, page, enabledSpec, created)
+
+    local thicknessSpec = {
+        type = "slider",
+        path = borderPath .. ".thickness",
+        name = spec.thicknessName or "Border width",
+        tooltip = spec.thicknessTooltip,
+        min = spec.thicknessMin or 1,
+        max = spec.thicknessMax or 10,
+        step = spec.thicknessStep or 1,
+        _parentInitializer = enabledInit,
+        _parentPredicate = function()
+            return enabledSetting:GetValue()
+        end,
+    }
+    schema.propagateModifiers(thicknessSpec, spec)
+    rowRegistration.register(sourceName, page, thicknessSpec, created)
+
+    local colorSpec = {
+        type = "color",
+        path = borderPath .. ".color",
+        name = spec.colorName or "Border color",
+        tooltip = spec.colorTooltip,
+        _parentInitializer = enabledInit,
+        _parentPredicate = function()
+            return enabledSetting:GetValue()
+        end,
+    }
+    schema.propagateModifiers(colorSpec, spec)
+    rowRegistration.register(sourceName, page, colorSpec, created)
+
+    if row.id then
+        created[row.id] = { initializer = enabledInit, setting = enabledSetting }
+    end
+    return enabledInit, enabledSetting
+end
+
+function rowRegistration.register(sourceName, page, row, created)
+    local rowType = row.type
+    if rowType == "checkboxList" then
+        return registerCompositeList(sourceName, page, row, created, "checkbox")
+    elseif rowType == "colorList" then
+        return registerCompositeList(sourceName, page, row, created, "color")
+    elseif rowType == "border" then
+        return registerBorder(sourceName, page, row, created)
+    elseif rowType == "fontOverride" then
+        return registerFontOverride(sourceName, page, row, created)
+    elseif rowType == "heightOverride" then
+        return registerHeightOverride(sourceName, page, row, created)
+    end
+
+    return registerBuiltRow(sourceName, page, row, created)
 end
 
 local function createManagedSubcategory(builder, name, parentCategory)
     local previous = builder._currentSubcategory
-    local category = internal.createSubcategory(builder, name, parentCategory)
+    local parent = parentCategory or builder._rootCategory
+    local category, layout = interop.createSubcategory(parent, name)
+    registry.storeCategory(builder, name, category, layout)
+    builder._currentSubcategory = category
     builder._currentSubcategory = previous
     return category
 end
@@ -661,7 +722,7 @@ local function bindPageLifecycle(page)
             confirmDefaults = confirmDefaults,
             pageName = page._name,
         }
-        installPageLifecycleHooks()
+        interop.installPageLifecycleHooks()
     end
 end
 
@@ -697,10 +758,10 @@ local function materializePage(page, category)
 end
 
 local function appendDeclarativeRows(page, sourceName, rows)
-    validateDeclarativeRows(sourceName, page._builder, rows, page._rowIDs)
+    schema.validateRows(sourceName, page._builder, rows, page._rowIDs)
     queuePageOperation(page, sourceName, function(created)
         for _, row in ipairs(rows) do
-            registerDeclarativeRow(sourceName, page, row, created)
+            rowRegistration.register(sourceName, page, row, created)
         end
     end)
     return page
@@ -882,7 +943,7 @@ function lib:HasCategory(category)
 end
 
 local function registerPageDefinition(owner, pageDef, defaultName)
-    validatePageDefinition("registerPageDefinition", pageDef)
+    schema.validatePageDefinition("registerPageDefinition", pageDef)
 
     local creator = owner._root and createSectionPage or createRootPage
     return creator(owner, pageDef.key, pageDef.rows, {
@@ -891,15 +952,15 @@ local function registerPageDefinition(owner, pageDef, defaultName)
         onHide = pageDef.onHide,
         onDefault = pageDef.onDefault,
         onDefaultEnabled = pageDef.onDefaultEnabled,
-        disabled = pageDef.disabled,
-        hidden = pageDef.hidden,
+        disabled = schema.normalizePredicate(pageDef.disabled),
+        hidden = schema.normalizePredicate(pageDef.hidden),
         order = pageDef.order,
         path = pageDef.path,
         useSectionCategory = pageDef.useSectionCategory or (owner._root ~= nil and pageDef.name == nil),
     })
 end
 
-function internal.registerTree(self, spec)
+function registry.registerTree(self, spec)
     assertRootConfigured(self, "Register")
     assert(type(spec) == "table", "Register: spec must be a table")
     assert(spec.page or spec.sections, "Register: spec requires page or sections")
@@ -929,16 +990,20 @@ function internal.registerTree(self, spec)
     return self
 end
 
-function internal.initializeRoot(self, name)
+function registry.initializeRoot(self, name)
     if not self._rootCategory then
         assert(name, "_initializeRoot: name is required")
-        internal.createRootCategory(self, name)
+        local category, layout = interop.createRootCategory(name)
+        self._rootCategory = category
+        self._rootCategoryName = name
+        self._layouts[category] = layout
+        self._currentSubcategory = nil
     elseif name and self._rootCategoryName ~= name then
         error("_initializeRoot: root already exists with name '" .. tostring(self._rootCategoryName) .. "'")
     end
 
     if not self._rootRegistered and self._rootCategory then
-        Settings.RegisterAddOnCategory(self._rootCategory)
+        interop.registerAddOnCategory(self._rootCategory)
         self._rootRegistered = true
     end
 
@@ -947,13 +1012,12 @@ function internal.initializeRoot(self, name)
     return self
 end
 
-lib._publicApi = {
-    GetSection = lib.GetSection,
-    GetRootPage = lib.GetRootPage,
-    GetPage = lib.GetPage,
-    HasCategory = lib.HasCategory,
-    _registerTree = internal.registerTree,
-    _initializeRoot = internal.initializeRoot,
-}
+lib._runtimeApi.GetSection = lib.GetSection
+lib._runtimeApi.GetRootPage = lib.GetRootPage
+lib._runtimeApi.GetPage = lib.GetPage
+lib._runtimeApi.HasCategory = lib.HasCategory
+lib._runtimeApi._registerTree = registry.registerTree
+lib._runtimeApi._initializeRoot = registry.initializeRoot
+lib._publicApi = lib._runtimeApi
 
 lib._loadState.open = nil
