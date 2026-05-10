@@ -408,9 +408,9 @@ ItemSetsOptions.page = {
             onClick = openCreateDialog,
         },
         {
-            id = "selectedItemSet",
+            id = "selectedManagedItemSet",
             type = "dropdown",
-            key = "selectedItemSet",
+            key = "selectedManagedItemSet",
             name = L["ITEM_SET"],
             tooltip = L["ITEM_SET_SELECT_DESC"],
             values = ItemSetsOptions.BuildSetValues,

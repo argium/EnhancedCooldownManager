@@ -93,6 +93,11 @@ function DropdownMethods:InitDropdown()
 end
 
 local function configureDropdownFrame(frame, initializer, data)
+    local previousInitializer = frame.initializer
+    if previousInitializer and previousInitializer ~= initializer and previousInitializer._lsbActiveFrame == frame then
+        previousInitializer._lsbActiveFrame = nil
+    end
+
     if not frame._lsbOriginalSetValue then
         frame._lsbOriginalSetValue = frame.SetValue
     end
@@ -112,6 +117,9 @@ if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownC
     hooksecurefunc(SettingsDropdownControlMixin, "Init", function(frame, initializer)
         local data = getInitializerData(initializer)
         if not data or (data._lsbKind ~= "dropdown" and data._lsbKind ~= "scrollDropdown") then
+            if frame.initializer and frame.initializer._lsbActiveFrame == frame then
+                frame.initializer._lsbActiveFrame = nil
+            end
             if frame._lsbOriginalSetValue then
                 frame.SetValue = frame._lsbOriginalSetValue
             end
