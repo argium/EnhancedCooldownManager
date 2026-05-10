@@ -25,7 +25,7 @@ ns.AboutPage = {
         {
             type = "info",
             name = L["CONTRIBUTORS"],
-            value = "kayti-wow",
+            value = "kayti-wow, Hubbotu (RU translation)",
         },
         {
             type = "info",

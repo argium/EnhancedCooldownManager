@@ -4,13 +4,11 @@
 
 local _, ns = ...
 
--- Locale table with fallback: missing keys return the key name itself.
-local L = setmetatable({}, {
-    __index = function(_, k)
-        return k
-    end,
-})
-ns.L = L
+if GetLocale() ~= "ruRU" then
+    return
+end
+
+local L = ns.L
 -- Translator ZamestoTV
 --------------------------------------------------------------------------------
 -- General
@@ -152,10 +150,10 @@ L["RESOURCE_TYPES"] = "Типы ресурсов"
 L["RESOURCE_SOUL_FRAGMENTS_DH"] = "Фрагменты души (Месть)"
 L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] = "Фрагменты души (Пожиратель)"
 L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] = "Фрагменты Бездны (Пожиратель)"
-L["RESOURCE_ICICLES"] = "Кристаллы льда (Маг ЛЬда)"
+L["RESOURCE_ICICLES"] = "Кристаллы льда (Маг: Лед)"
 L["RESOURCE_ARCANE_CHARGES"] = "Чародейские заряды"
-L["RESOURCE_CHI"] = "Энергия Ци"
-L["RESOURCE_COMBO_POINTS"] = "Приемы серии"
+L["RESOURCE_CHI"] = "Ци"
+L["RESOURCE_COMBO_POINTS"] = "Серия приемов"
 L["RESOURCE_ESSENCE"] = "Сущность"
 L["RESOURCE_HOLY_POWER"] = "Энергия Света"
 L["RESOURCE_MAELSTROM_WEAPON"] = "Оружие Водоворота (Совершенствование)"
@@ -406,14 +404,14 @@ L["RELOAD_UI_PROMPT"] = "Перезагрузить интерфейс?"
 --------------------------------------------------------------------------------
 
 L["ENCODE_NO_DATA"] = "Внутренняя ошибка: нет данных для кодирования - пожалуйста, сообщите об этом"
-L["ENCODE_SERIALIZATION_FAILED"] = "Не удалось создать зашифрованную строку (ошибка сериализации)"
-L["ENCODE_COMPRESSION_FAILED"] = "Не удалось создать зашифрованную строку (ошибка сжатия)"
-L["ENCODE_ENCODING_FAILED"] = "Не удалось создать зашифрованную строку (ошибка кодирования)"
+L["ENCODE_SERIALIZATION_FAILED"] = "Не удалось создать закодированную строку (ошибка сериализации)"
+L["ENCODE_COMPRESSION_FAILED"] = "Не удалось создать закодированную строку (ошибка сжатия)"
+L["ENCODE_ENCODING_FAILED"] = "Не удалось создать закодированную строку (ошибка кодирования)"
 L["DECODE_EMPTY"] = "Строка импорта пуста"
 L["DECODE_INVALID_FORMAT"] = "Предоставленная строка не является корректной строкой импорта ECM"
 L["DECODE_WRONG_ADDON"] = "Предоставленная строка не является корректной строкой импорта ECM (префикс: %s)"
 L["DECODE_INCOMPATIBLE_VERSION"] = "Предоставленная строка не является корректной строкой импорта ECM (ожидалась версия %d, получена %s)"
-L["DECODE_CORRUPTED"] = "Предоставленная строка импорта ECM неверна - возможно, она повреждена или не полна"
+L["DECODE_CORRUPTED"] = "Предоставленная строка импорта ECM неверна - возможно, она повреждена или неполна"
 L["DECODE_DECOMPRESS_FAILED"] = "Предоставленная строка импорта ECM неверна - ошибка при распаковке"
 L["DECODE_DESERIALIZE_FAILED"] = "Предоставленная строка импорта ECM неверна - ошибка десериализации"
 L["EXPORT_NO_PROFILE"] = "Внутренняя ошибка: активный профиль не найден - пожалуйста, сообщите об этом"
