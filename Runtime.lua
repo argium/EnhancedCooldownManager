@@ -542,9 +542,10 @@ end
 --- Requests a refresh (values only, no geometry) for a single module.
 --- @param module table The module to refresh.
 --- @param reason string Debug trace string.
-function Runtime.RequestRefresh(module, reason)
+--- @param immediate boolean|nil Whether to bypass refresh rate limiting.
+function Runtime.RequestRefresh(module, reason, immediate)
     if module and module.ThrottledRefresh then
-        module:ThrottledRefresh(reason)
+        module:ThrottledRefresh(reason, immediate)
     end
 end
 

@@ -331,7 +331,7 @@ Central layout dispatcher. All layout requests funnel through here.
 | `RequestLayout(reason?, opts?)` | Deferred layout pass (coalesces within frame via `C_Timer.After(0)`) |
 | `ScheduleLayoutUpdate(delay, reason?)` | Debounced timer layout; later call with shorter delay supersedes |
 | `UpdateLayoutImmediately(reason?)` | Synchronous layout (Edit Mode drag/resize) |
-| `RequestRefresh(module, reason?)` | Values-only refresh for a single module |
+| `RequestRefresh(module, reason?, immediate?)` | Values-only refresh for a single module; `immediate` bypasses rate limiting without forcing hidden frames visible |
 | `RegisterFrame(frame)` | Register a module frame to receive layout updates |
 | `UnregisterFrame(frame)` | Unregister a module frame |
 | `SetLayoutPreview(active)` | Toggle layout preview mode (bypasses hide/fade) |
@@ -356,7 +356,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | `CreateFrame()` | Build background, status bar, border, text layers |
 | `UpdateLayout(why?)` | Full layout pass: position, dimensions, border, background |
 | `Refresh(why?, force?)` | Base refresh (override for data updates) |
-| `ThrottledRefresh(why?)` | Rate-limited refresh (skips if within `updateFrequency`) |
+| `ThrottledRefresh(why?, immediate?)` | Rate-limited refresh; `immediate` skips the `updateFrequency` gate |
 | `GetModuleConfig()` | Return this module's config from AceDB profile |
 | `IsReady()` | Check enabled + has frame + has config |
 | `SetHidden(hide)` | Set global hidden state; defers show to next layout |
