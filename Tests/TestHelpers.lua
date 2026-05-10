@@ -1740,8 +1740,6 @@ local LIB_SETTINGS_BUILDER_SOURCE_FILES = {
     "Libs/LibSettingsBuilder/Builders/Rows.lua",
     "Libs/LibSettingsBuilder/Builders/LayoutRows.lua",
     "Libs/LibSettingsBuilder/Builders/Collections.lua",
-    "Libs/LibSettingsBuilder/Builders/Composites.lua",
-    "Libs/LibSettingsBuilder/Builders/CompositeLists.lua",
     "Libs/LibSettingsBuilder/Registry/Runtime.lua",
 }
 

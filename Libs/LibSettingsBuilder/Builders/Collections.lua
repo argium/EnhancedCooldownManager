@@ -11,52 +11,33 @@ end
 local internal = lib._internal
 local foundation = internal.foundation
 local interop = internal.interop
-local registry = internal.registry
 local builders = internal.builders
 
-local function createCollectionInitializer(self, spec, errorPrefix)
+local function createCollectionInitializer(spec, errorPrefix)
     assert(spec.height, errorPrefix .. ": spec.height is required")
 
-    local category = registry.resolveCategory(self, spec)
     local data = foundation.copyMixin({}, spec)
     if data.variant and data.preset == nil then
         data.preset = data.variant
     end
 
     local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", data, spec.height, interop.applyCollectionFrame)
+    interop.configureCollectionInitializer(initializer, data)
 
-    initializer._lsbEnabled = true
-    initializer.SetEnabled = function(controlInitializer, enabled)
-        controlInitializer._lsbEnabled = enabled
-        local activeFrame = controlInitializer._lsbActiveFrame
-        if activeFrame then
-            interop.applyCollectionFrame(activeFrame, data, controlInitializer)
-            activeFrame:SetAlpha(enabled and 1 or 0.5)
-            if enabled == false then
-                registry.setCanvasInteractive(self, activeFrame, false)
-            end
-        end
-    end
-
-    initializer._lsbRefreshFrame = function(frame)
-        initializer._lsbActiveFrame = frame
-        initializer:SetEnabled(initializer._lsbEnabled ~= false)
-    end
-
-    interop.registerInitializer(category, initializer)
-    registry.registerCategoryRefreshable(self, category, initializer)
-    registry.applyModifiers(self, initializer, spec)
-
-    return initializer
+    return {
+        initializer = initializer,
+        registration = "category",
+        refreshable = true,
+    }
 end
 
-function builders.list(self, spec)
+function builders.list(spec)
     assert(spec.items, "List: spec.items is required")
     assert(not spec.sections, "List: spec.sections is not supported")
-    return createCollectionInitializer(self, spec, "List")
+    return createCollectionInitializer(spec, "List")
 end
 
-function builders.sectionList(self, spec)
+function builders.sectionList(spec)
     assert(spec.sections, "SectionList: spec.sections is required")
-    return createCollectionInitializer(self, spec, "SectionList")
+    return createCollectionInitializer(spec, "SectionList")
 end

@@ -993,3 +993,23 @@ local function applyCollectionFrame(frame, data, initializer)
 end
 
 interop.applyCollectionFrame = applyCollectionFrame
+
+function interop.configureCollectionInitializer(initializer, data)
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            interop.applyCollectionFrame(activeFrame, data, controlInitializer)
+            activeFrame:SetAlpha(enabled and 1 or 0.5)
+            if enabled == false then
+                interop.setCanvasInteractive(activeFrame, false)
+            end
+        end
+    end
+
+    initializer._lsbRefreshFrame = function(frame)
+        initializer._lsbActiveFrame = frame
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
+    end
+end

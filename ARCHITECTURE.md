@@ -242,7 +242,7 @@ Profile change, Edit Mode, and per-module reactions are documented in each [modu
 
 ### Options UI
 
-Setting changes flow through LibSettingsBuilder's `onChanged` callback → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`. The embedded library is loaded through `Libs/LibSettingsBuilder/embed.xml`, which guarantees `Core.lua`, the primitive helper modules, standard control modules, composite control modules, and `Utility.lua` initialize in order before options pages register. See [`Libs/LibSettingsBuilder/README.md`](Libs/LibSettingsBuilder/README.md) for the library's public surface, declarative schema, and canonical row types.
+Setting changes flow through LibSettingsBuilder's `onChanged` callback → `Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")`. The embedded library is loaded through `Libs/LibSettingsBuilder/embed.xml`, which guarantees `Core.lua`, Foundation, Schema, Interop, Registry, and Builders initialize in order before options pages register. See [`Libs/LibSettingsBuilder/README.md`](Libs/LibSettingsBuilder/README.md) for the library's public surface, declarative schema, and canonical row types.
 
 ECM uses LibSettingsBuilder as a single declarative registration tree:
 

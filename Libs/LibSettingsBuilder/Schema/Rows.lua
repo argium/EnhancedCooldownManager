@@ -10,6 +10,7 @@ end
 
 local foundation = lib._internal.foundation
 local schema = lib._internal.schema
+local MODIFIER_KEYS = { "category", "disabled", "hidden", "layout" }
 
 schema.PROXY_ROW_TYPES = {
     checkbox = true,
@@ -61,6 +62,23 @@ function schema.getRowLabel(row)
     return tostring(row.id or row.key or row.path or row.name or row.type)
 end
 
+function schema.normalizePredicate(value)
+    if type(value) == "boolean" then
+        return function()
+            return value
+        end
+    end
+    return value
+end
+
+function schema.propagateModifiers(target, source)
+    for _, key in ipairs(MODIFIER_KEYS) do
+        if target[key] == nil then
+            target[key] = source[key]
+        end
+    end
+end
+
 function schema.normalizeRow(sourceName, row)
     assert(type(row) == "table", sourceName .. ": each row must be a table")
 
@@ -102,6 +120,8 @@ function schema.normalizeRow(sourceName, row)
     spec.formatValue = nil
 
     spec.id = row.id
+    spec.disabled = schema.normalizePredicate(spec.disabled)
+    spec.hidden = schema.normalizePredicate(spec.hidden)
 
     return spec
 end
@@ -185,4 +205,6 @@ function schema.validatePageDefinition(sourceName, pageDef)
     assert(type(pageDef) == "table", sourceName .. ": page definition must be a table")
     assert(pageDef.key, sourceName .. ": page definition requires key")
     assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
+    assertBooleanOrCallback(sourceName, "disabled", pageDef.disabled)
+    assertBooleanOrCallback(sourceName, "hidden", pageDef.hidden)
 end

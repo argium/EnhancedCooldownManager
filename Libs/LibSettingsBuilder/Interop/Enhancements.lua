@@ -581,6 +581,20 @@ function interop.forEachVisibleSettingsFrame(callback)
     end
 end
 
+function interop.reevaluateVisibleSettingsFrames()
+    if interop.isSettingsPanelShown() then
+        interop.forEachVisibleSettingsFrame(function(frame)
+            if frame.EvaluateState then
+                frame:EvaluateState()
+            end
+        end)
+    end
+end
+
+function interop.refreshVisibleSettingsFrames()
+    interop.forEachVisibleSettingsFrame(interop.refreshSettingsFrame)
+end
+
 function interop.ensureConfirmDialog(name)
     if not StaticPopupDialogs[name] then
         StaticPopupDialogs[name] = {

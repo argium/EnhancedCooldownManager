@@ -11,7 +11,5 @@
     <Script file="Builders/Rows.lua"/>
     <Script file="Builders/LayoutRows.lua"/>
     <Script file="Builders/Collections.lua"/>
-    <Script file="Builders/Composites.lua"/>
-    <Script file="Builders/CompositeLists.lua"/>
     <Script file="Registry/Runtime.lua"/>
 </Ui>

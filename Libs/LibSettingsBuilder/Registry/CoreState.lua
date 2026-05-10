@@ -49,8 +49,7 @@ local internal = lib._internal
 local foundation = internal.foundation
 local interop = internal.interop
 local registry = internal.registry
-
-local MODIFIER_KEYS = { "category", "disabled", "hidden", "layout" }
+lib._runtimeApi = lib._runtimeApi or {}
 
 local COMMON_SPEC_FIELDS = {
     path = true,
@@ -280,12 +279,34 @@ function registry.makeProxySetting(self, spec, varType, defaultFallback, binding
     return setting, category
 end
 
-function registry.propagateModifiers(_, target, source)
-    for _, key in ipairs(MODIFIER_KEYS) do
-        if target[key] == nil then
-            target[key] = source[key]
-        end
+function registry.makeColorSetting(self, spec)
+    local variable = registry.makeVarName(self, spec)
+    local category = registry.resolveCategory(self, spec)
+    local binding = registry.resolveBinding(self, spec)
+    local setting
+
+    local function getter()
+        return foundation.colorTableToHex(binding.get())
     end
+
+    local function setter(hexValue)
+        local color = interop.createColorFromHexString(hexValue)
+        local value = { r = color.r, g = color.g, b = color.b, a = color.a }
+        binding.set(value)
+        registry.postSet(self, spec, value, setting)
+    end
+
+    setting = interop.registerProxySetting(
+        category,
+        variable,
+        interop.getVarTypeString(),
+        spec.name,
+        foundation.colorTableToHex(binding.default or {}),
+        getter,
+        setter
+    )
+
+    return setting, category
 end
 
 function registry.validateSpecFields(_, controlType, spec)
@@ -309,21 +330,6 @@ function registry.validateSpecFields(_, controlType, spec)
                     .. tostring(spec.name or spec.path)
                     .. "'"
             )
-        end
-    end
-end
-
-function registry.setCanvasInteractive(self, frame, enabled)
-    if frame.SetEnabled then
-        frame:SetEnabled(enabled)
-    end
-    if frame.EnableMouse then
-        frame:EnableMouse(enabled)
-    end
-    if frame.GetChildren then
-        local children = { frame:GetChildren() }
-        for i = 1, #children do
-            registry.setCanvasInteractive(self, children[i], enabled)
         end
     end
 end
@@ -354,66 +360,52 @@ function registry.isControlEnabled(self, spec)
     return registry.isParentEnabled(self, spec)
 end
 
-function registry.applyCanvasState(self, canvas, enabled)
-    canvas:SetAlpha(enabled and 1 or 0.5)
-    registry.setCanvasInteractive(self, canvas, enabled)
-end
-
 function registry.reevaluateReactiveControls(self)
-    if interop.isSettingsPanelShown() then
-        interop.forEachVisibleSettingsFrame(function(frame)
-            if frame.EvaluateState then
-                frame:EvaluateState()
-            end
-        end)
-    end
+    interop.reevaluateVisibleSettingsFrames()
 
     for _, entry in ipairs(self._reactiveControls) do
-        local spec = entry[2]
-        if spec.canvas then
-            registry.applyCanvasState(self, spec.canvas, registry.isControlEnabled(self, spec))
-        end
+        interop.applyCanvasState(entry.canvas, registry.isControlEnabled(self, entry.spec))
     end
 end
 
-function registry.applyEnabledState(self, initializer, spec)
-    local enabled = registry.isControlEnabled(self, spec)
-    if initializer.SetEnabled then
-        initializer:SetEnabled(enabled)
+function registry.applyModifiers(self, initializer, spec, canvas)
+    interop.applyInitializerModifiers(initializer, {
+        disabled = spec.disabled,
+        hidden = spec.hidden,
+        parentInitializer = spec._parentInitializer,
+        canvas = canvas,
+        isEnabled = function()
+            return registry.isControlEnabled(self, spec)
+        end,
+        isParentEnabled = function()
+            return registry.isParentEnabled(self, spec)
+        end,
+    })
+
+    if canvas then
+        self._reactiveControls[#self._reactiveControls + 1] = { canvas = canvas, spec = spec }
     end
-    if spec.canvas then
-        registry.applyCanvasState(self, spec.canvas, enabled)
-    end
-    return enabled
 end
 
-function registry.applyModifiers(self, initializer, spec)
-    if not initializer then
+function registry.applyBuildResult(self, spec, result)
+    if not result then
         return
     end
 
-    if spec.disabled or spec.canvas or spec._parentInitializer then
-        initializer:AddModifyPredicate(function()
-            return registry.applyEnabledState(self, initializer, spec)
-        end)
-        registry.applyEnabledState(self, initializer, spec)
+    local initializer = result.initializer
+    if result.registration == "layout" then
+        interop.addLayoutInitializer(self._layouts[spec.category], initializer)
+    elseif result.registration == "category" then
+        interop.registerInitializer(spec.category, initializer)
     end
 
-    if spec._parentInitializer then
-        initializer:SetParentInitializer(spec._parentInitializer, function()
-            return registry.isParentEnabled(self, spec)
-        end)
+    if result.refreshable then
+        registry.registerCategoryRefreshable(self, spec.category, initializer)
     end
 
-    if spec.hidden then
-        initializer:AddShownPredicate(function()
-            return not spec.hidden()
-        end)
-    end
+    registry.applyModifiers(self, initializer, spec, result.canvas)
 
-    if spec.canvas then
-        self._reactiveControls[#self._reactiveControls + 1] = { initializer, spec }
-    end
+    return initializer, result.setting
 end
 
 function registry.storeCategory(self, name, category, layout)
@@ -460,7 +452,7 @@ function registry.newRuntime(config)
         _nextRootPageSequence = 0,
         _nextSectionSequence = 0,
         name = nil,
-    }, { __index = lib._publicApi })
+    }, { __index = lib._runtimeApi })
 end
 
 function lib.New(selfOrConfig, maybeConfig)

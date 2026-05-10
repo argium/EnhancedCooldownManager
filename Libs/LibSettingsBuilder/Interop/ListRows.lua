@@ -923,6 +923,110 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
     return initializer
 end
 
+function interop.configureDropdownInitializer(initializer, setting, spec)
+    initializer._lsbData = {
+        _lsbKind = "dropdown",
+        setting = setting,
+        values = spec.values,
+        name = spec.name,
+        tooltip = spec.tooltip,
+    }
+
+    if spec.scrollHeight then
+        initializer._lsbData._lsbKind = "scrollDropdown"
+        initializer._lsbData.scrollHeight = spec.scrollHeight
+        interop.setInitializerSetting(initializer, setting)
+        initializer._lsbRefreshFrame = function(frame)
+            if frame and frame.RefreshDropdownText then
+                frame:RefreshDropdownText()
+            end
+        end
+    end
+
+    if not initializer:GetSetting() then
+        interop.setInitializerSetting(initializer, setting)
+    end
+
+    if type(spec.values) == "function" and not initializer._lsbRefreshFrame then
+        initializer._lsbRefreshFrame = function(frame)
+            if frame and frame.InitDropdown and frame.lsbData and frame.lsbData._lsbKind == "scrollDropdown" then
+                frame:InitDropdown(initializer)
+            elseif frame and frame.RefreshDropdownText then
+                frame:RefreshDropdownText()
+            elseif frame and frame.SetValue and setting.GetValue then
+                frame:SetValue(setting:GetValue())
+            end
+        end
+    end
+end
+
+function interop.configureColorInitializer(initializer, setting)
+    interop.setInitializerSetting(initializer, setting)
+
+    local originalInitFrame = initializer.InitFrame
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if controlInitializer._lsbActiveFrame then
+            interop.applyColorRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+    initializer.InitFrame = function(controlInitializer, frame)
+        originalInitFrame(controlInitializer, frame)
+        interop.applyColorRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+    end
+end
+
+function interop.configureInputInitializer(initializer)
+    local originalInitFrame = initializer.InitFrame
+    local originalResetter = initializer.Resetter
+
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if controlInitializer._lsbActiveFrame then
+            interop.applyInputRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+
+    initializer.InitFrame = function(controlInitializer, frame)
+        controlInitializer._lsbActiveFrame = frame
+        originalInitFrame(controlInitializer, frame)
+        interop.applyInputRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+    end
+
+    initializer.Resetter = function(controlInitializer, frame)
+        interop.cancelInputPreviewTimer(frame)
+        if frame and frame._lsbInputEditBox then
+            frame._lsbInputEditBox:ClearFocus()
+            frame._lsbInputEditBox._lsbOwnerFrame = nil
+        end
+        frame._lsbInputData = nil
+        frame._lsbInputSetting = nil
+        if controlInitializer._lsbActiveFrame == frame then
+            controlInitializer._lsbActiveFrame = nil
+        end
+        originalResetter(controlInitializer, frame)
+    end
+end
+
+function interop.configurePageActionsInitializer(initializer)
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        local activeFrame = controlInitializer._lsbActiveFrame
+        if activeFrame then
+            interop.applyCanvasState(activeFrame, enabled)
+        end
+    end
+
+    initializer._lsbRefreshFrame = function(frame)
+        interop.applyHeaderFrame(frame, initializer:GetData())
+        initializer:SetEnabled(initializer._lsbEnabled ~= false)
+    end
+    initializer._lsbResetFrame = interop.hideHeaderActionButtons
+end
+
 interop.hideHeaderActionButtons = hideHeaderActionButtons
 interop.applyHeaderFrame = applyHeaderFrame
 interop.applySubheaderFrame = applySubheaderFrame

@@ -38,6 +38,82 @@ function interop.registerValueChangedCallback(frame, variable, callback, owner)
     end
 end
 
+function interop.setInitializerSetting(initializer, setting)
+    if initializer and initializer.SetSetting then
+        initializer:SetSetting(setting)
+    end
+end
+
+function interop.setCanvasInteractive(frame, enabled)
+    if frame.SetEnabled then
+        frame:SetEnabled(enabled)
+    end
+    if frame.EnableMouse then
+        frame:EnableMouse(enabled)
+    end
+    if frame.GetChildren then
+        local children = { frame:GetChildren() }
+        for i = 1, #children do
+            interop.setCanvasInteractive(children[i], enabled)
+        end
+    end
+end
+
+function interop.applyCanvasState(canvas, enabled)
+    canvas:SetAlpha(enabled and 1 or 0.5)
+    interop.setCanvasInteractive(canvas, enabled)
+end
+
+function interop.applyInitializerEnabledState(initializer, modifiers)
+    local enabled = modifiers.isEnabled()
+    if initializer.SetEnabled then
+        initializer:SetEnabled(enabled)
+    end
+    if modifiers.canvas then
+        interop.applyCanvasState(modifiers.canvas, enabled)
+    end
+    return enabled
+end
+
+function interop.applyInitializerModifiers(initializer, modifiers)
+    if not initializer then
+        return
+    end
+
+    if modifiers.disabled or modifiers.canvas or modifiers.parentInitializer then
+        initializer:AddModifyPredicate(function()
+            return interop.applyInitializerEnabledState(initializer, modifiers)
+        end)
+        interop.applyInitializerEnabledState(initializer, modifiers)
+    end
+
+    if modifiers.parentInitializer then
+        initializer:SetParentInitializer(modifiers.parentInitializer, modifiers.isParentEnabled)
+    end
+
+    if modifiers.hidden then
+        initializer:AddShownPredicate(function()
+            return not modifiers.hidden()
+        end)
+    end
+end
+
+function interop.refreshInitializer(initializer)
+    if initializer._lsbActiveFrame and initializer._lsbRefreshFrame then
+        initializer._lsbRefreshFrame(initializer._lsbActiveFrame, initializer)
+    end
+end
+
+function interop.refreshSettingsFrame(frame)
+    local initializer = frame.GetElementData and frame:GetElementData() or frame._lsbInitializer
+    if frame.EvaluateState then
+        frame:EvaluateState()
+    end
+    if initializer and initializer._lsbRefreshFrame then
+        initializer._lsbRefreshFrame(frame, initializer)
+    end
+end
+
 function interop.showFrame(frame)
     if frame and frame.Show then
         frame:Show()

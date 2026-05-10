@@ -1,12 +1,10 @@
-# LibSettingsBuilder Scoped Instructions
-
-Scope: `Libs/LibSettingsBuilder/**`
+# LibSettingsBuilder Instructions
 
 This library must remain a thin declarative data-model to Blizzard Settings translation layer. Future changes should make the code feel smaller and easier to reason about, not merely move complexity around.
 
 ## Architecture Contract
 
-Calls only move down this stack:
+Calls only move down this stack. Skipping down is allowed; calling upward is not.
 
 ```text
 Public API
@@ -22,8 +20,8 @@ Allowed dependencies:
 - `Core.lua` bootstraps LibStub and creates `lib._internal` namespaces only.
 - `Foundation/` contains pure Lua helpers only. No Blizzard globals, no runtime state.
 - `Schema/` contains row kinds, normalization, and validation. It may use `Foundation` only.
-- `Registry/` owns `LSB.New`, runtime state, page/section materialization, page handles, refresh, and lifecycle orchestration.
-- `Builders/` translates normalized row specs into interop calls. Builders may use `Foundation`, `Schema` data when needed, and `Interop`; they must not call `Registry`.
+- `Registry/` owns `LSB.New`, runtime state, page/section materialization, page handles, refresh, lifecycle orchestration, store/default binding, callback contexts, and composite row expansion.
+- `Builders/` translates prepared row specs into interop calls. Builders may use `Foundation`, `Schema` data when needed, and `Interop`; they must not call `Registry`, read runtime fields, accept the runtime object as `self`, or call runtime-private methods.
 - `Interop/` is the only layer allowed to call Blizzard/UI APIs or create/mutate frames. It may use `Foundation`, but must not call `Builders`, `Registry`, or schema dispatch.
 
 ## Hard Rules
@@ -33,7 +31,7 @@ Allowed dependencies:
 - Do not call Blizzard globals outside `Interop/`. This includes `Settings`, `SettingsPanel`, `CreateFrame`, `CreateColorFromHexString`, `StaticPopup_*`, `GameTooltip`, `hooksecurefunc`, `MinimalSliderWithSteppersMixin`, scrollbox APIs, and data providers.
 - Do not add compatibility aliases for old flat internals such as `internal.applyCollectionFrame` or `internal.createColorSwatch`.
 - Prefer deleting, inlining, or simplifying code over adding passthrough wrappers.
-- Keep composites declarative: they should build child specs and call builders, not create UI or touch Blizzard APIs.
+- Keep composites declarative: Registry expands them into child row specs before builder calls.
 - Keep migrations and consumer row schemas backward compatible unless a request explicitly says the old behavior is obsolete.
 
 ## Validation
@@ -51,7 +49,7 @@ The architecture spec must stay green. If it fails, fix the dependency direction
 
 When changing layer boundaries, public row behavior, or load order, update:
 
-- `Libs/LibSettingsBuilder/README.md`
-- `Libs/LibSettingsBuilder/docs/API_REFERENCE.md`
-- `Libs/LibSettingsBuilder/embed.xml`
-- `Tests/TestHelpers.lua` library load order
+- `README.md`
+- `docs/API_REFERENCE.md`
+- `embed.xml`
+- `../../Tests/TestHelpers.lua` library load order
