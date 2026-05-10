@@ -137,7 +137,28 @@ function builders.color(self, spec)
     )
     settingRef = setting
 
-    local initializer = interop.createColorSwatchInitializer(category, setting, spec.tooltip)
+    local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", {
+        name = spec.name,
+        setting = setting,
+        settingVariable = interop.getSettingVariable(setting),
+        tooltip = spec.tooltip,
+    }, 26, interop.applyColorRowFrame)
+    initializer:SetSetting(setting)
+
+    local originalInitFrame = initializer.InitFrame
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if controlInitializer._lsbActiveFrame then
+            interop.applyColorRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+    initializer.InitFrame = function(controlInitializer, frame)
+        originalInitFrame(controlInitializer, frame)
+        interop.applyColorRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+    end
+
+    interop.registerInitializer(category, initializer)
     registry.applyModifiers(self, initializer, spec)
 
     return initializer, setting

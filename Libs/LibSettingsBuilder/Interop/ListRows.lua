@@ -19,6 +19,8 @@ local listElementKeysToHide = {
     "_lsbSubheaderTitle",
     "_lsbInfoTitle",
     "_lsbInfoValue",
+    "_lsbColorTitle",
+    "_lsbColorSwatch",
     "_lsbCanvas",
     "_lsbInputTitle",
     "_lsbInputEditBox",
@@ -361,6 +363,326 @@ local function applyInputRowEnabledState(frame, enabled)
     editBox:EnableMouse(enabled)
 end
 
+local function ensureColorRowWidgets(frame)
+    if frame._lsbColorTitle and frame._lsbColorSwatch then
+        return frame._lsbColorTitle, frame._lsbColorSwatch
+    end
+
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetJustifyH("LEFT")
+    title:SetWordWrap(false)
+
+    local swatch = interop.createColorSwatch(frame)
+
+    frame._lsbColorTitle = title
+    frame._lsbColorSwatch = swatch
+    frame.Title = title
+    frame.Swatch = swatch
+
+    return title, swatch
+end
+
+local function parseHexColor(hexValue)
+    hexValue = type(hexValue) == "string" and hexValue or "FFFFFFFF"
+    if not hexValue:match("^%x%x%x%x%x%x%x%x$") then
+        hexValue = "FFFFFFFF"
+    end
+
+    local color = interop.createColorFromHexString(hexValue)
+    return { r = color.r, g = color.g, b = color.b, a = color.a }
+end
+
+local function applyColorSwatchValue(swatch, color)
+    if not swatch or not color then
+        return
+    end
+
+    if swatch.SetColorRGB then
+        swatch:SetColorRGB(color.r, color.g, color.b, color.a)
+    end
+
+    local texture = swatch._tex or swatch.Color
+    if texture and texture.SetColorTexture then
+        texture:SetColorTexture(color.r, color.g, color.b, color.a)
+    elseif texture and texture.SetVertexColor then
+        texture:SetVertexColor(color.r, color.g, color.b, color.a)
+    end
+end
+
+local function getPickerRGB()
+    if ColorPickerFrame and ColorPickerFrame.GetColorRGB then
+        return ColorPickerFrame:GetColorRGB()
+    end
+
+    local picker = ColorPickerFrame and ColorPickerFrame.Content and ColorPickerFrame.Content.ColorPicker
+    if picker and picker.GetColorRGB then
+        return picker:GetColorRGB()
+    end
+
+    return 1, 1, 1
+end
+
+local function getPickerAlpha()
+    if ColorPickerFrame and ColorPickerFrame.GetColorAlpha then
+        return ColorPickerFrame:GetColorAlpha()
+    end
+
+    return 1
+end
+
+local function setPickerRGB(r, g, b)
+    if ColorPickerFrame and ColorPickerFrame.SetColorRGB then
+        ColorPickerFrame:SetColorRGB(r, g, b)
+        return
+    end
+
+    local picker = ColorPickerFrame and ColorPickerFrame.Content and ColorPickerFrame.Content.ColorPicker
+    if picker and picker.SetColorRGB then
+        picker:SetColorRGB(r, g, b)
+    end
+end
+
+local function getNormalizedSixDigitHex(text)
+    text = tostring(text or ""):match("^%s*(.-)%s*$")
+    if text:sub(1, 1) == "#" then
+        text = text:sub(2)
+    end
+
+    return #text == 6 and text:match("^%x%x%x%x%x%x$") and text or nil
+end
+
+local colorPickerSession = nil
+local colorPickerHooksInstalled = false
+
+local function findFirstEditBox(...)
+    for i = 1, select("#", ...) do
+        local editBox = select(i, ...)
+        if editBox and editBox.GetText and editBox.SetScript then
+            return editBox
+        end
+    end
+
+    return nil
+end
+
+local function findColorPickerHexEditBox()
+    if not ColorPickerFrame then
+        return nil
+    end
+
+    local content = ColorPickerFrame.Content
+    local picker = content and content.ColorPicker
+    return findFirstEditBox(
+        ColorPickerFrame.HexBox,
+        ColorPickerFrame.HexEditBox,
+        ColorPickerFrame.HexInput,
+        ColorPickerFrame.EditBox,
+        content and content.HexBox,
+        content and content.HexEditBox,
+        content and content.HexInput,
+        content and content.HexColor,
+        content and content.HexColorBox,
+        content and content.HexColorEditBox,
+        picker and picker.HexBox,
+        picker and picker.HexEditBox,
+        picker and picker.HexInput
+    )
+end
+
+local function bindColorPickerHexEditBox()
+    local editBox = findColorPickerHexEditBox()
+    if not editBox or editBox._lsbColorPickerHexBound then
+        return
+    end
+
+    local originalOnTextChanged = editBox.GetScript and editBox:GetScript("OnTextChanged") or nil
+    editBox:SetScript("OnTextChanged", function(self, userInput)
+        if originalOnTextChanged then
+            originalOnTextChanged(self, userInput)
+        end
+        if userInput == false then
+            return
+        end
+
+        local hex = getNormalizedSixDigitHex(self:GetText())
+        if not hex then
+            return
+        end
+
+        setPickerRGB(
+            tonumber(hex:sub(1, 2), 16) / 255,
+            tonumber(hex:sub(3, 4), 16) / 255,
+            tonumber(hex:sub(5, 6), 16) / 255
+        )
+    end)
+    editBox._lsbColorPickerHexBound = true
+end
+
+local function commitColorPickerSession()
+    local session = colorPickerSession
+    if not session then
+        return
+    end
+
+    session.committed = true
+    if session.setting and session.setting.SetValue then
+        session.setting:SetValue(foundation.colorTableToHex(session.pendingColor))
+    end
+    colorPickerSession = nil
+end
+
+local function cancelColorPickerSession()
+    local session = colorPickerSession
+    if not session then
+        return
+    end
+
+    session.cancelled = true
+    applyColorSwatchValue(session.swatch, session.originalColor)
+    colorPickerSession = nil
+end
+
+local function showColorPickerSession(session)
+    if not ColorPickerFrame or not ColorPickerFrame.SetupColorPickerAndShow then
+        return
+    end
+
+    session.settingUp = true
+    ColorPickerFrame:SetupColorPickerAndShow({
+        r = session.pendingColor.r,
+        g = session.pendingColor.g,
+        b = session.pendingColor.b,
+        opacity = session.pendingColor.a,
+        hasOpacity = true,
+        swatchFunc = function()
+            if colorPickerSession ~= session or session.settingUp then
+                return
+            end
+            local r, g, b = getPickerRGB()
+            session.pendingColor.r = r
+            session.pendingColor.g = g
+            session.pendingColor.b = b
+            applyColorSwatchValue(session.swatch, session.pendingColor)
+        end,
+        opacityFunc = function()
+            if colorPickerSession ~= session or session.settingUp then
+                return
+            end
+            session.pendingColor.a = getPickerAlpha()
+            applyColorSwatchValue(session.swatch, session.pendingColor)
+        end,
+        cancelFunc = function() end,
+    })
+    session.settingUp = nil
+    bindColorPickerHexEditBox()
+end
+
+local function installColorPickerHooks()
+    if colorPickerHooksInstalled or not ColorPickerFrame then
+        return
+    end
+
+    local footer = ColorPickerFrame.Footer
+    local okayButton = footer and footer.OkayButton
+    local cancelButton = footer and footer.CancelButton
+    if okayButton and okayButton.HookScript then
+        okayButton:HookScript("OnClick", commitColorPickerSession)
+    end
+    if cancelButton and cancelButton.HookScript then
+        cancelButton:HookScript("OnClick", cancelColorPickerSession)
+    end
+    if ColorPickerFrame.HookScript then
+        ColorPickerFrame:HookScript("OnHide", function()
+            local session = colorPickerSession
+            if not session or session.committed or session.cancelled or session.reopening then
+                return
+            end
+
+            session.reopening = true
+            if C_Timer and C_Timer.After then
+                C_Timer.After(0, function()
+                    session.reopening = nil
+                    if colorPickerSession == session and not session.committed and not session.cancelled then
+                        showColorPickerSession(session)
+                    end
+                end)
+            else
+                session.reopening = nil
+                showColorPickerSession(session)
+            end
+        end)
+    end
+
+    colorPickerHooksInstalled = true
+end
+
+local function openColorPicker(frame)
+    local setting = frame and frame._lsbColorSetting
+    if not setting or not setting.GetValue then
+        return
+    end
+
+    installColorPickerHooks()
+
+    local originalColor = parseHexColor(setting:GetValue())
+    colorPickerSession = {
+        frame = frame,
+        setting = setting,
+        swatch = frame._lsbColorSwatch,
+        originalColor = originalColor,
+        pendingColor = { r = originalColor.r, g = originalColor.g, b = originalColor.b, a = originalColor.a },
+    }
+    showColorPickerSession(colorPickerSession)
+end
+
+local function applyColorRowEnabledState(frame, enabled)
+    if not frame then
+        return
+    end
+
+    frame:SetAlpha(enabled and 1 or 0.5)
+
+    local swatch = frame._lsbColorSwatch
+    if not swatch then
+        return
+    end
+
+    swatch:SetEnabled(enabled)
+    swatch:EnableMouse(enabled)
+end
+
+local function applyColorRowFrame(frame, data)
+    local title, swatch = ensureColorRowWidgets(frame)
+
+    title:ClearAllPoints()
+    title:SetPoint("LEFT", frame, "LEFT", 37, 0)
+    title:SetPoint("RIGHT", swatch, "LEFT", -8, 0)
+    title:SetJustifyV("MIDDLE")
+    title:SetText(data.name)
+    title:Show()
+
+    swatch:ClearAllPoints()
+    swatch:SetPoint("LEFT", frame, "CENTER", interop.defaultSwatchCenterX, 0)
+    swatch:Show()
+    interop.setSimpleTooltip(swatch, data.tooltip)
+
+    frame._lsbColorSetting = data.setting
+    swatch._lsbOwnerFrame = frame
+    if not swatch._lsbColorScriptsBound then
+        swatch:SetScript("OnClick", function(self)
+            openColorPicker(self._lsbOwnerFrame)
+        end)
+        swatch._lsbColorScriptsBound = true
+    end
+
+    applyColorSwatchValue(swatch, parseHexColor(data.setting and data.setting.GetValue and data.setting:GetValue()))
+
+    registerValueChangedCallback(frame, data.settingVariable, function()
+        local currentSetting = frame._lsbColorSetting
+        applyColorSwatchValue(frame._lsbColorSwatch, parseHexColor(currentSetting and currentSetting.GetValue and currentSetting:GetValue()))
+    end, frame)
+end
+
 local function applyInputRowFrame(frame, data)
     local title, editBox, preview = ensureInputRowWidgets(frame)
     local hasPreview = data.resolveText ~= nil
@@ -605,6 +927,8 @@ interop.hideHeaderActionButtons = hideHeaderActionButtons
 interop.applyHeaderFrame = applyHeaderFrame
 interop.applySubheaderFrame = applySubheaderFrame
 interop.applyInfoRowFrame = applyInfoRowFrame
+interop.applyColorRowFrame = applyColorRowFrame
+interop.applyColorRowEnabledState = applyColorRowEnabledState
 interop.applyInputRowFrame = applyInputRowFrame
 interop.applyInputRowEnabledState = applyInputRowEnabledState
 interop.cancelInputPreviewTimer = cancelInputPreviewTimer
