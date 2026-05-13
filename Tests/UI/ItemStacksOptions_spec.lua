@@ -179,6 +179,28 @@ describe("ItemStacksOptions settings page", function()
         assert.are.same({ registeredPage._category }, refreshCalls)
     end)
 
+    it("refreshes pending item row labels when requested item data finishes loading", function()
+        ns.ItemStacksOptions._createStack(profile, "Potions")
+        profile.extraIcons.itemStacks.byId[1].ids = { { itemID = 303 } }
+        local itemNames = {}
+        _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 303 end
+        _G.C_Item.GetItemNameByID = function(itemId) return itemNames[itemId] end
+
+        assert.is_true(ns.ItemStacksOptions._itemLoadFrame:IsEventRegistered("ITEM_DATA_LOAD_RESULT"))
+        assert.are.equal(ns.L["EXTRA_ICONS_ITEM_LOADING"] .. " |cff808080{303}|r", getSection().items[1].label)
+
+        itemNames[303] = "Loaded Item"
+        ns.ItemStacksOptions._itemLoadFrame:GetScript("OnEvent")(
+            ns.ItemStacksOptions._itemLoadFrame,
+            "ITEM_DATA_LOAD_RESULT",
+            303,
+            true
+        )
+
+        assert.are.equal("Loaded Item |cff808080{303}|r", getSection().items[1].label)
+        assert.are.same({ registeredPage._category }, refreshCalls)
+    end)
+
     it("refreshes pending item row labels again after item data settles", function()
         ns.ItemStacksOptions._createStack(profile, "Potions")
         profile.extraIcons.itemStacks.byId[1].ids = { { itemID = 303 } }

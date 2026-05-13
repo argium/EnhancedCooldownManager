@@ -476,25 +476,52 @@ describe("LibSettingsBuilder Controls", function()
         local oldInitializer = initializers[1]
         local selectedInitializer = initializers[2]
         local displayedText
+        local menuCallback
         local frame = {
             Control = {
                 Dropdown = {
                     OverrideText = function(_, text)
                         displayedText = text
                     end,
+                    SetupMenu = function(_, callback)
+                        menuCallback = callback
+                    end,
                 },
             },
             SetValue = function() end,
         }
+        local function buildMenuEntries()
+            local rootDescription = {
+                entries = {},
+                CreateRadio = function(self, label, isSelected, setSelected, value)
+                    self.entries[#self.entries + 1] = {
+                        label = label,
+                        isSelected = isSelected,
+                        setSelected = setSelected,
+                        value = value,
+                    }
+                end,
+                SetScrollMode = function(self, height)
+                    self.scrollHeight = height
+                end,
+            }
+            menuCallback(frame.Control.Dropdown, rootDescription)
+            return rootDescription
+        end
 
         dropdownHook(frame, oldInitializer)
         assert.are.equal("Outline", displayedText)
         assert.are.equal(frame, oldInitializer._lsbActiveFrame)
+        local oldMenu = buildMenuEntries()
+        assert.are.equal("Outline", oldMenu.entries[1].label)
+        assert.is_nil(oldMenu.scrollHeight)
 
         dropdownHook(frame, selectedInitializer)
         assert.are.equal("Potions", displayedText)
         assert.is_nil(oldInitializer._lsbActiveFrame)
         assert.are.equal(frame, selectedInitializer._lsbActiveFrame)
+        local selectedMenu = buildMenuEntries()
+        assert.are.equal("Potions", selectedMenu.entries[1].label)
 
         oldInitializer._lsbRefreshFrame(frame, oldInitializer)
         assert.are.equal("Potions", displayedText)

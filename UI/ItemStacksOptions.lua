@@ -459,6 +459,7 @@ function ItemStacksOptions.EnsureItemLoadFrame()
         return
     end
     itemLoadFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+    itemLoadFrame:RegisterEvent("ITEM_DATA_LOAD_RESULT")
     itemLoadFrame:SetScript("OnEvent", function(_, _, itemId)
         local pendingId = tonumber(itemId) or itemId
         if pendingId and ItemStacksOptions._pendingItemLoads[pendingId] then
