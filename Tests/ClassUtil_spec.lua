@@ -238,6 +238,11 @@ describe("ClassUtil", function()
             assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 2)
         end)
 
+        it("returns devourer normal values from alternate void fragment aura", function()
+            CUnitAurasStub.SetAura(ns.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT, { applications = 15 })
+            assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 3)
+        end)
+
         it("returns devourer normal zero stacks when no aura is present", function()
             assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 0)
         end)

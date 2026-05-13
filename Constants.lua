@@ -75,6 +75,7 @@ local constants = {
     SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     SPELLID_MAELSTROM_WEAPON = 344179,
     SPELLID_DEVOURER_SOUL_FRAGMENTS = 1225789, -- tracks progress towards void meta form (50 soul fragments)
+    SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT = 1245577, -- alternate aura for void meta soul fragments
     SPELLID_SOUL_GLUTTEN = 1247534, -- reduces the number of souls needed for void meta by 15
     SPELLID_VOID_META = 1217607, -- void meta
 
@@ -108,25 +109,6 @@ local constants = {
     DEFAULT_EXTRA_ICON_SIZE = 32,
     EXTRA_ICON_MAIN_BORDER_SCALE = 1.35,
     EXTRA_ICON_UTILITY_BORDER_SCALE = 1.4,
-
-    -- Consumables and equipment slots
-    COMBAT_POTIONS = {
-        { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
-        { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
-        { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
-        { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
-    },
-    HEALTH_POTIONS = {
-        { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
-        { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
-        { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
-    },
-    DEMONIC_HEALTHSTONE_ITEM_ID = 224464,
-    HEALTHSTONE_ITEM_ID = 5512,
-    HEALTHSTONES = {
-        { itemID = 224464 }, -- Demonic Healthstone
-        { itemID = 5512 }, -- Healthstone
-    },
 
     -- Saved variables and migration
     ACTIVE_SV_KEY = "_ECM_DB",
@@ -195,15 +177,12 @@ local constants = {
 --- Predefined icon stacks resolved at runtime by stackKey.
 --- Each entry defines an icon kind and its candidate sources.
 local BUILTIN_STACKS = {
-    trinket1      = { kind = "equipSlot", slotId = 13, label = "Trinket 1" },
-    trinket2      = { kind = "equipSlot", slotId = 14, label = "Trinket 2" },
-    combatPotions = { kind = "item", ids = constants.COMBAT_POTIONS, label = "Combat Potions" },
-    healthPotions = { kind = "item", ids = constants.HEALTH_POTIONS, label = "Health Potions" },
-    healthstones  = { kind = "item", ids = constants.HEALTHSTONES, label = "Healthstones" },
+    trinket1 = { kind = "equipSlot", slotId = 13, label = "Trinket 1" },
+    trinket2 = { kind = "equipSlot", slotId = 14, label = "Trinket 2" },
 }
 
 --- Default display order for builtin stack keys (matches default viewers.utility order).
-local BUILTIN_STACK_ORDER = { "trinket1", "trinket2", "combatPotions", "healthPotions", "healthstones" }
+local BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
 
 --- Racial ability lookup keyed by UnitRace("player") raceFileName.
 --- One primary active racial per race.
