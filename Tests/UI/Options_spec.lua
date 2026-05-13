@@ -119,6 +119,57 @@ describe("OptionUtil", function()
         assert.are.same({ r = 0.7, g = 0.8, b = 0.9, a = 0.6 }, changes[2])
     end)
 
+    it("renders positioning example previews fully opaque", function()
+        local createdTextures = {}
+
+        local function makeRegion()
+            return {
+                SetHeight = function() end,
+                SetSize = function() end,
+                SetPoint = function() end,
+                SetAllPoints = function() end,
+                SetJustifyH = function() end,
+                SetWordWrap = function() end,
+                SetText = function() end,
+            }
+        end
+
+        local function makeFrame()
+            local frame = makeRegion()
+            frame.CreateFontString = function()
+                return makeRegion()
+            end
+            frame.CreateTexture = function()
+                local texture = makeRegion()
+                texture.SetColorTexture = function(self, r, g, b, a)
+                    self.colorTexture = { r, g, b, a }
+                    createdTextures[#createdTextures + 1] = self
+                end
+                return texture
+            end
+            return frame
+        end
+
+        local originalCreateFrame = _G.CreateFrame
+        _G.CreateFrame = function()
+            return makeFrame()
+        end
+        local ok, canvas = pcall(ns.OptionUtil.CreatePositioningExamplesCanvas)
+        _G.CreateFrame = originalCreateFrame
+
+        assert.is_true(ok)
+        assert.is_table(canvas)
+
+        local backgrounds = 0
+        for _, texture in ipairs(createdTextures) do
+            assert.are.equal(1, texture.colorTexture[4])
+            if texture.colorTexture[1] == 0.08 and texture.colorTexture[2] == 0.08 and texture.colorTexture[3] == 0.08 then
+                backgrounds = backgrounds + 1
+            end
+        end
+        assert.are.equal(3, backgrounds)
+    end)
+
     describe("About page spec", function()
         it("registers the root About page", function()
             local _, registeredPage = TestHelpers.RegisterRootPageSpec(

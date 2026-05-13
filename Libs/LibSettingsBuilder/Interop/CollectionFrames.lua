@@ -603,6 +603,15 @@ local function ensureModeInputRow(row)
     row._editBox:SetMaxLetters(10)
     row._editBox:SetTextInsets(6, 6, 0, 0)
 
+    row._dropdownHost = CreateFrame("Frame", nil, row, "SettingsDropdownWithButtonsTemplate")
+    if row._dropdownHost.DecrementButton then row._dropdownHost.DecrementButton:Hide() end
+    if row._dropdownHost.IncrementButton then row._dropdownHost.IncrementButton:Hide() end
+    row._dropdown = row._dropdownHost.Dropdown or row._dropdownHost
+    row._dropdownHost:SetPoint("LEFT", row._modeButton, "RIGHT", 6, 0)
+    row._dropdownHost:SetSize(160, 22)
+    if row._dropdown.SetWidth then row._dropdown:SetWidth(160) end
+    row._dropdownHost:Hide()
+
     row._placeholder = row._editBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     row._placeholder:SetPoint("LEFT", row._editBox, "LEFT", 6, 0)
     row._placeholder:SetPoint("RIGHT", row._editBox, "RIGHT", -6, 0)
@@ -610,7 +619,6 @@ local function ensureModeInputRow(row)
     row._placeholder:SetWordWrap(false)
 
     row._previewIcon = row:CreateTexture(nil, "ARTWORK")
-    row._previewIcon:SetPoint("LEFT", row._editBox, "RIGHT", 8, 0)
     row._previewIcon:SetSize(16, 16)
     row._previewIcon:Hide()
 
@@ -698,6 +706,69 @@ local function getModeInputTrailerValue(trailer, key, row, sectionData)
     return evaluateStaticOrFunction(trailer and trailer[key], trailer, row, sectionData)
 end
 
+local function getDropdownLabel(values, value)
+    return values and values[value] or tostring(value or "")
+end
+
+local function setupModeInputDropdown(row, trailer, sectionData, enabled)
+    local dropdown = row._dropdown
+    local values = getModeInputTrailerValue(trailer, "inputValues", row, sectionData)
+    local value = getModeInputTrailerValue(trailer, "inputValue", row, sectionData)
+    local label = getDropdownLabel(values, value)
+
+    if dropdown.OverrideText then
+        dropdown:OverrideText(label)
+    elseif dropdown.SetText then
+        dropdown:SetText(label)
+    end
+
+    if dropdown.SetEnabled then
+        dropdown:SetEnabled(enabled)
+    end
+    if row._dropdownHost.SetEnabled then
+        row._dropdownHost:SetEnabled(enabled)
+    end
+
+    if dropdown.SetupMenu then
+        dropdown:SetupMenu(function(_, rootDescription)
+            if rootDescription.SetScrollMode then
+                rootDescription:SetScrollMode(200)
+            end
+            for _, entry in ipairs(lib._internal.foundation.getOrderedValueEntries(values)) do
+                rootDescription:CreateRadio(entry.label,
+                    function() return getModeInputTrailerValue(trailer, "inputValue", row, sectionData) == entry.value end,
+                    function()
+                        if trailer.onInputValueChanged then
+                            trailer.onInputValueChanged(entry.value, trailer, row, sectionData)
+                        end
+                        if row._lsbTrailerRefresh then
+                            row._lsbTrailerRefresh(row)
+                        end
+                    end)
+            end
+        end)
+    else
+        row._dropdown:SetScript("OnClick", function()
+            local ordered = lib._internal.foundation.getOrderedValueEntries(values)
+            if #ordered == 0 or not trailer.onInputValueChanged then
+                return
+            end
+            local currentIndex = 0
+            for index, entry in ipairs(ordered) do
+                if entry.value == value then
+                    currentIndex = index
+                    break
+                end
+            end
+            local nextEntry = ordered[(currentIndex % #ordered) + 1]
+            trailer.onInputValueChanged(nextEntry.value, trailer, row, sectionData)
+            if row._lsbTrailerRefresh then
+                row._lsbTrailerRefresh(row)
+            end
+        end)
+    end
+end
+
 local function refreshModeInputRow(row, trailer, sectionData)
     ensureModeInputRow(row)
 
@@ -714,6 +785,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
         local modeText = getModeInputTrailerValue(currentTrailer, "modeText", activeRow, activeSectionData)
         local modeTooltip = getModeInputTrailerValue(currentTrailer, "modeTooltip", activeRow, activeSectionData)
         local modeHidden = getModeInputTrailerValue(currentTrailer, "modeHidden", activeRow, activeSectionData) == true
+        local inputType = getModeInputTrailerValue(currentTrailer, "inputType", activeRow, activeSectionData) or "text"
         local text = getModeInputTrailerValue(currentTrailer, "inputText", activeRow, activeSectionData) or ""
         local placeholder = getModeInputTrailerValue(currentTrailer, "placeholder", activeRow, activeSectionData)
         local previewIcon = getModeInputTrailerValue(currentTrailer, "previewIcon", activeRow, activeSectionData)
@@ -742,18 +814,38 @@ local function refreshModeInputRow(row, trailer, sectionData)
             activeRow._editBox:SetPoint("LEFT", activeRow._modeButton, "RIGHT", 6, 0)
         end
 
-        if activeRow._editBox:GetText() ~= text then
-            activeRow._lsbSyncingText = true
-            activeRow._editBox:SetText(text)
-            activeRow._lsbSyncingText = nil
-        end
-        activeRow._editBox:SetEnabled(not disabled and inputEnabled ~= false)
-
-        activeRow._placeholder:SetText(placeholder or "")
-        if activeRow._lsbHasFocus or text ~= "" then
+        local inputIsDropdown = inputType == "dropdown"
+        if inputIsDropdown then
+            activeRow._editBox:Hide()
             activeRow._placeholder:Hide()
+            activeRow._dropdownHost:ClearAllPoints()
+            activeRow._dropdownHost:SetPoint("LEFT", modeHidden and activeRow or activeRow._modeButton, modeHidden and "LEFT" or "RIGHT", modeHidden and 0 or 6, 0)
+            activeRow._dropdownHost:Show()
+            setupModeInputDropdown(activeRow, currentTrailer, activeSectionData, not disabled and inputEnabled ~= false)
         else
-            activeRow._placeholder:Show()
+            activeRow._dropdownHost:Hide()
+            activeRow._dropdown:SetScript("OnClick", nil)
+            activeRow._editBox:Show()
+            if activeRow._editBox:GetText() ~= text then
+                activeRow._lsbSyncingText = true
+                activeRow._editBox:SetText(text)
+                activeRow._lsbSyncingText = nil
+            end
+            activeRow._editBox:SetEnabled(not disabled and inputEnabled ~= false)
+
+            activeRow._placeholder:SetText(placeholder or "")
+            if activeRow._lsbHasFocus or text ~= "" then
+                activeRow._placeholder:Hide()
+            else
+                activeRow._placeholder:Show()
+            end
+        end
+
+        activeRow._previewIcon:ClearAllPoints()
+        if inputIsDropdown then
+            activeRow._previewIcon:SetPoint("LEFT", activeRow._dropdownHost, "RIGHT", 8, 0)
+        else
+            activeRow._previewIcon:SetPoint("LEFT", activeRow._editBox, "RIGHT", 8, 0)
         end
 
         if previewIcon then
@@ -959,6 +1051,7 @@ local function refreshSectionedCollection(frame, data)
             end
 
             refreshActionsCollectionRow(row, item)
+            row:SetHeight(section.rowHeight or 26)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", content, "TOPLEFT", insetLeft, y)
             row:SetPoint("RIGHT", content, "RIGHT", -insetRight, 0)

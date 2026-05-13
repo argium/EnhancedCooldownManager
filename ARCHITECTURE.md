@@ -251,7 +251,7 @@ ECM uses LibSettingsBuilder as a single declarative registration tree:
 - `LSB.New(...)` materializes the tree into Blizzard Settings (flattening single-page sections by default and nesting multi-page sections automatically),
 - dynamic pages keep a registered page handle through `onRegistered(page)` and refresh via `page:Refresh()` when async or transient state changes.
 
-`ExtraIconsOptions` owns the main viewer-management page, while `ItemSetsOptions` appends the Item Sets subpage under the same Extra Icons section. Viewer entries reference item sets by stable profile IDs so renames do not mutate viewer rows.
+`ExtraIconsOptions` owns the main viewer-management page, while `ItemStacksOptions` appends the Item Stacks subpage under the same Extra Icons section. Viewer entries reference item stacks by stable profile IDs so renames do not mutate viewer rows.
 
 `UI/SpellColorsPage.lua` owns the shared Spell Colors subcategory. `BuffBarsOptions` registers the page once, and both `BuffBars` and `ExternalBars` register scoped sections into it, so the two modules share one editor without sharing saved color pools.
 

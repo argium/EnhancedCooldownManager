@@ -21,11 +21,6 @@ local BORDER_SCALE_BY_VIEWER = {
     utility = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE },
 }
 
-local SUPPRESS_IN_RATED_PVP = {
-    combatPotions = true,
-    healthPotions = true,
-}
-
 local RACIAL_SPELL_ALIASES = {}
 for _, racial in pairs(RACIAL_ABILITIES) do
     local spellIds = racial.spellIds or { racial.spellId }
@@ -161,10 +156,22 @@ local function resolveSpell(ids)
     end
 end
 
-local function resolveItemSet(entry, moduleConfig)
-    local itemSets = moduleConfig and moduleConfig.itemSets
-    local itemSet = itemSets and itemSets.byId and itemSets.byId[entry.itemSetId]
-    return itemSet and itemSet.ids and resolveItem(itemSet.ids) or nil
+local function isNonPvpInstance()
+    local inInstance, instanceType = IsInInstance()
+    return inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+end
+
+local function shouldSuppressItemStack(itemStack)
+    if not itemStack then return true end
+    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return true end
+    if itemStack.hideInInstances and isNonPvpInstance() then return true end
+    return false
+end
+
+local function resolveItemStack(entry, moduleConfig)
+    local itemStacks = moduleConfig and moduleConfig.itemStacks
+    local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
+    return not shouldSuppressItemStack(itemStack) and itemStack.ids and resolveItem(itemStack.ids) or nil
 end
 
 local function resolveEntry(entry, moduleConfig)
@@ -172,16 +179,13 @@ local function resolveEntry(entry, moduleConfig)
     if entry.stackKey then
         local stack = BUILTIN_STACKS[entry.stackKey]
         if not stack then return nil end
-        if SUPPRESS_IN_RATED_PVP[entry.stackKey] and C_PvP.IsRatedMap() then
-            return nil
-        end
         kind, slotId, ids = stack.kind, stack.slotId, stack.ids
     else
         kind, slotId, ids = entry.kind, entry.slotId, entry.ids
     end
     if kind == "equipSlot" then return resolveEquipSlot(slotId) end
     if kind == "item" then return ids and resolveItem(ids) end
-    if kind == "itemSet" then return resolveItemSet(entry, moduleConfig) end
+    if kind == "itemStack" then return resolveItemStack(entry, moduleConfig) end
     if kind == "spell" then return ids and resolveSpell(ids) end
 end
 

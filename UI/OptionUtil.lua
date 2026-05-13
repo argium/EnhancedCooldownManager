@@ -154,7 +154,7 @@ function OptionUtil.CreatePositioningExamplesCanvas()
         local previewBg = preview:CreateTexture(nil, "BACKGROUND")
         previewBg:SetAllPoints(preview)
         if type(previewBg.SetColorTexture) == "function" then
-            previewBg:SetColorTexture(0.08, 0.08, 0.08, 0.65)
+            previewBg:SetColorTexture(0.08, 0.08, 0.08, 1)
         end
 
         column.build(preview)

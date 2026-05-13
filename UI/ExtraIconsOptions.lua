@@ -51,6 +51,7 @@ ns.ExtraIconsOptions = ExtraIconsOptions
 
 ExtraIconsOptions._pendingItemLoads = ExtraIconsOptions._pendingItemLoads or {}
 ExtraIconsOptions._draftStates = ExtraIconsOptions._draftStates or {}
+ExtraIconsOptions._selectedItemStackIds = ExtraIconsOptions._selectedItemStackIds or {}
 local draftStates = ExtraIconsOptions._draftStates
 
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("extraIcons")
@@ -63,36 +64,57 @@ end
 local function getProfile() return ns.Addon.db.profile end
 local function getViewers() return getProfile().extraIcons.viewers end
 
-local function getItemSets()
+local function getItemStacks()
     local extraIcons = getProfile().extraIcons
-    extraIcons.itemSets = extraIcons.itemSets or { nextId = 1, order = {}, byId = {} }
-    extraIcons.itemSets.order = extraIcons.itemSets.order or {}
-    extraIcons.itemSets.byId = extraIcons.itemSets.byId or {}
-    extraIcons.itemSets.nextId = extraIcons.itemSets.nextId or 1
-    return extraIcons.itemSets
+    extraIcons.itemStacks = extraIcons.itemStacks or { nextId = 1, order = {}, byId = {} }
+    extraIcons.itemStacks.order = extraIcons.itemStacks.order or {}
+    extraIcons.itemStacks.byId = extraIcons.itemStacks.byId or {}
+    extraIcons.itemStacks.nextId = extraIcons.itemStacks.nextId or 1
+    return extraIcons.itemStacks
 end
 
-local function getItemSet(setId)
-    return setId and getItemSets().byId[setId] or nil
+local function getItemStack(stackId)
+    return stackId and getItemStacks().byId[stackId] or nil
 end
 
-local function getItemSetName(setId)
-    local itemSet = getItemSet(setId)
-    return itemSet and itemSet.name or nil
+local function getItemStackName(stackId)
+    local itemStack = getItemStack(stackId)
+    return itemStack and itemStack.name or nil
 end
 
-local function ensureSelectedItemSetId()
-    local itemSets = getItemSets()
-    local selected = ExtraIconsOptions._selectedItemSetId
-    if selected and itemSets.byId[selected] then
+local function getFirstStackIdAlphabetically(itemStacks)
+    local ids = {}
+    for _, stackId in ipairs(itemStacks.order) do
+        if itemStacks.byId[stackId] then
+            ids[#ids + 1] = stackId
+        end
+    end
+    table.sort(ids, function(a, b)
+        local left = itemStacks.byId[a]
+        local right = itemStacks.byId[b]
+        local leftName = tostring(left and left.name or a):lower()
+        local rightName = tostring(right and right.name or b):lower()
+        if leftName == rightName then
+            return tostring(a) < tostring(b)
+        end
+        return leftName < rightName
+    end)
+    return ids[1]
+end
+
+local function ensureSelectedItemStackId(viewerKey)
+    viewerKey = viewerKey or DEFAULT_SPECIAL_VIEWER
+    local itemStacks = getItemStacks()
+    local selected = ExtraIconsOptions._selectedItemStackIds[viewerKey]
+    if selected and itemStacks.byId[selected] then
         return selected
     end
-    selected = itemSets.order[1]
-    ExtraIconsOptions._selectedItemSetId = selected
+    selected = getFirstStackIdAlphabetically(itemStacks)
+    ExtraIconsOptions._selectedItemStackIds[viewerKey] = selected
     return selected
 end
 
-local function getSelectedItemSetName() return getItemSetName(ensureSelectedItemSetId()) end
+local function getSelectedItemStackName(viewerKey) return getItemStackName(ensureSelectedItemStackId(viewerKey)) end
 
 local function refreshPage()
     if registeredPage then
@@ -146,6 +168,11 @@ local function entryHasAnySpellId(entry, spellIds)
 end
 
 local function getItemIdFromEntry(entry) return type(entry) == "table" and (entry.itemID or entry.itemId) or entry end
+
+function ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
+    local quality = type(itemEntry) == "table" and itemEntry.quality
+    return quality and CreateAtlasMarkup("Professions-ChatIcon-Quality-12-Tier" .. quality, 14, 14) or nil
+end
 
 local function buildEntry(kind, ids)
     local entryIds = {}
@@ -210,8 +237,8 @@ local function getEntryTooltipTitle(entry)
             return ("%s (item ID %s)"):format(name, id)
         end
     end
-    if entry.kind == "itemSet" then
-        return ("%s (%s)"):format(name, L["ITEM_SET"])
+    if entry.kind == "itemStack" then
+        return ("%s (%s)"):format(name, L["ITEM_STACK"])
     end
     return name
 end
@@ -223,8 +250,8 @@ local function getEntryIdentityKey(entry)
     if entry.stackKey then
         return "stack:" .. entry.stackKey
     end
-    if entry.kind == "itemSet" and entry.itemSetId then
-        return "itemSet:" .. tostring(entry.itemSetId)
+    if entry.kind == "itemStack" and entry.itemStackId then
+        return "itemStack:" .. tostring(entry.itemStackId)
     end
     if not (entry.kind and entry.ids and #entry.ids > 0) then
         return nil
@@ -281,9 +308,11 @@ local function showRowTooltip(owner, rowData)
     end
 
     local stack = displayEntry.stackKey and BUILTIN_STACKS[displayEntry.stackKey]
-    if stack and stack.kind == "item" and stack.ids and #stack.ids > 0 then
+    local itemStack = displayEntry.kind == "itemStack" and getItemStack(displayEntry.itemStackId) or nil
+    local ids = stack and stack.kind == "item" and stack.ids or itemStack and itemStack.ids
+    if ids and #ids > 0 then
         tip(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"])
-        for _, itemEntry in ipairs(stack.ids) do
+        for _, itemEntry in ipairs(ids) do
             local itemId = getItemIdFromEntry(itemEntry)
             local parts = {}
             local icon = itemId and C_Item.GetItemIconByID(itemId)
@@ -291,9 +320,9 @@ local function showRowTooltip(owner, rowData)
                 parts[#parts + 1] = CreateTextureMarkup(icon, 64, 64, 14, 14, 0, 1, 0, 1)
             end
             parts[#parts + 1] = getItemDisplayName(itemId) or ("Item " .. tostring(itemId))
-            local quality = type(itemEntry) == "table" and itemEntry.quality
-            if quality then
-                parts[#parts + 1] = CreateAtlasMarkup("Professions-Icon-Quality-Tier" .. quality .. "-Small", 14, 14)
+            local qualityMarkup = ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
+            if qualityMarkup then
+                parts[#parts + 1] = qualityMarkup
             end
             tip(table.concat(parts, " "))
         end
@@ -370,8 +399,8 @@ function ExtraIconsOptions._getEntryName(entry)
         return getItemDisplayName(getItemIdFromEntry(entry.ids[1]))
     end
 
-    if entry.kind == "itemSet" then
-        return getItemSetName(entry.itemSetId) or L["ITEM_SET_MISSING"]
+    if entry.kind == "itemStack" then
+        return getItemStackName(entry.itemStackId) or L["ITEM_STACK_MISSING"]
     end
 
     return "Unknown"
@@ -402,9 +431,9 @@ function ExtraIconsOptions._getEntryIcon(entry)
         return itemId and C_Item.GetItemIconByID(itemId)
     end
 
-    if entry.kind == "itemSet" then
-        local itemSet = getItemSet(entry.itemSetId)
-        local first = itemSet and itemSet.ids and itemSet.ids[1]
+    if entry.kind == "itemStack" then
+        local itemStack = getItemStack(entry.itemStackId)
+        local first = itemStack and itemStack.ids and itemStack.ids[1]
         local itemId = getItemIdFromEntry(first)
         return itemId and C_Item.GetItemIconByID(itemId)
     end
@@ -430,9 +459,9 @@ function ExtraIconsOptions._addCustomEntry(profile, viewerKey, kind, ids)
     if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
 end
 
-function ExtraIconsOptions._addItemSetEntry(profile, viewerKey, itemSetId)
+function ExtraIconsOptions._addItemStackEntry(profile, viewerKey, itemStackId)
     local viewers = profile.extraIcons.viewers
-    local entry = { kind = "itemSet", itemSetId = itemSetId }
+    local entry = { kind = "itemStack", itemStackId = itemStackId }
     if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
 end
 
@@ -518,16 +547,16 @@ function ExtraIconsOptions._parseSingleId(text)
     return num
 end
 
-function ExtraIconsOptions._resolveDraftEntryPreview(kind, text)
-    if kind == "itemSet" then
-        local itemSetId = ensureSelectedItemSetId()
-        local itemSet = itemSetId and getItemSet(itemSetId)
-        if not itemSet then
+function ExtraIconsOptions._resolveDraftEntryPreview(kind, text, viewerKey)
+    if kind == "itemStack" then
+        local itemStackId = ensureSelectedItemStackId(viewerKey)
+        local itemStack = itemStackId and getItemStack(itemStackId)
+        if not itemStack then
             return "invalid", nil, nil
         end
-        local first = itemSet.ids and itemSet.ids[1]
+        local first = itemStack.ids and itemStack.ids[1]
         local itemId = getItemIdFromEntry(first)
-        return "resolved", itemSet.name, itemId and C_Item.GetItemIconByID(itemId) or nil
+        return "resolved", itemStack.name, itemId and C_Item.GetItemIconByID(itemId) or nil
     end
 
     local id = ExtraIconsOptions._parseSingleId(text)
@@ -661,12 +690,12 @@ end
 
 local function getDraftDuplicateInfo(viewerKey)
     local ds = draftStates[viewerKey]
-    if ds.kind == "itemSet" then
-        local selected = ensureSelectedItemSetId()
+    if ds.kind == "itemStack" then
+        local selected = ensureSelectedItemStackId(viewerKey)
         if not selected then
             return false, nil
         end
-        local dupViewer = ExtraIconsOptions._findDuplicateEntry(getViewers(), { kind = "itemSet", itemSetId = selected })
+        local dupViewer = ExtraIconsOptions._findDuplicateEntry(getViewers(), { kind = "itemStack", itemStackId = selected })
         return dupViewer ~= nil, dupViewer
     end
 
@@ -680,18 +709,18 @@ end
 
 local function addDraftEntry(viewerKey)
     local ds = draftStates[viewerKey]
-    if ds.kind == "itemSet" then
-        local itemSetId = ensureSelectedItemSetId()
+    if ds.kind == "itemStack" then
+        local itemStackId = ensureSelectedItemStackId(viewerKey)
         local isDuplicate = getDraftDuplicateInfo(viewerKey)
-        if not itemSetId or isDuplicate then
+        if not itemStackId or isDuplicate then
             return false
         end
-        ExtraIconsOptions._addItemSetEntry(getProfile(), viewerKey, itemSetId)
+        ExtraIconsOptions._addItemStackEntry(getProfile(), viewerKey, itemStackId)
         doAction()
         return true
     end
 
-    local status = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText)
+    local status = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
     local isDuplicate = getDraftDuplicateInfo(viewerKey)
     if status ~= "resolved" or isDuplicate then
         return false
@@ -819,7 +848,7 @@ local function buildModeInputTrailer(viewerKey)
     local ds = draftStates[viewerKey]
 
     local function getPreviewState()
-        local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText)
+        local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
         local isDup, dupViewer = getDraftDuplicateInfo(viewerKey)
         return status, name, icon, isDup, dupViewer
     end
@@ -829,8 +858,8 @@ local function buildModeInputTrailer(viewerKey)
         if ds.kind == "spell" then
             ds.kind = "item"
         elseif ds.kind == "item" then
-            ds.kind = "itemSet"
-            ensureSelectedItemSetId()
+            ds.kind = "itemStack"
+            ensureSelectedItemStackId(viewerKey)
         else
             ds.kind = "spell"
         end
@@ -843,15 +872,24 @@ local function buildModeInputTrailer(viewerKey)
         modeText = function()
             if ds.kind == "spell" then return L["ADD_SPELL"] end
             if ds.kind == "item" then return L["ADD_ITEM"] end
-            return L["ITEM_SET"]
+            return L["ITEM_STACK"]
         end,
         modeTooltip = L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"],
-        inputEnabled = function() return ds.kind ~= "itemSet" end,
-        inputText = function() return ds.kind == "itemSet" and (getSelectedItemSetName() or "") or ds.idText end,
+        inputType = function() return ds.kind == "itemStack" and "dropdown" or "text" end,
+        inputEnabled = function() return ds.kind ~= "itemStack" or ensureSelectedItemStackId(viewerKey) ~= nil end,
+        inputValues = ExtraIconsOptions.BuildItemStackValues,
+        inputValue = function()
+            local stackId = ensureSelectedItemStackId(viewerKey)
+            return stackId and tostring(stackId) or ""
+        end,
+        onInputValueChanged = function(value)
+            ExtraIconsOptions._selectedItemStackIds[viewerKey] = tonumber(value) or value
+        end,
+        inputText = function() return ds.kind == "itemStack" and (getSelectedItemStackName(viewerKey) or "") or ds.idText end,
         placeholder = function()
             if ds.kind == "spell" then return L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"] end
             if ds.kind == "item" then return L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"] end
-            return L["ITEM_SET_SELECT_PLACEHOLDER"]
+            return L["ITEM_STACK_SELECT_PLACEHOLDER"]
         end,
         previewIcon = function() local _, _, icon = getPreviewState(); return icon end,
         previewText = function()
@@ -874,7 +912,7 @@ local function buildModeInputTrailer(viewerKey)
             return status == "resolved" and not isDup
         end,
         onToggleMode = toggleKind,
-        onTextChanged = function(text) if ds.kind ~= "itemSet" then ds.idText = text or "" end end,
+        onTextChanged = function(text) if ds.kind ~= "itemStack" then ds.idText = text or "" end end,
         onSubmit = function() return not isDisabled() and addDraftEntry(viewerKey) or false end,
         onTabPressed = toggleKind,
     }
@@ -899,13 +937,13 @@ function ExtraIconsOptions.BuildSections()
     return sections
 end
 
-function ExtraIconsOptions.BuildItemSetValues()
-    local itemSets = getItemSets()
+function ExtraIconsOptions.BuildItemStackValues()
+    local itemStacks = getItemStacks()
     local values = {}
-    for _, setId in ipairs(itemSets.order) do
-        local itemSet = itemSets.byId[setId]
-        if itemSet then
-            values[setId] = itemSet.name
+    for _, stackId in ipairs(itemStacks.order) do
+        local itemStack = itemStacks.byId[stackId]
+        if itemStack then
+            values[tostring(stackId)] = itemStack.name
         end
     end
     return values
@@ -922,7 +960,7 @@ function ExtraIconsOptions.ResetToDefaults()
         draftStates[viewerKey].kind = "spell"
         draftStates[viewerKey].idText = ""
     end
-    ExtraIconsOptions._selectedItemSetId = nil
+    ExtraIconsOptions._selectedItemStackIds = {}
     doAction()
 end
 
@@ -979,27 +1017,6 @@ ExtraIconsOptions.pages = {
                 disabled = isDisabled,
                 onSet = function(ctx)
                     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-                    ctx.page:Refresh()
-                end,
-            },
-            {
-                id = "selectedItemSet",
-                type = "dropdown",
-                key = "selectedItemSet",
-                name = L["ITEM_SET"],
-                tooltip = L["EXTRA_ICONS_ITEM_SET_SELECT_DESC"],
-                layout = false,
-                values = ExtraIconsOptions.BuildItemSetValues,
-                get = function()
-                    return ensureSelectedItemSetId() or ""
-                end,
-                set = function(value)
-                    ExtraIconsOptions._selectedItemSetId = tonumber(value) or value
-                end,
-                disabled = function()
-                    return isDisabled() or ensureSelectedItemSetId() == nil
-                end,
-                onSet = function(ctx)
                     ctx.page:Refresh()
                 end,
             },
