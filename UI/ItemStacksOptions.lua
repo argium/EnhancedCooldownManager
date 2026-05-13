@@ -133,35 +133,14 @@ end
 
 local function getItemIcon(itemId) return itemId and C_Item.GetItemIconByID(itemId) or nil end
 
-local function getKnownItemQuality(itemId)
-    local defaultStacks = getDefaultItemStacks()
-    if not (itemId and defaultStacks and defaultStacks.byId) then
-        return nil
-    end
-
-    for _, itemStack in pairs(defaultStacks.byId) do
-        for _, entry in ipairs(itemStack.ids or {}) do
-            if getItemIdFromEntry(entry) == itemId then
-                return type(entry) == "table" and entry.quality or nil
-            end
-        end
-    end
-    return nil
-end
-
 local function getItemQualityMarkup(entry)
-    local quality = type(entry) == "table" and entry.quality or nil
-    quality = quality or getKnownItemQuality(getItemIdFromEntry(entry))
-    return quality and ns.ExtraIconsOptions
+    return ns.ExtraIconsOptions
         and ns.ExtraIconsOptions.GetItemQualityMarkup
-        and ns.ExtraIconsOptions.GetItemQualityMarkup({ quality = quality })
+        and ns.ExtraIconsOptions.GetItemQualityMarkup(entry)
         or nil
 end
 
-local function makeItemEntry(itemId)
-    local quality = getKnownItemQuality(itemId)
-    return quality and { itemID = itemId, quality = quality } or { itemID = itemId }
-end
+local function makeItemEntry(itemId) return { itemID = itemId } end
 
 local function getItemEntryDisplayName(entry, includeItemId)
     local itemId = getItemIdFromEntry(entry)

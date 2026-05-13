@@ -232,26 +232,48 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal(22, getSection().rowHeight)
     end)
 
-    it("uses known default item quality in previews and newly added rows", function()
+    it("uses WoW profession quality info in previews and newly added rows", function()
         ns.ItemStacksOptions._createStack(profile, "Potions")
         _G.C_Item.GetItemNameByID = function(itemId)
-            return itemId == 245898 and "Fleeting Light's Potential" or nil
+            return (itemId == 241288 or itemId == 241289) and "Potion of Recklessness" or nil
         end
-        _G.C_Item.GetItemIconByID = function(itemId) return itemId == 245898 and "icon-245898" or nil end
-        _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 245898 end
+        _G.C_Item.GetItemIconByID = function(itemId) return "icon-" .. tostring(itemId) end
+        _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 241288 or itemId == 241289 end
+        _G.C_TradeSkillUI.GetItemCraftedQualityInfo = function(itemId)
+            if itemId == 241288 then
+                return { quality = 2, iconChat = "Professions-ChatIcon-Quality-12-Tier2" }
+            end
+            if itemId == 241289 then
+                return { quality = 1, iconChat = "Professions-ChatIcon-Quality-12-Tier1" }
+            end
+        end
 
         local footer = assert(getSection().footer)
-        footer.onTextChanged("245898")
+        footer.onTextChanged("241288")
 
         assert.are.equal(
-            "Fleeting Light's Potential |AProfessions-ChatIcon-Quality-12-Tier2|a",
+            "Potion of Recklessness |AProfessions-ChatIcon-Quality-12-Tier2|a",
             getTrailerValue(footer, "previewText")
         )
         assert.is_true(footer.onSubmit())
-        assert.same({ { itemID = 245898, quality = 2 } }, profile.extraIcons.itemStacks.byId[1].ids)
+        assert.same({ { itemID = 241288 } }, profile.extraIcons.itemStacks.byId[1].ids)
         assert.are.equal(
-            "Fleeting Light's Potential |AProfessions-ChatIcon-Quality-12-Tier2|a |cff808080{245898}|r",
+            "Potion of Recklessness |AProfessions-ChatIcon-Quality-12-Tier2|a |cff808080{241288}|r",
             getSection().items[1].label
+        )
+
+        footer = assert(getSection().footer)
+        footer.onTextChanged("241289")
+
+        assert.are.equal(
+            "Potion of Recklessness |AProfessions-ChatIcon-Quality-12-Tier1|a",
+            getTrailerValue(footer, "previewText")
+        )
+        assert.is_true(footer.onSubmit())
+        assert.same({ { itemID = 241288 }, { itemID = 241289 } }, profile.extraIcons.itemStacks.byId[1].ids)
+        assert.are.equal(
+            "Potion of Recklessness |AProfessions-ChatIcon-Quality-12-Tier1|a |cff808080{241289}|r",
+            getSection().items[2].label
         )
     end)
 

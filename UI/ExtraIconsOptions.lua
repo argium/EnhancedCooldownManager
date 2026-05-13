@@ -169,8 +169,17 @@ end
 
 local function getItemIdFromEntry(entry) return type(entry) == "table" and (entry.itemID or entry.itemId) or entry end
 
+local function getItemProfessionQualityInfo(itemEntry)
+    local itemId = getItemIdFromEntry(itemEntry)
+    if not itemId then return nil end
+    return C_TradeSkillUI.GetItemCraftedQualityInfo(itemId) or C_TradeSkillUI.GetItemReagentQualityInfo(itemId)
+end
+
 function ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
-    local quality = type(itemEntry) == "table" and itemEntry.quality
+    local qualityInfo = getItemProfessionQualityInfo(itemEntry)
+    local iconChat = type(qualityInfo) == "table" and qualityInfo.iconChat or type(itemEntry) == "table" and itemEntry.iconChat
+    if iconChat then return CreateAtlasMarkup(iconChat, 14, 14) end
+    local quality = type(qualityInfo) == "table" and qualityInfo.quality or type(itemEntry) == "table" and itemEntry.quality
     return quality and CreateAtlasMarkup("Professions-ChatIcon-Quality-12-Tier" .. quality, 14, 14) or nil
 end
 

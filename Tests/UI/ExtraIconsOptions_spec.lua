@@ -13,17 +13,26 @@ local TestHelpers = assert(
 
 describe("ExtraIconsOptions data helpers", function()
     local ExtraIconsOptions, ns
-    local originalCreateAtlasMarkup, originalCreateColor
+    local originalCreateAtlasMarkup, originalCreateColor, originalCTradeSkillUI
 
     setup(function()
         originalCreateAtlasMarkup = _G.CreateAtlasMarkup
         originalCreateColor = _G.CreateColor
+        originalCTradeSkillUI = _G.C_TradeSkillUI
         _G.CreateAtlasMarkup = function(atlas)
             return "|A" .. tostring(atlas) .. "|a"
         end
         _G.CreateColor = function(r, g, b, a)
             return { r = r, g = g, b = b, a = a or 1 }
         end
+        _G.C_TradeSkillUI = {
+            GetItemCraftedQualityInfo = function(itemId)
+                return itemId == 245898 and { quality = 2, iconChat = "Professions-ChatIcon-Quality-12-Tier2" } or nil
+            end,
+            GetItemReagentQualityInfo = function()
+                return nil
+            end,
+        }
 
         ns = {}
         _G.Enum = {
@@ -76,6 +85,7 @@ describe("ExtraIconsOptions data helpers", function()
     teardown(function()
         _G.CreateAtlasMarkup = originalCreateAtlasMarkup
         _G.CreateColor = originalCreateColor
+        _G.C_TradeSkillUI = originalCTradeSkillUI
     end)
 
     describe("_isStackKeyPresent", function()
@@ -533,7 +543,7 @@ describe("ExtraIconsOptions data helpers", function()
         it("formats quality rank markup for item entries", function()
             assert.are.equal(
                 "|AProfessions-ChatIcon-Quality-12-Tier2|a",
-                ExtraIconsOptions.GetItemQualityMarkup({ itemID = 245898, quality = 2 })
+                ExtraIconsOptions.GetItemQualityMarkup({ itemID = 245898 })
             )
             assert.is_nil(ExtraIconsOptions.GetItemQualityMarkup({ itemID = 5512 }))
         end)
