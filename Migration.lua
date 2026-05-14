@@ -1284,7 +1284,10 @@ _migrations[13] = function(profile)
         for stackId in pairs(itemStacks.byId) do
             itemStacks.order[#itemStacks.order + 1] = stackId
         end
-        table.sort(itemStacks.order, function(a, b) return tostring(a) < tostring(b) end)
+        table.sort(itemStacks.order, function(a, b)
+            if type(a) == "number" and type(b) == "number" then return a < b end
+            return tostring(a) < tostring(b)
+        end)
     end
     if type(itemStacks.nextId) ~= "number" then
         local nextId = 1

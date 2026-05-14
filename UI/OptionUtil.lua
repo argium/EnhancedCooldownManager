@@ -564,8 +564,8 @@ end
 function OptionUtil.MakeTextInputDialog(text, button1, button2)
     return {
         text = text,
-        button1 = button1,
-        button2 = button2,
+        button1 = button1 or OKAY,
+        button2 = button2 or CANCEL,
         hasEditBox = true,
         OnAccept = function(self, data)
             data = data or (self and self.data)
