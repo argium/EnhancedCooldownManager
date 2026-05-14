@@ -62,6 +62,7 @@ describe("Migration", function()
     local SCHEMA_V10 = 10
     local SCHEMA_V11 = 11
     local SCHEMA_V12 = 12
+    local SCHEMA_V13 = 13
 
     local function runMigrationToVersion(profile, targetVersion)
         local previousVersion = ns.Constants.CURRENT_SCHEMA_VERSION
@@ -992,9 +993,9 @@ describe("Migration", function()
         assert.same({
             { stackKey = "trinket1" },
             { stackKey = "trinket2" },
-            { stackKey = "combatPotions" },
-            { stackKey = "healthPotions" },
-            { stackKey = "healthstones" },
+            { kind = "itemStack", itemStackId = "combatPotions" },
+            { kind = "itemStack", itemStackId = "healthPotions" },
+            { kind = "itemStack", itemStackId = "healthstones" },
         }, profile.extraIcons.viewers.utility)
         assert.same({}, profile.extraIcons.viewers.main)
     end)
@@ -1017,8 +1018,8 @@ describe("Migration", function()
         assert.are.equal(12, profile.schemaVersion)
         assert.same({
             { stackKey = "trinket1" },
-            { stackKey = "healthPotions" },
-            { stackKey = "healthstones" },
+            { kind = "itemStack", itemStackId = "healthPotions" },
+            { kind = "itemStack", itemStackId = "healthstones" },
         }, profile.extraIcons.viewers.utility)
     end)
 
@@ -1052,9 +1053,9 @@ describe("Migration", function()
         assert.same({
             { stackKey = "trinket1" },
             { stackKey = "trinket2" },
-            { stackKey = "combatPotions" },
-            { stackKey = "healthPotions" },
-            { stackKey = "healthstones" },
+            { kind = "itemStack", itemStackId = "combatPotions" },
+            { kind = "itemStack", itemStackId = "healthPotions" },
+            { kind = "itemStack", itemStackId = "healthstones" },
         }, profile.extraIcons.viewers.utility)
     end)
 
@@ -1110,6 +1111,48 @@ describe("Migration", function()
         assert.is_not_nil(string.find(logMsg, "healthstones", 1, true))
         assert.is_nil(string.find(logMsg, "trinket2", 1, true))
         assert.is_nil(string.find(logMsg, "healthPotions", 1, true))
+    end)
+
+    it("V13 initializes extraIcons item stacks", function()
+        local profile = {
+            schemaVersion = 12,
+            extraIcons = {
+                enabled = true,
+                viewers = { utility = {}, main = {} },
+            },
+        }
+
+        runMigrationToVersion(profile, SCHEMA_V13)
+
+        assert.are.equal(13, profile.schemaVersion)
+        assert.are.equal(1, profile.extraIcons.itemStacks.nextId)
+        assert.same({ "combatPotions", "healthPotions", "healthstones" }, profile.extraIcons.itemStacks.order)
+        assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)
+        assert.is_true(profile.extraIcons.itemStacks.byId.combatPotions.hideInRatedPvp)
+        assert.is_false(profile.extraIcons.itemStacks.byId.healthstones.hideInRatedPvp)
+    end)
+
+    it("V13 preserves existing item stacks and repairs missing metadata", function()
+        local profile = {
+            schemaVersion = 12,
+            extraIcons = {
+                itemStacks = {
+                    byId = {
+                        [3] = { name = "Potions", ids = { { itemID = 123 } } },
+                    },
+                },
+                viewers = { utility = { { kind = "itemStack", itemStackId = 3 } }, main = {} },
+            },
+        }
+
+        runMigrationToVersion(profile, SCHEMA_V13)
+
+        assert.are.equal(13, profile.schemaVersion)
+        assert.are.equal(4, profile.extraIcons.itemStacks.nextId)
+        assert.same({ 3, "combatPotions", "healthPotions", "healthstones" }, profile.extraIcons.itemStacks.order)
+        assert.are.equal("Potions", profile.extraIcons.itemStacks.byId[3].name)
+        assert.are.equal("Healthstones", profile.extraIcons.itemStacks.byId.healthstones.name)
+        assert.same({ { kind = "itemStack", itemStackId = 3 } }, profile.extraIcons.viewers.utility)
     end)
 
     it("ValidateRollback rejects non-integer target versions", function()

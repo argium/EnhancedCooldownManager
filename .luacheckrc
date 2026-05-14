@@ -52,7 +52,7 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
 
     -- Externals
     "AddonCompartmentFrame",
-    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_PvP", "C_Spell", "C_SpellBook", "C_Timer", "C_UnitAuras",
+    "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_PvP", "C_Spell", "C_SpellBook", "C_Timer", "C_TradeSkillUI", "C_UnitAuras",
     "CANCEL",
     "CreateAtlasMarkup",
     "ColorPickerFrame",

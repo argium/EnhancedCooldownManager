@@ -402,6 +402,131 @@ describe("LibSettingsBuilder Controls", function()
         assert.are.equal("Free", displayedText)
     end)
 
+    it("does not let stale dropdown initializers refresh reused frames", function()
+        local dropdownHook
+
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function(target, method, fn)
+            if target == _G.SettingsDropdownControlMixin and method == "Init" then
+                dropdownHook = fn
+            end
+        end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local originalCreateDropdown = Settings.CreateDropdown
+        local initializers = {}
+        rawset(Settings, "CreateDropdown", function(...)
+            local initializer = originalCreateDropdown(...)
+            initializers[#initializers + 1] = initializer
+            return initializer
+        end)
+
+        local profile = { general = { old = "OUTLINE", selected = 1 } }
+        local defaults = { general = { old = "OUTLINE", selected = 1 } }
+        LibStub("LibSettingsBuilder-1.0").New({
+            name = "Dropdown Reuse",
+            store = function()
+                return profile
+            end,
+            defaults = function()
+                return defaults
+            end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    id = "oldDropdown",
+                                    type = "dropdown",
+                                    path = "old",
+                                    name = "Old",
+                                    values = function()
+                                        return { OUTLINE = "Outline" }
+                                    end,
+                                },
+                                {
+                                    id = "selectedDropdown",
+                                    type = "dropdown",
+                                    path = "selected",
+                                    name = "Selected",
+                                    values = function()
+                                        return { [1] = "Potions" }
+                                    end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local oldInitializer = initializers[1]
+        local selectedInitializer = initializers[2]
+        local displayedText
+        local menuCallback
+        local frame = {
+            Control = {
+                Dropdown = {
+                    OverrideText = function(_, text)
+                        displayedText = text
+                    end,
+                    SetupMenu = function(_, callback)
+                        menuCallback = callback
+                    end,
+                },
+            },
+            SetValue = function() end,
+        }
+        local function buildMenuEntries()
+            local rootDescription = {
+                entries = {},
+                CreateRadio = function(self, label, isSelected, setSelected, value)
+                    self.entries[#self.entries + 1] = {
+                        label = label,
+                        isSelected = isSelected,
+                        setSelected = setSelected,
+                        value = value,
+                    }
+                end,
+                SetScrollMode = function(self, height)
+                    self.scrollHeight = height
+                end,
+            }
+            menuCallback(frame.Control.Dropdown, rootDescription)
+            return rootDescription
+        end
+
+        dropdownHook(frame, oldInitializer)
+        assert.are.equal("Outline", displayedText)
+        assert.are.equal(frame, oldInitializer._lsbActiveFrame)
+        local oldMenu = buildMenuEntries()
+        assert.are.equal("Outline", oldMenu.entries[1].label)
+        assert.is_nil(oldMenu.scrollHeight)
+
+        dropdownHook(frame, selectedInitializer)
+        assert.are.equal("Potions", displayedText)
+        assert.is_nil(oldInitializer._lsbActiveFrame)
+        assert.are.equal(frame, selectedInitializer._lsbActiveFrame)
+        local selectedMenu = buildMenuEntries()
+        assert.are.equal("Potions", selectedMenu.entries[1].label)
+
+        oldInitializer._lsbRefreshFrame(frame, oldInitializer)
+        assert.are.equal("Potions", displayedText)
+    end)
+
     it("passes custom row settings through initializer data", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()

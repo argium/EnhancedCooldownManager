@@ -16,6 +16,14 @@ local getOrderedValueEntries = foundation.getOrderedValueEntries
 
 local DropdownMethods = {}
 
+local function getDropdownValues(data)
+    local values = data and data.values
+    if type(values) == "function" then
+        values = values()
+    end
+    return values
+end
+
 function DropdownMethods:GetSetting()
     if self.lsbData and self.lsbData.setting then
         return self.lsbData.setting
@@ -38,10 +46,7 @@ function DropdownMethods:RefreshDropdownText(value)
         currentValue = setting:GetValue()
     end
 
-    local values = self.lsbData and self.lsbData.values
-    if type(values) == "function" then
-        values = values()
-    end
+    local values = getDropdownValues(self.lsbData)
     local text = values and values[currentValue] or tostring(currentValue or "")
 
     if dropdown.OverrideText then
@@ -68,31 +73,39 @@ function DropdownMethods:InitDropdown()
         return
     end
 
-    dropdown:SetupMenu(function(_, rootDescription)
-        rootDescription:SetScrollMode(scrollHeight)
+    -- Important: recycled settings rows must always receive a fresh menu
+    -- callback here. This stale-dropdown regression has happened multiple times.
+    if dropdown.SetupMenu then
+        dropdown:SetupMenu(function(_, rootDescription)
+            if data.scrollHeight and rootDescription.SetScrollMode then
+                rootDescription:SetScrollMode(scrollHeight)
+            end
 
-        local values = data.values
-        if type(values) == "function" then
-            values = values()
-        end
-        if not values then
-            return
-        end
+            local values = getDropdownValues(data)
+            if not values then
+                return
+            end
 
-        for _, entry in ipairs(getOrderedValueEntries(values)) do
-            rootDescription:CreateRadio(entry.label, function()
-                return setting:GetValue() == entry.value
-            end, function()
-                setting:SetValue(entry.value)
-                self:RefreshDropdownText(entry.value)
-            end, entry.value)
-        end
-    end)
+            for _, entry in ipairs(getOrderedValueEntries(values)) do
+                rootDescription:CreateRadio(entry.label, function()
+                    return setting:GetValue() == entry.value
+                end, function()
+                    setting:SetValue(entry.value)
+                    self:RefreshDropdownText(entry.value)
+                end, entry.value)
+            end
+        end)
+    end
 
     self:RefreshDropdownText()
 end
 
 local function configureDropdownFrame(frame, initializer, data)
+    local previousInitializer = frame.initializer
+    if previousInitializer and previousInitializer ~= initializer and previousInitializer._lsbActiveFrame == frame then
+        previousInitializer._lsbActiveFrame = nil
+    end
+
     if not frame._lsbOriginalSetValue then
         frame._lsbOriginalSetValue = frame.SetValue
     end
@@ -101,17 +114,16 @@ local function configureDropdownFrame(frame, initializer, data)
     frame.initializer = initializer
     frame.lsbData = data or {}
     initializer._lsbActiveFrame = frame
-    if frame.lsbData._lsbKind == "scrollDropdown" then
-        frame:InitDropdown()
-    else
-        frame:RefreshDropdownText()
-    end
+    frame:InitDropdown()
 end
 
 if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownControlMixin then
     hooksecurefunc(SettingsDropdownControlMixin, "Init", function(frame, initializer)
         local data = getInitializerData(initializer)
         if not data or (data._lsbKind ~= "dropdown" and data._lsbKind ~= "scrollDropdown") then
+            if frame.initializer and frame.initializer._lsbActiveFrame == frame then
+                frame.initializer._lsbActiveFrame = nil
+            end
             if frame._lsbOriginalSetValue then
                 frame.SetValue = frame._lsbOriginalSetValue
             end

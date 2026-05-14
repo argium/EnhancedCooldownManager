@@ -13,6 +13,52 @@ local LSMW = LibStub("LibLSMSettingsWidgets-1.0", true)
 
 ns.OptionUtil = OptionUtil
 
+OptionUtil.ACTION_ICON_BUTTON_SIZE = 20
+OptionUtil.ACTION_BUTTON_TEXTURES = {
+    delete = {
+        normal = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+        pushed = "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
+        disabled = "Interface\\Buttons\\UI-GroupLoot-Pass-Disabled",
+    },
+    moveDown = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Disabled",
+    },
+    moveLeft = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Disabled",
+    },
+    moveRight = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Disabled",
+    },
+    moveUp = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Disabled",
+    },
+    show = {
+        normal = "Interface\\Buttons\\UI-PlusButton-Up",
+        pushed = "Interface\\Buttons\\UI-PlusButton-Down",
+        disabled = "Interface\\Buttons\\UI-PlusButton-Disabled",
+    },
+}
+
+function OptionUtil.CreateIconAction(text, buttonTextures, enabled, tooltip, onClick)
+    return {
+        text = buttonTextures and "" or text,
+        width = OptionUtil.ACTION_ICON_BUTTON_SIZE,
+        height = OptionUtil.ACTION_ICON_BUTTON_SIZE,
+        buttonTextures = buttonTextures,
+        enabled = enabled,
+        tooltip = tooltip,
+        onClick = onClick,
+    }
+end
+
 function OptionUtil.IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
 end
@@ -108,7 +154,7 @@ function OptionUtil.CreatePositioningExamplesCanvas()
         local previewBg = preview:CreateTexture(nil, "BACKGROUND")
         previewBg:SetAllPoints(preview)
         if type(previewBg.SetColorTexture) == "function" then
-            previewBg:SetColorTexture(0.08, 0.08, 0.08, 0.65)
+            previewBg:SetColorTexture(0.08, 0.08, 0.08, 1)
         end
 
         column.build(preview)
@@ -478,13 +524,85 @@ function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChan
     return settings
 end
 
-function OptionUtil.MakeConfirmDialog(text)
+function OptionUtil.MakeConfirmDialog(text, button1, button2)
     return {
         text = text,
-        button1 = YES,
-        button2 = NO,
+        button1 = button1 or YES,
+        button2 = button2 or NO,
         OnAccept = function(self, data)
             if data and data.onAccept then data.onAccept() end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+end
+
+local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
+
+local function trimDialogText(text)
+    if strtrim then
+        return strtrim(text or "")
+    end
+    return tostring(text or ""):match("^%s*(.-)%s*$")
+end
+
+local function setDialogAcceptEnabled(frame, enabled)
+    local button = frame and (frame.button1 or (frame.Buttons and frame.Buttons[1]))
+    if not button then
+        return
+    end
+    if enabled and button.Enable then
+        button:Enable()
+    elseif not enabled and button.Disable then
+        button:Disable()
+    elseif button.SetEnabled then
+        button:SetEnabled(enabled)
+    end
+end
+
+function OptionUtil.MakeTextInputDialog(text, button1, button2)
+    return {
+        text = text,
+        button1 = button1 or OKAY,
+        button2 = button2 or CANCEL,
+        hasEditBox = true,
+        OnAccept = function(self, data)
+            data = data or (self and self.data)
+            local name = trimDialogText(getPopupEditBox(self) and getPopupEditBox(self):GetText())
+            if name ~= "" and data and data.onAccept then
+                data.onAccept(name)
+            end
+        end,
+        OnShow = function(self, data)
+            data = data or (self and self.data)
+            local editBox = getPopupEditBox(self)
+            if not editBox then
+                return
+            end
+            editBox:SetText(data and data.defaultText or "")
+            editBox:HighlightText()
+            setDialogAcceptEnabled(self, trimDialogText(editBox:GetText()) ~= "")
+        end,
+        EditBoxOnTextChanged = function(self)
+            local parent = self:GetParent()
+            setDialogAcceptEnabled(parent, trimDialogText(self:GetText()) ~= "")
+        end,
+        EditBoxOnEnterPressed = function(self)
+            local parent = self:GetParent()
+            if not parent then
+                return
+            end
+            local button1Frame = parent and (parent.button1 or (parent.Buttons and parent.Buttons[1]))
+            if button1Frame and button1Frame.IsEnabled and not button1Frame:IsEnabled() then
+                return
+            end
+            parent:Hide()
+            local dialog = parent and parent.which and StaticPopupDialogs[parent.which]
+            dialog = dialog or (parent and parent.data and parent.data.popupKey and StaticPopupDialogs[parent.data.popupKey])
+            if dialog and dialog.OnAccept then
+                dialog.OnAccept(parent, parent.data)
+            end
         end,
         timeout = 0,
         whileDead = true,

@@ -13,13 +13,26 @@ local TestHelpers = assert(
 
 describe("ExtraIconsOptions data helpers", function()
     local ExtraIconsOptions, ns
-    local originalCreateColor
+    local originalCreateAtlasMarkup, originalCreateColor, originalCTradeSkillUI
 
     setup(function()
+        originalCreateAtlasMarkup = _G.CreateAtlasMarkup
         originalCreateColor = _G.CreateColor
+        originalCTradeSkillUI = _G.C_TradeSkillUI
+        _G.CreateAtlasMarkup = function(atlas)
+            return "|A" .. tostring(atlas) .. "|a"
+        end
         _G.CreateColor = function(r, g, b, a)
             return { r = r, g = g, b = b, a = a or 1 }
         end
+        _G.C_TradeSkillUI = {
+            GetItemCraftedQualityInfo = function(itemId)
+                return itemId == 245898 and { quality = 2, iconChat = "Professions-ChatIcon-Quality-12-Tier2" } or nil
+            end,
+            GetItemReagentQualityInfo = function()
+                return nil
+            end,
+        }
 
         ns = {}
         _G.Enum = {
@@ -43,12 +56,36 @@ describe("ExtraIconsOptions data helpers", function()
             CreateModuleEnabledHandler = function() return function() end end,
             MakeConfirmDialog = function() return {} end,
         }
+        ns.Addon = {
+            db = {
+                profile = {
+                    extraIcons = {
+                        itemStacks = {
+                            nextId = 1,
+                            order = { "combatPotions" },
+                            byId = {
+                                combatPotions = {
+                                    name = "Combat Potions",
+                                    ids = { { itemID = 245898 } },
+                                },
+                                healthstones = {
+                                    name = "Healthstones",
+                                    ids = { { itemID = 5512 } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
     end)
 
     teardown(function()
+        _G.CreateAtlasMarkup = originalCreateAtlasMarkup
         _G.CreateColor = originalCreateColor
+        _G.C_TradeSkillUI = originalCTradeSkillUI
     end)
 
     describe("_isStackKeyPresent", function()
@@ -58,8 +95,8 @@ describe("ExtraIconsOptions data helpers", function()
         end)
 
         it("finds stackKey in main viewer", function()
-            local viewers = { utility = {}, main = { { stackKey = "healthstones" } } }
-            assert.is_true(ExtraIconsOptions._isStackKeyPresent(viewers, "healthstones"))
+            local viewers = { utility = {}, main = { { stackKey = "trinket2" } } }
+            assert.is_true(ExtraIconsOptions._isStackKeyPresent(viewers, "trinket2"))
         end)
 
         it("returns false when absent", function()
@@ -132,7 +169,10 @@ describe("ExtraIconsOptions data helpers", function()
 
         it("returns builtin stack label", function()
             assert.are.equal("Trinket 1 [Gladiator's Badge]", ExtraIconsOptions._getEntryName({ stackKey = "trinket1" }))
-            assert.are.equal("Combat Potions", ExtraIconsOptions._getEntryName({ stackKey = "combatPotions" }))
+            assert.are.equal("Combat Potions", ExtraIconsOptions._getEntryName({
+                kind = "itemStack",
+                itemStackId = "combatPotions",
+            }))
         end)
 
         it("returns spell name from API for racial spells", function()
@@ -165,7 +205,7 @@ describe("ExtraIconsOptions data helpers", function()
 
         it("creates viewer array if missing", function()
             local profile = { extraIcons = { viewers = {} } }
-            ExtraIconsOptions._addStackKey(profile, "main", "healthstones")
+            ExtraIconsOptions._addStackKey(profile, "main", "trinket2")
             assert.are.equal(1, #profile.extraIcons.viewers.main)
         end)
 
@@ -474,7 +514,7 @@ describe("ExtraIconsOptions data helpers", function()
 
         it("returns item icon for item stacks", function()
             assert.are.equal("potion-tex",
-                ExtraIconsOptions._getEntryIcon({ stackKey = "combatPotions" }))
+                ExtraIconsOptions._getEntryIcon({ kind = "itemStack", itemStackId = "combatPotions" }))
         end)
 
         it("returns spell texture for spell entries", function()
@@ -498,6 +538,14 @@ describe("ExtraIconsOptions data helpers", function()
 
         it("returns nil for unknown stackKey", function()
             assert.is_nil(ExtraIconsOptions._getEntryIcon({ stackKey = "nonexistent" }))
+        end)
+
+        it("formats quality rank markup for item entries", function()
+            assert.are.equal(
+                "|AProfessions-ChatIcon-Quality-12-Tier2|a",
+                ExtraIconsOptions.GetItemQualityMarkup({ itemID = 245898 })
+            )
+            assert.is_nil(ExtraIconsOptions.GetItemQualityMarkup({ itemID = 5512 }))
         end)
     end)
 
@@ -662,7 +710,7 @@ describe("ExtraIconsOptions data helpers", function()
             local viewers = {
                 utility = {
                     { stackKey = "trinket1" },
-                    { stackKey = "healthstones" },
+                    { kind = "itemStack", itemStackId = "healthstones" },
                 },
                 main = {},
             }
@@ -687,7 +735,7 @@ describe("ExtraIconsOptions data helpers", function()
             local hasHealthstones = false
             for _, row in ipairs(rows) do
                 hasHealthstones = hasHealthstones
-                    or (row.displayEntry and row.displayEntry.stackKey == "healthstones")
+                    or (row.displayEntry and row.displayEntry.itemStackId == "healthstones")
             end
             assert.is_true(hasHealthstones)
         end)
@@ -832,6 +880,7 @@ describe("ExtraIconsOptions settings page", function()
             enabled = true,
             showStackCount = true,
             showCharges = true,
+            itemStacks = { nextId = 2, order = { 1 }, byId = { [1] = { name = "Potions", ids = { { itemID = 777 } } } } },
             viewers = {
                 utility = {},
                 main = {},
@@ -886,6 +935,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("checkbox", getRow("enabled").type)
         assert.are.equal("checkbox", getRow("showStackCount").type)
         assert.are.equal("checkbox", getRow("showCharges").type)
+        assert.is_nil(getRow("selectedItemStack"))
         assert.is_nil(getRow("fontOverride"))
         assert.are.equal("sectionList", getRow("viewers").type)
         assert.are.equal(4, getRow("viewers").footerSpacing)
@@ -977,7 +1027,7 @@ describe("ExtraIconsOptions settings page", function()
             end,
         }
         profile.extraIcons.viewers.utility = {
-            { stackKey = "healthstones" },
+            { stackKey = "trinket1" },
             { kind = "spell", ids = { 12345 } },
         }
 
@@ -1011,7 +1061,7 @@ describe("ExtraIconsOptions settings page", function()
         assert.are.equal("", custom.actions.delete.text)
 
         local activeBuiltin = assert(findItem("utility", function(item)
-            return item.label == "Healthstones"
+            return type(item.label) == "string" and item.label:match("^Trinket 1") ~= nil
         end))
         assert.are.equal(
             "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
@@ -1031,7 +1081,7 @@ describe("ExtraIconsOptions settings page", function()
     it("hides trinket rows in the table when the equipped trinket has no on-use spell", function()
         profile.extraIcons.viewers.utility = {
             { stackKey = "trinket1" },
-            { stackKey = "healthstones" },
+            { kind = "itemStack", itemStackId = 1 },
         }
 
         _G.GetInventoryItemID = function(_, slotId)
@@ -1049,7 +1099,7 @@ describe("ExtraIconsOptions settings page", function()
             return type(item.label) == "string" and item.label:match("^Trinket 1") ~= nil
         end))
         assert.is_not_nil(findItem("utility", function(item)
-            return item.label == "Healthstones"
+            return item.label == "Potions"
         end))
     end)
 
@@ -1179,6 +1229,38 @@ describe("ExtraIconsOptions settings page", function()
 
         assert.are.equal(
             ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["UTILITY_VIEWER_SHORT"]),
+            getTrailerValue(footer, "previewText")
+        )
+        assert.is_false(getTrailerValue(footer, "submitEnabled"))
+    end)
+
+    it("adds selected item stacks through the Stack footer picker and blocks duplicates", function()
+        _G.C_Item.GetItemIconByID = function(itemId)
+            return itemId == 777 and "potion-icon" or nil
+        end
+
+        local footer = assert(getSection("main")).footer
+        footer.onToggleMode()
+        footer.onToggleMode()
+        footer = assert(getSection("main")).footer
+
+        assert.are.equal(ns.L["ITEM_STACK"], getTrailerValue(footer, "modeText"))
+        assert.are.equal("dropdown", getTrailerValue(footer, "inputType"))
+        assert.are.equal("1", getTrailerValue(footer, "inputValue"))
+        assert.are.equal("Potions", getTrailerValue(footer, "inputText"))
+        assert.are.equal("Potions", getTrailerValue(footer, "previewText"))
+        assert.are.equal("potion-icon", getTrailerValue(footer, "previewIcon"))
+        assert.is_true(getTrailerValue(footer, "submitEnabled"))
+        assert.is_true(footer.onSubmit())
+        assert.same({ { kind = "itemStack", itemStackId = 1 } }, profile.extraIcons.viewers.main)
+
+        footer = assert(getSection("utility")).footer
+        footer.onToggleMode()
+        footer.onToggleMode()
+        footer = assert(getSection("utility")).footer
+
+        assert.are.equal(
+            ns.L["EXTRA_ICONS_DUPLICATE_ENTRY"]:format(ns.L["MAIN_VIEWER_SHORT"]),
             getTrailerValue(footer, "previewText")
         )
         assert.is_false(getTrailerValue(footer, "submitEnabled"))

@@ -936,7 +936,10 @@ function interop.configureDropdownInitializer(initializer, setting, spec)
         initializer._lsbData._lsbKind = "scrollDropdown"
         initializer._lsbData.scrollHeight = spec.scrollHeight
         interop.setInitializerSetting(initializer, setting)
-        initializer._lsbRefreshFrame = function(frame)
+        initializer._lsbRefreshFrame = function(frame, activeInitializer)
+            if frame and frame.initializer ~= activeInitializer then
+                return
+            end
             if frame and frame.RefreshDropdownText then
                 frame:RefreshDropdownText()
             end
@@ -948,7 +951,10 @@ function interop.configureDropdownInitializer(initializer, setting, spec)
     end
 
     if type(spec.values) == "function" and not initializer._lsbRefreshFrame then
-        initializer._lsbRefreshFrame = function(frame)
+        initializer._lsbRefreshFrame = function(frame, activeInitializer)
+            if frame and frame.initializer ~= activeInitializer then
+                return
+            end
             if frame and frame.InitDropdown and frame.lsbData and frame.lsbData._lsbKind == "scrollDropdown" then
                 frame:InitDropdown(initializer)
             elseif frame and frame.RefreshDropdownText then

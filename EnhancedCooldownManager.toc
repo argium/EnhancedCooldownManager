@@ -62,6 +62,7 @@ UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
 UI\ExtraIconsOptions.lua
+UI\ItemStacksOptions.lua
 UI\SpellColorsPage.lua
 UI\BuffBarsOptions.lua
 UI\ExternalBarsOptions.lua

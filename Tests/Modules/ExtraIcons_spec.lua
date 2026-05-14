@@ -199,8 +199,14 @@ describe("ExtraIcons real source", function()
     local applyFontCalls
     local globalConfig
     local ratedMap
+    local inInstance
+    local instanceType
     local errorLogs
     local inaccessibleTables
+    local COMBAT_POTION_ID = 245898
+    local HEALTH_POTION_ID = 241305
+    local DEMONIC_HEALTHSTONE_ID = 224464
+    local HEALTHSTONE_ID = 5512
 
     local function installCooldownViewerItemFrameStub(viewer)
         function viewer:GetItemFrames()
@@ -257,6 +263,8 @@ describe("ExtraIcons real source", function()
         applyFontCalls = {}
         globalConfig = { font = "Global Font", fontSize = 11, fontOutline = "OUTLINE", fontShadow = false }
         ratedMap = false
+        inInstance = false
+        instanceType = "none"
         errorLogs = {}
         inaccessibleTables = {}
         _G.C_SpellBook = {
@@ -367,6 +375,9 @@ describe("ExtraIcons real source", function()
                 return ratedMap
             end,
         }
+        _G.IsInInstance = function()
+            return inInstance, instanceType
+        end
         _G.canaccesstable = function(value)
             return inaccessibleTables[value] ~= true
         end
@@ -488,8 +499,29 @@ describe("ExtraIcons real source", function()
         function ExtraIcons:ThrottledRefresh() end
     end)
 
-    local function makeViewersConfig(utilityStacks, mainStacks)
+    local function makeViewersConfig(utilityStacks, mainStacks, itemStacks)
         return {
+            itemStacks = itemStacks or {
+                nextId = 1,
+                order = { "combatPotions", "healthPotions", "healthstones" },
+                byId = {
+                    combatPotions = {
+                        name = "Combat Potions",
+                        hideInRatedPvp = true,
+                        ids = { { itemID = COMBAT_POTION_ID } },
+                    },
+                    healthPotions = {
+                        name = "Health Potions",
+                        hideInRatedPvp = true,
+                        ids = { { itemID = HEALTH_POTION_ID } },
+                    },
+                    healthstones = {
+                        name = "Healthstones",
+                        hideInRatedPvp = false,
+                        ids = { { itemID = DEMONIC_HEALTHSTONE_ID }, { itemID = HEALTHSTONE_ID } },
+                    },
+                },
+            },
             viewers = {
                 utility = utilityStacks or {},
                 main = mainStacks or {},
@@ -587,8 +619,8 @@ describe("ExtraIcons real source", function()
         inventoryItemBySlot[14] = 102
         inventoryTextureBySlot[14] = "trinket-2"
         inventorySpellByItem[102] = 9002
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
 
@@ -643,7 +675,7 @@ describe("ExtraIcons real source", function()
     it("rebuilds tracked equipment slots from config", function()
         ExtraIcons.GetModuleConfig = function()
             return makeViewersConfig(
-                { { stackKey = "trinket1" }, { stackKey = "healthstones" } },
+                { { stackKey = "trinket1" }, { kind = "itemStack", itemStackId = "healthstones" } },
                 { { stackKey = "trinket2" } }
             )
         end
@@ -702,11 +734,11 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
@@ -821,12 +853,12 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         -- First layout: icons placed, InnerFrame shown
@@ -958,18 +990,18 @@ describe("ExtraIcons real source", function()
         inventoryItemBySlot[14] = 102
         inventoryTextureBySlot[14] = "trinket-2"
         inventorySpellByItem[102] = 9002
-        itemCounts[ns.Constants.COMBAT_POTIONS[1].itemID] = 3
-        itemIconsByID[ns.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[COMBAT_POTION_ID] = 3
+        itemIconsByID[COMBAT_POTION_ID] = "combat-potion"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
             return makeViewersConfig({
                 { stackKey = "trinket1" },
                 { stackKey = "trinket2" },
-                { stackKey = "combatPotions" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "combatPotions" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             })
         end
 
@@ -983,8 +1015,8 @@ describe("ExtraIcons real source", function()
         assert.are.equal(13, vs.iconPool[1].slotId)
         assert.are.equal(102, vs.iconPool[2].itemId)
         assert.are.equal(14, vs.iconPool[2].slotId)
-        assert.are.equal(ns.Constants.COMBAT_POTIONS[1].itemID, vs.iconPool[3].itemId)
-        assert.are.equal(ns.Constants.HEALTHSTONE_ITEM_ID, vs.iconPool[4].itemId)
+        assert.are.equal(COMBAT_POTION_ID, vs.iconPool[3].itemId)
+        assert.are.equal(HEALTHSTONE_ID, vs.iconPool[4].itemId)
         assert.same(
             { "Fonts\\FRIZQT__.TTF", 17, "OUTLINE" },
             vs.iconPool[1].Cooldown.__fontRegion.__font
@@ -1011,12 +1043,12 @@ describe("ExtraIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
@@ -1039,12 +1071,12 @@ describe("ExtraIcons real source", function()
         inaccessibleTables[inaccessibleFrames] = true
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("rated-bg"))
@@ -1077,12 +1109,12 @@ describe("ExtraIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.has_no.errors(function()
@@ -1114,12 +1146,12 @@ describe("ExtraIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         local originalIpairs = _G.ipairs
@@ -1168,12 +1200,12 @@ describe("ExtraIcons real source", function()
         end
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
@@ -1313,7 +1345,7 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
             mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {
                 { stackKey = "trinket1" },
@@ -1321,7 +1353,7 @@ describe("ExtraIcons real source", function()
             afterUtility = {},
             afterMain = {
                 { stackKey = "trinket1" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
         },
         {
@@ -1333,13 +1365,13 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
             mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {
                 { stackKey = "trinket1" },
             },
             afterUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
                 { stackKey = "trinket1" },
             },
             afterMain = {},
@@ -1353,14 +1385,14 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
             mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
                 { stackKey = "trinket1" },
             },
             beforeMain = {
                 { stackKey = "trinket2" },
             },
             afterUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             afterMain = {
                 { stackKey = "trinket2" },
@@ -1376,7 +1408,7 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 0 },
             mainAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {
                 { stackKey = "trinket1" },
@@ -1384,7 +1416,7 @@ describe("ExtraIcons real source", function()
             afterUtility = {},
             afterMain = {
                 { stackKey = "trinket1" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
         },
         {
@@ -1396,7 +1428,7 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -100 },
             mainAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -60 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {
                 { stackKey = "trinket1" },
@@ -1404,7 +1436,7 @@ describe("ExtraIcons real source", function()
             afterUtility = {},
             afterMain = {
                 { stackKey = "trinket1" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
         },
         {
@@ -1416,7 +1448,7 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 0 },
             mainAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {
                 { stackKey = "trinket1" },
@@ -1424,7 +1456,7 @@ describe("ExtraIcons real source", function()
             afterUtility = {},
             afterMain = {
                 { stackKey = "trinket1" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
         },
         {
@@ -1436,12 +1468,12 @@ describe("ExtraIcons real source", function()
             utilityAnchor = { point = "LEFT", relativeTo = "main", relativePoint = "LEFT", x = 26, y = -40 },
             mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
             beforeUtility = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             beforeMain = {},
             afterUtility = {},
             afterMain = {
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             },
             expectUtilityRelativeTo = "main",
         },
@@ -1460,18 +1492,76 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID] = "demonic-healthstone"
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[DEMONIC_HEALTHSTONE_ID] = 1
+        itemIconsByID[DEMONIC_HEALTHSTONE_ID] = "demonic-healthstone"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
-        assert.are.equal(ns.Constants.DEMONIC_HEALTHSTONE_ITEM_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+        assert.are.equal(DEMONIC_HEALTHSTONE_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+    end)
+
+    it("resolves item stack entries through their priority list", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[202] = 3
+        itemIconsByID[101] = "missing-potion"
+        itemIconsByID[202] = "owned-potion"
+        itemCooldownByID[202] = { 20, 40, true }
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = 1 } }, nil, {
+                nextId = 2,
+                order = { 1 },
+                byId = {
+                    [1] = { name = "Potions", ids = { { itemID = 101 }, { itemID = 202 } } },
+                },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local icon = ExtraIcons._viewers.utility.iconPool[1]
+        assert.are.equal(202, icon.itemId)
+        assert.are.equal("owned-potion", icon.Icon.__texture)
+        assert.same({ 20, 40 }, icon.Cooldown.__cooldown)
+        assert.are.equal("3", icon.Count.__text)
+    end)
+
+    it("skips missing and empty item stack entries", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { kind = "itemStack", itemStackId = 1 },
+                { kind = "itemStack", itemStackId = 2 },
+            }, nil, {
+                nextId = 3,
+                order = { 1 },
+                byId = {
+                    [1] = { name = "Empty", ids = {} },
+                },
+            })
+        end
+
+        assert.is_false(ExtraIcons:UpdateLayout("test"))
+        assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
     end)
 
     it("suppresses combat and health potions on rated maps while still showing healthstones", function()
@@ -1483,25 +1573,67 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
         ratedMap = true
-        itemCounts[ns.Constants.COMBAT_POTIONS[1].itemID] = 1
-        itemIconsByID[ns.Constants.COMBAT_POTIONS[1].itemID] = "combat-potion"
-        itemCounts[ns.Constants.HEALTH_POTIONS[1].itemID] = 1
-        itemIconsByID[ns.Constants.HEALTH_POTIONS[1].itemID] = "health-potion"
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[COMBAT_POTION_ID] = 1
+        itemIconsByID[COMBAT_POTION_ID] = "combat-potion"
+        itemCounts[HEALTH_POTION_ID] = 1
+        itemIconsByID[HEALTH_POTION_ID] = "health-potion"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
             return makeViewersConfig({
-                { stackKey = "combatPotions" },
-                { stackKey = "healthPotions" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "combatPotions" },
+                { kind = "itemStack", itemStackId = "healthPotions" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
-        assert.are.equal(ns.Constants.HEALTHSTONE_ITEM_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
+        assert.are.equal(HEALTHSTONE_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
         assert.are.equal(18, ExtraIcons._viewers.utility.container:GetWidth())
+    end)
+
+    it("suppresses item stacks in non-PvP instances when configured", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        inInstance = true
+        instanceType = "party"
+        itemCounts[COMBAT_POTION_ID] = 1
+        itemIconsByID[COMBAT_POTION_ID] = "combat-potion"
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { kind = "itemStack", itemStackId = "combatPotions" },
+                { kind = "itemStack", itemStackId = "healthstones" },
+            }, nil, {
+                nextId = 1,
+                order = { "combatPotions", "healthstones" },
+                byId = {
+                    combatPotions = {
+                        name = "Combat Potions",
+                        hideInInstances = true,
+                        ids = { { itemID = COMBAT_POTION_ID } },
+                    },
+                    healthstones = {
+                        name = "Healthstones",
+                        hideInInstances = false,
+                        ids = { { itemID = HEALTHSTONE_ID } },
+                    },
+                },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        assert.are.equal(HEALTHSTONE_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
     end)
 
     it("anchors container to last active item frame when viewer layout is stale", function()
@@ -1540,9 +1672,9 @@ describe("ExtraIcons real source", function()
             return makeViewersConfig({
                 { stackKey = "trinket1" },
                 { stackKey = "trinket2" },
-                { stackKey = "combatPotions" },
-                { stackKey = "healthPotions" },
-                { stackKey = "healthstones" },
+                { kind = "itemStack", itemStackId = "combatPotions" },
+                { kind = "itemStack", itemStackId = "healthPotions" },
+                { kind = "itemStack", itemStackId = "healthstones" },
             })
         end
         ExtraIcons._viewers.utility.originalPoint = { "CENTER", UIParent, "CENTER", 10, 20 }
@@ -1566,13 +1698,13 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 1
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
-        itemCooldownByID[ns.Constants.HEALTHSTONE_ITEM_ID] = { 100, 60, true }
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+        itemCooldownByID[HEALTHSTONE_ID] = { 100, 60, true }
 
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { stackKey = "healthstones" } })
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         end
 
         assert.is_true(ExtraIcons:UpdateLayout("test"))
@@ -1587,10 +1719,10 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 5
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 5
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
-        local config = makeViewersConfig({ { stackKey = "healthstones" } })
+        local config = makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
             return config
@@ -1619,10 +1751,10 @@ describe("ExtraIcons real source", function()
         UtilityCooldownViewer._children = { utilityIconChild }
         UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[ns.Constants.HEALTHSTONE_ITEM_ID] = 5
-        itemIconsByID[ns.Constants.HEALTHSTONE_ITEM_ID] = "healthstone"
+        itemCounts[HEALTHSTONE_ID] = 5
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
 
-        local config = makeViewersConfig({ { stackKey = "healthstones" } })
+        local config = makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons.GetModuleConfig = function()
             return config

@@ -10,10 +10,10 @@
 | **Mixin** | `BarMixin.AddFrameMixin`; inherits [`BarMixin.FrameProto`](../BarMixin.lua) |
 | **Events listened to** | <ul><li>`BAG_UPDATE_COOLDOWN` — throttled icon cooldown refresh for item/spell state changes.</li><li>`BAG_UPDATE_DELAYED` — request a fresh layout after bag contents settle.</li><li>`PLAYER_EQUIPMENT_CHANGED` — re-evaluate tracked equip-slot entries (notably trinkets) and request layout when a referenced slot changed.</li><li>`PLAYER_ENTERING_WORLD` — request a full layout refresh after world entry.</li><li>`SPELLS_CHANGED` — request layout when known spells change.</li><li>`SPELL_UPDATE_COOLDOWN` — throttled spell cooldown refresh.</li><li>`UtilityCooldownViewer` / `EssentialCooldownViewer` `OnShow` — request layout when a Blizzard viewer becomes visible.</li><li>`UtilityCooldownViewer` / `EssentialCooldownViewer` `OnHide` — hide extra-icon containers/anchors and request layout.</li><li>`UtilityCooldownViewer` / `EssentialCooldownViewer` `OnSizeChanged` — request layout when Blizzard viewer width changes.</li><li>`EditModeManagerFrame` `OnShow` / `OnHide` — enter/exit edit-mode layout behavior.</li><li>`GET_ITEM_INFO_RECEIVED` — options-page async draft-item resolution refresh.</li><li>`PLAYER_EQUIPMENT_CHANGED` (options item-load frame) — refresh built-in equip-slot rows when tracked gear changes.</li></ul> |
 | **Layout ordering** | `ExtraIcons:UpdateLayout()` runs first inside `Runtime.updateAllLayouts()`, so the main viewer anchor reflects Blizzard icons plus appended extra icons before chained bars compute their own positions. |
-| **Dependencies** | <ul><li>`ns.BarMixin` / `BarMixin.FrameProto` — frame lifecycle, visibility, config access.</li><li>`ns.Runtime` — registration, layout requests, preview state.</li><li>`ns.Constants.BUILTIN_STACKS` — built-in stack definitions resolved by `stackKey`.</li><li>`ns.Constants.BUILTIN_STACK_ORDER` — canonical built-in row ordering: `trinket1`, `trinket2`, `combatPotions`, `healthPotions`, `healthstones`.</li><li>`ns.Constants.RACIAL_ABILITIES` — current-race racial placeholder synthesis in the options UI.</li><li>`ns.FrameUtil` — inherited lazy layout helpers through `FrameProto` / runtime-owned layout code.</li><li>`ns.OptionUtil` and `ns.ExtraIconsOptions` — settings UI actions, confirmation flow, section-list wiring.</li><li>`ns.Addon.db.profile.extraIcons` — persisted config source of truth.</li></ul> |
+| **Dependencies** | <ul><li>`ns.BarMixin` / `BarMixin.FrameProto` — frame lifecycle, visibility, config access.</li><li>`ns.Runtime` — registration, layout requests, preview state.</li><li>`ns.Constants.BUILTIN_STACKS` — built-in stack definitions resolved by `stackKey`.</li><li>`ns.Constants.BUILTIN_STACK_ORDER` — canonical built-in row ordering: `trinket1`, `trinket2`.</li><li>`ns.Constants.RACIAL_ABILITIES` — current-race racial placeholder synthesis in the options UI.</li><li>`ns.FrameUtil` — inherited lazy layout helpers through `FrameProto` / runtime-owned layout code.</li><li>`ns.OptionUtil` and `ns.ExtraIconsOptions` — settings UI actions, confirmation flow, section-list wiring.</li><li>`ns.Addon.db.profile.extraIcons` — persisted config source of truth.</li></ul> |
 | **Blizzard APIs used** | <ul><li>`UtilityCooldownViewer`, `EssentialCooldownViewer` — Blizzard viewer frames being extended and re-anchored.</li><li>`GetInventoryItemID`, `GetInventoryItemCooldown`, `GetInventoryItemTexture` — equip-slot resolution and cooldown display.</li><li>`C_Item.GetItemSpell`, `C_Item.GetItemCount`, `C_Item.GetItemCooldown` — item usability / cooldown resolution.</li><li>`C_Item.GetItemIconByID`, `C_Item.GetItemNameByID`, `C_Item.DoesItemExistByID`, `C_Item.RequestLoadItemDataByID` — options-page item preview and async item-load flow.</li><li>`C_SpellBook.IsSpellKnown` — spell resolver gate.</li><li>`C_Spell.GetSpellTexture`, `C_Spell.GetSpellCooldown` — spell icon and cooldown lookup (`GetSpellCooldown` stays pass-through / secret-value safe).</li><li>`C_Spell.GetSpellCharges`, `C_Spell.GetSpellChargeDuration`, `C_Spell.GetSpellCooldownDuration` — charge-aware cooldown rendering.</li><li>`UnitRace` — current-player racial placeholder resolution.</li></ul> |
-| **Options file(s)** | [`UI/ExtraIconsOptions.lua`](../UI/ExtraIconsOptions.lua) |
-| **Options dependencies** | <ul><li>`ns.OptionUtil` — enable/disable helpers and confirmation dialog plumbing.</li><li>`LibSettingsBuilder` section-list row (`type = "sectionList"`) — viewer collections and inline add rows.</li><li>Async item-info flow backed by `GET_ITEM_INFO_RECEIVED` and `C_Item.RequestLoadItemDataByID`.</li></ul> |
+| **Options file(s)** | [`UI/ExtraIconsOptions.lua`](../UI/ExtraIconsOptions.lua), [`UI/ItemStacksOptions.lua`](../UI/ItemStacksOptions.lua) |
+| **Options dependencies** | <ul><li>`ns.OptionUtil` — enable/disable helpers, shared action buttons, and popup dialog plumbing.</li><li>`LibSettingsBuilder` section-list row (`type = "sectionList"`) — viewer collections, item stack lists, and inline add rows.</li><li>Async item-info flow backed by `GET_ITEM_INFO_RECEIVED` and `C_Item.RequestLoadItemDataByID`.</li></ul> |
 
 ## Architecture Notes
 
@@ -29,9 +29,10 @@ Displays cooldown-tracked icons alongside Blizzard's cooldown viewer frames. Use
 |------|--------------|------------|-----------------|
 | `equipSlot` | `slotId` | `GetInventoryItemID` + `C_Item.GetItemSpell` on-use check | `GetInventoryItemCooldown` |
 | `item` | `ids[]` (priority stack) | First with `C_Item.GetItemCount > 0` | `C_Item.GetItemCooldown` |
+| `itemStack` | `itemStackId` | Profile item stack, honoring `hideInInstances` / `hideInRatedPvp` | `C_Item.GetItemCooldown` |
 | `spell` | `ids[]` (priority stack) | First known via `C_SpellBook.IsSpellKnown`, then `C_Spell.GetSpellTexture` | `C_Spell.GetSpellCooldown` (pass-through, no inspection) |
 
-Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`ids`/`slotId` from the constant at runtime. Built-in entries may also persist `disabled = true`, which keeps them in the settings list but skips them during runtime resolution. Custom and racial entries store fields directly in saved config.
+Predefined equipment stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the resolver reads `kind`/`slotId` from the constant at runtime. Consumable priority lists live in editable profile item stacks. Built-in equip-slot entries may also persist `disabled = true`, which keeps them in the settings list but skips them during runtime resolution. Custom and racial entries store fields directly in saved config.
 
 **Config Structure (`profile.extraIcons`):**
 
@@ -42,19 +43,25 @@ Predefined stacks (`BUILTIN_STACKS`) are referenced by `stackKey` in config; the
         utility = {                      -- ordered array
             { stackKey = "trinket1" },   -- resolved from BUILTIN_STACKS
             { stackKey = "trinket2", disabled = true },
-            { stackKey = "combatPotions" },
+            { kind = "itemStack", itemStackId = "combatPotions" },
             { kind = "spell", ids = { 59752 } },  -- racial (self-contained)
         },
         main = {},
+    },
+    itemStacks = {
+        order = { "combatPotions", "healthPotions", "healthstones" },
+        byId = {
+            combatPotions = { name = "Combat Potions", hideInRatedPvp = true, ids = { ... } },
+        },
     },
 }
 ```
 
 **Settings UI (`UI/ExtraIconsOptions.lua`):**
 
-Registers through the root/section/page API and exposes only native controls plus the single viewer-management section list. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) and page setup hooks (`SetRegisteredPage`, `EnsureItemLoadFrame`, `BuildSections`, `ResetToDefaults`) are exposed on `ns.ExtraIconsOptions` for testability and options bootstrap.
+Registers through the root/section/page API and exposes only native controls plus the viewer-management section list. `UI/ItemStacksOptions.lua` appends the Item Stacks subpage under the same section and stores named item priority lists in `extraIcons.itemStacks`; viewer rows reference them by stable `itemStackId`. Data helpers (`_addStackKey`, `_removeEntry`, `_reorderEntry`, `_moveEntry`, `_toggleBuiltinRow`, etc.) and page setup hooks (`SetRegisteredPage`, `EnsureItemLoadFrame`, `BuildSections`, `ResetToDefaults`) are exposed on `ns.ExtraIconsOptions` for testability and options bootstrap.
 
-*Row rendering and add flow.* Each viewer renders its ordered rows followed by an inline add row (`[type] [id] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the page as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows.
+*Row rendering and add flow.* Each viewer renders its ordered rows followed by an inline add row (`[type] [id/stack] [resolved name] [add]`). Draft item IDs resolve asynchronously: pending item loads show `...`, request `GET_ITEM_INFO_RECEIVED`, and refresh the page as soon as Blizzard returns the item data so the resolved name and add button appear without extra typing. Duplicate entries are blocked across both viewers for add and move flows.
 
 *Built-in rows.* Built-in rows use the trailing button as an enable/disable toggle instead of removal, and disabled built-ins are normalized to the bottom of their viewer in `BUILTIN_STACK_ORDER` so they stay visually stable. Missing built-ins are synthesized as disabled placeholders in the utility viewer so older profiles can still re-enable them without a separate quick-add section.
 

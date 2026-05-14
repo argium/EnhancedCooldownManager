@@ -21,11 +21,6 @@ local BORDER_SCALE_BY_VIEWER = {
     utility = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE },
 }
 
-local SUPPRESS_IN_RATED_PVP = {
-    combatPotions = true,
-    healthPotions = true,
-}
-
 local RACIAL_SPELL_ALIASES = {}
 for _, racial in pairs(RACIAL_ABILITIES) do
     local spellIds = racial.spellIds or { racial.spellId }
@@ -161,28 +156,44 @@ local function resolveSpell(ids)
     end
 end
 
-local function resolveEntry(entry)
+local function isNonPvpInstance()
+    local inInstance, instanceType = IsInInstance()
+    return inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+end
+
+local function shouldSuppressItemStack(itemStack)
+    if not itemStack then return true end
+    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return true end
+    if itemStack.hideInInstances and isNonPvpInstance() then return true end
+    return false
+end
+
+local function resolveItemStack(entry, moduleConfig)
+    local itemStacks = moduleConfig and moduleConfig.itemStacks
+    local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
+    return not shouldSuppressItemStack(itemStack) and itemStack.ids and resolveItem(itemStack.ids) or nil
+end
+
+local function resolveEntry(entry, moduleConfig)
     local kind, slotId, ids
     if entry.stackKey then
         local stack = BUILTIN_STACKS[entry.stackKey]
         if not stack then return nil end
-        if SUPPRESS_IN_RATED_PVP[entry.stackKey] and C_PvP.IsRatedMap() then
-            return nil
-        end
         kind, slotId, ids = stack.kind, stack.slotId, stack.ids
     else
         kind, slotId, ids = entry.kind, entry.slotId, entry.ids
     end
     if kind == "equipSlot" then return resolveEquipSlot(slotId) end
     if kind == "item" then return ids and resolveItem(ids) end
+    if kind == "itemStack" then return resolveItemStack(entry, moduleConfig) end
     if kind == "spell" then return ids and resolveSpell(ids) end
 end
 
 local _resolved = {}
-local function resolveEntries(entries)
+local function resolveEntries(entries, moduleConfig)
     wipe(_resolved)
     for _, entry in ipairs(entries) do
-        local data = not entry.disabled and resolveEntry(entry) or nil
+        local data = not entry.disabled and resolveEntry(entry, moduleConfig) or nil
         if data then _resolved[#_resolved + 1] = data end
     end
     return _resolved
@@ -489,7 +500,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
     cachePoint(vs, blizzFrame)
 
     local items = (not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0)
-        and {} or resolveEntries(entries)
+        and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
         applyPoint(vs, blizzFrame, sharedOffsetX)

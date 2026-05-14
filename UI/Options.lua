@@ -128,6 +128,10 @@ function Options:OnInitialize()
         ns.ExtraIconsOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
         ns.ExtraIconsOptions.EnsureItemLoadFrame()
     end
+    if ns.ItemStacksOptions and ns.ItemStacksOptions.SetRegisteredPage then
+        ns.ItemStacksOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "itemStacks"))
+        ns.ItemStacksOptions.EnsureItemLoadFrame()
+    end
     if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
         ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))
     end

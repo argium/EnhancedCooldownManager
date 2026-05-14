@@ -124,8 +124,20 @@ local _, ns = ...
 ---@field stackKey string|nil Built-in stack key resolved via `BUILTIN_STACKS`.
 ---@field kind string|nil Entry kind for custom or racial rows.
 ---@field ids table|nil Entry spell/item priority list.
+---@field itemStackId number|string|nil Stable item stack ID for `kind == "itemStack"` rows.
 ---@field slotId number|nil Slot ID for equip-slot entries.
 ---@field disabled boolean|nil When true, the entry stays in settings but is skipped at runtime.
+
+---@class ECM_ItemStackConfig Named item priority list.
+---@field name string Display name.
+---@field ids table Ordered item priority list.
+---@field hideInInstances boolean|nil Whether to hide in non-PvP instances.
+---@field hideInRatedPvp boolean|nil Whether to hide in rated PvP maps.
+
+---@class ECM_ItemStacksConfig Item stack collection.
+---@field nextId number Next stable custom item stack ID.
+---@field order table Ordered item stack IDs.
+---@field byId table<number|string, ECM_ItemStackConfig> Item stacks by stable ID.
 
 ---@class ECM_ExtraIconsConfig Extra icons configuration.
 ---@field enabled boolean Whether extra icons are enabled.
@@ -135,6 +147,7 @@ local _, ns = ...
 ---@field font string|nil Font face override for stack/charge counts.
 ---@field fontSize number|nil Font size override for stack/charge counts.
 ---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
+---@field itemStacks ECM_ItemStacksConfig Named item stacks that can be referenced by viewer entries.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -164,6 +177,43 @@ local _, ns = ...
 ---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
 
 local C = ns.Constants
+
+local defaultItemStacks = {
+    nextId = 1,
+    order = { "combatPotions", "healthPotions", "healthstones" },
+    byId = {
+        combatPotions = {
+            name = "Combat Potions",
+            hideInInstances = false,
+            hideInRatedPvp = true,
+            ids = {
+                { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
+                { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
+                { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
+                { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
+            },
+        },
+        healthPotions = {
+            name = "Health Potions",
+            hideInInstances = false,
+            hideInRatedPvp = true,
+            ids = {
+                { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
+                { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
+                { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
+            },
+        },
+        healthstones = {
+            name = "Healthstones",
+            hideInInstances = false,
+            hideInRatedPvp = false,
+            ids = {
+                { itemID = 224464 }, -- Demonic Healthstone
+                { itemID = 5512 }, -- Healthstone
+            },
+        },
+    },
+}
 
 -- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
@@ -330,13 +380,14 @@ local defaults = {
             showStackCount = true,
             showCharges = true,
             overrideFont = false,
+            itemStacks = defaultItemStacks,
             viewers = {
                 utility = {
                     { stackKey = "trinket1" },
                     { stackKey = "trinket2" },
-                    { stackKey = "combatPotions" },
-                    { stackKey = "healthPotions" },
-                    { stackKey = "healthstones" },
+                    { kind = "itemStack", itemStackId = "combatPotions" },
+                    { kind = "itemStack", itemStackId = "healthPotions" },
+                    { kind = "itemStack", itemStackId = "healthstones" },
                 },
                 main = {},
             },

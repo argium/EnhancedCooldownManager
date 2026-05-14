@@ -1102,6 +1102,7 @@ TestHelpers.OPTIONS_GLOBALS = {
     "GetInventoryItemID",
     "GetInventoryItemTexture",
     "C_Item",
+    "C_TradeSkillUI",
     "C_Spell",
     "C_SpellBook",
     "CreateTextureMarkup",
@@ -1269,6 +1270,14 @@ function TestHelpers.SetupOptionsGlobals()
             return true
         end,
         RequestLoadItemDataByID = function() end,
+    }
+    _G.C_TradeSkillUI = {
+        GetItemCraftedQualityInfo = function()
+            return nil
+        end,
+        GetItemReagentQualityInfo = function()
+            return nil
+        end,
     }
     _G.C_Spell = {
         GetSpellName = function()

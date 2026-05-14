@@ -354,6 +354,7 @@ Supported list variants:
 - section items use the built-in action-row layout (`up`, `down`, `move`, `delete`)
 - section action buttons may use text, `iconTexture`, or `buttonTextures = { normal, pushed?, disabled?, highlight?, highlightAlpha?, disabledAlpha? }`
 - section trailers support `type = "modeInput"` for toggle + input + preview + submit rows
+- mode-input trailers may set `modeHidden = true` for item-only add rows that should not show a type toggle
   Mode-input trailer display fields may be static values or functions that are re-evaluated during in-place row refreshes.
 
 ## Composite row types

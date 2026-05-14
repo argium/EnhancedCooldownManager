@@ -86,6 +86,13 @@ All Lua files start with:
 - `StaticPopup_Show` stubs forward `(name, text1, text2, data)` and call `OnAccept(self, data)`.
 - Shared confirm dialogs use `ECM.OptionUtil.MakeConfirmDialog(text)` with `data.onAccept`.
 
+## Popup Dialogs
+
+- Build option popups through shared helpers (`ECM.OptionUtil.MakeConfirmDialog` or `ECM.OptionUtil.MakeTextInputDialog`) unless a dialog needs a truly custom frame.
+- Use explicit, human-friendly action labels. Prefer macOS-style verbs such as `Delete` / `Don't delete`, `Create` / `Don't create`, `Rename` / `Don't rename`, and `Remove` / `Don't remove`.
+- Do not use generic `OK`, `Cancel`, `Yes`, or `No` for destructive, mutating, or named option actions.
+- Dialog prompt text should name the affected object where possible, and button text should describe the action rather than the implementation.
+
 ## Libraries and Migrations
 
 - Libraries stay self-contained: no ECM internals; tests and docs live with the library; public API changes are intentional and documented.
