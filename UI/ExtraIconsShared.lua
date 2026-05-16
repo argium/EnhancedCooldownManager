@@ -76,6 +76,27 @@ function ExtraIconsShared.RequestItemLoad(pendingItemLoads, itemId)
     C_Item.RequestLoadItemDataByID(itemId)
 end
 
+function ExtraIconsShared.EnsureItemLoadFrame(owner, events, onEvent)
+    assert(type(owner) == "table", "ExtraIconsShared.EnsureItemLoadFrame requires owner")
+    assert(type(events) == "table", "ExtraIconsShared.EnsureItemLoadFrame requires events")
+    assert(type(onEvent) == "function", "ExtraIconsShared.EnsureItemLoadFrame requires onEvent")
+
+    local itemLoadFrame = owner._itemLoadFrame
+    if not itemLoadFrame then
+        itemLoadFrame = CreateFrame("Frame")
+        owner._itemLoadFrame = itemLoadFrame
+    end
+    if itemLoadFrame._ecmHooked then
+        return
+    end
+
+    for _, event in ipairs(events) do
+        itemLoadFrame:RegisterEvent(event)
+    end
+    itemLoadFrame:SetScript("OnEvent", onEvent)
+    itemLoadFrame._ecmHooked = true
+end
+
 function ExtraIconsShared.GetItemDisplayName(itemId, pendingItemLoads)
     if not itemId then
         return nil

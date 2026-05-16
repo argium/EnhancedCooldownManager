@@ -364,39 +364,6 @@ local function disableDefaultStackActions()
     return stackId == nil or not isDefaultStackId(stackId)
 end
 
-function ItemStacksOptions.EnsureItemLoadFrame()
-    local itemLoadFrame = ItemStacksOptions._itemLoadFrame
-    if not itemLoadFrame then
-        itemLoadFrame = CreateFrame("Frame")
-        ItemStacksOptions._itemLoadFrame = itemLoadFrame
-    end
-    if itemLoadFrame._ecmHooked then
-        return
-    end
-    itemLoadFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-    itemLoadFrame:RegisterEvent("ITEM_DATA_LOAD_RESULT")
-    itemLoadFrame:SetScript("OnEvent", function(_, _, itemId)
-        local pendingId = tonumber(itemId) or itemId
-        if pendingId and ItemStacksOptions._pendingItemLoads[pendingId] then
-            ItemStacksOptions._pendingItemLoads[pendingId] = nil
-            refreshPage()
-            if not ItemStacksOptions._pendingRefreshScheduled then
-                ItemStacksOptions._pendingRefreshScheduled = true
-                C_Timer.After(0.1, function()
-                    ItemStacksOptions._pendingRefreshScheduled = nil
-                    refreshPage()
-                end)
-            end
-        end
-    end)
-    itemLoadFrame._ecmHooked = true
-end
-
-function ItemStacksOptions.OnInitialize()
-    registeredPage = ns.Settings:GetPage("extraIcons", "itemStacks")
-    ItemStacksOptions.EnsureItemLoadFrame()
-end
-
 local function openCreateDialog(ctx)
     StaticPopup_Show("ECM_CREATE_ITEM_STACK", nil, nil, {
         popupKey = "ECM_CREATE_ITEM_STACK",
@@ -448,6 +415,28 @@ local function revertSelectedStack(ctx)
     doAction(function()
         revertStackToDefault(getProfile(), stackId)
     end, ctx and ctx.page or registeredPage)
+end
+
+function ItemStacksOptions.EnsureItemLoadFrame()
+    Shared.EnsureItemLoadFrame(ItemStacksOptions, { "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }, function(_, _, itemId)
+        local pendingId = tonumber(itemId) or itemId
+        if pendingId and ItemStacksOptions._pendingItemLoads[pendingId] then
+            ItemStacksOptions._pendingItemLoads[pendingId] = nil
+            refreshPage()
+            if not ItemStacksOptions._pendingRefreshScheduled then
+                ItemStacksOptions._pendingRefreshScheduled = true
+                C_Timer.After(0.1, function()
+                    ItemStacksOptions._pendingRefreshScheduled = nil
+                    refreshPage()
+                end)
+            end
+        end
+    end)
+end
+
+function ItemStacksOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("extraIcons", "itemStacks")
+    ItemStacksOptions.EnsureItemLoadFrame()
 end
 
 ItemStacksOptions.page = {

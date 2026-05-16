@@ -370,6 +370,48 @@ describe("OptionUtil", function()
         end)
     end)
 
+    describe("CreateAuraBarModuleRows", function()
+        it("is exposed on ECM.OptionUtil", function()
+            assert.is_function(ns.OptionUtil.CreateAuraBarModuleRows)
+        end)
+
+        it("returns the shared aura bar appearance rows", function()
+            local disabled = function()
+                return true
+            end
+            local rows = ns.OptionUtil.CreateAuraBarModuleRows(disabled)
+            local height = getRow(rows, "slider", "height")
+            local verticalSpacing = getRow(rows, "slider", "verticalSpacing")
+
+            assert.are.equal(7, #rows)
+            assert.are.equal("appearanceHeader", rows[1].id)
+            assert.are.equal(disabled, rows[1].disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showIcon").disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showSpellName").disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showDuration").disabled)
+            assert.are.equal(disabled, height.disabled)
+            assert.are.equal(0, height.getTransform(nil))
+            assert.is_nil(height.setTransform(0))
+            assert.are.equal(5, height.setTransform(5))
+            assert.are.equal(disabled, verticalSpacing.disabled)
+            assert.are.equal(0, verticalSpacing.getTransform(nil))
+            assert.are.equal("fontOverride", rows[7].id)
+            assert.are.equal(disabled, rows[7].disabled)
+        end)
+
+        it("inserts extra rows after the appearance header", function()
+            local disabled = function()
+                return false
+            end
+            local extraRow = { type = "checkbox", path = "hideOriginalIcons" }
+            local rows = ns.OptionUtil.CreateAuraBarModuleRows(disabled, { extraRow })
+
+            assert.are.equal("appearanceHeader", rows[1].id)
+            assert.are.equal(extraRow, rows[2])
+            assert.are.equal("showIcon", rows[3].id)
+        end)
+    end)
+
     describe("SetNestedValue export", function()
         it("is exposed on ECM.OptionUtil", function()
             assert.is_function(ns.OptionUtil.SetNestedValue)

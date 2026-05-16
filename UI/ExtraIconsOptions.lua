@@ -8,7 +8,7 @@ local L = ns.L
 local Shared = ns.ExtraIconsShared
 
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_EXTRA_ICON"] =
-    ns.OptionUtil.MakeConfirmDialog(L["REMOVE_ENTRY_CONFIRM"])
+    ns.OptionUtil.MakeConfirmDialog(L["REMOVE_ENTRY_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
 
 local BUILTIN_STACKS = C.BUILTIN_STACKS
 local BUILTIN_STACK_ORDER = C.BUILTIN_STACK_ORDER
@@ -137,14 +137,6 @@ local function getItemProfessionQualityInfo(itemEntry)
     local itemId = Shared.GetItemIdFromEntry(itemEntry)
     if not itemId then return nil end
     return C_TradeSkillUI.GetItemCraftedQualityInfo(itemId) or C_TradeSkillUI.GetItemReagentQualityInfo(itemId)
-end
-
-function ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
-    local qualityInfo = getItemProfessionQualityInfo(itemEntry)
-    local iconChat = type(qualityInfo) == "table" and qualityInfo.iconChat or type(itemEntry) == "table" and itemEntry.iconChat
-    if iconChat then return CreateAtlasMarkup(iconChat, 14, 14) end
-    local quality = type(qualityInfo) == "table" and qualityInfo.quality or type(itemEntry) == "table" and itemEntry.quality
-    return quality and CreateAtlasMarkup("Professions-ChatIcon-Quality-12-Tier" .. quality, 14, 14) or nil
 end
 
 local function buildEntry(kind, ids)
@@ -607,34 +599,6 @@ local function buildViewerRows(viewers, viewerKey)
     return rows
 end
 
-function ExtraIconsOptions.OnInitialize()
-    registeredPage = ns.Settings:GetPage("extraIcons", "main")
-    ExtraIconsOptions.EnsureItemLoadFrame()
-end
-
-function ExtraIconsOptions.EnsureItemLoadFrame()
-    local itemLoadFrame = ExtraIconsOptions._itemLoadFrame
-    if not itemLoadFrame then
-        itemLoadFrame = CreateFrame("Frame")
-        ExtraIconsOptions._itemLoadFrame = itemLoadFrame
-    end
-    if itemLoadFrame._ecmHooked then
-        return
-    end
-
-    itemLoadFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-    itemLoadFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    itemLoadFrame:SetScript("OnEvent", function(_, event, arg1)
-        if event == "GET_ITEM_INFO_RECEIVED" and arg1 and ExtraIconsOptions._pendingItemLoads[arg1] then
-            ExtraIconsOptions._pendingItemLoads[arg1] = nil
-            refreshPage()
-        elseif event == "PLAYER_EQUIPMENT_CHANGED" and BUILTIN_EQUIP_SLOTS[arg1] then
-            refreshPage()
-        end
-    end)
-    itemLoadFrame._ecmHooked = true
-end
-
 local function getDraftDuplicateInfo(viewerKey)
     local ds = draftStates[viewerKey]
     if ds.kind == "itemStack" then
@@ -867,6 +831,11 @@ local function buildModeInputTrailer(viewerKey)
     }
 end
 
+local function canResetToDefaults()
+    local defaults = ns.Addon.db.defaults.profile
+    return defaults and defaults.extraIcons ~= nil
+end
+
 function ExtraIconsOptions.BuildSections()
     local viewers = getViewers()
     local sections = {}
@@ -901,9 +870,28 @@ function ExtraIconsOptions.ResetToDefaults()
     doActionAndUpdateLayout()
 end
 
-local function canResetToDefaults()
-    local defaults = ns.Addon.db.defaults.profile
-    return defaults and defaults.extraIcons ~= nil
+function ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
+    local qualityInfo = getItemProfessionQualityInfo(itemEntry)
+    local iconChat = type(qualityInfo) == "table" and qualityInfo.iconChat or type(itemEntry) == "table" and itemEntry.iconChat
+    if iconChat then return CreateAtlasMarkup(iconChat, 14, 14) end
+    local quality = type(qualityInfo) == "table" and qualityInfo.quality or type(itemEntry) == "table" and itemEntry.quality
+    return quality and CreateAtlasMarkup("Professions-ChatIcon-Quality-12-Tier" .. quality, 14, 14) or nil
+end
+
+function ExtraIconsOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("extraIcons", "main")
+    ExtraIconsOptions.EnsureItemLoadFrame()
+end
+
+function ExtraIconsOptions.EnsureItemLoadFrame()
+    Shared.EnsureItemLoadFrame(ExtraIconsOptions, { "GET_ITEM_INFO_RECEIVED", "PLAYER_EQUIPMENT_CHANGED" }, function(_, event, arg1)
+        if event == "GET_ITEM_INFO_RECEIVED" and arg1 and ExtraIconsOptions._pendingItemLoads[arg1] then
+            ExtraIconsOptions._pendingItemLoads[arg1] = nil
+            refreshPage()
+        elseif event == "PLAYER_EQUIPMENT_CHANGED" and BUILTIN_EQUIP_SLOTS[arg1] then
+            refreshPage()
+        end
+    end)
 end
 
 ExtraIconsOptions.key = "extraIcons"
