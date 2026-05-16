@@ -10,7 +10,7 @@ local constants = {
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
     ERROR_COLOR = "ff4040",
-    RELEASE_POPUP_VERSION = "v0.8.1",
+    RELEASE_POPUP_VERSION = "v0.8.3",
     VERSION_TAG_BETA = "beta",
 
     -- Module identifiers
