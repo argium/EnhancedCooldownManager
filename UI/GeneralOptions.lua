@@ -6,7 +6,7 @@ local _, ns = ...
 local L = ns.L
 local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 local function isFadeDisabled()
-    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local gc = ns.GetGlobalConfig()
     local fade = gc and gc.outOfCombatFade
     return not (fade and fade.enabled)
 end

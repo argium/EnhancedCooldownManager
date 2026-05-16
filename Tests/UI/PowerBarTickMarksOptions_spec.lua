@@ -40,9 +40,14 @@ describe("PowerBarTickMarksOptions", function()
             end,
         }
 
-        if captured.SetRegisteredPage then
-            captured.SetRegisteredPage(fakePage)
-        end
+        ns.Settings = {
+            GetPage = function(_, sectionKey, pageKey)
+                assert.are.equal("powerBar", sectionKey)
+                assert.are.equal("tickMarks", pageKey)
+                return fakePage
+            end,
+        }
+        captured:OnInitialize()
 
         return captured, refreshCalls, fakePage
     end

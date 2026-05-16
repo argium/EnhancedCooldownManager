@@ -46,6 +46,7 @@ describe("ExternalBarsOptions", function()
         TestHelpers.LoadChunk("UI/SpellColorsPage.lua", "Unable to load UI/SpellColorsPage.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/ExternalBarsOptions.lua", "Unable to load UI/ExternalBarsOptions.lua")(nil, ns)
         ExternalBarsOptions = ns.ExternalBarsOptions
+        ExternalBarsOptions.OnInitialize()
     end)
 
     it("exports the external cooldowns section with only the main page", function()
@@ -67,7 +68,7 @@ describe("ExternalBarsOptions", function()
     end)
 
     it("registers the external bars section with the shared spell colors page", function()
-        local sharedPage = ns.SpellColorsPage.CreatePage(ns.L["SPELL_COLORS_SUBCAT"])
+        local sharedPage = ns.SpellColorsPage:CreatePage(ns.L["SPELL_COLORS_SUBCAT"])
 
         assert.are.equal("spellColors", sharedPage.key)
         assert.are.equal("pageActions", assert(getRow(sharedPage.rows, "spellColorsPageActions")).type)

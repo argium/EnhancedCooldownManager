@@ -15,13 +15,15 @@ local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
 local layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton
 layoutMovedButton.id = "layoutMovedButton"
 
-SpellColorsPage.RegisterSection({
-    key = C.SCOPE_EXTERNALBARS,
-    label = L["EXTERNAL_BARS"],
-    scope = C.SCOPE_EXTERNALBARS,
-    isDisabledDelegate = SpellColorsPage.CreateSectionDisabledDelegate(C.SCOPE_EXTERNALBARS, "ExternalBars"),
-    ownerModuleName = "ExternalBars",
-})
+function ExternalBarsOptions.OnInitialize()
+    SpellColorsPage:RegisterSection({
+        key = C.SCOPE_EXTERNALBARS,
+        label = L["EXTERNAL_BARS"],
+        scope = C.SCOPE_EXTERNALBARS,
+        isDisabledDelegate = SpellColorsPage:CreateSectionDisabledDelegate(C.SCOPE_EXTERNALBARS),
+        ownerModuleName = "ExternalBars",
+    })
+end
 
 ExternalBarsOptions.key = "externalBars"
 ExternalBarsOptions.name = L["EXTERNAL_BARS"]

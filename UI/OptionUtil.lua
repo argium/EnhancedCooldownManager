@@ -314,7 +314,7 @@ local function setModuleEnabledValue(moduleName, value, setting)
         return
     end
 
-    local profile = ns.Addon and ns.Addon.db and ns.Addon.db.profile
+    local profile = ns.Addon.db.profile
     local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
     local moduleConfig = profile and profile[configKey]
     if moduleConfig then
@@ -351,12 +351,12 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
 end
 
 local function getGlobalFont()
-    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local gc = ns.GetGlobalConfig()
     return gc and gc.font
 end
 
 local function getGlobalFontSize()
-    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local gc = ns.GetGlobalConfig()
     return gc and gc.fontSize
 end
 

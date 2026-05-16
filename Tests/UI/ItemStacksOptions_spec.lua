@@ -33,12 +33,11 @@ describe("ItemStacksOptions settings page", function()
         return value
     end
 
-    local function getStackAction(text)
-        for _, action in ipairs(getRow("selectedStackActions").actions) do
-            if action.text == text then
-                return action
-            end
-        end
+    local function createStack(name)
+        TestHelpers.InstallPopupAutoAccept(name or "Potions")
+        getRow("createItemStack").onClick({ page = registeredPage })
+        refreshCalls = {}
+        scheduledReasons = {}
     end
 
     setup(function()
@@ -67,6 +66,7 @@ describe("ItemStacksOptions settings page", function()
         end
 
         TestHelpers.CollectSettings(function()
+            TestHelpers.LoadChunk("UI/ExtraIconsShared.lua", "ExtraIconsShared")(nil, ns)
             TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
             TestHelpers.LoadChunk("UI/ItemStacksOptions.lua", "ItemStacksOptions")(nil, ns)
             page = ns.ItemStacksOptions.page
@@ -76,7 +76,7 @@ describe("ItemStacksOptions settings page", function()
                 pages = { page },
             })
             registeredPage = registered
-            ns.ItemStacksOptions.SetRegisteredPage(registeredPage)
+            ns.ItemStacksOptions.OnInitialize()
         end)
         ns.ItemStacksOptions.EnsureItemLoadFrame()
         registeredPage.Refresh = function()
@@ -92,9 +92,21 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("checkbox", getRow("hideStackInRatedPvp").type)
         assert.are.equal("sectionList", getRow("itemStackItems").type)
         assert.are.equal("button", getRow("renameItemStack").type)
-        assert.are.equal("pageActions", getRow("selectedStackActions").type)
-        assert.is_table(getStackAction(ns.L["DELETE"]))
-        assert.is_table(getStackAction(ns.L["REVERT"]))
+        assert.are.equal("button", getRow("deleteItemStack").type)
+        assert.are.equal("button", getRow("revertItemStack").type)
+
+        local renameIndex, deleteIndex, revertIndex
+        for index, row in ipairs(page.rows) do
+            if row.id == "renameItemStack" then
+                renameIndex = index
+            elseif row.id == "deleteItemStack" then
+                deleteIndex = index
+            elseif row.id == "revertItemStack" then
+                revertIndex = index
+            end
+        end
+        assert.are.equal(renameIndex + 1, deleteIndex)
+        assert.are.equal(deleteIndex + 1, revertIndex)
     end)
 
     it("shows the layout preview while the item stacks page is open", function()
@@ -119,7 +131,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("renames an item stack without changing viewer references", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         profile.extraIcons.viewers.utility = { { kind = "itemStack", itemStackId = 1 } }
 
         TestHelpers.InstallPopupAutoAccept("Better Potions")
@@ -130,7 +142,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("adds resolved items, blocks duplicates, reorders, and removes with confirmation", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         local itemNames = { [101] = "Potion A", [202] = "Potion B" }
         _G.C_Item.GetItemNameByID = function(itemId) return itemNames[itemId] end
         _G.C_Item.GetItemIconByID = function(itemId) return "icon-" .. tostring(itemId) end
@@ -160,7 +172,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("refreshes pending item previews when item data arrives", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         local itemNames = {}
         _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 303 end
         _G.C_Item.GetItemNameByID = function(itemId) return itemNames[itemId] end
@@ -180,7 +192,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("refreshes pending item row labels when requested item data finishes loading", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         profile.extraIcons.itemStacks.byId[1].ids = { { itemID = 303 } }
         local itemNames = {}
         _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 303 end
@@ -202,7 +214,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("refreshes pending item row labels again after item data settles", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         profile.extraIcons.itemStacks.byId[1].ids = { { itemID = 303 } }
         local itemNames = {}
         _G.C_Item.DoesItemExistByID = function(itemId) return itemId == 303 end
@@ -221,7 +233,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("adds quality rank markup after item row names", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         profile.extraIcons.itemStacks.byId[1].ids = { { itemID = 101, quality = 2 } }
         _G.C_Item.GetItemNameByID = function(itemId) return itemId == 101 and "Potion A" or nil end
 
@@ -233,7 +245,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("uses WoW profession quality info in previews and newly added rows", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         _G.C_Item.GetItemNameByID = function(itemId)
             return (itemId == 241288 or itemId == 241289) and "Potion of Recklessness" or nil
         end
@@ -278,14 +290,13 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("deletes an item stack and removes viewer references", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
         profile.extraIcons.viewers.utility = { { kind = "itemStack", itemStackId = 1 } }
         profile.extraIcons.viewers.main = { { kind = "itemStack", itemStackId = 1 } }
 
-        local deleteAction = getStackAction(ns.L["DELETE"])
-        assert.is_false(deleteAction.hidden())
-        assert.is_true(getStackAction(ns.L["REVERT"]).hidden())
-        deleteAction.onClick()
+        assert.is_false(getRow("deleteItemStack").disabled())
+        assert.is_true(getRow("revertItemStack").disabled())
+        getRow("deleteItemStack").onClick()
 
         assert.is_nil(profile.extraIcons.itemStacks.byId[1])
         assert.same({}, profile.extraIcons.itemStacks.order)
@@ -305,8 +316,9 @@ describe("ItemStacksOptions settings page", function()
         }
 
         local picker = getRow("selectedManagedItemStack")
-        assert.are.equal("Alpha", ns.ItemStacksOptions.BuildStackValues()["2"])
-        assert.is_nil(ns.ItemStacksOptions.BuildStackValues()[2])
+    local values = picker.values()
+    assert.are.equal("Alpha", values["2"])
+    assert.is_nil(values[2])
         assert.are.equal("2", picker.get())
 
         picker.set(3)
@@ -317,7 +329,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("updates visibility checkboxes for the selected stack", function()
-        ns.ItemStacksOptions._createStack(profile, "Potions")
+        createStack("Potions")
 
         local instances = getRow("hideStackInInstances")
         local rated = getRow("hideStackInRatedPvp")
@@ -332,7 +344,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("protects default stacks and reverts them to defaults", function()
-        ns.Addon.db.defaults = nil
+        ns.Addon.db.defaults = { profile = { extraIcons = { itemStacks = { byId = {} } } } }
         ns.defaults = { profile = defaults }
         profile.extraIcons.itemStacks = TestHelpers.deepClone(defaults.extraIcons.itemStacks)
         profile.extraIcons.itemStacks.byId.combatPotions.name = "Custom Combat"
@@ -343,14 +355,15 @@ describe("ItemStacksOptions settings page", function()
         picker.set("combatPotions")
 
         assert.is_true(getRow("renameItemStack").disabled())
-        assert.is_true(getStackAction(ns.L["DELETE"]).hidden())
-        assert.is_false(getStackAction(ns.L["REVERT"]).hidden())
+        assert.is_nil(getRow("renameItemStack").hidden)
+        assert.is_true(getRow("deleteItemStack").disabled())
+        assert.is_false(getRow("revertItemStack").disabled())
 
         getRow("renameItemStack").onClick({ page = registeredPage })
-        getStackAction(ns.L["DELETE"]).onClick()
+        getRow("deleteItemStack").onClick()
         assert.is_not_nil(profile.extraIcons.itemStacks.byId.combatPotions)
 
-        getStackAction(ns.L["REVERT"]).onClick()
+        getRow("revertItemStack").onClick()
 
         assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)
         assert.are.equal(245898, profile.extraIcons.itemStacks.byId.combatPotions.ids[1].itemID)

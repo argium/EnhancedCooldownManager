@@ -8,12 +8,12 @@ local RuneBarOptions = {}
 ns.RuneBarOptions = RuneBarOptions
 local isDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
 local function isUseSpecColorDisabled()
-    local runeBar = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.runeBar
+    local runeBar = ns.Addon.db.profile.runeBar
     return isDisabled() or not (runeBar and runeBar.useSpecColor)
 end
 
 local function isSingleRuneColorDisabled()
-    local runeBar = ns.Addon and ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile.runeBar
+    local runeBar = ns.Addon.db.profile.runeBar
     return isDisabled() or (runeBar and runeBar.useSpecColor) == true
 end
 

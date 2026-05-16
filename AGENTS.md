@@ -51,6 +51,7 @@ All Lua files start with:
 - Keep one owner for shared state, derived values, utility functions, style metrics, and widget rendering details.
 - Use loose coupling through events, hooks, callbacks, or messages.
 - Do not add trivial passthrough wrappers, fixed-literal indirection, or single-caller abstractions without an independently testable contract.
+- Treat passthrough methods as an anti-pattern. If a method only forwards to another function, table, or shared helper without adding real behavior, delete it or call the real owner directly.
 - Prefer constant lookup tables and `O(1)` sets over mapping functions or linear scans for fixed load-time domains.
 - Remove dead code, stale fields, impossible branches, unused upvalues, and unused locale strings.
 - Clear critical state flags via `pcall` so one error cannot wedge later work.
@@ -59,6 +60,9 @@ All Lua files start with:
 
 - Mutable state belongs on the owning instance (`self._field`), not file-level locals. Prefix private fields/methods with `_`.
 - No forward declarations; reorder code instead. Alias shared modules once at file scope.
+- Functions used only within one file stay local. Do not attach file-local helpers to module tables just for organization, symmetry, or test access.
+- Attaching a function to a module table without using `self` is a smell. If it is also `_`-prefixed, that is a strong signal the function should be a `local function` instead of a table field.
+- Only attach functions to a module table when they are true cross-file APIs, lifecycle hooks, or intentionally shared test seams.
 - Prefer assertions for required parameters over guards and fallbacks.
 - Target WoW Lua 5.1: no `goto`, labels, `//`, bitwise operators, or newer Lua syntax.
 - Inline single-use locals into their sole call site. Compact trivial function bodies to one line when readable.
@@ -80,6 +84,7 @@ All Lua files start with:
 - Existing tests are behavioral specifications. Do not invert, weaken, or rewrite a test unless the old behavior is explicitly obsolete; preserve equivalent coverage for the new behavior.
 - Test load order mirrors TOC load order. Test files mirror source paths; library tests live under `Libs/<Name>/Tests/`.
 - Test production code directly. Do not mirror production logic in specs.
+- Do not preserve or introduce table-attached helper methods purely so specs can call them. Prefer testing the real public flow, or the actual shared owner of the logic.
 - Stub the canonical function, not a wrapper or alias. If a stub diverges from real behavior, fix the stub.
 - Do not guard production APIs only to satisfy tests. If an API exists in the supported runtime/load order, tests must stub it.
 - Reuse `Tests/TestHelpers.lua` before creating new shared helpers.

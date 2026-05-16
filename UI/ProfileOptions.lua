@@ -112,10 +112,7 @@ end
 
 local function otherProfilesGenerator()
     local container = Settings.CreateControlTextContainer()
-    local db = ns.Addon and ns.Addon.db
-    if not db then
-        return container:GetData()
-    end
+    local db = ns.Addon.db
 
     local current = db:GetCurrentProfile()
     for _, name in ipairs(db:GetProfiles()) do

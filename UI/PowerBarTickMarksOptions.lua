@@ -34,7 +34,7 @@ local function getTicksConfig()
 end
 
 local function getDefaultTicksConfig()
-    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    local defaults = ns.Addon.db.defaults.profile
     return defaults and defaults.powerBar and defaults.powerBar.ticks or nil
 end
 
@@ -107,8 +107,9 @@ local function setDefaultWidth(width)
 end
 
 local registeredPage
-function PowerBarTickMarksOptions.SetRegisteredPage(page)
-    registeredPage = page
+
+function PowerBarTickMarksOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("powerBar", "tickMarks")
 end
 
 local function refreshPage()

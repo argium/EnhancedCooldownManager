@@ -212,6 +212,8 @@ describe("BuffBarsOptions", function()
         TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/ExternalBarsOptions.lua", "Unable to load UI/ExternalBarsOptions.lua")(nil, ns)
         BuffBarsOptions = ns.BuffBarsOptions
+        ns.BuffBarsOptions.OnInitialize()
+        ns.ExternalBarsOptions.OnInitialize()
     end)
 
     -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
@@ -380,7 +382,7 @@ describe("BuffBarsOptions", function()
     end)
 
     local function registerSpellColorsSpec()
-        local spellColorsSpec = assert(ns.SpellColorsPage.CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
+        local spellColorsSpec = assert(ns.SpellColorsPage:CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
         local refreshCalls = {}
         local fakePage = {
             Refresh = function()
@@ -388,9 +390,14 @@ describe("BuffBarsOptions", function()
             end,
         }
 
-        if spellColorsSpec.SetRegisteredPage then
-            spellColorsSpec.SetRegisteredPage(fakePage)
-        end
+        ns.Settings = {
+            GetPage = function(_, sectionKey, pageKey)
+                assert.are.equal("spellColors", sectionKey)
+                assert.are.equal("spellColors", pageKey)
+                return fakePage
+            end,
+        }
+        ns.SpellColorsPage:OnInitialize()
 
         return spellColorsSpec, refreshCalls
     end
@@ -471,20 +478,31 @@ describe("BuffBarsOptions", function()
     end)
 
     it("registers combat refresh callbacks once and refreshes the latest registered page", function()
-        local spellColorsSpec = assert(ns.SpellColorsPage.CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
+        assert(ns.SpellColorsPage:CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
         local firstRefreshCalls = 0
         local secondRefreshCalls = 0
 
-        spellColorsSpec.SetRegisteredPage({
-            Refresh = function()
-                firstRefreshCalls = firstRefreshCalls + 1
+        ns.Settings = {
+            GetPage = function()
+                return {
+                    Refresh = function()
+                        firstRefreshCalls = firstRefreshCalls + 1
+                    end,
+                }
             end,
-        })
-        spellColorsSpec.SetRegisteredPage({
-            Refresh = function()
-                secondRefreshCalls = secondRefreshCalls + 1
+        }
+        ns.SpellColorsPage:OnInitialize()
+
+        ns.Settings = {
+            GetPage = function()
+                return {
+                    Refresh = function()
+                        secondRefreshCalls = secondRefreshCalls + 1
+                    end,
+                }
             end,
-        })
+        }
+        ns.SpellColorsPage:OnInitialize()
 
         local enterCallbacks = assert(addonEventCallbacks.PLAYER_REGEN_DISABLED)
         local leaveCallbacks = assert(addonEventCallbacks.PLAYER_REGEN_ENABLED)

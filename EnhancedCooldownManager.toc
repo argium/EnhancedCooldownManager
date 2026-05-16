@@ -61,6 +61,7 @@ UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
+UI\ExtraIconsShared.lua
 UI\ExtraIconsOptions.lua
 UI\ItemStacksOptions.lua
 UI\SpellColorsPage.lua

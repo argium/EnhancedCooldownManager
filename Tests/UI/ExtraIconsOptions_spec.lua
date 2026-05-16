@@ -78,6 +78,7 @@ describe("ExtraIconsOptions data helpers", function()
                 },
             },
         }
+        TestHelpers.LoadChunk("UI/ExtraIconsShared.lua", "ExtraIconsShared")(nil, ns)
         TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
         ExtraIconsOptions = ns.ExtraIconsOptions
     end)
@@ -88,711 +89,26 @@ describe("ExtraIconsOptions data helpers", function()
         _G.C_TradeSkillUI = originalCTradeSkillUI
     end)
 
-    describe("_isStackKeyPresent", function()
-        it("finds stackKey in utility viewer", function()
-            local viewers = { utility = { { stackKey = "trinket1" } }, main = {} }
-            assert.is_true(ExtraIconsOptions._isStackKeyPresent(viewers, "trinket1"))
-        end)
-
-        it("finds stackKey in main viewer", function()
-            local viewers = { utility = {}, main = { { stackKey = "trinket2" } } }
-            assert.is_true(ExtraIconsOptions._isStackKeyPresent(viewers, "trinket2"))
-        end)
-
-        it("returns false when absent", function()
-            local viewers = { utility = { { stackKey = "trinket1" } }, main = {} }
-            assert.is_false(ExtraIconsOptions._isStackKeyPresent(viewers, "trinket2"))
-        end)
-    end)
-
-    describe("_isRacialPresent", function()
-        it("finds racial by spellId", function()
-            local viewers = { utility = { { kind = "spell", ids = { 59752 } } }, main = {} }
-            assert.is_true(ExtraIconsOptions._isRacialPresent(viewers, 59752))
-        end)
-
-        it("finds racial with table-style ids", function()
-            local viewers = { utility = { { kind = "spell", ids = { { spellId = 33697 } } } }, main = {} }
-            assert.is_true(ExtraIconsOptions._isRacialPresent(viewers, 33697))
-        end)
-
-        it("finds racial by any candidate id", function()
-            local viewers = { utility = { { kind = "spell", ids = { 368970 } } }, main = {} }
-            assert.is_true(ExtraIconsOptions._isRacialPresent(viewers, { 357214, 368970 }))
-        end)
-
-        it("returns false when absent", function()
-            local viewers = { utility = { { kind = "spell", ids = { 59752 } } }, main = {} }
-            assert.is_false(ExtraIconsOptions._isRacialPresent(viewers, 33697))
-        end)
-
-        it("skips non-spell entries", function()
-            local viewers = { utility = { { stackKey = "trinket1" } }, main = {} }
-            assert.is_false(ExtraIconsOptions._isRacialPresent(viewers, 59752))
-        end)
-    end)
-
-    describe("_getEntryName", function()
-        local savedCSpell, savedCItem, savedInventoryItemID
-
-        before_each(function()
-            savedCSpell = _G.C_Spell
-            savedCItem = _G.C_Item
-            savedInventoryItemID = _G.GetInventoryItemID
-            _G.C_Spell = {
-                GetSpellName = function(spellId)
-                    if spellId == 59752 then return "Every Man for Himself" end
-                    return nil
-                end,
-            }
-            _G.C_Item = {
-                GetItemNameByID = function(itemId)
-                    if itemId == 99999 then return "Test Item" end
-                    if itemId == 10001 then return "Gladiator's Badge" end
-                    return nil
-                end,
-                DoesItemExistByID = function(itemId)
-                    return itemId == 99999 or itemId == 10001
-                end,
-                RequestLoadItemDataByID = function() end,
-            }
-            _G.GetInventoryItemID = function(_, slotId)
-                return slotId == 13 and 10001 or nil
-            end
-        end)
-
-        after_each(function()
-            _G.C_Spell = savedCSpell
-            _G.C_Item = savedCItem
-            _G.GetInventoryItemID = savedInventoryItemID
-        end)
-
-        it("returns builtin stack label", function()
-            assert.are.equal("Trinket 1 [Gladiator's Badge]", ExtraIconsOptions._getEntryName({ stackKey = "trinket1" }))
-            assert.are.equal("Combat Potions", ExtraIconsOptions._getEntryName({
-                kind = "itemStack",
-                itemStackId = "combatPotions",
-            }))
-        end)
-
-        it("returns spell name from API for racial spells", function()
-            assert.are.equal("Every Man for Himself",
-                ExtraIconsOptions._getEntryName({ kind = "spell", ids = { 59752 } }))
-        end)
-
-        it("falls back to spell ID when API returns nil", function()
-            assert.are.equal("Spell 12345",
-                ExtraIconsOptions._getEntryName({ kind = "spell", ids = { 12345 } }))
-        end)
-
-        it("returns item name from API for item entries", function()
-            assert.are.equal("Test Item",
-                ExtraIconsOptions._getEntryName({ kind = "item", ids = { { itemID = 99999 } } }))
-        end)
-
-        it("returns Unknown for unrecognized entry", function()
-            assert.are.equal("Unknown", ExtraIconsOptions._getEntryName({}))
-        end)
-    end)
-
-    describe("_addStackKey", function()
-        it("appends to viewer", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-            ExtraIconsOptions._addStackKey(profile, "utility", "trinket1")
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal("trinket1", profile.extraIcons.viewers.utility[1].stackKey)
-        end)
-
-        it("creates viewer array if missing", function()
-            local profile = { extraIcons = { viewers = {} } }
-            ExtraIconsOptions._addStackKey(profile, "main", "trinket2")
-            assert.are.equal(1, #profile.extraIcons.viewers.main)
-        end)
-
-        it("skips duplicate builtin entries across viewers", function()
-            local profile = {
-                extraIcons = {
-                    viewers = {
-                        utility = { { stackKey = "trinket1" } },
-                        main = {},
-                    },
-                },
-            }
-
-            ExtraIconsOptions._addStackKey(profile, "main", "trinket1")
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal(0, #profile.extraIcons.viewers.main)
-        end)
-    end)
-
-    describe("_addRacial", function()
-        it("adds spell entry with racial id", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-            ExtraIconsOptions._addRacial(profile, "utility", 59752)
-            local entry = profile.extraIcons.viewers.utility[1]
-            assert.are.equal("spell", entry.kind)
-            assert.are.same({ 59752 }, entry.ids)
-        end)
-    end)
-
-    describe("_addCustomEntry", function()
-        it("adds item entry with itemID wrappers", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-            ExtraIconsOptions._addCustomEntry(profile, "utility", "item", { 12345 })
-            local entry = profile.extraIcons.viewers.utility[1]
-            assert.are.equal("item", entry.kind)
-            assert.are.same({ { itemID = 12345 } }, entry.ids)
-        end)
-
-        it("adds spell entry with raw ids", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-            ExtraIconsOptions._addCustomEntry(profile, "main", "spell", { 100, 200 })
-            local entry = profile.extraIcons.viewers.main[1]
-            assert.are.equal("spell", entry.kind)
-            assert.are.same({ 100, 200 }, entry.ids)
-        end)
-
-        it("skips duplicate custom entries across viewers", function()
-            local profile = {
-                extraIcons = {
-                    viewers = {
-                        utility = { { kind = "spell", ids = { 12345 } } },
-                        main = {},
-                    },
-                },
-            }
-
-            ExtraIconsOptions._addCustomEntry(profile, "main", "spell", { 12345 })
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal(0, #profile.extraIcons.viewers.main)
-        end)
-    end)
-
-    describe("_setEntryDisabled", function()
-        it("sets and clears the disabled flag", function()
-            local profile = { extraIcons = { viewers = { utility = { { stackKey = "trinket1" } } } } }
-
-            ExtraIconsOptions._setEntryDisabled(profile, "utility", 1, true)
-            assert.is_true(profile.extraIcons.viewers.utility[1].disabled)
-
-            ExtraIconsOptions._setEntryDisabled(profile, "utility", 1, false)
-            assert.is_nil(profile.extraIcons.viewers.utility[1].disabled)
-        end)
-    end)
-
-    describe("_toggleBuiltinRow", function()
-        it("toggles the disabled flag for persisted builtin rows", function()
-            local profile = { extraIcons = { viewers = { utility = { { stackKey = "trinket1" } } } } }
-
-            ExtraIconsOptions._toggleBuiltinRow(profile, "utility", 1, "trinket1")
-            assert.is_true(profile.extraIcons.viewers.utility[1].disabled)
-
-            ExtraIconsOptions._toggleBuiltinRow(profile, "utility", 1, "trinket1")
-            assert.is_nil(profile.extraIcons.viewers.utility[1].disabled)
-        end)
-
-        it("adds missing builtin rows when toggled from a placeholder", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-
-            ExtraIconsOptions._toggleBuiltinRow(profile, "utility", nil, "trinket1")
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal("trinket1", profile.extraIcons.viewers.utility[1].stackKey)
-            assert.is_nil(profile.extraIcons.viewers.utility[1].disabled)
-        end)
-    end)
-
-    describe("_toggleCurrentRacialRow", function()
-        it("adds the current racial when toggled from a placeholder", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-
-            ExtraIconsOptions._toggleCurrentRacialRow(profile, "utility", nil, 59752)
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.same({ 59752 }, profile.extraIcons.viewers.utility[1].ids)
-        end)
-
-        it("adds all candidate ids for racials with alternate spell ids", function()
-            local profile = { extraIcons = { viewers = { utility = {}, main = {} } } }
-
-            ExtraIconsOptions._toggleCurrentRacialRow(profile, "utility", nil, { 357214, 368970 })
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.same({ 357214, 368970 }, profile.extraIcons.viewers.utility[1].ids)
-        end)
-
-        it("removes a persisted racial row when toggled", function()
-            local profile = { extraIcons = { viewers = { utility = { { kind = "spell", ids = { 59752 } } }, main = {} } } }
-
-            ExtraIconsOptions._toggleCurrentRacialRow(profile, "utility", 1, 59752)
-
-            assert.are.equal(0, #profile.extraIcons.viewers.utility)
-        end)
-    end)
-
-    describe("_removeEntry", function()
-        it("removes at given index", function()
-            local profile = { extraIcons = { viewers = { utility = {
-                { stackKey = "a" }, { stackKey = "b" }, { stackKey = "c" },
-            } } } }
-            ExtraIconsOptions._removeEntry(profile, "utility", 2)
-            assert.are.equal(2, #profile.extraIcons.viewers.utility)
-            assert.are.equal("a", profile.extraIcons.viewers.utility[1].stackKey)
-            assert.are.equal("c", profile.extraIcons.viewers.utility[2].stackKey)
-        end)
-
-        it("is a no-op for out-of-range index", function()
-            local profile = { extraIcons = { viewers = { utility = { { stackKey = "a" } } } } }
-            ExtraIconsOptions._removeEntry(profile, "utility", 5)
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-        end)
-    end)
-
-    describe("_moveEntry", function()
-        it("transfers entry to other viewer", function()
-            local profile = { extraIcons = { viewers = {
-                utility = { { stackKey = "a" }, { stackKey = "b" } },
-                main = { { stackKey = "c" } },
-            } } }
-            ExtraIconsOptions._moveEntry(profile, "utility", "main", 1)
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal("b", profile.extraIcons.viewers.utility[1].stackKey)
-            assert.are.equal(2, #profile.extraIcons.viewers.main)
-            assert.are.equal("a", profile.extraIcons.viewers.main[2].stackKey)
-        end)
-
-        it("creates target array if missing", function()
-            local profile = { extraIcons = { viewers = { utility = { { stackKey = "a" } } } } }
-            ExtraIconsOptions._moveEntry(profile, "utility", "main", 1)
-            assert.are.equal(0, #profile.extraIcons.viewers.utility)
-            assert.are.equal(1, #profile.extraIcons.viewers.main)
-        end)
-
-        it("is a no-op for invalid index", function()
-            local profile = { extraIcons = { viewers = { utility = { { stackKey = "a" } }, main = {} } } }
-            ExtraIconsOptions._moveEntry(profile, "utility", "main", 5)
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal(0, #profile.extraIcons.viewers.main)
-        end)
-
-        it("is a no-op when the target viewer already has the same entry", function()
-            local profile = {
-                extraIcons = {
-                    viewers = {
-                        utility = { { kind = "spell", ids = { 12345 } } },
-                        main = { { kind = "spell", ids = { 12345 } } },
-                    },
-                },
-            }
-
-            ExtraIconsOptions._moveEntry(profile, "utility", "main", 1)
-
-            assert.are.equal(1, #profile.extraIcons.viewers.utility)
-            assert.are.equal(1, #profile.extraIcons.viewers.main)
-        end)
-    end)
-
-    describe("_parseSingleId", function()
+    describe("ExtraIconsShared.ParseSingleId", function()
         it("parses a single integer ID", function()
-            assert.are.equal(12345, ExtraIconsOptions._parseSingleId("12345"))
+            assert.are.equal(12345, ns.ExtraIconsShared.ParseSingleId("12345"))
         end)
 
         it("returns nil for empty or invalid input", function()
-            assert.is_nil(ExtraIconsOptions._parseSingleId(""))
-            assert.is_nil(ExtraIconsOptions._parseSingleId("abc"))
-            assert.is_nil(ExtraIconsOptions._parseSingleId("1.5"))
-            assert.is_nil(ExtraIconsOptions._parseSingleId("-4"))
+            assert.is_nil(ns.ExtraIconsShared.ParseSingleId(""))
+            assert.is_nil(ns.ExtraIconsShared.ParseSingleId("abc"))
+            assert.is_nil(ns.ExtraIconsShared.ParseSingleId("1.5"))
+            assert.is_nil(ns.ExtraIconsShared.ParseSingleId("-4"))
         end)
     end)
 
-    describe("_resolveDraftEntryPreview", function()
-        local savedCSpell, savedCItem
-
-        before_each(function()
-            savedCSpell = _G.C_Spell
-            savedCItem = _G.C_Item
-            _G.C_Spell = {
-                GetSpellName = function(spellId)
-                    return spellId == 12345 and "Test Spell" or nil
-                end,
-                GetSpellTexture = function(spellId)
-                    return spellId == 12345 and "spell-tex" or nil
-                end,
-            }
-            _G.C_Item = {
-                DoesItemExistByID = function(itemId)
-                    return itemId == 777
-                end,
-                GetItemNameByID = function(itemId)
-                    return itemId == 777 and "Test Item" or nil
-                end,
-                GetItemIconByID = function(itemId)
-                    return itemId == 777 and "item-tex" or nil
-                end,
-                RequestLoadItemDataByID = function() end,
-            }
-        end)
-
-        after_each(function()
-            _G.C_Spell = savedCSpell
-            _G.C_Item = savedCItem
-        end)
-
-        it("returns spell preview text and icon", function()
-            local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview("spell", "12345")
-            assert.are.equal("resolved", status)
-            assert.are.equal("Test Spell", name)
-            assert.are.equal("spell-tex", icon)
-        end)
-
-        it("returns item preview text and icon", function()
-            local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview("item", "777")
-            assert.are.equal("resolved", status)
-            assert.are.equal("Test Item", name)
-            assert.are.equal("item-tex", icon)
-        end)
-
-        it("returns pending for items that exist but are not loaded yet", function()
-            _G.C_Item = {
-                DoesItemExistByID = function(itemId)
-                    return itemId == 555
-                end,
-                GetItemNameByID = function()
-                    return nil
-                end,
-                GetItemIconByID = function(itemId)
-                    return itemId == 555 and "pending-item-tex" or nil
-                end,
-                RequestLoadItemDataByID = function() end,
-            }
-
-            local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview("item", "555")
-            assert.are.equal("pending", status)
-            assert.is_nil(name)
-            assert.are.equal("pending-item-tex", icon)
-        end)
-    end)
-
-    describe("_getEntryIcon", function()
-        local savedTexture, savedCItem, savedCSpell
-
-        before_each(function()
-            savedTexture = _G.GetInventoryItemTexture
-            savedCItem = _G.C_Item
-            savedCSpell = _G.C_Spell
-            _G.GetInventoryItemTexture = function(_, slotId)
-                return slotId == 13 and "trinket1-tex" or nil
-            end
-            _G.C_Item = {
-                GetItemIconByID = function(itemId)
-                    if itemId == 245898 then return "potion-tex" end
-                    if itemId == 99999 then return "custom-item-tex" end
-                    return nil
-                end,
-            }
-            _G.C_Spell = {
-                GetSpellTexture = function(spellId)
-                    if spellId == 59752 then return "racial-tex" end
-                    if spellId == 12345 then return "spell-tex" end
-                    return nil
-                end,
-            }
-        end)
-
-        after_each(function()
-            _G.GetInventoryItemTexture = savedTexture
-            _G.C_Item = savedCItem
-            _G.C_Spell = savedCSpell
-        end)
-
-        it("returns equip slot texture for trinket stacks", function()
-            assert.are.equal("trinket1-tex",
-                ExtraIconsOptions._getEntryIcon({ stackKey = "trinket1" }))
-        end)
-
-        it("returns item icon for item stacks", function()
-            assert.are.equal("potion-tex",
-                ExtraIconsOptions._getEntryIcon({ kind = "itemStack", itemStackId = "combatPotions" }))
-        end)
-
-        it("returns spell texture for spell entries", function()
-            assert.are.equal("racial-tex",
-                ExtraIconsOptions._getEntryIcon({ kind = "spell", ids = { 59752 } }))
-        end)
-
-        it("returns spell texture for table-style spell ids", function()
-            assert.are.equal("spell-tex",
-                ExtraIconsOptions._getEntryIcon({ kind = "spell", ids = { { spellId = 12345 } } }))
-        end)
-
-        it("returns item icon for custom item entries", function()
-            assert.are.equal("custom-item-tex",
-                ExtraIconsOptions._getEntryIcon({ kind = "item", ids = { { itemID = 99999 } } }))
-        end)
-
-        it("returns nil for unknown entry", function()
-            assert.is_nil(ExtraIconsOptions._getEntryIcon({}))
-        end)
-
-        it("returns nil for unknown stackKey", function()
-            assert.is_nil(ExtraIconsOptions._getEntryIcon({ stackKey = "nonexistent" }))
-        end)
-
+    describe("GetItemQualityMarkup", function()
         it("formats quality rank markup for item entries", function()
             assert.are.equal(
                 "|AProfessions-ChatIcon-Quality-12-Tier2|a",
                 ExtraIconsOptions.GetItemQualityMarkup({ itemID = 245898 })
             )
             assert.is_nil(ExtraIconsOptions.GetItemQualityMarkup({ itemID = 5512 }))
-        end)
-    end)
-
-    describe("_isRacialForCurrentPlayer", function()
-        local savedUnitRace
-
-        before_each(function()
-            savedUnitRace = _G.UnitRace
-        end)
-
-        after_each(function()
-            _G.UnitRace = savedUnitRace
-        end)
-
-        it("returns true for non-spell entries", function()
-            _G.UnitRace = function() return "Human", "Human", 1 end
-            assert.is_true(ExtraIconsOptions._isRacialForCurrentPlayer({ stackKey = "trinket1" }))
-        end)
-
-        it("returns true for current race's racial", function()
-            _G.UnitRace = function() return "Human", "Human", 1 end
-            assert.is_true(ExtraIconsOptions._isRacialForCurrentPlayer({ kind = "spell", ids = { 59752 } }))
-        end)
-
-        it("returns false for another race's racial", function()
-            _G.UnitRace = function() return "Human", "Human", 1 end
-            -- Orc racial (Blood Fury = 33697)
-            assert.is_false(ExtraIconsOptions._isRacialForCurrentPlayer({ kind = "spell", ids = { 33697 } }))
-        end)
-
-        it("returns true for non-racial spell entries", function()
-            _G.UnitRace = function() return "Human", "Human", 1 end
-            assert.is_true(ExtraIconsOptions._isRacialForCurrentPlayer({ kind = "spell", ids = { 12345 } }))
-        end)
-
-        it("returns false for table-style racial ids from another race", function()
-            _G.UnitRace = function() return "Orc", "Orc", 2 end
-            -- Human racial (Every Man for Himself = 59752)
-            assert.is_false(ExtraIconsOptions._isRacialForCurrentPlayer(
-                { kind = "spell", ids = { { spellId = 59752 } } }))
-        end)
-
-        it("returns true when UnitRace returns unknown race", function()
-            _G.UnitRace = function() return "Unknown", "Unknown", 99 end
-            assert.is_true(ExtraIconsOptions._isRacialForCurrentPlayer({ kind = "spell", ids = { 33697 } }))
-        end)
-    end)
-
-    describe("_isCurrentRacialEntry", function()
-        local savedUnitRace
-
-        before_each(function()
-            savedUnitRace = _G.UnitRace
-            _G.UnitRace = function() return "Human", "Human", 1 end
-        end)
-
-        after_each(function()
-            _G.UnitRace = savedUnitRace
-        end)
-
-        it("returns true for the current player's racial", function()
-            assert.is_true(ExtraIconsOptions._isCurrentRacialEntry({ kind = "spell", ids = { 59752 } }))
-        end)
-
-        it("returns true for alternate ids of the current player's racial", function()
-            _G.UnitRace = function() return "Dracthyr", "Dracthyr", 70 end
-
-            assert.is_true(ExtraIconsOptions._isCurrentRacialEntry({ kind = "spell", ids = { 368970 } }))
-        end)
-
-        it("returns false for non-racial entries", function()
-            assert.is_false(ExtraIconsOptions._isCurrentRacialEntry({ stackKey = "trinket1" }))
-        end)
-    end)
-
-    describe("_buildViewerRows", function()
-        local savedUnitRace
-        local savedCSpellBook
-        local savedGetInventoryItemID
-        local savedCItem
-
-        before_each(function()
-            savedUnitRace = _G.UnitRace
-            savedCSpellBook = _G.C_SpellBook
-            savedGetInventoryItemID = _G.GetInventoryItemID
-            savedCItem = _G.C_Item
-            _G.UnitRace = function() return "Human", "Human", 1 end
-            _G.C_SpellBook = {
-                IsSpellKnown = function()
-                    return false
-                end,
-            }
-            _G.GetInventoryItemID = function(_, slotId)
-                if slotId == 13 then return 10001 end
-                if slotId == 14 then return 10002 end
-                return nil
-            end
-            _G.C_Item = {
-                GetItemSpell = function(itemId)
-                    if itemId == 10001 then return "Trinket 1 Use", 90001 end
-                    if itemId == 10002 then return "Trinket 2 Use", 90002 end
-                    return nil, nil
-                end,
-            }
-        end)
-
-        after_each(function()
-            _G.UnitRace = savedUnitRace
-            _G.C_SpellBook = savedCSpellBook
-            _G.GetInventoryItemID = savedGetInventoryItemID
-            _G.C_Item = savedCItem
-        end)
-
-        it("adds builtin and current-racial placeholders to utility when absent", function()
-            local viewers = {
-                utility = { { stackKey = "trinket1" } },
-                main = {},
-            }
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local hasTrinketEntry = false
-            local hasTrinketPlaceholder = false
-            local hasRacialPlaceholder = false
-            for _, row in ipairs(rows) do
-                hasTrinketEntry = hasTrinketEntry
-                    or (row.rowType == "entry" and row.displayEntry and row.displayEntry.stackKey == "trinket1")
-                hasTrinketPlaceholder = hasTrinketPlaceholder
-                    or (row.rowType == "builtinPlaceholder" and row.stackKey == "trinket2")
-                hasRacialPlaceholder = hasRacialPlaceholder
-                    or (row.rowType == "racialPlaceholder" and row.spellId == 59752)
-            end
-
-            assert.is_true(hasTrinketEntry)
-            assert.is_true(hasTrinketPlaceholder)
-            assert.is_true(hasRacialPlaceholder)
-        end)
-
-        it("hides foreign-race racials from built rows", function()
-            local viewers = {
-                utility = {
-                    { kind = "spell", ids = { 33697 } },
-                    { stackKey = "trinket1" },
-                },
-                main = {},
-            }
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local hasTrinket1 = false
-            local hasForeignRacial = false
-            for _, row in ipairs(rows) do
-                hasTrinket1 = hasTrinket1
-                    or (row.rowType == "entry" and row.displayEntry and row.displayEntry.stackKey == "trinket1")
-                hasForeignRacial = hasForeignRacial
-                    or (row.displayEntry and row.displayEntry.ids and row.displayEntry.ids[1] == 33697)
-            end
-
-            assert.is_true(hasTrinket1)
-            assert.is_false(hasForeignRacial)
-        end)
-
-        it("hides stored trinket rows without an on-use spell", function()
-            local viewers = {
-                utility = {
-                    { stackKey = "trinket1" },
-                    { kind = "itemStack", itemStackId = "healthstones" },
-                },
-                main = {},
-            }
-
-            _G.C_Item = {
-                GetItemSpell = function(itemId)
-                    if itemId == 10002 then return "Trinket 2 Use", 90002 end
-                    return nil, nil
-                end,
-            }
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local hasTrinket1 = false
-            for _, row in ipairs(rows) do
-                if row.displayEntry and row.displayEntry.stackKey == "trinket1" then
-                    hasTrinket1 = true
-                    break
-                end
-            end
-
-            assert.is_false(hasTrinket1)
-            local hasHealthstones = false
-            for _, row in ipairs(rows) do
-                hasHealthstones = hasHealthstones
-                    or (row.displayEntry and row.displayEntry.itemStackId == "healthstones")
-            end
-            assert.is_true(hasHealthstones)
-        end)
-
-        it("matches Shadowmeld from the UnitRace race file token", function()
-            local viewers = {
-                utility = {},
-                main = {},
-            }
-
-            _G.UnitRace = function() return "Night Elf", "NightElf", 4 end
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local racialPlaceholder
-            for _, row in ipairs(rows) do
-                if row.rowType == "racialPlaceholder" then
-                    racialPlaceholder = row
-                end
-            end
-
-            assert.are.equal(58984, assert(racialPlaceholder).spellId)
-        end)
-
-        it("matches Tail Swipe from the Dracthyr race file token", function()
-            local viewers = {
-                utility = {},
-                main = {},
-            }
-
-            _G.UnitRace = function() return "Dracthyr", "Dracthyr", 70 end
-
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local racialPlaceholder
-            for _, row in ipairs(rows) do
-                if row.rowType == "racialPlaceholder" then
-                    racialPlaceholder = row
-                end
-            end
-
-            assert.are.equal(357214, assert(racialPlaceholder).spellId)
-            assert.are.same({ 357214, 368970 }, racialPlaceholder.displayEntry.ids)
-        end)
-
-        it("does not synthesize a racial placeholder when UnitRace has no matching race file token", function()
-            local viewers = {
-                utility = {},
-                main = {},
-            }
-
-            _G.UnitRace = function() return "Night Elf", nil, 4 end
-            local rows = ExtraIconsOptions._buildViewerRows(viewers, "utility")
-            local hasRacialPlaceholder = false
-            for _, row in ipairs(rows) do
-                hasRacialPlaceholder = hasRacialPlaceholder or row.rowType == "racialPlaceholder"
-            end
-
-            assert.is_false(hasRacialPlaceholder)
         end)
     end)
 end)
@@ -896,11 +212,12 @@ describe("ExtraIconsOptions settings page", function()
         end
 
         TestHelpers.CollectSettings(function()
+            TestHelpers.LoadChunk("UI/ExtraIconsShared.lua", "ExtraIconsShared")(nil, ns)
             TestHelpers.LoadChunk("UI/ExtraIconsOptions.lua", "ExtraIconsOptions")(nil, ns)
             capturedPage = ns.ExtraIconsOptions.pages[1]
             local _, _, page = TestHelpers.RegisterSectionSpec(SB, ns.ExtraIconsOptions)
             registeredPage = page
-            ns.ExtraIconsOptions.SetRegisteredPage(page)
+            ns.ExtraIconsOptions.OnInitialize()
         end)
         ns.ExtraIconsOptions.EnsureItemLoadFrame()
         registeredPage.Refresh = function()
@@ -1014,7 +331,61 @@ describe("ExtraIconsOptions settings page", function()
         activeRacial.actions.delete.onClick()
 
         assert.is_false(popupShown)
-        assert.is_false(ns.ExtraIconsOptions._isRacialPresent(profile.extraIcons.viewers, 58984))
+        assert.are.same({}, profile.extraIcons.viewers.utility)
+    end)
+
+    it("hides racial spell entries that belong to another race", function()
+        _G.UnitRace = function() return "Human", "Human", 1 end
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return spellId == 58984 and "Shadowmeld" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return spellId == 58984 and "shadowmeld-tex" or nil
+            end,
+        }
+        profile.extraIcons.viewers.utility = {
+            { kind = "spell", ids = { 58984 } },
+        }
+
+        assert.is_nil(findItem("utility", function(item)
+            return item.label == "Shadowmeld"
+        end))
+        assert.is_not_nil(findItem("utility", function(item)
+            return item.actions.delete.tooltip == ns.L["ADD_ENTRY"]
+        end))
+    end)
+
+    it("recognizes current racial entries stored under alternate spell ids", function()
+        _G.UnitRace = function() return "Dracthyr", "Dracthyr", 52 end
+        _G.C_Spell = {
+            GetSpellName = function(spellId)
+                return (spellId == 357214 or spellId == 368970) and "Tail Swipe" or nil
+            end,
+            GetSpellTexture = function(spellId)
+                return (spellId == 357214 or spellId == 368970) and "tail-swipe-tex" or nil
+            end,
+        }
+        profile.extraIcons.viewers.utility = {
+            { kind = "spell", ids = { { spellId = 368970 } } },
+        }
+
+        local currentRacial = assert(findItem("utility", function(item)
+            return item.label == "Tail Swipe"
+        end))
+        assert.are.equal(ns.L["REMOVE_TOOLTIP"], currentRacial.actions.delete.tooltip)
+        assert.is_nil(findItem("utility", function(item)
+            return item.actions.delete.tooltip == ns.L["ADD_ENTRY"]
+        end))
+
+        local popupShown = false
+        _G.StaticPopup_Show = function()
+            popupShown = true
+        end
+        currentRacial.actions.delete.onClick()
+
+        assert.is_false(popupShown)
+        assert.are.same({}, profile.extraIcons.viewers.utility)
     end)
 
     it("maps row actions to built-in button texture states", function()

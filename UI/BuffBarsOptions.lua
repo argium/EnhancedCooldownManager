@@ -12,17 +12,19 @@ ns.BuffBarsOptions = BuffBarsOptions
 local SpellColorsPage = ns.SpellColorsPage
 local isBuffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate(C.SCOPE_BUFFBARS)
 
-SpellColorsPage.RegisterSection({
-    key = C.SCOPE_BUFFBARS,
-    label = L["AURA_BARS"],
-    scope = C.SCOPE_BUFFBARS,
-    isDisabledDelegate = SpellColorsPage.CreateSectionDisabledDelegate(C.SCOPE_BUFFBARS, "BuffBars"),
-    ownerModuleName = "BuffBars",
-})
-
 local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
 local layoutMovedButton = ns.OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton
 layoutMovedButton.id = "layoutMovedButton"
+
+function BuffBarsOptions.OnInitialize()
+    SpellColorsPage:RegisterSection({
+        key = C.SCOPE_BUFFBARS,
+        label = L["AURA_BARS"],
+        scope = C.SCOPE_BUFFBARS,
+        isDisabledDelegate = SpellColorsPage:CreateSectionDisabledDelegate(C.SCOPE_BUFFBARS),
+        ownerModuleName = "BuffBars",
+    })
+end
 
 BuffBarsOptions.key = "buffBars"
 BuffBarsOptions.name = L["AURA_BARS"]

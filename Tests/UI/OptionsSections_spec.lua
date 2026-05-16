@@ -80,6 +80,7 @@ describe("Options root assembly", function()
             return {
                 key = key,
                 name = name,
+                OnInitialize = function() end,
                 pages = {
                     {
                         key = "main",
@@ -96,13 +97,15 @@ describe("Options root assembly", function()
         ns.RuneBarOptions = placeholderSection("runeBar", ns.L["RUNE_BAR"])
         ns.BuffBarsOptions = placeholderSection("buffBars", ns.L["AURA_BARS"])
         ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
+        ns.ItemStacksOptions = { OnInitialize = function() end }
+        ns.PowerBarTickMarksOptions = { OnInitialize = function() end }
         ns.ProfileOptions = placeholderSection("profile", ns.L["PROFILES"])
         ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
         ns.SpellColorsPage = {
-            CreatePage = function(name)
+            CreatePage = function(_, name)
                 return { key = "spellColors", name = name, rows = {} }
             end,
-            SetRegisteredPage = function() end,
+            OnInitialize = function() end,
         }
 
         assert.is_table(createdModule)

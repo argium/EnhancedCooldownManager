@@ -5,6 +5,7 @@
 local _, ns = ...
 local C = ns.Constants
 local L = ns.L
+local Shared = ns.ExtraIconsShared
 
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_EXTRA_ICON"] =
     ns.OptionUtil.MakeConfirmDialog(L["REMOVE_ENTRY_CONFIRM"])
@@ -64,17 +65,8 @@ end
 local function getProfile() return ns.Addon.db.profile end
 local function getViewers() return getProfile().extraIcons.viewers end
 
-local function getItemStacks()
-    local extraIcons = getProfile().extraIcons
-    extraIcons.itemStacks = extraIcons.itemStacks or { nextId = 1, order = {}, byId = {} }
-    extraIcons.itemStacks.order = extraIcons.itemStacks.order or {}
-    extraIcons.itemStacks.byId = extraIcons.itemStacks.byId or {}
-    extraIcons.itemStacks.nextId = extraIcons.itemStacks.nextId or 1
-    return extraIcons.itemStacks
-end
-
 local function getItemStack(stackId)
-    return stackId and getItemStacks().byId[stackId] or nil
+    return stackId and Shared.EnsureItemStacks(getProfile()).byId[stackId] or nil
 end
 
 local function getItemStackName(stackId)
@@ -82,39 +74,13 @@ local function getItemStackName(stackId)
     return itemStack and itemStack.name or nil
 end
 
-local function getFirstStackIdAlphabetically(itemStacks)
-    local ids = {}
-    for _, stackId in ipairs(itemStacks.order) do
-        if itemStacks.byId[stackId] then
-            ids[#ids + 1] = stackId
-        end
-    end
-    table.sort(ids, function(a, b)
-        local left = itemStacks.byId[a]
-        local right = itemStacks.byId[b]
-        local leftName = tostring(left and left.name or a):lower()
-        local rightName = tostring(right and right.name or b):lower()
-        if leftName == rightName then
-            return tostring(a) < tostring(b)
-        end
-        return leftName < rightName
-    end)
-    return ids[1]
-end
-
 local function ensureSelectedItemStackId(viewerKey)
     viewerKey = viewerKey or DEFAULT_SPECIAL_VIEWER
-    local itemStacks = getItemStacks()
-    local selected = ExtraIconsOptions._selectedItemStackIds[viewerKey]
-    if selected and itemStacks.byId[selected] then
-        return selected
-    end
-    selected = getFirstStackIdAlphabetically(itemStacks)
+    local itemStacks = Shared.EnsureItemStacks(getProfile())
+    local selected = Shared.ResolveSelectedStackId(itemStacks, ExtraIconsOptions._selectedItemStackIds[viewerKey])
     ExtraIconsOptions._selectedItemStackIds[viewerKey] = selected
     return selected
 end
-
-local function getSelectedItemStackName(viewerKey) return getItemStackName(ensureSelectedItemStackId(viewerKey)) end
 
 local function refreshPage()
     if registeredPage then
@@ -122,7 +88,7 @@ local function refreshPage()
     end
 end
 
-local function doAction(fn)
+local function doActionAndUpdateLayout(fn)
     if fn then
         fn()
     end
@@ -167,10 +133,8 @@ local function entryHasAnySpellId(entry, spellIds)
     return false
 end
 
-local function getItemIdFromEntry(entry) return type(entry) == "table" and (entry.itemID or entry.itemId) or entry end
-
 local function getItemProfessionQualityInfo(itemEntry)
-    local itemId = getItemIdFromEntry(itemEntry)
+    local itemId = Shared.GetItemIdFromEntry(itemEntry)
     if not itemId then return nil end
     return C_TradeSkillUI.GetItemCraftedQualityInfo(itemId) or C_TradeSkillUI.GetItemReagentQualityInfo(itemId)
 end
@@ -186,7 +150,7 @@ end
 local function buildEntry(kind, ids)
     local entryIds = {}
     for _, id in ipairs(ids) do
-        entryIds[#entryIds + 1] = kind == "item" and { itemID = getItemIdFromEntry(id) } or id
+        entryIds[#entryIds + 1] = kind == "item" and { itemID = Shared.GetItemIdFromEntry(id) } or id
     end
     return { kind = kind, ids = entryIds }
 end
@@ -212,28 +176,75 @@ local function getCurrentRacialSpellIds()
     return racial and getRacialSpellIds(racial) or nil
 end
 
-local function getItemDisplayName(itemId)
-    if not itemId then
+local function getEntryName(entry)
+    if entry.stackKey then
+        local stack = BUILTIN_STACKS[entry.stackKey]
+        if not stack then
+            return entry.stackKey
+        end
+        if stack.kind == "equipSlot" then
+            local itemId = GetInventoryItemID("player", stack.slotId)
+            local itemName = itemId and Shared.GetItemDisplayName(itemId, ExtraIconsOptions._pendingItemLoads)
+            if itemName then
+                return ("%s [%s]"):format(stack.label, itemName)
+            end
+        end
+        return stack.label
+    end
+
+    if entry.kind == "spell" and entry.ids then
+        local spellId = getEntrySpellId(entry)
+        return getSpellName(spellId) or ("Spell " .. tostring(spellId))
+    end
+
+    if entry.kind == "item" and entry.ids then
+        return Shared.GetItemDisplayName(Shared.GetItemIdFromEntry(entry.ids[1]), ExtraIconsOptions._pendingItemLoads)
+    end
+
+    if entry.kind == "itemStack" then
+        return getItemStackName(entry.itemStackId) or L["ITEM_STACK_MISSING"]
+    end
+
+    return "Unknown"
+end
+
+local function getEntryIcon(entry)
+    if entry.stackKey then
+        local stack = BUILTIN_STACKS[entry.stackKey]
+        if not stack then
+            return nil
+        end
+        if stack.kind == "equipSlot" then
+            return GetInventoryItemTexture("player", stack.slotId)
+        end
+        if stack.ids and stack.ids[1] then
+            local itemId = Shared.GetItemIdFromEntry(stack.ids[1])
+            return itemId and C_Item.GetItemIconByID(itemId)
+        end
         return nil
     end
 
-    local name = C_Item.GetItemNameByID(itemId)
-    if name then
-        ExtraIconsOptions._pendingItemLoads[itemId] = nil
-        return name
+    if entry.kind == "spell" then
+        return getSpellTexture(getEntrySpellId(entry))
     end
 
-    if C_Item.DoesItemExistByID(itemId) then
-        ExtraIconsOptions._pendingItemLoads[itemId] = true
-        C_Item.RequestLoadItemDataByID(itemId)
-        return L["EXTRA_ICONS_ITEM_LOADING"]
+    if entry.kind == "item" and entry.ids then
+        local itemId = Shared.GetItemIdFromEntry(entry.ids[1])
+        return itemId and C_Item.GetItemIconByID(itemId)
     end
 
-    return "Item " .. tostring(itemId)
+    if entry.kind == "itemStack" then
+        local itemStack = getItemStack(entry.itemStackId)
+        local first = itemStack and itemStack.ids and itemStack.ids[1]
+        local itemId = Shared.GetItemIdFromEntry(first)
+        return itemId and C_Item.GetItemIconByID(itemId)
+    end
+
+    return nil
 end
 
 local function getEntryTooltipTitle(entry)
-    local name = ExtraIconsOptions._getEntryName(entry)
+    local name = getEntryName(entry)
     if entry.kind == "spell" then
         local id = getEntrySpellId(entry)
         if id then
@@ -241,7 +252,7 @@ local function getEntryTooltipTitle(entry)
         end
     end
     if entry.kind == "item" and entry.ids and entry.ids[1] then
-        local id = getItemIdFromEntry(entry.ids[1])
+        local id = Shared.GetItemIdFromEntry(entry.ids[1])
         if id then
             return ("%s (item ID %s)"):format(name, id)
         end
@@ -271,7 +282,7 @@ local function getEntryIdentityKey(entry)
         if entry.kind == "spell" then
             parts[#parts + 1] = tostring(type(id) == "table" and id.spellId or id)
         else
-            parts[#parts + 1] = tostring(getItemIdFromEntry(id))
+            parts[#parts + 1] = tostring(Shared.GetItemIdFromEntry(id))
         end
     end
     return table.concat(parts, ":")
@@ -287,6 +298,53 @@ local function findViewerEntry(viewers, predicate, ignoreViewerKey, ignoreIndex)
         end
     end
     return nil, nil, nil
+end
+
+local function findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
+    local candidateKey = getEntryIdentityKey(candidateEntry)
+    if not candidateKey then
+        return nil, nil
+    end
+
+    return findViewerEntry(viewers, function(entry)
+        return getEntryIdentityKey(entry) == candidateKey
+    end, ignoreViewerKey, ignoreIndex)
+end
+
+local function isDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
+    return findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex) ~= nil
+end
+
+local function isStackKeyPresent(viewers, stackKey)
+    return findDuplicateEntry(viewers, { stackKey = stackKey }) ~= nil
+end
+
+local function isRacialPresent(viewers, spellIds)
+    return findViewerEntry(viewers, function(entry)
+        return entryHasAnySpellId(entry, spellIds)
+    end) ~= nil
+end
+
+local function isCurrentRacialEntry(entry)
+    return entryHasAnySpellId(entry, getCurrentRacialSpellIds())
+end
+
+local function isRacialForCurrentPlayer(entry)
+    if not (entry and entry.kind == "spell" and entry.ids) then
+        return true
+    end
+
+    local hasRacialSpell = false
+    for _, id in ipairs(entry.ids) do
+        local spellId = getSpellId(id)
+        if RACIAL_SPELL_IDS[spellId] then
+            hasRacialSpell = true
+            break
+        end
+    end
+
+    local currentSpellIds = getCurrentRacialSpellIds()
+    return not currentSpellIds or entryHasAnySpellId(entry, currentSpellIds) or not hasRacialSpell
 end
 
 local function showRowTooltip(owner, rowData)
@@ -322,13 +380,14 @@ local function showRowTooltip(owner, rowData)
     if ids and #ids > 0 then
         tip(L["EXTRA_ICONS_STACK_TOOLTIP_INTRO"])
         for _, itemEntry in ipairs(ids) do
-            local itemId = getItemIdFromEntry(itemEntry)
+            local itemId = Shared.GetItemIdFromEntry(itemEntry)
             local parts = {}
             local icon = itemId and C_Item.GetItemIconByID(itemId)
             if icon then
                 parts[#parts + 1] = CreateTextureMarkup(icon, 64, 64, 14, 14, 0, 1, 0, 1)
             end
-            parts[#parts + 1] = getItemDisplayName(itemId) or ("Item " .. tostring(itemId))
+            parts[#parts + 1] = Shared.GetItemDisplayName(itemId, ExtraIconsOptions._pendingItemLoads)
+                or ("Item " .. tostring(itemId))
             local qualityMarkup = ExtraIconsOptions.GetItemQualityMarkup(itemEntry)
             if qualityMarkup then
                 parts[#parts + 1] = qualityMarkup
@@ -340,9 +399,7 @@ local function showRowTooltip(owner, rowData)
     GameTooltip:Show()
 end
 
-function ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) return ExtraIconsOptions._findDuplicateEntry(viewers, { stackKey = stackKey }) ~= nil end
-
-function ExtraIconsOptions._shouldShowBuiltinStackRow(stackKey)
+local function shouldShowBuiltinStackRow(stackKey)
     local stack = stackKey and BUILTIN_STACKS[stackKey]
     if not stack or stack.kind ~= "equipSlot" then
         return true
@@ -355,139 +412,42 @@ function ExtraIconsOptions._shouldShowBuiltinStackRow(stackKey)
     return spellId ~= nil
 end
 
-function ExtraIconsOptions._isRacialPresent(viewers, spellIds)
-    return findViewerEntry(viewers, function(entry)
-        return entryHasAnySpellId(entry, spellIds)
-    end) ~= nil
+local function shouldShowEntryRow(entry)
+    return isRacialForCurrentPlayer(entry) and (not entry.stackKey or shouldShowBuiltinStackRow(entry.stackKey))
 end
 
-function ExtraIconsOptions._isCurrentRacialEntry(entry) return entryHasAnySpellId(entry, getCurrentRacialSpellIds()) end
-
-function ExtraIconsOptions._isRacialForCurrentPlayer(entry)
-    if not (entry and entry.kind == "spell" and entry.ids) then
-        return true
-    end
-
-    local hasRacialSpell = false
-    for _, id in ipairs(entry.ids) do
-        local spellId = getSpellId(id)
-        if RACIAL_SPELL_IDS[spellId] then
-            hasRacialSpell = true
-            break
-        end
-    end
-
-    local currentSpellIds = getCurrentRacialSpellIds()
-    return not currentSpellIds or entryHasAnySpellId(entry, currentSpellIds) or not hasRacialSpell
-end
-
-local function shouldShowEntryRow(entry) return ExtraIconsOptions._isRacialForCurrentPlayer(entry) and (not entry.stackKey or ExtraIconsOptions._shouldShowBuiltinStackRow(entry.stackKey)) end
-
-function ExtraIconsOptions._getEntryName(entry)
-    if entry.stackKey then
-        local stack = BUILTIN_STACKS[entry.stackKey]
-        if not stack then
-            return entry.stackKey
-        end
-        if stack.kind == "equipSlot" then
-            local itemId = GetInventoryItemID("player", stack.slotId)
-            local itemName = itemId and getItemDisplayName(itemId)
-            if itemName then
-                return ("%s [%s]"):format(stack.label, itemName)
-            end
-        end
-        return stack.label
-    end
-
-    if entry.kind == "spell" and entry.ids then
-        local spellId = getEntrySpellId(entry)
-        return getSpellName(spellId) or ("Spell " .. tostring(spellId))
-    end
-
-    if entry.kind == "item" and entry.ids then
-        return getItemDisplayName(getItemIdFromEntry(entry.ids[1]))
-    end
-
-    if entry.kind == "itemStack" then
-        return getItemStackName(entry.itemStackId) or L["ITEM_STACK_MISSING"]
-    end
-
-    return "Unknown"
-end
-
-function ExtraIconsOptions._getEntryIcon(entry)
-    if entry.stackKey then
-        local stack = BUILTIN_STACKS[entry.stackKey]
-        if not stack then
-            return nil
-        end
-        if stack.kind == "equipSlot" then
-            return GetInventoryItemTexture("player", stack.slotId)
-        end
-        if stack.ids and stack.ids[1] then
-            local itemId = getItemIdFromEntry(stack.ids[1])
-            return itemId and C_Item.GetItemIconByID(itemId)
-        end
-        return nil
-    end
-
-    if entry.kind == "spell" then
-        return getSpellTexture(getEntrySpellId(entry))
-    end
-
-    if entry.kind == "item" and entry.ids then
-        local itemId = getItemIdFromEntry(entry.ids[1])
-        return itemId and C_Item.GetItemIconByID(itemId)
-    end
-
-    if entry.kind == "itemStack" then
-        local itemStack = getItemStack(entry.itemStackId)
-        local first = itemStack and itemStack.ids and itemStack.ids[1]
-        local itemId = getItemIdFromEntry(first)
-        return itemId and C_Item.GetItemIconByID(itemId)
-    end
-
-    return nil
-end
-
-function ExtraIconsOptions._addStackKey(profile, viewerKey, stackKey)
+local function addStackKey(profile, viewerKey, stackKey)
     local viewers = profile.extraIcons.viewers
-    if not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then appendViewerEntry(viewers, viewerKey, { stackKey = stackKey }) end
+    if not isStackKeyPresent(viewers, stackKey) then appendViewerEntry(viewers, viewerKey, { stackKey = stackKey }) end
 end
 
-function ExtraIconsOptions._addRacial(profile, viewerKey, spellIds)
+local function addRacial(profile, viewerKey, spellIds)
     local viewers = profile.extraIcons.viewers
-    if not ExtraIconsOptions._isRacialPresent(viewers, spellIds) then
+    if not isRacialPresent(viewers, spellIds) then
         appendViewerEntry(viewers, viewerKey, buildEntry("spell", type(spellIds) == "table" and spellIds or { spellIds }))
     end
 end
 
-function ExtraIconsOptions._addCustomEntry(profile, viewerKey, kind, ids)
+local function addCustomEntry(profile, viewerKey, kind, ids)
     local viewers = profile.extraIcons.viewers
     local entry = buildEntry(kind, ids)
-    if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
+    if not isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
 end
 
-function ExtraIconsOptions._addItemStackEntry(profile, viewerKey, itemStackId)
+local function addItemStackEntry(profile, viewerKey, itemStackId)
     local viewers = profile.extraIcons.viewers
     local entry = { kind = "itemStack", itemStackId = itemStackId }
-    if not ExtraIconsOptions._isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
+    if not isDuplicateEntry(viewers, entry) then appendViewerEntry(viewers, viewerKey, entry) end
 end
 
-function ExtraIconsOptions._removeEntry(profile, viewerKey, index)
+local function removeEntry(profile, viewerKey, index)
     local entries = profile.extraIcons.viewers[viewerKey]
     if entries and index >= 1 and index <= #entries then table.remove(entries, index) end
 end
 
-function ExtraIconsOptions._setEntryDisabled(profile, viewerKey, index, disabled)
-    local entries = profile.extraIcons.viewers[viewerKey]
-    local entry = entries and entries[index]
-    if entry then entry.disabled = disabled and true or nil end
-end
-
-function ExtraIconsOptions._toggleBuiltinRow(profile, viewerKey, index, stackKey)
+local function toggleBuiltinRow(profile, viewerKey, index, stackKey)
     if not index then
-        ExtraIconsOptions._addStackKey(profile, viewerKey, stackKey)
+        addStackKey(profile, viewerKey, stackKey)
         return
     end
 
@@ -495,17 +455,17 @@ function ExtraIconsOptions._toggleBuiltinRow(profile, viewerKey, index, stackKey
     if entry then entry.disabled = not entry.disabled and true or nil end
 end
 
-function ExtraIconsOptions._toggleCurrentRacialRow(profile, viewerKey, index, spellIds)
+local function toggleCurrentRacialRow(profile, viewerKey, index, spellIds)
     if index then
-        ExtraIconsOptions._removeEntry(profile, viewerKey, index)
+        removeEntry(profile, viewerKey, index)
         return
     end
     if spellIds then
-        ExtraIconsOptions._addRacial(profile, viewerKey, spellIds)
+        addRacial(profile, viewerKey, spellIds)
     end
 end
 
-function ExtraIconsOptions._reorderEntry(profile, viewerKey, index, direction)
+local function reorderEntry(profile, viewerKey, index, direction)
     local entries = profile.extraIcons.viewers[viewerKey]
     if not entries then
         return
@@ -531,13 +491,13 @@ function ExtraIconsOptions._reorderEntry(profile, viewerKey, index, direction)
     end
 end
 
-function ExtraIconsOptions._moveEntry(profile, fromViewer, toViewer, index)
+local function moveEntry(profile, fromViewer, toViewer, index)
     local viewers = profile.extraIcons.viewers
     local from = viewers[fromViewer]
     if not from or index < 1 or index > #from then
         return
     end
-    if ExtraIconsOptions._findDuplicateEntry(viewers, from[index], fromViewer, index) == toViewer then
+    if findDuplicateEntry(viewers, from[index], fromViewer, index) == toViewer then
         return
     end
 
@@ -545,18 +505,7 @@ function ExtraIconsOptions._moveEntry(profile, fromViewer, toViewer, index)
     appendViewerEntry(viewers, toViewer, entry)
 end
 
-function ExtraIconsOptions._parseSingleId(text)
-    if not text or text == "" then
-        return nil
-    end
-    local num = tonumber(text)
-    if not num or num <= 0 or num ~= math.floor(num) then
-        return nil
-    end
-    return num
-end
-
-function ExtraIconsOptions._resolveDraftEntryPreview(kind, text, viewerKey)
+local function resolveDraftEntryPreview(kind, text, viewerKey)
     if kind == "itemStack" then
         local itemStackId = ensureSelectedItemStackId(viewerKey)
         local itemStack = itemStackId and getItemStack(itemStackId)
@@ -564,11 +513,11 @@ function ExtraIconsOptions._resolveDraftEntryPreview(kind, text, viewerKey)
             return "invalid", nil, nil
         end
         local first = itemStack.ids and itemStack.ids[1]
-        local itemId = getItemIdFromEntry(first)
+        local itemId = Shared.GetItemIdFromEntry(first)
         return "resolved", itemStack.name, itemId and C_Item.GetItemIconByID(itemId) or nil
     end
 
-    local id = ExtraIconsOptions._parseSingleId(text)
+    local id = Shared.ParseSingleId(text)
     if not id then
         return "invalid", nil, nil
     end
@@ -590,26 +539,12 @@ function ExtraIconsOptions._resolveDraftEntryPreview(kind, text, viewerKey)
             return "resolved", name, icon
         end
 
-        ExtraIconsOptions._pendingItemLoads[id] = true
-        C_Item.RequestLoadItemDataByID(id)
+        Shared.RequestItemLoad(ExtraIconsOptions._pendingItemLoads, id)
         return "pending", nil, icon
     end
 
     return "invalid", nil, nil
 end
-
-function ExtraIconsOptions._findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex)
-    local candidateKey = getEntryIdentityKey(candidateEntry)
-    if not candidateKey then
-        return nil, nil
-    end
-
-    return findViewerEntry(viewers, function(entry)
-        return getEntryIdentityKey(entry) == candidateKey
-    end, ignoreViewerKey, ignoreIndex)
-end
-
-function ExtraIconsOptions._isDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex) return ExtraIconsOptions._findDuplicateEntry(viewers, candidateEntry, ignoreViewerKey, ignoreIndex) ~= nil end
 
 local function makeRowData(rowType, viewerKey, displayEntry, index)
     local isPlaceholder = rowType ~= "entry"
@@ -622,13 +557,13 @@ local function makeRowData(rowType, viewerKey, displayEntry, index)
         spellIds = displayEntry.kind == "spell" and displayEntry.ids or nil,
         displayEntry = displayEntry,
         isBuiltin = displayEntry.stackKey ~= nil,
-        isCurrentRacial = rowType == "racialPlaceholder" or ExtraIconsOptions._isCurrentRacialEntry(displayEntry),
+        isCurrentRacial = rowType == "racialPlaceholder" or isCurrentRacialEntry(displayEntry),
         isPlaceholder = isPlaceholder,
         isDisabled = isPlaceholder or displayEntry.disabled == true,
     }
 end
 
-function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
+local function buildViewerRows(viewers, viewerKey)
     local activeRows, disabledBuiltinRows = {}, {}
     for index, entry in ipairs(viewers[viewerKey] or {}) do
         if shouldShowEntryRow(entry) then
@@ -656,15 +591,15 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
                 rows[#rows + 1] = rowData
             end
         elseif viewerKey == DEFAULT_SPECIAL_VIEWER
-            and ExtraIconsOptions._shouldShowBuiltinStackRow(stackKey)
-            and not ExtraIconsOptions._isStackKeyPresent(viewers, stackKey) then
+            and shouldShowBuiltinStackRow(stackKey)
+            and not isStackKeyPresent(viewers, stackKey) then
             rows[#rows + 1] = makeRowData("builtinPlaceholder", viewerKey, { stackKey = stackKey })
         end
     end
 
     if viewerKey == DEFAULT_SPECIAL_VIEWER then
         local racialSpellIds = getCurrentRacialSpellIds()
-        if racialSpellIds and not ExtraIconsOptions._isRacialPresent(viewers, racialSpellIds) then
+        if racialSpellIds and not isRacialPresent(viewers, racialSpellIds) then
             rows[#rows + 1] = makeRowData("racialPlaceholder", viewerKey, buildEntry("spell", racialSpellIds))
         end
     end
@@ -672,7 +607,10 @@ function ExtraIconsOptions._buildViewerRows(viewers, viewerKey)
     return rows
 end
 
-function ExtraIconsOptions.SetRegisteredPage(page) registeredPage = page end
+function ExtraIconsOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("extraIcons", "main")
+    ExtraIconsOptions.EnsureItemLoadFrame()
+end
 
 function ExtraIconsOptions.EnsureItemLoadFrame()
     local itemLoadFrame = ExtraIconsOptions._itemLoadFrame
@@ -704,15 +642,15 @@ local function getDraftDuplicateInfo(viewerKey)
         if not selected then
             return false, nil
         end
-        local dupViewer = ExtraIconsOptions._findDuplicateEntry(getViewers(), { kind = "itemStack", itemStackId = selected })
+        local dupViewer = findDuplicateEntry(getViewers(), { kind = "itemStack", itemStackId = selected })
         return dupViewer ~= nil, dupViewer
     end
 
-    local id = ExtraIconsOptions._parseSingleId(ds.idText)
+    local id = Shared.ParseSingleId(ds.idText)
     if not id then
         return false, nil
     end
-    local dupViewer = ExtraIconsOptions._findDuplicateEntry(getViewers(), buildEntry(ds.kind, { id }))
+    local dupViewer = findDuplicateEntry(getViewers(), buildEntry(ds.kind, { id }))
     return dupViewer ~= nil, dupViewer
 end
 
@@ -724,21 +662,21 @@ local function addDraftEntry(viewerKey)
         if not itemStackId or isDuplicate then
             return false
         end
-        ExtraIconsOptions._addItemStackEntry(getProfile(), viewerKey, itemStackId)
-        doAction()
+        addItemStackEntry(getProfile(), viewerKey, itemStackId)
+        doActionAndUpdateLayout()
         return true
     end
 
-    local status = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
+    local status = resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
     local isDuplicate = getDraftDuplicateInfo(viewerKey)
     if status ~= "resolved" or isDuplicate then
         return false
     end
 
-    local id = ExtraIconsOptions._parseSingleId(ds.idText)
-    ExtraIconsOptions._addCustomEntry(getProfile(), viewerKey, ds.kind, { id })
+    local id = Shared.ParseSingleId(ds.idText)
+    addCustomEntry(getProfile(), viewerKey, ds.kind, { id })
     ds.idText = ""
-    doAction()
+    doActionAndUpdateLayout()
     return true
 end
 
@@ -748,7 +686,7 @@ end
 
 local function profileAction(fn)
     return function()
-        doAction(function()
+        doActionAndUpdateLayout(function()
             fn(getProfile())
         end)
     end
@@ -762,7 +700,7 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
             not controlsDisabled,
             rowData.isDisabled and L["ENABLE_TOOLTIP"] or L["EXTRA_ICONS_HIDE_TOOLTIP"],
             profileAction(function(profile)
-                ExtraIconsOptions._toggleBuiltinRow(
+                toggleBuiltinRow(
                     profile,
                     rowData.viewerKey,
                     rowData.index,
@@ -774,21 +712,21 @@ local function getDeleteAction(rowData, displayEntry, controlsDisabled)
 
     if rowData.isCurrentRacial and rowData.isPlaceholder then
         return makeAction("+", ACTION_BUTTON_TEXTURES.show, not controlsDisabled, L["ADD_ENTRY"], profileAction(function(profile)
-            ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellIds)
+            toggleCurrentRacialRow(profile, rowData.viewerKey, nil, rowData.spellIds)
         end))
     end
 
     if rowData.isCurrentRacial then
         return makeAction("x", ACTION_BUTTON_TEXTURES.delete, not controlsDisabled, L["REMOVE_TOOLTIP"],
             profileAction(function(profile)
-                ExtraIconsOptions._toggleCurrentRacialRow(profile, rowData.viewerKey, rowData.index)
+                toggleCurrentRacialRow(profile, rowData.viewerKey, rowData.index)
             end))
     end
 
     return makeAction("x", ACTION_BUTTON_TEXTURES.delete, not controlsDisabled, L["REMOVE_TOOLTIP"], function()
-        StaticPopup_Show("ECM_CONFIRM_REMOVE_EXTRA_ICON", ExtraIconsOptions._getEntryName(displayEntry), nil, {
+        StaticPopup_Show("ECM_CONFIRM_REMOVE_EXTRA_ICON", getEntryName(displayEntry), nil, {
             onAccept = profileAction(function(profile)
-                ExtraIconsOptions._removeEntry(profile, rowData.viewerKey, rowData.index)
+                removeEntry(profile, rowData.viewerKey, rowData.index)
             end),
         })
     end)
@@ -797,7 +735,7 @@ end
 local function makeReorderAction(rowData, text, buttonTextures, enabled, direction)
     return makeAction(text, buttonTextures, enabled, direction < 0 and L["MOVE_UP_TOOLTIP"] or L["MOVE_DOWN_TOOLTIP"],
         profileAction(function(profile)
-            ExtraIconsOptions._reorderEntry(profile, rowData.viewerKey, rowData.index, direction)
+            reorderEntry(profile, rowData.viewerKey, rowData.index, direction)
         end))
 end
 
@@ -816,7 +754,7 @@ local function buildActionItem(rowData)
     local displayEntry = rowData.displayEntry
     local otherViewer = rowData.viewerKey == "utility" and "main" or "utility"
     local dupViewer = rowData.index ~= nil
-        and ExtraIconsOptions._findDuplicateEntry(getViewers(), displayEntry, rowData.viewerKey, rowData.index) or nil
+        and findDuplicateEntry(getViewers(), displayEntry, rowData.viewerKey, rowData.index) or nil
     local hasMoveDup = dupViewer == otherViewer
     local posLocked = rowData.isBuiltin and rowData.isDisabled
     local canReorder = not controlsDisabled and rowData.activeIndex ~= nil and not posLocked
@@ -824,8 +762,8 @@ local function buildActionItem(rowData)
     local moveTextures = rowData.viewerKey == "utility" and ACTION_BUTTON_TEXTURES.moveRight or ACTION_BUTTON_TEXTURES.moveLeft
 
     return {
-        label = ExtraIconsOptions._getEntryName(displayEntry),
-        icon = ExtraIconsOptions._getEntryIcon(displayEntry) or 134400,
+        label = getEntryName(displayEntry),
+        icon = getEntryIcon(displayEntry) or 134400,
         disabled = rowData.isDisabled,
         onEnter = function(owner)
             showRowTooltip(owner, rowData)
@@ -845,7 +783,7 @@ local function buildActionItem(rowData)
                     return getMoveTooltip(hasMoveDup, posLocked, otherViewer)
                 end,
                 profileAction(function(profile)
-                    ExtraIconsOptions._moveEntry(profile, rowData.viewerKey, otherViewer, rowData.index)
+                    moveEntry(profile, rowData.viewerKey, otherViewer, rowData.index)
                 end)
             ),
             delete = getDeleteAction(rowData, displayEntry, controlsDisabled),
@@ -857,7 +795,7 @@ local function buildModeInputTrailer(viewerKey)
     local ds = draftStates[viewerKey]
 
     local function getPreviewState()
-        local status, name, icon = ExtraIconsOptions._resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
+        local status, name, icon = resolveDraftEntryPreview(ds.kind, ds.idText, viewerKey)
         local isDup, dupViewer = getDraftDuplicateInfo(viewerKey)
         return status, name, icon, isDup, dupViewer
     end
@@ -886,7 +824,7 @@ local function buildModeInputTrailer(viewerKey)
         modeTooltip = L["EXTRA_ICONS_DRAFT_TYPE_TOOLTIP"],
         inputType = function() return ds.kind == "itemStack" and "dropdown" or "text" end,
         inputEnabled = function() return ds.kind ~= "itemStack" or ensureSelectedItemStackId(viewerKey) ~= nil end,
-        inputValues = ExtraIconsOptions.BuildItemStackValues,
+        inputValues = function() return Shared.BuildItemStackValues(Shared.EnsureItemStacks(getProfile())) end,
         inputValue = function()
             local stackId = ensureSelectedItemStackId(viewerKey)
             return stackId and tostring(stackId) or ""
@@ -894,7 +832,9 @@ local function buildModeInputTrailer(viewerKey)
         onInputValueChanged = function(value)
             ExtraIconsOptions._selectedItemStackIds[viewerKey] = tonumber(value) or value
         end,
-        inputText = function() return ds.kind == "itemStack" and (getSelectedItemStackName(viewerKey) or "") or ds.idText end,
+        inputText = function()
+            return ds.kind == "itemStack" and (getItemStackName(ensureSelectedItemStackId(viewerKey)) or "") or ds.idText
+        end,
         placeholder = function()
             if ds.kind == "spell" then return L["EXTRA_ICONS_SPELL_ID_PLACEHOLDER"] end
             if ds.kind == "item" then return L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"] end
@@ -932,7 +872,7 @@ function ExtraIconsOptions.BuildSections()
     local sections = {}
     for _, viewerKey in ipairs(VIEWER_ORDER) do
         local items = {}
-        for _, rowData in ipairs(ExtraIconsOptions._buildViewerRows(viewers, viewerKey)) do
+        for _, rowData in ipairs(buildViewerRows(viewers, viewerKey)) do
             items[#items + 1] = buildActionItem(rowData)
         end
         sections[#sections + 1] = {
@@ -946,20 +886,8 @@ function ExtraIconsOptions.BuildSections()
     return sections
 end
 
-function ExtraIconsOptions.BuildItemStackValues()
-    local itemStacks = getItemStacks()
-    local values = {}
-    for _, stackId in ipairs(itemStacks.order) do
-        local itemStack = itemStacks.byId[stackId]
-        if itemStack then
-            values[tostring(stackId)] = itemStack.name
-        end
-    end
-    return values
-end
-
 function ExtraIconsOptions.ResetToDefaults()
-    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    local defaults = ns.Addon.db.defaults.profile
     if not (defaults and defaults.extraIcons) then
         return
     end
@@ -970,11 +898,11 @@ function ExtraIconsOptions.ResetToDefaults()
         draftStates[viewerKey].idText = ""
     end
     ExtraIconsOptions._selectedItemStackIds = {}
-    doAction()
+    doActionAndUpdateLayout()
 end
 
 local function canResetToDefaults()
-    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    local defaults = ns.Addon.db.defaults.profile
     return defaults and defaults.extraIcons ~= nil
 end
 
