@@ -215,13 +215,6 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
         return
     end
 
-    -- When "hide when inactive" is disabled, bar frames stay visible with no active
-    -- aura. An empty name means no aura is assigned; the normal background applies.
-    local nameText = bar.Name and type(bar.Name.GetText) == "function" and bar.Name:GetText()
-    if not nameText or nameText == "" then
-        return
-    end
-
     -- Match the foreground bar's texture so timeless auras render with the
     -- user's configured statusbar texture instead of the solid fallback
     -- already set by styleBarBackground. Prefer the module-level override
@@ -231,7 +224,6 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     if texture and type(barBG.SetTexture) == "function" then
         barBG:SetTexture(texture)
     end
-
     local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)
     if ok then
         barBG:SetVertexColor(r, g, b, a or 1)
@@ -333,7 +325,12 @@ local function styleChildBar(module, frame, config, globalConfig, spellColors)
     local barBG = FrameUtil.GetBarBackground(bar)
     styleBarBackground(frame, barBG, config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, spellColors, 0)
-    styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
+    -- Only fill the background solid for bars that are actively tracking a cooldown.
+    -- cooldownID is set when a cooldown is running (including timeless auras); it is
+    -- nil/0 when "hide when inactive" is off and the configured aura is not yet active.
+    if frame.cooldownID and frame.cooldownID ~= 0 then
+        styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
+    end
 
     FrameUtil.ApplyFont(bar.Name, globalConfig, config)
     FrameUtil.ApplyFont(bar.Duration, globalConfig, config)

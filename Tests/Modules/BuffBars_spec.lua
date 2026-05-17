@@ -1173,13 +1173,16 @@ describe("BuffBars real source", function()
 
         it("keeps the normal background for an empty bar slot when hide-when-inactive is off", function()
             -- When Blizzard's "hide when inactive" is disabled, bar frames remain
-            -- visible with no active aura. Their status bar values are 0/0, just like
-            -- timeless auras, but the name text is cleared. The timeless background
+            -- visible even when the configured aura is not yet active. Their status
+            -- bar values are 0/0 like a timeless aura, and the spell name IS set
+            -- (the slot is configured for the spell). The only reliable signal is
+            -- cooldownID: it is nil/0 when no cooldown is running, and non-zero
+            -- when a cooldown is active (including timeless). The timeless background
             -- treatment must not apply; the configured background color must be kept.
             local child = makeStyledChild("Slot", true, 1)
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
-            child.Bar.Name.GetText = function() return "" end
+            child.cooldownID = nil  -- no running cooldown (inactive configured slot)
             local bgRegion = makeBarBackground()
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
