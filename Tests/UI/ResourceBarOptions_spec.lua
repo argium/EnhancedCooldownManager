@@ -8,7 +8,7 @@ local TestHelpers =
 describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
     local profile, defaults, SB, ns, settings, capturedPage
-    local emptyIcon = "|TInterface\\Buttons\\WHITE8X8:14:14:0:0:8:8:0:0:0:0|t"
+    local emptyIcon = "|TInterface\\Buttons\\WHITE8X8:14:14:0:0:8:8:0:0:0:0:0:0:0:0|t"
 
     local function getPageRow(path)
         for _, row in ipairs(capturedPage.rows) do

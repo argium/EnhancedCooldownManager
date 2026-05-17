@@ -8,7 +8,12 @@ local L = ns.L
 local COLOR_WHITE_HEX = C.COLOR_WHITE_HEX or "FFFFFF"
 local RESOURCE_ICON_SIZE = 14
 local RESOURCE_ICON_SLOTS = 2
-local EMPTY_RESOURCE_ICON = "|TInterface\\Buttons\\WHITE8X8:14:14:0:0:8:8:0:0:0:0|t"
+local EMPTY_RESOURCE_ICON =
+    "|TInterface\\Buttons\\WHITE8X8:"
+    .. RESOURCE_ICON_SIZE
+    .. ":"
+    .. RESOURCE_ICON_SIZE
+    .. ":0:0:8:8:0:0:0:0:0:0:0:0|t"
 
 local function createResourceClassIcon(className)
     return "|A:classicon-" .. string.lower(className) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
@@ -17,14 +22,16 @@ end
 local function createResourceColorName(colorClassName, label, iconClasses)
     local color = (C.CLASS_COLORS and C.CLASS_COLORS[colorClassName]) or COLOR_WHITE_HEX
     local prefix = ""
-    local padding = RESOURCE_ICON_SLOTS - #iconClasses
+    local iconCount = math.min(#iconClasses, RESOURCE_ICON_SLOTS)
+    local padding = math.max(0, RESOURCE_ICON_SLOTS - iconCount)
+    local startIndex = math.max(1, #iconClasses - RESOURCE_ICON_SLOTS + 1)
 
     for _ = 1, padding do
         prefix = prefix .. EMPTY_RESOURCE_ICON
     end
 
-    for _, className in ipairs(iconClasses) do
-        prefix = prefix .. createResourceClassIcon(className)
+    for i = startIndex, #iconClasses do
+        prefix = prefix .. createResourceClassIcon(iconClasses[i])
     end
 
     return prefix .. " |cff" .. color .. label .. "|r"
@@ -50,7 +57,7 @@ local RESOURCE_COLOR_DEFS = {
     -- {
     --     -- Secret 2026/03
     --     key = Enum.PowerType.ArcaneCharges,
-    --     name = createResourceColorName("MAGE", L["RESOURCE_ARCANE_CHARGES"]),
+    --     name = createResourceColorName("MAGE", L["RESOURCE_ARCANE_CHARGES"], { "MAGE" }),
     -- },
     {
         key = Enum.PowerType.Chi,
