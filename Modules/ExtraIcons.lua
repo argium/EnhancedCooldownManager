@@ -102,7 +102,7 @@ local function getSharedOffsets(viewers)
     return offsets
 end
 
-local function updateViewerAnchor(vs, blizzFrame, rightFrame)
+local function updateMainViewerAnchor(vs, blizzFrame, rightFrame)
     local anchor = vs and vs.anchorFrame
     if not anchor then return end
 
@@ -500,7 +500,7 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
         applyPoint(vs, blizzFrame, sharedOffsetX)
         if isEditing then vs.originalPoint = nil end
         container:Hide()
-        if viewer.ownsAnchor then updateViewerAnchor(vs, blizzFrame, nil) end
+        if viewer.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
         return false
     end
 
@@ -582,7 +582,7 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
     container:SetPoint("LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0)
     container:Show()
 
-    if viewer.ownsAnchor then updateViewerAnchor(vs, blizzFrame, container) end
+    if viewer.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
     return true
 end
 
