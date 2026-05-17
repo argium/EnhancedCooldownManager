@@ -40,6 +40,14 @@ describe("ItemStacksOptions settings page", function()
         scheduledReasons = {}
     end
 
+    local function getStackAction(text)
+        for _, action in ipairs(getRow("selectedStackActions").actions) do
+            if action.text == text then
+                return action
+            end
+        end
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
     end)
@@ -93,10 +101,11 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("checkbox", getRow("showStackIfMissing").type)
         assert.are.equal("sectionList", getRow("itemStackItems").type)
         assert.are.equal("button", getRow("renameItemStack").type)
-        assert.are.equal("button", getRow("deleteItemStack").type)
-        assert.are.equal("button", getRow("revertItemStack").type)
+        assert.are.equal("pageActions", getRow("selectedStackActions").type)
+        assert.is_table(getStackAction(ns.L["DELETE"]))
+        assert.is_table(getStackAction(ns.L["REVERT"]))
 
-        local ratedIndex, missingIndex, itemsIndex, renameIndex, deleteIndex, revertIndex
+        local ratedIndex, missingIndex, itemsIndex, renameIndex, actionsIndex
         for index, row in ipairs(page.rows) do
             if row.id == "hideStackInRatedPvp" then
                 ratedIndex = index
@@ -106,16 +115,13 @@ describe("ItemStacksOptions settings page", function()
                 itemsIndex = index
             elseif row.id == "renameItemStack" then
                 renameIndex = index
-            elseif row.id == "deleteItemStack" then
-                deleteIndex = index
-            elseif row.id == "revertItemStack" then
-                revertIndex = index
+            elseif row.id == "selectedStackActions" then
+                actionsIndex = index
             end
         end
         assert.are.equal(ratedIndex + 1, missingIndex)
         assert.are.equal(missingIndex + 1, itemsIndex)
-        assert.are.equal(renameIndex + 1, deleteIndex)
-        assert.are.equal(deleteIndex + 1, revertIndex)
+        assert.are.equal(renameIndex + 1, actionsIndex)
     end)
 
     it("shows the layout preview while the item stacks page is open", function()
@@ -304,9 +310,10 @@ describe("ItemStacksOptions settings page", function()
         profile.extraIcons.viewers.utility = { { kind = "itemStack", itemStackId = 1 } }
         profile.extraIcons.viewers.main = { { kind = "itemStack", itemStackId = 1 } }
 
-        assert.is_false(getRow("deleteItemStack").disabled())
-        assert.is_true(getRow("revertItemStack").disabled())
-        getRow("deleteItemStack").onClick()
+        local deleteAction = getStackAction(ns.L["DELETE"])
+        assert.is_false(deleteAction.hidden())
+        assert.is_true(getStackAction(ns.L["REVERT"]).hidden())
+        deleteAction.onClick()
 
         assert.is_nil(profile.extraIcons.itemStacks.byId[1])
         assert.same({}, profile.extraIcons.itemStacks.order)
@@ -373,15 +380,15 @@ describe("ItemStacksOptions settings page", function()
 
         assert.is_true(getRow("renameItemStack").disabled())
         assert.is_nil(getRow("renameItemStack").hidden)
-        assert.is_true(getRow("deleteItemStack").disabled())
-        assert.is_false(getRow("revertItemStack").disabled())
+        assert.is_true(getStackAction(ns.L["DELETE"]).hidden())
+        assert.is_false(getStackAction(ns.L["REVERT"]).hidden())
 
         getRow("renameItemStack").onClick({ page = registeredPage })
-        getRow("deleteItemStack").onClick()
+        getStackAction(ns.L["DELETE"]).onClick()
         assert.is_not_nil(profile.extraIcons.itemStacks.byId.combatPotions)
 
         local getShownPopupName = TestHelpers.InstallPopupAutoAccept()
-        getRow("revertItemStack").onClick()
+        getStackAction(ns.L["REVERT"]).onClick()
 
         assert.are.equal("ECM_CONFIRM_REVERT_ITEM_STACK", getShownPopupName())
         assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)

@@ -380,11 +380,6 @@ local function disableManagedStackActions()
     return stackId == nil or isDefaultStackId(stackId)
 end
 
-local function disableDefaultStackActions()
-    local stackId = getSelectedStackId()
-    return stackId == nil or not isDefaultStackId(stackId)
-end
-
 local function openCreateDialog(ctx)
     StaticPopup_Show("ECM_CREATE_ITEM_STACK", nil, nil, {
         popupKey = "ECM_CREATE_ITEM_STACK",
@@ -580,24 +575,30 @@ ItemStacksOptions.page = {
             onClick = openRenameDialog,
         },
         {
-            id = "deleteItemStack",
-            type = "button",
-            name = L["DELETE_ITEM_STACK"],
-            buttonText = L["DELETE"],
-            tooltip = L["DELETE_ITEM_STACK_DESC"],
-            disabled = disableManagedStackActions,
+            id = "selectedStackActions",
+            type = "pageActions",
+            height = 28,
             layout = false,
-            onClick = openDeleteDialog,
-        },
-        {
-            id = "revertItemStack",
-            type = "button",
-            name = L["REVERT_ITEM_STACK"],
-            buttonText = L["REVERT"],
-            tooltip = L["REVERT_ITEM_STACK_DESC"],
-            disabled = disableDefaultStackActions,
-            layout = false,
-            onClick = revertSelectedStack,
+            actions = {
+                {
+                    text = L["DELETE"],
+                    tooltip = L["DELETE_ITEM_STACK_DESC"],
+                    enabled = function() return not isNoStackSelected() end,
+                    hidden = function() return isDefaultStackId(getSelectedStackId()) end,
+                    onClick = function()
+                        openDeleteDialog({ page = registeredPage })
+                    end,
+                },
+                {
+                    text = L["REVERT"],
+                    tooltip = L["REVERT_ITEM_STACK_DESC"],
+                    enabled = function() return not isNoStackSelected() end,
+                    hidden = function() return not isDefaultStackId(getSelectedStackId()) end,
+                    onClick = function()
+                        revertSelectedStack({ page = registeredPage })
+                    end,
+                },
+            },
         },
     },
 }
