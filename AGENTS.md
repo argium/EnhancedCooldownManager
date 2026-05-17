@@ -37,6 +37,13 @@ luacheck . -q
 
 # Core Rules
 
+## Working Values
+
+- Less code is better: prefer the smallest complete solution that preserves behavior.
+- Keep implementation direct and explicit; avoid clever indirection, speculative abstractions, and compatibility paths without a current supported need.
+- Prefer deleting duplication, dead code, and trivial wrappers over adding new layers.
+- Document architecture changes where they help future maintainers understand ownership and flow.
+
 All Lua files start with:
 
 ```lua

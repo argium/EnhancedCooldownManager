@@ -18,7 +18,7 @@ Each module owns its own reference doc with a summary table, actor diagram, comp
 
 ## Startup and the generic event pulse
 
-Cross-cutting view: addon startup, then the generic event → Runtime → module layout pulse. Per-scenario flows (profile change, Edit Mode, options, import/export, per-module data events) live in the module reference docs.
+Cross-cutting view: addon startup, then the generic event → Runtime → module layout pulse. Red regions identify changed architecture. Per-scenario flows (profile change, Edit Mode, options, import/export, per-module data events) live in the module reference docs.
 
 ```mermaid
 sequenceDiagram
@@ -45,14 +45,15 @@ sequenceDiagram
     Runtime->>Module: UpdateLayout("ModuleInit")
     end
 
-    rect rgb(26,46,30)
-    note over Game,Module: Generic event pulse
+    rect rgb(74,20,20)
+    note over Game,Module: Generic event pulse (changed)
     Game->>Runtime: layout event fires
-    Runtime->>Runtime: handleLayoutEvent → RequestLayout / ScheduleLayoutUpdate
-    Runtime->>Runtime: executeLayout → updateFadeAndHiddenStates
+    Runtime->>Runtime: EVENT_TABLE[event] → scheduler:request(reason, delay)
+    Runtime->>Runtime: scheduler:flush(reason) → fadePolicy + updateAllLayouts
     Runtime->>Module: SetHidden / SetAlpha / UpdateLayout(reason)
     end
 ```
+
 
 ## Initialization Chain
 
@@ -133,14 +134,14 @@ flowchart TD
 
 ## Event Flow & Layout Pipeline
 
-WoW events funnel through `Runtime.lua` into one of three layout-request paths, all converging on `executeLayout()`.
+WoW events funnel through `Runtime.lua` into a data-driven scheduler path. Red nodes and regions identify changed or newly documented architecture.
 
 ```mermaid
 flowchart TD
     subgraph EVENTS["WoW Event Sources"]
         WOW_MOUNT["PLAYER_MOUNT_DISPLAY_CHANGED<br/>UNIT_ENTERED/EXITED_VEHICLE"]
-        WOW_COMBAT["PLAYER_REGEN_ENABLED (delay 0.1s)<br/>PLAYER_REGEN_DISABLED (immediate)"]
-        WOW_ZONE["ZONE_CHANGED_* (delay 0.1s)<br/>PLAYER_ENTERING_WORLD (delay 0.4s)"]
+        WOW_COMBAT["PLAYER_REGEN_ENABLED / DISABLED"]
+        WOW_ZONE["ZONE_CHANGED_* / PLAYER_ENTERING_WORLD"]
         WOW_SPEC["PLAYER_SPECIALIZATION_CHANGED<br/>UPDATE_SHAPESHIFT_FORM"]
         WOW_TARGET["PLAYER_TARGET_CHANGED"]
         WOW_CVAR["CVAR_UPDATE"]
@@ -154,45 +155,36 @@ flowchart TD
     end
 
     subgraph HOOKS["Frame Hooks (BuffBars / ExternalBars)"]
-        BB_SETPT["child:SetPoint hook<br/>→ restore anchors + restyle"]
-        BB_SHOW["child:OnShow hook<br/>→ restyle"]
-        BB_HIDE["child:OnHide hook"]
-        BB_VIEWER["viewer:OnShow / OnSizeChanged"]
-        EB_VIEWER["ExternalDefensivesFrame:UpdateAuras / OnShow / OnHide<br/>→ ExternalBars sync + RequestLayout"]
+        BB_HOOKS["BuffBars: SetPoint / OnShow / OnHide / viewer hooks"]
+        EB_HOOKS["ExternalBars: UpdateAuras / OnShow / OnHide"]
     end
 
-    subgraph RUNTIME["Runtime.lua — Event Dispatch"]
-        HANDLE["handleLayoutEvent(event)"]
-        CVAR_HANDLE["CVAR_UPDATE handler<br/>(cooldownViewerEnabled only)"]
+    subgraph RUNTIME["Runtime.lua — Event Dispatch (changed)"]
+        DISPATCH["EVENT_TABLE[event] lookup<br/>{ delay, combatFlag, handler? }"]
 
-        subgraph LAYOUT_PATHS["Three Layout Request Paths"]
+        subgraph SCHEDULER["One scheduler · state = { pending, delay, timer, reason }"]
             direction LR
-            REQ_LAY["RequestLayout(reason)<br/>Coalesce within frame<br/>C_Timer.After(0, exec)"]
-            SCHED["ScheduleLayoutUpdate(delay)<br/>Debounced, cancels prior<br/>C_Timer.NewTimer(delay, exec)"]
-            IMMED["UpdateLayoutImmediately()<br/>Synchronous execution<br/>(Edit Mode drag)"]
+            REQ_LAY["RequestLayout(reason)<br/>thin wrapper"]
+            SCHED["ScheduleLayoutUpdate(delay)<br/>thin wrapper"]
+            IMMED["UpdateLayoutImmediately()<br/>thin wrapper"]
+            FLUSH["scheduler:flush(reason)"]
+            REQ_LAY --> FLUSH
+            SCHED --> FLUSH
+            IMMED --> FLUSH
         end
-
-        EXEC_LAY["executeLayout(reason)"]
     end
 
-    subgraph EXECUTE["executeLayout — Common Endpoint"]
+    subgraph EXECUTE["flush(reason) — single body (changed)"]
         HOOK_CVS["hookCooldownViewerSettings()<br/>(one-time)"]
-        UPD_FADE["updateFadeAndHiddenStates()"]
+        UPD_FADE["fadePolicy(reason)"]
         UPD_ALL["updateAllLayouts(reason)"]
-
         HOOK_CVS --> UPD_FADE --> UPD_ALL
     end
 
-    subgraph FADE_LOGIC["updateFadeAndHiddenStates()"]
-        EDIT_CHK{"Edit Mode<br/>or Preview?"}
-        HIDE_CHK["Check: CVar off?<br/>Mounted? Resting OOC?"]
-        ALPHA_CHK["Check fade config:<br/>OOC fade + exceptions<br/>(instance, hostile, friendly)"]
-        SET_HIDDEN["setGloballyHidden(hidden)<br/>→ each module:SetHidden()"]
-        SET_ALPHA["setAlpha(alpha)<br/>→ each module.InnerFrame"]
-        ENFORCE["enforceBlizzardFrameState()<br/>→ show/hide/alpha Blizzard frames"]
-
-        EDIT_CHK -->|yes| SET_HIDDEN
-        EDIT_CHK -->|no| HIDE_CHK --> ALPHA_CHK --> SET_HIDDEN --> SET_ALPHA --> ENFORCE
+    subgraph FADE_LOGIC["fadePolicy — flat linear decision (changed)"]
+        DECIDE["decide() → (hidden, alpha)<br/>1. edit/preview → visible<br/>2. CVar off / mount / rest → hidden<br/>3. OOC fade + exceptions → reduced alpha<br/>4. else → 1.0"]
+        APPLY["apply(hidden, alpha)<br/>→ each module:SetHidden / SetAlpha<br/>→ enforceBlizzardFrameState()"]
+        DECIDE --> APPLY
     end
 
     subgraph UPDATE_ALL["updateAllLayouts(reason)"]
@@ -202,39 +194,90 @@ flowchart TD
         CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ExternalBars"]
         OTHER_LOOP["Remaining non-chain modules (if any)"]
         MOD_UPD["module:UpdateLayout(reason)"]
-
         INV_DET --> UPD_DET --> EXTRA_FIRST --> CHAIN_LOOP --> OTHER_LOOP --> MOD_UPD
     end
 
-    %% Event Sources → Runtime
-    WOW_MOUNT & WOW_COMBAT & WOW_ZONE & WOW_SPEC & WOW_TARGET & WOW_REST --> HANDLE
-    WOW_CVAR --> CVAR_HANDLE --> SCHED
-    HANDLE -->|"delay > 0"| SCHED
-    HANDLE -->|"delay = 0"| UPD_FADE
-
-    %% Module events → RequestLayout
+    WOW_MOUNT & WOW_COMBAT & WOW_ZONE & WOW_SPEC & WOW_TARGET & WOW_REST & WOW_CVAR --> DISPATCH
+    DISPATCH --> SCHEDULER
     PB_PWR & RB_AURA & BB_ZONE --> REQ_LAY
-
-    %% Hooks → RequestLayout
-    BB_SETPT & BB_SHOW & BB_HIDE & BB_VIEWER & EB_VIEWER --> REQ_LAY
-
-    %% All paths → executeLayout
-    REQ_LAY --> EXEC_LAY
-    SCHED --> EXEC_LAY
-    IMMED --> EXEC_LAY
-
-    EXEC_LAY --> EXECUTE
+    BB_HOOKS & EB_HOOKS --> REQ_LAY
+    FLUSH --> EXECUTE
     UPD_FADE --> FADE_LOGIC
     UPD_ALL --> UPDATE_ALL
 
     style EVENTS fill:#1a1a2e,stroke:#4cc9f0,color:#e0e0e0
     style MODULE_EVENTS fill:#1a1a2e,stroke:#22c55e,color:#e0e0e0
     style HOOKS fill:#1a1a2e,stroke:#f7a855,color:#e0e0e0
-    style RUNTIME fill:#16213e,stroke:#7a84f7,color:#e0e0e0
-    style EXECUTE fill:#1a1a2e,stroke:#f43f5e,color:#e0e0e0
-    style FADE_LOGIC fill:#1a1a2e,stroke:#a855f7,color:#e0e0e0
     style UPDATE_ALL fill:#1a1a2e,stroke:#22c55e,color:#e0e0e0
+
+    style RUNTIME fill:#2e1616,stroke:#ff4444,color:#ffe0e0
+    style SCHEDULER fill:#2e1616,stroke:#ff4444,color:#ffe0e0
+    style EXECUTE fill:#2e1616,stroke:#ff4444,color:#ffe0e0
+    style FADE_LOGIC fill:#2e1616,stroke:#ff4444,color:#ffe0e0
+
+    style DISPATCH fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style REQ_LAY fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style SCHED fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style IMMED fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style FLUSH fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style DECIDE fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    style APPLY fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
 ```
+
+### Intra-module Ownership Map
+
+The changed nodes identify implementation targets where wrappers, branch duplication, or repeated walkers should collapse into one owner.
+
+```mermaid
+flowchart LR
+    subgraph SC["SpellColors.lua"]
+        SC_OLD["selectPrimaryKey + buildKey branch<br/>+ normalizeKey type chain<br/>+ MakeKey/NormalizeKey/KeysMatch/MergeKeys wrappers"]
+        SC_NEW["KEY_FIELDS ordered list<br/>+ public API = file-locals directly"]
+        SC_OLD ==>|consolidate| SC_NEW
+    end
+
+    subgraph EB["ExternalBars.lua"]
+        EB_OLD["per-aura pcall closure<br/>+ two error branches<br/>+ getFrameShown/Alpha/Width/Height wrappers"]
+        EB_NEW["buildAuraState(index, info)<br/>+ bail(reason, err)<br/>+ inlined frame reads"]
+        EB_OLD ==>|consolidate| EB_NEW
+    end
+
+    subgraph EI["ExtraIcons.lua"]
+        EI_OLD["empty/populated branch duplication<br/>+ cachePoint/applyPoint/horizontalBounds<br/>+ _updateMainAnchor split<br/>+ main vs utility if-chains"]
+        EI_NEW["single linear _updateSingleViewer<br/>+ VIEWERS config table"]
+        EI_OLD ==>|consolidate| EI_NEW
+    end
+
+    subgraph MG["Migration.lua"]
+        MG_OLD["3× nested [class][spec][key] walkers<br/>(normalizeBuffBarsCache,<br/>repairSpellColorStores, perBar→perSpell)"]
+        MG_NEW["forEachClassSpecEntry(store, fn)<br/>+ flat callbacks"]
+        MG_OLD ==>|consolidate| MG_NEW
+    end
+
+    subgraph BM["BarMixin.lua"]
+        BM_OLD["free vs chain/detached branches<br/>in CalculateLayoutParams + ApplyFramePosition"]
+        BM_NEW["one params computation<br/>+ 1-or-2 anchor emit loop"]
+        BM_OLD ==>|consolidate| BM_NEW
+    end
+
+    subgraph EC["ECM.lua"]
+        EC_OLD["getErrorDebugStack / CombatState / Timestamp<br/>+ safeTableTostring closure-pcall"]
+        EC_NEW["tryCall(fn, ...) helper<br/>+ targeted pcall(pairs, tbl)"]
+        EC_OLD ==>|consolidate| EC_NEW
+    end
+
+    classDef changed fill:#5a1a1a,stroke:#ff4444,color:#ffe0e0
+    classDef changedNew fill:#2e1616,stroke:#ff4444,color:#ffe0e0
+    class SC_OLD,EB_OLD,EI_OLD,MG_OLD,BM_OLD,EC_OLD changed
+    class SC_NEW,EB_NEW,EI_NEW,MG_NEW,BM_NEW,EC_NEW changedNew
+    style SC fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+    style EB fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+    style EI fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+    style MG fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+    style BM fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+    style EC fill:#1a1a2e,stroke:#ff4444,color:#ffe0e0
+```
+
 
 ## Secondary Flows
 
