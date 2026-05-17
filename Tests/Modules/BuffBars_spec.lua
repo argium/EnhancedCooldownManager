@@ -138,6 +138,7 @@ describe("BuffBars real source", function()
         }
         child.cooldownInfo = { spellID = layoutIndex }
         child.cooldownID = 1000 + layoutIndex
+        child.auraInstanceID = 3000 + layoutIndex
         child.iconTextureFileID = 2000 + layoutIndex
         child.RefreshCooldownInfo = function() end
         return child
@@ -1175,14 +1176,14 @@ describe("BuffBars real source", function()
             -- When Blizzard's "hide when inactive" is disabled, bar frames remain
             -- visible even when the configured aura is not yet active. Their status
             -- bar values are 0/0 like a timeless aura, and the spell name IS set
-            -- (the slot is configured for the spell). The only reliable signal is
-            -- cooldownID: it is nil/0 when no cooldown is running, and non-zero
-            -- when a cooldown is active (including timeless). The timeless background
-            -- treatment must not apply; the configured background color must be kept.
+            -- (the slot is configured for the spell). cooldownID still identifies
+            -- the configured slot, so auraInstanceID is the reliable active-aura signal.
+            -- The timeless background treatment must not apply; the configured
+            -- background color must be kept.
             local child = makeStyledChild("Slot", true, 1)
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
-            child.cooldownID = nil  -- no running cooldown (inactive configured slot)
+            child.auraInstanceID = nil
             local bgRegion = makeBarBackground()
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()

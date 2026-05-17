@@ -325,10 +325,9 @@ local function styleChildBar(module, frame, config, globalConfig, spellColors)
     local barBG = FrameUtil.GetBarBackground(bar)
     styleBarBackground(frame, barBG, config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, spellColors, 0)
-    -- Only fill the background solid for bars that are actively tracking a cooldown.
-    -- cooldownID is set when a cooldown is running (including timeless auras); it is
-    -- nil/0 when "hide when inactive" is off and the configured aura is not yet active.
-    if frame.cooldownID and frame.cooldownID ~= 0 then
+    -- Only fill the background solid for bars with an active aura. cooldownID
+    -- identifies the configured slot, including inactive visible slots.
+    if frame.auraInstanceID then
         styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     end
 
