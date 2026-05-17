@@ -355,6 +355,7 @@ local function refreshCategory(builder, category)
     end
 
     interop.refreshVisibleSettingsFrames()
+    registry.applyReactiveControlStates(builder)
 end
 
 local function getCategoryName(builder, category)

@@ -90,14 +90,21 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("dropdown", getRow("selectedManagedItemStack").type)
         assert.are.equal("checkbox", getRow("hideStackInInstances").type)
         assert.are.equal("checkbox", getRow("hideStackInRatedPvp").type)
+        assert.are.equal("checkbox", getRow("showStackIfMissing").type)
         assert.are.equal("sectionList", getRow("itemStackItems").type)
         assert.are.equal("button", getRow("renameItemStack").type)
         assert.are.equal("button", getRow("deleteItemStack").type)
         assert.are.equal("button", getRow("revertItemStack").type)
 
-        local renameIndex, deleteIndex, revertIndex
+        local ratedIndex, missingIndex, itemsIndex, renameIndex, deleteIndex, revertIndex
         for index, row in ipairs(page.rows) do
-            if row.id == "renameItemStack" then
+            if row.id == "hideStackInRatedPvp" then
+                ratedIndex = index
+            elseif row.id == "showStackIfMissing" then
+                missingIndex = index
+            elseif row.id == "itemStackItems" then
+                itemsIndex = index
+            elseif row.id == "renameItemStack" then
                 renameIndex = index
             elseif row.id == "deleteItemStack" then
                 deleteIndex = index
@@ -105,6 +112,8 @@ describe("ItemStacksOptions settings page", function()
                 revertIndex = index
             end
         end
+        assert.are.equal(ratedIndex + 1, missingIndex)
+        assert.are.equal(missingIndex + 1, itemsIndex)
         assert.are.equal(renameIndex + 1, deleteIndex)
         assert.are.equal(deleteIndex + 1, revertIndex)
     end)
@@ -164,6 +173,7 @@ describe("ItemStacksOptions settings page", function()
         assert.same({ { itemID = 101 }, { itemID = 202 } }, profile.extraIcons.itemStacks.byId[1].ids)
 
         local firstRow = getSection().items[1]
+        assert.is_nil(firstRow.actions.missing)
         firstRow.actions.down.onClick()
         assert.same({ { itemID = 202 }, { itemID = 101 } }, profile.extraIcons.itemStacks.byId[1].ids)
 
@@ -328,19 +338,26 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("2", picker.get())
     end)
 
-    it("updates visibility checkboxes for the selected stack", function()
+    it("updates top-level checkboxes for the selected stack", function()
         createStack("Potions")
 
         local instances = getRow("hideStackInInstances")
         local rated = getRow("hideStackInRatedPvp")
+        local missing = getRow("showStackIfMissing")
         assert.is_false(instances.get())
         assert.is_false(rated.get())
+        assert.is_false(missing.get())
 
         instances.set(true)
         rated.set(true)
+        missing.set(true)
 
         assert.is_true(profile.extraIcons.itemStacks.byId[1].hideInInstances)
         assert.is_true(profile.extraIcons.itemStacks.byId[1].hideInRatedPvp)
+        assert.is_true(profile.extraIcons.itemStacks.byId[1].showIfMissing)
+
+        missing.set(false)
+        assert.is_nil(profile.extraIcons.itemStacks.byId[1].showIfMissing)
     end)
 
     it("protects default stacks and reverts them to defaults", function()

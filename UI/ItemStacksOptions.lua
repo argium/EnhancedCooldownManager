@@ -191,6 +191,13 @@ local function setStackVisibility(profile, stackId, key, value)
     end
 end
 
+local function setStackShowIfMissing(profile, stackId, value)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
+    if itemStack then
+        itemStack.showIfMissing = value and true or nil
+    end
+end
+
 local function addItem(profile, stackId, itemId)
     local itemStack = EnsureItemStacks(profile).byId[stackId]
     if not itemStack then
@@ -349,6 +356,18 @@ local function setSelectedVisibility(key, value)
     local stackId = getSelectedStackId()
     if stackId then
         setStackVisibility(getProfile(), stackId, key, value)
+    end
+end
+
+local function getSelectedShowIfMissing()
+    local itemStack = getSelectedStack()
+    return itemStack and itemStack.showIfMissing == true or false
+end
+
+local function setSelectedShowIfMissing(value)
+    local stackId = getSelectedStackId()
+    if stackId then
+        setStackShowIfMissing(getProfile(), stackId, value)
     end
 end
 
@@ -521,6 +540,21 @@ ItemStacksOptions.page = {
             set = function(value)
                 setSelectedVisibility("hideInRatedPvp", value)
             end,
+            disabled = isNoStackSelected,
+            onSet = function(ctx)
+                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ctx.page:Refresh()
+            end,
+        },
+        {
+            id = "showStackIfMissing",
+            type = "checkbox",
+            key = "showStackIfMissing",
+            name = L["SHOW_IF_MISSING"],
+            tooltip = L["SHOW_IF_MISSING_TOOLTIP"],
+            layout = false,
+            get = getSelectedShowIfMissing,
+            set = setSelectedShowIfMissing,
             disabled = isNoStackSelected,
             onSet = function(ctx)
                 ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")

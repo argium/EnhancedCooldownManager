@@ -130,9 +130,14 @@ local _, ns = ...
 
 ---@class ECM_ItemStackConfig Named item priority list.
 ---@field name string Display name.
----@field ids table Ordered item priority list.
+---@field ids ECM_ItemStackEntry[] Ordered item priority list.
 ---@field hideInInstances boolean|nil Whether to hide in non-PvP instances.
 ---@field hideInRatedPvp boolean|nil Whether to hide in rated PvP maps.
+---@field showIfMissing boolean|nil Gets whether to show this stack greyscale when its active item is missing from inventory.
+
+---@class ECM_ItemStackEntry Item priority entry.
+---@field itemID number Gets the item ID.
+---@field quality number|nil Gets the profession quality rank for display.
 
 ---@class ECM_ItemStacksConfig Item stack collection.
 ---@field nextId number Next stable custom item stack ID.

@@ -121,12 +121,15 @@ local function resolveEquipSlot(slotId)
     return { itemId = itemId, texture = texture, slotId = slotId }
 end
 
-local function resolveItem(ids)
+local function resolveItem(ids, showIfMissing)
     for _, entry in ipairs(ids) do
         local itemId = entry.itemID or entry.itemId
         if itemId and C_Item.GetItemCount(itemId) > 0 then
             local texture = C_Item.GetItemIconByID(itemId)
             if texture then return { itemId = itemId, texture = texture } end
+        elseif itemId and showIfMissing then
+            local texture = C_Item.GetItemIconByID(itemId)
+            if texture then return { itemId = itemId, texture = texture, missing = true } end
         end
     end
 end
@@ -171,7 +174,10 @@ end
 local function resolveItemStack(entry, moduleConfig)
     local itemStacks = moduleConfig and moduleConfig.itemStacks
     local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
-    return not shouldSuppressItemStack(itemStack) and itemStack.ids and resolveItem(itemStack.ids) or nil
+    return not shouldSuppressItemStack(itemStack)
+        and itemStack.ids
+        and resolveItem(itemStack.ids, itemStack.showIfMissing == true)
+        or nil
 end
 
 local function resolveEntry(entry, moduleConfig)
@@ -568,6 +574,7 @@ function ExtraIcons:_updateSingleViewer(viewerKey, entries, isEditing, sharedOff
         icon.spellId = data.spellId
 
         icon.Icon:SetTexture(data.texture)
+        icon.Icon:SetDesaturated(data.missing == true)
         icon:ClearAllPoints()
         icon:SetPoint("LEFT", container, "LEFT", xOffset, 0)
         icon:Show()

@@ -64,6 +64,7 @@ describe("LibSettingsBuilder Controls", function()
             "MinimalSliderWithSteppersMixin",
             "ColorPickerFrame",
             "C_Timer",
+            "SettingsPanel",
         })
     end)
 
@@ -849,6 +850,84 @@ describe("LibSettingsBuilder Controls", function()
         assert.is_true(frame.Button:IsMouseEnabled())
 
         initializer:SetEnabled(false)
+
+        assert.are.equal(0.5, frame:GetAlpha())
+        assert.is_false(frame.Button:IsEnabled())
+        assert.is_false(frame.Button:IsMouseEnabled())
+    end)
+
+    it("reapplies button disabled visuals after page refresh", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        local originalButtonInitializer = _G.CreateSettingsButtonInitializer
+        _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
+            local initializer = originalButtonInitializer(name, buttonText, onClick, tooltip)
+            initializer.InitFrame = function(_, frame)
+                frame.Button = createScriptableFrame()
+            end
+            return initializer
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local disabled = false
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Button Refresh Visuals",
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "button",
+                                    name = "Rename",
+                                    buttonText = "Rename",
+                                    disabled = function() return disabled end,
+                                    onClick = function() end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = builder:GetPage("general", "main")
+        local initializer = TestHelpers.FindButtonInitializer(page._category:GetLayout()._initializers, "Rename")
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+        frame.EvaluateState = function(self)
+            self:SetAlpha(1)
+            self.Button:SetEnabled(false)
+        end
+        _G.SettingsPanel = {
+            IsShown = function() return true end,
+            GetCurrentCategory = function() return page._category end,
+            GetSettingsList = function()
+                return {
+                    ScrollBox = {
+                        ForEachFrame = function(_, callback)
+                            callback(frame)
+                        end,
+                    },
+                }
+            end,
+        }
+
+        disabled = true
+        page:Refresh()
 
         assert.are.equal(0.5, frame:GetAlpha())
         assert.is_false(frame.Button:IsEnabled())
