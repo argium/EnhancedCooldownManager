@@ -919,6 +919,7 @@ describe("BuffBars real source", function()
         function BuffBars:GetModuleConfig()
             return {
                 anchorMode = ns.Constants.ANCHORMODE_CHAIN,
+                height = 21,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -941,7 +942,7 @@ describe("BuffBars real source", function()
         assert.is_true(second.__ecmHooked)
         assert.are.equal(2, #appliedTextures)
         assert.are.equal(2, #appliedColors)
-        assert.are.equal(18, BuffBarCooldownViewer.__height)
+        assert.are.equal(21, BuffBarCooldownViewer.__height)
         assert.is_true(BuffBarCooldownViewer:IsShown())
     end)
 
