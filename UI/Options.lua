@@ -17,7 +17,7 @@ ns.Settings = LSB:New({
         return ns.Addon.db and ns.Addon.db.profile
     end,
     defaults = function()
-        return ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+        return ns.Addon.db.defaults.profile
     end,
     onChanged = function(ctx)
         if ctx.spec.layout ~= false then
@@ -106,14 +106,21 @@ function Options:OnInitialize()
         ns.ExtraIconsOptions,
     }
 
+    local function initializeOptionsTable(optionsTable)
+        optionsTable.OnInitialize()
+    end
+
+    initializeOptionsTable(ns.BuffBarsOptions)
+
     if ns.ExternalBarsOptions then
+        initializeOptionsTable(ns.ExternalBarsOptions)
         sections[#sections + 1] = ns.ExternalBarsOptions
     end
 
     sections[#sections + 1] = {
         key = "spellColors",
         name = L["SPELL_COLORS_SUBCAT"],
-        pages = { ns.SpellColorsPage.CreatePage(L["SPELL_COLORS_SUBCAT"]) },
+        pages = { ns.SpellColorsPage:CreatePage(L["SPELL_COLORS_SUBCAT"]) },
     }
 
     sections[#sections + 1] = ns.ProfileOptions
@@ -124,20 +131,10 @@ function Options:OnInitialize()
         sections = sections,
     })
 
-    if ns.ExtraIconsOptions and ns.ExtraIconsOptions.SetRegisteredPage then
-        ns.ExtraIconsOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "main"))
-        ns.ExtraIconsOptions.EnsureItemLoadFrame()
-    end
-    if ns.ItemStacksOptions and ns.ItemStacksOptions.SetRegisteredPage then
-        ns.ItemStacksOptions.SetRegisteredPage(ns.Settings:GetPage("extraIcons", "itemStacks"))
-        ns.ItemStacksOptions.EnsureItemLoadFrame()
-    end
-    if ns.PowerBarTickMarksOptions and ns.PowerBarTickMarksOptions.SetRegisteredPage then
-        ns.PowerBarTickMarksOptions.SetRegisteredPage(ns.Settings:GetPage("powerBar", "tickMarks"))
-    end
-    if ns.SpellColorsPage and ns.SpellColorsPage.SetRegisteredPage then
-        ns.SpellColorsPage.SetRegisteredPage(ns.Settings:GetPage("spellColors", "spellColors"))
-    end
+    initializeOptionsTable(ns.ExtraIconsOptions)
+    initializeOptionsTable(ns.ItemStacksOptions)
+    initializeOptionsTable(ns.PowerBarTickMarksOptions)
+    ns.SpellColorsPage:OnInitialize()
 
     self:InstallCategoryTracking()
 end

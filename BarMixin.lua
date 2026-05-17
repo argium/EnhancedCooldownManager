@@ -308,7 +308,6 @@ function FrameProto:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
-
     if mode == C.ANCHORMODE_FREE then
         local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
         return {
@@ -344,25 +343,21 @@ function FrameProto:ApplyFramePosition()
     end
 
     local params = self:CalculateLayoutParams()
-    local anchors
+    local anchorCount = params.mode == C.ANCHORMODE_FREE and 1 or 2
+    local anchors = {}
     if params.mode == C.ANCHORMODE_FREE then
         assert(params.anchor ~= nil, "anchor required for free anchor mode")
-        anchors = {
-            { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
-        }
-    else
-        -- Chain and detached both use 2-point anchoring
-        local lp = params.anchorPoint or "TOPLEFT"
-        local lr = params.anchorRelativePoint or "BOTTOMLEFT"
-        anchors = {
-            { lp, params.anchor, lr, params.offsetX, params.offsetY },
-            {
-                self.ChainRightPoint(lp, "TOPRIGHT"),
-                params.anchor,
-                self.ChainRightPoint(lr, "BOTTOMRIGHT"),
-                params.offsetX,
-                params.offsetY,
-            },
+    end
+
+    local lp = params.anchorPoint or "TOPLEFT"
+    local lr = params.anchorRelativePoint or "BOTTOMLEFT"
+    for i = 1, anchorCount do
+        anchors[i] = {
+            i == 1 and lp or self.ChainRightPoint(lp, "TOPRIGHT"),
+            params.anchor,
+            i == 1 and lr or self.ChainRightPoint(lr, "BOTTOMRIGHT"),
+            params.offsetX,
+            params.offsetY,
         }
     end
 

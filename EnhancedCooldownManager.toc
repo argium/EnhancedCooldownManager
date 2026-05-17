@@ -2,7 +2,7 @@
 ## Title: Enhanced Cooldown Manager |cff9c9c9cby|r |cffa855f7A|r|cff7a84f7r|r|cff4cc9f0g|r|cff22c55ei|r
 ## Notes: Add resource, power and buff bars, new spells and item icons to the built-in Cooldown Manager.
 ## Author: Argi
-## Version: v0.8.3
+## Version: v0.8.4
 ## SavedVariables: EnhancedCooldownManagerDB
 ## Category-enUS: User Interface
 ## IconTexture: Interface\AddOns\EnhancedCooldownManager\Media\icon
@@ -61,6 +61,7 @@ UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
 UI\ProfileOptions.lua
+UI\ExtraIconsShared.lua
 UI\ExtraIconsOptions.lua
 UI\ItemStacksOptions.lua
 UI\SpellColorsPage.lua

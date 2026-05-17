@@ -217,7 +217,7 @@ end
 ---@param section table
 ---@return table|nil
 local function getSpellColorOwnerModule(section)
-    return ns.Addon and section and section.ownerModuleName and ns.Addon[section.ownerModuleName] or nil
+    return ns.Addon[section.ownerModuleName]
 end
 
 ---@param section table
@@ -284,20 +284,15 @@ end
 
 local combatRefreshCallback
 
----@param page Frame|table|nil
-function SpellColorsPage.SetRegisteredPage(page)
-    registeredPage = page
-    SpellColorsPage._registeredPage = page
+function SpellColorsPage:OnInitialize()
+    registeredPage = ns.Settings:GetPage("spellColors", "spellColors")
+    self._registeredPage = registeredPage
 
     if combatRefreshCallback then
         return
     end
 
     local addon = ns.Addon
-    if not addon or type(addon.RegisterEvent) ~= "function" then
-        return
-    end
-
     combatRefreshCallback = function()
         doRefreshPage()
     end
@@ -628,7 +623,7 @@ local function rebuildPageSpecRows()
 end
 
 ---@param section { key: string, label: string, scope: string, isDisabledDelegate: fun(): boolean, ownerModuleName: string }
-function SpellColorsPage.RegisterSection(section)
+function SpellColorsPage:RegisterSection(section)
     assert(type(section) == "table", "SpellColorsPage.RegisterSection: section must be a table")
     assert(type(section.key) == "string", "SpellColorsPage.RegisterSection: section.key is required")
     assert(type(section.label) == "string", "SpellColorsPage.RegisterSection: section.label is required")
@@ -649,24 +644,14 @@ function SpellColorsPage.RegisterSection(section)
 end
 
 ---@param configPath string
----@param ownerModuleName string
 ---@return fun(): boolean
-function SpellColorsPage.CreateSectionDisabledDelegate(configPath, ownerModuleName)
-    local isDisabled = ns.OptionUtil.GetIsDisabledDelegate(configPath)
-
-    return function()
-        local ownerModule = ns.Addon and ns.Addon[ownerModuleName] or nil
-        if not ownerModule then
-            return true
-        end
-
-        return isDisabled()
-    end
+function SpellColorsPage:CreateSectionDisabledDelegate(configPath)
+    return ns.OptionUtil.GetIsDisabledDelegate(configPath)
 end
 
 ---@param subcatName string
 ---@return table
-function SpellColorsPage.CreatePage(subcatName)
+function SpellColorsPage:CreatePage(subcatName)
     if not pageSpec then
         local function refreshRegisteredPage()
             if registeredPage then
@@ -689,8 +674,7 @@ function SpellColorsPage.CreatePage(subcatName)
                 return canResetAnySpellColorSection()
             end,
         }
-        pageSpec.SetRegisteredPage = SpellColorsPage.SetRegisteredPage
-        SpellColorsPage._pageSpec = pageSpec
+        self._pageSpec = pageSpec
     end
 
     pageSpec.name = subcatName

@@ -4,29 +4,27 @@
 
 local _, ns = ...
 local L = ns.L
+local OptionUtil = ns.OptionUtil
+local Shared = ns.ExtraIconsShared
+local EnsureItemStacks = Shared.EnsureItemStacks
 
 StaticPopupDialogs["ECM_CREATE_ITEM_STACK"] =
-    ns.OptionUtil.MakeTextInputDialog(L["ITEM_STACK_CREATE_PROMPT"], L["CREATE"], L["DONT_CREATE"])
+    OptionUtil.MakeTextInputDialog(L["ITEM_STACK_CREATE_PROMPT"], L["CREATE"], L["DONT_CREATE"])
 StaticPopupDialogs["ECM_RENAME_ITEM_STACK"] =
-    ns.OptionUtil.MakeTextInputDialog(L["ITEM_STACK_RENAME_PROMPT"], L["RENAME"], L["DONT_RENAME"])
+    OptionUtil.MakeTextInputDialog(L["ITEM_STACK_RENAME_PROMPT"], L["RENAME"], L["DONT_RENAME"])
 StaticPopupDialogs["ECM_CONFIRM_DELETE_ITEM_STACK"] =
-    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_DELETE_CONFIRM"], L["DELETE"], L["DONT_DELETE"])
+    OptionUtil.MakeConfirmDialog(L["ITEM_STACK_DELETE_CONFIRM"], L["DELETE"], L["DONT_DELETE"])
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM"] =
-    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
+    OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
     ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
     ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 
 local ITEM_STACK_ROW_HEIGHT = 22
-local ITEM_STACK_COLLECTION_HEIGHT = 220
+local ITEM_STACK_COLLECTION_HEIGHT = 240
 local ITEM_ID_SUFFIX_COLOR = "ff808080"
-local ACTION_BUTTON_TEXTURES = ns.OptionUtil.ACTION_BUTTON_TEXTURES
-local DEFAULT_ITEM_STACK_IDS = {
-    combatPotions = true,
-    healthPotions = true,
-    healthstones = true,
-}
+local ACTION_BUTTON_TEXTURES = OptionUtil.ACTION_BUTTON_TEXTURES
 
 local ItemStacksOptions = ns.ItemStacksOptions or {}
 ns.ItemStacksOptions = ItemStacksOptions
@@ -37,73 +35,46 @@ ItemStacksOptions._draftState = ItemStacksOptions._draftState or { idText = "" }
 local registeredPage
 
 local function getProfile() return ns.Addon.db.profile end
-local function getDefaultItemStacks()
-    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
-    defaults = defaults or (ns.defaults and ns.defaults.profile)
-    return defaults and defaults.extraIcons and defaults.extraIcons.itemStacks or nil
+
+local function getDefaultStack(stackId)
+    local defaults = ns.Addon.db.defaults and ns.Addon.db.defaults.profile
+    local defaultStacks = defaults and defaults.extraIcons and defaults.extraIcons.itemStacks
+    local defaultStack = defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId]
+    if defaultStack then
+        return defaultStack
+    end
+
+    defaults = ns.defaults and ns.defaults.profile
+    defaultStacks = defaults and defaults.extraIcons and defaults.extraIcons.itemStacks
+    return defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId] or nil
 end
 
 local function refreshPage()
-    if registeredPage then
-        registeredPage:Refresh()
+    local page = registeredPage
+    if page then
+        page:Refresh()
     end
 end
 
-local function doAction(fn)
+local function doAction(fn, page)
     if fn then
         fn()
     end
     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    refreshPage()
-end
-
-local function ensureItemStacks(profile)
-    local extraIcons = profile.extraIcons
-    extraIcons.itemStacks = extraIcons.itemStacks or { nextId = 1, order = {}, byId = {} }
-    local itemStacks = extraIcons.itemStacks
-    itemStacks.order = itemStacks.order or {}
-    itemStacks.byId = itemStacks.byId or {}
-    itemStacks.nextId = itemStacks.nextId or 1
-    return itemStacks
-end
-
-local function getItemStacks() return ensureItemStacks(getProfile()) end
-
-local function isDefaultStackId(stackId)
-    local defaultStacks = getDefaultItemStacks()
-    if defaultStacks and defaultStacks.byId then
-        return defaultStacks.byId[stackId] ~= nil
+    if registeredPage then
+        refreshPage()
+    elseif page then
+        page:Refresh()
     end
-    return DEFAULT_ITEM_STACK_IDS[stackId] == true
 end
 
-local function getFirstStackIdAlphabetically(itemStacks)
-    local ids = {}
-    for _, stackId in ipairs(itemStacks.order) do
-        if itemStacks.byId[stackId] then
-            ids[#ids + 1] = stackId
-        end
-    end
-    table.sort(ids, function(a, b)
-        local left = itemStacks.byId[a]
-        local right = itemStacks.byId[b]
-        local leftName = tostring(left and left.name or a):lower()
-        local rightName = tostring(right and right.name or b):lower()
-        if leftName == rightName then
-            return tostring(a) < tostring(b)
-        end
-        return leftName < rightName
-    end)
-    return ids[1]
-end
+local function getItemStacks() return EnsureItemStacks(getProfile()) end
+
+local function isDefaultStackId(stackId) return getDefaultStack(stackId) ~= nil end
 
 local function getSelectedStackId()
     local itemStacks = getItemStacks()
-    local selected = ItemStacksOptions._selectedStackId
-    if selected and itemStacks.byId[selected] then
-        return selected
-    end
-    selected = getFirstStackIdAlphabetically(itemStacks)
+    local selected = Shared.ResolveSelectedStackId(itemStacks, ItemStacksOptions._selectedStackId)
     ItemStacksOptions._selectedStackId = selected
     return selected
 end
@@ -112,30 +83,6 @@ local function getSelectedStack()
     local stackId = getSelectedStackId()
     return stackId and getItemStacks().byId[stackId] or nil
 end
-
-local function getItemIdFromEntry(entry) return type(entry) == "table" and (entry.itemID or entry.itemId) or entry end
-
-local function getItemDisplayName(itemId)
-    if not itemId then
-        return nil
-    end
-
-    local name = C_Item.GetItemNameByID(itemId)
-    if name then
-        ItemStacksOptions._pendingItemLoads[itemId] = nil
-        return name
-    end
-
-    if C_Item.DoesItemExistByID(itemId) then
-        ItemStacksOptions._pendingItemLoads[itemId] = true
-        C_Item.RequestLoadItemDataByID(itemId)
-        return L["EXTRA_ICONS_ITEM_LOADING"]
-    end
-
-    return "Item " .. tostring(itemId)
-end
-
-local function getItemIcon(itemId) return itemId and C_Item.GetItemIconByID(itemId) or nil end
 
 local function getItemQualityMarkup(entry)
     return ns.ExtraIconsOptions
@@ -147,8 +94,8 @@ end
 local function makeItemEntry(itemId) return { itemID = itemId } end
 
 local function getItemEntryDisplayName(entry, includeItemId)
-    local itemId = getItemIdFromEntry(entry)
-    local name = getItemDisplayName(itemId)
+    local itemId = Shared.GetItemIdFromEntry(entry)
+    local name = Shared.GetItemDisplayName(itemId, ItemStacksOptions._pendingItemLoads)
     local displayName = name or ("Item " .. tostring(itemId))
     local qualityMarkup = getItemQualityMarkup(entry)
     if qualityMarkup then
@@ -160,19 +107,8 @@ local function getItemEntryDisplayName(entry, includeItemId)
     return displayName
 end
 
-function ItemStacksOptions._parseSingleId(text)
-    if not text or text == "" then
-        return nil
-    end
-    local num = tonumber(text)
-    if not num or num <= 0 or num ~= math.floor(num) then
-        return nil
-    end
-    return num
-end
-
-function ItemStacksOptions._resolveDraftItemPreview(text)
-    local id = ItemStacksOptions._parseSingleId(text)
+local function resolveDraftItemPreview(text)
+    local id = Shared.ParseSingleId(text)
     if not id or not C_Item.DoesItemExistByID(id) then
         return "invalid", nil, nil
     end
@@ -184,23 +120,12 @@ function ItemStacksOptions._resolveDraftItemPreview(text)
         return "resolved", getItemEntryDisplayName(makeItemEntry(id), false), icon
     end
 
-    ItemStacksOptions._pendingItemLoads[id] = true
-    C_Item.RequestLoadItemDataByID(id)
+    Shared.RequestItemLoad(ItemStacksOptions._pendingItemLoads, id)
     return "pending", nil, icon
 end
 
-local function selectedStackHasItem(itemId)
-    local itemStack = getSelectedStack()
-    for _, entry in ipairs(itemStack and itemStack.ids or {}) do
-        if getItemIdFromEntry(entry) == itemId then
-            return true
-        end
-    end
-    return false
-end
-
-function ItemStacksOptions._createStack(profile, name)
-    local itemStacks = ensureItemStacks(profile)
+local function createStack(profile, name)
+    local itemStacks = EnsureItemStacks(profile)
     local stackId = itemStacks.nextId
     itemStacks.nextId = stackId + 1
     itemStacks.order[#itemStacks.order + 1] = stackId
@@ -209,21 +134,21 @@ function ItemStacksOptions._createStack(profile, name)
     return stackId
 end
 
-function ItemStacksOptions._renameStack(profile, stackId, name)
+local function renameStack(profile, stackId, name)
     if isDefaultStackId(stackId) then
         return
     end
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     if itemStack then
         itemStack.name = name
     end
 end
 
-function ItemStacksOptions._deleteStack(profile, stackId)
+local function deleteStack(profile, stackId)
     if isDefaultStackId(stackId) then
         return
     end
-    local itemStacks = ensureItemStacks(profile)
+    local itemStacks = EnsureItemStacks(profile)
     itemStacks.byId[stackId] = nil
     for index = #itemStacks.order, 1, -1 do
         if itemStacks.order[index] == stackId then
@@ -242,7 +167,7 @@ function ItemStacksOptions._deleteStack(profile, stackId)
     end
 
     if ItemStacksOptions._selectedStackId == stackId then
-        ItemStacksOptions._selectedStackId = getFirstStackIdAlphabetically(itemStacks)
+        ItemStacksOptions._selectedStackId = Shared.GetFirstStackIdAlphabetically(itemStacks)
     end
     if ns.ExtraIconsOptions and ns.ExtraIconsOptions._selectedItemStackIds then
         for viewerKey, selectedStackId in pairs(ns.ExtraIconsOptions._selectedItemStackIds) do
@@ -253,103 +178,115 @@ function ItemStacksOptions._deleteStack(profile, stackId)
     end
 end
 
-function ItemStacksOptions._revertStackToDefault(profile, stackId)
-    local defaultStacks = getDefaultItemStacks()
-    local defaultStack = defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId]
+local function revertStackToDefault(profile, stackId)
+    local defaultStack = getDefaultStack(stackId)
     if not defaultStack then
         return
     end
-    ensureItemStacks(profile).byId[stackId] = ns.CloneValue(defaultStack)
+    EnsureItemStacks(profile).byId[stackId] = ns.CloneValue(defaultStack)
 end
 
-function ItemStacksOptions._setStackVisibility(profile, stackId, key, value)
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+local function setStackVisibility(profile, stackId, key, value)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     if itemStack then
         itemStack[key] = value and true or false
     end
 end
 
 local function setStackShowIfMissing(profile, stackId, value)
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     if itemStack then
         itemStack.showIfMissing = value and true or nil
     end
 end
 
-function ItemStacksOptions._addItem(profile, stackId, itemId)
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+local function addItem(profile, stackId, itemId)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     if not itemStack then
         return
     end
     for _, entry in ipairs(itemStack.ids) do
-        if getItemIdFromEntry(entry) == itemId then
+        if Shared.GetItemIdFromEntry(entry) == itemId then
             return
         end
     end
     itemStack.ids[#itemStack.ids + 1] = makeItemEntry(itemId)
 end
 
-function ItemStacksOptions._removeItem(profile, stackId, index)
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+local function removeItem(profile, stackId, index)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     if itemStack and index >= 1 and index <= #itemStack.ids then
         table.remove(itemStack.ids, index)
     end
 end
 
-function ItemStacksOptions._reorderItem(profile, stackId, index, direction)
-    local itemStack = ensureItemStacks(profile).byId[stackId]
+local function reorderItem(profile, stackId, index, direction)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
     local target = itemStack and index + direction or nil
     if target and target >= 1 and target <= #itemStack.ids then
         itemStack.ids[index], itemStack.ids[target] = itemStack.ids[target], itemStack.ids[index]
     end
 end
 
-local function makeAction(text, buttonTextures, enabled, tooltip, onClick)
-    return ns.OptionUtil.CreateIconAction(text, buttonTextures, enabled, tooltip, onClick)
-end
-
-local function profileAction(fn)
-    return function()
-        doAction(function()
-            fn(getProfile())
-        end)
-    end
-end
-
 local function buildItemRow(itemStack, stackId, entry, index)
-    local itemId = getItemIdFromEntry(entry)
+    local itemId = Shared.GetItemIdFromEntry(entry)
     local count = #itemStack.ids
     return {
         label = getItemEntryDisplayName(entry, true),
-        icon = getItemIcon(itemId) or 134400,
+        icon = C_Item.GetItemIconByID(itemId) or 134400,
         actions = {
-            up = makeAction("^", ACTION_BUTTON_TEXTURES.moveUp, index > 1, L["MOVE_UP_TOOLTIP"],
-                profileAction(function(profile)
-                    ItemStacksOptions._reorderItem(profile, stackId, index, -1)
-                end)),
-            down = makeAction("v", ACTION_BUTTON_TEXTURES.moveDown, index < count, L["MOVE_DOWN_TOOLTIP"],
-                profileAction(function(profile)
-                    ItemStacksOptions._reorderItem(profile, stackId, index, 1)
-                end)),
-            delete = makeAction("x", ACTION_BUTTON_TEXTURES.delete, true, L["REMOVE_TOOLTIP"], function()
-                StaticPopup_Show("ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM", getItemDisplayName(itemId), nil, {
-                    onAccept = profileAction(function(profile)
-                        ItemStacksOptions._removeItem(profile, stackId, index)
-                    end),
+            up = OptionUtil.CreateIconAction("^", ACTION_BUTTON_TEXTURES.moveUp, index > 1, L["MOVE_UP_TOOLTIP"],
+                function()
+                    doAction(function()
+                        reorderItem(getProfile(), stackId, index, -1)
+                    end)
+                end),
+            down = OptionUtil.CreateIconAction("v", ACTION_BUTTON_TEXTURES.moveDown, index < count, L["MOVE_DOWN_TOOLTIP"],
+                function()
+                    doAction(function()
+                        reorderItem(getProfile(), stackId, index, 1)
+                    end)
+                end),
+            delete = OptionUtil.CreateIconAction("x", ACTION_BUTTON_TEXTURES.delete, true, L["REMOVE_TOOLTIP"], function()
+                StaticPopup_Show(
+                    "ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM",
+                    Shared.GetItemDisplayName(itemId, ItemStacksOptions._pendingItemLoads),
+                    nil,
+                    {
+                    onAccept = function()
+                        doAction(function()
+                            removeItem(getProfile(), stackId, index)
+                        end)
+                    end,
                 })
             end),
         },
     }
 end
 
+local function getDraftPreviewState()
+    local itemId = Shared.ParseSingleId(ItemStacksOptions._draftState.idText)
+    local status, name, icon = resolveDraftItemPreview(ItemStacksOptions._draftState.idText)
+    local duplicate = false
+    if itemId then
+        local itemStack = getSelectedStack()
+        for _, entry in ipairs(itemStack and itemStack.ids or {}) do
+            if Shared.GetItemIdFromEntry(entry) == itemId then
+                duplicate = true
+                break
+            end
+        end
+    end
+    return status, name, icon, duplicate, itemId
+end
+
 local function addDraftItem()
     local stackId = getSelectedStackId()
-    local status = ItemStacksOptions._resolveDraftItemPreview(ItemStacksOptions._draftState.idText)
-    local itemId = ItemStacksOptions._parseSingleId(ItemStacksOptions._draftState.idText)
-    if not stackId or status ~= "resolved" or selectedStackHasItem(itemId) then
+    local status, _, _, duplicate, itemId = getDraftPreviewState()
+    if not stackId or status ~= "resolved" or duplicate then
         return false
     end
-    ItemStacksOptions._addItem(getProfile(), stackId, itemId)
+    addItem(getProfile(), stackId, itemId)
     ItemStacksOptions._draftState.idText = ""
     doAction()
     return true
@@ -358,20 +295,17 @@ end
 local function buildItemInputTrailer()
     local ds = ItemStacksOptions._draftState
 
-    local function getPreviewState()
-        local status, name, icon = ItemStacksOptions._resolveDraftItemPreview(ds.idText)
-        local itemId = ItemStacksOptions._parseSingleId(ds.idText)
-        return status, name, icon, itemId and selectedStackHasItem(itemId) or false
-    end
-
     return {
         type = "modeInput",
         modeHidden = true,
         inputText = function() return ds.idText end,
         placeholder = L["EXTRA_ICONS_ITEM_ID_PLACEHOLDER"],
-        previewIcon = function() local _, _, icon = getPreviewState(); return icon end,
+        previewIcon = function()
+            local _, _, icon = getDraftPreviewState()
+            return icon
+        end,
         previewText = function()
-            local status, name, _, duplicate = getPreviewState()
+            local status, name, _, duplicate = getDraftPreviewState()
             if status == "resolved" and duplicate then
                 return L["ITEM_STACK_DUPLICATE_ITEM"]
             end
@@ -386,7 +320,7 @@ local function buildItemInputTrailer()
         submitText = L["ADD_ENTRY"],
         submitTooltip = L["ADD_ENTRY"],
         submitEnabled = function()
-            local status, _, _, duplicate = getPreviewState()
+            local status, _, _, duplicate = getDraftPreviewState()
             return getSelectedStackId() ~= nil and status == "resolved" and not duplicate
         end,
         onTextChanged = function(text) ds.idText = text or "" end,
@@ -394,7 +328,7 @@ local function buildItemInputTrailer()
     }
 end
 
-function ItemStacksOptions.BuildSections()
+local function buildSections()
     local stackId = getSelectedStackId()
     local itemStack = getSelectedStack()
     local items = {}
@@ -415,27 +349,15 @@ function ItemStacksOptions.BuildSections()
     }
 end
 
-function ItemStacksOptions.BuildStackValues()
-    local itemStacks = getItemStacks()
-    local values = {}
-    for _, stackId in ipairs(itemStacks.order) do
-        local itemStack = itemStacks.byId[stackId]
-        if itemStack then
-            values[tostring(stackId)] = itemStack.name
-        end
-    end
-    return values
-end
-
-function ItemStacksOptions.GetSelectedVisibility(key)
+local function getSelectedVisibility(key)
     local itemStack = getSelectedStack()
     return itemStack and itemStack[key] == true or false
 end
 
-function ItemStacksOptions.SetSelectedVisibility(key, value)
+local function setSelectedVisibility(key, value)
     local stackId = getSelectedStackId()
     if stackId then
-        ItemStacksOptions._setStackVisibility(getProfile(), stackId, key, value)
+        setStackVisibility(getProfile(), stackId, key, value)
     end
 end
 
@@ -455,44 +377,18 @@ local function isNoStackSelected()
     return getSelectedStackId() == nil
 end
 
-function ItemStacksOptions.EnsureItemLoadFrame()
-    local itemLoadFrame = ItemStacksOptions._itemLoadFrame
-    if not itemLoadFrame then
-        itemLoadFrame = CreateFrame("Frame")
-        ItemStacksOptions._itemLoadFrame = itemLoadFrame
-    end
-    if itemLoadFrame._ecmHooked then
-        return
-    end
-    itemLoadFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-    itemLoadFrame:RegisterEvent("ITEM_DATA_LOAD_RESULT")
-    itemLoadFrame:SetScript("OnEvent", function(_, _, itemId)
-        local pendingId = tonumber(itemId) or itemId
-        if pendingId and ItemStacksOptions._pendingItemLoads[pendingId] then
-            ItemStacksOptions._pendingItemLoads[pendingId] = nil
-            refreshPage()
-            if not ItemStacksOptions._pendingRefreshScheduled then
-                ItemStacksOptions._pendingRefreshScheduled = true
-                C_Timer.After(0.1, function()
-                    ItemStacksOptions._pendingRefreshScheduled = nil
-                    refreshPage()
-                end)
-            end
-        end
-    end)
-    itemLoadFrame._ecmHooked = true
+local function disableManagedStackActions()
+    local stackId = getSelectedStackId()
+    return stackId == nil or isDefaultStackId(stackId)
 end
-
-function ItemStacksOptions.SetRegisteredPage(page) registeredPage = page end
 
 local function openCreateDialog(ctx)
     StaticPopup_Show("ECM_CREATE_ITEM_STACK", nil, nil, {
         popupKey = "ECM_CREATE_ITEM_STACK",
         onAccept = function(name)
             doAction(function()
-                ItemStacksOptions._createStack(getProfile(), name)
-            end)
-            ctx.page:Refresh()
+                createStack(getProfile(), name)
+            end, ctx and ctx.page or registeredPage)
         end,
     })
 end
@@ -508,9 +404,8 @@ local function openRenameDialog(ctx)
         defaultText = itemStack.name,
         onAccept = function(name)
             doAction(function()
-                ItemStacksOptions._renameStack(getProfile(), stackId, name)
-            end)
-            ctx.page:Refresh()
+                renameStack(getProfile(), stackId, name)
+            end, ctx and ctx.page or registeredPage)
         end,
     })
 end
@@ -524,13 +419,8 @@ local function openDeleteDialog(ctx)
     StaticPopup_Show("ECM_CONFIRM_DELETE_ITEM_STACK", itemStack.name, nil, {
         onAccept = function()
             doAction(function()
-                ItemStacksOptions._deleteStack(getProfile(), stackId)
-            end)
-            if ctx and ctx.page then
-                ctx.page:Refresh()
-            else
-                refreshPage()
-            end
+                deleteStack(getProfile(), stackId)
+            end, ctx and ctx.page or registeredPage)
         end,
     })
 end
@@ -544,15 +434,32 @@ local function revertSelectedStack(ctx)
     StaticPopup_Show("ECM_CONFIRM_REVERT_ITEM_STACK", itemStack.name, nil, {
         onAccept = function()
             doAction(function()
-                ItemStacksOptions._revertStackToDefault(getProfile(), stackId)
-            end)
-            if ctx and ctx.page then
-                ctx.page:Refresh()
-            else
-                refreshPage()
-            end
+                revertStackToDefault(getProfile(), stackId)
+            end, ctx and ctx.page or registeredPage)
         end,
     })
+end
+
+function ItemStacksOptions.EnsureItemLoadFrame()
+    Shared.EnsureItemLoadFrame(ItemStacksOptions, { "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }, function(_, _, itemId)
+        local pendingId = tonumber(itemId) or itemId
+        if pendingId and ItemStacksOptions._pendingItemLoads[pendingId] then
+            ItemStacksOptions._pendingItemLoads[pendingId] = nil
+            refreshPage()
+            if not ItemStacksOptions._pendingRefreshScheduled then
+                ItemStacksOptions._pendingRefreshScheduled = true
+                C_Timer.After(0.1, function()
+                    ItemStacksOptions._pendingRefreshScheduled = nil
+                    refreshPage()
+                end)
+            end
+        end
+    end)
+end
+
+function ItemStacksOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("extraIcons", "itemStacks")
+    ItemStacksOptions.EnsureItemLoadFrame()
 end
 
 ItemStacksOptions.page = {
@@ -581,7 +488,7 @@ ItemStacksOptions.page = {
             key = "selectedManagedItemStack",
             name = L["ITEM_STACK"],
             tooltip = L["ITEM_STACK_SELECT_DESC"],
-            values = ItemStacksOptions.BuildStackValues,
+            values = function() return Shared.BuildItemStackValues(getItemStacks()) end,
             layout = false,
             get = function()
                 local stackId = getSelectedStackId()
@@ -606,12 +513,12 @@ ItemStacksOptions.page = {
             tooltip = L["ITEM_STACK_HIDE_IN_INSTANCES_DESC"],
             layout = false,
             get = function()
-                return ItemStacksOptions.GetSelectedVisibility("hideInInstances")
+                return getSelectedVisibility("hideInInstances")
             end,
             set = function(value)
-                ItemStacksOptions.SetSelectedVisibility("hideInInstances", value)
+                setSelectedVisibility("hideInInstances", value)
             end,
-            disabled = function() return getSelectedStackId() == nil end,
+            disabled = isNoStackSelected,
             onSet = function(ctx)
                 ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
                 ctx.page:Refresh()
@@ -625,12 +532,12 @@ ItemStacksOptions.page = {
             tooltip = L["ITEM_STACK_HIDE_IN_RATED_PVP_DESC"],
             layout = false,
             get = function()
-                return ItemStacksOptions.GetSelectedVisibility("hideInRatedPvp")
+                return getSelectedVisibility("hideInRatedPvp")
             end,
             set = function(value)
-                ItemStacksOptions.SetSelectedVisibility("hideInRatedPvp", value)
+                setSelectedVisibility("hideInRatedPvp", value)
             end,
-            disabled = function() return getSelectedStackId() == nil end,
+            disabled = isNoStackSelected,
             onSet = function(ctx)
                 ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
                 ctx.page:Refresh()
@@ -656,7 +563,7 @@ ItemStacksOptions.page = {
             type = "sectionList",
             height = ITEM_STACK_COLLECTION_HEIGHT,
             footerSpacing = 4,
-            sections = ItemStacksOptions.BuildSections,
+            sections = buildSections,
             layout = false,
         },
         {
@@ -665,35 +572,35 @@ ItemStacksOptions.page = {
             name = L["RENAME_ITEM_STACK"],
             buttonText = L["RENAME"],
             tooltip = L["RENAME_ITEM_STACK_DESC"],
-            disabled = function() return getSelectedStackId() == nil or isDefaultStackId(getSelectedStackId()) end,
+            disabled = disableManagedStackActions,
             layout = false,
             onClick = openRenameDialog,
         },
         {
-            id = "selectedStackActions",
-            type = "pageActions",
-            height = 28,
+            id = "deleteItemStack",
+            type = "button",
+            name = L["DELETE"],
+            buttonText = L["DELETE"],
+            tooltip = L["DELETE_ITEM_STACK_DESC"],
+            hidden = function()
+                local stackId = getSelectedStackId()
+                return stackId == nil or isDefaultStackId(stackId)
+            end,
             layout = false,
-            actions = {
-                {
-                    text = L["DELETE"],
-                    tooltip = L["DELETE_ITEM_STACK_DESC"],
-                    enabled = function() return getSelectedStackId() ~= nil end,
-                    hidden = function() return isDefaultStackId(getSelectedStackId()) end,
-                    onClick = function()
-                        openDeleteDialog({ page = registeredPage })
-                    end,
-                },
-                {
-                    text = L["REVERT"],
-                    tooltip = L["REVERT_ITEM_STACK_DESC"],
-                    enabled = function() return getSelectedStackId() ~= nil end,
-                    hidden = function() return not isDefaultStackId(getSelectedStackId()) end,
-                    onClick = function()
-                        revertSelectedStack({ page = registeredPage })
-                    end,
-                },
-            },
+            onClick = openDeleteDialog,
+        },
+        {
+            id = "revertItemStack",
+            type = "button",
+            name = L["REVERT"],
+            buttonText = L["REVERT"],
+            tooltip = L["REVERT_ITEM_STACK_DESC"],
+            hidden = function()
+                local stackId = getSelectedStackId()
+                return stackId == nil or not isDefaultStackId(stackId)
+            end,
+            layout = false,
+            onClick = revertSelectedStack,
         },
     },
 }

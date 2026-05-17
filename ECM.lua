@@ -64,7 +64,7 @@ local function safeTableTostring(tbl, depth, seen)
 
     seen[tbl] = true
 
-    local ok, pairsOrErr = pcall(function()
+    local ok, result = pcall(function()
         local parts = {}
         local count = 0
 
@@ -82,12 +82,7 @@ local function safeTableTostring(tbl, depth, seen)
 
         return "{" .. table.concat(parts, ", ") .. "}"
     end)
-
-    if not ok then
-        return "<table_error>"
-    end
-
-    return pairsOrErr
+    return ok and result or "<table_error>"
 end
 
 function ns.ToString(v)
@@ -124,45 +119,6 @@ ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
-local function getErrorDebugStack()
-    if type(debugstack) ~= "function" then
-        return nil
-    end
-
-    local ok, stack = pcall(debugstack, 3, 8, 8)
-    if ok then
-        return stack
-    end
-
-    return "debugstack failed: " .. tostring(stack)
-end
-
-local function getErrorCombatState()
-    if type(InCombatLockdown) ~= "function" then
-        return nil
-    end
-
-    local ok, inCombat = pcall(InCombatLockdown)
-    if ok then
-        return inCombat == true
-    end
-
-    return nil
-end
-
-local function getErrorTimestamp()
-    if type(GetTime) ~= "function" then
-        return nil
-    end
-
-    local ok, timestamp = pcall(GetTime)
-    if ok then
-        return timestamp
-    end
-
-    return nil
-end
-
 local function makeErrorData(module, key, data)
     local payload = {}
     if type(data) == "table" then
@@ -185,13 +141,18 @@ local function makeErrorData(module, key, data)
         payload.errorKey = key
     end
     if payload.timestamp == nil then
-        payload.timestamp = getErrorTimestamp()
+        local ok, timestamp = pcall(GetTime)
+        payload.timestamp = ok and timestamp or nil
     end
     if payload.inCombatLockdown == nil then
-        payload.inCombatLockdown = getErrorCombatState()
+        local ok, inCombat = pcall(InCombatLockdown)
+        if ok then
+            payload.inCombatLockdown = inCombat == true
+        end
     end
     if payload.debugStack == nil then
-        payload.debugStack = getErrorDebugStack()
+        local ok, stackOrErr = pcall(debugstack, 3, 8, 8)
+        payload.debugStack = ok and stackOrErr or (stackOrErr and ("debugstack failed: " .. tostring(stackOrErr)) or nil)
     end
 
     return payload

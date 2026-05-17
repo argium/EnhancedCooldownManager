@@ -7,8 +7,8 @@ local L = ns.L
 
 StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     text = L["NEW_PROFILE_PROMPT"],
-    button1 = OKAY,
-    button2 = CANCEL,
+    button1 = L["CREATE"],
+    button2 = L["DONT_CREATE"],
     hasEditBox = true,
     OnAccept = function(self, data)
         local editBox = self and (self.EditBox or self.editBox)
@@ -44,8 +44,16 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     hideOnEscape = true,
 }
 
-StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(L["COPY_PROFILE_CONFIRM"])
-StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(L["DELETE_PROFILE_CONFIRM"])
+StaticPopupDialogs["ECM_CONFIRM_COPY_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(
+    L["COPY_PROFILE_CONFIRM"],
+    L["COPY"],
+    L["DONT_COPY"]
+)
+StaticPopupDialogs["ECM_CONFIRM_DELETE_PROFILE"] = ns.OptionUtil.MakeConfirmDialog(
+    L["DELETE_PROFILE_CONFIRM"],
+    L["DELETE"],
+    L["DONT_DELETE"]
+)
 
 local ProfileOptions = {}
 ns.ProfileOptions = ProfileOptions
@@ -112,10 +120,7 @@ end
 
 local function otherProfilesGenerator()
     local container = Settings.CreateControlTextContainer()
-    local db = ns.Addon and ns.Addon.db
-    if not db then
-        return container:GetData()
-    end
+    local db = ns.Addon.db
 
     local current = db:GetCurrentProfile()
     for _, name in ipairs(db:GetProfiles()) do

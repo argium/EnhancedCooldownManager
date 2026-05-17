@@ -34,8 +34,8 @@ local function getTicksConfig()
 end
 
 local function getDefaultTicksConfig()
-    local defaults = ns.Addon.db and ns.Addon.db.defaults and ns.Addon.db.defaults.profile
-    return defaults and defaults.powerBar and defaults.powerBar.ticks or nil
+    local defaults = ns.Addon.db.defaults.profile
+    return defaults and defaults.powerBar and defaults.powerBar.ticks
 end
 
 local function getCurrentTicks()
@@ -107,9 +107,6 @@ local function setDefaultWidth(width)
 end
 
 local registeredPage
-function PowerBarTickMarksOptions.SetRegisteredPage(page)
-    registeredPage = page
-end
 
 local function refreshPage()
     if registeredPage then
@@ -132,7 +129,7 @@ local function scheduleUpdate()
 end
 
 local function updatePickerSwatch(row, color)
-    local swatch = row and row._swatch or nil
+    local swatch = row and row._swatch
     if swatch then
         swatch:SetColorRGB(color.r or 1, color.g or 1, color.b or 1)
     end
@@ -218,6 +215,10 @@ local function buildTickCollectionItems()
     end
 
     return items
+end
+
+function PowerBarTickMarksOptions.OnInitialize()
+    registeredPage = ns.Settings:GetPage("powerBar", "tickMarks")
 end
 
 PowerBarTickMarksOptions.key = "tickMarks"

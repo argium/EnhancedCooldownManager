@@ -192,6 +192,8 @@ local defaultItemStacks = {
             hideInInstances = false,
             hideInRatedPvp = true,
             ids = {
+                { itemID = 241288, quality = 2 }, -- https://www.wowhead.com/item=241288/potion-of-recklessness
+                { itemID = 241289, quality = 1 }, -- https://www.wowhead.com/item=241289/potion-of-recklessness
                 { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
                 { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
                 { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential

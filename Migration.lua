@@ -152,38 +152,47 @@ local function normalizeBarConfig(cfg)
     end
 end
 
+local function forEachClassSpecEntry(store, fn)
+    if type(store) ~= "table" then
+        return
+    end
+
+    for classID, classMap in pairs(store) do
+        if type(classMap) == "table" then
+            for specID, specMap in pairs(classMap) do
+                if type(specMap) == "table" then
+                    fn(classID, specID, specMap)
+                end
+            end
+        end
+    end
+end
+
 local function normalizeBuffBarsCache(cfg)
     if not (cfg and cfg.colors and type(cfg.colors.cache) == "table") then
         return
     end
 
-    local cache = cfg.colors.cache
-    for _, classMap in pairs(cache) do
-        if type(classMap) == "table" then
-            for _, specMap in pairs(classMap) do
-                if type(specMap) == "table" then
-                    for index, entry in pairs(specMap) do
-                        if type(entry) ~= "table" then
-                            specMap[index] = nil
-                        else
-                            entry.color = nil
-                            local spellName = entry.spellName
-                            if type(spellName) ~= "string" then
-                                specMap[index] = nil
-                            else
-                                spellName = strtrim(spellName)
-                                if spellName == "" or spellName == "Unknown" then
-                                    specMap[index] = nil
-                                else
-                                    entry.spellName = spellName
-                                end
-                            end
-                        end
+    forEachClassSpecEntry(cfg.colors.cache, function(_, _, specMap)
+        for index, entry in pairs(specMap) do
+            if type(entry) ~= "table" then
+                specMap[index] = nil
+            else
+                entry.color = nil
+                local spellName = entry.spellName
+                if type(spellName) ~= "string" then
+                    specMap[index] = nil
+                else
+                    spellName = strtrim(spellName)
+                    if spellName == "" or spellName == "Unknown" then
+                        specMap[index] = nil
+                    else
+                        entry.spellName = spellName
                     end
                 end
             end
         end
-    end
+    end)
 end
 
 local FrameUtil = ns.FrameUtil
@@ -258,19 +267,13 @@ local function migrateToPerSpellColors(profile)
         end
     end
 
-    for classID, spec in pairs(perBar) do
-        for specID in pairs(spec) do
-            if not perSpell[classID] then
-                perSpell[classID] = {}
-            end
-            if not perSpell[classID][specID] then
-                perSpell[classID][specID] = {}
-            end
-            if cache[classID] and cache[classID][specID] then
-                doSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
-            end
+    forEachClassSpecEntry(perBar, function(classID, specID, perBarStore)
+        perSpell[classID] = perSpell[classID] or {}
+        perSpell[classID][specID] = perSpell[classID][specID] or {}
+        if cache[classID] and cache[classID][specID] then
+            doSpellMigration(perBarStore, perSpell[classID][specID], cache[classID][specID])
         end
-    end
+    end)
 
     cfg.colors.perBar = nil
 end
@@ -307,26 +310,19 @@ local function repairSpellColorStores(profile)
 
     -- Normalize metadata per stored tier so options/runtime no longer need to infer.
     for _, tier in ipairs(tierDefs) do
-        local store = colors[tier.storeKey]
-        for _, classMap in pairs(store) do
-            if type(classMap) == "table" then
-                for _, specMap in pairs(classMap) do
-                    if type(specMap) == "table" then
-                        for key, entry in pairs(specMap) do
-                            if type(entry) == "table" and type(entry.value) == "table" then
-                                local value = entry.value
-                                if not value.keyType then
-                                    value.keyType = tier.keyType
-                                end
-                                if tier.idField and type(key) == "number" and value[tier.idField] == nil then
-                                    value[tier.idField] = key
-                                end
-                            end
-                        end
+        forEachClassSpecEntry(colors[tier.storeKey], function(_, _, specMap)
+            for key, entry in pairs(specMap) do
+                if type(entry) == "table" and type(entry.value) == "table" then
+                    local value = entry.value
+                    if not value.keyType then
+                        value.keyType = tier.keyType
+                    end
+                    if tier.idField and type(key) == "number" and value[tier.idField] == nil then
+                        value[tier.idField] = key
                     end
                 end
             end
-        end
+        end)
     end
 
     local function ensureClassSpecStore(store, classID, specID)
@@ -340,33 +336,27 @@ local function repairSpellColorStores(profile)
     end
 
     -- Backfill fallback tiers from byName entries carrying embedded IDs.
-    for classID, classMap in pairs(colors.byName) do
-        if type(classMap) == "table" then
-            for specID, specMap in pairs(classMap) do
-                if type(specMap) == "table" then
-                    local bySpellIDSpec = ensureClassSpecStore(colors.bySpellID, classID, specID)
-                    local byCooldownIDSpec = ensureClassSpecStore(colors.byCooldownID, classID, specID)
-                    local byTextureSpec = ensureClassSpecStore(colors.byTexture, classID, specID)
+    forEachClassSpecEntry(colors.byName, function(classID, specID, specMap)
+        local bySpellIDSpec = ensureClassSpecStore(colors.bySpellID, classID, specID)
+        local byCooldownIDSpec = ensureClassSpecStore(colors.byCooldownID, classID, specID)
+        local byTextureSpec = ensureClassSpecStore(colors.byTexture, classID, specID)
 
-                    for _, entry in pairs(specMap) do
-                        if type(entry) == "table" and type(entry.value) == "table" then
-                            local value = entry.value
+        for _, entry in pairs(specMap) do
+            if type(entry) == "table" and type(entry.value) == "table" then
+                local value = entry.value
 
-                            if type(value.spellID) == "number" and bySpellIDSpec[value.spellID] == nil then
-                                bySpellIDSpec[value.spellID] = entry
-                            end
-                            if type(value.cooldownID) == "number" and byCooldownIDSpec[value.cooldownID] == nil then
-                                byCooldownIDSpec[value.cooldownID] = entry
-                            end
-                            if type(value.textureId) == "number" and byTextureSpec[value.textureId] == nil then
-                                byTextureSpec[value.textureId] = entry
-                            end
-                        end
-                    end
+                if type(value.spellID) == "number" and bySpellIDSpec[value.spellID] == nil then
+                    bySpellIDSpec[value.spellID] = entry
+                end
+                if type(value.cooldownID) == "number" and byCooldownIDSpec[value.cooldownID] == nil then
+                    byCooldownIDSpec[value.cooldownID] = entry
+                end
+                if type(value.textureId) == "number" and byTextureSpec[value.textureId] == nil then
+                    byTextureSpec[value.textureId] = entry
                 end
             end
         end
-    end
+    end)
 end
 
 --- Normalizes spell-color wrapper metadata and collapses duplicate entries.

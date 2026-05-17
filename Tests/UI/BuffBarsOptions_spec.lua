@@ -212,6 +212,8 @@ describe("BuffBarsOptions", function()
         TestHelpers.LoadChunk("UI/BuffBarsOptions.lua", "Unable to load UI/BuffBarsOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/ExternalBarsOptions.lua", "Unable to load UI/ExternalBarsOptions.lua")(nil, ns)
         BuffBarsOptions = ns.BuffBarsOptions
+        ns.BuffBarsOptions.OnInitialize()
+        ns.ExternalBarsOptions.OnInitialize()
     end)
 
     -- _BuildSpellColorRows tests (pure logic, preserved from old tests)
@@ -231,7 +233,7 @@ describe("BuffBarsOptions", function()
             { key = SpellColors.MakeKey("Persisted Only", 3003, nil, nil) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        local rows = ns.SpellColorsPage._BuildSpellColorRows(entries)
         assert.are.equal(3, #rows)
         assert.is_not_nil(findSpellColorRow(rows, "Active Name"))
         assert.is_not_nil(findSpellColorRow(rows, 2002))
@@ -244,7 +246,7 @@ describe("BuffBarsOptions", function()
             { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        local rows = ns.SpellColorsPage._BuildSpellColorRows(entries)
         assert.are.equal(1, #rows)
         assert.are.equal("spellName", rows[1].key.keyType)
         assert.are.equal("Immolation Aura", rows[1].key.primaryKey)
@@ -260,7 +262,7 @@ describe("BuffBarsOptions", function()
             { key = SpellColors.MakeKey("Spell B", nil, nil, 1234) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        local rows = ns.SpellColorsPage._BuildSpellColorRows(entries)
         assert.are.equal(2, #rows)
         assert.is_not_nil(findSpellColorRow(rows, "Spell A"))
         assert.is_not_nil(findSpellColorRow(rows, "Spell B"))
@@ -272,14 +274,14 @@ describe("BuffBarsOptions", function()
             { key = SpellColors.MakeKey(nil, nil, nil, 4444) },
         }
 
-        local rows = BuffBarsOptions._BuildSpellColorRows(entries)
+        local rows = ns.SpellColorsPage._BuildSpellColorRows(entries)
         assert.are.equal(1, #rows)
         assert.are.equal(4444, rows[1].key.primaryKey)
         assert.are.equal(4444, rows[1].textureFileID)
     end)
 
     it("_BuildSpellColorRows ignores invalid entries and handles nil inputs", function()
-        local rows = BuffBarsOptions._BuildSpellColorRows({
+        local rows = ns.SpellColorsPage._BuildSpellColorRows({
             {},
             { key = nil },
             { key = SpellColors.MakeKey("Valid", nil, nil, nil) },
@@ -297,7 +299,7 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_GetSpellColorsPageState hides the secret-name warning when all bar names are available", function()
-        local state = BuffBarsOptions._GetSpellColorsPageState({
+        local state = ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
@@ -308,7 +310,7 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_GetSpellColorsPageState shows the secret-name warning for unlabeled bars", function()
-        local state = BuffBarsOptions._GetSpellColorsPageState({
+        local state = ns.SpellColorsPage._GetSpellColorsPageState({
             { key = { primaryKey = "" } },
         })
 
@@ -320,7 +322,7 @@ describe("BuffBarsOptions", function()
             return true, "party"
         end
 
-        local state = BuffBarsOptions._GetSpellColorsPageState({
+        local state = ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
@@ -332,7 +334,7 @@ describe("BuffBarsOptions", function()
             return true
         end
 
-        local state = BuffBarsOptions._GetSpellColorsPageState({
+        local state = ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
@@ -344,7 +346,7 @@ describe("BuffBarsOptions", function()
             return true
         end
 
-        local state = BuffBarsOptions._GetSpellColorsPageState({
+        local state = ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         })
 
@@ -353,7 +355,7 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_BuildSpellColorKeyTooltipLines includes every available key", function()
-        local lines = BuffBarsOptions._BuildSpellColorKeyTooltipLines(
+        local lines = ns.SpellColorsPage._BuildSpellColorKeyTooltipLines(
             SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001)
         )
 
@@ -366,21 +368,21 @@ describe("BuffBarsOptions", function()
     end)
 
     it("_GetSpellColorsPageState detects rows missing any identifying key", function()
-        assert.is_false(BuffBarsOptions._GetSpellColorsPageState({
+        assert.is_false(ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, 77, 9001) },
         }).hasRowsNeedingReconcile)
 
-        assert.is_true(BuffBarsOptions._GetSpellColorsPageState({
+        assert.is_true(ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey("Immolation Aura", 258920, nil, nil) },
         }).hasRowsNeedingReconcile)
 
-        assert.is_true(BuffBarsOptions._GetSpellColorsPageState({
+        assert.is_true(ns.SpellColorsPage._GetSpellColorsPageState({
             { key = SpellColors.MakeKey(nil, 258920, 77, 9001) },
         }).hasRowsNeedingReconcile)
     end)
 
     local function registerSpellColorsSpec()
-        local spellColorsSpec = assert(ns.SpellColorsPage.CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
+        local spellColorsSpec = assert(ns.SpellColorsPage:CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
         local refreshCalls = {}
         local fakePage = {
             Refresh = function()
@@ -388,9 +390,14 @@ describe("BuffBarsOptions", function()
             end,
         }
 
-        if spellColorsSpec.SetRegisteredPage then
-            spellColorsSpec.SetRegisteredPage(fakePage)
-        end
+        ns.Settings = {
+            GetPage = function(_, sectionKey, pageKey)
+                assert.are.equal("spellColors", sectionKey)
+                assert.are.equal("spellColors", pageKey)
+                return fakePage
+            end,
+        }
+        ns.SpellColorsPage:OnInitialize()
 
         return spellColorsSpec, refreshCalls
     end
@@ -471,20 +478,31 @@ describe("BuffBarsOptions", function()
     end)
 
     it("registers combat refresh callbacks once and refreshes the latest registered page", function()
-        local spellColorsSpec = assert(ns.SpellColorsPage.CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
+        assert(ns.SpellColorsPage:CreatePage(ns.L["SPELL_COLORS_SUBCAT"]))
         local firstRefreshCalls = 0
         local secondRefreshCalls = 0
 
-        spellColorsSpec.SetRegisteredPage({
-            Refresh = function()
-                firstRefreshCalls = firstRefreshCalls + 1
+        ns.Settings = {
+            GetPage = function()
+                return {
+                    Refresh = function()
+                        firstRefreshCalls = firstRefreshCalls + 1
+                    end,
+                }
             end,
-        })
-        spellColorsSpec.SetRegisteredPage({
-            Refresh = function()
-                secondRefreshCalls = secondRefreshCalls + 1
+        }
+        ns.SpellColorsPage:OnInitialize()
+
+        ns.Settings = {
+            GetPage = function()
+                return {
+                    Refresh = function()
+                        secondRefreshCalls = secondRefreshCalls + 1
+                    end,
+                }
             end,
-        })
+        }
+        ns.SpellColorsPage:OnInitialize()
 
         local enterCallbacks = assert(addonEventCallbacks.PLAYER_REGEN_DISABLED)
         local leaveCallbacks = assert(addonEventCallbacks.PLAYER_REGEN_ENABLED)

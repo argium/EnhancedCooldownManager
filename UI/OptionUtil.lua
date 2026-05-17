@@ -229,13 +229,14 @@ function OptionUtil.SetNestedValue(tbl, path, value)
     local current, lastKey = tbl, nil
     for segment in path:gmatch("[^.]+") do
         if lastKey then
-            local resolved = lastKey
+            local resolved
             if current[lastKey] == nil then
                 local num = tonumber(lastKey)
                 if num and current[num] ~= nil then
                     resolved = num
                 end
             end
+            resolved = resolved or lastKey
             if current[resolved] == nil then
                 current[resolved] = {}
             end
@@ -243,13 +244,14 @@ function OptionUtil.SetNestedValue(tbl, path, value)
         end
         lastKey = segment
     end
-    local resolved = lastKey
+    local resolved
     if current[lastKey] == nil then
         local num = tonumber(lastKey)
         if num then
             resolved = num
         end
     end
+    resolved = resolved or lastKey
     current[resolved] = value
 end
 
@@ -314,7 +316,7 @@ local function setModuleEnabledValue(moduleName, value, setting)
         return
     end
 
-    local profile = ns.Addon and ns.Addon.db and ns.Addon.db.profile
+    local profile = ns.Addon.db.profile
     local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
     local moduleConfig = profile and profile[configKey]
     if moduleConfig then
@@ -351,12 +353,12 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
 end
 
 local function getGlobalFont()
-    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local gc = ns.GetGlobalConfig()
     return gc and gc.font
 end
 
 local function getGlobalFontSize()
-    local gc = ns.GetGlobalConfig and ns.GetGlobalConfig() or nil
+    local gc = ns.GetGlobalConfig()
     return gc and gc.fontSize
 end
 
@@ -410,6 +412,80 @@ function OptionUtil.CreateBarRows(isDisabled, options)
             disabled = isDisabled,
         }
     end
+
+    return rows
+end
+
+local function nilForZero(value)
+    return value > 0 and value or nil
+end
+
+--- Generates appearance rows shared by aura-style bar modules.
+---@param isDisabled fun(): boolean
+---@param extraRowsAfterHeader table[]|nil Rows inserted after the Appearance header.
+---@return table[] rows
+function OptionUtil.CreateAuraBarModuleRows(isDisabled, extraRowsAfterHeader)
+    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
+    local rows = {
+        { id = "appearanceHeader", type = "header", name = L["APPEARANCE"], disabled = isDisabled },
+    }
+
+    if extraRowsAfterHeader then
+        for _, row in ipairs(extraRowsAfterHeader) do
+            rows[#rows + 1] = row
+        end
+    end
+
+    rows[#rows + 1] = {
+        id = "showIcon",
+        type = "checkbox",
+        path = "showIcon",
+        name = L["SHOW_ICON"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "showSpellName",
+        type = "checkbox",
+        path = "showSpellName",
+        name = L["SHOW_SPELL_NAME"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "showDuration",
+        type = "checkbox",
+        path = "showDuration",
+        name = L["SHOW_REMAINING_DURATION"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "height",
+        type = "slider",
+        path = "height",
+        name = L["HEIGHT_OVERRIDE"],
+        tooltip = L["HEIGHT_OVERRIDE_DESC"],
+        min = 0,
+        max = 40,
+        step = 1,
+        disabled = isDisabled,
+        getTransform = defaultZero,
+        setTransform = nilForZero,
+    }
+    rows[#rows + 1] = {
+        id = "verticalSpacing",
+        type = "slider",
+        path = "verticalSpacing",
+        name = L["AURA_VERTICAL_SPACING"],
+        tooltip = L["AURA_VERTICAL_SPACING_DESC"],
+        min = 0,
+        max = 20,
+        step = 1,
+        disabled = isDisabled,
+        getTransform = defaultZero,
+    }
+
+    local fontOverride = OptionUtil.CreateFontOverrideRow(isDisabled)
+    fontOverride.id = "fontOverride"
+    rows[#rows + 1] = fontOverride
 
     return rows
 end
@@ -525,10 +601,13 @@ function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChan
 end
 
 function OptionUtil.MakeConfirmDialog(text, button1, button2)
+    assert(type(button1) == "string" and button1 ~= "", "OptionUtil.MakeConfirmDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "OptionUtil.MakeConfirmDialog requires button2")
+
     return {
         text = text,
-        button1 = button1 or YES,
-        button2 = button2 or NO,
+        button1 = button1,
+        button2 = button2,
         OnAccept = function(self, data)
             if data and data.onAccept then data.onAccept() end
         end,
@@ -562,10 +641,13 @@ local function setDialogAcceptEnabled(frame, enabled)
 end
 
 function OptionUtil.MakeTextInputDialog(text, button1, button2)
+    assert(type(button1) == "string" and button1 ~= "", "OptionUtil.MakeTextInputDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "OptionUtil.MakeTextInputDialog requires button2")
+
     return {
         text = text,
-        button1 = button1 or OKAY,
-        button2 = button2 or CANCEL,
+        button1 = button1,
+        button2 = button2,
         hasEditBox = true,
         OnAccept = function(self, data)
             data = data or (self and self.data)
@@ -631,8 +713,10 @@ function OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
         return
     end
 
-    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"] = OptionUtil.MakeConfirmDialog(L["RESET_PAGE_CONFIRM"])
-    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"].button1 = formatResetPageButton(pageName)
-    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"].button2 = L["DONT_RESET"]
+    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"] = OptionUtil.MakeConfirmDialog(
+        L["RESET_PAGE_CONFIRM"],
+        formatResetPageButton(pageName),
+        L["DONT_RESET"]
+    )
     StaticPopup_Show("ECM_CONFIRM_RESET_SETTINGS_PAGE", nil, nil, { onAccept = onAccept })
 end

@@ -241,20 +241,22 @@ local importFrame
 --- Shows a generic static confirmation popup with custom button labels.
 ---@param popupKey string
 ---@param text string
----@param button1 string|nil
----@param button2 string|nil
+---@param button1 string
+---@param button2 string
 ---@param onAccept fun()|nil
 ---@param onCancel fun()|nil
 function mod:ShowConfirmDialog(popupKey, text, button1, button2, onAccept, onCancel)
     if not popupKey or popupKey == "" then
         return
     end
+    assert(type(button1) == "string" and button1 ~= "", "ShowConfirmDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "ShowConfirmDialog requires button2")
 
     if not StaticPopupDialogs[popupKey] then
         StaticPopupDialogs[popupKey] = {
             text = text or "",
-            button1 = button1 or YES or "Yes",
-            button2 = button2 or NO or "No",
+            button1 = button1,
+            button2 = button2,
             OnAccept = function(_, data)
                 if data and data.onAccept then
                     data.onAccept()
@@ -273,8 +275,8 @@ function mod:ShowConfirmDialog(popupKey, text, button1, button2, onAccept, onCan
     end
 
     StaticPopupDialogs[popupKey].text = text or ""
-    StaticPopupDialogs[popupKey].button1 = button1 or YES or "Yes"
-    StaticPopupDialogs[popupKey].button2 = button2 or NO or "No"
+    StaticPopupDialogs[popupKey].button1 = button1
+    StaticPopupDialogs[popupKey].button2 = button2
     StaticPopup_Show(popupKey, nil, nil, { onAccept = onAccept, onCancel = onCancel })
 end
 
