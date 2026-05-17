@@ -321,7 +321,8 @@ function BuffBars:UpdateLayout(why)
     end
     ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
 
-    local barHeight = math.max(0, (cfg and cfg.height) or (globalConfig and globalConfig.barHeight) or 0)
+    local moduleHeight = cfg and cfg.height
+    local barHeight = math.max(0, moduleHeight or globalConfig.barHeight or 0)
     local totalHeight = (shownChildCount * barHeight) + (math.max(0, shownChildCount - 1) * verticalSpacing)
     FrameUtil.LazySetHeight(viewer, totalHeight)
 
