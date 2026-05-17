@@ -217,7 +217,8 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
 
     -- When "hide when inactive" is disabled, bar frames stay visible with no active
     -- aura. An empty name means no aura is assigned; the normal background applies.
-    if not bar.Name or type(bar.Name.GetText) ~= "function" or (bar.Name:GetText() or "") == "" then
+    local nameText = bar.Name and type(bar.Name.GetText) == "function" and bar.Name:GetText()
+    if not nameText or nameText == "" then
         return
     end
 
