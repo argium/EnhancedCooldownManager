@@ -17,7 +17,9 @@ StaticPopupDialogs["ECM_CONFIRM_DELETE_ITEM_STACK"] =
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM"] =
     OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
-    OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
+    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
+StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
+    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 
 local ITEM_STACK_ROW_HEIGHT = 22
 local ITEM_STACK_COLLECTION_HEIGHT = 240
