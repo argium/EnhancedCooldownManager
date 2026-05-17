@@ -122,16 +122,20 @@ local function resolveEquipSlot(slotId)
 end
 
 local function resolveItem(ids, showIfMissing)
+    local missingData
+
     for _, entry in ipairs(ids) do
         local itemId = entry.itemID or entry.itemId
         if itemId and C_Item.GetItemCount(itemId) > 0 then
             local texture = C_Item.GetItemIconByID(itemId)
             if texture then return { itemId = itemId, texture = texture } end
-        elseif itemId and showIfMissing then
+        elseif itemId and showIfMissing and not missingData then
             local texture = C_Item.GetItemIconByID(itemId)
-            if texture then return { itemId = itemId, texture = texture, missing = true } end
+            if texture then missingData = { itemId = itemId, texture = texture, missing = true } end
         end
     end
+
+    return missingData
 end
 
 local function resolveKnownSpell(spellId)
