@@ -360,12 +360,20 @@ function registry.isControlEnabled(self, spec)
     return registry.isParentEnabled(self, spec)
 end
 
+function registry.applyReactiveControlStates(self)
+    for _, entry in ipairs(self._reactiveControls) do
+        interop.applyInitializerEnabledState(entry.initializer, {
+            canvas = entry.canvas,
+            isEnabled = function()
+                return registry.isControlEnabled(self, entry.spec)
+            end,
+        })
+    end
+end
+
 function registry.reevaluateReactiveControls(self)
     interop.reevaluateVisibleSettingsFrames()
-
-    for _, entry in ipairs(self._reactiveControls) do
-        interop.applyCanvasState(entry.canvas, registry.isControlEnabled(self, entry.spec))
-    end
+    registry.applyReactiveControlStates(self)
 end
 
 function registry.applyModifiers(self, initializer, spec, canvas)
@@ -382,8 +390,8 @@ function registry.applyModifiers(self, initializer, spec, canvas)
         end,
     })
 
-    if canvas then
-        self._reactiveControls[#self._reactiveControls + 1] = { canvas = canvas, spec = spec }
+    if spec.disabled or spec._parentInitializer or canvas then
+        self._reactiveControls[#self._reactiveControls + 1] = { initializer = initializer, canvas = canvas, spec = spec }
     end
 end
 

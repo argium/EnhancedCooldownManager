@@ -90,8 +90,21 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("dropdown", getRow("selectedManagedItemStack").type)
         assert.are.equal("checkbox", getRow("hideStackInInstances").type)
         assert.are.equal("checkbox", getRow("hideStackInRatedPvp").type)
+        assert.are.equal("checkbox", getRow("showStackIfMissing").type)
         assert.are.equal("sectionList", getRow("itemStackItems").type)
         assert.are.equal("button", getRow("renameItemStack").type)
+        local ratedIndex, missingIndex, itemsIndex
+        for index, row in ipairs(page.rows) do
+            if row.id == "hideStackInRatedPvp" then
+                ratedIndex = index
+            elseif row.id == "showStackIfMissing" then
+                missingIndex = index
+            elseif row.id == "itemStackItems" then
+                itemsIndex = index
+            end
+        end
+        assert.are.equal(ratedIndex + 1, missingIndex)
+        assert.are.equal(missingIndex + 1, itemsIndex)
         assert.are.equal("pageActions", getRow("selectedStackActions").type)
         assert.is_table(getStackAction(ns.L["DELETE"]))
         assert.is_table(getStackAction(ns.L["REVERT"]))
@@ -152,6 +165,7 @@ describe("ItemStacksOptions settings page", function()
         assert.same({ { itemID = 101 }, { itemID = 202 } }, profile.extraIcons.itemStacks.byId[1].ids)
 
         local firstRow = getSection().items[1]
+        assert.is_nil(firstRow.actions.missing)
         firstRow.actions.down.onClick()
         assert.same({ { itemID = 202 }, { itemID = 101 } }, profile.extraIcons.itemStacks.byId[1].ids)
 
@@ -316,19 +330,26 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("2", picker.get())
     end)
 
-    it("updates visibility checkboxes for the selected stack", function()
+    it("updates top-level checkboxes for the selected stack", function()
         ns.ItemStacksOptions._createStack(profile, "Potions")
 
         local instances = getRow("hideStackInInstances")
         local rated = getRow("hideStackInRatedPvp")
+        local missing = getRow("showStackIfMissing")
         assert.is_false(instances.get())
         assert.is_false(rated.get())
+        assert.is_false(missing.get())
 
         instances.set(true)
         rated.set(true)
+        missing.set(true)
 
         assert.is_true(profile.extraIcons.itemStacks.byId[1].hideInInstances)
         assert.is_true(profile.extraIcons.itemStacks.byId[1].hideInRatedPvp)
+        assert.is_true(profile.extraIcons.itemStacks.byId[1].showIfMissing)
+
+        missing.set(false)
+        assert.is_nil(profile.extraIcons.itemStacks.byId[1].showIfMissing)
     end)
 
     it("protects default stacks and reverts them to defaults", function()
@@ -350,8 +371,10 @@ describe("ItemStacksOptions settings page", function()
         getStackAction(ns.L["DELETE"]).onClick()
         assert.is_not_nil(profile.extraIcons.itemStacks.byId.combatPotions)
 
+        local getShownPopupName = TestHelpers.InstallPopupAutoAccept()
         getStackAction(ns.L["REVERT"]).onClick()
 
+        assert.are.equal("ECM_CONFIRM_REVERT_ITEM_STACK", getShownPopupName())
         assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)
         assert.are.equal(245898, profile.extraIcons.itemStacks.byId.combatPotions.ids[1].itemID)
         assert.is_false(profile.extraIcons.itemStacks.byId.combatPotions.hideInInstances)

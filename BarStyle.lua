@@ -180,6 +180,47 @@ local function styleBarColor(module, frame, bar, globalConfig, spellColors, retr
     return module._editLocked
 end
 
+local function isEmptyStatusBar(bar)
+    if not bar or type(bar.GetMinMaxValues) ~= "function" or type(bar.GetValue) ~= "function" then
+        return false
+    end
+
+    local okMinMax, _, maxValue = pcall(bar.GetMinMaxValues, bar)
+    if not okMinMax then
+        return false
+    end
+
+    local okValue, value = pcall(bar.GetValue, bar)
+    if not okValue then
+        return false
+    end
+
+    if issecretvalue(maxValue) or issecretvalue(value) then
+        return false
+    end
+
+    if type(maxValue) ~= "number" or type(value) ~= "number" then
+        return false
+    end
+
+    return maxValue <= 0 and value <= 0
+end
+
+local function styleEmptyStatusBarBackground(bar, barBG)
+    if not barBG or type(bar.GetStatusBarColor) ~= "function" or type(barBG.SetVertexColor) ~= "function" then
+        return
+    end
+
+    if not isEmptyStatusBar(bar) then
+        return
+    end
+
+    local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)
+    if ok then
+        barBG:SetVertexColor(r, g, b, a or 1)
+    end
+end
+
 ---@param frame Frame
 ---@param iconFrame Frame|nil
 ---@param config table|nil
@@ -272,8 +313,10 @@ local function styleChildBar(module, frame, config, globalConfig, spellColors)
     bar.Pip:Hide()
     bar.Pip:SetTexture(nil)
 
-    styleBarBackground(frame, FrameUtil.GetBarBackground(bar), config, globalConfig)
+    local barBG = FrameUtil.GetBarBackground(bar)
+    styleBarBackground(frame, barBG, config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, spellColors, 0)
+    styleEmptyStatusBarBackground(bar, barBG)
 
     FrameUtil.ApplyFont(bar.Name, globalConfig, config)
     FrameUtil.ApplyFont(bar.Duration, globalConfig, config)
