@@ -180,6 +180,35 @@ local function mergeKeys(base, other)
     )
 end
 
+---@param spellName string|nil
+---@param spellID number|nil
+---@param cooldownID number|nil
+---@param textureFileID number|nil
+---@return ECM_SpellColorKey|nil
+local function makeKey(spellName, spellID, cooldownID, textureFileID)
+    return buildKey(
+        validateKey(spellName),
+        validateKey(spellID),
+        validateKey(cooldownID),
+        validateKey(textureFileID),
+        nil
+    )
+end
+
+---@param left ECM_SpellColorKey|table|nil
+---@param right ECM_SpellColorKey|table|nil
+---@return boolean
+local function keysMatchPayloads(left, right)
+    return keysMatch(normalizeKey(left), normalizeKey(right))
+end
+
+---@param base ECM_SpellColorKey|table|nil
+---@param other ECM_SpellColorKey|table|nil
+---@return ECM_SpellColorKey|nil
+local function mergeKeyPayloads(base, other)
+    return mergeKeys(normalizeKey(base), normalizeKey(other))
+end
+
 ---------------------------------------------------------------------------
 -- SpellColorKeyType methods
 ---------------------------------------------------------------------------
@@ -215,46 +244,10 @@ end
 -- Public key API
 ---------------------------------------------------------------------------
 
---- Creates a normalized spell-color key from identifying values.
---- Input values are validated and secret values are dropped.
----@param spellName string|nil
----@param spellID number|nil
----@param cooldownID number|nil
----@param textureFileID number|nil
----@return ECM_SpellColorKey|nil
-function SpellColors.MakeKey(spellName, spellID, cooldownID, textureFileID)
-    return buildKey(
-        validateKey(spellName),
-        validateKey(spellID),
-        validateKey(cooldownID),
-        validateKey(textureFileID),
-        nil
-    )
-end
-
---- Normalizes a key payload into an opaque spell-color key object.
----@param key ECM_SpellColorKey|table|nil
----@return ECM_SpellColorKey|nil
-function SpellColors.NormalizeKey(key)
-    return normalizeKey(key)
-end
-
---- Returns true when two keys identify the same logical spell-color entry.
----@param left ECM_SpellColorKey|table|nil
----@param right ECM_SpellColorKey|table|nil
----@return boolean
-function SpellColors.KeysMatch(left, right)
-    return keysMatch(normalizeKey(left), normalizeKey(right))
-end
-
---- Merges identifiers from matching keys into a single normalized key.
---- Returns nil when both keys are valid but identify different entries.
----@param base ECM_SpellColorKey|table|nil
----@param other ECM_SpellColorKey|table|nil
----@return ECM_SpellColorKey|nil
-function SpellColors.MergeKeys(base, other)
-    return mergeKeys(normalizeKey(base), normalizeKey(other))
-end
+SpellColors.MakeKey = makeKey
+SpellColors.NormalizeKey = normalizeKey
+SpellColors.KeysMatch = keysMatchPayloads
+SpellColors.MergeKeys = mergeKeyPayloads
 
 -- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
 local unpack = _G.unpack or table.unpack
@@ -858,7 +851,7 @@ end
 ---@param frame ECM_BuffBarMixin
 ---@return ECM_SpellColorKey|nil
 local function makeKeyFromBar(frame)
-    return SpellColors.MakeKey(
+    return makeKey(
         frame.Bar and frame.Bar.Name and frame.Bar.Name.GetText and frame.Bar.Name:GetText(),
         frame.cooldownInfo and frame.cooldownInfo.spellID,
         frame.cooldownID,

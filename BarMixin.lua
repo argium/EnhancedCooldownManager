@@ -308,10 +308,9 @@ function FrameProto:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
-    local params
     if mode == C.ANCHORMODE_FREE then
         local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
-        params = {
+        return {
             mode = C.ANCHORMODE_FREE,
             anchor = UIParent,
             isFirst = false,
@@ -322,11 +321,9 @@ function FrameProto:CalculateLayoutParams()
             height = moduleConfig.height or globalConfig.barHeight,
             width = moduleConfig.width or globalConfig.barWidth,
         }
-    else
-        params = getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     end
 
-    return params
+    return getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
 end
 
 --- Applies positioning to a frame based on layout parameters.

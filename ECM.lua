@@ -72,36 +72,25 @@ local function safeTableTostring(tbl, depth, seen)
 
     seen[tbl] = true
 
-    local ok, iterator, state, cursor = tryCall(pairs, tbl)
-    if not ok then
-        return "<table_error>"
-    end
+    local ok, result = pcall(function()
+        local parts = {}
+        local count = 0
 
-    local parts = {}
-    local count = 0
+        for k, x in pairs(tbl) do
+            count = count + 1
+            if count > C.TOSTRING_MAX_ITEMS then
+                parts[#parts + 1] = "..."
+                break
+            end
 
-    while true do
-        local okNext, k, x = tryCall(iterator, state, cursor)
-        if not okNext then
-            return "<table_error>"
-        end
-        if k == nil then
-            break
-        end
-
-        cursor = k
-        count = count + 1
-        if count > C.TOSTRING_MAX_ITEMS then
-            parts[#parts + 1] = "..."
-            break
+            local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
+            local valueStr = type(x) == "table" and safeTableTostring(x, depth + 1, seen) or safeStrTostring(x)
+            parts[#parts + 1] = keyStr .. "=" .. valueStr
         end
 
-        local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
-        local valueStr = type(x) == "table" and safeTableTostring(x, depth + 1, seen) or safeStrTostring(x)
-        parts[#parts + 1] = keyStr .. "=" .. valueStr
-    end
-
-    return "{" .. table.concat(parts, ", ") .. "}"
+        return "{" .. table.concat(parts, ", ") .. "}"
+    end)
+    return ok and result or "<table_error>"
 end
 
 function ns.ToString(v)
@@ -141,22 +130,13 @@ end)
 local function makeErrorData(module, key, data)
     local payload = {}
     if type(data) == "table" then
-        local ok, iterator, state, cursor = tryCall(pairs, data)
-        if ok then
-            while true do
-                local okNext, dataKey, value = tryCall(iterator, state, cursor)
-                if not okNext then
-                    payload.dataError = "error data could not be copied: " .. tostring(dataKey)
-                    break
-                end
-                if dataKey == nil then
-                    break
-                end
-                cursor = dataKey
+        local ok, err = pcall(function()
+            for dataKey, value in pairs(data) do
                 payload[dataKey] = value
             end
-        else
-            payload.dataError = "error data could not be copied: " .. tostring(iterator)
+        end)
+        if not ok then
+            payload.dataError = "error data could not be copied: " .. tostring(err)
         end
     elseif data ~= nil then
         payload.detail = data

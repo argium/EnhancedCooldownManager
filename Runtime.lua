@@ -28,7 +28,7 @@ local LAYOUT_EVENTS = {
     PLAYER_ENTERING_WORLD = { delay = C.LAYOUT_ENTERING_WORLD_DELAY },
     PLAYER_TARGET_CHANGED = { delay = 0 },
     PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true, onEvent = function()
-        if Runtime.OnCombatEnd then Runtime.OnCombatEnd() end
+        Runtime.OnCombatEnd()
     end },
     PLAYER_REGEN_DISABLED = { delay = 0, combatChange = true },
     ZONE_CHANGED_NEW_AREA = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
@@ -172,17 +172,12 @@ local function updateFadeAndHiddenStates()
     local alpha = 1
 
     if not (LibEditMode:IsInEditMode() or _layoutPreviewActive) then
-        if not C_CVar.GetCVarBool("cooldownViewerEnabled")
+        hidden = not C_CVar.GetCVarBool("cooldownViewerEnabled")
             or (globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")))
             or (not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting())
-        then
-            hidden = true
-        end
-    end
 
-    if not hidden and not (LibEditMode:IsInEditMode() or _layoutPreviewActive) then
         local fadeConfig = globalConfig.outOfCombatFade
-        if not _inCombat and fadeConfig and fadeConfig.enabled then
+        if not hidden and not _inCombat and fadeConfig and fadeConfig.enabled then
             local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
             local skipFade = (fadeConfig.exceptInInstance and isInInstanceContext())
                 or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target"))
