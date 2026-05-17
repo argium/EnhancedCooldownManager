@@ -8,6 +8,7 @@ local L = ns.L
 local COLOR_WHITE_HEX = C.COLOR_WHITE_HEX or "FFFFFF"
 local RESOURCE_ICON_SIZE = 14
 local RESOURCE_ICON_SLOTS = 2
+-- Transparent texture slot for right-aligning rows with fewer class icons.
 local EMPTY_RESOURCE_ICON =
     "|TInterface\\Buttons\\WHITE8X8:"
     .. RESOURCE_ICON_SIZE
