@@ -1135,7 +1135,7 @@ describe("BuffBars real source", function()
             assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
         end)
 
-        it("does not compare secret status bar values when checking for timeless auras",function()
+        it("does not compare secret status bar values when checking for timeless auras", function()
             local secretValue = { __secret = true }
             local child = makeStyledChild("Secret", true, 1)
             child.Bar.__minMax = { 0, secretValue }
