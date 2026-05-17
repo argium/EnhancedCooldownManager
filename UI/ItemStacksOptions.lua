@@ -14,7 +14,7 @@ StaticPopupDialogs["ECM_CONFIRM_DELETE_ITEM_STACK"] =
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM"] =
     ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
-    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
+    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
     ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 
