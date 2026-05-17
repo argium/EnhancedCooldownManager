@@ -206,13 +206,23 @@ local function isEmptyStatusBar(bar)
     return maxValue <= 0 and value <= 0
 end
 
-local function styleEmptyStatusBarBackground(bar, barBG)
+local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     if not barBG or type(bar.GetStatusBarColor) ~= "function" or type(barBG.SetVertexColor) ~= "function" then
         return
     end
 
     if not isEmptyStatusBar(bar) then
         return
+    end
+
+    -- Match the foreground bar's texture so timeless auras render with the
+    -- user's configured statusbar texture instead of the solid fallback
+    -- already set by styleBarBackground. Prefer the module-level override
+    -- when set, otherwise fall back to the global texture.
+    local textureName = (config and config.texture) or (globalConfig and globalConfig.texture)
+    local texture = FrameUtil.GetTexture(textureName)
+    if texture and type(barBG.SetTexture) == "function" then
+        barBG:SetTexture(texture)
     end
 
     local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)
@@ -316,7 +326,7 @@ local function styleChildBar(module, frame, config, globalConfig, spellColors)
     local barBG = FrameUtil.GetBarBackground(bar)
     styleBarBackground(frame, barBG, config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, spellColors, 0)
-    styleEmptyStatusBarBackground(bar, barBG)
+    styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
 
     FrameUtil.ApplyFont(bar.Name, globalConfig, config)
     FrameUtil.ApplyFont(bar.Duration, globalConfig, config)

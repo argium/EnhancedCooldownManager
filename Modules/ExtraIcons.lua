@@ -486,7 +486,7 @@ function ExtraIcons:ShouldShow()
     return false
 end
 
---- Updates the main viewer's logical anchor frame so chained ECM modules
+--- Returns the logical anchor frame used by chained ECM modules so they
 --- inherit the combined width of Blizzard icons plus appended extra icons.
 function ExtraIcons:GetMainViewerAnchor()
     local vs = self._viewers and self._viewers.main

@@ -232,8 +232,20 @@ end
 
 SpellColors.MakeKey = makeKey
 SpellColors.NormalizeKey = normalizeKey
-SpellColors.KeysMatch = keysMatch
-SpellColors.MergeKeys = mergeKeys
+
+--- Returns true when two keys identify the same logical spell-color entry.
+--- Both operands are normalized first so callers can pass either a
+--- `ECM_SpellColorKey` or a raw payload accepted by `NormalizeKey`.
+function SpellColors.KeysMatch(left, right)
+    return keysMatch(normalizeKey(left), normalizeKey(right))
+end
+
+--- Merges identifiers from two matching keys into a single normalized key.
+--- Both operands are normalized first so callers can pass either a
+--- `ECM_SpellColorKey` or a raw payload accepted by `NormalizeKey`.
+function SpellColors.MergeKeys(base, other)
+    return mergeKeys(normalizeKey(base), normalizeKey(other))
+end
 
 -- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
 local unpack = _G.unpack or table.unpack
