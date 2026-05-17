@@ -215,6 +215,12 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
         return
     end
 
+    -- When "hide when inactive" is disabled, bar frames stay visible with no active
+    -- aura. An empty name means no aura is assigned; the normal background applies.
+    if not bar.Name or type(bar.Name.GetText) ~= "function" or (bar.Name:GetText() or "") == "" then
+        return
+    end
+
     -- Match the foreground bar's texture so timeless auras render with the
     -- user's configured statusbar texture instead of the solid fallback
     -- already set by styleBarBackground. Prefer the module-level override
