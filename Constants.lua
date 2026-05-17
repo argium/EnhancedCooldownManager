@@ -9,12 +9,14 @@ local constants = {
     ADDON_ICON_TEXTURE = "Interface\\AddOns\\EnhancedCooldownManager\\Media\\icon",
     ADDON_METADATA_VERSION_KEY = "Version",
     DEBUG_COLOR = "F17934",
-    RELEASE_POPUP_VERSION = "v0.7.1",
+    ERROR_COLOR = "ff4040",
+    RELEASE_POPUP_VERSION = "v0.8.3",
     VERSION_TAG_BETA = "beta",
 
     -- Module identifiers
     BUFFBARS = "BuffBars",
-    ITEMICONS = "ItemIcons",
+    EXTERNALBARS = "ExternalBars",
+    EXTRAICONS = "ExtraIcons",
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
     RUNEBAR = "RuneBar",
@@ -27,6 +29,8 @@ local constants = {
     EDIT_MODE_DEFAULT_POINT = "CENTER",
     GROW_DIRECTION_DOWN = "down",
     GROW_DIRECTION_UP = "up",
+    SCOPE_BUFFBARS = "buffBars",
+    SCOPE_EXTERNALBARS = "externalBars",
 
     -- Shared visuals and defaults
     COLOR_BLACK = { r = 0, g = 0, b = 0, a = 1 },
@@ -71,6 +75,7 @@ local constants = {
     SPELLID_COLLAPSING_STAR = 1227702, -- when in void meta, tracks progress towards collapsing star (30 stacks)
     SPELLID_MAELSTROM_WEAPON = 344179,
     SPELLID_DEVOURER_SOUL_FRAGMENTS = 1225789, -- tracks progress towards void meta form (50 soul fragments)
+    SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT = 1245577, -- alternate aura for void meta soul fragments
     SPELLID_SOUL_GLUTTEN = 1247534, -- reduces the number of souls needed for void meta by 15
     SPELLID_VOID_META = 1217607, -- void meta
 
@@ -100,35 +105,14 @@ local constants = {
     SHAMAN_ENHANCEMENT_SPEC_INDEX = 2,
     SHAMAN_RESTORATION_SPEC_INDEX = 3,
 
-    -- Item icons
-    DEFAULT_ITEM_ICON_SIZE = 32,
-    ITEM_ICON_BORDER_SCALE = 1.35,
-    ITEM_ICONS_MAX = 5,
-
-    -- Consumables and equipment slots
-    COMBAT_POTIONS = {
-        { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
-        { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
-        { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
-        { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
-    },
-    HEALTH_POTIONS = {
-        { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
-        { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
-        { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
-    },
-    DEMONIC_HEALTHSTONE_ITEM_ID = 224464,
-    HEALTHSTONE_ITEM_ID = 5512,
-    HEALTHSTONES = {
-        { itemID = 224464 }, -- Demonic Healthstone
-        { itemID = 5512 }, -- Healthstone
-    },
-    TRINKET_SLOT_1 = 13,
-    TRINKET_SLOT_2 = 14,
+    -- Extra icons
+    DEFAULT_EXTRA_ICON_SIZE = 32,
+    EXTRA_ICON_MAIN_BORDER_SCALE = 1.35,
+    EXTRA_ICON_UTILITY_BORDER_SCALE = 1.4,
 
     -- Saved variables and migration
     ACTIVE_SV_KEY = "_ECM_DB",
-    CURRENT_SCHEMA_VERSION = 11,
+    CURRENT_SCHEMA_VERSION = 13,
     SV_NAME = "EnhancedCooldownManagerDB",
 
     -- Import and export
@@ -138,6 +122,8 @@ local constants = {
     -- Runtime timing and debug limits
     LAYOUT_COMBAT_END_DELAY = 0.1,
     LAYOUT_ENTERING_WORLD_DELAY = 0.4,
+    LAYOUT_STORM_COUNT = 20,
+    LAYOUT_STORM_WINDOW = 2,
     LAYOUT_ZONE_CHANGE_DELAY = 0.1,
     LIFECYCLE_SECOND_PASS_DELAY = 0.05,
     TOSTRING_MAX_DEPTH = 3,
@@ -176,12 +162,6 @@ local constants = {
 
     -- UI dimension constants
     POSITION_MODE_EXPLAINER_HEIGHT = 150,
-    SCROLL_ROW_HEIGHT_COMPACT = 26,
-    SCROLL_ROW_HEIGHT_WITH_CONTROLS = 34,
-    SPELL_COLORS_SCROLL_BOTTOM_OFFSET_WITH_SECRET_NAMES = 80,
-    SPELL_COLORS_SECRET_NAMES_BUTTON_BOTTOM_OFFSET = 8,
-    SPELL_COLORS_SECRET_NAMES_DESC_BOTTOM_OFFSET = 42,
-    SPELL_COLORS_SECRET_NAMES_DESC_HEIGHT = 40,
 
     VALUE_SLIDER_TIERS = {
         { ceiling = 200,    step = 1 },
@@ -192,6 +172,46 @@ local constants = {
         { ceiling = 100000, step = 500 },
         { ceiling = 500000, step = 2500 },
     },
+}
+
+--- Predefined icon stacks resolved at runtime by stackKey.
+--- Each entry defines an icon kind and its candidate sources.
+local BUILTIN_STACKS = {
+    trinket1 = { kind = "equipSlot", slotId = 13, label = "Trinket 1" },
+    trinket2 = { kind = "equipSlot", slotId = 14, label = "Trinket 2" },
+}
+
+--- Default display order for builtin stack keys (matches default viewers.utility order).
+local BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
+
+--- Racial ability lookup keyed by UnitRace("player") raceFileName.
+--- One primary active racial per race.
+local RACIAL_ABILITIES = {
+    Human              = { spellId = 59752  }, -- Every Man for Himself
+    Orc                = { spellId = 33697  }, -- Blood Fury
+    Dwarf              = { spellId = 20594  }, -- Stoneform
+    NightElf           = { spellId = 58984  }, -- Shadowmeld
+    Scourge            = { spellId = 7744   }, -- Will of the Forsaken
+    Tauren             = { spellId = 20549  }, -- War Stomp
+    Gnome              = { spellId = 20589  }, -- Escape Artist
+    Troll              = { spellId = 26297  }, -- Berserking
+    Goblin             = { spellId = 69070  }, -- Rocket Barrage
+    BloodElf           = { spellId = 28730  }, -- Arcane Torrent
+    Draenei            = { spellId = 59542  }, -- Gift of the Naaru
+    Worgen             = { spellId = 68992  }, -- Darkflight
+    Pandaren           = { spellId = 107079 }, -- Quaking Palm
+    Nightborne         = { spellId = 260364 }, -- Arcane Pulse
+    HighmountainTauren = { spellId = 255654 }, -- Bull Rush
+    VoidElf            = { spellId = 256948 }, -- Spatial Rift
+    LightforgedDraenei = { spellId = 255647 }, -- Light's Judgment
+    ZandalariTroll     = { spellId = 291944 }, -- Regeneratin'
+    KulTiran           = { spellId = 287712 }, -- Haymaker
+    DarkIronDwarf      = { spellId = 265221 }, -- Fireblood
+    Vulpera            = { spellId = 312411 }, -- Bag of Tricks
+    MagharOrc          = { spellId = 274738 }, -- Ancestral Call
+    Mechagnome         = { spellId = 312924 }, -- Hyper Organic Light Originator
+    Dracthyr           = { spellIds = { 357214, 368970 } }, -- Tail Swipe
+    EarthenDwarf       = { spellId = 436717 }, -- Azerite Surge
 }
 
 local BLIZZARD_FRAMES = {
@@ -235,8 +255,9 @@ local moduleConfigKeys = {
     [constants.POWERBAR] = "powerBar",
     [constants.RESOURCEBAR] = "resourceBar",
     [constants.RUNEBAR] = "runeBar",
-    [constants.BUFFBARS] = "buffBars",
-    [constants.ITEMICONS] = "itemIcons",
+    [constants.BUFFBARS] = constants.SCOPE_BUFFBARS,
+    [constants.EXTERNALBARS] = constants.SCOPE_EXTERNALBARS,
+    [constants.EXTRAICONS] = "extraIcons",
 }
 
 --- Returns the profile config key for a module name.
@@ -245,11 +266,27 @@ function constants.ConfigKeyForModule(name)
     return moduleConfigKeys[name] or (name:sub(1, 1):lower() .. name:sub(2))
 end
 
-local chainOrder = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS }
+local chainOrder = {
+    constants.POWERBAR,
+    constants.RESOURCEBAR,
+    constants.RUNEBAR,
+    constants.BUFFBARS,
+    constants.EXTERNALBARS,
+}
 constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER = { constants.POWERBAR, constants.RESOURCEBAR, constants.RUNEBAR, constants.BUFFBARS, constants.ITEMICONS }
+constants.MODULE_ORDER = {
+    constants.POWERBAR,
+    constants.RESOURCEBAR,
+    constants.RUNEBAR,
+    constants.BUFFBARS,
+    constants.EXTERNALBARS,
+    constants.EXTRAICONS,
+}
 constants.MODULE_CONFIG_KEYS = moduleConfigKeys
 constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
+constants.BUILTIN_STACKS = BUILTIN_STACKS
+constants.BUILTIN_STACK_ORDER = BUILTIN_STACK_ORDER
+constants.RACIAL_ABILITIES = RACIAL_ABILITIES
 constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes

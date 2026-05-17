@@ -7,8 +7,16 @@ local TestHelpers =
 
 describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, capturedTable
+    local profile, defaults, SB, ns, settings, capturedPage
     local emptyIcon = "|TInterface\\Buttons\\WHITE8X8:14:14:0:0:8:8:0:0:0:0|t"
+
+    local function getPageRow(path)
+        for _, row in ipairs(capturedPage.rows) do
+            if row.path == path then
+                return row
+            end
+        end
+    end
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -23,15 +31,10 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         profile, defaults = TestHelpers.MakeOptionsProfile()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
-        local originalRegisterFromTable = SB.RegisterFromTable
-        SB.RegisterFromTable = function(tbl)
-            capturedTable = tbl
-            return originalRegisterFromTable(tbl)
-        end
-
         settings = TestHelpers.CollectSettings(function()
             TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
-            ns.OptionsSections.ResourceBar.RegisterSettings(SB)
+            TestHelpers.RegisterSectionSpec(SB, ns.ResourceBarOptions)
+            capturedPage = ns.ResourceBarOptions.pages[1]
         end)
     end)
 
@@ -62,9 +65,14 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         it("removes anchorMode from the module page", function()
             assert.is_nil(settings["ECM_resourceBar_anchorMode"])
         end)
-        it("adds a breadcrumb to the Layout page", function()
-            assert.is_nil(capturedTable.args.layoutMovedInfo)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], capturedTable.args.layoutMovedButton.name)
+        it("adds an inline layout button row to the page", function()
+            local layoutButton
+            for _, row in ipairs(capturedPage.rows) do
+                if row.type == "button" and row.name == ns.L["LAYOUT_SUBCATEGORY"] then
+                    layoutButton = row
+                end
+            end
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], assert(layoutButton).buttonText)
         end)
     end)
 
@@ -150,7 +158,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("prefixes each resource label with its class icon and color", function()
             local defsByKey = {}
-            for _, def in ipairs(capturedTable.args.colors.defs) do
+            for _, def in ipairs(assert(getPageRow("colors")).defs) do
                 defsByKey[def.key] = def.name
             end
 
@@ -202,7 +210,7 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("reuses the icon-prefixed names for capped resource rows", function()
             local defsByKey = {}
-            for _, def in ipairs(capturedTable.args.maxColors.defs) do
+            for _, def in ipairs(assert(getPageRow("maxColors")).defs) do
                 defsByKey[def.key] = def.name
             end
 
@@ -242,7 +250,6 @@ describe("ResourceBarOptions class gating (DK)", function()
         local _, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         TestHelpers.LoadChunk("UI/ResourceBarOptions.lua", "ResourceBarOptions")(nil, ns)
-        assert.is_not_nil(ns.OptionsSections.ResourceBar)
-        assert.is_function(ns.OptionsSections.ResourceBar.RegisterSettings)
+        assert.is_true(ns.ResourceBarOptions.disabled())
     end)
 end)

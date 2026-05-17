@@ -1,0 +1,2 @@
+- UI option spec files can load before `ns.Addon.db` exists; do not read AceDB at chunk load time.
+- Keep profile/option dropdown selections lazy (inside getters/value generators or callbacks), otherwise chunk execution can abort and leave a half-built section table that later fails `Register: each section requires a key`.

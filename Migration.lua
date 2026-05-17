@@ -1,5 +1,5 @@
 -- Schema migration for Enhanced Cooldown Manager
--- Handles versioned SavedVariable namespacing and profile migrations (V2 → V11).
+-- Handles versioned SavedVariable namespacing and profile migrations.
 
 local _, ns = ...
 local Migration = {}
@@ -152,38 +152,47 @@ local function normalizeBarConfig(cfg)
     end
 end
 
+local function forEachClassSpecEntry(store, fn)
+    if type(store) ~= "table" then
+        return
+    end
+
+    for classID, classMap in pairs(store) do
+        if type(classMap) == "table" then
+            for specID, specMap in pairs(classMap) do
+                if type(specMap) == "table" then
+                    fn(classID, specID, specMap)
+                end
+            end
+        end
+    end
+end
+
 local function normalizeBuffBarsCache(cfg)
     if not (cfg and cfg.colors and type(cfg.colors.cache) == "table") then
         return
     end
 
-    local cache = cfg.colors.cache
-    for _, classMap in pairs(cache) do
-        if type(classMap) == "table" then
-            for _, specMap in pairs(classMap) do
-                if type(specMap) == "table" then
-                    for index, entry in pairs(specMap) do
-                        if type(entry) ~= "table" then
-                            specMap[index] = nil
-                        else
-                            entry.color = nil
-                            local spellName = entry.spellName
-                            if type(spellName) ~= "string" then
-                                specMap[index] = nil
-                            else
-                                spellName = strtrim(spellName)
-                                if spellName == "" or spellName == "Unknown" then
-                                    specMap[index] = nil
-                                else
-                                    entry.spellName = spellName
-                                end
-                            end
-                        end
+    forEachClassSpecEntry(cfg.colors.cache, function(_, _, specMap)
+        for index, entry in pairs(specMap) do
+            if type(entry) ~= "table" then
+                specMap[index] = nil
+            else
+                entry.color = nil
+                local spellName = entry.spellName
+                if type(spellName) ~= "string" then
+                    specMap[index] = nil
+                else
+                    spellName = strtrim(spellName)
+                    if spellName == "" or spellName == "Unknown" then
+                        specMap[index] = nil
+                    else
+                        entry.spellName = spellName
                     end
                 end
             end
         end
-    end
+    end)
 end
 
 local FrameUtil = ns.FrameUtil
@@ -258,19 +267,13 @@ local function migrateToPerSpellColors(profile)
         end
     end
 
-    for classID, spec in pairs(perBar) do
-        for specID in pairs(spec) do
-            if not perSpell[classID] then
-                perSpell[classID] = {}
-            end
-            if not perSpell[classID][specID] then
-                perSpell[classID][specID] = {}
-            end
-            if cache[classID] and cache[classID][specID] then
-                doSpellMigration(perBar[classID][specID], perSpell[classID][specID], cache[classID][specID])
-            end
+    forEachClassSpecEntry(perBar, function(classID, specID, perBarStore)
+        perSpell[classID] = perSpell[classID] or {}
+        perSpell[classID][specID] = perSpell[classID][specID] or {}
+        if cache[classID] and cache[classID][specID] then
+            doSpellMigration(perBarStore, perSpell[classID][specID], cache[classID][specID])
         end
-    end
+    end)
 
     cfg.colors.perBar = nil
 end
@@ -307,26 +310,19 @@ local function repairSpellColorStores(profile)
 
     -- Normalize metadata per stored tier so options/runtime no longer need to infer.
     for _, tier in ipairs(tierDefs) do
-        local store = colors[tier.storeKey]
-        for _, classMap in pairs(store) do
-            if type(classMap) == "table" then
-                for _, specMap in pairs(classMap) do
-                    if type(specMap) == "table" then
-                        for key, entry in pairs(specMap) do
-                            if type(entry) == "table" and type(entry.value) == "table" then
-                                local value = entry.value
-                                if not value.keyType then
-                                    value.keyType = tier.keyType
-                                end
-                                if tier.idField and type(key) == "number" and value[tier.idField] == nil then
-                                    value[tier.idField] = key
-                                end
-                            end
-                        end
+        forEachClassSpecEntry(colors[tier.storeKey], function(_, _, specMap)
+            for key, entry in pairs(specMap) do
+                if type(entry) == "table" and type(entry.value) == "table" then
+                    local value = entry.value
+                    if not value.keyType then
+                        value.keyType = tier.keyType
+                    end
+                    if tier.idField and type(key) == "number" and value[tier.idField] == nil then
+                        value[tier.idField] = key
                     end
                 end
             end
-        end
+        end)
     end
 
     local function ensureClassSpecStore(store, classID, specID)
@@ -340,33 +336,27 @@ local function repairSpellColorStores(profile)
     end
 
     -- Backfill fallback tiers from byName entries carrying embedded IDs.
-    for classID, classMap in pairs(colors.byName) do
-        if type(classMap) == "table" then
-            for specID, specMap in pairs(classMap) do
-                if type(specMap) == "table" then
-                    local bySpellIDSpec = ensureClassSpecStore(colors.bySpellID, classID, specID)
-                    local byCooldownIDSpec = ensureClassSpecStore(colors.byCooldownID, classID, specID)
-                    local byTextureSpec = ensureClassSpecStore(colors.byTexture, classID, specID)
+    forEachClassSpecEntry(colors.byName, function(classID, specID, specMap)
+        local bySpellIDSpec = ensureClassSpecStore(colors.bySpellID, classID, specID)
+        local byCooldownIDSpec = ensureClassSpecStore(colors.byCooldownID, classID, specID)
+        local byTextureSpec = ensureClassSpecStore(colors.byTexture, classID, specID)
 
-                    for _, entry in pairs(specMap) do
-                        if type(entry) == "table" and type(entry.value) == "table" then
-                            local value = entry.value
+        for _, entry in pairs(specMap) do
+            if type(entry) == "table" and type(entry.value) == "table" then
+                local value = entry.value
 
-                            if type(value.spellID) == "number" and bySpellIDSpec[value.spellID] == nil then
-                                bySpellIDSpec[value.spellID] = entry
-                            end
-                            if type(value.cooldownID) == "number" and byCooldownIDSpec[value.cooldownID] == nil then
-                                byCooldownIDSpec[value.cooldownID] = entry
-                            end
-                            if type(value.textureId) == "number" and byTextureSpec[value.textureId] == nil then
-                                byTextureSpec[value.textureId] = entry
-                            end
-                        end
-                    end
+                if type(value.spellID) == "number" and bySpellIDSpec[value.spellID] == nil then
+                    bySpellIDSpec[value.spellID] = entry
+                end
+                if type(value.cooldownID) == "number" and byCooldownIDSpec[value.cooldownID] == nil then
+                    byCooldownIDSpec[value.cooldownID] = entry
+                end
+                if type(value.textureId) == "number" and byTextureSpec[value.textureId] == nil then
+                    byTextureSpec[value.textureId] = entry
                 end
             end
         end
-    end
+    end)
 end
 
 --- Normalizes spell-color wrapper metadata and collapses duplicate entries.
@@ -1152,6 +1142,156 @@ _migrations[11] = function(profile)
             log(section .. ": section missing or not a table")
         end
     end
+end
+
+-- V11 → V12: convert itemIcons boolean flags to extraIcons.viewers structure.
+-- Old format: itemIcons = { enabled, showTrinket1, showTrinket2, showCombatPotion, showHealthPotion, showHealthstone }
+-- New format: extraIcons = { enabled, viewers = { utility = { {stackKey=...}, {kind="itemStack", itemStackId=...}, ... }, main = {} } }
+-- Frozen snapshot: flag names and built-in item stack IDs are inlined constants.
+_migrations[12] = function(profile)
+    local old = profile.itemIcons
+    if type(old) ~= "table" then
+        log("V12 no itemIcons section found; ensuring default extraIcons")
+        profile.extraIcons = profile.extraIcons or {
+            enabled = true,
+            viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "trinket2" },
+                    { kind = "itemStack", itemStackId = "combatPotions" },
+                    { kind = "itemStack", itemStackId = "healthPotions" },
+                    { kind = "itemStack", itemStackId = "healthstones" },
+                },
+                main = {},
+            },
+        }
+        profile.itemIcons = nil
+        return
+    end
+
+    local enabled = old.enabled
+    if enabled == nil then
+        enabled = true
+    end
+
+    -- Map old boolean flags to viewer entries in display order.
+    local FLAG_TO_ENTRY = {
+        { flag = "showTrinket1",     entry = { stackKey = "trinket1" } },
+        { flag = "showTrinket2",     entry = { stackKey = "trinket2" } },
+        { flag = "showCombatPotion", entry = { kind = "itemStack", itemStackId = "combatPotions" } },
+        { flag = "showHealthPotion", entry = { kind = "itemStack", itemStackId = "healthPotions" } },
+        { flag = "showHealthstone",  entry = { kind = "itemStack", itemStackId = "healthstones" } },
+    }
+
+    local utilityEntries = {}
+    for _, mapping in ipairs(FLAG_TO_ENTRY) do
+        local flagValue = old[mapping.flag]
+        if flagValue == nil or flagValue == true then
+            utilityEntries[#utilityEntries + 1] = mapping.entry
+        end
+    end
+
+    profile.extraIcons = {
+        enabled = enabled,
+        viewers = {
+            utility = utilityEntries,
+            main = {},
+        },
+    }
+
+    local migrated = {}
+    for _, entry in ipairs(utilityEntries) do
+        migrated[#migrated + 1] = entry.stackKey or entry.itemStackId
+    end
+    log("V12 migrated itemIcons -> extraIcons.viewers.utility: [" .. table.concat(migrated, ", ") .. "]")
+
+    profile.itemIcons = nil
+end
+
+local function makeDefaultItemStacks()
+    return {
+        nextId = 1,
+        order = { "combatPotions", "healthPotions", "healthstones" },
+        byId = {
+            combatPotions = {
+                name = "Combat Potions",
+                hideInInstances = false,
+                hideInRatedPvp = true,
+                ids = {
+                    { itemID = 245898, quality = 2 },
+                    { itemID = 245897, quality = 1 },
+                    { itemID = 241308, quality = 2 },
+                    { itemID = 241309, quality = 1 },
+                },
+            },
+            healthPotions = {
+                name = "Health Potions",
+                hideInInstances = false,
+                hideInRatedPvp = true,
+                ids = {
+                    { itemID = 241305, quality = 2 },
+                    { itemID = 241304, quality = 1 },
+                    { itemID = 258138, quality = 1 },
+                },
+            },
+            healthstones = {
+                name = "Healthstones",
+                hideInInstances = false,
+                hideInRatedPvp = false,
+                ids = {
+                    { itemID = 224464 },
+                    { itemID = 5512 },
+                },
+            },
+        },
+    }
+end
+
+local function ensureDefaultItemStack(itemStacks, stackId, defaults)
+    if itemStacks.byId[stackId] then
+        return
+    end
+    itemStacks.byId[stackId] = defaults.byId[stackId]
+    itemStacks.order[#itemStacks.order + 1] = stackId
+end
+
+-- V12 → V13: add named item stacks referenced by Extra Icons viewer rows.
+_migrations[13] = function(profile)
+    profile.extraIcons = profile.extraIcons or {}
+    local defaults = makeDefaultItemStacks()
+    local itemStacks = profile.extraIcons.itemStacks
+    if type(itemStacks) ~= "table" then
+        profile.extraIcons.itemStacks = defaults
+        log("V13 initialized extraIcons.itemStacks")
+        return
+    end
+
+    if type(itemStacks.byId) ~= "table" then
+        itemStacks.byId = {}
+    end
+    if type(itemStacks.order) ~= "table" then
+        itemStacks.order = {}
+        for stackId in pairs(itemStacks.byId) do
+            itemStacks.order[#itemStacks.order + 1] = stackId
+        end
+        table.sort(itemStacks.order, function(a, b)
+            if type(a) == "number" and type(b) == "number" then return a < b end
+            return tostring(a) < tostring(b)
+        end)
+    end
+    if type(itemStacks.nextId) ~= "number" then
+        local nextId = 1
+        for stackId in pairs(itemStacks.byId) do
+            if type(stackId) == "number" and stackId >= nextId then
+                nextId = stackId + 1
+            end
+        end
+        itemStacks.nextId = nextId
+    end
+    ensureDefaultItemStack(itemStacks, "combatPotions", defaults)
+    ensureDefaultItemStack(itemStacks, "healthPotions", defaults)
+    ensureDefaultItemStack(itemStacks, "healthstones", defaults)
+    log("V13 preserved extraIcons.itemStacks")
 end
 
 --- Runs all schema migrations on a profile from its current version to CURRENT_SCHEMA_VERSION.

@@ -17,13 +17,14 @@ end
 
 local function formatWhatsNewText(text)
     local lines = {}
-    for line in (text .. "\n"):gmatch("(.-)\n") do
-        if line:find("^### ") then
-            line = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, line:sub(5))
-        elseif line:find("^%- ") then
-            line = C.WHATS_NEW_LIST_BULLET .. " " .. line:sub(3)
+    for textLine in (text .. "\n"):gmatch("(.-)\n") do
+        local renderedLine = textLine
+        if renderedLine:find("^### ") then
+            renderedLine = ("|cff%s%s|r"):format(C.WHATS_NEW_HEADER_COLOR, renderedLine:sub(5))
+        elseif renderedLine:find("^%- ") then
+            renderedLine = C.WHATS_NEW_LIST_BULLET .. " " .. renderedLine:sub(3)
         end
-        lines[#lines + 1] = line
+        lines[#lines + 1] = renderedLine
     end
     return table.concat(lines, "\n")
 end
@@ -236,6 +237,48 @@ local exportFrame
 local copyTextFrame
 local migrationLogFrame
 local importFrame
+
+--- Shows a generic static confirmation popup with custom button labels.
+---@param popupKey string
+---@param text string
+---@param button1 string
+---@param button2 string
+---@param onAccept fun()|nil
+---@param onCancel fun()|nil
+function mod:ShowConfirmDialog(popupKey, text, button1, button2, onAccept, onCancel)
+    if not popupKey or popupKey == "" then
+        return
+    end
+    assert(type(button1) == "string" and button1 ~= "", "ShowConfirmDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "ShowConfirmDialog requires button2")
+
+    if not StaticPopupDialogs[popupKey] then
+        StaticPopupDialogs[popupKey] = {
+            text = text or "",
+            button1 = button1,
+            button2 = button2,
+            OnAccept = function(_, data)
+                if data and data.onAccept then
+                    data.onAccept()
+                end
+            end,
+            OnCancel = function(_, data)
+                if data and data.onCancel then
+                    data.onCancel()
+                end
+            end,
+            timeout = 0,
+            whileDead = 1,
+            hideOnEscape = 1,
+            preferredIndex = C.POPUP_PREFERRED_INDEX,
+        }
+    end
+
+    StaticPopupDialogs[popupKey].text = text or ""
+    StaticPopupDialogs[popupKey].button1 = button1
+    StaticPopupDialogs[popupKey].button2 = button2
+    StaticPopup_Show(popupKey, nil, nil, { onAccept = onAccept, onCancel = onCancel })
+end
 
 function mod:ShowReleasePopup(force)
     local popupVersion = C.RELEASE_POPUP_VERSION

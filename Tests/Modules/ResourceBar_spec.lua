@@ -196,6 +196,26 @@ describe("ResourceBar real source", function()
         assert.same({ r = 0.2, g = 0.3, b = 0.4, a = 1 }, ResourceBar:GetStatusBarColor())
     end)
 
+    it("returns max color for devourer meta when the tracked value is capped", function()
+        currentResourceType = ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META
+        currentValues = { 6, 6, 6 }
+        function ResourceBar:GetModuleConfig()
+            return {
+                colors = {
+                    [ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 0.2, g = 0.3, b = 0.4, a = 1 },
+                },
+                maxColorsEnabled = {
+                    [ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META] = true,
+                },
+                maxColors = {
+                    [ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META] = { r = 1, g = 1, b = 1, a = 1 },
+                },
+            }
+        end
+
+        assert.same({ r = 1, g = 1, b = 1, a = 1 }, ResourceBar:GetStatusBarColor())
+    end)
+
     it("does not define its own Refresh (uses base BarProto.Refresh with GetTickSpec)", function()
         assert.is_nil(rawget(ResourceBar, 'Refresh'))
     end)

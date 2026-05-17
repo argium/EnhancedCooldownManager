@@ -10,6 +10,14 @@ describe("OptionUtil", function()
     local ns
     local optionsModule
 
+    local function getRow(rows, rowType, path)
+        for _, row in ipairs(rows) do
+            if row.type == rowType and (path == nil or row.path == path) then
+                return row
+            end
+        end
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "ECM_DeepEquals",
@@ -28,6 +36,7 @@ describe("OptionUtil", function()
             "LibStub",
             "CreateFromMixins",
             "SettingsListElementInitializer",
+            "ColorPickerFrame",
         })
     end)
 
@@ -54,7 +63,11 @@ describe("OptionUtil", function()
                 DisableModule = function() end,
                 ConfirmReloadUI = function() end,
             },
-            OptionsSections = {},
+        }
+        ns.ColorUtil = {
+            Sparkle = function(text)
+                return text
+            end,
         }
 
         TestHelpers.LoadLiveConstants(ns)
@@ -71,8 +84,103 @@ describe("OptionUtil", function()
         end
 
         TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
+        TestHelpers.LoadChunk("UI/AboutOptions.lua", "Unable to load UI/AboutOptions.lua")(nil, ns)
         TestHelpers.LoadChunk("UI/Options.lua", "Unable to load UI/Options.lua")(nil, ns)
         optionsModule = ns.Addon._modules.Options
+    end)
+
+    it("ignores setup swatch callbacks and tolerates missing cancel state", function()
+        local pickerConfig
+        local changes = {}
+
+        _G.ColorPickerFrame = {
+            SetupColorPickerAndShow = function(_, config)
+                pickerConfig = config
+                config.swatchFunc()
+            end,
+            GetColorRGB = function()
+                return 0.1, 0.2, 0.3
+            end,
+            GetColorAlpha = function()
+                return 0.4
+            end,
+        }
+
+        ns.OptionUtil.OpenColorPicker({ r = 0.7, g = 0.8, b = 0.9, a = 0.6 }, true, function(color)
+            changes[#changes + 1] = color
+        end)
+
+        assert.are.equal(0, #changes)
+
+        pickerConfig.swatchFunc()
+        assert.are.same({ r = 0.1, g = 0.2, b = 0.3, a = 0.4 }, changes[1])
+
+        pickerConfig.cancelFunc(nil)
+        assert.are.same({ r = 0.7, g = 0.8, b = 0.9, a = 0.6 }, changes[2])
+    end)
+
+    it("renders positioning example previews fully opaque", function()
+        local createdTextures = {}
+
+        local function makeRegion()
+            return {
+                SetHeight = function() end,
+                SetSize = function() end,
+                SetPoint = function() end,
+                SetAllPoints = function() end,
+                SetJustifyH = function() end,
+                SetWordWrap = function() end,
+                SetText = function() end,
+            }
+        end
+
+        local function makeFrame()
+            local frame = makeRegion()
+            frame.CreateFontString = function()
+                return makeRegion()
+            end
+            frame.CreateTexture = function()
+                local texture = makeRegion()
+                texture.SetColorTexture = function(self, r, g, b, a)
+                    self.colorTexture = { r, g, b, a }
+                    createdTextures[#createdTextures + 1] = self
+                end
+                return texture
+            end
+            return frame
+        end
+
+        local originalCreateFrame = _G.CreateFrame
+        _G.CreateFrame = function()
+            return makeFrame()
+        end
+        local ok, canvas = pcall(ns.OptionUtil.CreatePositioningExamplesCanvas)
+        _G.CreateFrame = originalCreateFrame
+
+        assert.is_true(ok)
+        assert.is_table(canvas)
+
+        local backgrounds = 0
+        for _, texture in ipairs(createdTextures) do
+            assert.are.equal(1, texture.colorTexture[4])
+            if texture.colorTexture[1] == 0.08 and texture.colorTexture[2] == 0.08 and texture.colorTexture[3] == 0.08 then
+                backgrounds = backgrounds + 1
+            end
+        end
+        assert.are.equal(3, backgrounds)
+    end)
+
+    describe("About page spec", function()
+        it("registers the root About page", function()
+            local _, registeredPage = TestHelpers.RegisterRootPageSpec(
+                ns.SettingsBuilder,
+                ns.AboutPage,
+                ns.L["ADDON_NAME"]
+            )
+
+            assert.is_table(registeredPage)
+            assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetId())
+        end)
     end)
 
     describe("CreateModuleEnabledHandler", function()
@@ -92,7 +200,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(true)
+            handler({}, true)
 
             assert.are.equal("PowerBar", enabledModule)
         end)
@@ -104,7 +212,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(false)
+            handler({}, false)
 
             assert.are.equal("PowerBar", disabledModule)
         end)
@@ -116,7 +224,7 @@ describe("OptionUtil", function()
             end
 
             local handler = ns.OptionUtil.CreateModuleEnabledHandler("PowerBar")
-            handler(false)
+            handler({}, false)
 
             assert.is_false(reloadCalled)
         end)
@@ -129,7 +237,7 @@ describe("OptionUtil", function()
                 end
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload?")
-                handler(true)
+                handler({}, true)
 
                 assert.are.equal("BuffBars", enabledModule)
             end)
@@ -147,7 +255,7 @@ describe("OptionUtil", function()
                 }
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false, setting)
+                handler({ setting = setting }, false)
 
                 assert.is_true(revertedValue)
                 assert.are.equal("Reload now?", reloadMessage)
@@ -158,7 +266,7 @@ describe("OptionUtil", function()
                 ns.Addon.ConfirmReloadUI = function() end
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false)
+                handler({}, false)
 
                 assert.is_true(ns.Addon.db.profile.buffBars.enabled)
             end)
@@ -175,7 +283,7 @@ describe("OptionUtil", function()
                 local setting = { SetValueNoCallback = function() end }
 
                 local handler = ns.OptionUtil.CreateModuleEnabledHandler("BuffBars", "Reload now?")
-                handler(false, setting)
+                handler({ setting = setting }, false)
 
                 assert.is_function(capturedCallback)
                 capturedCallback()
@@ -184,115 +292,123 @@ describe("OptionUtil", function()
         end)
     end)
 
-    describe("CreateBarArgs", function()
+    describe("CreateBarRows", function()
         it("is exposed on ECM.OptionUtil", function()
-            assert.is_function(ns.OptionUtil.CreateBarArgs)
+            assert.is_function(ns.OptionUtil.CreateBarRows)
         end)
 
-        it("returns layout and appearance args with defaults", function()
+        it("returns layout and appearance rows with defaults", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.is_nil(args.layoutMovedInfo)
+            local layoutMovedButton = getRow(rows, "button")
+            local appearanceHeader = getRow(rows, "header")
 
-            assert.is_table(args.layoutMovedButton)
-            assert.are.equal("button", args.layoutMovedButton.type)
-            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], args.layoutMovedButton.name)
-            assert.are.equal("Open", args.layoutMovedButton.buttonText)
-            assert.are.equal(10, args.layoutMovedButton.order)
+            assert.is_table(layoutMovedButton)
+            assert.are.equal(ns.L["LAYOUT_SUBCATEGORY"], layoutMovedButton.name)
+            assert.are.equal(ns.L["LAYOUT_PAGE_MOVED_BUTTON_TEXT"], layoutMovedButton.buttonText)
 
-            assert.is_table(args.appearanceHeader)
-            assert.are.equal("header", args.appearanceHeader.type)
-            assert.are.equal("Appearance", args.appearanceHeader.name)
-            assert.are.equal(20, args.appearanceHeader.order)
+            assert.is_table(appearanceHeader)
+            assert.are.equal("Appearance", appearanceHeader.name)
         end)
 
         it("includes showText and border by default", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
+            local showText = getRow(rows, "checkbox", "showText")
+            local border = getRow(rows, "border", "border")
 
-            assert.is_table(args.showText)
-            assert.are.equal("toggle", args.showText.type)
-            assert.are.equal("showText", args.showText.path)
-            assert.are.equal(21, args.showText.order)
+            assert.is_table(showText)
+            assert.are.equal("showText", showText.path)
 
-            assert.is_table(args.border)
-            assert.are.equal("border", args.border.type)
-        end)
-
-        it("shifts height and font after showText when present", function()
-            local disabled = function()
-                return false
-            end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
-
-            assert.are.equal(21, args.showText.order)
-            assert.are.equal(22, args.heightOverride.order)
-            assert.are.equal(23, args.fontOverride.order)
-            assert.are.equal(24, args.border.order)
+            assert.is_table(border)
         end)
 
         it("omits showText when showText=false", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { showText = false })
 
-            assert.is_nil(args.showText)
-            assert.are.equal(21, args.heightOverride.order)
-            assert.are.equal(22, args.fontOverride.order)
+            assert.is_nil(getRow(rows, "checkbox", "showText"))
         end)
 
         it("omits border when border=false", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { border = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { border = false })
 
-            assert.is_nil(args.border)
+            assert.is_nil(getRow(rows, "border", "border"))
         end)
 
         it("omits both showText and border", function()
             local disabled = function()
                 return false
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { showText = false, border = false })
+            local rows = ns.OptionUtil.CreateBarRows(disabled, { showText = false, border = false })
 
-            assert.is_nil(args.showText)
-            assert.is_nil(args.border)
-            assert.are.equal(21, args.heightOverride.order)
-            assert.are.equal(22, args.fontOverride.order)
+            assert.is_nil(getRow(rows, "checkbox", "showText"))
+            assert.is_nil(getRow(rows, "border", "border"))
         end)
 
-        it("respects custom layoutOrder and appearanceOrder", function()
-            local disabled = function()
-                return false
-            end
-            local args = ns.OptionUtil.CreateBarArgs(disabled, { layoutOrder = 1, appearanceOrder = 5 })
-
-            assert.are.equal(1, args.layoutMovedButton.order)
-            assert.are.equal(5, args.appearanceHeader.order)
-            assert.are.equal(6, args.showText.order)
-            assert.are.equal(7, args.heightOverride.order)
-            assert.are.equal(8, args.fontOverride.order)
-            assert.are.equal(9, args.border.order)
-        end)
-
-        it("passes isDisabled to all args", function()
+        it("passes isDisabled to all rows", function()
             local disabled = function()
                 return true
             end
-            local args = ns.OptionUtil.CreateBarArgs(disabled)
+            local rows = ns.OptionUtil.CreateBarRows(disabled)
 
-            assert.are.equal(disabled, args.appearanceHeader.disabled)
-            assert.are.equal(disabled, args.showText.disabled)
-            assert.are.equal(disabled, args.heightOverride.disabled)
-            assert.are.equal(disabled, args.fontOverride.disabled)
-            assert.are.equal(disabled, args.border.disabled)
+            assert.are.equal(disabled, getRow(rows, "header").disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showText").disabled)
+            assert.are.equal(disabled, getRow(rows, "heightOverride").disabled)
+            assert.are.equal(disabled, getRow(rows, "fontOverride").disabled)
+            assert.are.equal(disabled, getRow(rows, "border", "border").disabled)
+        end)
+    end)
+
+    describe("CreateAuraBarModuleRows", function()
+        it("is exposed on ECM.OptionUtil", function()
+            assert.is_function(ns.OptionUtil.CreateAuraBarModuleRows)
+        end)
+
+        it("returns the shared aura bar appearance rows", function()
+            local disabled = function()
+                return true
+            end
+            local rows = ns.OptionUtil.CreateAuraBarModuleRows(disabled)
+            local height = getRow(rows, "slider", "height")
+            local verticalSpacing = getRow(rows, "slider", "verticalSpacing")
+
+            assert.are.equal(7, #rows)
+            assert.are.equal("appearanceHeader", rows[1].id)
+            assert.are.equal(disabled, rows[1].disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showIcon").disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showSpellName").disabled)
+            assert.are.equal(disabled, getRow(rows, "checkbox", "showDuration").disabled)
+            assert.are.equal(disabled, height.disabled)
+            assert.are.equal(0, height.getTransform(nil))
+            assert.is_nil(height.setTransform(0))
+            assert.are.equal(5, height.setTransform(5))
+            assert.are.equal(disabled, verticalSpacing.disabled)
+            assert.are.equal(0, verticalSpacing.getTransform(nil))
+            assert.are.equal("fontOverride", rows[7].id)
+            assert.are.equal(disabled, rows[7].disabled)
+        end)
+
+        it("inserts extra rows after the appearance header", function()
+            local disabled = function()
+                return false
+            end
+            local extraRow = { type = "checkbox", path = "hideOriginalIcons" }
+            local rows = ns.OptionUtil.CreateAuraBarModuleRows(disabled, { extraRow })
+
+            assert.are.equal("appearanceHeader", rows[1].id)
+            assert.are.equal(extraRow, rows[2])
+            assert.are.equal("showIcon", rows[3].id)
         end)
     end)
 
@@ -334,21 +450,41 @@ describe("OptionUtil", function()
                 openedCategory = categoryID
             end)
 
-            ns.OptionsSections["About"] = {
-                RegisterSettings = function() end,
-            }
-            ns.OptionsSections["General"] = {
-                RegisterSettings = function(SB)
-                    generalCategory = SB.CreateSubcategory(ns.L["GENERAL"])
+            local function placeholderSection(key, name)
+                return {
+                    key = key,
+                    name = name,
+                    OnInitialize = function() end,
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {},
+                        },
+                    },
+                }
+            end
+
+            ns.GeneralOptions = placeholderSection("general", ns.L["GENERAL"])
+            ns.LayoutOptions = placeholderSection("layout", ns.L["LAYOUT_SUBCATEGORY"])
+            ns.PowerBarOptions = placeholderSection("powerBar", ns.L["POWER_BAR"])
+            ns.ResourceBarOptions = placeholderSection("resourceBar", ns.L["RESOURCE_BAR"])
+            ns.RuneBarOptions = placeholderSection("runeBar", ns.L["RUNE_BAR"])
+            ns.BuffBarsOptions = placeholderSection("buffBars", ns.L["AURA_BARS"])
+            ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
+            ns.ItemStacksOptions = { OnInitialize = function() end }
+            ns.PowerBarTickMarksOptions = { OnInitialize = function() end }
+            ns.ProfileOptions = placeholderSection("profile", ns.L["PROFILES"])
+            ns.AdvancedOptions = placeholderSection("advancedOptions", ns.L["ADVANCED_OPTIONS"])
+            ns.SpellColorsPage = {
+                CreatePage = function(_, name)
+                    return { key = "spellColors", name = name, rows = {} }
                 end,
-            }
-            ns.OptionsSections["Profile"] = {
-                RegisterSettings = function(SB)
-                    profileCategory = SB.CreateSubcategory(ns.L["PROFILES"])
-                end,
+                OnInitialize = function() end,
             }
 
             optionsModule:OnInitialize()
+            generalCategory = ns.Settings:GetPage("general", "main")._category
+            profileCategory = ns.Settings:GetPage("profile", "main")._category
         end)
 
         it("opens General when no ECM page has been visited yet", function()
@@ -381,6 +517,58 @@ describe("OptionUtil", function()
             optionsModule:OpenOptions()
 
             assert.are.equal(profileCategory:GetID(), openedCategory)
+        end)
+
+        it("confirms native page defaults before invoking the header reset", function()
+            local nativeResetCalls = 0
+            local popupKey
+            local popupText
+            local acceptText
+            local cancelText
+            local acceptFn
+            local button = {
+                _script = function()
+                    nativeResetCalls = nativeResetCalls + 1
+                end,
+                _enabled = true,
+                GetScript = function(self)
+                    return self._script
+                end,
+                SetScript = function(self, _, script)
+                    self._script = script
+                end,
+                IsEnabled = function(self)
+                    return self._enabled
+                end,
+                SetEnabled = function(self, enabled)
+                    self._enabled = enabled
+                end,
+            }
+
+            rawset(SettingsPanel, "GetSettingsList", function()
+                return { Header = { DefaultsButton = button } }
+            end)
+            ns.Addon.ShowConfirmDialog = function(_, key, text, button1, button2, onAccept)
+                popupKey = key
+                popupText = text
+                acceptText = button1
+                cancelText = button2
+                acceptFn = onAccept
+            end
+
+            SettingsPanel:SetCurrentCategory(generalCategory)
+            SettingsPanel:DisplayCategory(generalCategory)
+            button:GetScript("OnClick")(button)
+
+            assert.are.equal(0, nativeResetCalls)
+            assert.are.equal("ECM_CONFIRM_RESET_SETTINGS_PAGE", popupKey)
+            assert.are.equal("Are you sure you want to reset settings on this page?", popupText)
+            assert.are.equal("Reset General settings", acceptText)
+            assert.are.equal("Don't reset", cancelText)
+
+            acceptFn()
+
+            assert.are.equal(1, nativeResetCalls)
         end)
     end)
 end)

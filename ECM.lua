@@ -36,6 +36,12 @@ function ns.IsDebugEnabled()
     return gc and gc.debug
 end
 
+--- Returns whether targeted error logging is enabled.
+function ns.IsErrorLoggingEnabled()
+    local gc = ns.GetGlobalConfig()
+    return not gc or gc.errorLogging ~= false
+end
+
 --- Returns whether the player is a Death Knight.
 function ns.IsDeathKnight()
     local _, class = UnitClass("player")
@@ -43,9 +49,7 @@ function ns.IsDeathKnight()
 end
 
 local function getAddonVersion()
-    if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
-        return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
-    end
+    return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
 end
 
 local function safeStrTostring(x)
@@ -60,7 +64,7 @@ local function safeTableTostring(tbl, depth, seen)
 
     seen[tbl] = true
 
-    local ok, pairsOrErr = pcall(function()
+    local ok, result = pcall(function()
         local parts = {}
         local count = 0
 
@@ -78,12 +82,7 @@ local function safeTableTostring(tbl, depth, seen)
 
         return "{" .. table.concat(parts, ", ") .. "}"
     end)
-
-    if not ok then
-        return "<table_error>"
-    end
-
-    return pairsOrErr
+    return ok and result or "<table_error>"
 end
 
 function ns.ToString(v)
@@ -120,6 +119,83 @@ ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
+local function makeErrorData(module, key, data)
+    local payload = {}
+    if type(data) == "table" then
+        local ok, err = pcall(function()
+            for dataKey, value in pairs(data) do
+                payload[dataKey] = value
+            end
+        end)
+        if not ok then
+            payload.dataError = "error data could not be copied: " .. tostring(err)
+        end
+    elseif data ~= nil then
+        payload.detail = data
+    end
+
+    if payload.module == nil then
+        payload.module = module or "nil"
+    end
+    if key ~= nil and payload.errorKey == nil then
+        payload.errorKey = key
+    end
+    if payload.timestamp == nil then
+        local ok, timestamp = pcall(GetTime)
+        payload.timestamp = ok and timestamp or nil
+    end
+    if payload.inCombatLockdown == nil then
+        local ok, inCombat = pcall(InCombatLockdown)
+        if ok then
+            payload.inCombatLockdown = inCombat == true
+        end
+    end
+    if payload.debugStack == nil then
+        local ok, stackOrErr = pcall(debugstack, 3, 8, 8)
+        payload.debugStack = ok and stackOrErr or (stackOrErr and ("debugstack failed: " .. tostring(stackOrErr)) or nil)
+    end
+
+    return payload
+end
+
+function ns.ErrorLog(module, message, data)
+    if not ns.IsErrorLoggingEnabled() then
+        return
+    end
+
+    local messageStr = ns.ToString(message)
+    local payload = makeErrorData(module, nil, data)
+    local dataStr = ns.ToString(payload)
+    local coloredPrefix = "|cff" .. C.ERROR_COLOR .. "[" .. L["ADDON_ABRV"] .. " Error"
+        .. (module and (" " .. module) or "") .. "]|r "
+
+    print(coloredPrefix .. messageStr .. "\n" .. dataStr)
+
+    if DevTool and DevTool.AddData then
+        pcall(DevTool.AddData, DevTool, {
+            module = module or "nil",
+            message = messageStr,
+            timestamp = payload.timestamp,
+            data = dataStr,
+        }, coloredPrefix .. messageStr)
+    end
+end
+
+function ns.ErrorLogOnce(module, key, message, data)
+    if not ns.IsErrorLoggingEnabled() then
+        return
+    end
+
+    mod._errorLogOnceKeys = mod._errorLogOnceKeys or {}
+    local onceKey = (module or "nil") .. ":" .. ns.ToString(key)
+    if mod._errorLogOnceKeys[onceKey] then
+        return
+    end
+
+    mod._errorLogOnceKeys[onceKey] = true
+    ns.ErrorLog(module, message, makeErrorData(module, key, data))
+end
+
 function ns.Log(module, message, data)
     if not ns.IsDebugEnabled() then
         return
@@ -140,6 +216,45 @@ function ns.Log(module, message, data)
     local cfg = ns.GetGlobalConfig()
     if cfg and cfg.debugToChat then
         print(coloredPrefix .. message)
+    end
+end
+
+local function getSecureVariableStatus(owner, key)
+    local ok, secure, taint
+    if key == nil then
+        ok, secure, taint = pcall(_G.issecurevariable, owner)
+    else
+        ok, secure, taint = pcall(_G.issecurevariable, owner, key)
+    end
+    if not ok then
+        return nil
+    end
+    return secure, taint
+end
+
+local function logTaint(key, reason, source)
+    local sourceName = source or "unknown"
+    ns.ErrorLogOnce("Taint", key, key .. " is tainted by " .. tostring(sourceName)
+        .. " during " .. tostring(reason or "unknown"), {
+        reason = reason,
+        source = sourceName,
+    })
+end
+
+function ns._CheckChatTaint(reason)
+    local secure, taint = getSecureVariableStatus("ChatFrameUtil")
+    if secure == false then
+        logTaint("ChatFrameUtil", reason, taint)
+    end
+
+    secure, taint = getSecureVariableStatus(_G.ChatFrameUtil, "SetLastTellTarget")
+    if secure == false then
+        logTaint("ChatFrameUtil.SetLastTellTarget", reason, taint)
+    end
+
+    secure, taint = getSecureVariableStatus(_G.ChatFrameMixin, "MessageEventHandler")
+    if secure == false then
+        logTaint("ChatFrameMixin.MessageEventHandler", reason, taint)
     end
 end
 
@@ -186,12 +301,15 @@ end
 function mod:ChatCommand(input)
     local cmd, arg = (input or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
 
-    if cmd == "help" then
+    if cmd == "help" or cmd == "h" then
         ns.Print(L["CMD_HELP_CLEARSEEN"])
         ns.Print(L["CMD_HELP_DEBUG"])
         ns.Print(L["CMD_HELP_EVENTS"])
+        ns.Print(L["CMD_HELP_EVENTS_RESET"])
         ns.Print(L["CMD_HELP_HELP"])
         ns.Print(L["CMD_HELP_MIGRATION"])
+        ns.Print(L["CMD_HELP_MIGRATION_LOG"])
+        ns.Print(L["CMD_HELP_MIGRATION_ROLLBACK"])
         ns.Print(L["CMD_HELP_OPTIONS"])
         ns.Print(L["CMD_HELP_REFRESH"])
         return
@@ -253,6 +371,7 @@ function mod:ChatCommand(input)
         local optionsModule = self:GetModule("Options", true)
         if optionsModule then
             optionsModule:OpenOptions()
+            ns._CheckChatTaint("ChatCommand:options")
         end
         return
     end
@@ -287,6 +406,11 @@ function mod:ChatCommand(input)
     if cmd == "clearseen" then
         gc.releasePopupSeenVersion = nil
         ns.Print(L["SEEN_CLEARED"])
+        if InCombatLockdown() then
+            ns.Print(L["RELOAD_BLOCKED_COMBAT"])
+            return
+        end
+        ReloadUI()
         return
     end
 end
@@ -368,7 +492,7 @@ function mod:OnInitialize()
 
     ns.Migration.FlushLog()
 
-    -- Register bundled font with LibSharedMedia if present.
+    -- Register bundled fonts with LibSharedMedia
     if LSM then
         pcall(
             LSM.Register,
@@ -376,6 +500,13 @@ function mod:OnInitialize()
             "font",
             "Expressway",
             "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Expressway.ttf"
+        )
+        pcall(
+            LSM.Register,
+            LSM,
+            "font",
+            "Cabin",
+            "Interface\\AddOns\\EnhancedCooldownManager\\media\\Fonts\\Cabin.ttf"
         )
     end
 
@@ -417,6 +548,7 @@ function mod:OnEnable()
     end
 
     self:ShowReleasePopup()
+    ns._CheckChatTaint("OnEnable")
 end
 
 --- Re-evaluates module enable/disable states after a profile change and refreshes layout.

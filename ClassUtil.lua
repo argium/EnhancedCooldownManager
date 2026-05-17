@@ -14,7 +14,8 @@ function ClassUtil.GetResourceType(class, specIndex, shapeshiftForm)
     if class == "DEMONHUNTER" then
         if specIndex == C.DEMONHUNTER_DEVOURER_SPEC_INDEX then
             local voidMeta = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_VOID_META)
-            if voidMeta then
+            local collapsingStar = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_COLLAPSING_STAR)
+            if voidMeta or collapsingStar then
                 return C.RESOURCEBAR_TYPE_DEVOURER_META
             else
                 return C.RESOURCEBAR_TYPE_DEVOURER_NORMAL
@@ -79,6 +80,14 @@ local function getDevourerSoulFragmentsMax()
     return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX
 end
 
+local function getDevourerSoulFragmentsAura()
+    local aura = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
+    if aura ~= nil then
+        return aura
+    end
+    return C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT)
+end
+
 --- Returns max, current, and a safe discrete count for the given resource type.
 --- The 3rd return (safeMax) is always a non-secret number suitable for comparison
 --- and arithmetic (e.g., tick layout). For special resource types, max and safeMax
@@ -109,7 +118,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     end
 
     if resourceType == C.RESOURCEBAR_TYPE_DEVOURER_NORMAL then
-        local soulFragments = C_UnitAuras.GetPlayerAuraBySpellID(C.SPELLID_DEVOURER_SOUL_FRAGMENTS)
+        local soulFragments = getDevourerSoulFragmentsAura()
         local max = getDevourerSoulFragmentsMax() / 5
         return max, soulFragments and soulFragments.applications / 5 or 0, max
     end

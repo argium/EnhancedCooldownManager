@@ -9,8 +9,55 @@ local _, ns = ...
 local C = ns.Constants
 local L = ns.L
 local OptionUtil = ns.OptionUtil or {}
+local LSMW = LibStub("LibLSMSettingsWidgets-1.0", true)
 
 ns.OptionUtil = OptionUtil
+
+OptionUtil.ACTION_ICON_BUTTON_SIZE = 20
+OptionUtil.ACTION_BUTTON_TEXTURES = {
+    delete = {
+        normal = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+        pushed = "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
+        disabled = "Interface\\Buttons\\UI-GroupLoot-Pass-Disabled",
+    },
+    moveDown = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Disabled",
+    },
+    moveLeft = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Disabled",
+    },
+    moveRight = {
+        normal = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up",
+        pushed = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down",
+        disabled = "Interface\\Buttons\\UI-SpellbookIcon-NextPage-Disabled",
+    },
+    moveUp = {
+        normal = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up",
+        pushed = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down",
+        disabled = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Disabled",
+    },
+    show = {
+        normal = "Interface\\Buttons\\UI-PlusButton-Up",
+        pushed = "Interface\\Buttons\\UI-PlusButton-Down",
+        disabled = "Interface\\Buttons\\UI-PlusButton-Disabled",
+    },
+}
+
+function OptionUtil.CreateIconAction(text, buttonTextures, enabled, tooltip, onClick)
+    return {
+        text = buttonTextures and "" or text,
+        width = OptionUtil.ACTION_ICON_BUTTON_SIZE,
+        height = OptionUtil.ACTION_ICON_BUTTON_SIZE,
+        buttonTextures = buttonTextures,
+        enabled = enabled,
+        tooltip = tooltip,
+        onClick = onClick,
+    }
+end
 
 function OptionUtil.IsAnchorModeFree(cfg)
     return cfg and cfg.anchorMode == C.ANCHORMODE_FREE
@@ -107,7 +154,7 @@ function OptionUtil.CreatePositioningExamplesCanvas()
         local previewBg = preview:CreateTexture(nil, "BACKGROUND")
         previewBg:SetAllPoints(preview)
         if type(previewBg.SetColorTexture) == "function" then
-            previewBg:SetColorTexture(0.08, 0.08, 0.08, 0.65)
+            previewBg:SetColorTexture(0.08, 0.08, 0.08, 1)
         end
 
         column.build(preview)
@@ -125,7 +172,9 @@ function OptionUtil.CreatePositioningExamplesCanvas()
 end
 
 function OptionUtil.OpenLayoutPage()
-    local categoryID = ns.SettingsBuilder.GetSubcategoryID(L["LAYOUT_SUBCATEGORY"])
+    local root = ns.Settings
+    local page = root and root:GetPage("layout", "main")
+    local categoryID = page and page:GetId()
     if categoryID then
         Settings.OpenToCategory(categoryID)
     end
@@ -180,13 +229,14 @@ function OptionUtil.SetNestedValue(tbl, path, value)
     local current, lastKey = tbl, nil
     for segment in path:gmatch("[^.]+") do
         if lastKey then
-            local resolved = lastKey
+            local resolved
             if current[lastKey] == nil then
                 local num = tonumber(lastKey)
                 if num and current[num] ~= nil then
                     resolved = num
                 end
             end
+            resolved = resolved or lastKey
             if current[resolved] == nil then
                 current[resolved] = {}
             end
@@ -194,13 +244,14 @@ function OptionUtil.SetNestedValue(tbl, path, value)
         end
         lastKey = segment
     end
-    local resolved = lastKey
+    local resolved
     if current[lastKey] == nil then
         local num = tonumber(lastKey)
         if num then
             resolved = num
         end
     end
+    resolved = resolved or lastKey
     current[resolved] = value
 end
 
@@ -226,6 +277,7 @@ end
 ---@param hasOpacity boolean
 ---@param onChange fun(color: {r:number, g:number, b:number, a:number})
 function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
+    local isSettingUp = true
     ColorPickerFrame:SetupColorPickerAndShow({
         r = currentColor.r,
         g = currentColor.g,
@@ -233,14 +285,19 @@ function OptionUtil.OpenColorPicker(currentColor, hasOpacity, onChange)
         opacity = currentColor.a,
         hasOpacity = hasOpacity,
         swatchFunc = function()
+            if isSettingUp then
+                return
+            end
             local r, g, b = ColorPickerFrame:GetColorRGB()
             local a = hasOpacity and ColorPickerFrame:GetColorAlpha() or 1
             onChange({ r = r, g = g, b = b, a = a })
         end,
         cancelFunc = function(prev)
-            onChange({ r = prev.r, g = prev.g, b = prev.b, a = hasOpacity and prev.opacity or 1 })
+            local source = prev or currentColor
+            onChange({ r = source.r, g = source.g, b = source.b, a = hasOpacity and (source.opacity or source.a) or 1 })
         end,
     })
+    isSettingUp = false
 end
 
 --- Returns a closure that checks if the module at configPath is disabled.
@@ -259,7 +316,7 @@ local function setModuleEnabledValue(moduleName, value, setting)
         return
     end
 
-    local profile = ns.Addon and ns.Addon.db and ns.Addon.db.profile
+    local profile = ns.Addon.db.profile
     local configKey = moduleName:sub(1, 1):lower() .. moduleName:sub(2)
     local moduleConfig = profile and profile[configKey]
     if moduleConfig then
@@ -271,9 +328,10 @@ end
 --- For modules that require a reload to disable, pass requiresReload with a message.
 ---@param moduleName string The module name (e.g., "PowerBar")
 ---@param requiresReload string|nil If set, disabling shows a reload confirmation with this message
----@return fun(value: boolean, setting: table)
+---@return fun(ctx: table, value: boolean)
 function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
-    return function(value, setting)
+    return function(ctx, value)
+        local setting = ctx and ctx.setting
         if value then
             ns.Addon:EnableModule(moduleName)
             return
@@ -294,41 +352,142 @@ function OptionUtil.CreateModuleEnabledHandler(moduleName, requiresReload)
     end
 end
 
---- Generates standard layout and appearance args shared by bar-type modules.
----@param isDisabled fun(): boolean
----@param options table|nil { showText: boolean, border: boolean, layoutOrder: number, appearanceOrder: number }
----@return table args Partial args table to merge into RegisterFromTable
-function OptionUtil.CreateBarArgs(isDisabled, options)
-    options = options or {}
-    local layoutOrder = options.layoutOrder or 10
-    local appearanceOrder = options.appearanceOrder or 20
-    local breadcrumbArgs = OptionUtil.CreateLayoutBreadcrumbArgs(layoutOrder)
+local function getGlobalFont()
+    local gc = ns.GetGlobalConfig()
+    return gc and gc.font
+end
 
-    local args = {
-        layoutMovedButton = breadcrumbArgs.layoutMovedButton,
-        appearanceHeader = { type = "header", name = L["APPEARANCE"], disabled = isDisabled, order = appearanceOrder },
-        heightOverride = { type = "heightOverride", disabled = isDisabled, order = appearanceOrder + 1 },
-        fontOverride = { type = "fontOverride", disabled = isDisabled, order = appearanceOrder + 2 },
+local function getGlobalFontSize()
+    local gc = ns.GetGlobalConfig()
+    return gc and gc.fontSize
+end
+
+function OptionUtil.CreateFontOverrideRow(isDisabled)
+    return {
+        type = "fontOverride",
+        path = "",
+        disabled = isDisabled,
+        fontValues = function()
+            return LSMW and LSMW.GetFontValues and LSMW.GetFontValues() or {}
+        end,
+        fontFallback = getGlobalFont,
+        fontSizeFallback = getGlobalFontSize,
+        fontTemplate = LSMW and LSMW.FONT_PICKER_TEMPLATE or nil,
+    }
+end
+
+--- Generates standard layout and appearance rows shared by bar-type modules.
+--- This is the canonical rows-array form used by declarative section/page specs.
+---@param isDisabled fun(): boolean
+---@param options table|nil { showText: boolean, border: boolean }
+---@return table[] rows
+function OptionUtil.CreateBarRows(isDisabled, options)
+    options = options or {}
+    local rows = {
+        OptionUtil.CreateLayoutBreadcrumbArgs(10).layoutMovedButton,
+        {
+            type = "header",
+            name = L["APPEARANCE"],
+            disabled = isDisabled,
+        },
     }
 
     if options.showText ~= false then
-        args.showText = {
-            type = "toggle",
+        rows[#rows + 1] = {
+            type = "checkbox",
             path = "showText",
             name = L["SHOW_TEXT"],
-            desc = L["SHOW_TEXT_DESC"],
+            tooltip = L["SHOW_TEXT_DESC"],
             disabled = isDisabled,
-            order = appearanceOrder + 1,
         }
-        args.heightOverride.order = appearanceOrder + 2
-        args.fontOverride.order = appearanceOrder + 3
     end
+
+    rows[#rows + 1] = { type = "heightOverride", path = "", disabled = isDisabled }
+    rows[#rows + 1] = OptionUtil.CreateFontOverrideRow(isDisabled)
 
     if options.border ~= false then
-        args.border = { type = "border", path = "border", disabled = isDisabled, order = args.fontOverride.order + 1 }
+        rows[#rows + 1] = {
+            type = "border",
+            path = "border",
+            disabled = isDisabled,
+        }
     end
 
-    return args
+    return rows
+end
+
+local function nilForZero(value)
+    return value > 0 and value or nil
+end
+
+--- Generates appearance rows shared by aura-style bar modules.
+---@param isDisabled fun(): boolean
+---@param extraRowsAfterHeader table[]|nil Rows inserted after the Appearance header.
+---@return table[] rows
+function OptionUtil.CreateAuraBarModuleRows(isDisabled, extraRowsAfterHeader)
+    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
+    local rows = {
+        { id = "appearanceHeader", type = "header", name = L["APPEARANCE"], disabled = isDisabled },
+    }
+
+    if extraRowsAfterHeader then
+        for _, row in ipairs(extraRowsAfterHeader) do
+            rows[#rows + 1] = row
+        end
+    end
+
+    rows[#rows + 1] = {
+        id = "showIcon",
+        type = "checkbox",
+        path = "showIcon",
+        name = L["SHOW_ICON"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "showSpellName",
+        type = "checkbox",
+        path = "showSpellName",
+        name = L["SHOW_SPELL_NAME"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "showDuration",
+        type = "checkbox",
+        path = "showDuration",
+        name = L["SHOW_REMAINING_DURATION"],
+        disabled = isDisabled,
+    }
+    rows[#rows + 1] = {
+        id = "height",
+        type = "slider",
+        path = "height",
+        name = L["HEIGHT_OVERRIDE"],
+        tooltip = L["HEIGHT_OVERRIDE_DESC"],
+        min = 0,
+        max = 40,
+        step = 1,
+        disabled = isDisabled,
+        getTransform = defaultZero,
+        setTransform = nilForZero,
+    }
+    rows[#rows + 1] = {
+        id = "verticalSpacing",
+        type = "slider",
+        path = "verticalSpacing",
+        name = L["AURA_VERTICAL_SPACING"],
+        tooltip = L["AURA_VERTICAL_SPACING_DESC"],
+        min = 0,
+        max = 20,
+        step = 1,
+        disabled = isDisabled,
+        getTransform = defaultZero,
+    }
+
+    local fontOverride = OptionUtil.CreateFontOverrideRow(isDisabled)
+    fontOverride.id = "fontOverride"
+    rows[#rows + 1] = fontOverride
+
+    return rows
 end
 
 local function createDetachedSettingSpecs()
@@ -336,7 +495,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedBarWidth",
             name = L["WIDTH"],
-            desc = L["DETACHED_WIDTH_DESC"],
+            tooltip = L["DETACHED_WIDTH_DESC"],
             default = C.DEFAULT_BAR_WIDTH,
             min = 100,
             max = 600,
@@ -346,7 +505,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedModuleSpacing",
             name = L["SPACING"],
-            desc = L["DETACHED_SPACING_DESC"],
+            tooltip = L["DETACHED_SPACING_DESC"],
             default = 0,
             min = 0,
             max = 20,
@@ -356,7 +515,7 @@ local function createDetachedSettingSpecs()
         {
             key = "detachedGrowDirection",
             name = L["GROW_DIRECTION"],
-            desc = L["DETACHED_GROW_DIRECTION_DESC"],
+            tooltip = L["DETACHED_GROW_DIRECTION_DESC"],
             default = C.GROW_DIRECTION_DOWN,
             values = {
                 { text = L["DOWN"], value = C.GROW_DIRECTION_DOWN },
@@ -367,40 +526,40 @@ local function createDetachedSettingSpecs()
     }
 end
 
-function OptionUtil.CreateDetachedStackArgs()
-    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
-    local args = {
-        detachedHeader = { type = "header", name = L["POSITION_MODE_DETACHED"], order = 30 },
+function OptionUtil.CreateDetachedStackRows()
+    local rows = {
+        {
+            type = "header",
+            name = L["POSITION_MODE_DETACHED"],
+        },
     }
 
-    local order = 31
+    local defaultZero = OptionUtil.CreateDefaultValueTransform(0)
     for _, spec in ipairs(createDetachedSettingSpecs()) do
-        local arg = {
+        local row = {
             path = "global." .. spec.key,
             name = spec.name,
-            desc = spec.desc,
-            order = order,
+            tooltip = spec.tooltip,
             getTransform = spec.default == 0 and defaultZero or OptionUtil.CreateDefaultValueTransform(spec.default),
         }
 
         if spec.values then
-            arg.type = "select"
-            arg.values = {}
+            row.type = "dropdown"
+            row.values = {}
             for _, option in ipairs(spec.values) do
-                arg.values[option.value] = option.text
+                row.values[option.value] = option.text
             end
         else
-            arg.type = "range"
-            arg.min = spec.min
-            arg.max = spec.max
-            arg.step = spec.step
+            row.type = "slider"
+            row.min = spec.min
+            row.max = spec.max
+            row.step = spec.step
         end
 
-        args[spec.key] = arg
-        order = order + 1
+        rows[#rows + 1] = row
     end
 
-    return args
+    return rows
 end
 
 function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChanged)
@@ -441,11 +600,14 @@ function OptionUtil.CreateDetachedAnchorEditModeSettings(getGlobalConfig, onChan
     return settings
 end
 
-function OptionUtil.MakeConfirmDialog(text)
+function OptionUtil.MakeConfirmDialog(text, button1, button2)
+    assert(type(button1) == "string" and button1 ~= "", "OptionUtil.MakeConfirmDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "OptionUtil.MakeConfirmDialog requires button2")
+
     return {
         text = text,
-        button1 = YES,
-        button2 = NO,
+        button1 = button1,
+        button2 = button2,
         OnAccept = function(self, data)
             if data and data.onAccept then data.onAccept() end
         end,
@@ -453,4 +615,108 @@ function OptionUtil.MakeConfirmDialog(text)
         whileDead = true,
         hideOnEscape = true,
     }
+end
+
+local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
+
+local function trimDialogText(text)
+    if strtrim then
+        return strtrim(text or "")
+    end
+    return tostring(text or ""):match("^%s*(.-)%s*$")
+end
+
+local function setDialogAcceptEnabled(frame, enabled)
+    local button = frame and (frame.button1 or (frame.Buttons and frame.Buttons[1]))
+    if not button then
+        return
+    end
+    if enabled and button.Enable then
+        button:Enable()
+    elseif not enabled and button.Disable then
+        button:Disable()
+    elseif button.SetEnabled then
+        button:SetEnabled(enabled)
+    end
+end
+
+function OptionUtil.MakeTextInputDialog(text, button1, button2)
+    assert(type(button1) == "string" and button1 ~= "", "OptionUtil.MakeTextInputDialog requires button1")
+    assert(type(button2) == "string" and button2 ~= "", "OptionUtil.MakeTextInputDialog requires button2")
+
+    return {
+        text = text,
+        button1 = button1,
+        button2 = button2,
+        hasEditBox = true,
+        OnAccept = function(self, data)
+            data = data or (self and self.data)
+            local name = trimDialogText(getPopupEditBox(self) and getPopupEditBox(self):GetText())
+            if name ~= "" and data and data.onAccept then
+                data.onAccept(name)
+            end
+        end,
+        OnShow = function(self, data)
+            data = data or (self and self.data)
+            local editBox = getPopupEditBox(self)
+            if not editBox then
+                return
+            end
+            editBox:SetText(data and data.defaultText or "")
+            editBox:HighlightText()
+            setDialogAcceptEnabled(self, trimDialogText(editBox:GetText()) ~= "")
+        end,
+        EditBoxOnTextChanged = function(self)
+            local parent = self:GetParent()
+            setDialogAcceptEnabled(parent, trimDialogText(self:GetText()) ~= "")
+        end,
+        EditBoxOnEnterPressed = function(self)
+            local parent = self:GetParent()
+            if not parent then
+                return
+            end
+            local button1Frame = parent and (parent.button1 or (parent.Buttons and parent.Buttons[1]))
+            if button1Frame and button1Frame.IsEnabled and not button1Frame:IsEnabled() then
+                return
+            end
+            parent:Hide()
+            local dialog = parent and parent.which and StaticPopupDialogs[parent.which]
+            dialog = dialog or (parent and parent.data and parent.data.popupKey and StaticPopupDialogs[parent.data.popupKey])
+            if dialog and dialog.OnAccept then
+                dialog.OnAccept(parent, parent.data)
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+end
+
+local function formatResetPageButton(pageName)
+    local format = L["RESET_PAGE_SETTINGS"]
+    if type(format) ~= "string" or not format:find("%%s") then
+        format = "Reset %s settings"
+    end
+    return format:format(pageName or "")
+end
+
+function OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
+    local addon = ns.Addon
+    if addon and addon.ShowConfirmDialog then
+        addon:ShowConfirmDialog(
+            "ECM_CONFIRM_RESET_SETTINGS_PAGE",
+            L["RESET_PAGE_CONFIRM"],
+            formatResetPageButton(pageName),
+            L["DONT_RESET"],
+            onAccept
+        )
+        return
+    end
+
+    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"] = OptionUtil.MakeConfirmDialog(
+        L["RESET_PAGE_CONFIRM"],
+        formatResetPageButton(pageName),
+        L["DONT_RESET"]
+    )
+    StaticPopup_Show("ECM_CONFIRM_RESET_SETTINGS_PAGE", nil, nil, { onAccept = onAccept })
 end

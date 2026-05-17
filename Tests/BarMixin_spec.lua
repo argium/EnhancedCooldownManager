@@ -17,6 +17,7 @@ describe("BarMixin", function()
         originalGlobals = TestHelpers.CaptureGlobals({
             "C_Timer",
             "GetTime",
+            "InCombatLockdown",
             "UIParent",
             "CreateFrame",
             "issecretvalue",
@@ -58,6 +59,9 @@ describe("BarMixin", function()
         }
         _G.GetTime = function()
             return 0
+        end
+        _G.InCombatLockdown = function()
+            return false
         end
         _G.UIParent = makeFrame({ name = "UIParent" })
         _G.issecretvalue = function()
@@ -195,6 +199,137 @@ describe("BarMixin", function()
 
             assert.are.equal(mt1, mt2)
             assert.is_true(mod._mixinApplied)
+        end)
+    end)
+
+    it("exports shared child-bar styling helpers", function()
+        TestHelpers.LoadChunk("BarStyle.lua", "Unable to load BarStyle.lua")(nil, ns)
+        local BarStyle = assert(ns.BarStyle, "BarStyle module did not initialize")
+        assert.is_function(BarStyle.ApplySquareIconStyle)
+        assert.is_function(BarStyle.StyleBarHeight)
+        assert.is_function(BarStyle.StyleBarBackground)
+        assert.is_function(BarStyle.StyleBarColor)
+        assert.is_function(BarStyle.StyleBarIcon)
+        assert.is_function(BarStyle.StyleBarAnchors)
+        assert.is_function(BarStyle.StyleChildBar)
+    end)
+
+    describe("BarStyle", function()
+        local BarStyle
+
+        before_each(function()
+            ns.IsDebugEnabled = function()
+                return true
+            end
+            TestHelpers.LoadChunk("BarStyle.lua", "Unable to load BarStyle.lua")(nil, ns)
+            BarStyle = assert(ns.BarStyle, "BarStyle module did not initialize")
+        end)
+
+        it("logs secret-key warnings with the calling module name", function()
+            local loggedTag
+            local loggedMessage
+            local secretSpellName = { __secret = true }
+            local secretSpellID = { __secret = true }
+            local secretCooldownID = { __secret = true }
+            local secretTextureFileID = { __secret = true }
+            local module = { Name = ns.Constants.EXTERNALBARS }
+
+            ns.Log = function(tag, message)
+                loggedTag = tag
+                loggedMessage = message
+            end
+            _G.issecretvalue = function(value)
+                return type(value) == "table" and value.__secret == true
+            end
+
+            local iconTexture = {
+                IsObjectType = function(_, objectType)
+                    return objectType == "Texture"
+                end,
+                GetTextureFileID = function()
+                    return secretTextureFileID
+                end,
+            }
+            local bar = {
+                Name = {
+                    GetText = function()
+                        return secretSpellName
+                    end,
+                },
+                _statusBarTexturePath = nil,
+                SetStatusBarTexture = function(self, texturePath)
+                    self._statusBarTexturePath = texturePath
+                end,
+                GetStatusBarTexture = function(self)
+                    local texturePath = self._statusBarTexturePath
+                    if not texturePath then
+                        return nil
+                    end
+                    return {
+                        GetTexture = function()
+                            return texturePath
+                        end,
+                    }
+                end,
+                GetStatusBarColor = function()
+                    return 0, 0, 0, 1
+                end,
+                SetStatusBarColor = function()
+                    error("expected no color update while all keys remain secret")
+                end,
+            }
+            local frame = {
+                Icon = {
+                    GetRegions = function()
+                        return iconTexture
+                    end,
+                },
+                cooldownInfo = { spellID = secretSpellID },
+                cooldownID = secretCooldownID,
+            }
+            local spellColors = {
+                GetColorForBar = function()
+                    return nil
+                end,
+                GetDefaultColor = function()
+                    error("expected no default color fallback while all keys remain secret")
+                end,
+            }
+
+            local editLocked = BarStyle.StyleBarColor(module, frame, bar, {}, spellColors, 3)
+
+            assert.is_true(editLocked)
+            assert.is_true(module._warned)
+            assert.are.equal(ns.Constants.EXTERNALBARS, loggedTag)
+            assert.are.equal("All identifying keys are secret outside of combat.", loggedMessage)
+        end)
+
+        it("uses asserts instead of guessing missing style inputs", function()
+            assert.has_error(function()
+                BarStyle.StyleBarHeight({}, {}, nil, nil, nil)
+            end)
+
+            assert.has_error(function()
+                BarStyle.StyleBarBackground({}, {
+                    SetParent = function() end,
+                    SetTexture = function() end,
+                    SetVertexColor = function() end,
+                    ClearAllPoints = function() end,
+                    SetAllPoints = function() end,
+                    SetDrawLayer = function() end,
+                }, nil, nil)
+            end)
+
+            assert.has_error(function()
+                BarStyle.StyleBarColor({}, {}, {}, {}, {
+                    GetColorForBar = function()
+                        return nil
+                    end,
+                    GetDefaultColor = function()
+                        return nil
+                    end,
+                }, 0)
+            end)
         end)
     end)
 

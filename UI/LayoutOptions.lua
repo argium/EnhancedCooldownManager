@@ -7,95 +7,98 @@ local C = ns.Constants
 local L = ns.L
 
 local LayoutOptions = {}
+ns.LayoutOptions = LayoutOptions
 
-local function createAnchorModeSpec(name, path, order, disabled)
+local function createAnchorModeSpec(name, path, disabled)
     return {
-        type = "select",
+        type = "dropdown",
         path = path,
         name = name,
-        desc = L["POSITION_MODE_DESC"],
+        tooltip = L["POSITION_MODE_DESC"],
         values = {
             [C.ANCHORMODE_CHAIN] = L["POSITION_MODE_ATTACHED"],
             [C.ANCHORMODE_DETACHED] = L["POSITION_MODE_DETACHED"],
             [C.ANCHORMODE_FREE] = L["POSITION_MODE_FREE"],
         },
         disabled = disabled,
-        order = order,
     }
 end
 
-function LayoutOptions.RegisterSettings(SB)
-    local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
-    local defaultDetachedGrowDirection = ns.OptionUtil.CreateDefaultValueTransform(C.GROW_DIRECTION_DOWN)
-    local powerBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
-    local resourceBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
-    local runeBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
-    local buffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
+local defaultZero = ns.OptionUtil.CreateDefaultValueTransform(0)
+local defaultDetachedGrowDirection = ns.OptionUtil.CreateDefaultValueTransform(C.GROW_DIRECTION_DOWN)
+local powerBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("powerBar")
+local resourceBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("resourceBar")
+local runeBarDisabled = ns.OptionUtil.GetIsDisabledDelegate("runeBar")
+local buffBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("buffBars")
+local externalBarsDisabled = ns.OptionUtil.GetIsDisabledDelegate("externalBars")
 
-    local args = {
-        positioningExamples = {
-            type = "canvas",
-            canvas = ns.OptionUtil.CreatePositioningExamplesCanvas(),
-            height = C.POSITION_MODE_EXPLAINER_HEIGHT,
-            order = 0,
+local rows = {
+    {
+        type = "canvas",
+        canvas = ns.OptionUtil.CreatePositioningExamplesCanvas(),
+        height = C.POSITION_MODE_EXPLAINER_HEIGHT,
+    },
+    {
+        type = "header",
+        name = L["MODULE_LAYOUT_HEADER"],
+    },
+    createAnchorModeSpec(L["POWER_BAR"], "powerBar.anchorMode", powerBarDisabled),
+    createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", resourceBarDisabled),
+    createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", runeBarDisabled),
+    createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", buffBarsDisabled),
+    createAnchorModeSpec(L["EXTERNAL_BARS"], "externalBars.anchorMode", externalBarsDisabled),
+    {
+        type = "header",
+        name = L["POSITION_MODE_ATTACHED"],
+    },
+    {
+        type = "slider",
+        path = "global.offsetY",
+        name = L["VERTICAL_OFFSET"],
+        tooltip = L["VERTICAL_OFFSET_DESC"],
+        min = 0,
+        max = 20,
+        step = 1,
+    },
+    {
+        type = "slider",
+        path = "global.moduleSpacing",
+        name = L["VERTICAL_SPACING"],
+        tooltip = L["VERTICAL_SPACING_DESC"],
+        min = 0,
+        max = 20,
+        step = 1,
+        getTransform = defaultZero,
+    },
+    {
+        type = "dropdown",
+        path = "global.moduleGrowDirection",
+        name = L["GROW_DIRECTION"],
+        tooltip = L["GROW_DIRECTION_ATTACHED_DESC"],
+        values = {
+            [C.GROW_DIRECTION_DOWN] = L["DOWN"],
+            [C.GROW_DIRECTION_UP] = L["UP"],
         },
+        getTransform = defaultDetachedGrowDirection,
+    },
+}
 
-        moduleHeader = { type = "header", name = L["MODULE_LAYOUT_HEADER"], order = 10 },
-        powerBarMode = createAnchorModeSpec(L["POWER_BAR"], "powerBar.anchorMode", 11, powerBarDisabled),
-        resourceBarMode = createAnchorModeSpec(L["RESOURCE_BAR"], "resourceBar.anchorMode", 12, resourceBarDisabled),
-        runeBarMode = createAnchorModeSpec(L["RUNE_BAR"], "runeBar.anchorMode", 13, runeBarDisabled),
-        buffBarsMode = createAnchorModeSpec(L["AURA_BARS"], "buffBars.anchorMode", 14, buffBarsDisabled),
+for _, row in ipairs(ns.OptionUtil.CreateDetachedStackRows()) do
+    rows[#rows + 1] = row
+end
 
-        attachedHeader = { type = "header", name = L["POSITION_MODE_ATTACHED"], order = 20 },
-        offsetY = {
-            type = "range",
-            path = "global.offsetY",
-            name = L["VERTICAL_OFFSET"],
-            desc = L["VERTICAL_OFFSET_DESC"],
-            min = 0,
-            max = 20,
-            step = 1,
-            order = 21,
-        },
-        moduleSpacing = {
-            type = "range",
-            path = "global.moduleSpacing",
-            name = L["VERTICAL_SPACING"],
-            desc = L["VERTICAL_SPACING_DESC"],
-            min = 0,
-            max = 20,
-            step = 1,
-            getTransform = defaultZero,
-            order = 22,
-        },
-        moduleGrowDirection = {
-            type = "select",
-            path = "global.moduleGrowDirection",
-            name = L["GROW_DIRECTION"],
-            desc = L["GROW_DIRECTION_ATTACHED_DESC"],
-            values = {
-                [C.GROW_DIRECTION_DOWN] = L["DOWN"],
-                [C.GROW_DIRECTION_UP] = L["UP"],
-            },
-            getTransform = defaultDetachedGrowDirection,
-            order = 23,
-        },
-    }
-
-    for key, spec in pairs(ns.OptionUtil.CreateDetachedStackArgs()) do
-        args[key] = spec
-    end
-
-    SB.RegisterFromTable({
-        name = L["LAYOUT_SUBCATEGORY"],
+LayoutOptions.key = "layout"
+LayoutOptions.name = L["LAYOUT_SUBCATEGORY"]
+LayoutOptions.path = ""
+LayoutOptions.pages = {
+    {
+        key = "main",
         onShow = function()
             ns.Runtime.SetLayoutPreview(true)
         end,
         onHide = function()
             ns.Runtime.SetLayoutPreview(false)
         end,
-        args = args,
-    })
-end
-
-ns.SettingsBuilder.RegisterSection(ns, "Layout", LayoutOptions)
+        rows = rows,
+    },
+}

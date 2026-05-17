@@ -340,6 +340,30 @@ describe("FrameMixin real source", function()
         assert.is_true(isFirst)
     end)
 
+    it("GetNextChainAnchor prefers the ExtraIcons main anchor when available", function()
+        local extraAnchor = makeFrame({ name = "ECMExtraIcons_mainAnchor" })
+
+        ns.Addon.GetECMModule = function(_, name)
+            if name == ns.Constants.EXTRAICONS then
+                return {
+                    IsEnabled = function()
+                        return true
+                    end,
+                    GetMainViewerAnchor = function()
+                        return extraAnchor
+                    end,
+                }
+            end
+
+            return nil
+        end
+
+        local anchor, isFirst = FrameProto.GetNextChainAnchor({ Name = "TestModule" }, ns.Constants.CHAIN_ORDER[1])
+
+        assert.are.equal(extraAnchor, anchor)
+        assert.is_true(isFirst)
+    end)
+
     it("CalculateLayoutParams keeps the first chained module anchored below the viewer", function()
         ns.Addon.GetECMModule = function()
             return nil

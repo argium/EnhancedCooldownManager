@@ -123,6 +123,20 @@ describe("ECM.Runtime layout system", function()
         }
     end
 
+    local function makeBlizzardFrame(name)
+        local frame = makeFrame({ name = name })
+        frame._hookScriptCalls = 0
+
+        local origHookScript = frame.HookScript
+        function frame:HookScript(...)
+            self._hookScriptCalls = self._hookScriptCalls + 1
+            return origHookScript(self, ...)
+        end
+
+        _G[name] = frame
+        return frame
+    end
+
     local CAPTURED_GLOBALS = {
         "LibStub",
         "C_Timer",
@@ -144,6 +158,9 @@ describe("ECM.Runtime layout system", function()
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
+        "issecurevariable",
+        "ChatFrameUtil",
+        "ChatFrameMixin",
         "Enum",
         "print",
         "StaticPopupDialogs",
@@ -161,6 +178,7 @@ describe("ECM.Runtime layout system", function()
         "CooldownViewerSettings",
         "SlashCmdList",
         "hash_SlashCmdList",
+        "debugstack",
     }
 
     setup(function()
@@ -225,6 +243,11 @@ describe("ECM.Runtime layout system", function()
         _G.issecrettable = function()
             return false
         end
+        _G.issecurevariable = function()
+            return true
+        end
+        _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+        _G.ChatFrameMixin = { MessageEventHandler = function() end }
         _G.tinsert = table.insert
         _G.strtrim = function(s)
             return (s:gsub("^%s+", ""):gsub("%s+$", ""))
@@ -242,6 +265,7 @@ describe("ECM.Runtime layout system", function()
         _G.CLOSE = "Close"
         _G.CANCEL = "Cancel"
         _G.OKAY = "Okay"
+        _G.debugstack = nil
         _G.CooldownViewerSettings = nil
         _G.EssentialCooldownViewer = nil
         _G.UtilityCooldownViewer = nil
@@ -511,6 +535,97 @@ describe("ECM.Runtime layout system", function()
             assert.same({ "First" }, reasons)
         end)
 
+        it("does not count coalesced layout requests as a layout storm", function()
+            local logs = {}
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("BuffBars:OnShow:child")
+            end
+
+            assert.are.equal(1, #timerQueue)
+            assert.are.equal(0, #logs)
+        end)
+
+        it("logs repeated accepted layout batches without enabling debug mode", function()
+            local logs = {}
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("BuffBars:OnShow:child")
+                timerQueue[#timerQueue].callback()
+            end
+
+            assert.are.equal(1, #logs)
+            assert.are.equal("Runtime", logs[1].module)
+            assert.are.equal("LayoutStorm:BuffBars:OnShow:child", logs[1].key)
+            assert.are.equal("Repeated layout requests detected for BuffBars:OnShow:child ("
+                .. ns.Constants.LAYOUT_STORM_COUNT .. " in " .. ns.Constants.LAYOUT_STORM_WINDOW .. "s)", logs[1].message)
+            assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
+        end)
+
+        it("includes request diagnostics and stack data in layout storm logs", function()
+            local logs = {}
+            local diagnosticCalls = 0
+            _G.debugstack = function()
+                return "runtime storm stack"
+            end
+            ns.ErrorLogOnce = function(module, key, message, data)
+                logs[#logs + 1] = { module = module, key = key, message = message, data = data }
+            end
+
+            for _ = 1, ns.Constants.LAYOUT_STORM_COUNT do
+                ns.Runtime.RequestLayout("ExternalBars:viewer:UpdateAuras", {
+                    diagnostics = function()
+                        diagnosticCalls = diagnosticCalls + 1
+                        return {
+                            viewerExists = true,
+                            activeAuraCount = 2,
+                        }
+                    end,
+                })
+                timerQueue[#timerQueue].callback()
+            end
+
+            assert.are.equal(1, #logs)
+            assert.are.equal(1, diagnosticCalls)
+            assert.are.equal("runtime storm stack", logs[1].data.debugStack)
+            assert.are.equal("ExternalBars:viewer:UpdateAuras", logs[1].data.reason)
+            assert.are.equal(ns.Constants.LAYOUT_STORM_COUNT, logs[1].data.count)
+            assert.are.equal(0, logs[1].data.elapsed)
+            assert.is_false(logs[1].data.requestPending)
+            assert.is_false(logs[1].data.layoutPending)
+            assert.is_false(logs[1].data.secondPassPending)
+            assert.same({ viewerExists = true, activeAuraCount = 2 }, logs[1].data.diagnostics)
+        end)
+
+        it("updates ExtraIcons before the chain so attached bars see the final viewer footprint", function()
+            local callOrder = {}
+            local extraIcons = makeRegisteredModule(ns.Constants.EXTRAICONS)
+            local powerBar = makeRegisteredModule(ns.Constants.POWERBAR)
+
+            _G._testDB.profile.extraIcons = { enabled = true }
+            _G._testDB.profile.powerBar.anchorMode = ns.Constants.ANCHORMODE_CHAIN
+
+            extraIcons.UpdateLayout = function(_, reason)
+                callOrder[#callOrder + 1] = "ExtraIcons:" .. reason
+            end
+            powerBar.UpdateLayout = function(_, reason)
+                callOrder[#callOrder + 1] = "PowerBar:" .. reason
+            end
+
+            ns.Runtime.ScheduleLayoutUpdate(0, "Order")
+
+            assert.are.equal(1, #timerQueue)
+            timerQueue[1].callback()
+
+            assert.same({ "ExtraIcons:Order", "PowerBar:Order" }, callOrder)
+        end)
+
         it("zero-delay layout events update visibility immediately without adding a runtime timer hop", function()
             local mod = makeRegisteredModule()
             local reasons = {}
@@ -577,6 +692,25 @@ describe("ECM.Runtime layout system", function()
             timerQueue[1].callback()
 
             assert.same({ "ZONE_CHANGED" }, reasons)
+        end)
+
+        it("checks chat taint immediately on zone change events", function()
+            local taintReasons = {}
+            local libEvent = LibStub("LibEvent-1.0")
+            ns._CheckChatTaint = function(reason)
+                taintReasons[#taintReasons + 1] = reason
+            end
+
+            ns.Runtime.Enable(fakeAddon)
+
+            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
+            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
+
+            handler(addonFrame, "ZONE_CHANGED")
+            handler(addonFrame, "ZONE_CHANGED_INDOORS")
+            handler(addonFrame, "PLAYER_ENTERING_WORLD")
+
+            assert.same({ "ZONE_CHANGED", "ZONE_CHANGED_INDOORS" }, taintReasons)
         end)
 
         it("ScheduleLayoutUpdate with a shorter delay supersedes a pending longer-delay timer", function()
@@ -848,20 +982,7 @@ describe("ECM.Runtime layout system", function()
     end)
 
     describe("watchdog graceful degradation", function()
-        --- Creates a Blizzard frame stub in _G with HookScript call tracking.
-        local function makeBlizzardFrame(name)
-            local frame = makeFrame({ name = name })
-            frame._hookScriptCalls = 0
-            local origHookScript = frame.HookScript
-            function frame:HookScript(...)
-                self._hookScriptCalls = self._hookScriptCalls + 1
-                return origHookScript(self, ...)
-            end
-            _G[name] = frame
-            return frame
-        end
-
-        --- Places all 4 Blizzard frames + CooldownViewerSettings in _G.
+        --- Places all Blizzard frames and CooldownViewerSettings in _G.
         local function createAllBlizzardFrames()
             local frames = {}
             for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
@@ -884,10 +1005,11 @@ describe("ECM.Runtime layout system", function()
             ns.Runtime.Enable(fakeAddon)
 
             local ticker = createdTickers[1]
+            local allNames = ns.Constants.BLIZZARD_FRAMES
 
             -- First tick: hooks all frames + settings
             ticker.callback()
-            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(allNames) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should be hooked exactly once after first tick")
             end
@@ -896,7 +1018,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Second tick: setup should be skipped
             ticker.callback()
-            for _, name in ipairs(ns.Constants.BLIZZARD_FRAMES) do
+            for _, name in ipairs(allNames) do
                 assert.are.equal(1, frames[name]._hookScriptCalls,
                     name .. " should still be hooked exactly once after second tick")
             end
@@ -915,18 +1037,22 @@ describe("ECM.Runtime layout system", function()
             frames[ns.Constants.BLIZZARD_FRAMES[1]]:Hide()
             assert.is_false(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown())
 
-            -- Enforcement tick should re-show it
             ticker.callback()
             assert.is_true(frames[ns.Constants.BLIZZARD_FRAMES[1]]:IsShown(),
                 "Enforcement should re-show externally hidden Blizzard frame")
         end)
 
         it("continues setup when frames appear late", function()
-            -- Start with only 2 of 4 Blizzard frames
+            -- Start with only 2 Blizzard frames.
+            local allNames = ns.Constants.BLIZZARD_FRAMES
             local firstTwo = {}
+            local remainingNames = {}
             for i = 1, 2 do
-                local name = ns.Constants.BLIZZARD_FRAMES[i]
+                local name = allNames[i]
                 firstTwo[name] = makeBlizzardFrame(name)
+            end
+            for i = 3, #allNames do
+                remainingNames[#remainingNames + 1] = allNames[i]
             end
 
             ns.Runtime.Enable(fakeAddon)
@@ -934,7 +1060,7 @@ describe("ECM.Runtime layout system", function()
 
             -- First tick: hooks 2 frames, but no CooldownViewerSettings yet
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[1], ns.Constants.BLIZZARD_FRAMES[2] }) do
+            for _, name in ipairs({ allNames[1], allNames[2] }) do
                 assert.are.equal(1, firstTwo[name]._hookScriptCalls)
             end
 
@@ -943,8 +1069,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Now add remaining frames + settings
             local laterFrames = {}
-            for i = 3, 4 do
-                local name = ns.Constants.BLIZZARD_FRAMES[i]
+            for _, name in ipairs(remainingNames) do
                 laterFrames[name] = makeBlizzardFrame(name)
             end
             local settings = makeFrame({ name = "CooldownViewerSettings" })
@@ -958,7 +1083,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Third tick: hooks remaining frames + settings, setup completes
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs(remainingNames) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should be hooked on third tick")
             end
@@ -966,7 +1091,7 @@ describe("ECM.Runtime layout system", function()
 
             -- Fourth tick: setup skipped, no additional hooks
             ticker.callback()
-            for _, name in ipairs({ ns.Constants.BLIZZARD_FRAMES[3], ns.Constants.BLIZZARD_FRAMES[4] }) do
+            for _, name in ipairs(remainingNames) do
                 assert.are.equal(1, laterFrames[name]._hookScriptCalls,
                     name .. " should not be re-hooked after setup complete")
             end

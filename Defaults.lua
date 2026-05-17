@@ -15,6 +15,10 @@ local _, ns = ...
 ---@field x number X offset from anchor.
 ---@field y number Y offset from anchor.
 
+---@alias ns.Constants.ANCHORMODE_CHAIN "chain"
+---@alias ns.Constants.ANCHORMODE_DETACHED "detached"
+---@alias ns.Constants.ANCHORMODE_FREE "free"
+
 ---@class ECM_BarConfigBase Shared bar layout configuration.
 ---@field enabled boolean Whether the bar is enabled.
 ---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
@@ -51,6 +55,7 @@ local _, ns = ...
 
 ---@class ECM_GlobalConfig Global configuration.
 ---@field debug boolean Whether debug logging is enabled.
+---@field errorLogging boolean Whether targeted error logging is enabled.
 ---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
 ---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
 ---@field updateFrequency number Update frequency in seconds.
@@ -85,7 +90,7 @@ local _, ns = ...
 ---@field byCooldownID table<number, table<number, table<number, table>>> Per-cooldownID colors by class/spec/cooldownID.
 ---@field byTexture table<number, table<number, table<number, table>>> Per-texture colors by class/spec/textureId.
 ---@field cache table<number, table<number, table<number, ECM_BarCacheEntry>>> Cached bar metadata by class/spec/index.
----@field defaultColor ECM_Color Default color for buff bars.
+---@field defaultColor ECM_Color Default color when no per-spell override applies.
 
 ---@class ECM_BuffBarsConfig Buff bars configuration.
 ---@field enabled boolean Whether buff bars are enabled.
@@ -99,13 +104,55 @@ local _, ns = ...
 ---@field fontSize number|nil Font size override for aura bar text.
 ---@field colors ECM_SpellColorsConfig Per-spell color settings.
 
----@class ECM_ItemIconsConfig Item icons configuration.
----@field enabled boolean Whether item icons are enabled.
----@field showTrinket1 boolean Whether to show trinket slot 1 (if on-use).
----@field showTrinket2 boolean Whether to show trinket slot 2 (if on-use).
----@field showCombatPotion boolean Whether to show combat potions.
----@field showHealthPotion boolean Whether to show health potions.
----@field showHealthstone boolean Whether to show healthstone.
+---@class ECM_ExternalBarsConfig External cooldown bars configuration.
+---@field enabled boolean Whether external cooldown bars are enabled.
+---@field hideOriginalIcons boolean Whether Blizzard's original external cooldown icons are hidden.
+---@field anchorMode ns.Constants.ANCHORMODE_CHAIN|ns.Constants.ANCHORMODE_DETACHED|ns.Constants.ANCHORMODE_FREE|nil Anchor behavior for external cooldown bars.
+---@field editModePositions table<string, ECM_EditModePosition>|nil Per-layout positions saved via Edit Mode.
+---@field width number|nil Bar width override.
+---@field height number|nil Bar height override.
+---@field verticalSpacing number|nil Vertical gap between bars (pixels).
+---@field showIcon boolean|nil Whether to show external cooldown icons.
+---@field showSpellName boolean|nil Whether to show spell names.
+---@field showDuration boolean|nil Whether to show durations.
+---@field overrideFont boolean|nil Whether external cooldown bars override global font settings.
+---@field font string|nil Font face override for bar text.
+---@field fontSize number|nil Font size override for bar text.
+---@field colors ECM_SpellColorsConfig Per-spell color settings.
+
+---@class ECM_ExtraIconEntry
+---@field stackKey string|nil Built-in stack key resolved via `BUILTIN_STACKS`.
+---@field kind string|nil Entry kind for custom or racial rows.
+---@field ids table|nil Entry spell/item priority list.
+---@field itemStackId number|string|nil Stable item stack ID for `kind == "itemStack"` rows.
+---@field slotId number|nil Slot ID for equip-slot entries.
+---@field disabled boolean|nil When true, the entry stays in settings but is skipped at runtime.
+
+---@class ECM_ItemStackConfig Named item priority list.
+---@field name string Display name.
+---@field ids ECM_ItemStackEntry[] Ordered item priority list.
+---@field hideInInstances boolean|nil Whether to hide in non-PvP instances.
+---@field hideInRatedPvp boolean|nil Whether to hide in rated PvP maps.
+---@field showIfMissing boolean|nil Gets whether to show this stack greyscale when its active item is missing from inventory.
+
+---@class ECM_ItemStackEntry Item priority entry.
+---@field itemID number Gets the item ID.
+---@field quality number|nil Gets the profession quality rank for display.
+
+---@class ECM_ItemStacksConfig Item stack collection.
+---@field nextId number Next stable custom item stack ID.
+---@field order table Ordered item stack IDs.
+---@field byId table<number|string, ECM_ItemStackConfig> Item stacks by stable ID.
+
+---@class ECM_ExtraIconsConfig Extra icons configuration.
+---@field enabled boolean Whether extra icons are enabled.
+---@field showStackCount boolean Whether to show item stack counts.
+---@field showCharges boolean Whether to show spell charges.
+---@field overrideFont boolean|nil Whether stack/charge counts override global font settings.
+---@field font string|nil Font face override for stack/charge counts.
+---@field fontSize number|nil Font size override for stack/charge counts.
+---@field viewers table<string, ECM_ExtraIconEntry[]> Per-viewer ordered icon lists.
+---@field itemStacks ECM_ItemStacksConfig Named item stacks that can be referenced by viewer entries.
 
 ---@class ECM_TickMark Tick mark definition.
 ---@field value number Tick mark value.
@@ -131,9 +178,49 @@ local _, ns = ...
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
----@field itemIcons ECM_ItemIconsConfig Item icons configuration.
+---@field externalBars ECM_ExternalBarsConfig External cooldown bars configuration.
+---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
 
 local C = ns.Constants
+
+local defaultItemStacks = {
+    nextId = 1,
+    order = { "combatPotions", "healthPotions", "healthstones" },
+    byId = {
+        combatPotions = {
+            name = "Combat Potions",
+            hideInInstances = false,
+            hideInRatedPvp = true,
+            ids = {
+                { itemID = 241288, quality = 2 }, -- https://www.wowhead.com/item=241288/potion-of-recklessness
+                { itemID = 241289, quality = 1 }, -- https://www.wowhead.com/item=241289/potion-of-recklessness
+                { itemID = 245898, quality = 2 }, -- https://www.wowhead.com/item=245898/fleeting-lights-potential
+                { itemID = 245897, quality = 1 }, -- https://www.wowhead.com/item=245897/fleeting-lights-potential
+                { itemID = 241308, quality = 2 }, -- https://www.wowhead.com/item=241308/lights-potential
+                { itemID = 241309, quality = 1 }, -- https://www.wowhead.com/item=241309/lights-potential
+            },
+        },
+        healthPotions = {
+            name = "Health Potions",
+            hideInInstances = false,
+            hideInRatedPvp = true,
+            ids = {
+                { itemID = 241305, quality = 2 }, -- Silvermoon Health Potion R2 https://www.wowhead.com/item=241305/silvermoon-health-potion
+                { itemID = 241304, quality = 1 }, -- Silvermoon Health Potion R1 https://www.wowhead.com/item=241304/silvermoon-health-potion
+                { itemID = 258138, quality = 1 }, -- Potent Healing Potion https://www.wowhead.com/item=258138/potent-healing-potion
+            },
+        },
+        healthstones = {
+            name = "Healthstones",
+            hideInInstances = false,
+            hideInRatedPvp = false,
+            ids = {
+                { itemID = 224464 }, -- Demonic Healthstone
+                { itemID = 5512 }, -- Healthstone
+            },
+        },
+    },
+}
 
 -- Defines default tick marks for specific specialisations
 local powerBarTickMappings = {}
@@ -149,6 +236,7 @@ local defaults = {
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             debug = false,
+            errorLogging = false,
             debugToChat = false,
             releasePopupSeenVersion = "",
             hideWhenMounted = true,
@@ -273,13 +361,43 @@ local defaults = {
                 defaultColor = { r = 228 / 255, g = 233 / 255, b = 235 / 255, a = 1 },
             },
         },
-        itemIcons = {
+        externalBars = {
+            enabled = false,
+            hideOriginalIcons = false,
+            anchorMode = C.ANCHORMODE_CHAIN,
+            editModePositions = {},
+            width = C.DEFAULT_BAR_WIDTH,
+            height = 0,
+            verticalSpacing = 0,
+            showIcon = true,
+            showSpellName = true,
+            showDuration = true,
+            overrideFont = false,
+            colors = {
+                byName = {},
+                bySpellID = {},
+                byCooldownID = {},
+                byTexture = {},
+                cache = {},
+                defaultColor = { r = 0.40, g = 0.78, b = 0.95, a = 1 },
+            },
+        },
+        extraIcons = {
             enabled = true,
-            showTrinket1 = true,
-            showTrinket2 = true,
-            showCombatPotion = true,
-            showHealthPotion = true,
-            showHealthstone = true,
+            showStackCount = true,
+            showCharges = true,
+            overrideFont = false,
+            itemStacks = defaultItemStacks,
+            viewers = {
+                utility = {
+                    { stackKey = "trinket1" },
+                    { stackKey = "trinket2" },
+                    { kind = "itemStack", itemStackId = "combatPotions" },
+                    { kind = "itemStack", itemStackId = "healthPotions" },
+                    { kind = "itemStack", itemStackId = "healthstones" },
+                },
+                main = {},
+            },
         },
     },
 }

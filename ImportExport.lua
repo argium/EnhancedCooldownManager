@@ -133,7 +133,7 @@ end
 function ImportExport.ExportCurrentProfile()
     local db = ns.Addon.db
     if not db or not db.profile then
-        return nil, L["IMPORT_NO_PROFILE"]
+        return nil, L["EXPORT_NO_PROFILE"]
     end
 
     local exportData = prepareProfileForExport(db.profile)
@@ -166,12 +166,12 @@ end
 ---@return string|nil errorMessage Error message if apply failed
 function ImportExport.ApplyImportData(data)
     if not data or not data.profile then
-        return false, L["IMPORT_INVALID_DATA"]
+        return false, L["IMPORT_NO_PROFILE_DATA"]
     end
 
     local db = ns.Addon.db
     if not db or not db.profile then
-        return false, L["IMPORT_NO_ACTIVE_PROFILE"]
+        return false, L["IMPORT_NO_PROFILE"]
     end
 
     -- Preserve the cache if it exists (deep copy to avoid shared references)

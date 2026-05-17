@@ -20,28 +20,36 @@ ns.Runtime = Runtime
 
 local LAYOUT_EVENTS = {
     PLAYER_MOUNT_DISPLAY_CHANGED = { delay = 0 },
-    UNIT_ENTERED_VEHICLE = { delay = 0 },
-    UNIT_EXITED_VEHICLE = { delay = 0 },
+    UNIT_ENTERED_VEHICLE = { delay = 0, unit = "player" },
+    UNIT_EXITED_VEHICLE = { delay = 0, unit = "player" },
     VEHICLE_UPDATE = { delay = 0 },
     PLAYER_UPDATE_RESTING = { delay = 0 },
     PLAYER_SPECIALIZATION_CHANGED = { delay = 0 },
     PLAYER_ENTERING_WORLD = { delay = C.LAYOUT_ENTERING_WORLD_DELAY },
     PLAYER_TARGET_CHANGED = { delay = 0 },
-    PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true },
+    PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true, onEvent = function()
+        if Runtime.OnCombatEnd then
+            Runtime.OnCombatEnd()
+        end
+    end },
     PLAYER_REGEN_DISABLED = { delay = 0, combatChange = true },
     ZONE_CHANGED_NEW_AREA = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
     ZONE_CHANGED = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
     ZONE_CHANGED_INDOORS = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
     UPDATE_SHAPESHIFT_FORM = { delay = 0 },
+    CVAR_UPDATE = { delay = 0, arg1 = "cooldownViewerEnabled" },
+}
+
+local CHAT_TAINT_ZONE_EVENTS = {
+    ZONE_CHANGED_NEW_AREA = true,
+    ZONE_CHANGED = true,
+    ZONE_CHANGED_INDOORS = true,
 }
 
 local _modules = {}
 local _globallyHidden = false
 local _desiredAlpha = 1
 local _inCombat = InCombatLockdown()
-local _layoutPending = false
-local _layoutPendingDelay = nil
-local _layoutPendingTimer = nil
 local _layoutEventsEnabled = false
 local _layoutWatchdogTicker = nil
 local _cooldownViewerSettingsHooked = false
@@ -56,21 +64,36 @@ end
 
 local _detachedAnchor = nil
 local _detachedAnchorMetrics = nil
+local _layoutScheduler = {
+    pending = false,
+    delay = nil,
+    timer = nil,
+    reason = nil,
+    requestPending = false,
+    requestSecondPass = false,
+}
+
+--- Applies the current Runtime-owned visibility and alpha to one
+--- Blizzard-managed cooldown viewer frame.
+---@param frame Frame
+local function applyBlizzardFrameState(frame)
+    if _globallyHidden then
+        if frame:IsShown() then frame:Hide() end
+        return
+    end
+
+    if not frame:IsShown() then frame:Show() end
+    ns.FrameUtil.LazySetAlpha(frame, _desiredAlpha)
+end
 
 --- Enforces the current desired visibility and alpha on all Blizzard frames.
 --- Single enforcement point called from state changes, OnShow hooks, and the
 --- watchdog ticker.
 local function enforceBlizzardFrameState()
-    local alpha = _desiredAlpha
     for _, name in ipairs(C.BLIZZARD_FRAMES) do
         local frame = _G[name]
         if frame then
-            if _globallyHidden then
-                if frame:IsShown() then frame:Hide() end
-            else
-                if not frame:IsShown() then frame:Show() end
-                ns.FrameUtil.LazySetAlpha(frame, alpha)
-            end
+            applyBlizzardFrameState(frame)
         end
     end
 end
@@ -85,11 +108,7 @@ local function hookBlizzardFrame(frame, name)
     end
 
     frame:HookScript("OnShow", function(self)
-        if _globallyHidden then
-            self:Hide()
-        else
-            ns.FrameUtil.LazySetAlpha(self, _desiredAlpha)
-        end
+        applyBlizzardFrameState(self)
     end)
 
     _hookedBlizzardFrames[name] = true
@@ -151,26 +170,16 @@ local function updateFadeAndHiddenStates()
         return
     end
 
-    -- Force-show while edit mode or the Layout options preview is active so the
-    -- user can see and position modules without hide/fade interference.
-    if LibEditMode:IsInEditMode() or _layoutPreviewActive then
-        setGloballyHidden(false)
-        setAlpha(1)
-        enforceBlizzardFrameState()
-        return
-    end
-
-    local hidden = not C_CVar.GetCVarBool("cooldownViewerEnabled")
-        or (globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")))
-        or (not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting())
-
-    setGloballyHidden(hidden)
-
-    -- Determine alpha (only matters when visible)
+    local hidden = false
     local alpha = 1
-    if not hidden then
+
+    if not (LibEditMode:IsInEditMode() or _layoutPreviewActive) then
+        hidden = not C_CVar.GetCVarBool("cooldownViewerEnabled")
+            or (globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")))
+            or (not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting())
+
         local fadeConfig = globalConfig.outOfCombatFade
-        if not _inCombat and fadeConfig and fadeConfig.enabled then
+        if not hidden and not _inCombat and fadeConfig and fadeConfig.enabled then
             local hasLiveTarget = UnitExists("target") and not UnitIsDead("target")
             local skipFade = (fadeConfig.exceptInInstance and isInInstanceContext())
                 or (hasLiveTarget and fadeConfig.exceptIfTargetCanBeAttacked and UnitCanAttack("player", "target"))
@@ -182,6 +191,7 @@ local function updateFadeAndHiddenStates()
         end
     end
 
+    setGloballyHidden(hidden)
     setAlpha(alpha)
     enforceBlizzardFrameState()
 end
@@ -355,6 +365,14 @@ local function updateAllLayouts(reason)
     invalidateDetachedAnchorMetrics()
     updateDetachedAnchorLayout()
 
+    -- ExtraIcons can widen the main viewer's effective footprint. Update it
+    -- before chained modules so attached bars compute width-dependent layout
+    -- (ticks, fragments, etc.) against the final combined anchor.
+    local extraIcons = _modules[C.EXTRAICONS]
+    if extraIcons and extraIcons:IsReady() then
+        extraIcons:UpdateLayout(reason)
+    end
+
     -- Chain frames update in deterministic order so downstream bars can
     -- resolve anchors against already-laid-out predecessors.
     for _, moduleName in ipairs(C.CHAIN_ORDER) do
@@ -365,7 +383,7 @@ local function updateAllLayouts(reason)
     end
 
     for frameName, module in pairs(_modules) do
-        if not _chainSet[frameName] and module:IsReady() then
+        if frameName ~= C.EXTRAICONS and not _chainSet[frameName] and module:IsReady() then
             module:UpdateLayout(reason)
         end
     end
@@ -395,7 +413,7 @@ end
 -- Public API
 --------------------------------------------------------------------------------
 
---- Sets or clears the layout preview override.
+--- Sets or clears the options preview override.
 --- When active, hide-when-mounted, hide-in-rest, and out-of-combat fade are bypassed.
 ---@param active boolean
 function Runtime.SetLayoutPreview(active)
@@ -411,9 +429,12 @@ end
 
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
 local function executeLayout(reason)
-    _layoutPending = false
-    _layoutPendingDelay = nil
-    _layoutPendingTimer = nil
+    if _layoutScheduler.timer and _layoutScheduler.timer.Cancel then
+        _layoutScheduler.timer:Cancel()
+    end
+    _layoutScheduler.pending = false
+    _layoutScheduler.delay = nil
+    _layoutScheduler.timer = nil
     hookCooldownViewerSettings()
     updateFadeAndHiddenStates()
     updateAllLayouts(reason)
@@ -427,33 +448,87 @@ function Runtime.UpdateLayoutImmediately(reason)
     executeLayout(reason)
 end
 
-local _requestPending = false
-local _requestReason = nil
-local _requestSecondPass = false
+local _layoutStorms = {}
 
---- Requests a deferred layout pass for all registered modules.
---- Coalesces multiple requests within the same frame into one pass.
---- @param reason string Debug trace string identifying the caller.
---- @param opts table|nil Optional parameters: { secondPass = boolean }
-function Runtime.RequestLayout(reason, opts)
-    if opts and opts.secondPass then
-        _requestSecondPass = true
+local function getRequestDiagnostics(opts)
+    if type(opts) ~= "table" or opts.diagnostics == nil then
+        return nil, nil
     end
-    if _requestPending then
+
+    if type(opts.diagnostics) ~= "function" then
+        return opts.diagnostics, nil
+    end
+
+    local ok, data = pcall(opts.diagnostics)
+    if ok then
+        return data, nil
+    end
+
+    return nil, tostring(data)
+end
+
+local function getRequestDebugStack()
+    if type(debugstack) ~= "function" then
+        return nil
+    end
+
+    local ok, stack = pcall(debugstack, 3, 8, 8)
+    if ok then
+        return stack
+    end
+
+    return "debugstack failed: " .. tostring(stack)
+end
+
+local function recordLayoutRequest(reason, opts)
+    local now = GetTime()
+    local key = reason or "nil"
+    local storm = _layoutStorms[key]
+    if not storm or now - storm.startedAt > C.LAYOUT_STORM_WINDOW then
+        _layoutStorms[key] = { startedAt = now, count = 1 }
         return
     end
-    _requestReason = reason
-    _requestPending = true
+
+    storm.count = storm.count + 1
+    if storm.count == C.LAYOUT_STORM_COUNT then
+        local diagnostics, diagnosticsError = getRequestDiagnostics(opts)
+        ns.ErrorLogOnce("Runtime", "LayoutStorm:" .. key, "Repeated layout requests detected for " .. key
+            .. " (" .. storm.count .. " in " .. C.LAYOUT_STORM_WINDOW .. "s)", {
+            reason = key,
+            count = storm.count,
+            window = C.LAYOUT_STORM_WINDOW,
+            elapsed = now - storm.startedAt,
+            requestPending = _layoutScheduler.requestPending == true,
+            layoutPending = _layoutScheduler.pending == true,
+            secondPassPending = _layoutScheduler.requestSecondPass == true,
+            debugStack = getRequestDebugStack(),
+            diagnostics = diagnostics,
+            diagnosticsError = diagnosticsError,
+        })
+    end
+end
+
+function _layoutScheduler:request(reason, opts)
+    if opts and opts.secondPass then
+        self.requestSecondPass = true
+    end
+    if self.requestPending then
+        return
+    end
+
+    recordLayoutRequest(reason, opts)
+    self.reason = reason
+    self.requestPending = true
     C_Timer.After(0, function()
-        local why = _requestReason
-        local needSecondPass = _requestSecondPass
-        _requestPending = false
-        _requestReason = nil
-        _requestSecondPass = false
+        local why = self.reason
+        local needSecondPass = self.requestSecondPass
+        self.requestPending = false
+        self.reason = nil
+        self.requestSecondPass = false
         executeLayout(why)
         if needSecondPass then
             C_Timer.After(C.LIFECYCLE_SECOND_PASS_DELAY, function()
-                if _requestPending or _layoutPending then
+                if self.requestPending or self.pending then
                     return
                 end
                 executeLayout("SecondPass")
@@ -462,12 +537,39 @@ function Runtime.RequestLayout(reason, opts)
     end)
 end
 
+function _layoutScheduler:schedule(delay, reason)
+    local waitTime = delay or 0
+    if self.pending and self.delay ~= nil and self.delay <= waitTime then
+        return
+    end
+    if self.timer and self.timer.Cancel then
+        self.timer:Cancel()
+    end
+
+    invalidateDetachedAnchorMetrics()
+    self.pending = true
+    self.delay = waitTime
+    self.reason = reason
+    self.timer = C_Timer.NewTimer(waitTime, function()
+        executeLayout(reason)
+    end)
+end
+
+--- Requests a deferred layout pass for all registered modules.
+--- Coalesces multiple requests within the same frame into one pass.
+--- @param reason string Debug trace string identifying the caller.
+--- @param opts table|nil Optional parameters: { secondPass = boolean, diagnostics = table|function }
+function Runtime.RequestLayout(reason, opts)
+    _layoutScheduler:request(reason, opts)
+end
+
 --- Requests a refresh (values only, no geometry) for a single module.
 --- @param module table The module to refresh.
 --- @param reason string Debug trace string.
-function Runtime.RequestRefresh(module, reason)
+--- @param immediate boolean|nil Whether to bypass refresh rate limiting.
+function Runtime.RequestRefresh(module, reason, immediate)
     if module and module.ThrottledRefresh then
-        module:ThrottledRefresh(reason)
+        module:ThrottledRefresh(reason, immediate)
     end
 end
 
@@ -476,24 +578,7 @@ end
 --- @param delay number Delay in seconds
 --- @param reason string|nil The lifecycle reason (defaults to OPTION_CHANGED)
 function Runtime.ScheduleLayoutUpdate(delay, reason)
-    local waitTime = delay or 0
-
-    -- Skip if already pending with an equal or shorter delay
-    if _layoutPending and _layoutPendingDelay ~= nil and _layoutPendingDelay <= waitTime then
-        return
-    end
-
-    -- Cancel the existing timer if we're superseding it
-    if _layoutPendingTimer and _layoutPendingTimer.Cancel then
-        _layoutPendingTimer:Cancel()
-    end
-
-    invalidateDetachedAnchorMetrics()
-    _layoutPending = true
-    _layoutPendingDelay = waitTime
-    _layoutPendingTimer = C_Timer.NewTimer(waitTime, function()
-        executeLayout(reason)
-    end)
+    _layoutScheduler:schedule(delay, reason)
 end
 
 --- Registers a module frame to receive layout update events.
@@ -536,29 +621,20 @@ local function handleLayoutEvent(_addon, event, arg1)
         tryCompleteWatchdogSetup()
     end
 
-    if (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") and arg1 ~= "player" then
-        return
-    end
-
-    if event == "PLAYER_REGEN_ENABLED" and Runtime.OnCombatEnd then
-        Runtime.OnCombatEnd()
-    end
-
-    if event == "CVAR_UPDATE" then
-        if arg1 == "cooldownViewerEnabled" then
-            updateFadeAndHiddenStates()
-            Runtime.ScheduleLayoutUpdate(0, "CVAR_UPDATE:cooldownViewerEnabled")
-        end
-        return
-    end
-
     local config = LAYOUT_EVENTS[event]
-    if not config then
+    if not config or (config.unit and arg1 ~= config.unit) or (config.arg1 and arg1 ~= config.arg1) then
         return
+    end
+
+    if CHAT_TAINT_ZONE_EVENTS[event] then
+        ns._CheckChatTaint(event)
     end
 
     if config.combatChange then
         _inCombat = (event == "PLAYER_REGEN_DISABLED")
+    end
+    if config.onEvent then
+        config.onEvent()
     end
 
     if config.delay > 0 then
@@ -566,8 +642,7 @@ local function handleLayoutEvent(_addon, event, arg1)
         return
     end
 
-    updateFadeAndHiddenStates()
-    updateAllLayouts(event)
+    Runtime.UpdateLayoutImmediately(event == "CVAR_UPDATE" and "CVAR_UPDATE:" .. tostring(arg1) or event)
 end
 
 local function enableLayoutEvents(addon)
@@ -586,9 +661,6 @@ local function enableLayoutEvents(addon)
             handleLayoutEvent(addon, eventName, ...)
         end)
     end
-    addon:RegisterEvent("CVAR_UPDATE", function(_, _event, ...)
-        handleLayoutEvent(addon, "CVAR_UPDATE", ...)
-    end)
 
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
@@ -618,7 +690,6 @@ local function disableLayoutEvents(addon)
     for eventName in pairs(LAYOUT_EVENTS) do
         addon:UnregisterEvent(eventName)
     end
-    addon:UnregisterEvent("CVAR_UPDATE")
 
     if _layoutWatchdogTicker then
         _layoutWatchdogTicker:Cancel()

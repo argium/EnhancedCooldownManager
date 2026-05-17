@@ -1,0 +1,15 @@
+<Ui>
+    <Script file="Core.lua"/>
+    <Script file="Foundation/Helpers.lua"/>
+    <Script file="Schema/Rows.lua"/>
+    <Script file="Interop/Settings.lua"/>
+    <Script file="Interop/Widgets.lua"/>
+    <Script file="Interop/Enhancements.lua"/>
+    <Script file="Interop/ListRows.lua"/>
+    <Script file="Interop/CollectionFrames.lua"/>
+    <Script file="Registry/CoreState.lua"/>
+    <Script file="Builders/Rows.lua"/>
+    <Script file="Builders/LayoutRows.lua"/>
+    <Script file="Builders/Collections.lua"/>
+    <Script file="Registry/Runtime.lua"/>
+</Ui>

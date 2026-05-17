@@ -9,7 +9,7 @@ local TestHelpers = assert(
 
 describe("AdvancedOptions getters/setters/defaults", function()
     local originalGlobals
-    local profile, defaults, SB, ns, settings, advancedCategory, initializers
+    local profile, defaults, SB, ns, settings
 
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals(TestHelpers.OPTIONS_GLOBALS)
@@ -25,11 +25,9 @@ describe("AdvancedOptions getters/setters/defaults", function()
         SB, ns = TestHelpers.SetupOptionsEnv(profile, defaults)
 
         settings = TestHelpers.CollectSettings(function()
-            TestHelpers.LoadChunk("UI/GeneralOptions.lua", "GeneralOptions")(nil, ns)
-            ns.OptionsSections["Advanced Options"].RegisterSettings(SB)
+            TestHelpers.LoadChunk("UI/AdvancedOptions.lua", "AdvancedOptions")(nil, ns)
+            TestHelpers.RegisterSectionSpec(SB, ns.AdvancedOptions)
         end)
-        advancedCategory = SB._subcategories[ns.L["ADVANCED_OPTIONS"]]
-        initializers = SB._layouts[advancedCategory]._initializers
     end)
 
     describe("debug", function()
@@ -42,6 +40,19 @@ describe("AdvancedOptions getters/setters/defaults", function()
         end)
         it("default matches expected", function()
             assert.is_false(settings["ECM_global_debug"]._default)
+        end)
+    end)
+
+    describe("errorLogging", function()
+        it("getter returns profile value", function()
+            assert.is_false(settings["ECM_global_errorLogging"]:GetValue())
+        end)
+        it("setter writes to profile", function()
+            settings["ECM_global_errorLogging"]:SetValue(true)
+            assert.is_true(profile.global.errorLogging)
+        end)
+        it("default matches expected", function()
+            assert.is_false(settings["ECM_global_errorLogging"]._default)
         end)
     end)
 
@@ -64,21 +75,4 @@ describe("AdvancedOptions getters/setters/defaults", function()
         end)
     end)
 
-    describe("Show What's New button", function()
-        it("uses a placeholder label for the button row", function()
-            local button = assert(TestHelpers.FindButtonInitializer(initializers, ns.L["SHOW_WHATS_NEW"]))
-            assert.are.equal(" ", button._name)
-        end)
-
-        it("forces the popup open through the addon method", function()
-            local forced
-            ns.Addon.ShowReleasePopup = function(_, force)
-                forced = force
-            end
-
-            TestHelpers.FindButtonInitializer(initializers, ns.L["SHOW_WHATS_NEW"])._onClick()
-
-            assert.is_true(forced)
-        end)
-    end)
 end)

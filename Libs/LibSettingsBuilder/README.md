@@ -1,100 +1,97 @@
 # LibSettingsBuilder-1.0
 
-`LibSettingsBuilder` is a World of Warcraft Settings API builder for addon authors who want less boilerplate and more reuse.
+`LibSettingsBuilder` turns plain Lua tables into World of Warcraft Settings pages.
 
-It supports:
+It exists so addons can describe settings once, bind rows to saved values, and avoid repeating Blizzard Settings API boilerplate for every checkbox, slider, dropdown, and section.
 
-- path-based bindings for AceDB-style profile tables,
-- handler-mode bindings for arbitrary storage,
-- composite builders for common settings groups,
-- canvas layout helpers for more complex pages,
-- deterministic dropdown ordering,
-- clickable slider value editing.
+Load it through `Libs\LibSettingsBuilder\embed.xml` after `LibStub`.
 
-Distributed via [LibStub](https://www.wowace.com/projects/libstub).
-
-## At a glance
-
-| Need | LibSettingsBuilder |
-|---|---|
-| Standard settings pages | `RegisterFromTable(...)` |
-| Fine-grained control | imperative `SB.Checkbox(...)`, `SB.Slider(...)`, etc. |
-| Existing AceDB profiles | `PathAdapter(...)` |
-| Custom storage | handler mode with `get` / `set` / `key` |
-| Reusable settings groups | border, font override, positioning composites |
-| Custom settings pages | `CreateCanvasLayout(...)` |
-
-## Quick start
+## Direct Saved Variables
 
 ```lua
 local LSB = LibStub("LibSettingsBuilder-1.0")
 
-local SB = LSB:New({
-    pathAdapter = LSB.PathAdapter({
-        getStore = function()
-            return MyAddonDB.profile
-        end,
-        getDefaults = function()
-            return MyAddonDefaults.profile
-        end,
-    }),
-    varPrefix = "MYADDON",
+MyAddonDB = MyAddonDB or {
+    enabled = true,
+    scale = 75,
+}
+
+local defaults = {
+    enabled = true,
+    scale = 75,
+}
+
+LSB.New({
+    name = "My Addon",
+    store = MyAddonDB,
+    defaults = defaults,
     onChanged = function()
         MyAddon:Refresh()
     end,
-})
-
-SB.CreateRootCategory("My Addon")
-
-SB.RegisterFromTable({
-    name = "General",
-    path = "general",
-    args = {
-        enabled = {
-            type = "toggle",
-            path = "enabled",
-            name = "Enable",
-            order = 1,
-        },
-        opacity = {
-            type = "range",
-            path = "opacity",
-            name = "Opacity",
-            min = 0,
-            max = 100,
-            step = 1,
-            order = 2,
+    page = {
+        key = "main",
+        rows = {
+            {
+                type = "checkbox",
+                path = "enabled",
+                name = "Enable",
+            },
+            {
+                type = "slider",
+                path = "scale",
+                name = "Scale",
+                min = 0,
+                max = 100,
+                step = 1,
+            },
         },
     },
 })
-
-SB.RegisterCategories()
 ```
 
-## Documentation
+## AceDB Profile
 
-- [Installation & Compatibility](docs/INSTALLATION.md)
-- [Quick Start](docs/QUICK_START.md)
-- [API Reference](docs/API_REFERENCE.md)
-- [Migration Guide](docs/MIGRATION_GUIDE.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
+```lua
+local LSB = LibStub("LibSettingsBuilder-1.0")
 
-## Testing
+local defaults = {
+    profile = {
+        enabled = true,
+        scale = 75,
+    },
+}
 
-Tests live in `Tests/` and use [busted](https://olivinelabs.com/busted/). Run from the **host addon root** (the directory containing `.busted`):
+MyAddon.db = LibStub("AceDB-3.0"):New("MyAddonDB", defaults, true)
 
-```sh
-busted --run libsettingsbuilder
+LSB.New({
+    name = "My Addon",
+    store = function()
+        return MyAddon.db.profile
+    end,
+    defaults = defaults.profile,
+    onChanged = function()
+        MyAddon:Refresh()
+    end,
+    page = {
+        key = "main",
+        rows = {
+            {
+                type = "checkbox",
+                path = "enabled",
+                name = "Enable",
+            },
+            {
+                type = "slider",
+                path = "scale",
+                name = "Scale",
+                min = 0,
+                max = 100,
+                step = 1,
+            },
+        },
+    },
+})
 ```
-
-The `.busted` config defines the `libsettingsbuilder` task pointing at this library's test directory.
-
-## Notes for library consumers
-
-- Embed the library inside your addon's `Libs/` folder.
-- Load `LibStub` before `LibSettingsBuilder`.
-- Canvas layout spacing can be tuned globally or per layout.
-- Slider value editing and scroll dropdown support are implemented through Settings UI integration hooks.
 
 ## License
 

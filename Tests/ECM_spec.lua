@@ -41,6 +41,9 @@ describe("ECM layout system", function()
         "IsInInstance",
         "issecretvalue",
         "issecrettable",
+        "issecurevariable",
+        "ChatFrameUtil",
+        "ChatFrameMixin",
         "Enum",
         "print",
         "StaticPopupDialogs",
@@ -58,6 +61,7 @@ describe("ECM layout system", function()
         "CooldownViewerSettings",
         "SlashCmdList",
         "hash_SlashCmdList",
+        "debugstack",
     }
 
     setup(function()
@@ -124,6 +128,11 @@ describe("ECM layout system", function()
         _G.issecrettable = function()
             return false
         end
+        _G.issecurevariable = function()
+            return true
+        end
+        _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+        _G.ChatFrameMixin = { MessageEventHandler = function() end }
         _G.tinsert = table.insert
         _G.strtrim = function(s)
             return (s:gsub("^%s+", ""):gsub("%s+$", ""))
@@ -141,6 +150,7 @@ describe("ECM layout system", function()
         _G.CLOSE = "Close"
         _G.CANCEL = "Cancel"
         _G.OKAY = "Okay"
+        _G.debugstack = nil
         _G.CooldownViewerSettings = nil
 
         _G.C_CVar = {
@@ -382,6 +392,97 @@ describe("ECM layout system", function()
         end)
     end)
 
+    describe("error logging", function()
+        it("is disabled by default", function()
+            assert.is_false(ns.IsErrorLoggingEnabled())
+        end)
+
+        it("prints targeted errors to chat and DevTool", function()
+            local devToolCalls = {}
+            _G._testDB.profile.global.errorLogging = true
+            _G.DevTool = {
+                AddData = function(_, data, title)
+                    devToolCalls[#devToolCalls + 1] = { data = data, title = title }
+                end,
+            }
+
+            ns.ErrorLog("Taint", "ChatFrameUtil.SetLastTellTarget is tainted", { source = "EnhancedCooldownManager" })
+
+            assert.are.equal(1, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("%[ECM Error Taint%]"))
+            assert.is_truthy(printedMessages[1]:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true))
+            assert.is_truthy(printedMessages[1]:find("source=EnhancedCooldownManager", 1, true))
+            assert.is_truthy(printedMessages[1]:find("module=Taint", 1, true))
+            assert.is_truthy(printedMessages[1]:find("timestamp=100", 1, true))
+            assert.is_truthy(printedMessages[1]:find("inCombatLockdown=false", 1, true))
+            assert.are.equal(1, #devToolCalls)
+            assert.are.equal("Taint", devToolCalls[1].data.module)
+            assert.are.equal("ChatFrameUtil.SetLastTellTarget is tainted", devToolCalls[1].data.message)
+            assert.is_truthy(devToolCalls[1].data.data:find("source=EnhancedCooldownManager", 1, true))
+        end)
+
+        it("prints error data without requiring DevTool", function()
+            _G._testDB.profile.global.errorLogging = true
+            _G.DevTool = nil
+
+            ns.ErrorLog("Runtime", "Repeated layout requests detected", { reason = "ExternalBars:viewer:UpdateAuras" })
+
+            assert.are.equal(1, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("Repeated layout requests detected", 1, true))
+            assert.is_truthy(printedMessages[1]:find("reason=ExternalBars:viewer:UpdateAuras", 1, true))
+        end)
+
+        it("does not log when disabled", function()
+            _G._testDB.profile.global.errorLogging = false
+            _G.DevTool = {
+                AddData = function()
+                    error("expected DevTool not to be called")
+                end,
+            }
+
+            ns.ErrorLog("Taint", "hidden")
+            ns.ErrorLogOnce("Taint", "hidden-key", "hidden once")
+
+            assert.same({}, printedMessages)
+        end)
+
+        it("suppresses repeated once-per-key errors", function()
+            _G._testDB.profile.global.errorLogging = true
+            ns.ErrorLogOnce("Taint", "same-key", "first")
+            ns.ErrorLogOnce("Taint", "same-key", "second")
+            ns.ErrorLogOnce("Taint", "other-key", "third")
+
+            assert.are.equal(2, #printedMessages)
+            assert.is_truthy(printedMessages[1]:find("first", 1, true))
+            assert.is_truthy(printedMessages[1]:find("errorKey=same-key", 1, true))
+            assert.is_truthy(printedMessages[2]:find("third", 1, true))
+            assert.is_truthy(printedMessages[2]:find("errorKey=other-key", 1, true))
+        end)
+
+        it("reports tainted chat reply helpers once during enable", function()
+            _G._testDB.profile.global.errorLogging = true
+            _G.ChatFrameUtil = { SetLastTellTarget = function() end }
+            _G.issecurevariable = function(owner, key)
+                if owner == _G.ChatFrameUtil and key == "SetLastTellTarget" then
+                    return false, "EnhancedCooldownManager"
+                end
+                return true
+            end
+
+            fakeAddon:OnEnable()
+            fakeAddon:OnEnable()
+
+            local taintMessages = 0
+            for _, message in ipairs(printedMessages) do
+                if message:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true) then
+                    assert.is_truthy(message:find("by EnhancedCooldownManager during OnEnable", 1, true))
+                    taintMessages = taintMessages + 1
+                end
+            end
+            assert.are.equal(1, taintMessages)
+        end)
+    end)
+
     describe("release popup", function()
         local function getWhatsNewFrame()
             for _, frame in ipairs(createdFrames) do
@@ -495,37 +596,12 @@ describe("ECM layout system", function()
             assert.is_true(fakeAddon:ShowReleasePopup(true))
             local frame = assert(getWhatsNewFrame())
 
-            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_WIDTH, frame:GetWidth())
-            assert.are.equal(ns.Constants.WHATS_NEW_FRAME_HEIGHT, frame:GetHeight())
             assert.are.equal(ns.L["ADDON_NAME"], frame.Title:GetText())
             assert.are.equal(string.format(ns.L["WHATS_NEW_TITLE_FORMAT"], addonVersion), frame.Subtitle:GetText())
             assert.are.equal("LEFT", frame.Title._justifyH)
             assert.are.equal("LEFT", frame.Subtitle._justifyH)
             assert.are.equal("LEFT", frame.Body._justifyH)
             assert.are.equal("TOP", frame.Body._justifyV)
-            assert.same(
-                {
-                    { "TOPLEFT", frame, "TOPLEFT", ns.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
-                    { "TOPRIGHT", frame, "TOPRIGHT", -ns.Constants.WHATS_NEW_FRAME_PADDING,
-                        -ns.Constants.WHATS_NEW_FRAME_PADDING },
-                },
-                frame.Title._anchors
-            )
-            assert.same(
-                {
-                    { "TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
-                    { "TOPRIGHT", frame.Title, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_SUBTITLE_SPACING },
-                },
-                frame.Subtitle._anchors
-            )
-            assert.same(
-                {
-                    { "TOPLEFT", frame.Subtitle, "BOTTOMLEFT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
-                    { "TOPRIGHT", frame.Subtitle, "BOTTOMRIGHT", 0, -ns.Constants.WHATS_NEW_BODY_SPACING },
-                },
-                frame.Body._anchors
-            )
         end)
 
         it("does not show an empty popup when release notes are unavailable", function()
