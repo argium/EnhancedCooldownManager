@@ -307,9 +307,7 @@ function BuffBars:UpdateLayout(why)
         for _, entry in ipairs(visibleChildren) do
             hookChildFrame(entry.frame, self)
             StyleChildBar(self, entry.frame, cfg, globalConfig, spellColors)
-            if entry.frame:IsShown() then
-                shownChildCount = shownChildCount + 1
-            end
+            if entry.frame:IsShown() then shownChildCount = shownChildCount + 1 end
         end
 
         layoutBars(visibleChildren, viewer, growsUp, verticalSpacing)
@@ -321,10 +319,8 @@ function BuffBars:UpdateLayout(why)
     end
     ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
 
-    local moduleHeight = cfg and cfg.height
-    local barHeight = math.max(0, moduleHeight or globalConfig.barHeight or 0)
-    local totalHeight = (shownChildCount * barHeight) + (math.max(0, shownChildCount - 1) * verticalSpacing)
-    FrameUtil.LazySetHeight(viewer, totalHeight)
+    local barHeight = (cfg and cfg.height) or globalConfig.barHeight or 0
+    FrameUtil.LazySetHeight(viewer, shownChildCount * barHeight + math.max(0, shownChildCount - 1) * verticalSpacing)
 
     viewer:Show()
     ns.Log(ns.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
