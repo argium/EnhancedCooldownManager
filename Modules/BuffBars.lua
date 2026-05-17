@@ -320,7 +320,10 @@ function BuffBars:UpdateLayout(why)
     ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
 
     local barHeight = (cfg and cfg.height) or globalConfig.barHeight or 0
-    FrameUtil.LazySetHeight(viewer, shownChildCount * barHeight + math.max(0, shownChildCount - 1) * verticalSpacing)
+
+    -- Size the viewer from shown rows so hidden buff bars do not reserve chain space.
+    local totalHeight = shownChildCount * barHeight + math.max(0, shownChildCount - 1) * verticalSpacing
+    FrameUtil.LazySetHeight(viewer, totalHeight)
 
     viewer:Show()
     ns.Log(ns.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
