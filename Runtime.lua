@@ -509,7 +509,10 @@ local function recordLayoutRequest(reason, opts)
 end
 
 function _layoutScheduler:flush(reason)
-    executeLayout(reason or self.reason)
+    if reason == nil then
+        reason = self.reason
+    end
+    executeLayout(reason)
 end
 
 function _layoutScheduler:request(reason, opts)

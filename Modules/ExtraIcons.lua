@@ -485,9 +485,9 @@ function ExtraIcons:GetMainViewerAnchor()
     return _G[BLIZZ_KEY.main]
 end
 
-function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffsetX, moduleConfig, why)
-    local blizzFrame = _G[viewer.blizzKey]
-    local vs = self._viewers[viewer.key]
+function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, sharedOffsetX, moduleConfig, why)
+    local blizzFrame = _G[viewerConfig.blizzKey]
+    local vs = self._viewers[viewerConfig.key]
     if not vs then return false end
     local container = vs.container
     sharedOffsetX = sharedOffsetX or 0
@@ -500,13 +500,13 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
         applyPoint(vs, blizzFrame, sharedOffsetX)
         if isEditing then vs.originalPoint = nil end
         container:Hide()
-        if viewer.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
+        if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
         return false
     end
 
     for _, icon in ipairs(vs.iconPool) do icon:Hide() end
     for i = #vs.iconPool + 1, #items do
-        vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewer.borderScale)
+        vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewerConfig.borderScale)
     end
 
     local fontPath, fontSize, fontFlags = getSiblingFont(blizzFrame)
@@ -516,7 +516,7 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
     local spacing = blizzFrame.childXPadding or 0
     local lastActive = nil
 
-    local itemFrames = getAccessibleItemFrames(blizzFrame, viewer.key, why)
+    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig.key, why)
     if itemFrames then
         local ok, err = pcall(function()
             for _, itemFrame in ipairs(itemFrames) do
@@ -529,10 +529,10 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
         if not ok then
             iconSize = DEFAULT_SIZE
             lastActive = nil
-            local data = getViewerDiagnostics(blizzFrame, viewer.key, why, itemFrames)
+            local data = getViewerDiagnostics(blizzFrame, viewerConfig.key, why, itemFrames)
             data.error = tostring(err)
-            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewer.key,
-                "Unable to iterate cooldown viewer item frames for " .. viewer.key .. " during "
+            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerConfig.key,
+                "Unable to iterate cooldown viewer item frames for " .. viewerConfig.key .. " during "
                 .. tostring(why or "unknown") .. ": " .. tostring(err), data)
         end
     end
@@ -555,7 +555,7 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
-        icon.Border:SetSize(iconSize * viewer.borderScale[1], iconSize * viewer.borderScale[2])
+        icon.Border:SetSize(iconSize * viewerConfig.borderScale[1], iconSize * viewerConfig.borderScale[2])
         icon.slotId = data.slotId
         icon.itemId = data.itemId
         icon.spellId = data.spellId
@@ -582,7 +582,7 @@ function ExtraIcons:_updateSingleViewer(viewer, entries, isEditing, sharedOffset
     container:SetPoint("LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0)
     container:Show()
 
-    if viewer.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
+    if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
     return true
 end
 
