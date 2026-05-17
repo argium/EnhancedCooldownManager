@@ -14,6 +14,7 @@ Authoritative source for repo-wide agent rules. Topic-specific docs own their ow
 | [Libs/LibConsole/README.md](Libs/LibConsole/README.md) | Slash-command library |
 | [Libs/LibEvent/README.md](Libs/LibEvent/README.md) | Embeddable event system |
 | [Libs/LibLSMSettingsWidgets/README.md](Libs/LibLSMSettingsWidgets/README.md) | LSM picker templates |
+| [`.agents/prompts/default-refactor-cleanup.md`](.agents/prompts/default-refactor-cleanup.md) | Reusable prompt for applying the default implementation standard to future refactors |
 
 Keep `ARCHITECTURE.md` current for addon-level design changes; each library's README owns its quick-start, API, and tests.
 
@@ -43,6 +44,18 @@ luacheck . -q
 - Keep implementation direct and explicit; avoid clever indirection, speculative abstractions, and compatibility paths without a current supported need.
 - Prefer deleting duplication, dead code, and trivial wrappers over adding new layers.
 - Document architecture changes where they help future maintainers understand ownership and flow.
+
+## Default Implementation Standard
+
+This is the default implementation style. Apply it first before adding abstractions, wrappers, fallbacks, or compatibility seams.
+
+- Prefer direct calls to the real owner. Do not add wrapper methods, helper exports, or aliases unless they add behavior or preserve a documented public API.
+- Keep file-local helpers file-local. Public tables expose public APIs only; internal helpers are not exported for symmetry, organization, or test access.
+- Make ownership explicit at the call site. Local functions that operate on an instance take the owner as a parameter or become instance methods; they must not rely on implicit `self`.
+- Flatten control flow with early returns and single decision blocks. Do not compute temporary results only to return them later when an immediate return is clearer.
+- Use one protected operation around risky table iteration or callback execution instead of wrapping every iterator step in helper indirection.
+- Collapse single-use locals, single-caller helpers, fixed-literal mapping functions, and stale compatibility branches into their call sites.
+- When a plan identifies cleanup gaps, keep iterating until every item is either implemented, explicitly documented as intentionally deferred, or rejected with a clear reason.
 
 All Lua files start with:
 
