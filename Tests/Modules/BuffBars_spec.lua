@@ -448,6 +448,7 @@ describe("BuffBars real source", function()
         ns.Runtime.DetachedAnchor = detachedAnchor
         local originalCalculateLayoutParams = ns.BarMixin.FrameProto.CalculateLayoutParams
         local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
+        local originalLazySetHeight = ns.FrameUtil.LazySetHeight
 
         ns.BarMixin.FrameProto.CalculateLayoutParams = function(self)
             local gc = self:GetGlobalConfig()
@@ -464,6 +465,9 @@ describe("BuffBars real source", function()
         ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
+        end
+        ns.FrameUtil.LazySetHeight = function(frame, value)
+            frame.__height = value
         end
 
         BuffBars.GetModuleConfig = function()
@@ -496,6 +500,7 @@ describe("BuffBars real source", function()
         ns.Runtime.DetachedAnchor = nil
         ns.BarMixin.FrameProto.CalculateLayoutParams = originalCalculateLayoutParams
         ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        ns.FrameUtil.LazySetHeight = originalLazySetHeight
     end)
 
     it("free mode sets width from baseBarWidth*barWidthScale without touching viewer anchors", function()
@@ -505,10 +510,14 @@ describe("BuffBars real source", function()
             appliedWidths[#appliedWidths + 1] = { frame = frame, value = value }
         end
         local originalLazySetAnchors = ns.FrameUtil.LazySetAnchors
+        local originalLazySetHeight = ns.FrameUtil.LazySetHeight
         ns.FrameUtil.LazySetAnchors = function(frame, anchors)
             anchorCalls[#anchorCalls + 1] = frame
             frame.__ecmAnchorCache = anchors
             frame.__anchors = anchors
+        end
+        ns.FrameUtil.LazySetHeight = function(frame, value)
+            frame.__height = value
         end
 
         BuffBarCooldownViewer.baseBarWidth = 180
@@ -543,6 +552,7 @@ describe("BuffBars real source", function()
         end
 
         ns.FrameUtil.LazySetAnchors = originalLazySetAnchors
+        ns.FrameUtil.LazySetHeight = originalLazySetHeight
     end)
 
     it("free mode does not clobber Blizzard-managed viewer position across edit mode cycles", function()
@@ -909,6 +919,7 @@ describe("BuffBars real source", function()
         function BuffBars:GetModuleConfig()
             return {
                 anchorMode = ns.Constants.ANCHORMODE_CHAIN,
+                height = 21,
                 showIcon = false,
                 showSpellName = true,
                 showDuration = true,
@@ -931,6 +942,7 @@ describe("BuffBars real source", function()
         assert.is_true(second.__ecmHooked)
         assert.are.equal(2, #appliedTextures)
         assert.are.equal(2, #appliedColors)
+        assert.are.equal(21, BuffBarCooldownViewer.__height)
         assert.is_true(BuffBarCooldownViewer:IsShown())
     end)
 
