@@ -41,10 +41,10 @@ describe("ItemStacksOptions settings page", function()
     end
 
     local function getStackAction(text)
-        for _, action in ipairs(getRow("selectedStackActions").actions) do
-            if action.text == text then
-                return action
-            end
+        if text == ns.L["DELETE"] then
+            return getRow("deleteItemStack")
+        elseif text == ns.L["REVERT"] then
+            return getRow("revertItemStack")
         end
     end
 
@@ -101,11 +101,10 @@ describe("ItemStacksOptions settings page", function()
         assert.are.equal("checkbox", getRow("showStackIfMissing").type)
         assert.are.equal("sectionList", getRow("itemStackItems").type)
         assert.are.equal("button", getRow("renameItemStack").type)
-        assert.are.equal("pageActions", getRow("selectedStackActions").type)
-        assert.is_table(getStackAction(ns.L["DELETE"]))
-        assert.is_table(getStackAction(ns.L["REVERT"]))
+        assert.are.equal("button", getRow("deleteItemStack").type)
+        assert.are.equal("button", getRow("revertItemStack").type)
 
-        local ratedIndex, missingIndex, itemsIndex, renameIndex, actionsIndex
+        local ratedIndex, missingIndex, itemsIndex, renameIndex, deleteIndex, revertIndex
         for index, row in ipairs(page.rows) do
             if row.id == "hideStackInRatedPvp" then
                 ratedIndex = index
@@ -115,13 +114,16 @@ describe("ItemStacksOptions settings page", function()
                 itemsIndex = index
             elseif row.id == "renameItemStack" then
                 renameIndex = index
-            elseif row.id == "selectedStackActions" then
-                actionsIndex = index
+            elseif row.id == "deleteItemStack" then
+                deleteIndex = index
+            elseif row.id == "revertItemStack" then
+                revertIndex = index
             end
         end
         assert.are.equal(ratedIndex + 1, missingIndex)
         assert.are.equal(missingIndex + 1, itemsIndex)
-        assert.are.equal(renameIndex + 1, actionsIndex)
+        assert.are.equal(renameIndex + 1, deleteIndex)
+        assert.are.equal(deleteIndex + 1, revertIndex)
     end)
 
     it("shows the layout preview while the item stacks page is open", function()

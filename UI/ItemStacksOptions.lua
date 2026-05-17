@@ -575,34 +575,30 @@ ItemStacksOptions.page = {
             onClick = openRenameDialog,
         },
         {
-            id = "selectedStackActions",
-            type = "pageActions",
-            height = 28,
+            id = "deleteItemStack",
+            type = "button",
+            name = L["DELETE"],
+            buttonText = L["DELETE"],
+            tooltip = L["DELETE_ITEM_STACK_DESC"],
+            hidden = function()
+                local stackId = getSelectedStackId()
+                return stackId == nil or isDefaultStackId(stackId)
+            end,
             layout = false,
-            actions = {
-                {
-                    text = L["DELETE"],
-                    tooltip = L["DELETE_ITEM_STACK_DESC"],
-                    hidden = function()
-                        local stackId = getSelectedStackId()
-                        return stackId == nil or isDefaultStackId(stackId)
-                    end,
-                    onClick = function()
-                        openDeleteDialog({ page = registeredPage })
-                    end,
-                },
-                {
-                    text = L["REVERT"],
-                    tooltip = L["REVERT_ITEM_STACK_DESC"],
-                    hidden = function()
-                        local stackId = getSelectedStackId()
-                        return stackId == nil or not isDefaultStackId(stackId)
-                    end,
-                    onClick = function()
-                        revertSelectedStack({ page = registeredPage })
-                    end,
-                },
-            },
+            onClick = openDeleteDialog,
+        },
+        {
+            id = "revertItemStack",
+            type = "button",
+            name = L["REVERT"],
+            buttonText = L["REVERT"],
+            tooltip = L["REVERT_ITEM_STACK_DESC"],
+            hidden = function()
+                local stackId = getSelectedStackId()
+                return stackId == nil or not isDefaultStackId(stackId)
+            end,
+            layout = false,
+            onClick = revertSelectedStack,
         },
     },
 }
