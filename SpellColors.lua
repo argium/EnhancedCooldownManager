@@ -25,19 +25,20 @@ local FrameUtil = ns.FrameUtil
 local DEFAULT_SCOPE = C.SCOPE_BUFFBARS
 local _storesByScope = {}
 
-local KEY_DEFS = { "byName", "bySpellID", "byCooldownID", "byTexture" }
-local KEY_TYPE_TO_STORE = {
-    byName = "spellName",
-    bySpellID = "spellID",
-    byCooldownID = "cooldownID",
-    byTexture = "textureFileID",
+local KEY_FIELDS = {
+    { storeKey = "byName", keyType = "spellName", valueType = "string" },
+    { storeKey = "bySpellID", keyType = "spellID", valueType = "number" },
+    { storeKey = "byCooldownID", keyType = "cooldownID", valueType = "number" },
+    { storeKey = "byTexture", keyType = "textureFileID", valueType = "number", alias = "textureId" },
 }
-local KEY_TYPES = {
-    spellName = true,
-    spellID = true,
-    cooldownID = true,
-    textureFileID = true,
-}
+local KEY_DEFS = {}
+local KEY_TYPE_TO_STORE = {}
+local KEY_TYPES = {}
+for i, field in ipairs(KEY_FIELDS) do
+    KEY_DEFS[i] = field.storeKey
+    KEY_TYPE_TO_STORE[field.storeKey] = field.keyType
+    KEY_TYPES[field.keyType] = field
+end
 
 local function normalizeScope(scope)
     return type(scope) == "string" and scope or DEFAULT_SCOPE
@@ -75,45 +76,21 @@ SpellColorKeyType.__index = SpellColorKeyType
 ---@param spellName string|nil
 ---@param spellID number|nil
 ---@param cooldownID number|nil
----@param textureId number|nil
----@return string|number|nil primaryKey
----@return "spellName"|"spellID"|"cooldownID"|"textureFileID"|nil keyType
-local function selectPrimaryKey(spellName, spellID, cooldownID, textureId)
-    if spellName then
-        return spellName, "spellName"
-    end
-    if spellID then
-        return spellID, "spellID"
-    end
-    if cooldownID then
-        return cooldownID, "cooldownID"
-    end
-    if textureId then
-        return textureId, "textureFileID"
-    end
-    return nil, nil
-end
-
----@param spellName string|nil
----@param spellID number|nil
----@param cooldownID number|nil
 ---@param textureFileID number|nil
 ---@param preferredType "spellName"|"spellID"|"cooldownID"|"textureFileID"|nil
 ---@return ECM_SpellColorKey|nil
 local function buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)
-    local keyType = preferredType
-    local primaryKey
-    if keyType == "spellName" then
-        primaryKey = spellName
-    elseif keyType == "spellID" then
-        primaryKey = spellID
-    elseif keyType == "cooldownID" then
-        primaryKey = cooldownID
-    elseif keyType == "textureFileID" then
-        primaryKey = textureFileID
-    end
+    local values = { spellName = spellName, spellID = spellID, cooldownID = cooldownID, textureFileID = textureFileID }
+    local keyType = KEY_TYPES[preferredType] and preferredType or nil
+    local primaryKey = keyType and values[keyType] or nil
     if not primaryKey then
-        primaryKey, keyType = selectPrimaryKey(spellName, spellID, cooldownID, textureFileID)
+        for _, field in ipairs(KEY_FIELDS) do
+            primaryKey = values[field.keyType]
+            if primaryKey then
+                keyType = field.keyType
+                break
+            end
+        end
     end
     if not (keyType and primaryKey) then
         return nil
@@ -136,24 +113,19 @@ local function normalizeKey(key)
         return nil
     end
 
-    local spellName = validateKey(key.spellName)
-    local spellID = validateKey(key.spellID)
-    local cooldownID = validateKey(key.cooldownID)
-    local textureFileID = validateKey(key.textureFileID or key.textureId)
+    local values = {}
+    for _, field in ipairs(KEY_FIELDS) do
+        values[field.keyType] = validateKey(key[field.keyType] or (field.alias and key[field.alias] or nil))
+    end
     local keyType = KEY_TYPES[key.keyType] and key.keyType or nil
     local primaryKey = validateKey(key.primaryKey)
+    local field = KEY_TYPES[keyType]
 
-    if keyType == "spellName" and type(primaryKey) == "string" and not spellName then
-        spellName = primaryKey
-    elseif keyType == "spellID" and type(primaryKey) == "number" and not spellID then
-        spellID = primaryKey
-    elseif keyType == "cooldownID" and type(primaryKey) == "number" and not cooldownID then
-        cooldownID = primaryKey
-    elseif keyType == "textureFileID" and type(primaryKey) == "number" and not textureFileID then
-        textureFileID = primaryKey
+    if field and type(primaryKey) == field.valueType and not values[keyType] then
+        values[keyType] = primaryKey
     end
 
-    return buildKey(spellName, spellID, cooldownID, textureFileID, keyType)
+    return buildKey(values.spellName, values.spellID, values.cooldownID, values.textureFileID, keyType)
 end
 
 ---@param a ECM_SpellColorKey|nil
@@ -164,14 +136,11 @@ local function keysMatch(a, b)
         return false
     end
 
-    if a.spellName and b.spellName and a.spellName == b.spellName then
-        return true
-    end
-    if a.spellID and b.spellID and a.spellID == b.spellID then
-        return true
-    end
-    if a.cooldownID and b.cooldownID and a.cooldownID == b.cooldownID then
-        return true
+    for _, field in ipairs(KEY_FIELDS) do
+        local keyType = field.keyType
+        if keyType ~= "textureFileID" and a[keyType] and b[keyType] and a[keyType] == b[keyType] then
+            return true
+        end
     end
 
     local aTextureOnly = (a.spellName == nil and a.spellID == nil and a.cooldownID == nil)
@@ -368,14 +337,17 @@ local function buildKeyFromEntry(entry, tierKeyType, rawKey)
     end
 
     local validRawKey = validateKey(rawKey)
-    if tierKeyType == "spellName" and type(validRawKey) == "string" then
-        spellName = validRawKey
-    elseif tierKeyType == "spellID" and type(validRawKey) == "number" then
-        spellID = validRawKey
-    elseif tierKeyType == "cooldownID" and type(validRawKey) == "number" then
-        cooldownID = validRawKey
-    elseif tierKeyType == "textureFileID" and type(validRawKey) == "number" then
-        textureFileID = validRawKey
+    local rawField = KEY_TYPES[tierKeyType]
+    if rawField and type(validRawKey) == rawField.valueType then
+        if tierKeyType == "spellName" then
+            spellName = validRawKey
+        elseif tierKeyType == "spellID" then
+            spellID = validRawKey
+        elseif tierKeyType == "cooldownID" then
+            cooldownID = validRawKey
+        elseif tierKeyType == "textureFileID" then
+            textureFileID = validRawKey
+        end
     end
 
     return buildKey(spellName, spellID, cooldownID, textureFileID, preferredType)

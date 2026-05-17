@@ -57,6 +57,14 @@ local function safeStrTostring(x)
     return issecretvalue(x) and "[secret]" or tostring(x)
 end
 
+local function tryCall(fn, ...)
+    if type(fn) ~= "function" then
+        return false, nil
+    end
+
+    return pcall(fn, ...)
+end
+
 local function safeTableTostring(tbl, depth, seen)
     if issecrettable(tbl) then return "[secrettable]" end
     if seen[tbl] then return "<cycle>" end
@@ -64,30 +72,36 @@ local function safeTableTostring(tbl, depth, seen)
 
     seen[tbl] = true
 
-    local ok, pairsOrErr = pcall(function()
-        local parts = {}
-        local count = 0
-
-        for k, x in pairs(tbl) do
-            count = count + 1
-            if count > C.TOSTRING_MAX_ITEMS then
-                parts[#parts + 1] = "..."
-                break
-            end
-
-            local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
-            local valueStr = type(x) == "table" and safeTableTostring(x, depth + 1, seen) or safeStrTostring(x)
-            parts[#parts + 1] = keyStr .. "=" .. valueStr
-        end
-
-        return "{" .. table.concat(parts, ", ") .. "}"
-    end)
-
+    local ok, iterator, state, cursor = tryCall(pairs, tbl)
     if not ok then
         return "<table_error>"
     end
 
-    return pairsOrErr
+    local parts = {}
+    local count = 0
+
+    while true do
+        local okNext, k, x = tryCall(iterator, state, cursor)
+        if not okNext then
+            return "<table_error>"
+        end
+        if k == nil then
+            break
+        end
+
+        cursor = k
+        count = count + 1
+        if count > C.TOSTRING_MAX_ITEMS then
+            parts[#parts + 1] = "..."
+            break
+        end
+
+        local keyStr = issecretvalue(k) and "[secret]" or tostring(k)
+        local valueStr = type(x) == "table" and safeTableTostring(x, depth + 1, seen) or safeStrTostring(x)
+        parts[#parts + 1] = keyStr .. "=" .. valueStr
+    end
+
+    return "{" .. table.concat(parts, ", ") .. "}"
 end
 
 function ns.ToString(v)
@@ -124,55 +138,25 @@ ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)
 
-local function getErrorDebugStack()
-    if type(debugstack) ~= "function" then
-        return nil
-    end
-
-    local ok, stack = pcall(debugstack, 3, 8, 8)
-    if ok then
-        return stack
-    end
-
-    return "debugstack failed: " .. tostring(stack)
-end
-
-local function getErrorCombatState()
-    if type(InCombatLockdown) ~= "function" then
-        return nil
-    end
-
-    local ok, inCombat = pcall(InCombatLockdown)
-    if ok then
-        return inCombat == true
-    end
-
-    return nil
-end
-
-local function getErrorTimestamp()
-    if type(GetTime) ~= "function" then
-        return nil
-    end
-
-    local ok, timestamp = pcall(GetTime)
-    if ok then
-        return timestamp
-    end
-
-    return nil
-end
-
 local function makeErrorData(module, key, data)
     local payload = {}
     if type(data) == "table" then
-        local ok, err = pcall(function()
-            for dataKey, value in pairs(data) do
+        local ok, iterator, state, cursor = tryCall(pairs, data)
+        if ok then
+            while true do
+                local okNext, dataKey, value = tryCall(iterator, state, cursor)
+                if not okNext then
+                    payload.dataError = "error data could not be copied: " .. tostring(dataKey)
+                    break
+                end
+                if dataKey == nil then
+                    break
+                end
+                cursor = dataKey
                 payload[dataKey] = value
             end
-        end)
-        if not ok then
-            payload.dataError = "error data could not be copied: " .. tostring(err)
+        else
+            payload.dataError = "error data could not be copied: " .. tostring(iterator)
         end
     elseif data ~= nil then
         payload.detail = data
@@ -185,13 +169,18 @@ local function makeErrorData(module, key, data)
         payload.errorKey = key
     end
     if payload.timestamp == nil then
-        payload.timestamp = getErrorTimestamp()
+        local ok, timestamp = tryCall(GetTime)
+        payload.timestamp = ok and timestamp or nil
     end
     if payload.inCombatLockdown == nil then
-        payload.inCombatLockdown = getErrorCombatState()
+        local ok, inCombat = tryCall(InCombatLockdown)
+        if ok then
+            payload.inCombatLockdown = inCombat == true
+        end
     end
     if payload.debugStack == nil then
-        payload.debugStack = getErrorDebugStack()
+        local ok, stackOrErr = tryCall(debugstack, 3, 8, 8)
+        payload.debugStack = ok and stackOrErr or (stackOrErr and ("debugstack failed: " .. tostring(stackOrErr)) or nil)
     end
 
     return payload

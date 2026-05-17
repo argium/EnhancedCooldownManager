@@ -308,10 +308,10 @@ function FrameProto:CalculateLayoutParams()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
-
+    local params
     if mode == C.ANCHORMODE_FREE then
         local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
-        return {
+        params = {
             mode = C.ANCHORMODE_FREE,
             anchor = UIParent,
             isFirst = false,
@@ -322,9 +322,11 @@ function FrameProto:CalculateLayoutParams()
             height = moduleConfig.height or globalConfig.barHeight,
             width = moduleConfig.width or globalConfig.barWidth,
         }
+    else
+        params = getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     end
 
-    return getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
+    return params
 end
 
 --- Applies positioning to a frame based on layout parameters.
@@ -344,25 +346,21 @@ function FrameProto:ApplyFramePosition()
     end
 
     local params = self:CalculateLayoutParams()
-    local anchors
+    local anchorCount = params.mode == C.ANCHORMODE_FREE and 1 or 2
+    local anchors = {}
     if params.mode == C.ANCHORMODE_FREE then
         assert(params.anchor ~= nil, "anchor required for free anchor mode")
-        anchors = {
-            { params.anchorPoint, params.anchor, params.anchorRelativePoint, params.offsetX, params.offsetY },
-        }
-    else
-        -- Chain and detached both use 2-point anchoring
-        local lp = params.anchorPoint or "TOPLEFT"
-        local lr = params.anchorRelativePoint or "BOTTOMLEFT"
-        anchors = {
-            { lp, params.anchor, lr, params.offsetX, params.offsetY },
-            {
-                self.ChainRightPoint(lp, "TOPRIGHT"),
-                params.anchor,
-                self.ChainRightPoint(lr, "BOTTOMRIGHT"),
-                params.offsetX,
-                params.offsetY,
-            },
+    end
+
+    local lp = params.anchorPoint or "TOPLEFT"
+    local lr = params.anchorRelativePoint or "BOTTOMLEFT"
+    for i = 1, anchorCount do
+        anchors[i] = {
+            i == 1 and lp or self.ChainRightPoint(lp, "TOPRIGHT"),
+            params.anchor,
+            i == 1 and lr or self.ChainRightPoint(lr, "BOTTOMRIGHT"),
+            params.offsetX,
+            params.offsetY,
         }
     end
 
