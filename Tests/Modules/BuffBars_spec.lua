@@ -1132,9 +1132,10 @@ describe("BuffBars real source", function()
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
         end)
 
-        it("does not compare secret status bar values when checking for timeless auras", function()
+        it("does not compare secret status bar values when checking for timeless auras",function()
             local secretValue = { __secret = true }
             local child = makeStyledChild("Secret", true, 1)
             child.Bar.__minMax = { 0, secretValue }
@@ -1166,6 +1167,7 @@ describe("BuffBars real source", function()
             child:RefreshCooldownInfo()
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
             assert.are.equal(0, child.Bar.__value)
         end)
 
@@ -1183,6 +1185,7 @@ describe("BuffBars real source", function()
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
         end)
     end)
 
