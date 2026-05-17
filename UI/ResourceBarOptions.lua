@@ -15,9 +15,6 @@ local EMPTY_RESOURCE_ICON =
     .. RESOURCE_ICON_SIZE
     .. ":0:0:8:8:0:0:0:0:0:0:0:0|t"
 
-local function createResourceClassIcon(className)
-    return "|A:classicon-" .. string.lower(className) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
-end
 
 local function createResourceColorName(colorClassName, label, iconClasses)
     local color = (C.CLASS_COLORS and C.CLASS_COLORS[colorClassName]) or COLOR_WHITE_HEX
@@ -31,7 +28,7 @@ local function createResourceColorName(colorClassName, label, iconClasses)
     end
 
     for i = startIndex, #iconClasses do
-        prefix = prefix .. createResourceClassIcon(iconClasses[i])
+        prefix = prefix .. "|A:classicon-" .. string.lower(iconClasses[i]) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
     end
 
     return prefix .. " |cff" .. color .. label .. "|r"
