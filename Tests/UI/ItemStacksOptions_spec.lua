@@ -394,7 +394,7 @@ describe("ItemStacksOptions settings page", function()
 
         assert.are.equal("ECM_CONFIRM_REVERT_ITEM_STACK", getShownPopupName())
         assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)
-        assert.are.equal(245898, profile.extraIcons.itemStacks.byId.combatPotions.ids[1].itemID)
+        assert.are.equal(241288, profile.extraIcons.itemStacks.byId.combatPotions.ids[1].itemID)
         assert.is_false(profile.extraIcons.itemStacks.byId.combatPotions.hideInInstances)
         assert.is_true(profile.extraIcons.itemStacks.byId.combatPotions.hideInRatedPvp)
     end)

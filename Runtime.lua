@@ -28,7 +28,9 @@ local LAYOUT_EVENTS = {
     PLAYER_ENTERING_WORLD = { delay = C.LAYOUT_ENTERING_WORLD_DELAY },
     PLAYER_TARGET_CHANGED = { delay = 0 },
     PLAYER_REGEN_ENABLED = { delay = C.LAYOUT_COMBAT_END_DELAY, combatChange = true, onEvent = function()
-        Runtime.OnCombatEnd()
+        if Runtime.OnCombatEnd then
+            Runtime.OnCombatEnd()
+        end
     end },
     PLAYER_REGEN_DISABLED = { delay = 0, combatChange = true },
     ZONE_CHANGED_NEW_AREA = { delay = C.LAYOUT_ZONE_CHANGE_DELAY },
@@ -427,6 +429,9 @@ end
 
 --- Shared layout execution: hooks deferred frames, updates visibility, runs layout.
 local function executeLayout(reason)
+    if _layoutScheduler.timer and _layoutScheduler.timer.Cancel then
+        _layoutScheduler.timer:Cancel()
+    end
     _layoutScheduler.pending = false
     _layoutScheduler.delay = nil
     _layoutScheduler.timer = nil
@@ -656,9 +661,6 @@ local function enableLayoutEvents(addon)
             handleLayoutEvent(addon, eventName, ...)
         end)
     end
-    addon:RegisterEvent("CVAR_UPDATE", function(_, _event, ...)
-        handleLayoutEvent(addon, "CVAR_UPDATE", ...)
-    end)
 
     -- Watchdog — catches cases where the game externally re-shows or resets alpha
     -- on Blizzard cooldown viewer frames between layout events.
@@ -688,7 +690,6 @@ local function disableLayoutEvents(addon)
     for eventName in pairs(LAYOUT_EVENTS) do
         addon:UnregisterEvent(eventName)
     end
-    addon:UnregisterEvent("CVAR_UPDATE")
 
     if _layoutWatchdogTicker then
         _layoutWatchdogTicker:Cancel()

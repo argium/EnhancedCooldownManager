@@ -37,7 +37,7 @@ local registeredPage
 local function getProfile() return ns.Addon.db.profile end
 
 local function getDefaultStack(stackId)
-    local defaults = ns.Addon.db.defaults.profile
+    local defaults = ns.Addon.db.defaults and ns.Addon.db.defaults.profile
     local defaultStacks = defaults and defaults.extraIcons and defaults.extraIcons.itemStacks
     local defaultStack = defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId]
     if defaultStack then

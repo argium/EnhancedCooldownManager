@@ -164,17 +164,17 @@ flowchart TD
 
         subgraph SCHEDULER["One scheduler · state = { pending, delay, timer, reason }"]
             direction LR
-            REQ_LAY["RequestLayout(reason)<br/>thin wrapper"]
-            SCHED["ScheduleLayoutUpdate(delay)<br/>thin wrapper"]
-            IMMED["UpdateLayoutImmediately()<br/>thin wrapper"]
-            FLUSH["scheduler:flush(reason)"]
+            REQ_LAY["RequestLayout(reason)<br/>scheduler:request"]
+            SCHED["ScheduleLayoutUpdate(delay)<br/>scheduler:schedule"]
+            IMMED["UpdateLayoutImmediately()<br/>direct executeLayout"]
+            FLUSH["executeLayout(reason)"]
             REQ_LAY --> FLUSH
             SCHED --> FLUSH
             IMMED --> FLUSH
         end
     end
 
-    subgraph EXECUTE["flush(reason) — single body (changed)"]
+    subgraph EXECUTE["executeLayout(reason) — single body (changed)"]
         HOOK_CVS["hookCooldownViewerSettings()<br/>(one-time)"]
         UPD_FADE["fadePolicy(reason)"]
         UPD_ALL["updateAllLayouts(reason)"]
@@ -262,7 +262,7 @@ flowchart LR
 
     subgraph EC["ECM.lua"]
         EC_OLD["getErrorDebugStack / CombatState / Timestamp<br/>+ safeTableTostring closure-pcall"]
-        EC_NEW["tryCall(fn, ...) helper<br/>+ targeted pcall(pairs, tbl)"]
+        EC_NEW["inlined pcall(GetTime) / pcall(InCombatLockdown) / pcall(debugstack, ...)<br/>+ direct pcall around the table walker"]
         EC_OLD ==>|consolidate| EC_NEW
     end
 
