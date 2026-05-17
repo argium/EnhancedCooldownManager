@@ -57,14 +57,6 @@ local function safeStrTostring(x)
     return issecretvalue(x) and "[secret]" or tostring(x)
 end
 
-local function tryCall(fn, ...)
-    if type(fn) ~= "function" then
-        return false, nil
-    end
-
-    return pcall(fn, ...)
-end
-
 local function safeTableTostring(tbl, depth, seen)
     if issecrettable(tbl) then return "[secrettable]" end
     if seen[tbl] then return "<cycle>" end
@@ -149,17 +141,17 @@ local function makeErrorData(module, key, data)
         payload.errorKey = key
     end
     if payload.timestamp == nil then
-        local ok, timestamp = tryCall(GetTime)
+        local ok, timestamp = pcall(GetTime)
         payload.timestamp = ok and timestamp or nil
     end
     if payload.inCombatLockdown == nil then
-        local ok, inCombat = tryCall(InCombatLockdown)
+        local ok, inCombat = pcall(InCombatLockdown)
         if ok then
             payload.inCombatLockdown = inCombat == true
         end
     end
     if payload.debugStack == nil then
-        local ok, stackOrErr = tryCall(debugstack, 3, 8, 8)
+        local ok, stackOrErr = pcall(debugstack, 3, 8, 8)
         payload.debugStack = ok and stackOrErr or (stackOrErr and ("debugstack failed: " .. tostring(stackOrErr)) or nil)
     end
 

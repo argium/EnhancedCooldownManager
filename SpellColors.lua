@@ -195,20 +195,6 @@ local function makeKey(spellName, spellID, cooldownID, textureFileID)
     )
 end
 
----@param left ECM_SpellColorKey|table|nil
----@param right ECM_SpellColorKey|table|nil
----@return boolean
-local function keysMatchPayloads(left, right)
-    return keysMatch(normalizeKey(left), normalizeKey(right))
-end
-
----@param base ECM_SpellColorKey|table|nil
----@param other ECM_SpellColorKey|table|nil
----@return ECM_SpellColorKey|nil
-local function mergeKeyPayloads(base, other)
-    return mergeKeys(normalizeKey(base), normalizeKey(other))
-end
-
 ---------------------------------------------------------------------------
 -- SpellColorKeyType methods
 ---------------------------------------------------------------------------
@@ -246,8 +232,8 @@ end
 
 SpellColors.MakeKey = makeKey
 SpellColors.NormalizeKey = normalizeKey
-SpellColors.KeysMatch = keysMatchPayloads
-SpellColors.MergeKeys = mergeKeyPayloads
+SpellColors.KeysMatch = keysMatch
+SpellColors.MergeKeys = mergeKeys
 
 -- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
 local unpack = _G.unpack or table.unpack

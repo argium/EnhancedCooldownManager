@@ -440,7 +440,7 @@ end
 --- @param reason string|nil The lifecycle reason.
 function Runtime.UpdateLayoutImmediately(reason)
     invalidateDetachedAnchorMetrics()
-    _layoutScheduler:flush(reason)
+    executeLayout(reason)
 end
 
 local _layoutStorms = {}
@@ -503,13 +503,6 @@ local function recordLayoutRequest(reason, opts)
     end
 end
 
-function _layoutScheduler:flush(reason)
-    if reason == nil then
-        reason = self.reason
-    end
-    executeLayout(reason)
-end
-
 function _layoutScheduler:request(reason, opts)
     if opts and opts.secondPass then
         self.requestSecondPass = true
@@ -527,13 +520,13 @@ function _layoutScheduler:request(reason, opts)
         self.requestPending = false
         self.reason = nil
         self.requestSecondPass = false
-        self:flush(why)
+        executeLayout(why)
         if needSecondPass then
             C_Timer.After(C.LIFECYCLE_SECOND_PASS_DELAY, function()
                 if self.requestPending or self.pending then
                     return
                 end
-                self:flush("SecondPass")
+                executeLayout("SecondPass")
             end)
         end
     end)
@@ -553,7 +546,7 @@ function _layoutScheduler:schedule(delay, reason)
     self.delay = waitTime
     self.reason = reason
     self.timer = C_Timer.NewTimer(waitTime, function()
-        self:flush(reason)
+        executeLayout(reason)
     end)
 end
 

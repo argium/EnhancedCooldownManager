@@ -833,13 +833,13 @@ function ExternalBars:OnExternalAurasUpdated(reason)
     local auraDiagnostics = debugEnabled and {} or nil
 
     local activeAuraCount = 0
-    local function abortAuraSync(logKey, message, err)
+    local function abortAuraSync(owner, logKey, message, err)
         activeAuraCount = 0
         wipe(auraStates)
-        self:_hideExcessBars(0)
-        self:_StopDurationTicker()
+        owner:_hideExcessBars(0)
+        owner:_StopDurationTicker()
         local data = getAuraInfoErrorData(reason, viewer, auraInfo)
-        data.activeAuraCountBefore = self._activeAuraCount or 0
+        data.activeAuraCountBefore = owner._activeAuraCount or 0
         if err then
             data.error = tostring(err)
         end
@@ -847,7 +847,7 @@ function ExternalBars:OnExternalAurasUpdated(reason)
     end
 
     if type(auraInfo) == "table" and not canAccessTable(auraInfo) then
-        abortAuraSync("AuraInfoInaccessible", "Blizzard external aura info is inaccessible during "
+        abortAuraSync(self, "AuraInfoInaccessible", "Blizzard external aura info is inaccessible during "
             .. tostring(reason or "unknown"))
     elseif type(auraInfo) == "table" then
         local ok, err = pcall(function()
@@ -868,7 +868,7 @@ function ExternalBars:OnExternalAurasUpdated(reason)
             end
         end)
         if not ok then
-            abortAuraSync("AuraInfoIterateFailed", "Blizzard external aura info could not be iterated during "
+            abortAuraSync(self, "AuraInfoIterateFailed", "Blizzard external aura info could not be iterated during "
                 .. tostring(reason or "unknown") .. ": " .. tostring(err), err)
         end
     end
