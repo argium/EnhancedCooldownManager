@@ -1538,6 +1538,74 @@ describe("ExtraIcons real source", function()
         assert.are.equal("3", icon.Count.__text)
     end)
 
+    it("prefers owned item stack entries over the missing fallback", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[202] = 3
+        itemIconsByID[101] = "missing-potion"
+        itemIconsByID[202] = "owned-potion"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = 1 } }, nil, {
+                nextId = 2,
+                order = { 1 },
+                byId = {
+                    [1] = {
+                        name = "Potions",
+                        showIfMissing = true,
+                        ids = { { itemID = 101 }, { itemID = 202 } },
+                    },
+                },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local icon = ExtraIcons._viewers.utility.iconPool[1]
+        assert.are.equal(202, icon.itemId)
+        assert.are.equal("owned-potion", icon.Icon.__texture)
+        assert.is_false(icon.Icon:IsDesaturated())
+        assert.are.equal("3", icon.Count.__text)
+    end)
+
+    it("shows missing item stack entries as greyscale when configured", function()
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemIconsByID[101] = "missing-potion"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = 1 } }, nil, {
+                nextId = 2,
+                order = { 1 },
+                byId = {
+                    [1] = {
+                        name = "Potions",
+                        showIfMissing = true,
+                        ids = { { itemID = 101 }, { itemID = 202 } },
+                    },
+                },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local icon = ExtraIcons._viewers.utility.iconPool[1]
+        assert.are.equal(101, icon.itemId)
+        assert.are.equal("missing-potion", icon.Icon.__texture)
+        assert.is_true(icon.Icon:IsDesaturated())
+        assert.is_nil(icon.Count.__text)
+    end)
+
     it("skips missing and empty item stack entries", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end

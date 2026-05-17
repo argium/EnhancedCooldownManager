@@ -363,6 +363,30 @@ local function applyInputRowEnabledState(frame, enabled)
     editBox:EnableMouse(enabled)
 end
 
+local function getButtonRowButton(frame)
+    local control = frame and frame.Control
+    return frame and (frame.Button or (control and (control.Button or control))) or nil
+end
+
+local function applyButtonRowEnabledState(frame, enabled)
+    if not frame then
+        return
+    end
+
+    frame:SetAlpha(enabled and 1 or 0.5)
+
+    local button = getButtonRowButton(frame)
+    if not button then
+        return
+    end
+    if button.SetEnabled then
+        button:SetEnabled(enabled)
+    end
+    if button.EnableMouse then
+        button:EnableMouse(enabled)
+    end
+end
+
 local function ensureColorRowWidgets(frame)
     if frame._lsbColorTitle and frame._lsbColorSwatch then
         return frame._lsbColorTitle, frame._lsbColorSwatch
@@ -1033,10 +1057,45 @@ function interop.configurePageActionsInitializer(initializer)
     initializer._lsbResetFrame = interop.hideHeaderActionButtons
 end
 
+function interop.configureButtonInitializer(initializer)
+    local originalSetEnabled = initializer.SetEnabled
+    local originalInitFrame = initializer.InitFrame
+    local originalResetter = initializer.Resetter
+
+    initializer._lsbEnabled = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsbEnabled = enabled
+        if originalSetEnabled then
+            originalSetEnabled(controlInitializer, enabled)
+        end
+        if controlInitializer._lsbActiveFrame then
+            applyButtonRowEnabledState(controlInitializer._lsbActiveFrame, enabled)
+        end
+    end
+
+    if originalInitFrame then
+        initializer.InitFrame = function(controlInitializer, frame)
+            controlInitializer._lsbActiveFrame = frame
+            originalInitFrame(controlInitializer, frame)
+            applyButtonRowEnabledState(frame, controlInitializer._lsbEnabled ~= false)
+        end
+    end
+
+    if originalResetter then
+        initializer.Resetter = function(controlInitializer, frame)
+            if controlInitializer._lsbActiveFrame == frame then
+                controlInitializer._lsbActiveFrame = nil
+            end
+            originalResetter(controlInitializer, frame)
+        end
+    end
+end
+
 interop.hideHeaderActionButtons = hideHeaderActionButtons
 interop.applyHeaderFrame = applyHeaderFrame
 interop.applySubheaderFrame = applySubheaderFrame
 interop.applyInfoRowFrame = applyInfoRowFrame
+interop.applyButtonRowEnabledState = applyButtonRowEnabledState
 interop.applyColorRowFrame = applyColorRowFrame
 interop.applyColorRowEnabledState = applyColorRowEnabledState
 interop.applyInputRowFrame = applyInputRowFrame

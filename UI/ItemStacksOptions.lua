@@ -16,6 +16,8 @@ StaticPopupDialogs["ECM_CONFIRM_DELETE_ITEM_STACK"] =
     OptionUtil.MakeConfirmDialog(L["ITEM_STACK_DELETE_CONFIRM"], L["DELETE"], L["DONT_DELETE"])
 StaticPopupDialogs["ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM"] =
     OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
+StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
+    OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 
 local ITEM_STACK_ROW_HEIGHT = 22
 local ITEM_STACK_COLLECTION_HEIGHT = 220
@@ -189,6 +191,13 @@ local function setStackVisibility(profile, stackId, key, value)
     end
 end
 
+local function setStackShowIfMissing(profile, stackId, value)
+    local itemStack = EnsureItemStacks(profile).byId[stackId]
+    if itemStack then
+        itemStack.showIfMissing = value and true or nil
+    end
+end
+
 local function addItem(profile, stackId, itemId)
     local itemStack = EnsureItemStacks(profile).byId[stackId]
     if not itemStack then
@@ -350,6 +359,18 @@ local function setSelectedVisibility(key, value)
     end
 end
 
+local function getSelectedShowIfMissing()
+    local itemStack = getSelectedStack()
+    return itemStack and itemStack.showIfMissing == true or false
+end
+
+local function setSelectedShowIfMissing(value)
+    local stackId = getSelectedStackId()
+    if stackId then
+        setStackShowIfMissing(getProfile(), stackId, value)
+    end
+end
+
 local function isNoStackSelected()
     return getSelectedStackId() == nil
 end
@@ -409,12 +430,17 @@ end
 
 local function revertSelectedStack(ctx)
     local stackId = getSelectedStackId()
-    if not stackId then
+    local itemStack = getSelectedStack()
+    if not itemStack or not isDefaultStackId(stackId) then
         return
     end
-    doAction(function()
-        revertStackToDefault(getProfile(), stackId)
-    end, ctx and ctx.page or registeredPage)
+    StaticPopup_Show("ECM_CONFIRM_REVERT_ITEM_STACK", itemStack.name, nil, {
+        onAccept = function()
+            doAction(function()
+                revertStackToDefault(getProfile(), stackId)
+            end, ctx and ctx.page or registeredPage)
+        end,
+    })
 end
 
 function ItemStacksOptions.EnsureItemLoadFrame()
@@ -514,6 +540,21 @@ ItemStacksOptions.page = {
             set = function(value)
                 setSelectedVisibility("hideInRatedPvp", value)
             end,
+            disabled = isNoStackSelected,
+            onSet = function(ctx)
+                ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
+                ctx.page:Refresh()
+            end,
+        },
+        {
+            id = "showStackIfMissing",
+            type = "checkbox",
+            key = "showStackIfMissing",
+            name = L["SHOW_IF_MISSING"],
+            tooltip = L["SHOW_IF_MISSING_TOOLTIP"],
+            layout = false,
+            get = getSelectedShowIfMissing,
+            set = setSelectedShowIfMissing,
             disabled = isNoStackSelected,
             onSet = function(ctx)
                 ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")

@@ -111,6 +111,18 @@ describe("BuffBars real source", function()
                 Hide = function() end,
                 SetTexture = function() end,
             },
+            __minMax = { 0, 20 },
+            __value = 20,
+            GetMinMaxValues = function(self)
+                return self.__minMax[1], self.__minMax[2]
+            end,
+            GetValue = function(self)
+                return self.__value
+            end,
+            GetStatusBarColor = function(self)
+                local color = self.__color or { 1, 1, 1, 1 }
+                return color[1], color[2], color[3], color[4]
+            end,
             SetShown = function(self, value)
                 self.__shown = value
             end,
@@ -127,6 +139,7 @@ describe("BuffBars real source", function()
         child.cooldownInfo = { spellID = layoutIndex }
         child.cooldownID = 1000 + layoutIndex
         child.iconTextureFileID = 2000 + layoutIndex
+        child.RefreshCooldownInfo = function() end
         return child
     end
 
@@ -972,8 +985,11 @@ describe("BuffBars real source", function()
     end)
 
     -- Helper: runs a single child through UpdateLayout and returns it styled.
-    local function layoutSingleChild(child, moduleConfig, globalConfig)
+    local function layoutSingleChild(child, moduleConfig, globalConfig, configure)
         stubChildLayoutEnvironment()
+        if configure then
+            configure()
+        end
         spellColorStore.DiscoverBar = function() end
         function BuffBarCooldownViewer:GetChildren() return child end
         function BuffBars:ShouldShow() return true end
@@ -995,6 +1011,18 @@ describe("BuffBars real source", function()
         }
         if overrides then for k, v in pairs(overrides) do m[k] = v end end
         return m
+    end
+
+    local function makeBarBackground()
+        return {
+            SetParent = function() end,
+            SetPoint = function() end,
+            SetTexture = function(self, texture) self.__texture = texture end,
+            SetVertexColor = function(self, r, g, b, a) self.__vcolor = { r, g, b, a } end,
+            ClearAllPoints = function() end,
+            SetAllPoints = function() end,
+            SetDrawLayer = function(self, layer, sublayer) self.__drawLayer = { layer, sublayer } end,
+        }
     end
 
     describe("styleBarHeight", function()
@@ -1079,6 +1107,70 @@ describe("BuffBars real source", function()
             layoutSingleChild(child, defaultModule(), defaultGlobal())
 
             assert.are.equal(1, #timerCallbacks, "expected one retry timer")
+        end)
+
+        it("fills timeless aura bars solid", function()
+            local child = makeStyledChild("Infinite", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            local bgRegion = makeBarBackground()
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+            end)
+
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+        end)
+
+        it("does not compare secret status bar values when checking for timeless auras", function()
+            local secretValue = { __secret = true }
+            local child = makeStyledChild("Secret", true, 1)
+            child.Bar.__minMax = { 0, secretValue }
+            child.Bar.__value = secretValue
+            local bgRegion = makeBarBackground()
+            _G.issecretvalue = function(value)
+                return type(value) == "table" and value.__secret == true
+            end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+            end)
+
+            assert.same({ 0, 0, 0, 0.8 }, bgRegion.__vcolor)
+        end)
+
+        it("keeps the background solid after Blizzard refreshes a timeless aura", function()
+            local child = makeStyledChild("Infinite", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            local bgRegion = makeBarBackground()
+            child.RefreshCooldownInfo = function(self)
+                self.Bar.__value = 0
+            end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+            end)
+            child:RefreshCooldownInfo()
+
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(0, child.Bar.__value)
+        end)
+
+        it("does not call Blizzard cooldown data methods while styling", function()
+            local child = makeStyledChild("Infinite", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            child.GetCooldownValues = function()
+                error("GetCooldownValues must not be called from addon styling")
+            end
+            local bgRegion = makeBarBackground()
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+            end)
+
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
         end)
     end)
 
