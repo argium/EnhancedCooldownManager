@@ -583,8 +583,10 @@ ItemStacksOptions.page = {
                 {
                     text = L["DELETE"],
                     tooltip = L["DELETE_ITEM_STACK_DESC"],
-                    enabled = function() return not isNoStackSelected() end,
-                    hidden = function() return isDefaultStackId(getSelectedStackId()) end,
+                    hidden = function()
+                        local stackId = getSelectedStackId()
+                        return stackId == nil or isDefaultStackId(stackId)
+                    end,
                     onClick = function()
                         openDeleteDialog({ page = registeredPage })
                     end,
@@ -592,8 +594,10 @@ ItemStacksOptions.page = {
                 {
                     text = L["REVERT"],
                     tooltip = L["REVERT_ITEM_STACK_DESC"],
-                    enabled = function() return not isNoStackSelected() end,
-                    hidden = function() return not isDefaultStackId(getSelectedStackId()) end,
+                    hidden = function()
+                        local stackId = getSelectedStackId()
+                        return stackId == nil or not isDefaultStackId(stackId)
+                    end,
                     onClick = function()
                         revertSelectedStack({ page = registeredPage })
                     end,
