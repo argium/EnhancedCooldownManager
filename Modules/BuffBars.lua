@@ -302,10 +302,12 @@ function BuffBars:UpdateLayout(why)
 
     -- Style all visible children (lazy setters make redundant calls no-ops)
     self._editLocked = false
+    local shownChildCount = 0
     local ok, err = pcall(function()
         for _, entry in ipairs(visibleChildren) do
             hookChildFrame(entry.frame, self)
             StyleChildBar(self, entry.frame, cfg, globalConfig, spellColors)
+            if entry.frame:IsShown() then shownChildCount = shownChildCount + 1 end
         end
 
         layoutBars(visibleChildren, viewer, growsUp, verticalSpacing)
@@ -316,6 +318,12 @@ function BuffBars:UpdateLayout(why)
         self._warned = false
     end
     ns.DebugAssert(ok, "Error styling buff bars: " .. tostring(err))
+
+    local barHeight = (cfg and cfg.height) or globalConfig.barHeight or 0
+
+    -- Size the viewer from shown rows so hidden buff bars do not reserve chain space.
+    local totalHeight = shownChildCount * barHeight + math.max(0, shownChildCount - 1) * verticalSpacing
+    FrameUtil.LazySetHeight(viewer, totalHeight)
 
     viewer:Show()
     ns.Log(ns.Constants.BUFFBARS, "UpdateLayout (" .. (why or "") .. ")", {
