@@ -257,6 +257,7 @@ L["ITEM_STACK_CREATE_PROMPT"] = "Название этой стопки пред
 L["ITEM_STACK_RENAME_PROMPT"] = "Новое название этой стопки предметов:"
 L["ITEM_STACK_DELETE_CONFIRM"] = "Удалить %s?"
 L["ITEM_STACK_REMOVE_ITEM_CONFIRM"] = "Удалить %s?"
+L["ITEM_STACK_REVERT_CONFIRM"] = "Вернуть %s к настройкам по умолчанию?"
 L["ITEM_STACK_DUPLICATE_ITEM"] = "Уже есть в этой стопке"
 L["ITEM_STACK_HIDE_IN_INSTANCES"] = "Скрывать в: подземельях и рейдах"
 L["ITEM_STACK_HIDE_IN_INSTANCES_DESC"] = "Скрывать эту стопку предметов в инстансах без PvP."
@@ -303,6 +304,7 @@ L["RENAME"] = "Переименовать"
 L["DONT_RENAME"] = "Не переименовывать"
 L["DONT_DELETE"] = "Не удалять"
 L["DONT_REMOVE"] = "Не удалять"
+L["DONT_REVERT"] = "Не возвращать"
 
 --------------------------------------------------------------------------------
 -- About

@@ -91,5 +91,6 @@ function builders.button(spec)
     local initializer = interop.createButtonInitializer(spec.name, spec.buttonText or spec.name, function()
         spec._onClick()
     end, spec.tooltip, true)
+    interop.configureButtonInitializer(initializer)
     return layoutResult(initializer)
 end

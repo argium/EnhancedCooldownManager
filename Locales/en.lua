@@ -259,6 +259,7 @@ L["ITEM_STACK_CREATE_PROMPT"] = "Name this item stack:"
 L["ITEM_STACK_RENAME_PROMPT"] = "Rename this item stack:"
 L["ITEM_STACK_DELETE_CONFIRM"] = "Delete %s?"
 L["ITEM_STACK_REMOVE_ITEM_CONFIRM"] = "Remove %s?"
+L["ITEM_STACK_REVERT_CONFIRM"] = "Revert %s to defaults?"
 L["ITEM_STACK_DUPLICATE_ITEM"] = "Already in this stack"
 L["ITEM_STACK_HIDE_IN_INSTANCES"] = "Hide in: Instances"
 L["ITEM_STACK_HIDE_IN_INSTANCES_DESC"] = "Hide this item stack in non-PvP instances."
@@ -305,6 +306,7 @@ L["RENAME"] = "Rename"
 L["DONT_RENAME"] = "Don't rename"
 L["DONT_DELETE"] = "Don't delete"
 L["DONT_REMOVE"] = "Don't remove"
+L["DONT_REVERT"] = "Don't revert"
 
 --------------------------------------------------------------------------------
 -- About

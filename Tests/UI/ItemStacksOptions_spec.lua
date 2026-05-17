@@ -363,8 +363,10 @@ describe("ItemStacksOptions settings page", function()
         getRow("deleteItemStack").onClick()
         assert.is_not_nil(profile.extraIcons.itemStacks.byId.combatPotions)
 
+        local getShownPopupName = TestHelpers.InstallPopupAutoAccept()
         getRow("revertItemStack").onClick()
 
+        assert.are.equal("ECM_CONFIRM_REVERT_ITEM_STACK", getShownPopupName())
         assert.are.equal("Combat Potions", profile.extraIcons.itemStacks.byId.combatPotions.name)
         assert.are.equal(245898, profile.extraIcons.itemStacks.byId.combatPotions.ids[1].itemID)
         assert.is_false(profile.extraIcons.itemStacks.byId.combatPotions.hideInInstances)

@@ -719,6 +719,142 @@ describe("LibSettingsBuilder Controls", function()
         assert.are.equal(frame, clickedFrame)
     end)
 
+    it("reevaluates dynamic button disabled predicates after handler-backed settings change", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local selected = "custom"
+        local disabledCalls = 0
+        local builder
+        local settings = TestHelpers.CollectSettings(function()
+            builder = LibStub("LibSettingsBuilder-1.0").New({
+                name = "Dynamic Button Disabled",
+                onChanged = function() end,
+                sections = {
+                    {
+                        key = "general",
+                        name = "General",
+                        pages = {
+                            {
+                                key = "main",
+                                rows = {
+                                    {
+                                        id = "stack",
+                                        type = "dropdown",
+                                        key = "stack",
+                                        name = "Stack",
+                                        values = { custom = "Custom", default = "Default" },
+                                        get = function() return selected end,
+                                        set = function(value) selected = value end,
+                                    },
+                                    {
+                                        type = "button",
+                                        name = "Rename",
+                                        buttonText = "Rename",
+                                        disabled = function()
+                                            disabledCalls = disabledCalls + 1
+                                            return selected == "default"
+                                        end,
+                                        onClick = function() end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+        end)
+
+        local initializers = builder:GetPage("general", "main")._category:GetLayout()._initializers
+        local dropdownSetting
+        for _, setting in pairs(settings) do
+            dropdownSetting = setting
+        end
+        local buttonInitializer = TestHelpers.FindButtonInitializer(initializers, "Rename")
+
+        assert.is_true(buttonInitializer._enabled)
+        assert.are.equal(1, disabledCalls)
+
+        dropdownSetting:SetValue("default")
+
+        assert.is_false(buttonInitializer._enabled)
+        assert.are.equal(2, disabledCalls)
+    end)
+
+    it("applies button disabled state to the active button frame", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        local originalButtonInitializer = _G.CreateSettingsButtonInitializer
+        _G.CreateSettingsButtonInitializer = function(name, buttonText, onClick, tooltip)
+            local initializer = originalButtonInitializer(name, buttonText, onClick, tooltip)
+            initializer.InitFrame = function(_, frame)
+                frame.Button = createScriptableFrame()
+            end
+            return initializer
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Button Visuals",
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "button",
+                                    name = "Rename",
+                                    buttonText = "Rename",
+                                    disabled = function() return false end,
+                                    onClick = function() end,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = TestHelpers.FindButtonInitializer(
+            builder:GetPage("general", "main")._category:GetLayout()._initializers,
+            "Rename"
+        )
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+
+        assert.are.equal(1, frame:GetAlpha())
+        assert.is_true(frame.Button:IsEnabled())
+        assert.is_true(frame.Button:IsMouseEnabled())
+
+        initializer:SetEnabled(false)
+
+        assert.are.equal(0.5, frame:GetAlpha())
+        assert.is_false(frame.Button:IsEnabled())
+        assert.is_false(frame.Button:IsMouseEnabled())
+    end)
+
     it("renders dynamic info rows without freezing display text or multiline state", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
