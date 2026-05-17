@@ -1060,6 +1060,70 @@ describe("ExtraIcons real source", function()
         assert.are.equal(87, x)
     end)
 
+    it("anchors to the viewer when active item frames are hidden", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = false, width = 22, height = 22 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("hidden-active-frame"))
+
+        local _, anchorFrame = ExtraIcons._viewers.utility.container:GetPoint(1)
+        assert.are.equal(UtilityCooldownViewer, anchorFrame)
+    end)
+
+    it("does not reapply unchanged anchors on repeated layouts", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("initial"))
+
+        local vs = ExtraIcons._viewers.utility
+        local viewerSetPoints = TestHelpers.getCalls(UtilityCooldownViewer, "SetPoint")
+        local viewerClears = TestHelpers.getCalls(UtilityCooldownViewer, "ClearAllPoints")
+        local containerSetPoints = TestHelpers.getCalls(vs.container, "SetPoint")
+        local containerClears = TestHelpers.getCalls(vs.container, "ClearAllPoints")
+        local iconSetPoints = TestHelpers.getCalls(vs.iconPool[1], "SetPoint")
+        local iconClears = TestHelpers.getCalls(vs.iconPool[1], "ClearAllPoints")
+
+        assert.is_true(ExtraIcons:UpdateLayout("unchanged"))
+
+        assert.are.equal(viewerSetPoints, TestHelpers.getCalls(UtilityCooldownViewer, "SetPoint"))
+        assert.are.equal(viewerClears, TestHelpers.getCalls(UtilityCooldownViewer, "ClearAllPoints"))
+        assert.are.equal(containerSetPoints, TestHelpers.getCalls(vs.container, "SetPoint"))
+        assert.are.equal(containerClears, TestHelpers.getCalls(vs.container, "ClearAllPoints"))
+        assert.are.equal(iconSetPoints, TestHelpers.getCalls(vs.iconPool[1], "SetPoint"))
+        assert.are.equal(iconClears, TestHelpers.getCalls(vs.iconPool[1], "ClearAllPoints"))
+    end)
+
     it("does not iterate inaccessible GetItemFrames results", function()
         local inaccessibleFrames = {}
         UtilityCooldownViewer.childXPadding = 4

@@ -42,11 +42,23 @@ local function cachePoint(vs, blizzFrame)
     vs.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
 end
 
+local function setSinglePoint(frame, point, relativeTo, relativePoint, x, y)
+    x, y = x or 0, y or 0
+    if frame:GetNumPoints() == 1 then
+        local currentPoint, currentRelativeTo, currentRelativePoint, currentX, currentY = frame:GetPoint(1)
+        if currentPoint == point and currentRelativeTo == relativeTo and currentRelativePoint == relativePoint
+            and (currentX or 0) == x and (currentY or 0) == y then
+            return
+        end
+    end
+    frame:ClearAllPoints()
+    frame:SetPoint(point, relativeTo, relativePoint, x, y)
+end
+
 local function applyPoint(vs, blizzFrame, offsetX)
     local p = vs and vs.originalPoint
     if not p or not blizzFrame then return end
-    blizzFrame:ClearAllPoints()
-    blizzFrame:SetPoint(p[1], p[2], p[3], p[4] + (offsetX or 0), p[5])
+    setSinglePoint(blizzFrame, p[1], p[2], p[3], p[4] + (offsetX or 0), p[5])
 end
 
 local function horizontalBounds(point, width)
@@ -532,7 +544,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
             for _, itemFrame in ipairs(itemFrames) do
                 if itemFrame.isActive then
                     iconSize = itemFrame:GetWidth() or iconSize
-                    lastActive = itemFrame
+                    if itemFrame:IsShown() then lastActive = itemFrame end
                 end
             end
         end)
@@ -572,8 +584,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
 
         icon.Icon:SetTexture(data.texture)
         icon.Icon:SetDesaturated(data.missing == true)
-        icon:ClearAllPoints()
-        icon:SetPoint("LEFT", container, "LEFT", xOffset, 0)
+        setSinglePoint(icon, "LEFT", container, "LEFT", xOffset, 0)
         icon:Show()
 
         updateIconCooldown(icon)
@@ -589,8 +600,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
         xOffset = xOffset + iconSize + spacing
     end
 
-    container:ClearAllPoints()
-    container:SetPoint("LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0)
+    setSinglePoint(container, "LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0)
     container:Show()
 
     if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
