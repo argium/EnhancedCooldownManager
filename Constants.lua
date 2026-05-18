@@ -184,7 +184,7 @@ local BUILTIN_STACKS = {
 --- Default display order for builtin stack keys (matches default viewers.utility order).
 local BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
 
-local DRACTHYR_WING_BUFFET_IDS = { 357214, 368970 }
+local DRACTHYR_WING_BUFFET_IDS = { 357214, 368970 } -- Base and enhanced evoker variants.
 
 --- Racial ability lookup keyed by UnitRace("player") raceFileName.
 --- One primary active racial per race.

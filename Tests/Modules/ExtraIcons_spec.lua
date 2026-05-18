@@ -303,6 +303,7 @@ describe("ExtraIcons real source", function()
             GetGlobalConfig = function()
                 return globalConfig
             end,
+            -- ECM.lua is not loaded in this isolated source spec.
             GetFrameValue = function(frame, methodName)
                 if not frame or type(frame[methodName]) ~= "function" then
                     return nil

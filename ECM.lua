@@ -115,6 +115,7 @@ function ns.CloneValue(value)
     return copy
 end
 
+--- Safely calls a frame method for diagnostics and returns nil on error.
 function ns.GetFrameValue(frame, methodName)
     if not frame or type(frame[methodName]) ~= "function" then
         return nil
