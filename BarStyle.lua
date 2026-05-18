@@ -224,7 +224,6 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     if texture and type(barBG.SetTexture) == "function" then
         barBG:SetTexture(texture)
     end
-
     local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)
     if ok then
         barBG:SetVertexColor(r, g, b, a or 1)
@@ -326,7 +325,11 @@ local function styleChildBar(module, frame, config, globalConfig, spellColors)
     local barBG = FrameUtil.GetBarBackground(bar)
     styleBarBackground(frame, barBG, config, globalConfig)
     styleBarColor(module, frame, bar, globalConfig, spellColors, 0)
-    styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
+    -- Only fill the background solid for bars with an active aura. cooldownID
+    -- identifies the configured slot, including inactive visible slots.
+    if frame.auraInstanceID then
+        styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
+    end
 
     FrameUtil.ApplyFont(bar.Name, globalConfig, config)
     FrameUtil.ApplyFont(bar.Duration, globalConfig, config)
