@@ -1176,6 +1176,33 @@ describe("BuffBars real source", function()
             assert.are.equal(0, child.Bar.__value)
         end)
 
+        it("restores the normal background after a timeless aura expires", function()
+            -- When a timeless aura expires, Blizzard clears auraInstanceID on the
+            -- child frame and re-runs the SetPoint/OnShow/layout hooks that drive
+            -- StyleChildBar. The unconditional styleBarBackground call at the top
+            -- of styleChildBar must reset the background texture/color so the
+            -- empty-bar fill applied during the active phase does not stick.
+            local child = makeStyledChild("Expiring", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
+            local function configure()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
+            end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), configure)
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
+
+            child.auraInstanceID = nil
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), configure)
+
+            assert.are.equal(ns.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
+            assert.same({ 0, 0, 0, 0.8 }, bgRegion.__vcolor)
+        end)
+
         it("keeps the normal background for an empty bar slot when hide-when-inactive is off", function()
             -- When Blizzard's "hide when inactive" is disabled, bar frames remain
             -- visible even when the configured aura is not yet active. Their status
