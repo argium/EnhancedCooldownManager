@@ -235,6 +235,7 @@ describe("ExtraIcons real source", function()
             "C_Item",
             "C_PvP",
             "canaccesstable",
+            "issecretvalue",
             "ipairs",
         })
     end)
@@ -299,21 +300,21 @@ describe("ExtraIcons real source", function()
                 UnregisterFrame = function() end,
                 RequestLayout = function() end,
             },
-            FrameUtil = {
-                ApplyFont = function(fontString, appliedGlobalConfig, moduleConfig)
-                    applyFontCalls[#applyFontCalls + 1] = {
-                        fontString = fontString,
-                        globalConfig = appliedGlobalConfig,
-                        moduleConfig = moduleConfig,
-                    }
-                end,
-            },
             GetGlobalConfig = function()
                 return globalConfig
             end,
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        _G.issecretvalue = function() return false end
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        ns.FrameUtil.ApplyFont = function(fontString, appliedGlobalConfig, moduleConfig)
+            applyFontCalls[#applyFontCalls + 1] = {
+                fontString = fontString,
+                globalConfig = appliedGlobalConfig,
+                moduleConfig = moduleConfig,
+            }
+        end
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         EditModeManagerFrame = TestHelpers.makeHookableFrame(false)
         UtilityCooldownViewer = TestHelpers.makeHookableFrame(true)
