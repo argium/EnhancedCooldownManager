@@ -303,6 +303,14 @@ describe("ExtraIcons real source", function()
             GetGlobalConfig = function()
                 return globalConfig
             end,
+            GetFrameValue = function(frame, methodName)
+                if not frame or type(frame[methodName]) ~= "function" then
+                    return nil
+                end
+                local ok, value = pcall(frame[methodName], frame)
+                if ok then return value end
+                return nil
+            end,
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
@@ -714,8 +722,8 @@ describe("ExtraIcons real source", function()
     it("hooks viewers only once", function()
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
 
-        ExtraIcons:_hookViewer("utility")
-        ExtraIcons:_hookViewer("utility")
+        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
+        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
 
         assert.is_true(ExtraIcons._viewers.utility.hooked)
         assert.are.equal(1, UtilityCooldownViewer:GetHookCount("OnShow"))
@@ -785,7 +793,7 @@ describe("ExtraIcons real source", function()
             return enabled
         end
 
-        ExtraIcons:_hookViewer("utility")
+        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
         UtilityCooldownViewer._hooks.OnShow[1]()
         UtilityCooldownViewer._hooks.OnHide[1]()
         UtilityCooldownViewer._hooks.OnSizeChanged[1]()
@@ -1018,10 +1026,6 @@ describe("ExtraIcons real source", function()
         assert.are.equal(14, vs.iconPool[2].slotId)
         assert.are.equal(COMBAT_POTION_ID, vs.iconPool[3].itemId)
         assert.are.equal(HEALTHSTONE_ID, vs.iconPool[4].itemId)
-        assert.same(
-            { "Fonts\\FRIZQT__.TTF", 17, "OUTLINE" },
-            vs.iconPool[1].Cooldown.__fontRegion.__font
-        )
 
         local point, relativeTo, relativePoint, x, y = UtilityCooldownViewer:GetPoint(1)
         assert.are.equal("CENTER", point)

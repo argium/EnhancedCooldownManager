@@ -8,64 +8,32 @@ local FrameUtil = ns.FrameUtil
 local ExtraIcons = ns.Addon:NewModule("ExtraIcons")
 ns.Addon.ExtraIcons = ExtraIcons
 
--- ExtraIcons adds the user's chosen potions, trinkets, racials, and spells
--- directly after Blizzard's cooldown viewer rows. Think of each Blizzard row
--- as a train: this module adds a small extra car to the end without moving the
--- train station anchor that other ECM modules use.
 local BUILTIN_STACKS = ns.Constants.BUILTIN_STACKS
-local RACIAL_ABILITIES = ns.Constants.RACIAL_ABILITIES
+local RACIAL_SPELL_ALIASES = ns.Constants.RACIAL_SPELL_ALIASES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
 local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
 local UTILITY_BORDER_SCALE = ns.Constants.EXTRA_ICON_UTILITY_BORDER_SCALE
 local canAccessTable = _G.canaccesstable
 
--- Some racial abilities have different spell IDs for different races/factions.
--- This lookup lets a saved spell ID find its whole family of equivalent IDs.
-local RACIAL_SPELL_ALIASES = {}
-for _, racial in pairs(RACIAL_ABILITIES) do
-    local spellIds = racial.spellIds or { racial.spellId }
-    for _, spellId in ipairs(spellIds) do
-        RACIAL_SPELL_ALIASES[spellId] = spellIds
-    end
-end
-
--- Ordered viewer keys mapped to their Blizzard frame globals. The order matters
--- because the main and utility rows may need to move together as one visual
--- group when extra icons widen one row.
+local MAIN_VIEWER_KEY = "EssentialCooldownViewer"
+local UTILITY_VIEWER_KEY = "UtilityCooldownViewer"
 local VIEWERS = {
-    { key = "main", blizzKey = "EssentialCooldownViewer", borderScale = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE }, ownsAnchor = true },
+    { key = "main", blizzKey = MAIN_VIEWER_KEY, borderScale = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE }, ownsAnchor = true },
     -- Utility icon frames render square; keep the overlay square so extras do not look short.
-    { key = "utility", blizzKey = "UtilityCooldownViewer", borderScale = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE } },
+    { key = "utility", blizzKey = UTILITY_VIEWER_KEY, borderScale = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE } },
 }
-local BLIZZ_KEY = {}
-for _, v in ipairs(VIEWERS) do BLIZZ_KEY[v.key] = v.blizzKey end
 
 --------------------------------------------------------------------------------
 -- Shared horizontal centering
 --------------------------------------------------------------------------------
 
 local function cachePoint(vs, blizzFrame)
-    -- Save the Blizzard viewer's first anchor before ECM moves it. Future
-    -- layouts always start from this remembered "home" position so small
-    -- refreshes do not keep adding offsets on top of old offsets.
     if vs.originalPoint or not blizzFrame then return end
     local point, relativeTo, relativePoint, x, y = blizzFrame:GetPoint()
     vs.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
 end
 
-local function applyPoint(vs, blizzFrame, offsetX)
-    -- Move the Blizzard viewer relative to its saved home position. The shared
-    -- FrameUtil helper does nothing when the anchor is already correct, which
-    -- prevents unnecessary clear/re-anchor work and visual flicker.
-    local p = vs and vs.originalPoint
-    if not p or not blizzFrame then return end
-    FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] + (offsetX or 0), p[5] } })
-end
-
-local function horizontalBounds(point, width)
-    -- Convert an anchor name into "how far this frame reaches left and right
-    -- from its anchor." A left-anchored frame grows to the right, a right
-    -- anchored frame grows to the left, and a centered frame grows both ways.
+local function getHorizontalBounds(point, width)
     if point == "LEFT" or point == "TOPLEFT" or point == "BOTTOMLEFT" then
         return 0, width
     elseif point == "RIGHT" or point == "TOPRIGHT" or point == "BOTTOMRIGHT" then
@@ -111,11 +79,9 @@ local function logSharedOffsets(why, reason, mainFrame, utilFrame, mainPoint, ut
     })
 end
 
---- Computes a per-viewer horizontal offset that re-centers both viewers as a
---- single stacked group when they share the same original anchor.
---- ELI5: if two rows are stacked on the same nail, and one row becomes wider,
---- nudge each row so the whole stack still looks centered on that nail.
-local function getSharedOffsets(viewers, why)
+--- Computes per-viewer offsets that re-center both viewers as a single stacked
+--- group when they share the same original anchor.
+local function getAdjustedOffsetsToRecenterViewer(viewers, why)
     local offsets = { main = 0, utility = 0 }
     local mainState, utilState = viewers.main, viewers.utility
     if not mainState or not utilState then
@@ -123,8 +89,8 @@ local function getSharedOffsets(viewers, why)
         return offsets
     end
 
-    local mainFrame = _G[BLIZZ_KEY.main]
-    local utilFrame = _G[BLIZZ_KEY.utility]
+    local mainFrame = _G[MAIN_VIEWER_KEY]
+    local utilFrame = _G[UTILITY_VIEWER_KEY]
     cachePoint(mainState, mainFrame)
     cachePoint(utilState, utilFrame)
 
@@ -147,7 +113,7 @@ local function getSharedOffsets(viewers, why)
         local frame = _G[v.blizzKey]
         local p = viewers[v.key].originalPoint
         if frame and frame:IsShown() and p then
-            local l, r = horizontalBounds(p[1], frame:GetWidth() or 0)
+            local l, r = getHorizontalBounds(p[1], frame:GetWidth() or 0)
             sharedLeft = sharedLeft and math.min(sharedLeft, l) or l
             sharedRight = sharedRight and math.max(sharedRight, r) or r
         end
@@ -162,7 +128,7 @@ local function getSharedOffsets(viewers, why)
         local frame = _G[v.blizzKey]
         local p = viewers[v.key].originalPoint
         if frame and frame:IsShown() and p then
-            local l, r = horizontalBounds(p[1], frame:GetWidth() or 0)
+            local l, r = getHorizontalBounds(p[1], frame:GetWidth() or 0)
             offsets[v.key] = center - ((l + r) / 2)
         end
     end
@@ -171,10 +137,6 @@ local function getSharedOffsets(viewers, why)
 end
 
 local function updateMainViewerAnchor(vs, blizzFrame, rightFrame)
-    -- Chained ECM modules ask this module where the main row ends. This hidden
-    -- anchor stretches from Blizzard's main viewer to the extra-icon container,
-    -- so the next module attaches after the combined width instead of only
-    -- after Blizzard's original icons.
     local anchor = vs and vs.anchorFrame
     if not anchor then return end
 
@@ -196,9 +158,7 @@ end
 -- Entry resolution
 --------------------------------------------------------------------------------
 
-local function resolveEquipSlot(slotId)
-    -- Equipment entries track a gear slot, not a fixed item. Resolve the item
-    -- currently worn in that slot so swapping trinkets updates the extra icon.
+local function getEquipSlotIconData(slotId)
     local itemId = GetInventoryItemID("player", slotId)
     if not itemId then return nil end
     local _, spellId = C_Item.GetItemSpell(itemId)
@@ -208,10 +168,7 @@ local function resolveEquipSlot(slotId)
     return { itemId = itemId, texture = texture, slotId = slotId }
 end
 
-local function resolveItem(ids, showIfMissing)
-    -- Item entries can list several item IDs in priority order. Use the first
-    -- owned item with an icon; optionally show a grey missing icon for the first
-    -- configured item if none are owned.
+local function resolveFirstItem(ids, showIfMissing)
     local missingData
 
     for _, entry in ipairs(ids) do
@@ -228,28 +185,24 @@ local function resolveItem(ids, showIfMissing)
     return missingData
 end
 
-local function resolveKnownSpell(spellId)
-    -- A spell is usable only if the current character knows it and Blizzard can
-    -- provide an icon for it.
+local function getKnownSpellData(spellId)
     if spellId and C_SpellBook.IsSpellKnown(spellId) then
         local texture = C_Spell.GetSpellTexture(spellId)
         if texture then return { spellId = spellId, texture = texture } end
     end
 end
 
-local function resolveSpell(ids)
-    -- Spell entries also use priority order. Racial spells may resolve through
-    -- aliases because the configured spell may have a race-specific equivalent.
+local function resolveFirstKnownSpell(ids)
     for _, entry in ipairs(ids) do
         local spellId = type(entry) == "table" and entry.spellId or entry
-        local data = resolveKnownSpell(spellId)
+        local data = getKnownSpellData(spellId)
         if data then return data end
 
         local aliases = RACIAL_SPELL_ALIASES[spellId]
         if aliases then
             for _, aliasSpellId in ipairs(aliases) do
                 if aliasSpellId ~= spellId then
-                    data = resolveKnownSpell(aliasSpellId)
+                    data = getKnownSpellData(aliasSpellId)
                     if data then return data end
                 end
             end
@@ -257,37 +210,25 @@ local function resolveSpell(ids)
     end
 end
 
-local function isNonPvpInstance()
-    -- "Non-PvP instance" means dungeons, raids, scenarios, and similar places
-    -- where potion rules may differ from battlegrounds and arenas.
+local function shouldShowItemStack(itemStack)
+    if not itemStack then return false end
+    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return false end
+
     local inInstance, instanceType = IsInInstance()
-    return inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+    if itemStack.hideInInstances and inInstance and instanceType ~= "pvp" and instanceType ~= "arena" then return false end
+    return true
 end
 
-local function shouldSuppressItemStack(itemStack)
-    -- Some built-in item groups intentionally disappear in rated PvP or
-    -- non-PvP instances so the row only shows context-relevant consumables.
-    if not itemStack then return true end
-    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return true end
-    if itemStack.hideInInstances and isNonPvpInstance() then return true end
-    return false
-end
-
-local function resolveItemStack(entry, moduleConfig)
-    -- Custom item stacks are user-configured groups such as "my preferred
-    -- health potions." Resolve the stack's item list like a normal item entry.
+local function resolveConfiguredItemStack(entry, moduleConfig)
     local itemStacks = moduleConfig and moduleConfig.itemStacks
     local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
-    return not shouldSuppressItemStack(itemStack)
+    return shouldShowItemStack(itemStack)
         and itemStack.ids
-        and resolveItem(itemStack.ids, itemStack.showIfMissing == true)
+        and resolveFirstItem(itemStack.ids, itemStack.showIfMissing == true)
         or nil
 end
 
 local function resolveEntry(entry, moduleConfig)
-    -- Turn one saved config entry into one drawable icon, or nil if it should
-    -- not be shown right now. Built-in stack keys expand into their real entry
-    -- data before the normal kind-specific resolver runs.
     local kind, slotId, ids
     if entry.stackKey then
         local stack = BUILTIN_STACKS[entry.stackKey]
@@ -296,16 +237,14 @@ local function resolveEntry(entry, moduleConfig)
     else
         kind, slotId, ids = entry.kind, entry.slotId, entry.ids
     end
-    if kind == "equipSlot" then return resolveEquipSlot(slotId) end
-    if kind == "item" then return ids and resolveItem(ids) end
-    if kind == "itemStack" then return resolveItemStack(entry, moduleConfig) end
-    if kind == "spell" then return ids and resolveSpell(ids) end
+    if kind == "equipSlot" then return getEquipSlotIconData(slotId) end
+    if kind == "item" then return ids and resolveFirstItem(ids) end
+    if kind == "itemStack" then return resolveConfiguredItemStack(entry, moduleConfig) end
+    if kind == "spell" then return ids and resolveFirstKnownSpell(ids) end
 end
 
 local _resolved = {}
 local function resolveEntries(entries, moduleConfig)
-    -- Reuse one temporary result table on every layout pass to avoid allocating
-    -- a new table during frequent UI refreshes.
     wipe(_resolved)
     for _, entry in ipairs(entries) do
         local data = not entry.disabled and resolveEntry(entry, moduleConfig) or nil
@@ -319,9 +258,6 @@ end
 --------------------------------------------------------------------------------
 
 local function createIcon(parent, size, borderScale)
-    -- Build one square extra icon using Blizzard-like parts: artwork, mask,
-    -- cooldown swipe, border, count text, and optional shadow. The caller
-    -- reuses these icons from a pool instead of creating new ones every layout.
     local icon = CreateFrame("Button", nil, parent)
     icon:SetSize(size, size)
 
@@ -363,9 +299,6 @@ local function createIcon(parent, size, borderScale)
 end
 
 local function updateIconCooldown(icon)
-    -- Pick the right Blizzard cooldown API for the thing shown on this icon:
-    -- spells use spell cooldowns, equipment slots use inventory cooldowns, and
-    -- bag items use item cooldowns.
     if icon.spellId then
         local cdInfo = C_Spell.GetSpellCooldown(icon.spellId)
         if cdInfo and cdInfo.isOnGCD then
@@ -402,9 +335,7 @@ local function updateIconCooldown(icon)
     end
 end
 
-local function setIconCountText(icon, text)
-    -- Count text is optional. Nil means "hide the number"; any value means
-    -- "show this number on top of the icon."
+local function applyIconCountText(icon, text)
     if text ~= nil then
         icon.Count:SetText(tostring(text))
         icon.Count:Show()
@@ -415,15 +346,13 @@ local function setIconCountText(icon, text)
 end
 
 local function updateIconCountText(icon, globalConfig, config)
-    -- Item icons can show stack counts and spell icons can show charges. Only
-    -- show useful numbers: one item or a non-charge spell should stay clean.
     if not icon.Count then return end
     FrameUtil.ApplyFont(icon.Count, globalConfig, config)
 
     if icon.itemId and (not config or config.showStackCount ~= false) then
         local count = C_Item.GetItemCount(icon.itemId)
         if count and count > 1 then
-            setIconCountText(icon, count)
+            applyIconCountText(icon, count)
             return
         end
     end
@@ -431,54 +360,15 @@ local function updateIconCountText(icon, globalConfig, config)
     if icon.spellId and (not config or config.showCharges ~= false) then
         local charges = C_Spell.GetSpellCharges(icon.spellId)
         if charges and charges.maxCharges and charges.maxCharges > 1 and charges.currentCharges ~= nil then
-            setIconCountText(icon, charges.currentCharges)
+            applyIconCountText(icon, charges.currentCharges)
             return
         end
     end
 
-    setIconCountText(icon, nil)
-end
-
---- Caches and returns the cooldown number font from a sibling Blizzard icon.
---- ELI5: copy Blizzard's number style so ECM's extra icons look like they
---- belong in the same row.
-local function getSiblingFont(viewer)
-    local cached = viewer.__ecmCDFont
-    if cached then return cached[1], cached[2], cached[3] end
-
-    for _, child in ipairs({ viewer:GetChildren() }) do
-        local cooldown = child.Cooldown
-        if cooldown and cooldown.GetRegions then
-            local region = cooldown:GetRegions()
-            if region and region.IsObjectType and region:IsObjectType("FontString") and region.GetFont then
-                local fp, fs, ff = region:GetFont()
-                if fp and fs then
-                    viewer.__ecmCDFont = { fp, fs, ff }
-                    return fp, fs, ff
-                end
-            end
-        end
-    end
-end
-
-local function getFrameValue(frame, methodName)
-    -- Diagnostics should never create a new error while trying to describe the
-    -- original problem, so every optional frame read is protected.
-    if not frame or type(frame[methodName]) ~= "function" then
-        return nil
-    end
-
-    local ok, value = pcall(frame[methodName], frame)
-    if ok then
-        return value
-    end
-
-    return nil
+    applyIconCountText(icon, nil)
 end
 
 local function getItemFramesCount(itemFrames)
-    -- Count Blizzard's item frame array only when Lua is allowed to read it.
-    -- Some protected/tainted tables must not be iterated directly.
     if type(itemFrames) ~= "table" or not canAccessTable(itemFrames) then
         return nil
     end
@@ -492,56 +382,39 @@ local function getItemFramesCount(itemFrames)
     return ok and count or nil
 end
 
-local function getCombatState()
-    -- Combat state is only extra debug context. If the API is unavailable or
-    -- errors in tests, leave it blank instead of failing layout.
-    if type(InCombatLockdown) ~= "function" then
-        return nil
-    end
-
-    local ok, inCombat = pcall(InCombatLockdown)
-    return ok and inCombat == true or nil
-end
-
-local function getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames)
-    -- Build a small snapshot for error logs so bug reports explain what the
-    -- Blizzard viewer looked like when ECM could not safely read its children.
+local function getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
     local itemFramesAccessible = nil
     if type(itemFrames) == "table" then
         itemFramesAccessible = canAccessTable(itemFrames)
     end
 
     return {
-        viewerKey = viewerKey,
-        blizzardFrameKey = BLIZZ_KEY[viewerKey],
+        viewerKey = viewerConfig.key,
+        blizzardFrameKey = viewerConfig.blizzKey,
         reason = why,
         viewerExists = blizzFrame ~= nil,
-        viewerName = getFrameValue(blizzFrame, "GetName"),
-        viewerShown = getFrameValue(blizzFrame, "IsShown"),
-        viewerWidth = getFrameValue(blizzFrame, "GetWidth"),
-        viewerHeight = getFrameValue(blizzFrame, "GetHeight"),
-        viewerAlpha = getFrameValue(blizzFrame, "GetAlpha"),
-        viewerNumPoints = getFrameValue(blizzFrame, "GetNumPoints"),
+        viewerName = ns.GetFrameValue(blizzFrame, "GetName"),
+        viewerShown = ns.GetFrameValue(blizzFrame, "IsShown"),
+        viewerWidth = ns.GetFrameValue(blizzFrame, "GetWidth"),
+        viewerHeight = ns.GetFrameValue(blizzFrame, "GetHeight"),
+        viewerAlpha = ns.GetFrameValue(blizzFrame, "GetAlpha"),
+        viewerNumPoints = ns.GetFrameValue(blizzFrame, "GetNumPoints"),
         viewerIconScale = blizzFrame and blizzFrame.iconScale or nil,
         viewerChildXPadding = blizzFrame and blizzFrame.childXPadding or nil,
         viewerHasGetItemFrames = blizzFrame ~= nil and type(blizzFrame.GetItemFrames) == "function",
         itemFramesType = type(itemFrames),
         itemFramesAccessible = itemFramesAccessible,
         itemFramesArrayCount = getItemFramesCount(itemFrames),
-        inCombatLockdown = getCombatState(),
     }
 end
 
-local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
-    -- Blizzard owns the real cooldown viewer children. Read them carefully:
-    -- if another addon or secure code makes the list unsafe, log once and keep
-    -- the layout conservative instead of breaking the UI.
+local function getAccessibleItemFrames(blizzFrame, viewerConfig, why)
     local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
     if not ok then
-        local data = getViewerDiagnostics(blizzFrame, viewerKey, why, nil)
+        local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, nil)
         data.error = tostring(itemFrames)
-        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey,
-            "Unable to read cooldown viewer item frames for " .. viewerKey .. " during "
+        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerConfig.key,
+            "Unable to read cooldown viewer item frames for " .. viewerConfig.key .. " during "
             .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), data)
         return nil
     end
@@ -551,9 +424,9 @@ local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     end
 
     if not canAccessTable(itemFrames) then
-        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey,
-            "Cooldown viewer item frames are inaccessible for " .. viewerKey .. " during "
-            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames))
+        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerConfig.key,
+            "Cooldown viewer item frames are inaccessible for " .. viewerConfig.key .. " during "
+            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames))
         return nil
     end
 
@@ -565,9 +438,6 @@ end
 --------------------------------------------------------------------------------
 
 function ExtraIcons:CreateFrame()
-    -- Create one invisible parent plus one container per Blizzard viewer. The
-    -- containers hold visible extra icons; the anchor frames are invisible
-    -- measuring sticks for modules that chain after ExtraIcons.
     local parent = CreateFrame("Frame", "ECMExtraIcons", UIParent)
     parent:SetFrameStrata("MEDIUM")
     parent:SetSize(1, 1)
@@ -578,10 +448,13 @@ function ExtraIcons:CreateFrame()
         container:SetFrameStrata("MEDIUM")
         container:SetSize(1, 1)
 
-        local anchor = CreateFrame("Frame", "ECMExtraIcons_" .. v.key .. "Anchor", parent)
-        anchor:SetFrameStrata("MEDIUM")
-        anchor:SetSize(1, 1)
-        anchor:Hide()
+        local anchor
+        if v.ownsAnchor then
+            anchor = CreateFrame("Frame", "ECMExtraIcons_" .. v.key .. "Anchor", parent)
+            anchor:SetFrameStrata("MEDIUM")
+            anchor:SetSize(1, 1)
+            anchor:Hide()
+        end
 
         self._viewers[v.key] = {
             anchorFrame = anchor,
@@ -596,8 +469,6 @@ function ExtraIcons:CreateFrame()
 end
 
 function ExtraIcons:ShouldShow()
-    -- ExtraIcons only has something useful to do when the base module is
-    -- enabled and at least one Blizzard cooldown viewer row is visible.
     if not BarMixin.FrameProto.ShouldShow(self) then return false end
     for _, v in ipairs(VIEWERS) do
         local frame = _G[v.blizzKey]
@@ -608,19 +479,14 @@ end
 
 --- Returns the logical anchor frame used by chained ECM modules so they
 --- inherit the combined width of Blizzard icons plus appended extra icons.
---- ELI5: tell the next module to stand after the whole row, including our
---- added icons, not just after Blizzard's original row.
 function ExtraIcons:GetMainViewerAnchor()
     local vs = self._viewers and self._viewers.main
     local anchor = vs and vs.anchorFrame
     if anchor and anchor:IsShown() then return anchor end
-    return _G[BLIZZ_KEY.main]
+    return _G[MAIN_VIEWER_KEY]
 end
 
 function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, sharedOffsetX, moduleConfig, why)
-    -- Lay out one row. If there are no extra icons, restore the Blizzard row to
-    -- its saved home position. If there are extras, shift Blizzard left and put
-    -- the ECM icons immediately to its right so the combined row stays centered.
     local blizzFrame = _G[viewerConfig.blizzKey]
     local vs = self._viewers[viewerConfig.key]
     if not vs then return false end
@@ -632,7 +498,10 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
         and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
-        applyPoint(vs, blizzFrame, sharedOffsetX)
+        local p = vs.originalPoint
+        if p and blizzFrame then
+            FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] + sharedOffsetX, p[5] } })
+        end
         if isEditing then vs.originalPoint = nil end
         container:Hide()
         if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
@@ -644,22 +513,17 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
         vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewerConfig.borderScale)
     end
 
-    local fontPath, fontSize, fontFlags = getSiblingFont(blizzFrame)
     local globalConfig = self:GetGlobalConfig()
     local iconSize = DEFAULT_SIZE
     local viewerScale = blizzFrame.iconScale or 1.0
     local spacing = blizzFrame.childXPadding or 0
     local lastActive = nil
 
-    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig.key, why)
+    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig, why)
     if itemFrames then
         local ok, err = pcall(function()
             for _, itemFrame in ipairs(itemFrames) do
                 if itemFrame.isActive then
-                    -- Match Blizzard's active icon size. Hidden active frames
-                    -- still provide size, but they should not be used as the
-                    -- right-side anchor because anchoring to hidden frames can
-                    -- make extras jump or disappear.
                     iconSize = itemFrame:GetWidth() or iconSize
                     if itemFrame:IsShown() then lastActive = itemFrame end
                 end
@@ -668,7 +532,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
         if not ok then
             iconSize = DEFAULT_SIZE
             lastActive = nil
-            local data = getViewerDiagnostics(blizzFrame, viewerConfig.key, why, itemFrames)
+            local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
             data.error = tostring(err)
             ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerConfig.key,
                 "Unable to iterate cooldown viewer item frames for " .. viewerConfig.key .. " during "
@@ -686,7 +550,10 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
     -- on-screen centre already coincides with the original anchor; we only
     -- need to absorb the on-screen width of the gap + extra group.
     local extraOnScreen = (spacing + totalWidth) * viewerScale
-    applyPoint(vs, blizzFrame, sharedOffsetX - extraOnScreen / 2)
+    local p = vs.originalPoint
+    if p and blizzFrame then
+        FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] + sharedOffsetX - extraOnScreen / 2, p[5] } })
+    end
 
     local xOffset = 0
     for i, data in ipairs(items) do
@@ -701,26 +568,15 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
 
         icon.Icon:SetTexture(data.texture)
         icon.Icon:SetDesaturated(data.missing == true)
-        -- Place each pooled extra icon at its x offset inside the container.
-        -- LazySetAnchors skips the work if the icon is already there.
         FrameUtil.LazySetAnchors(icon, { { "LEFT", container, "LEFT", xOffset, 0 } })
         icon:Show()
 
         updateIconCooldown(icon)
         updateIconCountText(icon, globalConfig, moduleConfig)
 
-        if fontPath and fontSize then
-            local region = icon.Cooldown:GetRegions()
-            if region and region.IsObjectType and region:IsObjectType("FontString") and region.SetFont then
-                region:SetFont(fontPath, fontSize, fontFlags)
-            end
-        end
-
         xOffset = xOffset + iconSize + spacing
     end
 
-    -- Attach the container after the last shown Blizzard active icon, or after
-    -- the viewer itself if Blizzard has no visible active child to anchor to.
     FrameUtil.LazySetAnchors(container, { { "LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0 } })
     container:Show()
 
@@ -729,9 +585,6 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
 end
 
 function ExtraIcons:UpdateLayout(why)
-    -- This is the main layout entry point. It resolves configured entries,
-    -- updates both viewer rows, keeps shared rows centered, and then refreshes
-    -- cooldown/count text for any icons that were placed.
     if not self.InnerFrame or not self._viewers then return false end
 
     local shouldShow = self:ShouldShow()
@@ -745,7 +598,7 @@ function ExtraIcons:UpdateLayout(why)
     -- When hidden, leave viewers nil so each call gets empty entries, which
     -- restores Blizzard viewer positions and hides extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
-    local offsets = getSharedOffsets(self._viewers, why)
+    local offsets = getAdjustedOffsetsToRecenterViewer(self._viewers, why)
     local anyPlaced = false
 
     for _, v in ipairs(VIEWERS) do
@@ -772,8 +625,6 @@ function ExtraIcons:UpdateLayout(why)
 end
 
 function ExtraIcons:Refresh(why, force)
-    -- Refresh is lighter than layout: it keeps existing icons in place and only
-    -- updates timers/counts that can change while the row is already visible.
     if not BarMixin.FrameProto.Refresh(self, why, force) then return false end
     if not self._viewers then return false end
 
@@ -802,40 +653,28 @@ end
 --------------------------------------------------------------------------------
 
 function ExtraIcons:OnBagUpdateCooldown()
-    -- Bag item cooldowns can change without a full layout change, so only
-    -- refresh the visible cooldown swipes.
     self:ThrottledRefresh("OnBagUpdateCooldown")
 end
 
 function ExtraIcons:OnBagUpdateDelayed()
-    -- Bag contents changed. Re-resolve entries because an item may have been
-    -- gained, consumed, or removed.
     ns.Runtime.RequestLayout("ExtraIcons:OnBagUpdateDelayed")
 end
 
 function ExtraIcons:OnPlayerEquipmentChanged(slotId)
-    -- Only relayout for watched gear slots. This avoids work when unrelated
-    -- equipment changes cannot affect any configured extra icon.
     if self._trackedEquipSlots and self._trackedEquipSlots[slotId] then
         ns.Runtime.RequestLayout("ExtraIcons:OnPlayerEquipmentChanged")
     end
 end
 
 function ExtraIcons:OnPlayerEnteringWorld()
-    -- Instance/PvP state and Blizzard viewer state can change on zone load, so
-    -- rebuild the row after entering the world.
     ns.Runtime.RequestLayout("ExtraIcons:OnPlayerEnteringWorld")
 end
 
 function ExtraIcons:OnSpellsChanged()
-    -- Talents, racials, or spellbook updates can change which spell entries are
-    -- known by the character.
     ns.Runtime.RequestLayout("ExtraIcons:OnSpellsChanged")
 end
 
 --- Rebuilds the set of equipment slots referenced by current config.
---- ELI5: make a checklist of gear slots that matter, so equipment events can
---- ignore slots the user never configured.
 function ExtraIcons:_rebuildTrackedSlots()
     local tracked = {}
     local config = self:GetModuleConfig()
@@ -855,8 +694,6 @@ function ExtraIcons:_rebuildTrackedSlots()
 end
 
 function ExtraIcons:HookEditMode()
-    -- Edit Mode lets Blizzard move its own frames. Hide ECM extras while the
-    -- user is editing, then recache positions after Edit Mode closes.
     local mgr = _G.EditModeManagerFrame
     if not mgr or self._editModeHooked then return end
     self._editModeHooked = true
@@ -882,12 +719,9 @@ function ExtraIcons:HookEditMode()
     end)
 end
 
-function ExtraIcons:_hookViewer(viewerKey)
-    -- Watch Blizzard viewer show/hide/resize events. Whenever Blizzard changes
-    -- the base row, ask ECM to rebuild extras around the new row.
-    local blizzKey = BLIZZ_KEY[viewerKey]
-    local blizzFrame = _G[blizzKey]
-    local vs = self._viewers and self._viewers[viewerKey]
+function ExtraIcons:_hookViewer(viewerConfig)
+    local blizzFrame = _G[viewerConfig.blizzKey]
+    local vs = self._viewers and self._viewers[viewerConfig.key]
     if not blizzFrame or not vs or vs.hooked then return end
     vs.hooked = true
 
@@ -912,7 +746,7 @@ function ExtraIcons:_hookViewer(viewerKey)
         ns.Runtime.RequestLayout("ExtraIcons:OnSizeChanged")
     end)
 
-    ns.Log(self.Name, "Hooked " .. blizzKey)
+    ns.Log(self.Name, "Hooked " .. viewerConfig.blizzKey)
 end
 
 --------------------------------------------------------------------------------
@@ -920,13 +754,10 @@ end
 --------------------------------------------------------------------------------
 
 function ExtraIcons:OnInitialize()
-    -- Attach the shared bar-frame behavior used by ECM modules.
     BarMixin.AddFrameMixin(self, "ExtraIcons")
 end
 
 function ExtraIcons:OnEnable()
-    -- Start the module: create frames, register with the layout runtime, track
-    -- relevant equipment slots, and subscribe to game events that affect icons.
     self:EnsureFrame()
     ns.Runtime.RegisterFrame(self)
     self:_rebuildTrackedSlots()
@@ -947,14 +778,12 @@ function ExtraIcons:OnEnable()
         end
 
         self:HookEditMode()
-        for _, v in ipairs(VIEWERS) do self:_hookViewer(v.key) end
+        for _, v in ipairs(VIEWERS) do self:_hookViewer(v) end
         ns.Runtime.RequestLayout("ExtraIcons:OnEnable")
     end)
 end
 
 function ExtraIcons:OnDisable()
-    -- Stop the module and clear cached layout state so the next enable starts
-    -- from Blizzard's current frame positions.
     self:UnregisterAllEvents()
     self:UpdateLayout("OnDisable")
     ns.Runtime.UnregisterFrame(self)
