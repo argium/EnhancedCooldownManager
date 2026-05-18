@@ -33,109 +33,6 @@ local function cachePoint(vs, blizzFrame)
     vs.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
 end
 
-local function getHorizontalBounds(point, width)
-    if point == "LEFT" or point == "TOPLEFT" or point == "BOTTOMLEFT" then
-        return 0, width
-    elseif point == "RIGHT" or point == "TOPRIGHT" or point == "BOTTOMRIGHT" then
-        return -width, 0
-    end
-    local h = width / 2
-    return -h, h
-end
-
-local function getFrameDebugName(frame)
-    if not frame then return nil end
-    local name = frame.GetName and frame:GetName()
-    return name or tostring(frame)
-end
-
-local function getPointDebugData(point)
-    if not point then return nil end
-    return {
-        point = point[1],
-        relativeTo = getFrameDebugName(point[2]),
-        relativePoint = point[3],
-        x = point[4],
-        y = point[5],
-    }
-end
-
-local function logSharedOffsets(why, reason, mainFrame, utilFrame, mainPoint, utilPoint, offsets)
-    if not ns.IsDebugEnabled() then return end
-    ns.Log("ExtraIcons", "Shared offsets: " .. reason, {
-        reason = why,
-        main = {
-            shown = mainFrame and mainFrame:IsShown(),
-            width = mainFrame and mainFrame:GetWidth(),
-            point = getPointDebugData(mainPoint),
-            offset = offsets.main,
-        },
-        utility = {
-            shown = utilFrame and utilFrame:IsShown(),
-            width = utilFrame and utilFrame:GetWidth(),
-            point = getPointDebugData(utilPoint),
-            offset = offsets.utility,
-        },
-    })
-end
-
---- Computes per-viewer offsets that re-center both viewers as a single stacked
---- group when they share the same original anchor.
-local function getAdjustedOffsetsToRecenterViewer(viewers, why)
-    local offsets = { main = 0, utility = 0 }
-    local mainState, utilState = viewers.main, viewers.utility
-    if not mainState or not utilState then
-        logSharedOffsets(why, "missing viewer state", nil, nil, nil, nil, offsets)
-        return offsets
-    end
-
-    local mainFrame = _G[MAIN_VIEWER_KEY]
-    local utilFrame = _G[UTILITY_VIEWER_KEY]
-    cachePoint(mainState, mainFrame)
-    cachePoint(utilState, utilFrame)
-
-    local mp, up = mainState.originalPoint, utilState.originalPoint
-    if not mp or not up then
-        logSharedOffsets(why, "missing original point", mainFrame, utilFrame, mp, up, offsets)
-        return offsets
-    end
-    if mainFrame and up[2] == mainFrame then
-        logSharedOffsets(why, "utility anchored to main", mainFrame, utilFrame, mp, up, offsets)
-        return offsets
-    end
-    if up[1] ~= mp[1] or up[2] ~= mp[2] or up[3] ~= mp[3] or up[4] ~= mp[4] then
-        logSharedOffsets(why, "independent anchors", mainFrame, utilFrame, mp, up, offsets)
-        return offsets
-    end
-
-    local sharedLeft, sharedRight
-    for _, v in ipairs(VIEWERS) do
-        local frame = _G[v.blizzKey]
-        local p = viewers[v.key].originalPoint
-        if frame and frame:IsShown() and p then
-            local l, r = getHorizontalBounds(p[1], frame:GetWidth() or 0)
-            sharedLeft = sharedLeft and math.min(sharedLeft, l) or l
-            sharedRight = sharedRight and math.max(sharedRight, r) or r
-        end
-    end
-    if not sharedLeft then
-        logSharedOffsets(why, "no shown viewers", mainFrame, utilFrame, mp, up, offsets)
-        return offsets
-    end
-    local center = (sharedLeft + sharedRight) / 2
-
-    for _, v in ipairs(VIEWERS) do
-        local frame = _G[v.blizzKey]
-        local p = viewers[v.key].originalPoint
-        if frame and frame:IsShown() and p then
-            local l, r = getHorizontalBounds(p[1], frame:GetWidth() or 0)
-            offsets[v.key] = center - ((l + r) / 2)
-        end
-    end
-    logSharedOffsets(why, "computed", mainFrame, utilFrame, mp, up, offsets)
-    return offsets
-end
-
 local function updateMainViewerAnchor(vs, blizzFrame, rightFrame)
     local anchor = vs and vs.anchorFrame
     if not anchor then return end
@@ -485,12 +382,11 @@ function ExtraIcons:GetMainViewerAnchor()
     return _G[MAIN_VIEWER_KEY]
 end
 
-function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, sharedOffsetX, moduleConfig, why)
+function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, moduleConfig, why)
     local blizzFrame = _G[viewerConfig.blizzKey]
     local vs = self._viewers[viewerConfig.key]
     if not vs then return false end
     local container = vs.container
-    sharedOffsetX = sharedOffsetX or 0
     cachePoint(vs, blizzFrame)
 
     local items = (not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0)
@@ -499,7 +395,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
     if #items == 0 then
         local p = vs.originalPoint
         if p and blizzFrame then
-            FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] + sharedOffsetX, p[5] } })
+            FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4], p[5] } })
         end
         if isEditing then vs.originalPoint = nil end
         container:Hide()
@@ -551,7 +447,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
     local extraOnScreen = (spacing + totalWidth) * viewerScale
     local p = vs.originalPoint
     if p and blizzFrame then
-        FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] + sharedOffsetX - extraOnScreen / 2, p[5] } })
+        FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] - extraOnScreen / 2, p[5] } })
     end
 
     local xOffset = 0
@@ -597,12 +493,11 @@ function ExtraIcons:UpdateLayout(why)
     -- When hidden, leave viewers nil so each call gets empty entries, which
     -- restores Blizzard viewer positions and hides extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
-    local offsets = getAdjustedOffsetsToRecenterViewer(self._viewers, why)
     local anyPlaced = false
 
     for _, v in ipairs(VIEWERS) do
         local entries = viewers and viewers[v.key] or {}
-        if self:_updateSingleViewer(v, entries, isEditing, offsets[v.key], moduleConfig, why) then
+        if self:_updateSingleViewer(v, entries, isEditing, moduleConfig, why) then
             anyPlaced = true
         end
     end
