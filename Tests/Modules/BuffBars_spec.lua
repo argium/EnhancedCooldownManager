@@ -138,6 +138,7 @@ describe("BuffBars real source", function()
         }
         child.cooldownInfo = { spellID = layoutIndex }
         child.cooldownID = 1000 + layoutIndex
+        child.auraInstanceID = 3000 + layoutIndex
         child.iconTextureFileID = 2000 + layoutIndex
         child.RefreshCooldownInfo = function() end
         return child
@@ -838,6 +839,27 @@ describe("BuffBars real source", function()
         assert.is_true(BuffBars._viewerHooked)
     end)
 
+    it("registers UNIT_AURA on enable and requests layout only for player auras", function()
+        local captured = {}
+        function BuffBars:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        local reasons = {}
+        ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        BuffBars:OnInitialize()
+        BuffBars:OnEnable()
+
+        local cb = assert(captured["UNIT_AURA"], "expected UNIT_AURA registration")
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        cb(BuffBars, "UNIT_AURA", "target")
+        cb(BuffBars, "UNIT_AURA", "player")
+
+        assert.same({ "BuffBars:UNIT_AURA" }, reasons)
+    end)
+
     it("unregisters on disable", function()
         function BuffBars:UnregisterAllEvents() end
 
@@ -1126,12 +1148,15 @@ describe("BuffBars real source", function()
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
         end)
 
         it("does not compare secret status bar values when checking for timeless auras", function()
@@ -1156,17 +1181,69 @@ describe("BuffBars real source", function()
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
             child.RefreshCooldownInfo = function(self)
                 self.Bar.__value = 0
             end
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
             child:RefreshCooldownInfo()
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
             assert.are.equal(0, child.Bar.__value)
+        end)
+
+        it("restores the normal background after a timeless aura expires", function()
+            -- When a timeless aura expires, Blizzard clears auraInstanceID on the
+            -- child frame and re-runs the SetPoint/OnShow/layout hooks that drive
+            -- StyleChildBar. The unconditional styleBarBackground call at the top
+            -- of styleChildBar must reset the background texture/color so the
+            -- empty-bar fill applied during the active phase does not stick.
+            local child = makeStyledChild("Expiring", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
+            local function configure()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
+            end
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), configure)
+            assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
+
+            child.auraInstanceID = nil
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), configure)
+
+            assert.are.equal(ns.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
+            assert.same({ 0, 0, 0, 0.8 }, bgRegion.__vcolor)
+        end)
+
+        it("keeps the normal background for an empty bar slot when hide-when-inactive is off", function()
+            -- When Blizzard's "hide when inactive" is disabled, bar frames remain
+            -- visible even when the configured aura is not yet active. Their status
+            -- bar values are 0/0 like a timeless aura, and the spell name IS set
+            -- (the slot is configured for the spell). cooldownID still identifies
+            -- the configured slot, so auraInstanceID is the reliable active-aura signal.
+            -- The timeless background treatment must not apply; the configured
+            -- background color must be kept.
+            local child = makeStyledChild("Slot", true, 1)
+            child.Bar.__minMax = { 0, 0 }
+            child.Bar.__value = 0
+            child.auraInstanceID = nil
+            local bgRegion = makeBarBackground()
+
+            layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
+                ns.FrameUtil.GetBarBackground = function() return bgRegion end
+            end)
+
+            assert.are.equal(ns.Constants.FALLBACK_TEXTURE, bgRegion.__texture)
+            assert.same({ 0, 0, 0, 0.8 }, bgRegion.__vcolor)
         end)
 
         it("does not call Blizzard cooldown data methods while styling", function()
@@ -1177,12 +1254,15 @@ describe("BuffBars real source", function()
                 error("GetCooldownValues must not be called from addon styling")
             end
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
         end)
     end)
 

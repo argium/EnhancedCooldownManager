@@ -422,6 +422,17 @@ function BuffBars:OnEnable()
     self:RegisterEvent("ZONE_CHANGED", function(_, ...) self:OnZoneChanged(...) end)
     self:RegisterEvent("ZONE_CHANGED_INDOORS", function(_, ...) self:OnZoneChanged(...) end)
     self:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, ...) self:OnZoneChanged(...) end)
+    -- Blizzard updates each child's auraInstanceID synchronously inside its own
+    -- UNIT_AURA handler but does not always re-fire SetPoint/OnShow/OnHide on
+    -- bars whose layout order is unchanged (e.g. a configured slot whose aura
+    -- toggles on/off). Defer a layout pass so StyleChildBar re-evaluates the
+    -- active-aura background after Blizzard's update completes.
+    self:RegisterEvent("UNIT_AURA", function(_, _, unit)
+        if unit ~= "player" then
+            return
+        end
+        ns.Runtime.RequestLayout("BuffBars:UNIT_AURA")
+    end)
 
     C_Timer.After(0.1, function()
         self:HookViewer()
