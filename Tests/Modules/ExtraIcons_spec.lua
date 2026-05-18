@@ -235,6 +235,7 @@ describe("ExtraIcons real source", function()
             "C_Item",
             "C_PvP",
             "canaccesstable",
+            "issecretvalue",
             "ipairs",
         })
     end)
@@ -299,21 +300,30 @@ describe("ExtraIcons real source", function()
                 UnregisterFrame = function() end,
                 RequestLayout = function() end,
             },
-            FrameUtil = {
-                ApplyFont = function(fontString, appliedGlobalConfig, moduleConfig)
-                    applyFontCalls[#applyFontCalls + 1] = {
-                        fontString = fontString,
-                        globalConfig = appliedGlobalConfig,
-                        moduleConfig = moduleConfig,
-                    }
-                end,
-            },
             GetGlobalConfig = function()
                 return globalConfig
+            end,
+            -- ECM.lua is not loaded in this isolated source spec.
+            GetFrameValue = function(frame, methodName)
+                if not frame or type(frame[methodName]) ~= "function" then
+                    return nil
+                end
+                local ok, value = pcall(frame[methodName], frame)
+                if ok then return value end
+                return nil
             end,
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
+        _G.issecretvalue = function() return false end
+        TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+        ns.FrameUtil.ApplyFont = function(fontString, appliedGlobalConfig, moduleConfig)
+            applyFontCalls[#applyFontCalls + 1] = {
+                fontString = fontString,
+                globalConfig = appliedGlobalConfig,
+                moduleConfig = moduleConfig,
+            }
+        end
         _G.UIParent = TestHelpers.makeFrame({ name = "UIParent" })
         EditModeManagerFrame = TestHelpers.makeHookableFrame(false)
         UtilityCooldownViewer = TestHelpers.makeHookableFrame(true)
@@ -529,124 +539,6 @@ describe("ExtraIcons real source", function()
         }
     end
 
-    local function makeActiveFrames(count, width)
-        local frames = {}
-        for i = 1, count do
-            local frame = TestHelpers.makeFrame({ shown = true, width = width, height = width })
-            frame.isActive = true
-            frames[i] = frame
-        end
-        return frames
-    end
-
-    local function getPointAnchorOffset(point, width)
-        if point == "LEFT" or point == "TOPLEFT" or point == "BOTTOMLEFT" then
-            return 0
-        elseif point == "RIGHT" or point == "TOPRIGHT" or point == "BOTTOMRIGHT" then
-            return width
-        elseif point == "CENTER" or point == "TOP" or point == "BOTTOM" then
-            return width / 2
-        end
-
-        error("Unsupported point " .. tostring(point))
-    end
-
-    local function getFrameLeft(frame)
-        local point, relativeTo, relativePoint, x = frame:GetPoint(1)
-        local width = frame:GetWidth() or 0
-        local anchorX = x or 0
-
-        if relativeTo and relativeTo ~= UIParent then
-            local relativeLeft = getFrameLeft(relativeTo)
-            local relativeWidth = relativeTo:GetWidth() or 0
-            anchorX = relativeLeft + getPointAnchorOffset(relativePoint, relativeWidth) + (x or 0)
-        end
-
-        return anchorX - getPointAnchorOffset(point, width)
-    end
-
-    local function getViewerRowCenter(viewerFrame, container)
-        local rowWidth = viewerFrame:GetWidth() or 0
-        if container and container:IsShown() then
-            rowWidth = rowWidth + (viewerFrame.childXPadding or 0) + ((container:GetWidth() or 0) * (container.__scale or 1))
-        end
-        return getFrameLeft(viewerFrame) + (rowWidth / 2)
-    end
-
-    local function resolveAnchorTarget(anchorTarget)
-        if anchorTarget == "UIParent" then
-            return UIParent
-        elseif anchorTarget == "main" then
-            return EssentialCooldownViewer
-        elseif anchorTarget == "utility" then
-            return UtilityCooldownViewer
-        end
-        return nil
-    end
-
-    local function assertViewerRowsStayCenteredAfterMove(args)
-        UtilityCooldownViewer.childXPadding = 4
-        UtilityCooldownViewer.iconScale = 1.0
-        UtilityCooldownViewer:SetWidth(args.utilityViewerWidth)
-        UtilityCooldownViewer.GetItemFrames = function()
-            return makeActiveFrames(args.utilityActiveCount, 22)
-        end
-        UtilityCooldownViewer:SetPoint(
-            args.utilityAnchor.point,
-            resolveAnchorTarget(args.utilityAnchor.relativeTo),
-            args.utilityAnchor.relativePoint,
-            args.utilityAnchor.x,
-            args.utilityAnchor.y
-        )
-
-        EssentialCooldownViewer.childXPadding = 4
-        EssentialCooldownViewer.iconScale = 1.0
-        EssentialCooldownViewer:SetWidth(args.mainViewerWidth)
-        EssentialCooldownViewer.GetItemFrames = function()
-            return makeActiveFrames(args.mainActiveCount, 22)
-        end
-        EssentialCooldownViewer:SetPoint(
-            args.mainAnchor.point,
-            resolveAnchorTarget(args.mainAnchor.relativeTo),
-            args.mainAnchor.relativePoint,
-            args.mainAnchor.x,
-            args.mainAnchor.y
-        )
-
-        inventoryItemBySlot[13] = 101
-        inventoryTextureBySlot[13] = "trinket-1"
-        inventorySpellByItem[101] = 9001
-        inventoryItemBySlot[14] = 102
-        inventoryTextureBySlot[14] = "trinket-2"
-        inventorySpellByItem[102] = 9002
-        itemCounts[HEALTHSTONE_ID] = 1
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-
-        local config = makeViewersConfig(args.beforeUtility, args.beforeMain)
-        ExtraIcons.GetModuleConfig = function()
-            return config
-        end
-
-        assert.is_true(ExtraIcons:UpdateLayout("before-move"))
-
-        config.viewers.utility = args.afterUtility
-        config.viewers.main = args.afterMain
-
-        assert.is_true(ExtraIcons:UpdateLayout("after-move"))
-
-        local utilityCenter = getViewerRowCenter(UtilityCooldownViewer, ExtraIcons._viewers.utility.container)
-        local mainCenter = getViewerRowCenter(EssentialCooldownViewer, ExtraIcons._viewers.main.container)
-
-        assert.are.equal(mainCenter, utilityCenter)
-
-        if args.expectUtilityRelativeTo then
-            local _, relativeTo = UtilityCooldownViewer:GetPoint(1)
-            assert.are.equal(resolveAnchorTarget(args.expectUtilityRelativeTo), relativeTo)
-        end
-    end
-
     it("requires at least one viewer to be visible in ShouldShow", function()
         assert.is_true(ExtraIcons:ShouldShow())
 
@@ -713,8 +605,9 @@ describe("ExtraIcons real source", function()
     it("hooks viewers only once", function()
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
 
-        ExtraIcons:_hookViewer("utility")
-        ExtraIcons:_hookViewer("utility")
+        local utilityHookConfig = { key = "utility", blizzKey = "UtilityCooldownViewer" }
+        ExtraIcons:_hookViewer(utilityHookConfig)
+        ExtraIcons:_hookViewer(utilityHookConfig)
 
         assert.is_true(ExtraIcons._viewers.utility.hooked)
         assert.are.equal(1, UtilityCooldownViewer:GetHookCount("OnShow"))
@@ -784,7 +677,7 @@ describe("ExtraIcons real source", function()
             return enabled
         end
 
-        ExtraIcons:_hookViewer("utility")
+        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
         UtilityCooldownViewer._hooks.OnShow[1]()
         UtilityCooldownViewer._hooks.OnHide[1]()
         UtilityCooldownViewer._hooks.OnSizeChanged[1]()
@@ -1017,10 +910,6 @@ describe("ExtraIcons real source", function()
         assert.are.equal(14, vs.iconPool[2].slotId)
         assert.are.equal(COMBAT_POTION_ID, vs.iconPool[3].itemId)
         assert.are.equal(HEALTHSTONE_ID, vs.iconPool[4].itemId)
-        assert.same(
-            { "Fonts\\FRIZQT__.TTF", 17, "OUTLINE" },
-            vs.iconPool[1].Cooldown.__fontRegion.__font
-        )
 
         local point, relativeTo, relativePoint, x, y = UtilityCooldownViewer:GetPoint(1)
         assert.are.equal("CENTER", point)
@@ -1058,6 +947,70 @@ describe("ExtraIcons real source", function()
         assert.are.equal(activeFrame, anchorFrame)
         local _, _, _, x = UtilityCooldownViewer:GetPoint(1)
         assert.are.equal(87, x)
+    end)
+
+    it("anchors to the viewer when active item frames are hidden", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = false, width = 22, height = 22 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("hidden-active-frame"))
+
+        local _, anchorFrame = ExtraIcons._viewers.utility.container:GetPoint(1)
+        assert.are.equal(UtilityCooldownViewer, anchorFrame)
+    end)
+
+    it("does not reapply unchanged anchors on repeated layouts", function()
+        local activeFrame = TestHelpers.makeFrame({ shown = true, width = 22, height = 22 })
+        activeFrame.isActive = true
+        UtilityCooldownViewer.childXPadding = 4
+        UtilityCooldownViewer.iconScale = 1.0
+        UtilityCooldownViewer:SetWidth(22)
+        UtilityCooldownViewer.GetItemFrames = function()
+            return { activeFrame }
+        end
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
+
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("initial"))
+
+        local vs = ExtraIcons._viewers.utility
+        local viewerSetPoints = TestHelpers.getCalls(UtilityCooldownViewer, "SetPoint")
+        local viewerClears = TestHelpers.getCalls(UtilityCooldownViewer, "ClearAllPoints")
+        local containerSetPoints = TestHelpers.getCalls(vs.container, "SetPoint")
+        local containerClears = TestHelpers.getCalls(vs.container, "ClearAllPoints")
+        local iconSetPoints = TestHelpers.getCalls(vs.iconPool[1], "SetPoint")
+        local iconClears = TestHelpers.getCalls(vs.iconPool[1], "ClearAllPoints")
+
+        assert.is_true(ExtraIcons:UpdateLayout("unchanged"))
+
+        assert.are.equal(viewerSetPoints, TestHelpers.getCalls(UtilityCooldownViewer, "SetPoint"))
+        assert.are.equal(viewerClears, TestHelpers.getCalls(UtilityCooldownViewer, "ClearAllPoints"))
+        assert.are.equal(containerSetPoints, TestHelpers.getCalls(vs.container, "SetPoint"))
+        assert.are.equal(containerClears, TestHelpers.getCalls(vs.container, "ClearAllPoints"))
+        assert.are.equal(iconSetPoints, TestHelpers.getCalls(vs.iconPool[1], "SetPoint"))
+        assert.are.equal(iconClears, TestHelpers.getCalls(vs.iconPool[1], "ClearAllPoints"))
     end)
 
     it("does not iterate inaccessible GetItemFrames results", function()
@@ -1334,155 +1287,6 @@ describe("ExtraIcons real source", function()
         assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
         assert.is_true(ExtraIcons._viewers.main.container:IsShown())
     end)
-
-    for _, case in ipairs({
-        {
-            name = "keeps same-parent viewer rows centered when utility becomes empty",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
-            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {
-                { stackKey = "trinket1" },
-            },
-            afterUtility = {},
-            afterMain = {
-                { stackKey = "trinket1" },
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-        },
-        {
-            name = "keeps same-parent viewer rows centered when main becomes empty",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
-            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {
-                { stackKey = "trinket1" },
-            },
-            afterUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-                { stackKey = "trinket1" },
-            },
-            afterMain = {},
-        },
-        {
-            name = "keeps same-parent viewer rows centered when both viewers still have different ECM counts",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 0 },
-            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-                { stackKey = "trinket1" },
-            },
-            beforeMain = {
-                { stackKey = "trinket2" },
-            },
-            afterUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            afterMain = {
-                { stackKey = "trinket2" },
-                { stackKey = "trinket1" },
-            },
-        },
-        {
-            name = "keeps same-parent viewer rows centered for center anchors when utility becomes empty",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 0 },
-            mainAnchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {
-                { stackKey = "trinket1" },
-            },
-            afterUtility = {},
-            afterMain = {
-                { stackKey = "trinket1" },
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-        },
-        {
-            name = "keeps same-parent viewer rows centered for top-left anchors when utility becomes empty",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -100 },
-            mainAnchor = { point = "TOPLEFT", relativeTo = "UIParent", relativePoint = "TOPLEFT", x = 100, y = -60 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {
-                { stackKey = "trinket1" },
-            },
-            afterUtility = {},
-            afterMain = {
-                { stackKey = "trinket1" },
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-        },
-        {
-            name = "keeps same-parent viewer rows centered for right anchors when utility becomes empty",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 0 },
-            mainAnchor = { point = "RIGHT", relativeTo = "UIParent", relativePoint = "RIGHT", x = -100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {
-                { stackKey = "trinket1" },
-            },
-            afterUtility = {},
-            afterMain = {
-                { stackKey = "trinket1" },
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-        },
-        {
-            name = "keeps a utility viewer anchored to main centered without same-parent coupling",
-            utilityViewerWidth = 22,
-            utilityActiveCount = 1,
-            mainViewerWidth = 48,
-            mainActiveCount = 2,
-            utilityAnchor = { point = "LEFT", relativeTo = "main", relativePoint = "LEFT", x = 26, y = -40 },
-            mainAnchor = { point = "LEFT", relativeTo = "UIParent", relativePoint = "LEFT", x = 100, y = 40 },
-            beforeUtility = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            beforeMain = {},
-            afterUtility = {},
-            afterMain = {
-                { kind = "itemStack", itemStackId = "healthstones" },
-            },
-            expectUtilityRelativeTo = "main",
-        },
-    }) do
-        local currentCase = case
-        it(currentCase.name, function()
-            assertViewerRowsStayCenteredAfterMove(currentCase)
-        end)
-    end
 
     it("prefers demonic healthstone over the legacy healthstone", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })

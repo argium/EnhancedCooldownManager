@@ -115,6 +115,17 @@ function ns.CloneValue(value)
     return copy
 end
 
+--- Safely calls a frame method for diagnostics and returns nil on error.
+function ns.GetFrameValue(frame, methodName)
+    if not frame or type(frame[methodName]) ~= "function" then
+        return nil
+    end
+
+    local ok, value = pcall(frame[methodName], frame)
+    if ok then return value end
+    return nil
+end
+
 ns.Print = LibConsole:NewPrinter(function(message)
     print(ns.ColorUtil.Sparkle(L["ADDON_ABRV"] .. ":") .. " " .. message)
 end)

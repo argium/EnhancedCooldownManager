@@ -9,28 +9,19 @@ local ExtraIcons = ns.Addon:NewModule("ExtraIcons")
 ns.Addon.ExtraIcons = ExtraIcons
 
 local BUILTIN_STACKS = ns.Constants.BUILTIN_STACKS
-local RACIAL_ABILITIES = ns.Constants.RACIAL_ABILITIES
+local RACIAL_SPELL_ALIASES = ns.Constants.RACIAL_SPELL_ALIASES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
 local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
 local UTILITY_BORDER_SCALE = ns.Constants.EXTRA_ICON_UTILITY_BORDER_SCALE
 local canAccessTable = _G.canaccesstable
 
-local RACIAL_SPELL_ALIASES = {}
-for _, racial in pairs(RACIAL_ABILITIES) do
-    local spellIds = racial.spellIds or { racial.spellId }
-    for _, spellId in ipairs(spellIds) do
-        RACIAL_SPELL_ALIASES[spellId] = spellIds
-    end
-end
-
--- Ordered viewer keys mapped to their Blizzard frame globals.
+local MAIN_VIEWER_KEY = "EssentialCooldownViewer"
+local UTILITY_VIEWER_KEY = "UtilityCooldownViewer"
 local VIEWERS = {
-    { key = "main", blizzKey = "EssentialCooldownViewer", borderScale = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE }, ownsAnchor = true },
+    { key = "main", blizzKey = MAIN_VIEWER_KEY, borderScale = { MAIN_BORDER_SCALE, MAIN_BORDER_SCALE }, ownsAnchor = true },
     -- Utility icon frames render square; keep the overlay square so extras do not look short.
-    { key = "utility", blizzKey = "UtilityCooldownViewer", borderScale = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE } },
+    { key = "utility", blizzKey = UTILITY_VIEWER_KEY, borderScale = { UTILITY_BORDER_SCALE, UTILITY_BORDER_SCALE } },
 }
-local BLIZZ_KEY = {}
-for _, v in ipairs(VIEWERS) do BLIZZ_KEY[v.key] = v.blizzKey end
 
 --------------------------------------------------------------------------------
 -- Shared horizontal centering
@@ -40,66 +31,6 @@ local function cachePoint(vs, blizzFrame)
     if vs.originalPoint or not blizzFrame then return end
     local point, relativeTo, relativePoint, x, y = blizzFrame:GetPoint()
     vs.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
-end
-
-local function applyPoint(vs, blizzFrame, offsetX)
-    local p = vs and vs.originalPoint
-    if not p or not blizzFrame then return end
-    blizzFrame:ClearAllPoints()
-    blizzFrame:SetPoint(p[1], p[2], p[3], p[4] + (offsetX or 0), p[5])
-end
-
-local function horizontalBounds(point, width)
-    if point == "LEFT" or point == "TOPLEFT" or point == "BOTTOMLEFT" then
-        return 0, width
-    elseif point == "RIGHT" or point == "TOPRIGHT" or point == "BOTTOMRIGHT" then
-        return -width, 0
-    end
-    local h = width / 2
-    return -h, h
-end
-
---- Computes a per-viewer horizontal offset that re-centers both viewers as a
---- single stacked group when they share the same original anchor.
-local function getSharedOffsets(viewers)
-    local offsets = { main = 0, utility = 0 }
-    local mainState, utilState = viewers.main, viewers.utility
-    if not mainState or not utilState then return offsets end
-
-    local mainFrame = _G[BLIZZ_KEY.main]
-    local utilFrame = _G[BLIZZ_KEY.utility]
-    cachePoint(mainState, mainFrame)
-    cachePoint(utilState, utilFrame)
-
-    local mp, up = mainState.originalPoint, utilState.originalPoint
-    if not mp or not up then return offsets end
-    if mainFrame and up[2] == mainFrame then return offsets end
-    if up[1] ~= mp[1] or up[2] ~= mp[2] or up[3] ~= mp[3] or up[4] ~= mp[4] then
-        return offsets
-    end
-
-    local sharedLeft, sharedRight
-    for _, v in ipairs(VIEWERS) do
-        local frame = _G[v.blizzKey]
-        local p = viewers[v.key].originalPoint
-        if frame and frame:IsShown() and p then
-            local l, r = horizontalBounds(p[1], frame:GetWidth() or 0)
-            sharedLeft = sharedLeft and math.min(sharedLeft, l) or l
-            sharedRight = sharedRight and math.max(sharedRight, r) or r
-        end
-    end
-    if not sharedLeft then return offsets end
-    local center = (sharedLeft + sharedRight) / 2
-
-    for _, v in ipairs(VIEWERS) do
-        local frame = _G[v.blizzKey]
-        local p = viewers[v.key].originalPoint
-        if frame and frame:IsShown() and p then
-            local l, r = horizontalBounds(p[1], frame:GetWidth() or 0)
-            offsets[v.key] = center - ((l + r) / 2)
-        end
-    end
-    return offsets
 end
 
 local function updateMainViewerAnchor(vs, blizzFrame, rightFrame)
@@ -124,7 +55,7 @@ end
 -- Entry resolution
 --------------------------------------------------------------------------------
 
-local function resolveEquipSlot(slotId)
+local function getEquipSlotIconData(slotId)
     local itemId = GetInventoryItemID("player", slotId)
     if not itemId then return nil end
     local _, spellId = C_Item.GetItemSpell(itemId)
@@ -134,7 +65,7 @@ local function resolveEquipSlot(slotId)
     return { itemId = itemId, texture = texture, slotId = slotId }
 end
 
-local function resolveItem(ids, showIfMissing)
+local function resolveFirstItem(ids, showIfMissing)
     local missingData
 
     for _, entry in ipairs(ids) do
@@ -151,24 +82,24 @@ local function resolveItem(ids, showIfMissing)
     return missingData
 end
 
-local function resolveKnownSpell(spellId)
+local function getKnownSpellData(spellId)
     if spellId and C_SpellBook.IsSpellKnown(spellId) then
         local texture = C_Spell.GetSpellTexture(spellId)
         if texture then return { spellId = spellId, texture = texture } end
     end
 end
 
-local function resolveSpell(ids)
+local function resolveFirstKnownSpell(ids)
     for _, entry in ipairs(ids) do
         local spellId = type(entry) == "table" and entry.spellId or entry
-        local data = resolveKnownSpell(spellId)
+        local data = getKnownSpellData(spellId)
         if data then return data end
 
         local aliases = RACIAL_SPELL_ALIASES[spellId]
         if aliases then
             for _, aliasSpellId in ipairs(aliases) do
                 if aliasSpellId ~= spellId then
-                    data = resolveKnownSpell(aliasSpellId)
+                    data = getKnownSpellData(aliasSpellId)
                     if data then return data end
                 end
             end
@@ -176,24 +107,20 @@ local function resolveSpell(ids)
     end
 end
 
-local function isNonPvpInstance()
+local function shouldShowItemStack(itemStack)
+    if not itemStack then return false end
+    local hiddenInRatedPvp = itemStack.hideInRatedPvp and C_PvP.IsRatedMap()
     local inInstance, instanceType = IsInInstance()
-    return inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+    local hiddenInInstance = itemStack.hideInInstances and inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+    return not hiddenInRatedPvp and not hiddenInInstance
 end
 
-local function shouldSuppressItemStack(itemStack)
-    if not itemStack then return true end
-    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return true end
-    if itemStack.hideInInstances and isNonPvpInstance() then return true end
-    return false
-end
-
-local function resolveItemStack(entry, moduleConfig)
+local function getConfiguredItemStackData(entry, moduleConfig)
     local itemStacks = moduleConfig and moduleConfig.itemStacks
     local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
-    return not shouldSuppressItemStack(itemStack)
+    return shouldShowItemStack(itemStack)
         and itemStack.ids
-        and resolveItem(itemStack.ids, itemStack.showIfMissing == true)
+        and resolveFirstItem(itemStack.ids, itemStack.showIfMissing == true)
         or nil
 end
 
@@ -206,10 +133,10 @@ local function resolveEntry(entry, moduleConfig)
     else
         kind, slotId, ids = entry.kind, entry.slotId, entry.ids
     end
-    if kind == "equipSlot" then return resolveEquipSlot(slotId) end
-    if kind == "item" then return ids and resolveItem(ids) end
-    if kind == "itemStack" then return resolveItemStack(entry, moduleConfig) end
-    if kind == "spell" then return ids and resolveSpell(ids) end
+    if kind == "equipSlot" then return getEquipSlotIconData(slotId) end
+    if kind == "item" then return ids and resolveFirstItem(ids) end
+    if kind == "itemStack" then return getConfiguredItemStackData(entry, moduleConfig) end
+    if kind == "spell" then return ids and resolveFirstKnownSpell(ids) end
 end
 
 local _resolved = {}
@@ -304,7 +231,7 @@ local function updateIconCooldown(icon)
     end
 end
 
-local function setIconCountText(icon, text)
+local function applyIconCountText(icon, text)
     if text ~= nil then
         icon.Count:SetText(tostring(text))
         icon.Count:Show()
@@ -321,7 +248,7 @@ local function updateIconCountText(icon, globalConfig, config)
     if icon.itemId and (not config or config.showStackCount ~= false) then
         local count = C_Item.GetItemCount(icon.itemId)
         if count and count > 1 then
-            setIconCountText(icon, count)
+            applyIconCountText(icon, count)
             return
         end
     end
@@ -329,45 +256,12 @@ local function updateIconCountText(icon, globalConfig, config)
     if icon.spellId and (not config or config.showCharges ~= false) then
         local charges = C_Spell.GetSpellCharges(icon.spellId)
         if charges and charges.maxCharges and charges.maxCharges > 1 and charges.currentCharges ~= nil then
-            setIconCountText(icon, charges.currentCharges)
+            applyIconCountText(icon, charges.currentCharges)
             return
         end
     end
 
-    setIconCountText(icon, nil)
-end
-
---- Caches and returns the cooldown number font from a sibling Blizzard icon.
-local function getSiblingFont(viewer)
-    local cached = viewer.__ecmCDFont
-    if cached then return cached[1], cached[2], cached[3] end
-
-    for _, child in ipairs({ viewer:GetChildren() }) do
-        local cooldown = child.Cooldown
-        if cooldown and cooldown.GetRegions then
-            local region = cooldown:GetRegions()
-            if region and region.IsObjectType and region:IsObjectType("FontString") and region.GetFont then
-                local fp, fs, ff = region:GetFont()
-                if fp and fs then
-                    viewer.__ecmCDFont = { fp, fs, ff }
-                    return fp, fs, ff
-                end
-            end
-        end
-    end
-end
-
-local function getFrameValue(frame, methodName)
-    if not frame or type(frame[methodName]) ~= "function" then
-        return nil
-    end
-
-    local ok, value = pcall(frame[methodName], frame)
-    if ok then
-        return value
-    end
-
-    return nil
+    applyIconCountText(icon, nil)
 end
 
 local function getItemFramesCount(itemFrames)
@@ -384,49 +278,39 @@ local function getItemFramesCount(itemFrames)
     return ok and count or nil
 end
 
-local function getCombatState()
-    if type(InCombatLockdown) ~= "function" then
-        return nil
-    end
-
-    local ok, inCombat = pcall(InCombatLockdown)
-    return ok and inCombat == true or nil
-end
-
-local function getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames)
+local function getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
     local itemFramesAccessible = nil
     if type(itemFrames) == "table" then
         itemFramesAccessible = canAccessTable(itemFrames)
     end
 
     return {
-        viewerKey = viewerKey,
-        blizzardFrameKey = BLIZZ_KEY[viewerKey],
+        viewerKey = viewerConfig.key,
+        blizzardFrameKey = viewerConfig.blizzKey,
         reason = why,
         viewerExists = blizzFrame ~= nil,
-        viewerName = getFrameValue(blizzFrame, "GetName"),
-        viewerShown = getFrameValue(blizzFrame, "IsShown"),
-        viewerWidth = getFrameValue(blizzFrame, "GetWidth"),
-        viewerHeight = getFrameValue(blizzFrame, "GetHeight"),
-        viewerAlpha = getFrameValue(blizzFrame, "GetAlpha"),
-        viewerNumPoints = getFrameValue(blizzFrame, "GetNumPoints"),
+        viewerName = ns.GetFrameValue(blizzFrame, "GetName"),
+        viewerShown = ns.GetFrameValue(blizzFrame, "IsShown"),
+        viewerWidth = ns.GetFrameValue(blizzFrame, "GetWidth"),
+        viewerHeight = ns.GetFrameValue(blizzFrame, "GetHeight"),
+        viewerAlpha = ns.GetFrameValue(blizzFrame, "GetAlpha"),
+        viewerNumPoints = ns.GetFrameValue(blizzFrame, "GetNumPoints"),
         viewerIconScale = blizzFrame and blizzFrame.iconScale or nil,
         viewerChildXPadding = blizzFrame and blizzFrame.childXPadding or nil,
         viewerHasGetItemFrames = blizzFrame ~= nil and type(blizzFrame.GetItemFrames) == "function",
         itemFramesType = type(itemFrames),
         itemFramesAccessible = itemFramesAccessible,
         itemFramesArrayCount = getItemFramesCount(itemFrames),
-        inCombatLockdown = getCombatState(),
     }
 end
 
-local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
+local function getAccessibleItemFrames(blizzFrame, viewerConfig, why)
     local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
     if not ok then
-        local data = getViewerDiagnostics(blizzFrame, viewerKey, why, nil)
+        local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, nil)
         data.error = tostring(itemFrames)
-        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerKey,
-            "Unable to read cooldown viewer item frames for " .. viewerKey .. " during "
+        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerConfig.key,
+            "Unable to read cooldown viewer item frames for " .. viewerConfig.key .. " during "
             .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), data)
         return nil
     end
@@ -436,9 +320,9 @@ local function getAccessibleItemFrames(blizzFrame, viewerKey, why)
     end
 
     if not canAccessTable(itemFrames) then
-        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerKey,
-            "Cooldown viewer item frames are inaccessible for " .. viewerKey .. " during "
-            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerKey, why, itemFrames))
+        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerConfig.key,
+            "Cooldown viewer item frames are inaccessible for " .. viewerConfig.key .. " during "
+            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames))
         return nil
     end
 
@@ -460,10 +344,13 @@ function ExtraIcons:CreateFrame()
         container:SetFrameStrata("MEDIUM")
         container:SetSize(1, 1)
 
-        local anchor = CreateFrame("Frame", "ECMExtraIcons_" .. v.key .. "Anchor", parent)
-        anchor:SetFrameStrata("MEDIUM")
-        anchor:SetSize(1, 1)
-        anchor:Hide()
+        local anchor
+        if v.ownsAnchor then
+            anchor = CreateFrame("Frame", "ECMExtraIcons_" .. v.key .. "Anchor", parent)
+            anchor:SetFrameStrata("MEDIUM")
+            anchor:SetSize(1, 1)
+            anchor:Hide()
+        end
 
         self._viewers[v.key] = {
             anchorFrame = anchor,
@@ -492,22 +379,24 @@ function ExtraIcons:GetMainViewerAnchor()
     local vs = self._viewers and self._viewers.main
     local anchor = vs and vs.anchorFrame
     if anchor and anchor:IsShown() then return anchor end
-    return _G[BLIZZ_KEY.main]
+    return _G[MAIN_VIEWER_KEY]
 end
 
-function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, sharedOffsetX, moduleConfig, why)
+function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, moduleConfig, why)
     local blizzFrame = _G[viewerConfig.blizzKey]
     local vs = self._viewers[viewerConfig.key]
     if not vs then return false end
     local container = vs.container
-    sharedOffsetX = sharedOffsetX or 0
     cachePoint(vs, blizzFrame)
 
     local items = (not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0)
         and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
-        applyPoint(vs, blizzFrame, sharedOffsetX)
+        local p = vs.originalPoint
+        if p and blizzFrame then
+            FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4], p[5] } })
+        end
         if isEditing then vs.originalPoint = nil end
         container:Hide()
         if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
@@ -519,27 +408,26 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
         vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewerConfig.borderScale)
     end
 
-    local fontPath, fontSize, fontFlags = getSiblingFont(blizzFrame)
     local globalConfig = self:GetGlobalConfig()
     local iconSize = DEFAULT_SIZE
     local viewerScale = blizzFrame.iconScale or 1.0
     local spacing = blizzFrame.childXPadding or 0
     local lastActive = nil
 
-    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig.key, why)
+    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig, why)
     if itemFrames then
         local ok, err = pcall(function()
             for _, itemFrame in ipairs(itemFrames) do
                 if itemFrame.isActive then
                     iconSize = itemFrame:GetWidth() or iconSize
-                    lastActive = itemFrame
+                    if itemFrame:IsShown() then lastActive = itemFrame end
                 end
             end
         end)
         if not ok then
             iconSize = DEFAULT_SIZE
             lastActive = nil
-            local data = getViewerDiagnostics(blizzFrame, viewerConfig.key, why, itemFrames)
+            local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
             data.error = tostring(err)
             ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerConfig.key,
                 "Unable to iterate cooldown viewer item frames for " .. viewerConfig.key .. " during "
@@ -557,7 +445,10 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
     -- on-screen centre already coincides with the original anchor; we only
     -- need to absorb the on-screen width of the gap + extra group.
     local extraOnScreen = (spacing + totalWidth) * viewerScale
-    applyPoint(vs, blizzFrame, sharedOffsetX - extraOnScreen / 2)
+    local p = vs.originalPoint
+    if p and blizzFrame then
+        FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4] - extraOnScreen / 2, p[5] } })
+    end
 
     local xOffset = 0
     for i, data in ipairs(items) do
@@ -572,25 +463,16 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, shared
 
         icon.Icon:SetTexture(data.texture)
         icon.Icon:SetDesaturated(data.missing == true)
-        icon:ClearAllPoints()
-        icon:SetPoint("LEFT", container, "LEFT", xOffset, 0)
+        FrameUtil.LazySetAnchors(icon, { { "LEFT", container, "LEFT", xOffset, 0 } })
         icon:Show()
 
         updateIconCooldown(icon)
         updateIconCountText(icon, globalConfig, moduleConfig)
 
-        if fontPath and fontSize then
-            local region = icon.Cooldown:GetRegions()
-            if region and region.IsObjectType and region:IsObjectType("FontString") and region.SetFont then
-                region:SetFont(fontPath, fontSize, fontFlags)
-            end
-        end
-
         xOffset = xOffset + iconSize + spacing
     end
 
-    container:ClearAllPoints()
-    container:SetPoint("LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0)
+    FrameUtil.LazySetAnchors(container, { { "LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0 } })
     container:Show()
 
     if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
@@ -611,12 +493,11 @@ function ExtraIcons:UpdateLayout(why)
     -- When hidden, leave viewers nil so each call gets empty entries, which
     -- restores Blizzard viewer positions and hides extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
-    local offsets = getSharedOffsets(self._viewers)
     local anyPlaced = false
 
     for _, v in ipairs(VIEWERS) do
         local entries = viewers and viewers[v.key] or {}
-        if self:_updateSingleViewer(v, entries, isEditing, offsets[v.key], moduleConfig, why) then
+        if self:_updateSingleViewer(v, entries, isEditing, moduleConfig, why) then
             anyPlaced = true
         end
     end
@@ -732,10 +613,9 @@ function ExtraIcons:HookEditMode()
     end)
 end
 
-function ExtraIcons:_hookViewer(viewerKey)
-    local blizzKey = BLIZZ_KEY[viewerKey]
-    local blizzFrame = _G[blizzKey]
-    local vs = self._viewers and self._viewers[viewerKey]
+function ExtraIcons:_hookViewer(viewerConfig)
+    local blizzFrame = _G[viewerConfig.blizzKey]
+    local vs = self._viewers and self._viewers[viewerConfig.key]
     if not blizzFrame or not vs or vs.hooked then return end
     vs.hooked = true
 
@@ -760,7 +640,7 @@ function ExtraIcons:_hookViewer(viewerKey)
         ns.Runtime.RequestLayout("ExtraIcons:OnSizeChanged")
     end)
 
-    ns.Log(self.Name, "Hooked " .. blizzKey)
+    ns.Log(self.Name, "Hooked " .. viewerConfig.blizzKey)
 end
 
 --------------------------------------------------------------------------------
@@ -792,7 +672,7 @@ function ExtraIcons:OnEnable()
         end
 
         self:HookEditMode()
-        for _, v in ipairs(VIEWERS) do self:_hookViewer(v.key) end
+        for _, v in ipairs(VIEWERS) do self:_hookViewer(v) end
         ns.Runtime.RequestLayout("ExtraIcons:OnEnable")
     end)
 end
