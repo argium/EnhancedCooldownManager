@@ -1127,13 +1127,15 @@ describe("BuffBars real source", function()
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
-            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
         end)
 
         it("does not compare secret status bar values when checking for timeless auras", function()
@@ -1158,17 +1160,19 @@ describe("BuffBars real source", function()
             child.Bar.__minMax = { 0, 0 }
             child.Bar.__value = 0
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
             child.RefreshCooldownInfo = function(self)
                 self.Bar.__value = 0
             end
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
             child:RefreshCooldownInfo()
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
-            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
             assert.are.equal(0, child.Bar.__value)
         end)
 
