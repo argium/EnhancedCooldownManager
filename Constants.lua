@@ -184,6 +184,8 @@ local BUILTIN_STACKS = {
 --- Default display order for builtin stack keys (matches default viewers.utility order).
 local BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
 
+local DRACTHYR_WING_BUFFET_IDS = { 357214, 368970 } -- Base and enhanced evoker variants.
+
 --- Racial ability lookup keyed by UnitRace("player") raceFileName.
 --- One primary active racial per race.
 local RACIAL_ABILITIES = {
@@ -210,8 +212,15 @@ local RACIAL_ABILITIES = {
     Vulpera            = { spellId = 312411 }, -- Bag of Tricks
     MagharOrc          = { spellId = 274738 }, -- Ancestral Call
     Mechagnome         = { spellId = 312924 }, -- Hyper Organic Light Originator
-    Dracthyr           = { spellIds = { 357214, 368970 } }, -- Tail Swipe
+    Dracthyr           = { spellIds = DRACTHYR_WING_BUFFET_IDS }, -- Wing Buffet
     EarthenDwarf       = { spellId = 436717 }, -- Azerite Surge
+}
+
+--- Some racial abilities have different spell IDs. For example, Dracthyr evokers
+--- have a more potent wing buffet compared to other classes.
+local RACIAL_SPELL_ALIASES = {
+    [357214] = DRACTHYR_WING_BUFFET_IDS,
+    [368970] = DRACTHYR_WING_BUFFET_IDS,
 }
 
 local BLIZZARD_FRAMES = {
@@ -287,6 +296,7 @@ constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
 constants.BUILTIN_STACKS = BUILTIN_STACKS
 constants.BUILTIN_STACK_ORDER = BUILTIN_STACK_ORDER
 constants.RACIAL_ABILITIES = RACIAL_ABILITIES
+constants.RACIAL_SPELL_ALIASES = RACIAL_SPELL_ALIASES
 constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells
 constants.CLASS_COLORS = CLASS_COLORS
 constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes
