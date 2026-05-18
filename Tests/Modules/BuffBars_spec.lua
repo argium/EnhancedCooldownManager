@@ -839,6 +839,27 @@ describe("BuffBars real source", function()
         assert.is_true(BuffBars._viewerHooked)
     end)
 
+    it("registers UNIT_AURA on enable and requests layout only for player auras", function()
+        local captured = {}
+        function BuffBars:RegisterEvent(event, cb)
+            captured[event] = cb
+        end
+        local reasons = {}
+        ns.Runtime.RequestLayout = function(reason)
+            reasons[#reasons + 1] = reason
+        end
+
+        BuffBars:OnInitialize()
+        BuffBars:OnEnable()
+
+        local cb = assert(captured["UNIT_AURA"], "expected UNIT_AURA registration")
+        -- LibEvent dispatches cb(target, event, ...wowArgs)
+        cb(BuffBars, "UNIT_AURA", "target")
+        cb(BuffBars, "UNIT_AURA", "player")
+
+        assert.same({ "BuffBars:UNIT_AURA" }, reasons)
+    end)
+
     it("unregisters on disable", function()
         function BuffBars:UnregisterAllEvents() end
 
