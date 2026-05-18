@@ -212,14 +212,13 @@ end
 
 local function shouldShowItemStack(itemStack)
     if not itemStack then return false end
-    if itemStack.hideInRatedPvp and C_PvP.IsRatedMap() then return false end
-
+    local hiddenInRatedPvp = itemStack.hideInRatedPvp and C_PvP.IsRatedMap()
     local inInstance, instanceType = IsInInstance()
-    if itemStack.hideInInstances and inInstance and instanceType ~= "pvp" and instanceType ~= "arena" then return false end
-    return true
+    local hiddenInInstance = itemStack.hideInInstances and inInstance and instanceType ~= "pvp" and instanceType ~= "arena"
+    return not hiddenInRatedPvp and not hiddenInInstance
 end
 
-local function resolveConfiguredItemStack(entry, moduleConfig)
+local function getConfiguredItemStackData(entry, moduleConfig)
     local itemStacks = moduleConfig and moduleConfig.itemStacks
     local itemStack = itemStacks and itemStacks.byId and itemStacks.byId[entry.itemStackId]
     return shouldShowItemStack(itemStack)
@@ -239,7 +238,7 @@ local function resolveEntry(entry, moduleConfig)
     end
     if kind == "equipSlot" then return getEquipSlotIconData(slotId) end
     if kind == "item" then return ids and resolveFirstItem(ids) end
-    if kind == "itemStack" then return resolveConfiguredItemStack(entry, moduleConfig) end
+    if kind == "itemStack" then return getConfiguredItemStackData(entry, moduleConfig) end
     if kind == "spell" then return ids and resolveFirstKnownSpell(ids) end
 end
 

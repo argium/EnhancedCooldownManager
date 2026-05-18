@@ -723,8 +723,9 @@ describe("ExtraIcons real source", function()
     it("hooks viewers only once", function()
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
 
-        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
-        ExtraIcons:_hookViewer({ key = "utility", blizzKey = "UtilityCooldownViewer" })
+        local utilityHookConfig = { key = "utility", blizzKey = "UtilityCooldownViewer" }
+        ExtraIcons:_hookViewer(utilityHookConfig)
+        ExtraIcons:_hookViewer(utilityHookConfig)
 
         assert.is_true(ExtraIcons._viewers.utility.hooked)
         assert.are.equal(1, UtilityCooldownViewer:GetHookCount("OnShow"))
