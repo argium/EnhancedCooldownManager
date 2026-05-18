@@ -1206,13 +1206,15 @@ describe("BuffBars real source", function()
                 error("GetCooldownValues must not be called from addon styling")
             end
             local bgRegion = makeBarBackground()
+            local expectedTexture = "ExpectedStatusBarTexture"
 
             layoutSingleChild(child, defaultModule(), defaultGlobal(), function()
                 ns.FrameUtil.GetBarBackground = function() return bgRegion end
+                ns.FrameUtil.GetTexture = function() return expectedTexture end
             end)
 
             assert.same({ 0.4, 0.5, 0.6, 1.0 }, bgRegion.__vcolor)
-            assert.are.equal("Interface\\TargetingFrame\\UI-StatusBar", bgRegion.__texture)
+            assert.are.equal(expectedTexture, bgRegion.__texture)
         end)
     end)
 
