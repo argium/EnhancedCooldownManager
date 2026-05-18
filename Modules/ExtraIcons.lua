@@ -75,14 +75,53 @@ local function horizontalBounds(point, width)
     return -h, h
 end
 
+local function getFrameDebugName(frame)
+    if not frame then return nil end
+    local name = frame.GetName and frame:GetName()
+    return name or tostring(frame)
+end
+
+local function getPointDebugData(point)
+    if not point then return nil end
+    return {
+        point = point[1],
+        relativeTo = getFrameDebugName(point[2]),
+        relativePoint = point[3],
+        x = point[4],
+        y = point[5],
+    }
+end
+
+local function logSharedOffsets(why, reason, mainFrame, utilFrame, mainPoint, utilPoint, offsets)
+    if not ns.IsDebugEnabled() then return end
+    ns.Log("ExtraIcons", "Shared offsets: " .. reason, {
+        reason = why,
+        main = {
+            shown = mainFrame and mainFrame:IsShown(),
+            width = mainFrame and mainFrame:GetWidth(),
+            point = getPointDebugData(mainPoint),
+            offset = offsets.main,
+        },
+        utility = {
+            shown = utilFrame and utilFrame:IsShown(),
+            width = utilFrame and utilFrame:GetWidth(),
+            point = getPointDebugData(utilPoint),
+            offset = offsets.utility,
+        },
+    })
+end
+
 --- Computes a per-viewer horizontal offset that re-centers both viewers as a
 --- single stacked group when they share the same original anchor.
 --- ELI5: if two rows are stacked on the same nail, and one row becomes wider,
 --- nudge each row so the whole stack still looks centered on that nail.
-local function getSharedOffsets(viewers)
+local function getSharedOffsets(viewers, why)
     local offsets = { main = 0, utility = 0 }
     local mainState, utilState = viewers.main, viewers.utility
-    if not mainState or not utilState then return offsets end
+    if not mainState or not utilState then
+        logSharedOffsets(why, "missing viewer state", nil, nil, nil, nil, offsets)
+        return offsets
+    end
 
     local mainFrame = _G[BLIZZ_KEY.main]
     local utilFrame = _G[BLIZZ_KEY.utility]
@@ -90,9 +129,16 @@ local function getSharedOffsets(viewers)
     cachePoint(utilState, utilFrame)
 
     local mp, up = mainState.originalPoint, utilState.originalPoint
-    if not mp or not up then return offsets end
-    if mainFrame and up[2] == mainFrame then return offsets end
+    if not mp or not up then
+        logSharedOffsets(why, "missing original point", mainFrame, utilFrame, mp, up, offsets)
+        return offsets
+    end
+    if mainFrame and up[2] == mainFrame then
+        logSharedOffsets(why, "utility anchored to main", mainFrame, utilFrame, mp, up, offsets)
+        return offsets
+    end
     if up[1] ~= mp[1] or up[2] ~= mp[2] or up[3] ~= mp[3] or up[4] ~= mp[4] then
+        logSharedOffsets(why, "independent anchors", mainFrame, utilFrame, mp, up, offsets)
         return offsets
     end
 
@@ -106,7 +152,10 @@ local function getSharedOffsets(viewers)
             sharedRight = sharedRight and math.max(sharedRight, r) or r
         end
     end
-    if not sharedLeft then return offsets end
+    if not sharedLeft then
+        logSharedOffsets(why, "no shown viewers", mainFrame, utilFrame, mp, up, offsets)
+        return offsets
+    end
     local center = (sharedLeft + sharedRight) / 2
 
     for _, v in ipairs(VIEWERS) do
@@ -117,6 +166,7 @@ local function getSharedOffsets(viewers)
             offsets[v.key] = center - ((l + r) / 2)
         end
     end
+    logSharedOffsets(why, "computed", mainFrame, utilFrame, mp, up, offsets)
     return offsets
 end
 
@@ -695,7 +745,7 @@ function ExtraIcons:UpdateLayout(why)
     -- When hidden, leave viewers nil so each call gets empty entries, which
     -- restores Blizzard viewer positions and hides extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
-    local offsets = getSharedOffsets(self._viewers)
+    local offsets = getSharedOffsets(self._viewers, why)
     local anyPlaced = false
 
     for _, v in ipairs(VIEWERS) do
