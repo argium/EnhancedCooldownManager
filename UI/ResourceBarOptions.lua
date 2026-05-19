@@ -16,7 +16,6 @@ local EMPTY_RESOURCE_ICON =
     .. RESOURCE_ICON_SIZE
     .. "|t"
 
-
 local function createResourceColorName(colorClassName, label, iconClasses)
     local color = (C.CLASS_COLORS and C.CLASS_COLORS[colorClassName]) or COLOR_WHITE_HEX
     local icons = {}
@@ -29,7 +28,8 @@ local function createResourceColorName(colorClassName, label, iconClasses)
     end
 
     for i = startIndex, #iconClasses do
-        icons[#icons + 1] = "|A:classicon-" .. string.lower(iconClasses[i]) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
+        local iconClass = string.lower(iconClasses[i])
+        icons[#icons + 1] = "|A:classicon-" .. iconClass .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
     end
 
     return table.concat(icons, " ") .. " |cff" .. color .. label .. "|r"
