@@ -13,7 +13,6 @@ local RACIAL_SPELL_ALIASES = ns.Constants.RACIAL_SPELL_ALIASES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
 local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
 local UTILITY_BORDER_SCALE = ns.Constants.EXTRA_ICON_UTILITY_BORDER_SCALE
-local canAccessTable = _G.canaccesstable
 
 local MAIN_VIEWER_KEY = "EssentialCooldownViewer"
 local UTILITY_VIEWER_KEY = "UtilityCooldownViewer"
@@ -173,6 +172,7 @@ local function createIcon(parent, size, borderScale)
     icon.Cooldown:SetDrawSwipe(true)
     icon.Cooldown:SetHideCountdownNumbers(false)
     icon.Cooldown:SetSwipeTexture([[Interface\HUD\UI-HUD-CoolDownManager-Icon-Swipe]], 0, 0, 0, 0.2)
+    ---@diagnostic disable-next-line: missing-parameter, param-type-mismatch
     icon.Cooldown:SetEdgeTexture([[Interface\Cooldown\UI-HUD-ActionBar-SecondaryCooldown]])
 
     icon.Border = icon:CreateTexture(nil, "OVERLAY")
@@ -485,7 +485,7 @@ function ExtraIcons:UpdateLayout(why)
     local moduleConfig = self:GetModuleConfig()
     local isEditing = self._isEditModeActive
     if isEditing == nil then
-        local mgr = _G.EditModeManagerFrame
+        local mgr = EditModeManagerFrame
         isEditing = mgr and mgr:IsShown() or false
     end
 
@@ -588,7 +588,7 @@ end
 
 function ExtraIcons:HookEditMode()
     if self._editModeHooked then return end
-    local mgr = _G.EditModeManagerFrame
+    local mgr = EditModeManagerFrame
     self._editModeHooked = true
     self._isEditModeActive = mgr:IsShown()
 

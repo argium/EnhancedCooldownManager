@@ -23,11 +23,11 @@ local C = ns.Constants
 local L = ns.L
 
 --- Returns the global config section. Standalone accessor for non-module callers.
----@return table|nil
+---@return ECM_GlobalConfig
 function ns.GetGlobalConfig()
     local db = ns.Addon and ns.Addon.db
     local profile = db and db.profile
-    return profile and profile[C.CONFIG_SECTION_GLOBAL]
+    return profile and profile[C.CONFIG_SECTION_GLOBAL] or {}
 end
 
 --- Returns whether debug mode is enabled.
@@ -227,45 +227,6 @@ function ns.Log(module, message, data)
     end
 end
 
-local function getSecureVariableStatus(owner, key)
-    local ok, secure, taint
-    if key == nil then
-        ok, secure, taint = pcall(_G.issecurevariable, owner)
-    else
-        ok, secure, taint = pcall(_G.issecurevariable, owner, key)
-    end
-    if not ok then
-        return nil
-    end
-    return secure, taint
-end
-
-local function logTaint(key, reason, source)
-    local sourceName = source or "unknown"
-    ns.ErrorLogOnce("Taint", key, key .. " is tainted by " .. tostring(sourceName)
-        .. " during " .. tostring(reason or "unknown"), {
-        reason = reason,
-        source = sourceName,
-    })
-end
-
-function ns._CheckChatTaint(reason)
-    local secure, taint = getSecureVariableStatus("ChatFrameUtil")
-    if secure == false then
-        logTaint("ChatFrameUtil", reason, taint)
-    end
-
-    secure, taint = getSecureVariableStatus(_G.ChatFrameUtil, "SetLastTellTarget")
-    if secure == false then
-        logTaint("ChatFrameUtil.SetLastTellTarget", reason, taint)
-    end
-
-    secure, taint = getSecureVariableStatus(_G.ChatFrameMixin, "MessageEventHandler")
-    if secure == false then
-        logTaint("ChatFrameMixin.MessageEventHandler", reason, taint)
-    end
-end
-
 --- Shows a confirmation popup and reloads the UI on accept.
 --- ReloadUI is blocked in combat.
 ---@param text string
@@ -378,8 +339,8 @@ function mod:ChatCommand(input)
 
         local optionsModule = self:GetModule("Options", true)
         if optionsModule then
+            ---@cast optionsModule ECM_OptionsModule
             optionsModule:OpenOptions()
-            ns._CheckChatTaint("ChatCommand:options")
         end
         return
     end
@@ -478,6 +439,7 @@ function mod:HandleOpenOptionsAfterCombat()
 
     local optionsModule = self:GetModule("Options", true)
     if optionsModule then
+        ---@cast optionsModule ECM_OptionsModule
         optionsModule:OpenOptions()
     end
 end
@@ -556,7 +518,6 @@ function mod:OnEnable()
     end
 
     self:ShowReleasePopup()
-    ns._CheckChatTaint("OnEnable")
 end
 
 --- Re-evaluates module enable/disable states after a profile change and refreshes layout.

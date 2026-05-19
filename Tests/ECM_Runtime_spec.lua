@@ -256,7 +256,7 @@ describe("ECM.Runtime layout system", function()
             printedMessages[#printedMessages + 1] = message
         end
         _G.StaticPopupDialogs = {}
-        _G.StaticPopup_Show = function() end
+        _G.StaticPopup_Show = function(...) end
         _G.YES = "Yes"
         _G.NO = "No"
         _G.DevTool = nil
@@ -692,25 +692,6 @@ describe("ECM.Runtime layout system", function()
             timerQueue[1].callback()
 
             assert.same({ "ZONE_CHANGED" }, reasons)
-        end)
-
-        it("checks chat taint immediately on zone change events", function()
-            local taintReasons = {}
-            local libEvent = LibStub("LibEvent-1.0")
-            ns._CheckChatTaint = function(reason)
-                taintReasons[#taintReasons + 1] = reason
-            end
-
-            ns.Runtime.Enable(fakeAddon)
-
-            local addonFrame = assert(libEvent.embeds[fakeAddon].frame)
-            local handler = assert(addonFrame.__scripts and addonFrame.__scripts["OnEvent"])
-
-            handler(addonFrame, "ZONE_CHANGED")
-            handler(addonFrame, "ZONE_CHANGED_INDOORS")
-            handler(addonFrame, "PLAYER_ENTERING_WORLD")
-
-            assert.same({ "ZONE_CHANGED", "ZONE_CHANGED_INDOORS" }, taintReasons)
         end)
 
         it("ScheduleLayoutUpdate with a shorter delay supersedes a pending longer-delay timer", function()

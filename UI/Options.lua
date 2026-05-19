@@ -2,6 +2,9 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@class ECM_OptionsModule : AceModule Options module that opens and tracks ECM settings categories.
+---@field OpenOptions fun(self: ECM_OptionsModule) Opens the options UI to the last tracked category.
+
 local _, ns = ...
 local L = ns.L
 

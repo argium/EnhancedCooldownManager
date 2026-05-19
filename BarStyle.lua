@@ -2,6 +2,15 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@class ECM_BuffBarStatusBar : StatusBar Buff/external bar StatusBar with text child regions.
+---@field Name FontString|nil Spell name text.
+---@field Duration FontString|nil Duration text.
+---@field Pip Texture|nil Pip/spark texture.
+
+---@class ECM_BuffIconFrame : Frame Icon frame on a buff bar with application count.
+---@field Applications FontString|nil Stack count text.
+---@field __ecmSquareStyled boolean|nil One-time square-style flag.
+
 local _, ns = ...
 local FrameUtil = ns.FrameUtil
 
@@ -15,7 +24,7 @@ local FrameUtil = ns.FrameUtil
 --- Strips circular masks and hides overlay/border to produce a square icon.
 --- The heavy cleanup (mask removal, pcalls, region iteration) is cached on the
 --- frame via `__ecmSquareStyled` so it only runs once per icon frame.
----@param iconFrame Frame|nil
+---@param iconFrame ECM_BuffIconFrame|nil
 ---@param iconTexture Texture|nil
 ---@param iconOverlay Texture|nil
 ---@param debuffBorder Texture|nil
@@ -49,9 +58,9 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
     iconFrame.__ecmSquareStyled = true
 end
 
----@param frame Frame
----@param bar StatusBar
----@param iconFrame Frame|nil
+---@param frame ECM_BuffBarMixin
+---@param bar ECM_BuffBarStatusBar
+---@param iconFrame ECM_BuffIconFrame|nil
 ---@param config table|nil
 ---@param globalConfig table|nil
 local function styleBarHeight(frame, bar, iconFrame, config, globalConfig)
@@ -86,6 +95,7 @@ local function styleBarBackground(frame, barBG, config, globalConfig)
     -- so Blizzard cannot override our anchors. SetAllPoints does not fire
     -- SetPoint hooks, so no re-entrancy guard is needed.
     if not barBG.__ecmBGHooked then
+        ---@diagnostic disable-next-line: inject-field
         barBG.__ecmBGHooked = true
         barBG:SetParent(frame)
         hooksecurefunc(barBG, "SetPoint", function()
@@ -108,7 +118,7 @@ end
 --- Returns true if the module's _editLocked flag was set by this call.
 ---@param module table
 ---@param frame ECM_BuffBarMixin|Frame
----@param bar StatusBar
+---@param bar ECM_BuffBarStatusBar
 ---@param globalConfig table|nil
 ---@param spellColors ECM_SpellColorStore
 ---@param retryCount number|nil
@@ -224,8 +234,8 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     end
 end
 
----@param frame Frame
----@param iconFrame Frame|nil
+---@param frame ECM_BuffBarMixin
+---@param iconFrame ECM_BuffIconFrame|nil
 ---@param config table|nil
 local function styleBarIcon(frame, iconFrame, config)
     assert(frame ~= nil, "BarStyle.styleBarIcon requires a frame")
@@ -254,9 +264,9 @@ local function styleBarIcon(frame, iconFrame, config)
     end
 end
 
----@param frame Frame
----@param bar StatusBar
----@param iconFrame Frame|nil
+---@param frame ECM_BuffBarMixin
+---@param bar ECM_BuffBarStatusBar
+---@param iconFrame ECM_BuffIconFrame|nil
 ---@param config table|nil
 local function styleBarAnchors(frame, bar, iconFrame, config)
     assert(frame ~= nil, "BarStyle.styleBarAnchors requires a frame")
