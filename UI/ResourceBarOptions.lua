@@ -10,29 +10,29 @@ local RESOURCE_ICON_SIZE = 14
 local RESOURCE_ICON_SLOTS = 2
 -- Transparent texture slot for right-aligning rows with fewer class icons.
 local EMPTY_RESOURCE_ICON =
-    "|TInterface\\Buttons\\WHITE8X8:"
+    "|TInterface\\Common\\spacer:"
     .. RESOURCE_ICON_SIZE
     .. ":"
     .. RESOURCE_ICON_SIZE
-    .. ":0:0:8:8:0:0:0:0:0:0:0:0|t"
+    .. "|t"
 
 
 local function createResourceColorName(colorClassName, label, iconClasses)
     local color = (C.CLASS_COLORS and C.CLASS_COLORS[colorClassName]) or COLOR_WHITE_HEX
-    local prefix = ""
+    local icons = {}
     local iconCount = math.min(#iconClasses, RESOURCE_ICON_SLOTS)
     local padding = math.max(0, RESOURCE_ICON_SLOTS - iconCount)
     local startIndex = math.max(1, #iconClasses - RESOURCE_ICON_SLOTS + 1)
 
     for _ = 1, padding do
-        prefix = prefix .. EMPTY_RESOURCE_ICON
+        icons[#icons + 1] = EMPTY_RESOURCE_ICON
     end
 
     for i = startIndex, #iconClasses do
-        prefix = prefix .. "|A:classicon-" .. string.lower(iconClasses[i]) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
+        icons[#icons + 1] = "|A:classicon-" .. string.lower(iconClasses[i]) .. ":" .. RESOURCE_ICON_SIZE .. ":" .. RESOURCE_ICON_SIZE .. "|a"
     end
 
-    return prefix .. " |cff" .. color .. label .. "|r"
+    return table.concat(icons, " ") .. " |cff" .. color .. label .. "|r"
 end
 
 local RESOURCE_COLOR_DEFS = {
