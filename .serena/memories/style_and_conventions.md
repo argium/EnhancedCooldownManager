@@ -3,7 +3,7 @@
 ## Authoritative Docs
 - `AGENTS.md` is the repo-wide agent rule source.
 - `README.md` owns user-facing overview, install, and configuration.
-- `ARCHITECTURE.md` owns addon module boundaries, init chain, event flow, and public APIs; keep it current for addon-level design changes.
+- `docs/ARCHITECTURE.md` owns addon module boundaries, init chain, event flow, and public APIs; keep it current for addon-level design changes.
 - Library READMEs own each library's quick-start, API, schema, and tests: `LibSettingsBuilder`, `LibConsole`, `LibEvent`, and `LibLSMSettingsWidgets`.
 
 ## Mandatory Lua Rules

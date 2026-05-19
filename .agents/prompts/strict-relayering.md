@@ -71,6 +71,6 @@ Use `.agents/prompts/strict-relayering.md` to refactor `Modules/AuraTracking`.
 
 Keep public behavior stable for module registration and event outputs.
 External boundaries include WoW aura APIs, event subscriptions, and saved variable writes.
-Update `ARCHITECTURE.md` and any affected tests/load helpers.
+Update `docs/ARCHITECTURE.md` and any affected tests/load helpers.
 Run `busted Tests` and `luacheck . -q`.
 ```

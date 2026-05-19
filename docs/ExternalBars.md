@@ -2,7 +2,7 @@
 
 `ExternalBars` mirrors Blizzard's `ExternalDefensivesFrame` into ECM-owned bar rows. Unlike the aura-driven modules, it does not register its own aura events; Blizzard remains the authoritative source and ECM follows via hooks.
 
-This module is intentionally absent from the `ARCHITECTURE.md` Event Reference table because its data flow is hook-driven, not event-driven.
+This module is intentionally absent from the `docs/ARCHITECTURE.md` Event Reference table because its data flow is hook-driven, not event-driven.
 
 ## Summary
 

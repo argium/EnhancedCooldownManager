@@ -8,7 +8,7 @@ Authoritative source for repo-wide agent rules. Topic-specific docs own their ow
 | Doc | Owns |
 |---|---|
 | [README.md](README.md) | User-facing overview, install, configuration |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Module boundaries, init chain, event flow, public APIs |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module boundaries, init chain, event flow, public APIs |
 | [docs/BlizzardDeprecatedApis.md](docs/BlizzardDeprecatedApis.md) | Deprecated Blizzard API denylist |
 | [Libs/LibSettingsBuilder/README.md](Libs/LibSettingsBuilder/README.md) | Settings builder API and schema |
 | [Libs/LibConsole/README.md](Libs/LibConsole/README.md) | Slash-command library |
@@ -16,11 +16,18 @@ Authoritative source for repo-wide agent rules. Topic-specific docs own their ow
 | [Libs/LibLSMSettingsWidgets/README.md](Libs/LibLSMSettingsWidgets/README.md) | LSM picker templates |
 | [`.agents/prompts/default-refactor-cleanup.md`](.agents/prompts/default-refactor-cleanup.md) | Reusable prompt for applying the default implementation standard to future refactors |
 
-Keep `ARCHITECTURE.md` current for addon-level design changes; each library's README owns its quick-start, API, and tests.
+Keep `docs/ARCHITECTURE.md` current for addon-level design changes; each library's README owns its quick-start, API, and tests.
+Document architecture changes when they clarify ownership, module boundaries, or runtime flow for future maintainers.
 
 ---
 
 # Validation
+
+Run targeted validation for changed areas; docs-only prompt edits do not need runtime validation.
+
+- Root-level Lua, `Modules/`, or `UI/`: `busted Tests` and `luacheck . -q`.
+- `Libs/<Name>/`: that library's suite too.
+- Reserve unrelated full-suite runs for broad or risky code changes.
 
 ```sh
 busted Tests
@@ -31,30 +38,21 @@ busted --run liblsmsettingswidgets
 luacheck . -q
 ```
 
-- Changes to `Modules/`, `UI/`, or root-level `*.lua` must pass `busted Tests` and `luacheck . -q`.
-- Changes under `Libs/<Name>/` must also pass that library's suite.
-
 ---
 
 # Core Rules
 
-## Working Values
-
-- Less code is better: prefer the smallest complete solution that preserves behavior.
-- Keep implementation direct and explicit; avoid clever indirection, speculative abstractions, and compatibility paths without a current supported need.
-- Prefer deleting duplication, dead code, and trivial wrappers over adding new layers.
-- Document architecture changes where they help future maintainers understand ownership and flow.
-
 ## Default Implementation Standard
 
-This is the default implementation style. Apply it first before adding abstractions, wrappers, fallbacks, or compatibility seams.
+Apply this style before adding abstractions, wrappers, fallbacks, or compatibility seams.
 
-- Prefer direct calls to the real owner. Do not add wrapper methods, helper exports, or aliases unless they add behavior or preserve a documented public API.
-- Keep file-local helpers file-local. Public tables expose public APIs only; internal helpers are not exported for symmetry, organization, or test access.
-- Make ownership explicit at the call site. Local functions that operate on an instance take the owner as a parameter or become instance methods; they must not rely on implicit `self`.
-- Flatten control flow with early returns and single decision blocks. Do not compute temporary results only to return them later when an immediate return is clearer.
-- Use one protected operation around risky table iteration or callback execution instead of wrapping every iterator step in helper indirection.
-- Collapse single-use locals, single-caller helpers, fixed-literal mapping functions, and stale compatibility branches into their call sites.
+- Prefer the smallest complete solution that preserves behavior.
+- Keep implementation direct and explicit; avoid clever indirection and speculative seams.
+- Call the real owner directly. Add wrappers, aliases, or helper exports only when they add behavior or preserve a documented public API.
+- Keep internal helpers file-local. Public tables expose public APIs, lifecycle hooks, and intentional shared test seams only.
+- Make ownership explicit. Local functions that operate on an instance take the owner as a parameter or become instance methods; they must not rely on implicit `self`.
+- Flatten control flow with early returns and single decision blocks. Return directly when an intermediate local adds no clarity.
+- Collapse duplication, dead code, trivial passthrough wrappers/methods, fixed-literal indirection or mapping functions, single-caller helpers/abstractions without a clear, independently testable contract, and stale compatibility branches into their call sites.
 - When a plan identifies cleanup gaps, keep iterating until every item is either implemented, explicitly documented as intentionally deferred, or rejected with a clear reason.
 
 All Lua files start with:
@@ -67,13 +65,12 @@ All Lua files start with:
 
 ## Architecture
 
-- Prefer the simplest production code for current supported runtimes. No fallback paths, compatibility branches, defensive adapters, or built-in shims without a concrete supported environment that needs them.
-- Do not nil-guard methods, fields, or globals that are guaranteed to exist on current Retail (e.g., `Frame:GetRegions`, `Region:IsObjectType`, `Texture:GetMaskTexture`/`RemoveMaskTexture`, `:Hide`, `YES`/`NO`, `C_EditMode`). Call them directly. Guard only against optional third-party addons (e.g., `DevTool`), genuinely polymorphic shapes, or runtime data that may be absent.
+- Target current Retail WoW. Do not add fallback paths, compatibility branches, defensive adapters, or built-in shims without a concrete supported environment that needs them.
+- Do not nil-guard methods, fields, or globals guaranteed on current Retail (e.g., `Frame:GetRegions`, `Region:IsObjectType`, `Texture:GetMaskTexture`/`RemoveMaskTexture`, `:Hide`, `YES`/`NO`, `C_EditMode`). Call them directly. Guard only optional third-party addons (e.g., `DevTool`), genuinely polymorphic shapes, or runtime data that may be absent.
 - Keep one owner for shared state, derived values, utility functions, style metrics, and widget rendering details.
 - Use loose coupling through events, hooks, callbacks, or messages.
-- Do not add trivial passthrough wrappers, fixed-literal indirection, or single-caller abstractions without an independently testable contract.
-- Treat passthrough methods as an anti-pattern. If a method only forwards to another function, table, or shared helper without adding real behavior, delete it or call the real owner directly.
 - Prefer constant lookup tables and `O(1)` sets over mapping functions or linear scans for fixed load-time domains.
+- Use one direct `pcall` boundary around risky table iteration or callback execution instead of wrapping every step.
 - Remove dead code, stale fields, impossible branches, unused upvalues, and unused locale strings.
 - Clear critical state flags via `pcall` so one error cannot wedge later work.
 
@@ -81,9 +78,9 @@ All Lua files start with:
 
 - Mutable state belongs on the owning instance (`self._field`), not file-level locals. Prefix private fields/methods with `_`.
 - No forward declarations; reorder code instead. Alias shared modules once at file scope.
-- Functions used only within one file stay local. Do not attach file-local helpers to module tables just for organization, symmetry, or test access.
-- Attaching a function to a module table without using `self` is a smell. If it is also `_`-prefixed, that is a strong signal the function should be a `local function` instead of a table field.
-- Only attach functions to a module table when they are true cross-file APIs, lifecycle hooks, or intentionally shared test seams.
+- Functions used only within one file stay local. Do not attach helpers to module tables for organization, symmetry, or test access.
+- A module-table function that does not use `self` is a smell; if it is also `_`-prefixed, prefer a local function.
+- Attach functions to module tables only for true cross-file APIs, lifecycle hooks, or intentional shared test seams.
 - Prefer assertions for required parameters over guards and fallbacks.
 - Target WoW Lua 5.1: no `goto`, labels, `//`, bitwise operators, or newer Lua syntax.
 - Inline single-use locals into their sole call site. Compact trivial function bodies to one line when readable.
@@ -102,10 +99,10 @@ All Lua files start with:
 
 ## Tests
 
-- Existing tests are behavioral specifications. Do not invert, weaken, or rewrite a test unless the old behavior is explicitly obsolete; preserve equivalent coverage for the new behavior.
+- Existing tests are behavioral specifications. Do not invert, weaken, or rewrite them unless the old behavior is explicitly obsolete; preserve equivalent coverage for the new behavior.
 - Test load order mirrors TOC load order. Test files mirror source paths; library tests live under `Libs/<Name>/Tests/`.
-- Test production code directly. Do not mirror production logic in specs.
-- Do not preserve or introduce table-attached helper methods purely so specs can call them. Prefer testing the real public flow, or the actual shared owner of the logic.
+- Test production code directly. Do not mirror production logic in specs or preserve table-attached helpers just so specs can call them.
+- Prefer testing the real public flow, or the actual shared owner of the logic.
 - Stub the canonical function, not a wrapper or alias. If a stub diverges from real behavior, fix the stub.
 - Do not guard production APIs only to satisfy tests. If an API exists in the supported runtime/load order, tests must stub it.
 - Reuse `Tests/TestHelpers.lua` before creating new shared helpers.

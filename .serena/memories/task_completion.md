@@ -6,7 +6,7 @@
 
 ## Before Finishing
 - Keep the standard GPL header intact on every new or modified Lua file.
-- Keep `ARCHITECTURE.md` current for addon-level design changes.
+- Keep `docs/ARCHITECTURE.md` current for addon-level design changes.
 - Keep the relevant library README current for library API/schema/test changes.
 - Verify new constants live in `Constants.lua`; defaults live in `Defaults.lua`.
 - Review for duplication, dead code, stale fields, redundant guards/fallbacks, unused locale strings, avoidable allocations, and needless abstractions.

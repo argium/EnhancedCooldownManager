@@ -31,7 +31,7 @@ Implementation requirements:
 5. Flatten conditionals and return early when it makes the main path clearer.
 6. Inline single-use locals and helpers when doing so improves clarity.
 7. Preserve behavior and test coverage; do not weaken tests to make the refactor pass.
-8. Update `ARCHITECTURE.md` or library README files only when ownership, public API, or module boundaries change.
+8. Update `docs/ARCHITECTURE.md` or library README files only when ownership, public API, or module boundaries change.
 
 Validation requirements:
 - Run the targeted tests for changed areas first.

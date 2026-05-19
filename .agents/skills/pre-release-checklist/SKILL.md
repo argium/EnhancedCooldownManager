@@ -16,7 +16,7 @@ Verify release readiness for EnhancedCooldownManager with emphasis on schema mig
 3. If the options schema version increased, verify that the schema changes are incorporated into `Migration.lua`.
 4. Verify migration test coverage for every schema change.
 5. Verify black-box tests cover old saved-variable data migrating to the expected current shape.
-6. Ensure `AGENTS.md`, `ARCHITECTURE.md`, and documentation are accurate and consistent with the product code.
+6. Ensure `AGENTS.md`, `docs/ARCHITECTURE.md`, and documentation are accurate and consistent with the product code.
 7. Ask the user whether `RELEASE_POPUP_VERSION` in `Constants.lua` needs to be updated so that a release prompt is displayed again.
 8. If `RELEASE_POPUP_VERSION` needs to be updated, confirm `WHATS_NEW_BODY` in `Locales/en.lua` has been updated in this release.
 9. Verify the release preconditions below.

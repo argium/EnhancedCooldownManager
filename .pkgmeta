@@ -22,7 +22,6 @@ externals:
 
 ignore:
   - AGENTS.md
-  - ARCHITECTURE.md
   - Tests
   - TODO.md
   - '**/*.html'
