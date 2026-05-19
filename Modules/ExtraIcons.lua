@@ -265,7 +265,7 @@ local function updateIconCountText(icon, globalConfig, config)
 end
 
 local function getItemFramesCount(itemFrames)
-    if type(itemFrames) ~= "table" or not canAccessTable(itemFrames) then
+    if type(itemFrames) ~= "table" or not canaccesstable(itemFrames) then
         return nil
     end
 
@@ -281,7 +281,7 @@ end
 local function getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
     local itemFramesAccessible = nil
     if type(itemFrames) == "table" then
-        itemFramesAccessible = canAccessTable(itemFrames)
+        itemFramesAccessible = canaccesstable(itemFrames)
     end
 
     return {
@@ -318,7 +318,7 @@ local function getAccessibleItemFrames(blizzFrame, viewerConfig, why)
         return nil
     end
 
-    if not canAccessTable(itemFrames) then
+    if not canaccesstable(itemFrames) then
         ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerConfig.key,
             "Cooldown viewer item frames are inaccessible for " .. viewerConfig.key .. " during "
             .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames))
