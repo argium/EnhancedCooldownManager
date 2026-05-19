@@ -2,7 +2,27 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@diagnostic disable: need-check-nil, redundant-parameter
+
+---@class RuneBarFrame : BarInnerFrame Rune bar inner frame with fragmented sub-bars and animation state.
+---@field FragmentedBars StatusBar[]|nil Array of StatusBar fragments, one per rune.
+---@field _maxResources number|nil Maximum rune count.
+---@field _readySet table|nil Per-frame ready state lookup (reused).
+---@field _cdLookup table|nil Per-frame cooldown lookup (reused).
+---@field _lastReadySet table|nil Snapshot of previous ready states.
+---@field _lastBarWidth number|nil Cached bar width for change detection.
+---@field _lastBarHeight number|nil Cached bar height for change detection.
+---@field _displayOrder table|nil Reused display order buffer.
+---@field _cdSortBuf table|nil Reused cooldown sort buffer.
+---@field _lastValueUpdate number|nil Timestamp of last value update.
+
 local _, ns = ...
+
+---@class RuneBar : BarProto Rune bar module for Death Knight rune display.
+---@field InnerFrame RuneBarFrame|nil
+---@field EnsureTicks fun(self: RuneBar, count: number, parentFrame: Frame, poolKey: string|nil) Ensures rune tick textures exist.
+---@field LayoutResourceTicks fun(self: RuneBar, maxResources: number, color: ECM_Color|table|nil, tickWidth: number|nil, poolKey: string|nil) Positions rune divider ticks.
+---@field RegisterEvent fun(self: RuneBar, event: string, callback: function)
 local RuneBar = ns.Addon:NewModule("RuneBar")
 local C = ns.Constants
 local FrameUtil = ns.FrameUtil
@@ -65,7 +85,7 @@ local function applyRuneFragmentVisual(frag, isReady, cd, color)
 end
 
 --- Creates or returns fragmented sub-bars for runes.
----@param bar Frame
+---@param bar RuneBarFrame
 ---@param maxResources number
 ---@param tex string Texture path
 local function ensureFragmentedBars(bar, maxResources, tex)
@@ -100,7 +120,7 @@ end
 
 --- Updates fragmented rune display (individual bars per rune).
 --- Only repositions bars when rune ready states change to avoid flickering.
----@param bar Frame
+---@param bar RuneBarFrame
 ---@param maxRunes number
 ---@param moduleConfig table
 ---@param globalConfig table
@@ -201,7 +221,7 @@ end
 --- Triggers a full layout refresh when rune ready/CD states change.
 --- Self-stops the animation ticker when all runes are ready.
 ---@param self RuneBar
----@param frame Frame
+---@param frame RuneBarFrame
 local function updateRuneValues(self, frame)
     local frags = frame.FragmentedBars
     if not frags then
@@ -283,7 +303,7 @@ function RuneBar:Refresh(why, force)
 
     local cfg = self:GetModuleConfig()
     local globalConfig = self:GetGlobalConfig()
-    local frame = self.InnerFrame
+    local frame = assert(self.InnerFrame, "InnerFrame required")
     local maxRunes = C.RUNEBAR_MAX_RUNES
 
     if frame._maxResources ~= maxRunes then
@@ -321,7 +341,7 @@ function RuneBar:_StartAnimationTicker()
     end
     self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
         if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
-            updateRuneValues(self, self.InnerFrame)
+            updateRuneValues(self, self.InnerFrame --[[@as RuneBarFrame]])
         end
     end)
 end

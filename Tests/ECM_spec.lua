@@ -141,7 +141,7 @@ describe("ECM layout system", function()
             printedMessages[#printedMessages + 1] = message
         end
         _G.StaticPopupDialogs = {}
-        _G.StaticPopup_Show = function() end
+        _G.StaticPopup_Show = function(...) end
         _G.YES = "Yes"
         _G.NO = "No"
         _G.DevTool = nil
@@ -459,28 +459,6 @@ describe("ECM layout system", function()
             assert.is_truthy(printedMessages[2]:find("errorKey=other-key", 1, true))
         end)
 
-        it("reports tainted chat reply helpers once during enable", function()
-            _G._testDB.profile.global.errorLogging = true
-            _G.ChatFrameUtil = { SetLastTellTarget = function() end }
-            _G.issecurevariable = function(owner, key)
-                if owner == _G.ChatFrameUtil and key == "SetLastTellTarget" then
-                    return false, "EnhancedCooldownManager"
-                end
-                return true
-            end
-
-            fakeAddon:OnEnable()
-            fakeAddon:OnEnable()
-
-            local taintMessages = 0
-            for _, message in ipairs(printedMessages) do
-                if message:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true) then
-                    assert.is_truthy(message:find("by EnhancedCooldownManager during OnEnable", 1, true))
-                    taintMessages = taintMessages + 1
-                end
-            end
-            assert.are.equal(1, taintMessages)
-        end)
     end)
 
     describe("release popup", function()

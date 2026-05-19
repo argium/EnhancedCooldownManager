@@ -7,15 +7,43 @@
 -- by name, spell ID, cooldown ID, or texture file ID. Includes persistence and
 -- public APIs for per-spell color customization.
 
+---@alias ECM_SpellColorKeyField "spellName"|"spellID"|"cooldownID"|"textureFileID"
+
+---@class ECM_SpellColorKey Spell color identity assembled from one or more supported key fields.
+---@field keyType ECM_SpellColorKeyField Primary key field type.
+---@field primaryKey string|number Primary key value.
+---@field spellName string|nil Spell name key.
+---@field spellID number|nil Spell ID key.
+---@field cooldownID number|nil Cooldown ID key.
+---@field textureFileID number|nil Texture file ID key.
+---@field Matches fun(self: ECM_SpellColorKey, other: ECM_SpellColorKey|table|nil): boolean Gets whether another key identifies the same logical spell color entry.
+---@field Merge fun(self: ECM_SpellColorKey, other: ECM_SpellColorKey|table|nil): ECM_SpellColorKey|nil Merges another matching key into this key.
+---@field ToString fun(self: ECM_SpellColorKey): string Gets a debug string for the key.
+---@field ToArray fun(self: ECM_SpellColorKey): table Gets key values in tier order.
+
+---@class ECM_SpellColorKeyType : ECM_SpellColorKey Runtime metatable for spell color keys.
+
+---@class ECM_SpellColorStore Spell color storage facade for one options scope.
+---@field _scope string Store scope name.
+---@field _configAccessor (fun(): table|nil)|nil Optional config accessor override.
+---@field _discoveredKeys ECM_SpellColorKey[] Runtime-discovered keys from visible bars.
+---@field _SetConfigAccessor fun(self: ECM_SpellColorStore, accessor: fun(): table|nil) Sets the config accessor used by this store.
+---@field GetColorByKey fun(self: ECM_SpellColorStore, key: ECM_SpellColorKey|table|nil): ECM_Color|nil Gets the configured color for a key.
+---@field GetAllColorEntries fun(self: ECM_SpellColorStore): table[] Gets deduplicated color entries for the current class/spec.
+---@field SetColorByKey fun(self: ECM_SpellColorStore, key: ECM_SpellColorKey|table|nil, color: ECM_Color) Sets the configured color for a key.
+---@field SetDefaultColor fun(self: ECM_SpellColorStore, color: ECM_Color) Sets the default color for this store scope.
+---@field ResetColorByKey fun(self: ECM_SpellColorStore, key: ECM_SpellColorKey|table|nil): boolean, boolean, boolean, boolean Resets the configured color for a key.
+---@field ReconcileAllKeys fun(self: ECM_SpellColorStore, keys: ECM_SpellColorKey[]|nil): number Reconciles and repairs persisted key metadata.
+---@field RemoveEntriesByKeys fun(self: ECM_SpellColorStore, keys: (ECM_SpellColorKey|table)[]): ECM_SpellColorKey[] Removes persisted and discovered entries matching keys.
+---@field DiscoverBar fun(self: ECM_SpellColorStore, frame: ECM_BuffBarMixin) Registers a visible bar in the discovered key cache.
+---@field ClearDiscoveredKeys fun(self: ECM_SpellColorStore) Clears the runtime discovered key cache.
+---@field ClearCurrentSpecColors fun(self: ECM_SpellColorStore): number Clears persisted colors for the current class/spec.
+---@field GetColorForBar fun(self: ECM_SpellColorStore, frame: ECM_BuffBarMixin|Frame): table|nil Gets the configured color for a bar frame.
+---@field GetDefaultColor fun(self: ECM_SpellColorStore): table Gets the default color for this store scope.
+
 local _, ns = ...
 
 local C = ns.Constants
-
----@class ECM_SpellColorStore
----@field _scope string
----@field _configAccessor (fun(): table|nil)|nil
----@field _discoveredKeys ECM_SpellColorKey[]
----@field _SetConfigAccessor fun(self: ECM_SpellColorStore, accessor: fun(): table|nil)
 
 local SpellColors = {}
 ns.SpellColors = SpellColors
@@ -61,17 +89,8 @@ end
 -- SpellColorKeyType class
 ---------------------------------------------------------------------------
 
----@class ECM_SpellColorKeyType : ECM_SpellColorKey
 local SpellColorKeyType = {}
 SpellColorKeyType.__index = SpellColorKeyType
-
----@class ECM_SpellColorKey
----@field keyType "spellName"|"spellID"|"cooldownID"|"textureFileID"
----@field primaryKey string|number
----@field spellName string|nil
----@field spellID number|nil
----@field cooldownID number|nil
----@field textureFileID number|nil
 
 ---@param spellName string|nil
 ---@param spellID number|nil
@@ -222,6 +241,7 @@ function SpellColorKeyType:ToString()
     )
 end
 
+---@return table values Key values in tier order.
 function SpellColorKeyType:ToArray()
     return { self.spellName, self.spellID, self.cooldownID, self.textureFileID }
 end
@@ -236,6 +256,9 @@ SpellColors.NormalizeKey = normalizeKey
 --- Returns true when two keys identify the same logical spell-color entry.
 --- Both operands are normalized first so callers can pass either a
 --- `ECM_SpellColorKey` or a raw payload accepted by `NormalizeKey`.
+---@param left ECM_SpellColorKey|table|nil
+---@param right ECM_SpellColorKey|table|nil
+---@return boolean
 function SpellColors.KeysMatch(left, right)
     return keysMatch(normalizeKey(left), normalizeKey(right))
 end
@@ -243,11 +266,15 @@ end
 --- Merges identifiers from two matching keys into a single normalized key.
 --- Both operands are normalized first so callers can pass either a
 --- `ECM_SpellColorKey` or a raw payload accepted by `NormalizeKey`.
+---@param base ECM_SpellColorKey|table|nil
+---@param other ECM_SpellColorKey|table|nil
+---@return ECM_SpellColorKey|nil
 function SpellColors.MergeKeys(base, other)
     return mergeKeys(normalizeKey(base), normalizeKey(other))
 end
 
 -- WoW uses Lua 5.1 (global `unpack`), busted tests use Lua 5.3+ (`table.unpack`).
+---@diagnostic disable-next-line: undefined-field
 local unpack = _G.unpack or table.unpack
 
 ---------------------------------------------------------------------------
@@ -353,7 +380,7 @@ local function normalizeEntryMetadata(entry, normalized)
     end
 
     local changed = scrubLegacyColorMetadata(entry.value)
-    local desired = buildEntryMeta(normalized)
+    local desired = assert(buildEntryMeta(normalized), "entry metadata required")
     local current = type(entry.meta) == "table" and entry.meta or nil
     if
         not current
@@ -488,6 +515,7 @@ function SpellColors.Get(scope)
 end
 
 -- Not used by production code; retained for tests that need to swap config sources after construction.
+---@param accessor fun(): table|nil
 function SpellColorStore:_SetConfigAccessor(accessor)
     self._configAccessor = accessor
 end
@@ -866,7 +894,7 @@ function SpellColorStore:GetColorForBar(frame)
     if not (frame and frame.__ecmHooked) then
         ns.Log("SpellColors", "GetColorForBar - invalid bar frame", {
             frame = frame,
-            nameExists = frame and type(frame.Name) == "table" and type(frame.Name.GetText) == "function",
+            nameExists = frame and frame.Bar and type(frame.Bar.Name) == "table" and type(frame.Bar.Name.GetText) == "function",
             iconExists = frame and type(frame.Icon) == "table" and type(frame.Icon.GetRegions) == "function",
         })
         return nil

@@ -8,9 +8,6 @@ if not lib or not lib._loadState or not lib._loadState.open then
     return
 end
 
-local ADD = _G.ADD
-local REMOVE = _G.REMOVE
-
 local internal = lib._internal
 local foundation = internal.foundation
 local interop = internal.interop
@@ -379,7 +376,7 @@ local function refreshEditorCollectionRow(row, item)
     row._removeButton:ClearAllPoints()
     row._removeButton:SetPoint("LEFT", row._swatch, "RIGHT", 8, 0)
     row._removeButton:SetSize((item.remove and item.remove.width) or 70, 22)
-    row._removeButton:SetText((item.remove and item.remove.text) or REMOVE or "Remove")
+    row._removeButton:SetText((item.remove and item.remove.text) or REMOVE)
     row._removeButton:SetScript("OnClick", function()
         if item.remove and item.remove.onClick then
             item.remove.onClick(item, row)
@@ -631,7 +628,7 @@ local function ensureModeInputRow(row)
     row._submitButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row._submitButton:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     row._submitButton:SetSize(44, 22)
-    row._submitButton:SetText(ADD or "Add")
+    row._submitButton:SetText(ADD)
 
     row._previewLabel:SetPoint("RIGHT", row._submitButton, "LEFT", -6, 0)
 
@@ -860,7 +857,7 @@ local function refreshModeInputRow(row, trailer, sectionData)
             activeRow._previewLabel:Hide()
         end
 
-        activeRow._submitButton:SetText(submitText or ADD or "Add")
+        activeRow._submitButton:SetText(submitText or ADD)
         setSimpleTooltip(activeRow._submitButton, submitTooltip)
         activeRow._submitButton:SetScript("OnClick", function()
             if currentTrailer.onSubmit and canSubmit then

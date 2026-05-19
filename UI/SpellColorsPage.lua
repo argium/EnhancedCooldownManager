@@ -85,7 +85,7 @@ end
 
 ---@return boolean
 local function isSpellColorsReconcileRestricted()
-    return _G.UnitAffectingCombat("player") or InCombatLockdown() or IsInInstance()
+    return UnitAffectingCombat("player") or InCombatLockdown() or IsInInstance()
 end
 
 ---@param rows { key: ECM_SpellColorKey }[]|nil

@@ -2,6 +2,67 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
+---@alias AnchorPoint string
+
+---@class ECM_EditModeFrame : Frame Frame registered with LibEditMode.
+---@field editModeName string|nil Edit Mode registration name.
+
+---@class ECM_EditModeFrameOptions Options used to register a frame with LibEditMode.
+---@field name string Edit Mode display name.
+---@field defaultPosition ECM_EditModePosition|nil Default frame position.
+---@field onPositionChanged fun(layoutName: string, point: string, x: number, y: number) Callback invoked when the frame is moved.
+---@field hideSelection fun(): boolean|nil Predicate that hides the LibEditMode selection frame when true.
+---@field settings table[]|nil LibEditMode settings entries.
+
+---@class FrameProto Frame mixin that owns visibility, positioning, Edit Mode registration, and config access.
+---@field _configKey string|nil Config key for this frame's section.
+---@field _editModeRegisteredFrame Frame|nil Frame already registered with Edit Mode.
+---@field _lastUpdate number|nil Timestamp of the most recent throttled refresh.
+---@field IsHidden boolean|nil Whether the frame is currently hidden.
+---@field InnerFrame Frame|nil Inner WoW frame owned by this mixin.
+---@field Name string Name of the frame.
+---@field ChainRightPoint fun(point: string|nil, fallback: string): string Gets the matching right-side anchor point.
+---@field NormalizeGrowDirection fun(direction: string|nil): string Gets a supported grow direction.
+---@field GetGlobalConfig fun(self: FrameProto): ECM_GlobalConfig Gets the live global configuration.
+---@field RegisterEvent fun(self: FrameProto, event: string, callback: function) Registers an event callback.
+---@field UnregisterEvent fun(self: FrameProto, event: string) Unregisters an event callback.
+---@field UnregisterAllEvents fun(self: FrameProto) Unregisters all event callbacks.
+---@field GetModuleConfig fun(self: FrameProto): table|nil Gets the live module configuration.
+---@field GetNextChainAnchor fun(self: FrameProto, frameName: string|nil, anchorMode: string|nil): Frame, boolean Gets the previous frame in the module chain.
+---@field EnsureFrame fun(self: FrameProto) Ensures the inner frame exists and is registered with Edit Mode.
+---@field IsEnabled fun(self: FrameProto): boolean Gets whether the module is enabled.
+---@field ShouldShow fun(self: FrameProto): boolean Gets whether the frame should currently be shown.
+---@field ShouldRegisterEditMode fun(self: FrameProto): boolean Gets whether the frame should be registered with Edit Mode.
+---@field CreateFrame fun(self: FrameProto): Frame Creates the inner frame.
+---@field CalculateLayoutParams fun(self: FrameProto): table Gets layout parameters for the current anchoring mode.
+---@field ApplyFramePosition fun(self: FrameProto): table|nil Applies the current frame position.
+---@field UpdateLayout fun(self: FrameProto, why: string|nil): boolean Updates frame layout.
+---@field SetHidden fun(self: FrameProto, hidden: boolean) Sets whether the frame is hidden.
+---@field Refresh fun(self: FrameProto, why: string|nil, force: boolean|nil): boolean Refreshes frame state.
+---@field ThrottledRefresh fun(self: FrameProto, why: string|nil, immediate: boolean|nil): boolean Refreshes frame state subject to throttling.
+---@field IsReady fun(self: FrameProto): boolean Gets whether the module is ready for layout updates.
+---@field _SaveEditModePosition fun(self: FrameProto, layoutName: string, point: string, x: number, y: number) Saves an Edit Mode position.
+---@field _RegisterEditMode fun(self: FrameProto) Registers the frame with Edit Mode.
+
+---@class BarInnerFrame : Frame Inner frame for bar modules with StatusBar and tick regions.
+---@field StatusBar StatusBar Value display bar.
+---@field TicksFrame Frame Container for tick mark textures.
+---@field TextValue FontString|nil Text overlay for value display.
+---@field TextFrame Frame|nil Container frame for text overlay.
+---@field SetText fun(self: BarInnerFrame, text: string|number|nil) Sets the displayed text value.
+---@field SetTextVisible fun(self: BarInnerFrame, shown: boolean) Sets whether the displayed text is visible.
+
+---@class BarProto : FrameProto Status bar layer with ticks, text, and value refresh.
+---@field InnerFrame BarInnerFrame|nil Inner frame with StatusBar and tick children.
+---@field tickPool table<number, Texture>|nil Default pool of tick mark textures.
+---@field EnsureTicks fun(self: BarProto, count: number, parentFrame: Frame, poolKey: string|nil) Ensures a tick texture pool has enough visible ticks.
+---@field HideAllTicks fun(self: BarProto, poolKey: string|nil) Hides all ticks in a tick texture pool.
+---@field LayoutResourceTicks fun(self: BarProto, maxResources: number, color: ECM_Color|table|nil, tickWidth: number|nil, poolKey: string|nil) Positions ticks evenly as resource dividers.
+---@field LayoutValueTicks fun(self: BarProto, statusBar: StatusBar, ticks: table, maxValue: number, defaultColor: ECM_Color, defaultWidth: number, poolKey: string|nil) Positions ticks at specific resource values.
+---@field GetStatusBarValues fun(self: BarProto): number|nil, number|nil, number|nil, boolean Gets the current bar value details.
+---@field GetStatusBarColor fun(self: BarProto): ECM_Color Gets the current status bar color.
+---@field GetTickSpec fun(self: BarProto): table|nil Gets tick layout details for the current refresh.
+
 local _, ns = ...
 local C = ns.Constants
 local L = ns.L
@@ -17,6 +78,7 @@ EditMode.Lib = LibEditMode
 ns.EditMode = EditMode
 
 --- Gets the active Edit Mode layout name.
+---@return string|nil layoutName
 function EditMode.GetActiveLayoutName()
     return LibEditMode:GetActiveLayoutName()
 end
@@ -42,6 +104,7 @@ function EditMode.GetPosition(positions, layoutName)
     return { point = C.EDIT_MODE_DEFAULT_POINT, x = 0, y = 0 }, activeLayoutName
 end
 
+--- Saves an Edit Mode position for a layout.
 ---@param container table|nil
 ---@param fieldName string
 ---@param layoutName string
@@ -60,8 +123,8 @@ function EditMode.SavePosition(container, fieldName, layoutName, point, x, y)
     container[fieldName][layoutName] = { point = point, x = x, y = y }
 end
 
----@param frame Frame|nil
----@param options table
+---@param frame ECM_EditModeFrame|nil
+---@param options ECM_EditModeFrameOptions
 function EditMode.RegisterFrame(frame, options)
     if not frame then
         return
@@ -113,14 +176,6 @@ end)
 -- FrameProto — base frame layer (positioning, visibility, edit mode, config)
 --------------------------------------------------------------------------------
 
----@alias AnchorPoint string
-
----@class FrameProto : AceModule Frame mixin that owns visibility and config access.
----@field _configKey string|nil Config key for this frame's section.
----@field IsHidden boolean|nil Whether the frame is currently hidden.
----@field InnerFrame Frame|nil Inner WoW frame owned by this mixin.
----@field Name string Name of the frame.
-
 local FrameProto = {}
 
 --- Returns the effective root anchor for chained modules.
@@ -142,10 +197,10 @@ local function getPrimaryChainAnchor()
 end
 
 --- Determine the correct anchor for this specific frame in the fixed order.
---- @param frameName string|nil The name of the current frame, or nil if first in chain.
---- @param anchorMode string|nil The anchor mode to filter by (defaults to ANCHORMODE_CHAIN).
---- @return Frame The frame to anchor to.
---- @return boolean isFirst True if this is the first frame in the chain.
+---@param frameName string|nil The name of the current frame, or nil if first in chain.
+---@param anchorMode string|nil The anchor mode to filter by (defaults to ANCHORMODE_CHAIN).
+---@return Frame anchor The frame to anchor to.
+---@return boolean isFirst True if this is the first frame in the chain.
 function FrameProto:GetNextChainAnchor(frameName, anchorMode)
     anchorMode = anchorMode or C.ANCHORMODE_CHAIN
 
@@ -182,11 +237,12 @@ function FrameProto:GetNextChainAnchor(frameName, anchorMode)
     return getPrimaryChainAnchor(), true
 end
 
-function FrameProto:SetHidden(hide)
-    self.IsHidden = hide
+---@param hidden boolean
+function FrameProto:SetHidden(hidden)
+    self.IsHidden = hidden
     if self.InnerFrame then
         -- Hide immediately, but defer showing until the next layout pass to ensure proper anchoring.
-        if hide then
+        if hidden then
             self.InnerFrame:Hide()
         else
             ns.Runtime.RequestLayout("SetHidden")
@@ -207,6 +263,7 @@ function FrameProto:ShouldRegisterEditMode()
     return true
 end
 
+---@return Frame frame
 function FrameProto:CreateFrame()
     local globalConfig = self:GetGlobalConfig()
     local moduleConfig = self:GetModuleConfig()
@@ -274,7 +331,7 @@ local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     local anchor, isFirst = self:GetNextChainAnchor(self.Name, mode)
 
     local directionKey = isDetached and "detachedGrowDirection" or "moduleGrowDirection"
-    local growsUp = self.NormalizeGrowDirection(globalConfig and globalConfig[directionKey]) == C.GROW_DIRECTION_UP
+    local growsUp = FrameProto.NormalizeGrowDirection(globalConfig and globalConfig[directionKey]) == C.GROW_DIRECTION_UP
 
     local gap
     if isDetached then
@@ -305,8 +362,8 @@ end
 --- Modules with custom positioning (e.g. BuffBars) override this.
 ---@return table params Layout parameters: mode, anchor, isFirst, anchorPoint, anchorRelativePoint, offsetX, offsetY, width, height
 function FrameProto:CalculateLayoutParams()
-    local globalConfig = self:GetGlobalConfig()
-    local moduleConfig = self:GetModuleConfig()
+    local globalConfig = assert(self:GetGlobalConfig(), "global config required")
+    local moduleConfig = assert(self:GetModuleConfig(), "module config required")
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
     if mode == C.ANCHORMODE_FREE then
         local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
@@ -330,7 +387,7 @@ end
 --- Handles ShouldShow check, layout calculation, and anchor positioning.
 ---@return table|nil params Layout params if shown, nil if hidden
 function FrameProto:ApplyFramePosition()
-    local frame = self.InnerFrame
+    local frame = assert(self.InnerFrame, "InnerFrame required")
     if not self:ShouldShow() then
         frame:Hide()
         return nil
@@ -370,9 +427,9 @@ end
 ---@param why string|nil
 ---@return boolean
 function FrameProto:UpdateLayout(why)
-    local globalConfig = self:GetGlobalConfig()
-    local moduleConfig = self:GetModuleConfig()
-    local frame = self.InnerFrame
+    local globalConfig = assert(self:GetGlobalConfig(), "global config required")
+    local moduleConfig = assert(self:GetModuleConfig(), "module config required")
+    local frame = assert(self.InnerFrame, "InnerFrame required")
     local borderConfig = moduleConfig.border
 
     local params = self:ApplyFramePosition()
@@ -404,17 +461,17 @@ function FrameProto:UpdateLayout(why)
 end
 
 --- Handles common refresh logic for FrameProto-derived frames.
---- @param why string|nil Optional debug string for why the refresh was triggered.
---- @param force boolean|nil Whether to force a refresh, even if the bar is hidden.
---- @return boolean continue True if the frame should continue refreshing, false to skip.
+---@param why string|nil Optional debug string for why the refresh was triggered.
+---@param force boolean|nil Whether to force a refresh, even if the bar is hidden.
+---@return boolean continue True if the frame should continue refreshing, false to skip.
 function FrameProto:Refresh(why, force)
     return force or self:ShouldShow()
 end
 
 --- Rate-limited refresh. Skips if called within updateFrequency window unless immediate is true.
---- @param why string|nil Optional debug string for why the refresh was triggered.
---- @param immediate boolean|nil Whether to bypass the rate limit without bypassing ShouldShow.
---- @return boolean refreshed True if Refresh() was called
+---@param why string|nil Optional debug string for why the refresh was triggered.
+---@param immediate boolean|nil Whether to bypass the rate limit without bypassing ShouldShow.
+---@return boolean refreshed True if Refresh() was called
 function FrameProto:ThrottledRefresh(why, immediate)
     local globalConfig = self:GetGlobalConfig()
     local freq = (globalConfig and globalConfig.updateFrequency) or C.DEFAULT_REFRESH_FREQUENCY
@@ -427,7 +484,7 @@ function FrameProto:ThrottledRefresh(why, immediate)
 end
 
 --- Checks if the module is ready for layout updates.
---- @return boolean ready True if the module is ready for updates.
+---@return boolean ready True if the module is ready for updates.
 function FrameProto:IsReady()
     return self:IsEnabled()
         and self.InnerFrame ~= nil
@@ -453,6 +510,7 @@ function FrameProto:_RegisterEditMode()
     if not frame or self._editModeRegisteredFrame == frame then
         return
     end
+    ---@cast frame ECM_EditModeFrame
 
     local module = self
     EditMode.RegisterFrame(frame, {
@@ -497,7 +555,7 @@ function FrameProto:_RegisterEditMode()
 end
 
 --- Returns this module's config section (live from AceDB profile).
----@return table|nil
+---@return table|nil config
 function FrameProto:GetModuleConfig()
     return ns.Addon.db and ns.Addon.db.profile and ns.Addon.db.profile[self._configKey]
 end
@@ -505,12 +563,10 @@ end
 --------------------------------------------------------------------------------
 -- BarProto — status bar layer (StatusBar, ticks, text, refresh)
 --------------------------------------------------------------------------------
-
 local BarProto = setmetatable({}, { __index = FrameProto })
 
 --- Ensures the tick pool has the required number of ticks.
 --- Creates new ticks as needed, shows required ticks, hides extras.
----@param self BarProto
 ---@param count number Number of ticks needed
 ---@param parentFrame Frame Frame to create ticks on (e.g., bar.StatusBar or bar.TicksFrame)
 ---@param poolKey string|nil Key for tick pool on bar (default "tickPool")
@@ -541,7 +597,6 @@ function BarProto:EnsureTicks(count, parentFrame, poolKey)
 end
 
 --- Hides all ticks in the pool.
----@param self BarProto
 ---@param poolKey string|nil Key for tick pool (default "tickPool")
 function BarProto:HideAllTicks(poolKey)
     local pool = self[poolKey or "tickPool"]
@@ -556,7 +611,6 @@ end
 
 --- Positions ticks evenly as resource dividers.
 --- Used by ResourceBar to show divisions between resources.
----@param self BarProto
 ---@param maxResources number Number of resources (ticks = maxResources - 1)
 ---@param color ECM_Color|table|nil RGBA color (default black)
 ---@param tickWidth number|nil Width of each tick (default 1)
@@ -568,7 +622,7 @@ function BarProto:LayoutResourceTicks(maxResources, color, tickWidth, poolKey)
         return
     end
 
-    local frame = self.InnerFrame
+    local frame = assert(self.InnerFrame, "InnerFrame required")
     local barWidth = frame:GetWidth()
     local barHeight = frame:GetHeight()
     if barWidth <= 0 or barHeight <= 0 then
@@ -600,7 +654,6 @@ end
 
 --- Positions ticks at specific resource values.
 --- Used by PowerBar for breakpoint markers (e.g., energy thresholds).
----@param self BarProto
 ---@param statusBar StatusBar StatusBar to position ticks on
 ---@param ticks table Array of tick definitions { { value = number, color = ECM_Color, width = number }, ... }
 ---@param maxValue number Maximum resource value
@@ -617,7 +670,7 @@ function BarProto:LayoutValueTicks(statusBar, ticks, maxValue, defaultColor, def
         return
     end
 
-    local frame = self.InnerFrame
+    local frame = assert(self.InnerFrame, "InnerFrame required")
     local barWidth = statusBar:GetWidth()
     local barHeight = frame:GetHeight()
     if barWidth <= 0 or barHeight <= 0 then
@@ -660,7 +713,7 @@ end
 ---@return number|nil current
 ---@return number|nil max
 ---@return number|nil displayValue
----@return boolean isFraction valueType
+---@return boolean isFraction
 function BarProto:GetStatusBarValues()
     ns.DebugAssert(false, "GetStatusBarValues not implemented in derived class")
     return -1, -1, -1, false
@@ -676,17 +729,19 @@ function BarProto:GetStatusBarColor()
 end
 
 --- Refreshes the bar frame layout and values.
---- @param why string|nil Reason for refresh (for logging/debugging).
---- @param force boolean|nil If true, forces a refresh even if not needed.
---- @return boolean continue True if refresh completed, false if skipped
+---@param why string|nil Reason for refresh (for logging/debugging).
+---@param force boolean|nil If true, forces a refresh even if not needed.
+---@return boolean continue True if refresh completed, false if skipped
+---@diagnostic disable-next-line: duplicate-set-field
 function BarProto:Refresh(why, force)
     if not FrameProto.Refresh(self, why, force) then
         return false
     end
 
-    local frame = self.InnerFrame
+    local frame = assert(self.InnerFrame, "InnerFrame required")
+    ---@cast frame BarInnerFrame
     local globalConfig = self:GetGlobalConfig()
-    local moduleConfig = self:GetModuleConfig()
+    local moduleConfig = assert(self:GetModuleConfig(), "module config required")
 
     -- Values: apply min/max before value so startup/transient states do not
     -- render full when current is zero.
@@ -749,8 +804,11 @@ function BarProto:Refresh(why, force)
     return true
 end
 
+---@return BarInnerFrame frame
+---@diagnostic disable-next-line: duplicate-set-field
 function BarProto:CreateFrame()
     local frame = FrameProto.CreateFrame(self)
+    ---@cast frame BarInnerFrame
 
     -- StatusBar for value display
     frame.StatusBar = CreateFrame("StatusBar", nil, frame)
@@ -795,6 +853,7 @@ BarMixin.FrameProto = FrameProto
 BarMixin.BarProto = BarProto
 setmetatable(BarMixin, { __index = BarProto })
 
+---@param target table
 function BarMixin.AssertValid(target)
     assert(target and type(target) == "table", "target is not a table")
     assert(target.Name, "target is missing a Name")
@@ -804,8 +863,8 @@ end
 --- Applies frame-only mixin (positioning, visibility, edit mode, config access).
 --- Used by modules that manage their own inner content (e.g. BuffBars, ExtraIcons).
 --- Idempotent — safe to call more than once (no-op after first application).
---- @param target table table to apply the mixin to.
---- @param name string the module name. must be unique.
+---@param target table table to apply the mixin to.
+---@param name string the module name. must be unique.
 function BarMixin.AddFrameMixin(target, name)
     assert(target, "target required")
     assert(name, "name required")
@@ -843,24 +902,26 @@ end
 --- Applies bar mixin (frame + StatusBar, ticks, text, refresh).
 --- Used by bar modules (PowerBar, ResourceBar, RuneBar).
 --- Idempotent — safe to call more than once (no-op after first application).
-function BarMixin.AddBarMixin(module, name)
-    assert(module, "target required")
+---@param target table table to apply the mixin to.
+---@param name string the module name. must be unique.
+function BarMixin.AddBarMixin(target, name)
+    assert(target, "target required")
     assert(name, "name required")
-    if module._mixinApplied then
+    if target._mixinApplied then
         return
     end
 
-    local existingMt = getmetatable(module)
+    local existingMt = getmetatable(target)
     local existingIndex = existingMt and existingMt.__index
 
-    setmetatable(module, {
+    setmetatable(target, {
         __index = function(_, k)
             local v = BarProto[k]
             if v ~= nil then
                 return v
             end
             if type(existingIndex) == "function" then
-                return existingIndex(module, k)
+                return existingIndex(target, k)
             end
             if type(existingIndex) == "table" then
                 return existingIndex[k]
@@ -868,12 +929,12 @@ function BarMixin.AddBarMixin(module, name)
         end,
     })
 
-    module.Name = name
-    module._configKey = C.ConfigKeyForModule(name)
-    if not module.GetGlobalConfig then
-        module.GetGlobalConfig = ns.GetGlobalConfig
+    target.Name = name
+    target._configKey = C.ConfigKeyForModule(name)
+    if not target.GetGlobalConfig then
+        target.GetGlobalConfig = ns.GetGlobalConfig
     end
-    module.IsHidden = false
-    module._mixinApplied = true
-    module._lastUpdate = GetTime()
+    target.IsHidden = false
+    target._mixinApplied = true
+    target._lastUpdate = GetTime()
 end

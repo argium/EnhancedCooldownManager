@@ -7,6 +7,10 @@ local BarMixin = ns.BarMixin
 local FrameUtil = ns.FrameUtil
 local ChainRightPoint = BarMixin.FrameProto.ChainRightPoint
 local StyleChildBar = ns.BarStyle.StyleChildBar
+
+---@class BuffBars : FrameProto Buff bars module with LibEvent embedding.
+---@field RegisterEvent fun(self: BuffBars, event: string, callback: function)
+---@field UnregisterEvent fun(self: BuffBars, event: string)
 local BuffBars = ns.Addon:NewModule("BuffBars")
 ns.Addon.BuffBars = BuffBars
 
@@ -48,13 +52,15 @@ end
 
 ---@class ECM_BuffBarMixin : Frame
 ---@field __ecmHooked boolean
----@field Bar StatusBar
----@field DebuffBorder any
----@field Icon Frame
+---@field Bar ECM_BuffBarStatusBar
+---@field DebuffBorder Texture|nil
+---@field Icon Frame|nil
 ---@field ignoreInLayout boolean|nil
 ---@field layoutIndex number|nil
 ---@field cooldownID number|nil
 ---@field cooldownInfo { spellID: number|nil }|nil
+---@field auraInstanceID number|nil
+---@field _ecmColorRetryTimer FunctionContainer|nil
 
 local function getChildrenOrdered(viewer, why)
     local children = collectViewerChildren(viewer, why)
@@ -199,7 +205,7 @@ function BuffBars:ShouldRegisterEditMode()
 end
 
 function BuffBars:CreateFrame()
-    return _G["BuffBarCooldownViewer"]
+    return BuffBarCooldownViewer
 end
 
 function BuffBars:IsReady()
@@ -207,7 +213,7 @@ function BuffBars:IsReady()
         return false
     end
 
-    local viewer = _G["BuffBarCooldownViewer"]
+    local viewer = BuffBarCooldownViewer
     if not viewer then
         return false
     end
@@ -217,7 +223,7 @@ end
 
 --- Override UpdateLayout to position the BuffBarViewer and apply styling to children.
 function BuffBars:UpdateLayout(why)
-    local viewer = _G["BuffBarCooldownViewer"]
+    local viewer = BuffBarCooldownViewer
     local globalConfig = self:GetGlobalConfig()
     local cfg = self:GetModuleConfig()
     local spellColors = getSpellColors()
@@ -330,7 +336,7 @@ end
 --- Bars where all identifying keys are secret/nil are skipped.
 ---@return ECM_SpellColorKey[]
 function BuffBars:GetActiveSpellData()
-    local viewer = _G["BuffBarCooldownViewer"]
+    local viewer = BuffBarCooldownViewer
     if not viewer then
         return {}
     end
@@ -359,7 +365,7 @@ end
 
 --- Hooks the BuffBarCooldownViewer for automatic updates.
 function BuffBars:HookViewer()
-    local viewer = _G["BuffBarCooldownViewer"]
+    local viewer = BuffBarCooldownViewer
     if not viewer or self._viewerHooked then
         return
     end
@@ -405,10 +411,10 @@ function BuffBars:OnEnable()
     self:EnsureFrame()
     ns.Runtime.RegisterFrame(self)
 
-    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", function(_, ...) self:OnZoneChanged(...) end)
-    self:RegisterEvent("ZONE_CHANGED", function(_, ...) self:OnZoneChanged(...) end)
-    self:RegisterEvent("ZONE_CHANGED_INDOORS", function(_, ...) self:OnZoneChanged(...) end)
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, ...) self:OnZoneChanged(...) end)
+    self:RegisterEvent("ZONE_CHANGED_NEW_AREA", function(_, ...) self:OnZoneChanged() end)
+    self:RegisterEvent("ZONE_CHANGED", function(_, ...) self:OnZoneChanged() end)
+    self:RegisterEvent("ZONE_CHANGED_INDOORS", function(_, ...) self:OnZoneChanged() end)
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, ...) self:OnZoneChanged() end)
     -- Blizzard updates each child's auraInstanceID synchronously inside its own
     -- UNIT_AURA handler but does not always re-fire SetPoint/OnShow/OnHide on
     -- bars whose layout order is unchanged (e.g. a configured slot whose aura

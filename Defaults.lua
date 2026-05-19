@@ -56,10 +56,13 @@ local _, ns = ...
 ---@class ECM_GlobalConfig Global configuration.
 ---@field debug boolean Whether debug logging is enabled.
 ---@field errorLogging boolean Whether targeted error logging is enabled.
+---@field debugToChat boolean Whether debug output is also printed to chat.
+---@field releasePopupSeenVersion string|nil Last release popup version acknowledged by the player.
 ---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
 ---@field hideOutOfCombatInRestAreas boolean Whether to hide out of combat in rest areas.
 ---@field updateFrequency number Update frequency in seconds.
 ---@field barHeight number Default bar height.
+---@field barWidth number|nil Legacy global free-mode bar width fallback.
 ---@field barBgColor ECM_Color Default bar background color.
 ---@field offsetY number Global vertical offset.
 ---@field moduleSpacing number Vertical gap between chained modules.

@@ -40,12 +40,6 @@ local LAYOUT_EVENTS = {
     CVAR_UPDATE = { delay = 0, arg1 = "cooldownViewerEnabled" },
 }
 
-local CHAT_TAINT_ZONE_EVENTS = {
-    ZONE_CHANGED_NEW_AREA = true,
-    ZONE_CHANGED = true,
-    ZONE_CHANGED_INDOORS = true,
-}
-
 local _modules = {}
 local _globallyHidden = false
 local _desiredAlpha = 1
@@ -395,7 +389,7 @@ local function hookCooldownViewerSettings()
         return
     end
 
-    local settingsFrame = _G.CooldownViewerSettings
+    local settingsFrame = CooldownViewerSettings
     if not settingsFrame then
         return
     end
@@ -608,7 +602,7 @@ end
 --------------------------------------------------------------------------------
 
 --- Handles a layout-triggering event, updating combat state and scheduling layout.
----@param addon table The AceAddon instance (self from the event handler)
+---@param _addon table The AceAddon instance (self from the event handler)
 ---@param event string
 ---@param arg1 any
 local function handleLayoutEvent(_addon, event, arg1)
@@ -620,10 +614,6 @@ local function handleLayoutEvent(_addon, event, arg1)
     local config = LAYOUT_EVENTS[event]
     if not config or (config.unit and arg1 ~= config.unit) or (config.arg1 and arg1 ~= config.arg1) then
         return
-    end
-
-    if CHAT_TAINT_ZONE_EVENTS[event] then
-        ns._CheckChatTaint(event)
     end
 
     if config.combatChange then

@@ -11,12 +11,8 @@ local C = ns.Constants
 local ExternalBars = ns.Addon:NewModule("ExternalBars")
 ns.Addon.ExternalBars = ExternalBars
 
-local PLAYER_UNIT = "player"
-local SPELL_COLOR_SCOPE = C.SCOPE_EXTERNALBARS
-local canAccessTable = _G.canaccesstable
-
 local function getSpellColors()
-    return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
+    return ns.SpellColors.Get(C.SCOPE_EXTERNALBARS)
 end
 
 ---@class ECM_ExternalAuraState Cached external aura data keyed by Blizzard's aura array position.
@@ -104,7 +100,7 @@ end
 ---@param auraInfo table|nil
 ---@return table
 local function getAuraInfoErrorData(reason, viewer, auraInfo)
-    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = _G.GetInstanceInfo()
+    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = GetInstanceInfo()
     local canAccessAuraInfo = nil
     if type(auraInfo) == "table" then
         canAccessAuraInfo = canAccessTable(auraInfo)
@@ -137,7 +133,7 @@ local function buildAuraState(index, info, auraState, includeDiagnostics)
     local auraInstanceID = info.auraInstanceID
     local auraName = nil
     local spellID = nil
-    local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID(PLAYER_UNIT, auraInstanceID)
+    local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
     local accessibleAuraData = canAccessTable(auraData) and auraData or nil
     if accessibleAuraData then
         local auraDataName = accessibleAuraData.name
@@ -153,7 +149,7 @@ local function buildAuraState(index, info, auraState, includeDiagnostics)
 
     local duration = info.duration
     local expirationTime = info.expirationTime
-    local durationObject = C_UnitAuras.GetAuraDuration(PLAYER_UNIT, auraInstanceID)
+    local durationObject = C_UnitAuras.GetAuraDuration("player", auraInstanceID)
     local canUpdateDurationBar = durationObject ~= nil
 
     auraState.index = index
@@ -363,7 +359,7 @@ end
 ---@param activeAuraCount number
 ---@return table
 function ExternalBars:_GetLayoutRequestDiagnostics(reason, viewer, auraInfo, activeAuraCount)
-    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = _G.GetInstanceInfo()
+    local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = GetInstanceInfo()
     local moduleConfig = self:GetModuleConfig()
     local globalConfig = self:GetGlobalConfig()
     local diagnostics = self:_GetDiagnostics(viewer, auraInfo, reason)
