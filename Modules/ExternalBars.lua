@@ -53,7 +53,7 @@ local function logAccessibleCountError(tbl, logKey, reason, operation, err)
             operation = operation,
             error = tostring(err),
             tableType = type(tbl),
-            tableAccessible = type(tbl) == "table" and canAccessTable(tbl) or nil,
+            tableAccessible = type(tbl) == "table" and canaccesstable(tbl) or nil,
             inCombatLockdown = InCombatLockdown(),
         })
     end
@@ -64,7 +64,7 @@ end
 ---@param reason string|nil
 ---@return number|nil, number|nil
 local function countAccessibleEntries(tbl, logKey, reason)
-    if type(tbl) ~= "table" or not canAccessTable(tbl) then
+    if type(tbl) ~= "table" or not canaccesstable(tbl) then
         return nil, nil
     end
 
@@ -103,7 +103,7 @@ local function getAuraInfoErrorData(reason, viewer, auraInfo)
     local instanceName, instanceType, difficultyID, difficultyName, maxPlayers, _, _, instanceID = GetInstanceInfo()
     local canAccessAuraInfo = nil
     if type(auraInfo) == "table" then
-        canAccessAuraInfo = canAccessTable(auraInfo)
+        canAccessAuraInfo = canaccesstable(auraInfo)
     end
 
     return {
@@ -134,7 +134,7 @@ local function buildAuraState(index, info, auraState, includeDiagnostics)
     local auraName = nil
     local spellID = nil
     local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)
-    local accessibleAuraData = canAccessTable(auraData) and auraData or nil
+    local accessibleAuraData = canaccesstable(auraData) and auraData or nil
     if accessibleAuraData then
         local auraDataName = accessibleAuraData.name
         if not issecretvalue(auraDataName) and auraDataName ~= nil and auraDataName ~= "" then
@@ -822,13 +822,13 @@ function ExternalBars:OnExternalAurasUpdated(reason)
         ns.ErrorLogOnce("ExternalBars", logKey, message, data)
     end
 
-    if type(auraInfo) == "table" and not canAccessTable(auraInfo) then
+    if type(auraInfo) == "table" and not canaccesstable(auraInfo) then
         abortAuraSync(self, "AuraInfoInaccessible", "Blizzard external aura info is inaccessible during "
             .. tostring(reason or "unknown"))
     elseif type(auraInfo) == "table" then
         local ok, err = pcall(function()
             for index, info in ipairs(auraInfo) do
-                if type(info) ~= "table" or not canAccessTable(info) then
+                if type(info) ~= "table" or not canaccesstable(info) then
                     error("inaccessible external aura info entry at index " .. tostring(index))
                 end
 
