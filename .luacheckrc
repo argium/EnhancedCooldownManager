@@ -51,7 +51,10 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
 
     -- Externals
     "AddonCompartmentFrame",
+    "BuffBarCooldownViewer",
     "C_AddOns", "C_CVar", "C_EditMode", "C_Item", "C_PartyInfo", "C_PvP", "C_Spell", "C_SpellBook", "C_Timer", "C_TradeSkillUI", "C_UnitAuras",
+    "canAccessTable",
+
     "CANCEL",
     "CreateAtlasMarkup",
     "ColorPickerFrame",
@@ -90,7 +93,10 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
     "StaticPopup_Show",
     "UIParent",
     "UnitCanAssist", "UnitCanAttack", "UnitClass", "UnitExists", "UnitIsPlayer", "UnitName",  "UnitInVehicle", "UnitOnTaxi", "UnitIsDead", "UnitName", "UnitRace",
-    "UnitPower", "UnitPowerMax", "UnitPowerPercent", "UnitPowerType",
+    "UnitPower", "UnitPowerMax", "UnitPowerPercent", "UnitPowerType", "UnitAffectingCombat",
     "YES",
+    "ADD",
+    "REMOVE",
     "MinimalSliderWithSteppersMixin",
+    "GetInstanceInfo"
 }
