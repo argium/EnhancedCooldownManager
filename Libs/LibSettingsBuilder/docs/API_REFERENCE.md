@@ -483,7 +483,3 @@ Row builders still fall into the same public families:
 
 `input` is implemented as a built-in custom list row on `SettingsListElementTemplate`. It creates an `InputBoxTemplate` edit box at runtime, subscribes to watched proxy settings through callback handles, and optionally debounces preview refreshes. That gives it built-in-row behavior without requiring a separate XML template.
 `canvas` rows stay on the current lifecycle path. The documented public canvas API is the `canvas` row type; older canvas-layout helpers live under internal implementation details and are not part of the public surface documented here.
-
-## Debugging
-
-Set `LSB_DEBUG = true` to warn about unknown spec fields while developing new settings definitions.

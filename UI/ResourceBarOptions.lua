@@ -30,11 +30,6 @@ local RESOURCE_COLOR_DEFS = {
         key = C.RESOURCEBAR_TYPE_ICICLES,
         name = createResourceColorName("MAGE", L["RESOURCE_ICICLES"]),
     },
-    -- {
-    --     -- Secret 2026/03
-    --     key = Enum.PowerType.ArcaneCharges,
-    --     name = createResourceColorName("MAGE", L["RESOURCE_ARCANE_CHARGES"]),
-    -- },
     {
         key = Enum.PowerType.Chi,
         name = createResourceColorName("MONK", L["RESOURCE_CHI"]),

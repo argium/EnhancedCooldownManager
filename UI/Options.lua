@@ -39,7 +39,7 @@ local function isTrackedECMCategory(category)
 end
 
 local function getCategoryOpenToken(category)
-    if category and type(category.GetID) == "function" then
+    if category then
         return category:GetID()
     end
 end
@@ -70,28 +70,9 @@ function Options:InstallCategoryTracking()
         return
     end
 
-    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
-        if self._categoryTrackingDeferred or type(CreateFrame) ~= "function" then
-            return
-        end
-
-        self._categoryTrackingDeferred = true
-        local tracker = CreateFrame("Frame")
-        tracker:RegisterEvent("ADDON_LOADED")
-        tracker:SetScript("OnEvent", function(frame)
-            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
-                self._categoryTrackingDeferred = nil
-                self:InstallCategoryTracking()
-                frame:UnregisterAllEvents()
-            end
-        end)
-        return
-    end
-
     self._categoryTrackingInstalled = true
     hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
-        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
-        rememberTrackedCategory(self, category)
+        rememberTrackedCategory(self, panel:GetCurrentCategory())
     end)
 end
 
@@ -142,8 +123,7 @@ end
 function Options:OpenOptions()
     self:InstallCategoryTracking()
 
-    local currentCategory = SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
-    rememberTrackedCategory(self, currentCategory)
+    rememberTrackedCategory(self, SettingsPanel:GetCurrentCategory())
 
     local categoryToken = self._lastOpenedCategoryToken or getDefaultOptionsCategoryToken()
     if categoryToken then

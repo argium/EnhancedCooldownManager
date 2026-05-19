@@ -27,25 +27,19 @@ local function applySquareIconStyle(iconFrame, iconTexture, iconOverlay, debuffB
     iconTexture:SetTexCoord(0, 1, 0, 1)
 
     -- Remove circular masks from the icon texture
-    if iconTexture.GetNumMaskTextures and iconTexture.RemoveMaskTexture and iconTexture.GetMaskTexture then
-        for i = (iconTexture:GetNumMaskTextures() or 0), 1, -1 do
-            local mask = iconTexture:GetMaskTexture(i)
-            if mask then
-                iconTexture:RemoveMaskTexture(mask)
-                if mask.Hide then mask:Hide() end
-            end
+    for i = (iconTexture:GetNumMaskTextures() or 0), 1, -1 do
+        local mask = iconTexture:GetMaskTexture(i)
+        if mask then
+            iconTexture:RemoveMaskTexture(mask)
+            mask:Hide()
         end
-    elseif iconTexture.SetMask then
-        pcall(iconTexture.SetMask, iconTexture, nil)
     end
 
     -- Remove mask regions from the icon frame
-    if iconFrame.GetRegions and iconTexture.RemoveMaskTexture then
-        for _, region in ipairs({ iconFrame:GetRegions() }) do
-            if region and region.IsObjectType and region:IsObjectType("MaskTexture") then
-                pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
-                if region.Hide then region:Hide() end
-            end
+    for _, region in ipairs({ iconFrame:GetRegions() }) do
+        if region:IsObjectType("MaskTexture") then
+            pcall(iconTexture.RemoveMaskTexture, iconTexture, region)
+            region:Hide()
         end
     end
 
@@ -181,7 +175,7 @@ local function styleBarColor(module, frame, bar, globalConfig, spellColors, retr
 end
 
 local function isEmptyStatusBar(bar)
-    if not bar or type(bar.GetMinMaxValues) ~= "function" or type(bar.GetValue) ~= "function" then
+    if not bar then
         return false
     end
 
@@ -207,7 +201,7 @@ local function isEmptyStatusBar(bar)
 end
 
 local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
-    if not barBG or type(bar.GetStatusBarColor) ~= "function" or type(barBG.SetVertexColor) ~= "function" then
+    if not barBG then
         return
     end
 
@@ -221,7 +215,7 @@ local function styleEmptyStatusBarBackground(bar, barBG, config, globalConfig)
     -- when set, otherwise fall back to the global texture.
     local textureName = (config and config.texture) or (globalConfig and globalConfig.texture)
     local texture = FrameUtil.GetTexture(textureName)
-    if texture and type(barBG.SetTexture) == "function" then
+    if texture then
         barBG:SetTexture(texture)
     end
     local ok, r, g, b, a = pcall(bar.GetStatusBarColor, bar)

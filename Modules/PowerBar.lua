@@ -11,9 +11,8 @@ ns.Addon.PowerBar = PowerBar
 --- Elemental Shamans use Maelstrom while other Shaman specs use Mana.
 local function getCurrentPowerType()
     local _, class = UnitClass("player")
-    local specIndex = GetSpecialization()
-    if class == "SHAMAN" and specIndex then
-        if specIndex == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
+    if class == "SHAMAN" then
+        if GetSpecialization() == C.SHAMAN_ELEMENTAL_SPEC_INDEX then
             return Enum.PowerType.Maelstrom
         end
         return Enum.PowerType.Mana
@@ -35,7 +34,6 @@ function PowerBar:GetTickSpec()
 
     local classID = select(3, UnitClass("player"))
     local specIndex = GetSpecialization()
-    if not classID or not specIndex then return nil end
 
     local classMappings = ticksCfg.mappings[classID]
     local ticks = classMappings and classMappings[specIndex]

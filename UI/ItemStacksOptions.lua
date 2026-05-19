@@ -18,8 +18,6 @@ StaticPopupDialogs["ECM_CONFIRM_REMOVE_ITEM_STACK_ITEM"] =
     OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REMOVE_ITEM_CONFIRM"], L["REMOVE"], L["DONT_REMOVE"])
 StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
     ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
-StaticPopupDialogs["ECM_CONFIRM_REVERT_ITEM_STACK"] =
-    ns.OptionUtil.MakeConfirmDialog(L["ITEM_STACK_REVERT_CONFIRM"], L["REVERT"], L["DONT_REVERT"])
 
 local ITEM_STACK_ROW_HEIGHT = 22
 local ITEM_STACK_COLLECTION_HEIGHT = 240
@@ -39,13 +37,6 @@ local function getProfile() return ns.Addon.db.profile end
 local function getDefaultStack(stackId)
     local defaults = ns.Addon.db.defaults and ns.Addon.db.defaults.profile
     local defaultStacks = defaults and defaults.extraIcons and defaults.extraIcons.itemStacks
-    local defaultStack = defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId]
-    if defaultStack then
-        return defaultStack
-    end
-
-    defaults = ns.defaults and ns.defaults.profile
-    defaultStacks = defaults and defaults.extraIcons and defaults.extraIcons.itemStacks
     return defaultStacks and defaultStacks.byId and defaultStacks.byId[stackId] or nil
 end
 
@@ -56,16 +47,12 @@ local function refreshPage()
     end
 end
 
-local function doAction(fn, page)
+local function doAction(fn)
     if fn then
         fn()
     end
     ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
-    if registeredPage then
-        refreshPage()
-    elseif page then
-        page:Refresh()
-    end
+    refreshPage()
 end
 
 local function getItemStacks() return EnsureItemStacks(getProfile()) end
@@ -382,18 +369,18 @@ local function disableManagedStackActions()
     return stackId == nil or isDefaultStackId(stackId)
 end
 
-local function openCreateDialog(ctx)
+local function openCreateDialog()
     StaticPopup_Show("ECM_CREATE_ITEM_STACK", nil, nil, {
         popupKey = "ECM_CREATE_ITEM_STACK",
         onAccept = function(name)
             doAction(function()
                 createStack(getProfile(), name)
-            end, ctx and ctx.page or registeredPage)
+            end)
         end,
     })
 end
 
-local function openRenameDialog(ctx)
+local function openRenameDialog()
     local stackId = getSelectedStackId()
     local itemStack = getSelectedStack()
     if not itemStack or isDefaultStackId(stackId) then
@@ -405,12 +392,12 @@ local function openRenameDialog(ctx)
         onAccept = function(name)
             doAction(function()
                 renameStack(getProfile(), stackId, name)
-            end, ctx and ctx.page or registeredPage)
+            end)
         end,
     })
 end
 
-local function openDeleteDialog(ctx)
+local function openDeleteDialog()
     local stackId = getSelectedStackId()
     local itemStack = getSelectedStack()
     if not itemStack or isDefaultStackId(stackId) then
@@ -420,12 +407,12 @@ local function openDeleteDialog(ctx)
         onAccept = function()
             doAction(function()
                 deleteStack(getProfile(), stackId)
-            end, ctx and ctx.page or registeredPage)
+            end)
         end,
     })
 end
 
-local function revertSelectedStack(ctx)
+local function revertSelectedStack()
     local stackId = getSelectedStackId()
     local itemStack = getSelectedStack()
     if not itemStack or not isDefaultStackId(stackId) then
@@ -435,7 +422,7 @@ local function revertSelectedStack(ctx)
         onAccept = function()
             doAction(function()
                 revertStackToDefault(getProfile(), stackId)
-            end, ctx and ctx.page or registeredPage)
+            end)
         end,
     })
 end

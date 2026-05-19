@@ -16,30 +16,17 @@ local function getSpellColors()
     return ns.SpellColors.Get(SPELL_COLOR_SCOPE)
 end
 
-local function getFrameValue(frame, methodName)
-    if not frame or type(frame[methodName]) ~= "function" then
-        return nil
-    end
-
-    local ok, value = pcall(frame[methodName], frame)
-    if ok then
-        return value
-    end
-
-    return nil
-end
-
 local function getViewerDiagnostics(viewer, why)
     return {
         reason = why,
         viewerExists = viewer ~= nil,
-        viewerName = getFrameValue(viewer, "GetName"),
-        viewerShown = getFrameValue(viewer, "IsShown"),
-        viewerWidth = getFrameValue(viewer, "GetWidth"),
-        viewerHeight = getFrameValue(viewer, "GetHeight"),
-        viewerAlpha = getFrameValue(viewer, "GetAlpha"),
-        viewerNumPoints = getFrameValue(viewer, "GetNumPoints"),
-        viewerHasGetChildren = viewer ~= nil and type(viewer.GetChildren) == "function",
+        viewerName = ns.GetFrameValue(viewer, "GetName"),
+        viewerShown = ns.GetFrameValue(viewer, "IsShown"),
+        viewerWidth = ns.GetFrameValue(viewer, "GetWidth"),
+        viewerHeight = ns.GetFrameValue(viewer, "GetHeight"),
+        viewerAlpha = ns.GetFrameValue(viewer, "GetAlpha"),
+        viewerNumPoints = ns.GetFrameValue(viewer, "GetNumPoints"),
+        viewerHasGetChildren = viewer ~= nil,
         inCombatLockdown = InCombatLockdown(),
     }
 end
@@ -292,7 +279,7 @@ function BuffBars:UpdateLayout(why)
         growsUp = position.point == "BOTTOMLEFT"
     else
         -- In free mode, infer from the viewer's current (Blizzard-managed) anchor.
-        local currentPoint = viewer.GetPoint and viewer:GetPoint(1)
+        local currentPoint = viewer:GetPoint(1)
         growsUp = currentPoint == "BOTTOMLEFT" or currentPoint == "BOTTOM" or currentPoint == "BOTTOMRIGHT"
     end
 

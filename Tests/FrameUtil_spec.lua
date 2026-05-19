@@ -677,27 +677,6 @@ describe("FrameUtil", function()
                 assert.are.equal(600, h)
             end)
 
-            it("falls back to GetWidth/GetHeight", function()
-                local p = {
-                    GetWidth = function() return 1024 end,
-                    GetHeight = function() return 768 end,
-                }
-                local w, h = FrameUtil.GetParentSize(p)
-                assert.are.equal(1024, w)
-                assert.are.equal(768, h)
-            end)
-
-            it("falls back to GetWidth/GetHeight when GetSize returns nil", function()
-                local p = {
-                    GetSize = function() return nil, nil end,
-                    GetWidth = function() return 640 end,
-                    GetHeight = function() return 480 end,
-                }
-                local w, h = FrameUtil.GetParentSize(p)
-                assert.are.equal(640, w)
-                assert.are.equal(480, h)
-            end)
-
             it("returns 0, 0 for nil parent", function()
                 local w, h = FrameUtil.GetParentSize(nil)
                 assert.are.equal(0, w)

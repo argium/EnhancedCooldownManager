@@ -11,32 +11,21 @@ StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     button2 = L["DONT_CREATE"],
     hasEditBox = true,
     OnAccept = function(self, data)
-        local editBox = self and (self.EditBox or self.editBox)
-        if not editBox then
-            return
-        end
-        local name = strtrim(editBox:GetText())
+        local name = strtrim(self.editBox:GetText())
         if name ~= "" and data and data.onAccept then
             data.onAccept(name)
         end
     end,
     OnShow = function(self)
-        local editBox = self.EditBox or self.editBox
-        if not editBox then
-            return
-        end
-        editBox:SetText(UnitName("player") .. " - " .. date("%H%M%S"))
-        editBox:HighlightText()
+        self.editBox:SetText(UnitName("player") .. " - " .. date("%H%M%S"))
+        self.editBox:HighlightText()
     end,
     EditBoxOnEnterPressed = function(self)
         local parent = self:GetParent()
-        local button1 = parent and (parent.button1 or (parent.Buttons and parent.Buttons[1]))
-        if not button1 or button1:IsEnabled() then
+        if parent.button1:IsEnabled() then
             parent:Hide()
             local dialog = StaticPopupDialogs["ECM_NEW_PROFILE"]
-            if dialog.OnAccept then
-                dialog.OnAccept(parent, parent.data)
-            end
+            dialog.OnAccept(parent, parent.data)
         end
     end,
     timeout = 0,

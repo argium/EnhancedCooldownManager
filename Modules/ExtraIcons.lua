@@ -297,7 +297,6 @@ local function getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
         viewerNumPoints = ns.GetFrameValue(blizzFrame, "GetNumPoints"),
         viewerIconScale = blizzFrame and blizzFrame.iconScale or nil,
         viewerChildXPadding = blizzFrame and blizzFrame.childXPadding or nil,
-        viewerHasGetItemFrames = blizzFrame ~= nil and type(blizzFrame.GetItemFrames) == "function",
         itemFramesType = type(itemFrames),
         itemFramesAccessible = itemFramesAccessible,
         itemFramesArrayCount = getItemFramesCount(itemFrames),
@@ -588,8 +587,8 @@ function ExtraIcons:_rebuildTrackedSlots()
 end
 
 function ExtraIcons:HookEditMode()
+    if self._editModeHooked then return end
     local mgr = _G.EditModeManagerFrame
-    if not mgr or self._editModeHooked then return end
     self._editModeHooked = true
     self._isEditModeActive = mgr:IsShown()
 

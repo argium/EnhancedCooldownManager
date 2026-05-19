@@ -115,15 +115,12 @@ function ns.CloneValue(value)
     return copy
 end
 
---- Safely calls a frame method for diagnostics and returns nil on error.
+--- Safely calls a frame method for diagnostics and returns nil when the frame is missing.
 function ns.GetFrameValue(frame, methodName)
-    if not frame or type(frame[methodName]) ~= "function" then
+    if not frame then
         return nil
     end
-
-    local ok, value = pcall(frame[methodName], frame)
-    if ok then return value end
-    return nil
+    return frame[methodName](frame)
 end
 
 ns.Print = LibConsole:NewPrinter(function(message)
@@ -283,8 +280,8 @@ function mod:ConfirmReloadUI(text, onAccept, onCancel)
     if not StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] then
         StaticPopupDialogs[C.POPUP_CONFIRM_RELOAD_UI] = {
             text = L["RELOAD_UI_PROMPT"],
-            button1 = YES or "Yes",
-            button2 = NO or "No",
+            button1 = YES,
+            button2 = NO,
             OnAccept = function(_, data)
                 if data and data.onAccept then
                     data.onAccept()
