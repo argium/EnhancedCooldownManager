@@ -296,6 +296,8 @@ ECM uses LibSettingsBuilder as a single declarative registration tree:
 
 `ExtraIconsOptions` owns the main viewer-management page, while `ItemStacksOptions` appends the Item Stacks subpage under the same Extra Icons section. Viewer entries reference item stacks by stable profile IDs so renames do not mutate viewer rows.
 
+Resource bar color rows prepend a fixed two-icon prefix so shared resources like Combo Points can show multiple class icons while keeping the icon column right-aligned.
+
 `UI/SpellColorsPage.lua` owns the shared Spell Colors subcategory. `BuffBarsOptions` registers the page once, and both `BuffBars` and `ExternalBars` register scoped sections into it, so the two modules share one editor without sharing saved color pools.
 
 ECM only consumes the documented public surface (`LSB.New`, `lsb:GetSection`, `lsb:GetRootPage`, `lsb:GetPage`, `lsb:HasCategory`, `page:GetId`, `page:Refresh`) and registers pages through raw declarative row tables — no builder-level helper constructors and no deprecated transition namespaces.

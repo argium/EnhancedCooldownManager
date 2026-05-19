@@ -8,6 +8,15 @@ local TestHelpers =
 describe("ResourceBarOptions getters/setters/defaults", function()
     local originalGlobals
     local profile, defaults, SB, ns, settings, capturedPage
+    local emptyIcon = "|TInterface\\Common\\spacer:14:14|t"
+
+    local function classIcon(className)
+        return "|A:classicon-" .. className .. ":14:14|a"
+    end
+
+    local function resourceLabel(prefix, colorClass, labelKey)
+        return prefix .. " |cff" .. ns.Constants.CLASS_COLORS[colorClass] .. ns.L[labelKey] .. "|r"
+    end
 
     local function getPageRow(path)
         for _, row in ipairs(capturedPage.rows) do
@@ -157,19 +166,47 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("prefixes each resource label with its class icon and color", function()
             local defsByKey = {}
+            local demonHunterIcon = emptyIcon .. " " .. classIcon("demonhunter")
             for _, def in ipairs(assert(getPageRow("colors")).defs) do
                 defsByKey[def.key] = def.name
             end
 
-            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DH"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS])
-            assert.are.equal("|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL])
-            assert.are.equal("|A:classicon-mage:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MAGE .. ns.L["RESOURCE_ICICLES"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_ICICLES])
-            assert.are.equal("|A:classicon-monk:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MONK .. ns.L["RESOURCE_CHI"] .. "|r", defsByKey[Enum.PowerType.Chi])
-            assert.are.equal("|A:classicon-rogue:14:14|a |cff" .. ns.Constants.CLASS_COLORS.ROGUE .. ns.L["RESOURCE_COMBO_POINTS"] .. "|r", defsByKey[Enum.PowerType.ComboPoints])
-            assert.are.equal("|A:classicon-evoker:14:14|a |cff" .. ns.Constants.CLASS_COLORS.EVOKER .. ns.L["RESOURCE_ESSENCE"] .. "|r", defsByKey[Enum.PowerType.Essence])
-            assert.are.equal("|A:classicon-paladin:14:14|a |cff" .. ns.Constants.CLASS_COLORS.PALADIN .. ns.L["RESOURCE_HOLY_POWER"] .. "|r", defsByKey[Enum.PowerType.HolyPower])
-            assert.are.equal("|A:classicon-shaman:14:14|a |cff" .. ns.Constants.CLASS_COLORS.SHAMAN .. ns.L["RESOURCE_MAELSTROM_WEAPON"] .. "|r", defsByKey[ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON])
-            assert.are.equal("|A:classicon-warlock:14:14|a |cff" .. ns.Constants.CLASS_COLORS.WARLOCK .. ns.L["RESOURCE_SOUL_SHARDS"] .. "|r", defsByKey[Enum.PowerType.SoulShards])
+            assert.are.equal(
+                resourceLabel(demonHunterIcon, "DEMONHUNTER", "RESOURCE_SOUL_FRAGMENTS_DH"),
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_VENGEANCE_SOULS]
+            )
+            assert.are.equal(
+                resourceLabel(demonHunterIcon, "DEMONHUNTER", "RESOURCE_SOUL_FRAGMENTS_DEVOURER"),
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("mage"), "MAGE", "RESOURCE_ICICLES"),
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_ICICLES]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("monk"), "MONK", "RESOURCE_CHI"),
+                defsByKey[Enum.PowerType.Chi]
+            )
+            assert.are.equal(
+                resourceLabel(classIcon("druid") .. " " .. classIcon("rogue"), "ROGUE", "RESOURCE_COMBO_POINTS"),
+                defsByKey[Enum.PowerType.ComboPoints]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("evoker"), "EVOKER", "RESOURCE_ESSENCE"),
+                defsByKey[Enum.PowerType.Essence]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("paladin"), "PALADIN", "RESOURCE_HOLY_POWER"),
+                defsByKey[Enum.PowerType.HolyPower]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("shaman"), "SHAMAN", "RESOURCE_MAELSTROM_WEAPON"),
+                defsByKey[ns.Constants.RESOURCEBAR_TYPE_MAELSTROM_WEAPON]
+            )
+            assert.are.equal(
+                resourceLabel(emptyIcon .. " " .. classIcon("warlock"), "WARLOCK", "RESOURCE_SOUL_SHARDS"),
+                defsByKey[Enum.PowerType.SoulShards]
+            )
             assert.is_nil(defsByKey[Enum.PowerType.ArcaneCharges])
         end)
     end)
@@ -209,20 +246,21 @@ describe("ResourceBarOptions getters/setters/defaults", function()
         end)
         it("reuses the icon-prefixed names for capped resource rows", function()
             local defsByKey = {}
+            local demonHunterIcon = emptyIcon .. " " .. classIcon("demonhunter")
             for _, def in ipairs(assert(getPageRow("maxColors")).defs) do
                 defsByKey[def.key] = def.name
             end
 
             assert.are.equal(
-                "|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_SOUL_FRAGMENTS_DEVOURER"] .. "|r",
+                resourceLabel(demonHunterIcon, "DEMONHUNTER", "RESOURCE_SOUL_FRAGMENTS_DEVOURER"),
                 defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL]
             )
             assert.are.equal(
-                "|A:classicon-demonhunter:14:14|a |cff" .. ns.Constants.CLASS_COLORS.DEMONHUNTER .. ns.L["RESOURCE_VOID_FRAGMENTS_DEVOURER"] .. "|r",
+                resourceLabel(demonHunterIcon, "DEMONHUNTER", "RESOURCE_VOID_FRAGMENTS_DEVOURER"),
                 defsByKey[ns.Constants.RESOURCEBAR_TYPE_DEVOURER_META]
             )
             assert.are.equal(
-                "|A:classicon-mage:14:14|a |cff" .. ns.Constants.CLASS_COLORS.MAGE .. ns.L["RESOURCE_ICICLES"] .. "|r",
+                resourceLabel(emptyIcon .. " " .. classIcon("mage"), "MAGE", "RESOURCE_ICICLES"),
                 defsByKey[ns.Constants.RESOURCEBAR_TYPE_ICICLES]
             )
         end)
