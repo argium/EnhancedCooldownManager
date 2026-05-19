@@ -49,70 +49,54 @@ local function getViewer()
     return _G["ExternalDefensivesFrame"]
 end
 
----@param tbl table|nil
----@param logKey string|nil
----@param reason string|nil
----@return number|nil
-local function countAccessibleArray(tbl, logKey, reason)
-    if type(tbl) ~= "table" or not canAccessTable(tbl) then
-        return nil
-    end
-
-    local count = 0
-    local ok, err = pcall(function()
-        for index in ipairs(tbl) do
-            count = index
-        end
-    end)
-    if ok then
-        return count
-    end
-
+local function logAccessibleCountError(tbl, logKey, reason, operation, err)
     if logKey then
         ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate " .. logKey
-            .. " with ipairs during " .. tostring(reason or "unknown") .. ": " .. tostring(err), {
+            .. " with " .. operation .. " during " .. tostring(reason or "unknown") .. ": " .. tostring(err), {
             reason = reason,
-            operation = "ipairs",
+            operation = operation,
             error = tostring(err),
             tableType = type(tbl),
             tableAccessible = type(tbl) == "table" and canAccessTable(tbl) or nil,
             inCombatLockdown = InCombatLockdown(),
         })
     end
-    return nil
 end
 
 ---@param tbl table|nil
 ---@param logKey string|nil
 ---@param reason string|nil
----@return number|nil
-local function countAccessibleKeys(tbl, logKey, reason)
+---@return number|nil, number|nil
+local function countAccessibleEntries(tbl, logKey, reason)
     if type(tbl) ~= "table" or not canAccessTable(tbl) then
-        return nil
+        return nil, nil
     end
 
-    local count = 0
+    local arrayCount = nil
     local ok, err = pcall(function()
+        local count = 0
+        for index in ipairs(tbl) do
+            count = index
+        end
+        arrayCount = count
+    end)
+    if not ok then
+        logAccessibleCountError(tbl, logKey, reason, "ipairs", err)
+    end
+
+    local keyCount = nil
+    ok, err = pcall(function()
+        local count = 0
         for _ in pairs(tbl) do
             count = count + 1
         end
+        keyCount = count
     end)
-    if ok then
-        return count
+    if not ok then
+        logAccessibleCountError(tbl, logKey, reason, "pairs", err)
     end
 
-    if logKey then
-        ns.ErrorLogOnce("ExternalBars", logKey, "ExternalBars diagnostics could not iterate " .. logKey
-            .. " with pairs during " .. tostring(reason or "unknown") .. ": " .. tostring(err), {
-            reason = reason,
-            operation = "pairs",
-            error = tostring(err),
-            tableType = type(tbl),
-            tableAccessible = type(tbl) == "table" and canAccessTable(tbl) or nil,
-            inCombatLockdown = InCombatLockdown(),
-        })
-    end
-    return nil
+    return arrayCount, keyCount
 end
 
 ---@param reason string|nil
@@ -131,8 +115,8 @@ local function getAuraInfoErrorData(reason, viewer, auraInfo)
         auraInfoType = type(auraInfo),
         canAccessAuraInfo = canAccessAuraInfo,
         viewerExists = viewer ~= nil,
-        viewerShown = viewer and viewer.IsShown and viewer:IsShown() or nil,
-        viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+        viewerShown = viewer and viewer:IsShown() or nil,
+        viewerAlpha = viewer and viewer:GetAlpha() or nil,
         inCombatLockdown = InCombatLockdown(),
         instanceName = instanceName,
         instanceType = instanceType,
@@ -347,33 +331,29 @@ function ExternalBars:_GetDiagnostics(viewer, auraInfo, reason)
     if moduleConfig then
         moduleConfigEnabled = moduleConfig.enabled ~= false
     end
-
-    local viewerHasUpdateAuras = false
-    if viewer then
-        viewerHasUpdateAuras = type(viewer.UpdateAuras) == "function"
-    end
+    local auraInfoArrayCount, auraInfoKeyCount = countAccessibleEntries(auraInfo, "AuraInfoDiagnosticsFailed", reason)
+    local auraFramesArrayCount, auraFramesKeyCount = countAccessibleEntries(auraFrames, "AuraFramesDiagnosticsFailed", reason)
 
     return {
         moduleEnabled = self.IsEnabled and self:IsEnabled() or nil,
         moduleConfigEnabled = moduleConfigEnabled,
         moduleHidden = self.IsHidden == true,
         frameCreated = frame ~= nil,
-        frameShown = frame and frame.IsShown and frame:IsShown() or nil,
-        frameWidth = frame and frame.GetWidth and frame:GetWidth() or nil,
-        frameHeight = frame and frame.GetHeight and frame:GetHeight() or nil,
+        frameShown = frame and frame:IsShown() or nil,
+        frameWidth = frame and frame:GetWidth() or nil,
+        frameHeight = frame and frame:GetHeight() or nil,
         viewerExists = viewer ~= nil,
-        viewerShown = viewer and viewer.IsShown and viewer:IsShown() or nil,
-        viewerAlpha = viewer and viewer.GetAlpha and viewer:GetAlpha() or nil,
+        viewerShown = viewer and viewer:IsShown() or nil,
+        viewerAlpha = viewer and viewer:GetAlpha() or nil,
         viewerHooked = self._viewerHooked == true,
-        viewerHasUpdateAuras = viewerHasUpdateAuras,
         originalIconsHidden = self._originalIconsHidden == true,
         activeAuraCount = self._activeAuraCount or 0,
         auraInfoType = type(auraInfo),
-        auraInfoArrayCount = countAccessibleArray(auraInfo, "AuraInfoDiagnosticsFailed", reason),
-        auraInfoKeyCount = countAccessibleKeys(auraInfo, "AuraInfoDiagnosticsFailed", reason),
+        auraInfoArrayCount = auraInfoArrayCount,
+        auraInfoKeyCount = auraInfoKeyCount,
         auraFramesType = type(auraFrames),
-        auraFramesArrayCount = countAccessibleArray(auraFrames, "AuraFramesDiagnosticsFailed", reason),
-        auraFramesKeyCount = countAccessibleKeys(auraFrames, "AuraFramesDiagnosticsFailed", reason),
+        auraFramesArrayCount = auraFramesArrayCount,
+        auraFramesKeyCount = auraFramesKeyCount,
     }
 end
 
@@ -449,11 +429,11 @@ function ExternalBars:_GetBarDiagnostics(index, bar, auraState)
         canShowDurationText = canShowDurationText,
         canUpdateDurationBar = canUpdateDurationBar,
         barExists = bar ~= nil,
-        barShown = bar and bar.IsShown and bar:IsShown() or nil,
-        barWidth = bar and bar.GetWidth and bar:GetWidth() or nil,
-        barHeight = bar and bar.GetHeight and bar:GetHeight() or nil,
-        iconShown = bar and bar.Icon and bar.Icon.IsShown and bar.Icon:IsShown() or nil,
-        iconTexture = iconTexture and iconTexture.GetTexture and iconTexture:GetTexture() or nil,
+        barShown = bar and bar:IsShown() or nil,
+        barWidth = bar and bar:GetWidth() or nil,
+        barHeight = bar and bar:GetHeight() or nil,
+        iconShown = bar and bar.Icon and bar.Icon:IsShown() or nil,
+        iconTexture = iconTexture and iconTexture:GetTexture() or nil,
         cooldownSpellID = bar and bar.cooldownInfo and bar.cooldownInfo.spellID or nil,
     }
 end

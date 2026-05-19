@@ -351,13 +351,13 @@ describe("LibEvent", function()
         assert.same({ "stable" }, calls)
     end)
 
-    it("does not initialize _stats when metrics debug is disabled", function()
+    it("does not initialize stats storage", function()
         local target = {}
         LibEvent:Embed(target)
         assert.is_nil(LibEvent.embeds[target]._stats)
     end)
 
-    it("does not increment _stats when metrics debug is disabled", function()
+    it("does not increment stats during dispatch", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
 
@@ -370,7 +370,7 @@ describe("LibEvent", function()
         assert.same({}, target:GetEventStats())
     end)
 
-    it("GetEventStats returns an empty table when metrics debug is disabled", function()
+    it("GetEventStats returns an empty table", function()
         local target = { TEST_EVENT = function() end }
         LibEvent:Embed(target)
 
@@ -382,7 +382,7 @@ describe("LibEvent", function()
         assert.is_nil(stats.TEST_EVENT)
     end)
 
-    it("ResetEventStats is a no-op when metrics debug is disabled", function()
+    it("ResetEventStats is a no-op", function()
         local target = {
             EVENT_A = function() end,
             EVENT_B = function() end,

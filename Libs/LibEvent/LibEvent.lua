@@ -3,7 +3,7 @@
 -- Licensed under the GNU General Public License v3.0
 
 ---@class LibEvent
----@field embeds table<table, { frame: Frame, _events: table<string, function[]>, _stats: table<string, number>|nil }> Stores embedded event instances by target table.
+---@field embeds table<table, { frame: Frame, _events: table<string, function[]> }> Stores embedded event instances by target table.
 
 local MAJOR, MINOR = "LibEvent-1.0", 3
 local LibEvent = LibStub:NewLibrary(MAJOR, MINOR)
@@ -15,9 +15,7 @@ end
 local ipairs = ipairs
 local pairs = pairs
 local type = type
-local wipe = wipe
 
-local METRICS_DEBUG_ENABLED = false
 local EMPTY_STATS = {}
 
 LibEvent.embeds = LibEvent.embeds or {}
@@ -92,26 +90,20 @@ function LibEvent:UnregisterAllEvents()
     end
 end
 
----Gets event invocation stats when metrics are enabled.
----@return table<string, number> A table mapping event names to their fire counts, or an empty table when metrics are disabled.
+---Gets event invocation stats.
+---@return table<string, number> Empty stats table; metrics collection is not enabled in normal runtime.
 function LibEvent:GetEventStats()
-    return getInstance(self)._stats or EMPTY_STATS
+    getInstance(self)
+    return EMPTY_STATS
 end
 
----Resets event invocation stats when metrics are enabled.
-function LibEvent:ResetEventStats()
-    local stats = getInstance(self)._stats
-    if stats then wipe(stats) end
-end
+---Resets event invocation stats.
+function LibEvent:ResetEventStats() getInstance(self) end
 
 local function createInstance(target)
     local instance = LibEvent.embeds[target]
     if type(instance) ~= "table" then
         instance = { _events = {} }
-    end
-
-    if METRICS_DEBUG_ENABLED and not instance._stats then
-        instance._stats = {}
     end
 
     instance._events = instance._events or {}
@@ -126,10 +118,6 @@ local function createInstance(target)
         if not cbs then
             return
         end
-        if METRICS_DEBUG_ENABLED then
-            instance._stats[event] = (instance._stats[event] or 0) + 1
-        end
-        instance._dispatching = true
         local i = 1
         while i <= #cbs do
             local cb = cbs[i]
@@ -139,7 +127,6 @@ local function createInstance(target)
                 i = i + 1
             end
         end
-        instance._dispatching = false
     end)
 
     LibEvent.embeds[target] = instance

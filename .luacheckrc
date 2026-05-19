@@ -31,7 +31,6 @@ files = {
 }
 
 globals = {
-    "LSB_DEBUG",
     "LibLSMSettingsWidgets_FontPickerMixin",
     "LibLSMSettingsWidgets_TexturePickerMixin",
     "SlashCmdList",

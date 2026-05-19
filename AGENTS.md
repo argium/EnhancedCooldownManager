@@ -68,6 +68,7 @@ All Lua files start with:
 ## Architecture
 
 - Prefer the simplest production code for current supported runtimes. No fallback paths, compatibility branches, defensive adapters, or built-in shims without a concrete supported environment that needs them.
+- Do not nil-guard methods, fields, or globals that are guaranteed to exist on current Retail (e.g., `Frame:GetRegions`, `Region:IsObjectType`, `Texture:GetMaskTexture`/`RemoveMaskTexture`, `:Hide`, `YES`/`NO`, `C_EditMode`). Call them directly. Guard only against optional third-party addons (e.g., `DevTool`), genuinely polymorphic shapes, or runtime data that may be absent.
 - Keep one owner for shared state, derived values, utility functions, style metrics, and widget rendering details.
 - Use loose coupling through events, hooks, callbacks, or messages.
 - Do not add trivial passthrough wrappers, fixed-literal indirection, or single-caller abstractions without an independently testable contract.

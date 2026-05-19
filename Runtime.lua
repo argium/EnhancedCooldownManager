@@ -468,10 +468,6 @@ local function getRequestDiagnostics(opts)
 end
 
 local function getRequestDebugStack()
-    if type(debugstack) ~= "function" then
-        return nil
-    end
-
     local ok, stack = pcall(debugstack, 3, 8, 8)
     if ok then
         return stack

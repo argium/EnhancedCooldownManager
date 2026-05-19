@@ -114,6 +114,9 @@ describe("Migration", function()
             end
         end
         _G.UIParent = {
+            GetSize = function()
+                return 1920, 1080
+            end,
             GetWidth = function()
                 return 1920
             end,
@@ -951,8 +954,12 @@ describe("Migration", function()
         assert.same(expected, profile.powerBar.editModePositions.MyCustomLayout)
     end)
 
-    it("V11 advances schema even when the active layout name cannot be resolved", function()
-        _G.C_EditMode = nil
+    it("V11 advances schema when Edit Mode layout data is unavailable", function()
+        _G.C_EditMode = {
+            GetLayouts = function()
+                return nil
+            end,
+        }
 
         local profile = {
             schemaVersion = 10,

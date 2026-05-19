@@ -166,6 +166,12 @@ describe("BuffBars real source", function()
             ErrorLogOnce = function(module, key, message, data)
                 errorLogs[#errorLogs + 1] = { module = module, key = key, message = message, data = data }
             end,
+            GetFrameValue = function(frame, methodName)
+                if not frame then
+                    return nil
+                end
+                return frame[methodName](frame)
+            end,
             DebugAssert = function() end,
             IsDebugEnabled = function() return false end,
             Constants = nil,

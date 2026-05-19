@@ -395,8 +395,6 @@ local function prepareButtonClick(builder, spec)
 end
 
 local function prepareProxyRow(builder, rowType, spec)
-    registry.validateSpecFields(builder, rowType, spec)
-
     local setting, category
     if rowType == "checkbox" then
         setting, category = registry.makeProxySetting(builder, spec, interop.getVarTypeBoolean(), false)

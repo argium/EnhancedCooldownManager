@@ -117,7 +117,7 @@ local function configureDropdownFrame(frame, initializer, data)
     frame:InitDropdown()
 end
 
-if not lib._scrollDropdownHookInstalled and hooksecurefunc and SettingsDropdownControlMixin then
+if not lib._scrollDropdownHookInstalled then
     hooksecurefunc(SettingsDropdownControlMixin, "Init", function(frame, initializer)
         local data = getInitializerData(initializer)
         if not data or (data._lsbKind ~= "dropdown" and data._lsbKind ~= "scrollDropdown") then
@@ -156,10 +156,6 @@ local function getSliderStepCount(minValue, maxValue, step)
 end
 
 local function createInlineSliderFormatters()
-    if not MinimalSliderWithSteppersMixin or not MinimalSliderWithSteppersMixin.Label then
-        return nil
-    end
-
     return {
         [MinimalSliderWithSteppersMixin.Label.Right] = function()
             return ""
@@ -233,7 +229,7 @@ local function attachInlineSliderEditor(slider, textLabel, editBoxWidth)
 
     valueButton:SetScript("OnClick", function()
         editBox:SetText(textLabel and textLabel.GetText and textLabel:GetText() or "")
-        if textLabel and textLabel.Hide then
+        if textLabel then
             textLabel:Hide()
         end
         editBox:Show()
@@ -295,7 +291,7 @@ local function configureInlineSlider(slider, textLabel, field, onValueChanged, r
             end
         end
 
-        if slider.RegisterCallback and MinimalSliderWithSteppersMixin and MinimalSliderWithSteppersMixin.Event then
+        if slider.RegisterCallback then
             slider:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, handleValueChanged, slider)
         else
             slider:HookScript("OnValueChanged", handleValueChanged)
@@ -308,10 +304,6 @@ interop.configureInlineSlider = configureInlineSlider
 
 if not lib._sliderHookInstalled then
     local function setupSliderEditableValue()
-        if not SettingsSliderControlMixin then
-            return
-        end
-
         local function findValueLabel(sliderWithSteppers)
             if sliderWithSteppers._label then
                 return sliderWithSteppers._label
@@ -454,7 +446,7 @@ if not lib._sliderHookInstalled then
 end
 
 local function getCategoryDefaultsButton()
-    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local settingsList = SettingsPanel:GetSettingsList()
     local header = settingsList and settingsList.Header
     return header and header.DefaultsButton or nil
 end
@@ -527,26 +519,10 @@ function interop.installPageLifecycleHooks()
         return
     end
 
-    if type(SettingsPanel) ~= "table" or type(SettingsPanel.DisplayCategory) ~= "function" then
-        if lib._pageLifecycleDeferred or type(CreateFrame) ~= "function" then
-            return
-        end
-        lib._pageLifecycleDeferred = true
-        local f = CreateFrame("Frame")
-        f:RegisterEvent("ADDON_LOADED")
-        f:SetScript("OnEvent", function(self)
-            if type(SettingsPanel) == "table" and type(SettingsPanel.DisplayCategory) == "function" then
-                self:UnregisterAllEvents()
-                interop.installPageLifecycleHooks()
-            end
-        end)
-        return
-    end
-
     lib._pageLifecycleHooked = true
 
     hooksecurefunc(SettingsPanel, "DisplayCategory", function(panel)
-        local category = panel.GetCurrentCategory and panel:GetCurrentCategory() or nil
+        local category = panel:GetCurrentCategory()
         local old = lib._activeLifecycleCategory
         if old == category then
             return
@@ -578,15 +554,15 @@ function interop.installPageLifecycleHooks()
 end
 
 function interop.getCurrentSettingsCategory()
-    return SettingsPanel and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() or nil
+    return SettingsPanel:GetCurrentCategory()
 end
 
 function interop.isSettingsPanelShown()
-    return SettingsPanel and SettingsPanel.IsShown and SettingsPanel:IsShown()
+    return SettingsPanel:IsShown()
 end
 
 function interop.forEachVisibleSettingsFrame(callback)
-    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local settingsList = SettingsPanel:GetSettingsList()
     local scrollBox = settingsList and settingsList.ScrollBox
     if scrollBox and scrollBox.ForEachFrame then
         scrollBox:ForEachFrame(callback)

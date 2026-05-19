@@ -37,16 +37,9 @@ local function resetListElement(frame)
 end
 
 local function hideListElementObjects(frame, getterName)
-    if not frame or not frame[getterName] then
-        return
-    end
-
     local objects = { frame[getterName](frame) }
     for i = 1, #objects do
-        local object = objects[i]
-        if object and object.Hide then
-            object:Hide()
-        end
+        objects[i]:Hide()
     end
 end
 
@@ -101,7 +94,7 @@ local function ensureHeaderRowWidgets(frame)
 end
 
 local function getSettingsListHeader()
-    local settingsList = SettingsPanel and SettingsPanel.GetSettingsList and SettingsPanel:GetSettingsList()
+    local settingsList = SettingsPanel:GetSettingsList()
     return settingsList and settingsList.Header or nil
 end
 
@@ -336,7 +329,7 @@ local function scheduleInputPreview(frame, immediate)
     end
 
     local delay = immediate and 0 or (data.debounce or 0)
-    if delay > 0 and C_Timer and C_Timer.NewTimer then
+    if delay > 0 then
         frame._lsbInputPreviewTimer = C_Timer.NewTimer(delay, function()
             frame._lsbInputPreviewTimer = nil
             resolveInputPreview(frame)
@@ -379,12 +372,8 @@ local function applyButtonRowEnabledState(frame, enabled)
     if not button then
         return
     end
-    if button.SetEnabled then
-        button:SetEnabled(enabled)
-    end
-    if button.EnableMouse then
-        button:EnableMouse(enabled)
-    end
+    button:SetEnabled(enabled)
+    button:EnableMouse(enabled)
 end
 
 local function ensureColorRowWidgets(frame)
@@ -623,17 +612,12 @@ local function installColorPickerHooks()
             end
 
             session.reopening = true
-            if C_Timer and C_Timer.After then
-                C_Timer.After(0, function()
-                    session.reopening = nil
-                    if colorPickerSession == session and not session.committed and not session.cancelled then
-                        showColorPickerSession(session)
-                    end
-                end)
-            else
+            C_Timer.After(0, function()
                 session.reopening = nil
-                showColorPickerSession(session)
-            end
+                if colorPickerSession == session and not session.committed and not session.cancelled then
+                    showColorPickerSession(session)
+                end
+            end)
         end)
     end
 

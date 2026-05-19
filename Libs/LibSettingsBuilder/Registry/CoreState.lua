@@ -51,41 +51,6 @@ local interop = internal.interop
 local registry = internal.registry
 lib._runtimeApi = lib._runtimeApi or {}
 
-local COMMON_SPEC_FIELDS = {
-    path = true,
-    name = true,
-    tooltip = true,
-    category = true,
-    onSet = true,
-    getTransform = true,
-    setTransform = true,
-    disabled = true,
-    hidden = true,
-    layout = true,
-    type = true,
-    desc = true,
-    get = true,
-    set = true,
-    key = true,
-    default = true,
-}
-
-local EXTRA_FIELDS_BY_TYPE = {
-    checkbox = {},
-    slider = { min = true, max = true, step = true, formatter = true },
-    dropdown = { values = true, scrollHeight = true },
-    color = {},
-    input = {
-        debounce = true,
-        maxLetters = true,
-        numeric = true,
-        onTextChanged = true,
-        resolveText = true,
-        width = true,
-    },
-    custom = { template = true, varType = true },
-}
-
 local function defaultGetNestedValue(tbl, path)
     local current = tbl
     for segment in path:gmatch("[^.]+") do
@@ -307,31 +272,6 @@ function registry.makeColorSetting(self, spec)
     )
 
     return setting, category
-end
-
-function registry.validateSpecFields(_, controlType, spec)
-    if not LSB_DEBUG then
-        return
-    end
-
-    local allowed = EXTRA_FIELDS_BY_TYPE[controlType]
-    if not allowed then
-        return
-    end
-
-    for key in pairs(spec) do
-        if not COMMON_SPEC_FIELDS[key] and not allowed[key] then
-            print(
-                "|cffFF8800LibSettingsBuilder WARNING:|r Unknown spec field '"
-                    .. tostring(key)
-                    .. "' on "
-                    .. controlType
-                    .. " control '"
-                    .. tostring(spec.name or spec.path)
-                    .. "'"
-            )
-        end
-    end
 end
 
 function registry.isParentEnabled(self, spec)

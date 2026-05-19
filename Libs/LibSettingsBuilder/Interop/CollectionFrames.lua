@@ -182,7 +182,7 @@ local function bindCollectionRowTooltip(row, item)
         setCollectionRowHighlight(row, false)
         if item.onLeave then
             item.onLeave(self, item)
-        elseif GameTooltip_Hide then
+        else
             GameTooltip_Hide()
         end
     end)
@@ -722,12 +722,8 @@ local function setupModeInputDropdown(row, trailer, sectionData, enabled)
         dropdown:SetText(label)
     end
 
-    if dropdown.SetEnabled then
-        dropdown:SetEnabled(enabled)
-    end
-    if row._dropdownHost.SetEnabled then
-        row._dropdownHost:SetEnabled(enabled)
-    end
+    dropdown:SetEnabled(enabled)
+    row._dropdownHost:SetEnabled(enabled)
 
     if dropdown.SetupMenu then
         dropdown:SetupMenu(function(_, rootDescription)

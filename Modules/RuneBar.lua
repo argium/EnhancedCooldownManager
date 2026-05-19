@@ -105,10 +105,6 @@ end
 ---@param moduleConfig table
 ---@param globalConfig table
 local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalConfig)
-    if not GetRuneCooldown then
-        return
-    end
-
     if not bar.FragmentedBars then
         return
     end

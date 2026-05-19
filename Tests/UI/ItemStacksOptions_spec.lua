@@ -370,8 +370,7 @@ describe("ItemStacksOptions settings page", function()
     end)
 
     it("protects default stacks and reverts them to defaults", function()
-        ns.Addon.db.defaults = { profile = { extraIcons = { itemStacks = { byId = {} } } } }
-        ns.defaults = { profile = defaults }
+        ns.Addon.db.defaults = { profile = TestHelpers.deepClone(defaults) }
         profile.extraIcons.itemStacks = TestHelpers.deepClone(defaults.extraIcons.itemStacks)
         profile.extraIcons.itemStacks.byId.combatPotions.name = "Custom Combat"
         profile.extraIcons.itemStacks.byId.combatPotions.ids = { { itemID = 999 } }

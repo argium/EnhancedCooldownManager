@@ -65,9 +65,7 @@ end
 
 local function createPreviewBlock(parent, width, height, point, relativeTo, relativePoint, x, y, color)
     local block = parent:CreateTexture(nil, "ARTWORK")
-    if type(block.SetColorTexture) == "function" then
-        block:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-    end
+    block:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
     block:SetSize(width, height)
     block:SetPoint(point, relativeTo, relativePoint, x, y)
     return block
@@ -80,10 +78,6 @@ local function createPreviewBars(parent, positions)
 end
 
 function OptionUtil.CreatePositioningExamplesCanvas()
-    if type(CreateFrame) ~= "function" then
-        return {}
-    end
-
     local frame = CreateFrame("Frame")
     frame:SetHeight(C.POSITION_MODE_EXPLAINER_HEIGHT)
 
@@ -153,9 +147,7 @@ function OptionUtil.CreatePositioningExamplesCanvas()
 
         local previewBg = preview:CreateTexture(nil, "BACKGROUND")
         previewBg:SetAllPoints(preview)
-        if type(previewBg.SetColorTexture) == "function" then
-            previewBg:SetColorTexture(0.08, 0.08, 0.08, 1)
-        end
+        previewBg:SetColorTexture(0.08, 0.08, 0.08, 1)
 
         column.build(preview)
 
@@ -368,11 +360,11 @@ function OptionUtil.CreateFontOverrideRow(isDisabled)
         path = "",
         disabled = isDisabled,
         fontValues = function()
-            return LSMW and LSMW.GetFontValues and LSMW.GetFontValues() or {}
+            return LSMW.GetFontValues()
         end,
         fontFallback = getGlobalFont,
         fontSizeFallback = getGlobalFontSize,
-        fontTemplate = LSMW and LSMW.FONT_PICKER_TEMPLATE or nil,
+        fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
     }
 end
 
@@ -617,25 +609,15 @@ function OptionUtil.MakeConfirmDialog(text, button1, button2)
     }
 end
 
-local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
+local function getPopupEditBox(frame) return frame and frame.editBox end
 
 local function trimDialogText(text)
-    if strtrim then
-        return strtrim(text or "")
-    end
-    return tostring(text or ""):match("^%s*(.-)%s*$")
+    return strtrim(text or "")
 end
 
 local function setDialogAcceptEnabled(frame, enabled)
-    local button = frame and (frame.button1 or (frame.Buttons and frame.Buttons[1]))
-    if not button then
-        return
-    end
-    if enabled and button.Enable then
-        button:Enable()
-    elseif not enabled and button.Disable then
-        button:Disable()
-    elseif button.SetEnabled then
+    local button = frame and frame.button1
+    if button then
         button:SetEnabled(enabled)
     end
 end
@@ -675,13 +657,12 @@ function OptionUtil.MakeTextInputDialog(text, button1, button2)
             if not parent then
                 return
             end
-            local button1Frame = parent and (parent.button1 or (parent.Buttons and parent.Buttons[1]))
-            if button1Frame and button1Frame.IsEnabled and not button1Frame:IsEnabled() then
+            if parent.button1 and not parent.button1:IsEnabled() then
                 return
             end
             parent:Hide()
-            local dialog = parent and parent.which and StaticPopupDialogs[parent.which]
-            dialog = dialog or (parent and parent.data and parent.data.popupKey and StaticPopupDialogs[parent.data.popupKey])
+            local dialog = parent.which and StaticPopupDialogs[parent.which]
+            dialog = dialog or (parent.data and parent.data.popupKey and StaticPopupDialogs[parent.data.popupKey])
             if dialog and dialog.OnAccept then
                 dialog.OnAccept(parent, parent.data)
             end

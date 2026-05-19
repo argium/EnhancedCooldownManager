@@ -9,7 +9,7 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 - Embed into any table to give it event registration capabilities.
 - Zero-allocation dispatch loop — no snapshot copies per fire.
 - Idempotent embedding — safe to re-embed on library upgrades.
-- Metrics hooks via `GetEventStats` / `ResetEventStats`; metrics are disabled by default, so these APIs return no counts in normal runtime.
+- No-op stats hooks via `GetEventStats` / `ResetEventStats` for callers that need a stable API surface.
 
 ## Quick start
 
@@ -33,8 +33,8 @@ end)
 | `UnregisterEvent(event, callback)` | Remove a specific callback. |
 | `UnregisterAllEvents()` | Remove all callbacks and unregister the hidden frame. |
 | `Fire(event, ...)` | Manually fire an event on the target. |
-| `GetEventStats()` | Returns event fire counts when metrics are enabled, otherwise an empty table. |
-| `ResetEventStats()` | Clears accumulated stats when metrics are enabled. |
+| `GetEventStats()` | Returns an empty table. |
+| `ResetEventStats()` | No-op retained for API stability. |
 
 ## Testing
 

@@ -212,6 +212,10 @@ function TestHelpers.SetupSettingsStubs()
         "ECM_DeepEquals",
         "CreateFromMixins",
         "SettingsListElementInitializer",
+        "hooksecurefunc",
+        "SettingsDropdownControlMixin",
+        "SettingsSliderControlMixin",
+        "SettingsPanel",
     }
 
     local function makeLayout()
@@ -382,6 +386,17 @@ function TestHelpers.SetupSettingsStubs()
         Event = { OnValueChanged = "OnValueChanged" },
     }
 
+    _G.hooksecurefunc = _G.hooksecurefunc or function() end
+    _G.SettingsDropdownControlMixin = _G.SettingsDropdownControlMixin or {}
+    _G.SettingsSliderControlMixin = _G.SettingsSliderControlMixin or {}
+    _G.SettingsPanel = _G.SettingsPanel or {
+        DisplayCategory = function() end,
+        GetCurrentCategory = function() return nil end,
+        GetSettingsList = function() return nil end,
+        HookScript = function() end,
+        IsShown = function() return false end,
+    }
+
     _G.CreateColor = function(r, g, b, a)
         return { r = r, g = g, b = b, a = a or 1 }
     end
@@ -401,7 +416,7 @@ function TestHelpers.SetupSettingsStubs()
             if dialog.hasEditBox then
                 local text = ""
                 local editBox = { GetText = function() return text end, SetText = function(_, t) text = t end, HighlightText = function() end }
-                local self = { editBox = editBox, button1 = { IsEnabled = function() return true end } }
+                local self = { editBox = editBox, button1 = { IsEnabled = function() return true end, SetEnabled = function() end } }
                 if dialog.OnShow then dialog.OnShow(self) end
                 dialog.OnAccept(self, data)
             else
@@ -627,6 +642,21 @@ function TestHelpers.makeTexture(opts)
     end
     function texture:IsDesaturated()
         return self.__desaturated == true
+    end
+
+    texture.__masks = {}
+    function texture:GetNumMaskTextures()
+        return #self.__masks
+    end
+    function texture:GetMaskTexture(index)
+        return self.__masks[index]
+    end
+    function texture:RemoveMaskTexture(mask)
+        for i = #self.__masks, 1, -1 do
+            if self.__masks[i] == mask then
+                table.remove(self.__masks, i)
+            end
+        end
     end
 
     return texture
@@ -1945,6 +1975,7 @@ function TestHelpers.InstallPopupAutoAccept(editText)
                     IsEnabled = function()
                         return true
                     end,
+                    SetEnabled = function() end,
                 },
             }
 

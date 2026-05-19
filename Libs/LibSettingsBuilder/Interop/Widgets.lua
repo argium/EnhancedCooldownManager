@@ -48,14 +48,10 @@ function interop.setCanvasInteractive(frame, enabled)
     if frame.SetEnabled then
         frame:SetEnabled(enabled)
     end
-    if frame.EnableMouse then
-        frame:EnableMouse(enabled)
-    end
-    if frame.GetChildren then
-        local children = { frame:GetChildren() }
-        for i = 1, #children do
-            interop.setCanvasInteractive(children[i], enabled)
-        end
+    frame:EnableMouse(enabled)
+    local children = { frame:GetChildren() }
+    for i = 1, #children do
+        interop.setCanvasInteractive(children[i], enabled)
     end
 end
 
@@ -115,13 +111,13 @@ function interop.refreshSettingsFrame(frame)
 end
 
 function interop.showFrame(frame)
-    if frame and frame.Show then
+    if frame then
         frame:Show()
     end
 end
 
 function interop.setTextureValue(texture, value)
-    if not texture or not texture.SetTexture then
+    if not texture then
         return
     end
 
@@ -155,19 +151,13 @@ function interop.setSimpleTooltip(owner, text)
     end
 
     owner:SetScript("OnEnter", function(self)
-        if not GameTooltip then
-            return
-        end
-
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:ClearLines()
         interop.setGameTooltipText(text, true)
         GameTooltip:Show()
     end)
     owner:SetScript("OnLeave", function()
-        if GameTooltip_Hide then
-            GameTooltip_Hide()
-        end
+        GameTooltip_Hide()
     end)
 end
 
@@ -255,13 +245,9 @@ local function setButtonTextureState(button, setterName, getterName, value, blen
         return
     end
 
-    if texture.ClearAllPoints then
-        texture:ClearAllPoints()
-    end
-    if texture.SetAllPoints then
-        texture:SetAllPoints(button)
-    end
-    if alpha ~= nil and texture.SetAlpha then
+    texture:ClearAllPoints()
+    texture:SetAllPoints(button)
+    if alpha ~= nil then
         texture:SetAlpha(alpha)
     end
 end

@@ -97,13 +97,11 @@ local function doActionAndUpdateLayout(fn)
 end
 
 local function getSpellName(spellId)
-    local api = type(C_Spell) == "table" and C_Spell or nil
-    return spellId and api and api.GetSpellName and api.GetSpellName(spellId) or nil
+    return spellId and C_Spell.GetSpellName(spellId) or nil
 end
 
 local function getSpellTexture(spellId)
-    local api = type(C_Spell) == "table" and C_Spell or nil
-    return spellId and api and api.GetSpellTexture and api.GetSpellTexture(spellId) or nil
+    return spellId and C_Spell.GetSpellTexture(spellId) or nil
 end
 
 local function isDisabledBuiltinEntry(entry) return entry and entry.stackKey and entry.disabled and BUILTIN_STACK_SET[entry.stackKey] == true end

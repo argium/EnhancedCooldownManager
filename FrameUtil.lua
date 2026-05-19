@@ -17,7 +17,7 @@ local function tryGetRegion(frame, index, regionType)
     end
 
     local region = select(index, frame:GetRegions())
-    if region and region.IsObjectType and region:IsObjectType(regionType) then
+    if region and region:IsObjectType(regionType) then
         return region
     end
 
@@ -51,15 +51,17 @@ end
 ---@param statusBar StatusBar|nil
 ---@return Texture|nil
 function FrameUtil.GetBarBackground(statusBar)
-    if not statusBar or not statusBar.GetRegions then
+    if not statusBar then
         return nil
     end
     local cached = statusBar.__ecmBarBG
-    if cached and cached.IsObjectType and cached:IsObjectType("Texture") then
+    if cached and cached:IsObjectType("Texture") then
+        ---@cast cached Texture
         return cached
     end
     for _, region in ipairs({ statusBar:GetRegions() }) do
-        if region and region.IsObjectType and region:IsObjectType("Texture") then
+        if region:IsObjectType("Texture") then
+            ---@cast region Texture
             local atlas = region.GetAtlas and region:GetAtlas()
             if atlas == "UI-HUD-CoolDownManager-Bar-BG" or atlas == "UI-HUD-CooldownManager-Bar-BG" then
                 statusBar.__ecmBarBG = region
@@ -130,15 +132,10 @@ end
 ---@param parent Frame|nil
 ---@return number, number
 function FrameUtil.GetParentSize(parent)
-    if parent and parent.GetSize then
-        local width, height = parent:GetSize()
-        if width and height then
-            return width, height
-        end
+    if not parent then
+        return 0, 0
     end
-    local width = (parent and parent.GetWidth and parent:GetWidth()) or 0
-    local height = (parent and parent.GetHeight and parent:GetHeight()) or 0
-    return width, height
+    return parent:GetSize()
 end
 
 --- Returns the offset from the frame's center to the specified anchor point,

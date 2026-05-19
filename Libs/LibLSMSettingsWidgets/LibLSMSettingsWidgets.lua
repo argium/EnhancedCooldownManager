@@ -20,9 +20,7 @@ local function invalidateMediaCache()
     wipe(mediaCache)
 end
 
-if LSM and LSM.RegisterCallback then
-    LSM:RegisterCallback("LibSharedMedia_Registered", invalidateMediaCache)
-end
+LSM:RegisterCallback("LibSharedMedia_Registered", invalidateMediaCache)
 
 local function getSortedMediaNames(mediaType, fallback)
     local cached = mediaCache[mediaType]
@@ -31,10 +29,8 @@ local function getSortedMediaNames(mediaType, fallback)
     end
 
     local sorted = {}
-    if LSM and LSM.List then
-        for _, name in ipairs(LSM:List(mediaType)) do
-            sorted[#sorted + 1] = name
-        end
+    for _, name in ipairs(LSM:List(mediaType)) do
+        sorted[#sorted + 1] = name
     end
 
     if #sorted == 0 then
@@ -69,17 +65,17 @@ end
 --------------------------------------------------------------------------------
 
 local function setPickerEnabled(self, enabled)
-    if self.DropDown.SetEnabled then self.DropDown:SetEnabled(enabled) end
-    if self.DropDown.EnableMouse then self.DropDown:EnableMouse(enabled) end
-    if self.DropDownHost.SetEnabled then self.DropDownHost:SetEnabled(enabled) end
-    if self.DropDownHost.EnableMouse then self.DropDownHost:EnableMouse(enabled) end
+    self.DropDown:SetEnabled(enabled)
+    self.DropDown:EnableMouse(enabled)
+    self.DropDownHost:SetEnabled(enabled)
+    self.DropDownHost:EnableMouse(enabled)
     self.Preview[enabled and "Show" or "Hide"](self.Preview)
 end
 
 local function createDropDown(self)
     local host = CreateFrame("Frame", nil, self, "SettingsDropdownWithButtonsTemplate")
-    if host.DecrementButton then host.DecrementButton:Hide() end
-    if host.IncrementButton then host.IncrementButton:Hide() end
+    host.DecrementButton:Hide()
+    host.IncrementButton:Hide()
 
     local dropdown = host.Dropdown or host
     dropdown:SetPoint("LEFT", self.Text, "RIGHT", 10, 0)
@@ -140,7 +136,7 @@ local function updateDropdownText(self, mediaType)
     if not self.setting then return nil, nil end
 
     local currentName = self.setting:GetValue()
-    local mediaPath = LSM and LSM.Fetch and LSM:Fetch(mediaType, currentName)
+    local mediaPath = LSM:Fetch(mediaType, currentName)
 
     if self.DropDown and self.DropDown.OverrideText then
         self.DropDown:OverrideText(currentName or "")

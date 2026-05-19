@@ -202,10 +202,6 @@ local EDIT_MODE_BUILTIN_NAMES = { "Modern", "Classic" }
 
 ---@return string[]|nil names All layout names, or nil if unavailable.
 local function resolveAllLayoutNames()
-    if type(C_EditMode) ~= "table" or type(C_EditMode.GetLayouts) ~= "function" then
-        return nil
-    end
-
     local layoutInfo = C_EditMode.GetLayouts()
     if not layoutInfo then
         return nil
