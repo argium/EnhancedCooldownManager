@@ -84,9 +84,9 @@ Declarative pages use canonical row types only:
 - specialized row templates,
 - genuinely bespoke embedded frames.
 
-If you only need text or numeric entry, use the built-in `input` type first. Reach for `type = "custom"` only when you need a genuinely different widget.
+If you only need text or numeric entry, use the built-in `input` type first. Reach for a registered row type only when you need a genuinely different widget.
 
-If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "list"` or `type = "sectionList"` before reaching for `type = "custom"` or `type = "canvas"`.
+If you need an ordered list, grouped editor, or add/remove workflow, prefer `type = "list"` or `type = "sectionList"` before reaching for a registered row type or `type = "canvas"`.
 
 ## Migrating AceConfig input fields
 

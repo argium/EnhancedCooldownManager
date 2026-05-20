@@ -4,7 +4,6 @@
 
 local _, ns = ...
 local L = ns.L
-local LSMW = LibStub("LibLSMSettingsWidgets-1.0")
 local function isFadeDisabled()
     local gc = ns.GetGlobalConfig()
     local fade = gc and gc.outOfCombatFade
@@ -72,18 +71,16 @@ local GeneralOptions = {
         -- Appearance
         { type = "header", name = L["APPEARANCE"] },
         {
-            type = "custom",
+            type = "texture",
             path = "texture",
             name = L["BAR_TEXTURE"],
             tooltip = L["BAR_TEXTURE_DESC"],
-            template = LSMW.TEXTURE_PICKER_TEMPLATE,
         },
         {
-            type = "custom",
+            type = "font",
             path = "font",
             name = L["FONT"],
             tooltip = L["FONT_DESC"],
-            template = LSMW.FONT_PICKER_TEMPLATE,
         },
         {
             type = "slider",

@@ -53,7 +53,7 @@ When you use `input` rows with `debounce` / `resolveText`, the library also uses
 
 Those hooks are part of the library's behavior and should be considered when debugging conflicts with heavily customized Settings UI code.
 
-## Built-in controls vs custom templates
+## Built-in controls and registered row types
 
 Most library features are available with no extra XML:
 
@@ -61,13 +61,7 @@ Most library features are available with no extra XML:
 - layout rows like `header`, `subheader`, `info`, `button`, `pageActions`, and `canvas`,
 - composite builders like `border`, `fontOverride`, and `heightOverride`.
 
-`input` is a built-in row type implemented entirely in Lua on top of `SettingsListElementTemplate` plus a runtime-created `InputBoxTemplate` edit box.
-
-Only `type = "custom"` rows require you to supply your own template. In that case:
-
-1. define the template in XML,
-2. load that XML from your TOC before calling `LSB.New({ ... })`, and
-3. pass the template name through `spec.template`.
+`input` is a built-in row type implemented entirely in Lua on top of `SettingsListElementTemplate` plus a runtime-created `InputBoxTemplate` edit box. Other libraries can add pure-Lua row types with `LSB:RegisterRowType(name, descriptor)`.
 
 ## Canvas support
 

@@ -1,19 +1,16 @@
--- LibLSMSettingsWidgets: LibSharedMedia picker widgets for the WoW Settings API.
--- Provides font and texture picker templates with live previews.
+-- Enhanced Cooldown Manager addon for World of Warcraft
+-- Author: Argium
+-- Licensed under the GNU General Public License v3.0
 
-local MAJOR, MINOR = "LibLSMSettingsWidgets-1.0", 2
+-- LibLSMSettingsWidgets: LibSharedMedia picker widgets for LibSettingsBuilder rows.
+
+local MAJOR, MINOR = "LibLSMSettingsWidgets-1.0", 3
 local lib = LibStub:NewLibrary(MAJOR, MINOR)
 if not lib then return end
 
 local LSM = LibStub("LibSharedMedia-3.0")
 
-lib.FONT_PICKER_TEMPLATE = "LibLSMSettingsWidgets_FontPickerTemplate"
-lib.TEXTURE_PICKER_TEMPLATE = "LibLSMSettingsWidgets_TexturePickerTemplate"
-
---------------------------------------------------------------------------------
--- Media value helpers
---------------------------------------------------------------------------------
-
+local FONT_PREVIEW_TEXT = "AaBbCcDd 1234"
 local mediaCache = {}
 
 local function invalidateMediaCache()
@@ -42,179 +39,207 @@ local function getSortedMediaNames(mediaType, fallback)
     return sorted
 end
 
-function lib.GetFontValues()
-    local names = getSortedMediaNames("font", "Expressway")
+local function getMediaValues(mediaType, fallback)
     local values = {}
-    for _, name in ipairs(names) do
+    for _, name in ipairs(getSortedMediaNames(mediaType, fallback)) do
         values[name] = name
     end
     return values
+end
+
+function lib.GetFontValues()
+    return getMediaValues("font", "Expressway")
 end
 
 function lib.GetStatusbarValues()
-    local names = getSortedMediaNames("statusbar", "Blizzard")
-    local values = {}
-    for _, name in ipairs(names) do
-        values[name] = name
+    return getMediaValues("statusbar", "Blizzard")
+end
+
+local function createDropDown(frame)
+    local host = CreateFrame("Frame", nil, frame, "SettingsDropdownWithButtonsTemplate")
+    if host.DecrementButton then
+        host.DecrementButton:Hide()
     end
-    return values
-end
-
---------------------------------------------------------------------------------
--- Shared picker helpers
---------------------------------------------------------------------------------
-
-local function setPickerEnabled(self, enabled)
-    self.DropDown:SetEnabled(enabled)
-    self.DropDown:EnableMouse(enabled)
-    self.DropDownHost:SetEnabled(enabled)
-    self.DropDownHost:EnableMouse(enabled)
-    self.Preview[enabled and "Show" or "Hide"](self.Preview)
-end
-
-local function createDropDown(self)
-    local host = CreateFrame("Frame", nil, self, "SettingsDropdownWithButtonsTemplate")
-    host.DecrementButton:Hide()
-    host.IncrementButton:Hide()
+    if host.IncrementButton then
+        host.IncrementButton:Hide()
+    end
 
     local dropdown = host.Dropdown or host
-    dropdown:SetPoint("LEFT", self.Text, "RIGHT", 10, 0)
     dropdown:SetWidth(200)
-    self.DropDownHost = host
-    return dropdown
+    return host, dropdown
 end
 
-local function initPicker(self, initializer)
-    SettingsListElementMixin.Init(self, initializer)
-
-    local data = initializer:GetData() or {}
-    self.setting = data.setting or (initializer.GetSetting and initializer:GetSetting()) or nil
-
-    if data.name and self.Text then
-        self.Text:SetText(data.name)
+local function ensurePicker(frame, kind)
+    local picker = frame._lsmwPicker
+    if not picker then
+        local host, dropdown = createDropDown(frame)
+        picker = { host = host, dropdown = dropdown }
+        frame._lsmwPicker = picker
     end
 
-    self:SetupDropdown()
-    self:UpdatePreview()
-
-    local frame = self
-    local oldSetEnabled = initializer.SetEnabled
-    initializer.SetEnabled = function(init, enabled)
-        if oldSetEnabled then
-            oldSetEnabled(init, enabled)
+    if picker.kind ~= kind then
+        if picker.preview then
+            picker.preview:Hide()
         end
-        frame:SetEnabled(enabled)
+
+        if kind == "font" then
+            picker.preview = picker.fontPreview or frame:CreateFontString(nil, "OVERLAY")
+            picker.fontPreview = picker.preview
+            picker.preview:SetFontObject(GameFontHighlight)
+            picker.preview:SetJustifyH("LEFT")
+        else
+            picker.preview = picker.texturePreview or frame:CreateTexture(nil, "ARTWORK")
+            picker.texturePreview = picker.preview
+            picker.preview:SetSize(120, 16)
+            picker.preview:SetVertexColor(0.4, 0.6, 0.9, 1)
+        end
+        picker.kind = kind
+    end
+
+    return picker
+end
+
+local function setPickerEnabled(frame, enabled)
+    local picker = frame._lsmwPicker
+    if not picker then return end
+
+    picker.dropdown:SetEnabled(enabled)
+    picker.dropdown:EnableMouse(enabled)
+    picker.host:SetEnabled(enabled)
+    picker.host:EnableMouse(enabled)
+    picker.preview[enabled and "Show" or "Hide"](picker.preview)
+end
+
+local function anchorPicker(frame, picker)
+    if frame.Text then
+        frame.Text:ClearAllPoints()
+        frame.Text:SetPoint("LEFT", frame, "LEFT", 37, 0)
+        frame.Text:SetPoint("RIGHT", frame, "CENTER", -85, 0)
+        frame.Text:SetJustifyV("MIDDLE")
+        frame.Text:Show()
+    end
+
+    picker.host:ClearAllPoints()
+    if frame.Text then
+        picker.host:SetPoint("LEFT", frame.Text, "RIGHT", 10, 0)
+    else
+        picker.host:SetPoint("LEFT", frame, "CENTER", -80, 0)
+    end
+    picker.host:Show()
+
+    picker.preview:ClearAllPoints()
+    picker.preview:SetPoint("LEFT", picker.dropdown, "RIGHT", 10, 0)
+    picker.preview:SetPoint("RIGHT", frame, "RIGHT", -20, 0)
+    picker.preview:Show()
+end
+
+local function updateDropdownText(picker, setting, mediaType)
+    local currentName = setting and setting.GetValue and setting:GetValue() or nil
+
+    if picker.dropdown.OverrideText then
+        picker.dropdown:OverrideText(currentName or "")
+    end
+
+    if not currentName then
+        return nil, nil
+    end
+
+    return currentName, LSM:Fetch(mediaType, currentName)
+end
+
+local function updateFontPreview(picker, setting)
+    local _, fontPath = updateDropdownText(picker, setting, "font")
+    if fontPath then
+        picker.preview:SetFont(fontPath, 14, "")
+        picker.preview:SetText(FONT_PREVIEW_TEXT)
+    else
+        picker.preview:SetFontObject(GameFontHighlight)
+        picker.preview:SetText("")
     end
 end
 
-local function setupMediaDropdown(self, mediaType, fallback)
-    local setting = self.setting
-    local picker = self
+local function updateTexturePreview(picker, setting)
+    local _, texturePath = updateDropdownText(picker, setting, "statusbar")
+    picker.preview:SetTexture(texturePath)
+end
 
+local function setupMediaDropdown(frame, picker, setting, mediaType, fallback, updatePreview)
     if not setting then return end
 
-    self.DropDown:SetupMenu(function(_, rootDescription)
+    picker.dropdown:SetupMenu(function(_, rootDescription)
         rootDescription:SetScrollMode(200)
 
-        local sorted = getSortedMediaNames(mediaType, fallback)
-
-        for _, name in ipairs(sorted) do
+        for _, name in ipairs(getSortedMediaNames(mediaType, fallback)) do
             rootDescription:CreateRadio(name,
                 function() return setting:GetValue() == name end,
                 function()
                     setting:SetValue(name)
-                    picker:UpdatePreview()
+                    updatePreview(picker, setting)
+                    if frame.RefreshDropdownText then
+                        frame:RefreshDropdownText()
+                    end
                 end)
         end
     end)
 end
 
---- Updates the dropdown label and fetches the media path for the current value.
----@return string|nil currentName
----@return string|nil mediaPath
-local function updateDropdownText(self, mediaType)
-    if not self.setting then return nil, nil end
+local function applyPickerRow(frame, data, initializer, kind, mediaType, fallback, updatePreview)
+    local picker = ensurePicker(frame, kind)
+    local setting = data.setting
 
-    local currentName = self.setting:GetValue()
-    local mediaPath = LSM:Fetch(mediaType, currentName)
-
-    if self.DropDown and self.DropDown.OverrideText then
-        self.DropDown:OverrideText(currentName or "")
+    frame._lsmwPickerSetting = setting
+    if frame.Text then
+        frame.Text:SetText(data.name or "")
     end
 
-    return currentName, mediaPath
-end
+    anchorPicker(frame, picker)
+    setupMediaDropdown(frame, picker, setting, mediaType, fallback, updatePreview)
+    updatePreview(picker, setting)
 
---------------------------------------------------------------------------------
--- Font Picker Mixin
---------------------------------------------------------------------------------
-
-LibLSMSettingsWidgets_FontPickerMixin = {}
-
-function LibLSMSettingsWidgets_FontPickerMixin:OnLoad()
-    SettingsListElementMixin.OnLoad(self)
-
-    self.DropDown = createDropDown(self)
-    self.Preview = self:CreateFontString(nil, "OVERLAY")
-    self.Preview:SetFontObject(GameFontHighlight)
-    self.Preview:SetPoint("LEFT", self.DropDown, "RIGHT", 10, 0)
-    self.Preview:SetPoint("RIGHT", self, "RIGHT", -20, 0)
-    self.Preview:SetJustifyH("LEFT")
-    self.Preview:SetText("AaBbCcDd 1234")
-end
-
-LibLSMSettingsWidgets_FontPickerMixin.CreateDropDown = createDropDown
-LibLSMSettingsWidgets_FontPickerMixin.Init = initPicker
-LibLSMSettingsWidgets_FontPickerMixin.SetEnabled = setPickerEnabled
-
-function LibLSMSettingsWidgets_FontPickerMixin:SetupDropdown()
-    setupMediaDropdown(self, "font", "Expressway")
-end
-
-function LibLSMSettingsWidgets_FontPickerMixin:UpdatePreview()
-    local _, fontPath = updateDropdownText(self, "font")
-    if self.Preview then
-        if fontPath then
-            self.Preview:SetFont(fontPath, 14, "")
-            self.Preview:SetText("AaBbCcDd 1234")
-        else
-            self.Preview:SetFontObject(GameFontHighlight)
-            self.Preview:SetText("")
-        end
+    initializer.SetEnabled = function(_, enabled)
+        setPickerEnabled(frame, enabled)
     end
 end
 
---------------------------------------------------------------------------------
--- Texture Picker Mixin
---------------------------------------------------------------------------------
-
-LibLSMSettingsWidgets_TexturePickerMixin = {}
-
-function LibLSMSettingsWidgets_TexturePickerMixin:OnLoad()
-    SettingsListElementMixin.OnLoad(self)
-
-    self.DropDown = createDropDown(self)
-    self.Preview = self:CreateTexture(nil, "ARTWORK")
-    self.Preview:SetPoint("LEFT", self.DropDown, "RIGHT", 10, 0)
-    self.Preview:SetSize(120, 16)
-    self.Preview:SetVertexColor(0.4, 0.6, 0.9, 1)
+function lib.ApplyFontPickerRow(frame, data, initializer)
+    applyPickerRow(frame, data, initializer, "font", "font", "Expressway", updateFontPreview)
 end
 
-LibLSMSettingsWidgets_TexturePickerMixin.CreateDropDown = createDropDown
-LibLSMSettingsWidgets_TexturePickerMixin.Init = initPicker
-LibLSMSettingsWidgets_TexturePickerMixin.SetEnabled = setPickerEnabled
-
-function LibLSMSettingsWidgets_TexturePickerMixin:SetupDropdown()
-    setupMediaDropdown(self, "statusbar", "Blizzard")
+function lib.ApplyTexturePickerRow(frame, data, initializer)
+    applyPickerRow(frame, data, initializer, "texture", "statusbar", "Blizzard", updateTexturePreview)
 end
 
-function LibLSMSettingsWidgets_TexturePickerMixin:UpdatePreview()
-    local _, texturePath = updateDropdownText(self, "statusbar")
-    if self.Preview then
-        if texturePath then
-            self.Preview:SetTexture(texturePath)
-        else
-            self.Preview:SetTexture(nil)
-        end
+function lib.ResetPickerRow(frame)
+    local picker = frame._lsmwPicker
+    if not picker then return end
+
+    picker.host:Hide()
+    if picker.fontPreview then
+        picker.fontPreview:Hide()
     end
+    if picker.texturePreview then
+        picker.texturePreview:Hide()
+    end
+    frame._lsmwPickerSetting = nil
 end
+
+function lib.Register(settingsBuilder)
+    if not settingsBuilder or not settingsBuilder.RegisterRowType then return end
+
+    settingsBuilder:RegisterRowType("font", {
+        varType = "string",
+        defaultValue = "",
+        extent = 26,
+        applyFrame = lib.ApplyFontPickerRow,
+        resetFrame = lib.ResetPickerRow,
+    })
+    settingsBuilder:RegisterRowType("texture", {
+        varType = "string",
+        defaultValue = "",
+        extent = 26,
+        applyFrame = lib.ApplyTexturePickerRow,
+        resetFrame = lib.ResetPickerRow,
+    })
+end
+
+lib.Register(LibStub("LibSettingsBuilder-1.0", true))

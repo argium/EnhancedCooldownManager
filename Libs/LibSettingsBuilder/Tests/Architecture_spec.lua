@@ -116,6 +116,7 @@ describe("LibSettingsBuilder architecture", function()
     it("keeps lib table exports public-only", function()
         local allowed = {
             New = true,
+            RegisterRowType = true,
             GetSection = true,
             GetRootPage = true,
             GetPage = true,

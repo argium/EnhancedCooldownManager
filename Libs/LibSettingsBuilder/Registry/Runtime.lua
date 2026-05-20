@@ -38,7 +38,6 @@
 ---| "checkboxList"
 ---| "color"
 ---| "colorList"
----| "custom"
 ---| "dropdown"
 ---| "fontOverride"
 ---| "header"
@@ -193,11 +192,6 @@
 ---@field resolveText LibSettingsBuilderInputResolveTextCallback|nil Gets the preview-text resolver shown beneath the edit box.
 ---@field width number|nil Gets the edit-box width.
 
----@class LibSettingsBuilderCustomRowConfig: LibSettingsBuilderBindableRowBase
----@field type "custom" Gets the XML-template-backed custom row kind.
----@field template string Gets the XML template name registered with Blizzard's Settings API.
----@field varType any Gets the optional `Settings.VarType` override.
-
 ---@class LibSettingsBuilderButtonRowConfig: LibSettingsBuilderRowBase
 ---@field type "button" Gets the button row kind.
 ---@field buttonText string|nil Gets the button label; defaults to `name`.
@@ -269,9 +263,7 @@
 ---@field enabledTooltip string|nil Gets the override toggle tooltip.
 ---@field fontName string|nil Gets the font-row label.
 ---@field fontTooltip string|nil Gets the font-row tooltip.
----@field fontValues (fun(): table<any, string>)|nil Gets the optional dropdown value provider for the font row.
 ---@field fontFallback (fun(): string|nil)|nil Gets the fallback font name used when no override is stored.
----@field fontTemplate string|nil Gets the optional custom template used instead of the built-in dropdown.
 ---@field sizeName string|nil Gets the font-size row label.
 ---@field sizeTooltip string|nil Gets the font-size row tooltip.
 ---@field sizeMin number|nil Gets the minimum font size.
@@ -291,7 +283,6 @@
 ---| LibSettingsBuilderDropdownRowConfig
 ---| LibSettingsBuilderColorRowConfig
 ---| LibSettingsBuilderInputRowConfig
----| LibSettingsBuilderCustomRowConfig
 ---| LibSettingsBuilderButtonRowConfig
 ---| LibSettingsBuilderHeaderRowConfig
 ---| LibSettingsBuilderSubheaderRowConfig
@@ -334,9 +325,25 @@ local ROW_BUILDERS = {
     subheader = builders.subheader,
     color = builders.color,
     input = builders.input,
-    custom = builders.custom,
 }
 local PROXY_ROW_TYPES = schema.PROXY_ROW_TYPES
+
+local function getRegisteredRowType(rowType)
+    return lib._registeredRowTypes and lib._registeredRowTypes[rowType]
+end
+
+local function getRegisteredRowVarType(descriptor)
+    if descriptor.varType == "boolean" then
+        return interop.getVarTypeBoolean()
+    end
+    if descriptor.varType == "number" then
+        return interop.getVarTypeNumber()
+    end
+    if type(descriptor.varType) == "function" then
+        return descriptor.varType()
+    end
+    return interop.getVarTypeString()
+end
 
 local function refreshCategory(builder, category)
     if not category then
@@ -417,8 +424,14 @@ local function prepareProxyRow(builder, rowType, spec)
         setting, category = registry.makeColorSetting(builder, spec)
     elseif rowType == "input" then
         setting, category = registry.makeProxySetting(builder, spec, interop.getVarTypeString(), "")
-    elseif rowType == "custom" then
-        setting, category = registry.makeProxySetting(builder, spec, spec.varType or interop.getVarTypeString(), "")
+    elseif getRegisteredRowType(rowType) then
+        local descriptor = getRegisteredRowType(rowType)
+        setting, category = registry.makeProxySetting(
+            builder,
+            spec,
+            getRegisteredRowVarType(descriptor),
+            descriptor.defaultValue or ""
+        )
     end
 
     spec.setting = setting
@@ -469,7 +482,7 @@ local function registerBuiltRow(sourceName, page, row, created)
     local spec = prepareRow(sourceName, page, row)
     local builder = page._builder
     local rowType = spec.type
-    local build = ROW_BUILDERS[rowType]
+    local build = ROW_BUILDERS[rowType] or (getRegisteredRowType(rowType) and builders.registered)
     if not build then
         error(sourceName .. ": unknown row type '" .. tostring(rowType) .. "'")
     end
@@ -565,12 +578,10 @@ local function registerFontOverride(sourceName, page, row, created)
     end
 
     local fontSpec = {
-        type = spec.fontTemplate and "custom" or "dropdown",
+        type = "font",
         path = sectionPath .. ".font",
         name = spec.fontName or "Font",
         tooltip = spec.fontTooltip,
-        values = spec.fontValues,
-        template = spec.fontTemplate,
         disabled = isOverrideDisabled,
         getTransform = function(value)
             if value then

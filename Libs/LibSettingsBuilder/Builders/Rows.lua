@@ -84,17 +84,20 @@ function builders.input(spec)
     return { initializer = initializer, setting = spec.setting, registration = "category" }
 end
 
---- Creates a proxy setting backed by a custom frame template.
---- The template's Init receives initializer data containing {setting, name, tooltip}.
-function builders.custom(spec)
-    assert(spec.template, "Custom: spec.template is required")
+function builders.registered(spec)
+    local descriptor = lib._registeredRowTypes[spec.type]
+    assert(descriptor, "Registered row type '" .. tostring(spec.type) .. "' is not available")
 
-    local initializer = interop.createElementInitializer(spec.template, {
+    local initializer = interop.createCustomListRowInitializer("SettingsListElementTemplate", {
         name = spec.name,
         setting = spec.setting,
+        settingVariable = interop.getSettingVariable(spec.setting),
         tooltip = spec.tooltip,
-    })
+    }, descriptor.extent or 26, descriptor.applyFrame, descriptor.resetFrame)
 
     interop.setInitializerSetting(initializer, spec.setting)
+    if descriptor.configureInitializer then
+        descriptor.configureInitializer(initializer, spec.setting, spec)
+    end
     return { initializer = initializer, setting = spec.setting, registration = "category" }
 end

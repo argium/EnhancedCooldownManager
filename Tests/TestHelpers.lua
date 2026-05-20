@@ -1799,8 +1799,15 @@ function TestHelpers.SetupLibSettingsBuilder()
     lsmw.GetStatusbarValues = function()
         return { Solid = "Solid" }
     end
-    lsmw.FONT_PICKER_TEMPLATE = "TestFontPickerTemplate"
-    lsmw.TEXTURE_PICKER_TEMPLATE = "TestTexturePickerTemplate"
+    lsmw.Register = function(lsb)
+        lsb:RegisterRowType("font", {
+            applyFrame = function() end,
+        })
+        lsb:RegisterRowType("texture", {
+            applyFrame = function() end,
+        })
+    end
+    lsmw.Register(LibStub("LibSettingsBuilder-1.0"))
 
     return lsmw
 end
