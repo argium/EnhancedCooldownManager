@@ -1851,11 +1851,12 @@ function TestHelpers.SetupOptionsEnv(profile, defaults)
     ns.GetGlobalConfig = function()
         return mod.db.profile and mod.db.profile.global
     end
-    ns.IsDeathKnight = function()
-        local _, classToken = UnitClass("player")
-        return classToken == "DEATHKNIGHT"
-    end
-    ns.ClassUtil = {}
+    ns.ClassUtil = {
+        IsDeathKnight = function()
+            local _, classToken = UnitClass("player")
+            return classToken == "DEATHKNIGHT"
+        end,
+    }
 
     TestHelpers.LoadChunk("UI/OptionUtil.lua", "Unable to load UI/OptionUtil.lua")(nil, ns)
     TestHelpers.LoadChunk("UI/ExtraIconsShared.lua", "Unable to load UI/ExtraIconsShared.lua")(nil, ns)

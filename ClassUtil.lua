@@ -64,6 +64,12 @@ function ClassUtil.GetPlayerResourceType()
     return ClassUtil.GetResourceType(class, GetSpecialization(), GetShapeshiftForm())
 end
 
+--- Returns whether the player is a Death Knight.
+function ClassUtil.IsDeathKnight()
+    local _, class = UnitClass("player")
+    return class == "DEATHKNIGHT"
+end
+
 --- Gets the max Maelstrom value that can diff based on talents
 local function getMaelstromWeaponMax()
     if C_SpellBook.IsSpellKnown(C.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then
@@ -135,6 +141,7 @@ function ClassUtil.GetCurrentMaxResourceValues(resourceType)
     if resourceType then
         local max = UnitPowerMax("player", resourceType)
         local current = UnitPower("player", resourceType)
+        ---@type number|nil
         local safeMax = max
         if issecretvalue(max) then
             safeMax = nil

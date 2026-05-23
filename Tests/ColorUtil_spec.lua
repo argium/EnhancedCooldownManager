@@ -19,19 +19,18 @@ describe("ColorUtil", function()
     end)
 
     before_each(function()
-        ns = {}
+        ns = {
+            Round = function(value)
+                if value == nil then return 0 end
+                return math.floor((value * 100) + 0.5) / 100
+            end,
+        }
+        ns.NumericEquals = function(a, b)
+            return ns.Round(a) == ns.Round(b)
+        end
 
         TestHelpers.LoadChunk("ColorUtil.lua", "Unable to load ColorUtil.lua")(nil, ns)
         ColorUtil = assert(ns.ColorUtil, "ColorUtil did not initialize")
-    end)
-
-    it("AreEqual handles identical, nil, and distinct colors", function()
-        local color = { r = 1, g = 0.5, b = 0.25, a = 1 }
-
-        assert.is_true(ColorUtil.AreEqual(color, color))
-        assert.is_true(ColorUtil.AreEqual(nil, nil))
-        assert.is_false(ColorUtil.AreEqual(color, nil))
-        assert.is_false(ColorUtil.AreEqual(color, { r = 1, g = 0.5, b = 0.25, a = 0.5 }))
     end)
 
     it("ColorToHex converts normalized RGB values to lowercase hex", function()

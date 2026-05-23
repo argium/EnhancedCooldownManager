@@ -68,9 +68,11 @@ describe("RuneBar real source", function()
                     target.EnsureFrame = target.EnsureFrame or function() end
                 end,
             },
-            IsDeathKnight = function()
-                return isDeathKnight
-            end,
+            ClassUtil = {
+                IsDeathKnight = function()
+                    return isDeathKnight
+                end,
+            },
             Runtime = {
                 RegisterFrame = function()
                     registerFrameCalls = registerFrameCalls + 1

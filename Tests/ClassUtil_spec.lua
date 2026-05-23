@@ -71,6 +71,24 @@ describe("ClassUtil", function()
         end
     end)
 
+    describe("IsDeathKnight", function()
+        it("returns true when the player's class token is DEATHKNIGHT", function()
+            _G.UnitClass = function()
+                return "Death Knight", "DEATHKNIGHT", 6
+            end
+
+            assert.is_true(ns.ClassUtil.IsDeathKnight())
+        end)
+
+        it("returns false when the player's class token is not DEATHKNIGHT", function()
+            _G.UnitClass = function()
+                return "Warrior", "WARRIOR", 1
+            end
+
+            assert.is_false(ns.ClassUtil.IsDeathKnight())
+        end)
+    end)
+
     describe("GetResourceType", function()
         local function setAvailablePowerType(powerType)
             UnitStub.Reset()

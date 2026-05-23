@@ -30,7 +30,7 @@ for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled, { showText = false,
     rows[#rows + 1] = row
 end
 
-if not ns.IsDeathKnight() then
+if not ns.ClassUtil.IsDeathKnight() then
     table.insert(rows, 1, {
         type = "subheader",
         name = L["DK_ONLY_WARNING"],
@@ -79,7 +79,7 @@ rows[#rows + 1] = {
 RuneBarOptions.key = "runeBar"
 RuneBarOptions.name = L["RUNE_BAR"]
 RuneBarOptions.disabled = function()
-    return not ns.IsDeathKnight()
+    return not ns.ClassUtil.IsDeathKnight()
 end
 RuneBarOptions.pages = {
     {

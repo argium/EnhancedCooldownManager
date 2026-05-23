@@ -51,12 +51,6 @@ function ns.AreWarningsEnabled()
     return not gc or gc.warnings ~= false
 end
 
---- Returns whether the player is a Death Knight.
-function ns.IsDeathKnight()
-    local _, class = UnitClass("player")
-    return class == "DEATHKNIGHT"
-end
-
 local function getAddonVersion()
     return C_AddOns.GetAddOnMetadata(ADDON_NAME, C.ADDON_METADATA_VERSION_KEY)
 end

@@ -694,7 +694,7 @@ end
 function Runtime.Enable(addon)
     local profile = addon.db and addon.db.profile
 
-    for _, moduleName in ipairs(C.MODULE_ORDER) do
+    for _, moduleName in ipairs(C.MODULE_LOAD_ORDER) do
         local configKey = C.MODULE_CONFIG_KEYS[moduleName]
         local moduleConfig = profile and profile[configKey]
         local shouldEnable = (not moduleConfig) or (moduleConfig.enabled ~= false)

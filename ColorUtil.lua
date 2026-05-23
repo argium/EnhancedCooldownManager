@@ -7,20 +7,6 @@ local _, ns = ...
 local ColorUtil = {}
 ns.ColorUtil = ColorUtil
 
---- Compares two ECM_Color tables for equality.
----@param c1 ECM_Color|nil
----@param c2 ECM_Color|nil
----@return boolean
-function ColorUtil.AreEqual(c1, c2)
-    if c1 == c2 then
-        return true
-    end
-    if not c1 or not c2 then
-        return false
-    end
-    return c1.r == c2.r and c1.g == c2.g and c1.b == c2.b and c1.a == c2.a
-end
-
 local function clamp(v, minV, maxV)
     return math.max(minV, math.min(maxV, v))
 end
