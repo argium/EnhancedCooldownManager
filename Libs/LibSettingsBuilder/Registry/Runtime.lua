@@ -430,7 +430,7 @@ local function prepareProxyRow(builder, rowType, spec)
             builder,
             spec,
             getRegisteredRowVarType(descriptor),
-            descriptor.defaultValue or ""
+            descriptor.defaultValue ~= nil and descriptor.defaultValue or ""
         )
     end
 
