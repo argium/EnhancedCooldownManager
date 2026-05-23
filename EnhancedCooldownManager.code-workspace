@@ -89,7 +89,14 @@
             "ADD",
             "REMOVE",
             "BuffBarCooldownViewer",
-            "UISpecialFrames"
+            "UISpecialFrames",
+            "ScrollUtil",
+            "CreateScrollBoxListLinearView",
+            "CreateDataProvider",
+            "GameTooltip_Hide",
+            "SettingsPanel",
+            "SettingsSliderControlMixin",
+            "CreateSettingsListSectionHeaderInitializer"
         ],
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"

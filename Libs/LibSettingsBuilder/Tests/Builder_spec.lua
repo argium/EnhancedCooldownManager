@@ -187,6 +187,121 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_nil(profile.general.height)
     end)
 
+    it("falls back to a dropdown for fontOverride without a registered font row", function()
+        local settings = TestHelpers.CollectSettings(function()
+            createBuilder({
+                sections = {
+                    {
+                        key = "general",
+                        name = "General",
+                        pages = {
+                            {
+                                key = "main",
+                                rows = {
+                                    {
+                                        type = "fontOverride",
+                                        path = "",
+                                        fontFallback = function()
+                                            return "Fallback Font"
+                                        end,
+                                        fontValues = function()
+                                            return {
+                                                ["Fallback Font"] = "Fallback Font",
+                                                ["Other Font"] = "Other Font",
+                                            }
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+        end)
+
+        local fontSetting = assert(settings["BS_general_font"])
+        local fontOptions = fontSetting._optionsGen()
+
+        assert.is_not_nil(settings["BS_general_overrideFont"])
+        assert.is_not_nil(settings["BS_general_fontSize"])
+        assert.is_function(fontSetting._optionsGen)
+        assert.are.equal("Fallback Font", fontSetting:GetValue())
+        assert.are.equal("Fallback Font", fontOptions[1].value)
+        assert.are.equal("Other Font", fontOptions[2].value)
+    end)
+
+    it("uses fontFallback as the default fontOverride dropdown value source", function()
+        local settings = TestHelpers.CollectSettings(function()
+            createBuilder({
+                sections = {
+                    {
+                        key = "general",
+                        name = "General",
+                        pages = {
+                            {
+                                key = "main",
+                                rows = {
+                                    {
+                                        type = "fontOverride",
+                                        path = "",
+                                        fontFallback = function()
+                                            return "Fallback Font"
+                                        end,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+        end)
+
+        local fontSetting = assert(settings["BS_general_font"])
+        local fontOptions = fontSetting._optionsGen()
+
+        assert.are.equal("Fallback Font", fontSetting:GetValue())
+        assert.are.equal(1, #fontOptions)
+        assert.are.equal("Fallback Font", fontOptions[1].value)
+        assert.are.equal("Fallback Font", fontOptions[1].label)
+    end)
+
+    it("keeps registered font rows for fontOverride when available", function()
+        LibStub("LibSettingsBuilder-1.0"):RegisterRowType("font", {
+            applyFrame = function() end,
+        })
+
+        local settings = TestHelpers.CollectSettings(function()
+            createBuilder({
+                sections = {
+                    {
+                        key = "general",
+                        name = "General",
+                        pages = {
+                            {
+                                key = "main",
+                                rows = {
+                                    {
+                                        type = "fontOverride",
+                                        path = "",
+                                        fontValues = {
+                                            ["Fallback Font"] = "Fallback Font",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            })
+        end)
+
+        local fontSetting = assert(settings["BS_general_font"])
+
+        assert.is_not_nil(settings["BS_general_overrideFont"])
+        assert.is_not_nil(settings["BS_general_fontSize"])
+        assert.is_nil(fontSetting._optionsGen)
+    end)
+
     it("rejects deprecated desc fields at registration time", function()
         local ok, err = pcall(function()
             createBuilder({

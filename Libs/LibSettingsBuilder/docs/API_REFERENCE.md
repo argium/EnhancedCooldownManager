@@ -380,6 +380,7 @@ Fields:
 - `enabledTooltip`
 - `fontName`
 - `fontTooltip`
+- `fontValues`
 - `fontFallback`
 - `sizeName`
 - `sizeTooltip`
@@ -390,7 +391,9 @@ Fields:
 
 Notes:
 
-- expands to an override checkbox, a `type = "font"` selector, and a size slider.
+- expands to an override checkbox, a font selector, and a size slider.
+- uses a registered `type = "font"` row when available; otherwise uses a built-in `dropdown` selector.
+- `fontValues` may provide the fallback dropdown values as a table or function; when omitted, the fallback dropdown lists the current `fontFallback()` value when available.
 
 ### `border`
 

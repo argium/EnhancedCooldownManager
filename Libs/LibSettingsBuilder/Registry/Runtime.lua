@@ -554,6 +554,17 @@ local function registerHeightOverride(sourceName, page, row, created)
     return initializer, setting
 end
 
+local function getFontOverrideDropdownValues(spec)
+    if spec.fontValues then
+        return spec.fontValues
+    end
+
+    return function()
+        local font = spec.fontFallback and spec.fontFallback()
+        return font and { [font] = font } or {}
+    end
+end
+
 local function registerFontOverride(sourceName, page, row, created)
     local spec = prepareRow(sourceName, page, row)
     local sectionPath = schema.resolvePagePath(page.path or "", spec.path)
@@ -578,7 +589,7 @@ local function registerFontOverride(sourceName, page, row, created)
     end
 
     local fontSpec = {
-        type = "font",
+        type = getRegisteredRowType("font") and "font" or "dropdown",
         path = sectionPath .. ".font",
         name = spec.fontName or "Font",
         tooltip = spec.fontTooltip,
@@ -593,6 +604,9 @@ local function registerFontOverride(sourceName, page, row, created)
             return nil
         end,
     }
+    if fontSpec.type == "dropdown" then
+        fontSpec.values = getFontOverrideDropdownValues(spec)
+    end
     schema.propagateModifiers(fontSpec, spec)
     rowRegistration.register(sourceName, page, fontSpec, created)
 
