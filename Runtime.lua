@@ -147,7 +147,7 @@ local function setAlpha(alpha)
     if not changed then return end
     for _, module in pairs(_modules) do
         if module.InnerFrame then
-            FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+            ns.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
         end
     end
 end

@@ -106,7 +106,8 @@
             "/^busted Tests$/": {
                 "approve": true,
                 "matchCommandLine": true
-            }
+            },
+            "luacheck": true
         },
 	}
 }

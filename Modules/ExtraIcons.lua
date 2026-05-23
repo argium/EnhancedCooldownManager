@@ -178,7 +178,7 @@ local function createIcon(parent, size, borderScale)
     icon.Border = icon:CreateTexture(nil, "OVERLAY")
     icon.Border:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
     icon.Border:SetPoint("CENTER")
-    icon.Border:SetSize(size * borderScale[1], size * borderScale[2])
+    icon.Border:SetSize(ns.Round(size * borderScale[1]), ns.Round(size * borderScale[2]))
 
     icon.Count = icon:CreateFontString(nil, "OVERLAY")
     icon.Count:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -2, 2)
@@ -264,111 +264,6 @@ local function updateIconCountText(icon, globalConfig, config)
     applyIconCountText(icon, nil)
 end
 
-local function formatDebugValue(value)
-    if value == nil then return "nil" end
-    if issecretvalue(value) then return "[secret]" end
-    return tostring(value)
-end
-
-local function formatDebugFrame(frame)
-    if not frame then return "nil" end
-    if type(frame.GetName) == "function" then
-        local ok, name = pcall(frame.GetName, frame)
-        if ok and name then return formatDebugValue(name) end
-    end
-    return formatDebugValue(frame)
-end
-
-local function formatDebugPoint(frame)
-    if not frame then return "nil" end
-    if type(frame.GetPoint) ~= "function" then return "no-GetPoint" end
-    local ok, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, 1)
-    if not ok then return "error:" .. formatDebugValue(point) end
-    if not point then return "none" end
-    return formatDebugValue(point) .. "," .. formatDebugFrame(relativeTo) .. ","
-        .. formatDebugValue(relativePoint) .. "," .. formatDebugValue(x or 0) .. "," .. formatDebugValue(y or 0)
-end
-
-local function formatDebugAnchor(anchor)
-    if not anchor then return "nil" end
-    return formatDebugValue(anchor[1]) .. "," .. formatDebugFrame(anchor[2]) .. ","
-        .. formatDebugValue(anchor[3]) .. "," .. formatDebugValue(anchor[4] or 0) .. ","
-        .. formatDebugValue(anchor[5] or 0)
-end
-
-local function debugField(name, value)
-    return name .. "=" .. formatDebugValue(value)
-end
-
-local function debugLog(moduleName, event, fields)
-    table.insert(fields, 1, "[ExtraIconsDebug:" .. event .. "]")
-    ns.Log(moduleName, table.concat(fields, " "))
-end
-
-local function getItemFramesCount(itemFrames)
-    if type(itemFrames) ~= "table" or not canaccesstable(itemFrames) then
-        return nil
-    end
-
-    local count = 0
-    local ok = pcall(function()
-        for index in ipairs(itemFrames) do
-            count = index
-        end
-    end)
-    return ok and count or nil
-end
-
-local function getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
-    local itemFramesAccessible = nil
-    if type(itemFrames) == "table" then
-        itemFramesAccessible = canaccesstable(itemFrames)
-    end
-
-    return {
-        viewerKey = viewerConfig.key,
-        blizzardFrameKey = viewerConfig.blizzKey,
-        reason = why,
-        viewerExists = blizzFrame ~= nil,
-        viewerName = ns.GetFrameValue(blizzFrame, "GetName"),
-        viewerShown = ns.GetFrameValue(blizzFrame, "IsShown"),
-        viewerWidth = ns.GetFrameValue(blizzFrame, "GetWidth"),
-        viewerHeight = ns.GetFrameValue(blizzFrame, "GetHeight"),
-        viewerAlpha = ns.GetFrameValue(blizzFrame, "GetAlpha"),
-        viewerNumPoints = ns.GetFrameValue(blizzFrame, "GetNumPoints"),
-        viewerIconScale = blizzFrame and blizzFrame.iconScale or nil,
-        viewerChildXPadding = blizzFrame and blizzFrame.childXPadding or nil,
-        itemFramesType = type(itemFrames),
-        itemFramesAccessible = itemFramesAccessible,
-        itemFramesArrayCount = getItemFramesCount(itemFrames),
-    }
-end
-
-local function getAccessibleItemFrames(blizzFrame, viewerConfig, why)
-    local ok, itemFrames = pcall(blizzFrame.GetItemFrames, blizzFrame)
-    if not ok then
-        local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, nil)
-        data.error = tostring(itemFrames)
-        ns.ErrorLogOnce("ExtraIcons", "GetItemFrames:" .. viewerConfig.key,
-            "Unable to read cooldown viewer item frames for " .. viewerConfig.key .. " during "
-            .. tostring(why or "unknown") .. ": " .. tostring(itemFrames), data)
-        return nil
-    end
-
-    if type(itemFrames) ~= "table" then
-        return nil
-    end
-
-    if not canaccesstable(itemFrames) then
-        ns.ErrorLogOnce("ExtraIcons", "InaccessibleItemFrames:" .. viewerConfig.key,
-            "Cooldown viewer item frames are inaccessible for " .. viewerConfig.key .. " during "
-            .. tostring(why or "unknown"), getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames))
-        return nil
-    end
-
-    return itemFrames
-end
-
 --------------------------------------------------------------------------------
 -- Module methods
 --------------------------------------------------------------------------------
@@ -432,50 +327,18 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
     -- the extra-icon container.
     local arcUIActive = C_AddOns.IsAddOnLoaded("ArcUI")
     cachePoint(viewerState, blizzFrame)
-    local debugEnabled = ns.IsDebugEnabled()
-    if debugEnabled then
-        local p = viewerState.originalPoint
-        debugLog(self.Name, "viewer-start", {
-            debugField("trigger", why or ""),
-            debugField("viewer", viewerConfig.key),
-            debugField("blizzKey", viewerConfig.blizzKey),
-            debugField("blizzFrame", formatDebugFrame(blizzFrame)),
-            debugField("blizzShown", blizzFrame and blizzFrame:IsShown() or false),
-            debugField("entries", #entries),
-            debugField("isEditing", isEditing == true),
-            debugField("originalPoint", p and formatDebugAnchor(p) or "nil"),
-            debugField("livePoint", formatDebugPoint(blizzFrame)),
-            debugField("containerShown", container:IsShown()),
-            debugField("containerPoint", formatDebugPoint(container)),
-        })
-    end
 
     local items = (not blizzFrame or not blizzFrame:IsShown() or isEditing or #entries == 0)
         and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
         local p = viewerState.originalPoint
-        local restoredAnchor = false
         if p and blizzFrame and not arcUIActive then
-            restoredAnchor = FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4], p[5] } })
+            FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4], p[5] } })
         end
         if isEditing then viewerState.originalPoint = nil end
         container:Hide()
         if viewerConfig.ownsAnchor then updateMainViewerAnchor(viewerState, blizzFrame, nil) end
-        if debugEnabled then
-            debugLog(self.Name, "viewer-empty", {
-                debugField("trigger", why or ""),
-                debugField("viewer", viewerConfig.key),
-                debugField("items", #items),
-                debugField("blizzExists", blizzFrame ~= nil),
-                debugField("blizzShown", blizzFrame and blizzFrame:IsShown() or false),
-                debugField("entries", #entries),
-                debugField("isEditing", isEditing == true),
-                debugField("restoredAnchor", restoredAnchor),
-                debugField("finalBlizzPoint", formatDebugPoint(blizzFrame)),
-                debugField("containerShown", container:IsShown()),
-            })
-        end
         return false
     end
 
@@ -489,39 +352,23 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
     local viewerScale = ns.Round(blizzFrame.iconScale or 1.0)
     local spacing = ns.Round(blizzFrame.childXPadding or 0)
     local lastActive = nil
-    local itemFramesCount = nil
-    local activeItemFrames = 0
-    local shownActiveItemFrames = 0
 
-    local itemFrames = getAccessibleItemFrames(blizzFrame, viewerConfig, why)
-    if itemFrames then
-        itemFramesCount = getItemFramesCount(itemFrames)
-        local ok, err = pcall(function()
-            for _, itemFrame in ipairs(itemFrames) do
-                if itemFrame.isActive then
-                    activeItemFrames = activeItemFrames + 1
-                    iconSize = ns.Round(itemFrame:GetWidth() or iconSize)
-                    if itemFrame:IsShown() then
-                        shownActiveItemFrames = shownActiveItemFrames + 1
-                        lastActive = itemFrame
-                    end
-                end
+    local ok = pcall(function()
+        for _, itemFrame in ipairs(blizzFrame:GetItemFrames()) do
+            if itemFrame.isActive then
+                iconSize = ns.Round(itemFrame:GetWidth() or iconSize)
+                if itemFrame:IsShown() then lastActive = itemFrame end
             end
-        end)
-        if not ok then
-            iconSize = DEFAULT_SIZE
-            lastActive = nil
-            local data = getViewerDiagnostics(blizzFrame, viewerConfig, why, itemFrames)
-            data.error = tostring(err)
-            ns.ErrorLogOnce("ExtraIcons", "IterateItemFrames:" .. viewerConfig.key,
-                "Unable to iterate cooldown viewer item frames for " .. viewerConfig.key .. " during "
-                .. tostring(why or "unknown") .. ": " .. tostring(err), data)
         end
+    end)
+    if not ok then
+        iconSize = DEFAULT_SIZE
+        lastActive = nil
     end
 
     container:SetScale(viewerScale)
 
-    local totalWidth = #items * iconSize + (#items - 1) * spacing
+    local totalWidth = ns.Round(#items * iconSize + (#items - 1) * spacing)
     container:SetSize(totalWidth, iconSize)
 
     -- Shift the Blizzard viewer left to keep the combined group centred.
@@ -530,83 +377,41 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
     -- need to absorb the on-screen width of the gap + extra group.
     local extraOnScreen = ns.Round((spacing + totalWidth) * viewerScale)
     local p = viewerState.originalPoint
-    local viewerAnchor = nil
-    local viewerAnchorChanged = false
     if p and blizzFrame and not arcUIActive then
-        viewerAnchor = { p[1], p[2], p[3], ns.Round(p[4] - extraOnScreen / 2), p[5] }
-        viewerAnchorChanged = FrameUtil.LazySetAnchors(blizzFrame, { viewerAnchor })
+        FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], ns.Round(p[4] - extraOnScreen / 2), p[5] } })
     end
 
     local xOffset = 0
-    local iconAnchorChanges = 0
     for i, data in ipairs(items) do
         local icon = viewerState.iconPool[i]
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
-        icon.Border:SetSize(iconSize * viewerConfig.borderScale[1], iconSize * viewerConfig.borderScale[2])
+        icon.Border:SetSize(ns.Round(iconSize * viewerConfig.borderScale[1]), ns.Round(iconSize * viewerConfig.borderScale[2]))
         icon.slotId = data.slotId
         icon.itemId = data.itemId
         icon.spellId = data.spellId
 
         icon.Icon:SetTexture(data.texture)
         icon.Icon:SetDesaturated(data.missing == true)
-        if FrameUtil.LazySetAnchors(icon, { { "LEFT", container, "LEFT", xOffset, 0 } }) then
-            iconAnchorChanges = iconAnchorChanges + 1
-        end
+        FrameUtil.LazySetAnchors(icon, { { "LEFT", container, "LEFT", xOffset, 0 } })
         icon:Show()
 
         updateIconCooldown(icon)
         updateIconCountText(icon, globalConfig, moduleConfig)
 
-        xOffset = xOffset + iconSize + spacing
+        xOffset = ns.Round(xOffset + iconSize + spacing)
     end
 
-    local containerAnchor = { "LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0 }
-    local containerAnchorChanged = FrameUtil.LazySetAnchors(container, { containerAnchor })
+    FrameUtil.LazySetAnchors(container, { { "LEFT", lastActive or blizzFrame, "RIGHT", spacing, 0 } })
     container:Show()
 
     if viewerConfig.ownsAnchor then updateMainViewerAnchor(viewerState, blizzFrame, container) end
-    if debugEnabled then
-        debugLog(self.Name, "viewer-placed", {
-            debugField("trigger", why or ""),
-            debugField("viewer", viewerConfig.key),
-            debugField("items", #items),
-            debugField("entries", #entries),
-            debugField("itemFrames", itemFramesCount),
-            debugField("activeFrames", activeItemFrames),
-            debugField("shownActiveFrames", shownActiveItemFrames),
-            debugField("lastActive", formatDebugFrame(lastActive)),
-            debugField("iconSize", iconSize),
-            debugField("viewerScale", viewerScale),
-            debugField("spacing", spacing),
-            debugField("totalWidth", totalWidth),
-            debugField("extraOnScreen", extraOnScreen),
-            debugField("viewerAnchor", viewerAnchor and formatDebugAnchor(viewerAnchor) or "nil"),
-            debugField("viewerAnchorChanged", viewerAnchorChanged),
-            debugField("containerAnchor", formatDebugAnchor(containerAnchor)),
-            debugField("containerAnchorChanged", containerAnchorChanged),
-            debugField("iconAnchorChanges", iconAnchorChanges),
-            debugField("finalBlizzPoint", formatDebugPoint(blizzFrame)),
-            debugField("finalContainerPoint", formatDebugPoint(container)),
-            debugField("containerSize", container:GetWidth() .. "x" .. container:GetHeight()),
-        })
-    end
     return true
 end
 
 function ExtraIcons:UpdateLayout(why)
-    local debugEnabled = ns.IsDebugEnabled()
-    if not self.InnerFrame or not self._viewers then
-        if debugEnabled then
-            debugLog(self.Name, "layout-skipped", {
-                debugField("trigger", why or ""),
-                debugField("hasInnerFrame", self.InnerFrame ~= nil),
-                debugField("hasViewers", self._viewers ~= nil),
-            })
-        end
-        return false
-    end
+    if not self.InnerFrame or not self._viewers then return false end
 
     local shouldShow = self:ShouldShow()
     local moduleConfig = self:GetModuleConfig()
@@ -620,21 +425,6 @@ function ExtraIcons:UpdateLayout(why)
     -- restores Blizzard viewer positions and hides extra-icon containers.
     local viewers = shouldShow and moduleConfig and moduleConfig.viewers
     local anyPlaced = false
-
-    if debugEnabled then
-        local mainEntries = viewers and viewers.main or {}
-        local utilityEntries = viewers and viewers.utility or {}
-        debugLog(self.Name, "layout-start", {
-            debugField("trigger", why or ""),
-            debugField("shouldShow", shouldShow),
-            debugField("isEditing", isEditing == true),
-            debugField("hasModuleConfig", moduleConfig ~= nil),
-            debugField("hasViewersConfig", viewers ~= nil),
-            debugField("mainEntries", #mainEntries),
-            debugField("utilityEntries", #utilityEntries),
-            debugField("innerShown", self.InnerFrame:IsShown()),
-        })
-    end
 
     for _, v in ipairs(VIEWERS) do
         local entries = viewers and viewers[v.key] or {}
@@ -654,14 +444,6 @@ function ExtraIcons:UpdateLayout(why)
     if anyPlaced then
         ns.Log(self.Name, "UpdateLayout (" .. (why or "") .. ")")
         self:ThrottledRefresh("UpdateLayout")
-    end
-
-    if debugEnabled then
-        debugLog(self.Name, "layout-finish", {
-            debugField("trigger", why or ""),
-            debugField("anyPlaced", anyPlaced),
-            debugField("innerShown", self.InnerFrame:IsShown()),
-        })
     end
 
     return anyPlaced

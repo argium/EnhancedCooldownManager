@@ -23,6 +23,7 @@ local C = ns.Constants
 local L = ns.L
 
 function ns.Round(value)
+    if value == nil then return 0 end
     return math.floor(value * 100 + 0.5) / 100
 end
 

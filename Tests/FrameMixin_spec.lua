@@ -33,6 +33,13 @@ describe("FrameMixin", function()
         fakeTime = 0
 
         ns = {}
+        ns.Round = function(value)
+            if value == nil then return 0 end
+            return math.floor(value * 100 + 0.5) / 100
+        end
+        ns.NumericEquals = function(a, b)
+            return ns.Round(a) == ns.Round(b)
+        end
         ns.IsDebugEnabled = function() return false end
         ns.ColorUtil = {
             AreEqual = function(a, b)
@@ -251,6 +258,13 @@ describe("FrameMixin real source", function()
         ns = {
             IsDebugEnabled = function() return false end,
             Log = function() end,
+            Round = function(value)
+                if value == nil then return 0 end
+                return math.floor(value * 100 + 0.5) / 100
+            end,
+            NumericEquals = function(a, b)
+                return ns.Round(a) == ns.Round(b)
+            end,
             DebugAssert = function(condition, message)
                 if not condition then
                     error(message or "ECM.DebugAssert failed")

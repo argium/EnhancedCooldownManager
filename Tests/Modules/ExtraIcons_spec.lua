@@ -201,8 +201,6 @@ describe("ExtraIcons real source", function()
     local ratedMap
     local inInstance
     local instanceType
-    local errorLogs
-    local inaccessibleTables
     local COMBAT_POTION_ID = 245898
     local HEALTH_POTION_ID = 241305
     local DEMONIC_HEALTHSTONE_ID = 224464
@@ -227,6 +225,7 @@ describe("ExtraIcons real source", function()
             "UIParent",
             "CreateFrame",
             "C_Timer",
+            "C_AddOns",
             "C_Spell",
             "C_SpellBook",
             "GetInventoryItemID",
@@ -234,7 +233,6 @@ describe("ExtraIcons real source", function()
             "GetInventoryItemCooldown",
             "C_Item",
             "C_PvP",
-            "canaccesstable",
             "issecretvalue",
             "ipairs",
         })
@@ -266,8 +264,6 @@ describe("ExtraIcons real source", function()
         ratedMap = false
         inInstance = false
         instanceType = "none"
-        errorLogs = {}
-        inaccessibleTables = {}
         _G.C_SpellBook = {
             IsSpellKnown = function(spellId)
                 return knownSpells[spellId] or false
@@ -275,13 +271,12 @@ describe("ExtraIcons real source", function()
         }
         ns = {
             Log = function() end,
-            ErrorLogOnce = function(module, key, message, data)
-                errorLogs[#errorLogs + 1] = { module = module, key = key, message = message, data = data }
-            end,
-            IsDebugEnabled = function() return false end,
             Round = function(value)
                 if value == nil then return 0 end
                 return math.floor((value * 100) + 0.5) / 100
+            end,
+            NumericEquals = function(a, b)
+                return ns.Round(a) == ns.Round(b)
             end,
             BarMixin = {
                 FrameProto = {
@@ -307,15 +302,6 @@ describe("ExtraIcons real source", function()
             GetGlobalConfig = function()
                 return globalConfig
             end,
-            -- ECM.lua is not loaded in this isolated source spec.
-            GetFrameValue = function(frame, methodName)
-                if not frame or type(frame[methodName]) ~= "function" then
-                    return nil
-                end
-                local ok, value = pcall(frame[methodName], frame)
-                if ok then return value end
-                return nil
-            end,
         }
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
@@ -340,6 +326,11 @@ describe("ExtraIcons real source", function()
         _G.C_Timer = {
             After = function(_, callback)
                 timerCallbacks[#timerCallbacks + 1] = callback
+            end,
+        }
+        _G.C_AddOns = {
+            IsAddOnLoaded = function()
+                return false
             end,
         }
         _G.GetInventoryItemID = function(_, slotId)
@@ -391,9 +382,6 @@ describe("ExtraIcons real source", function()
         }
         _G.IsInInstance = function()
             return inInstance, instanceType
-        end
-        _G.canaccesstable = function(value)
-            return inaccessibleTables[value] ~= true
         end
         _G.CreateFrame = function(frameType)
             local frame = TestHelpers.makeFrame({ shown = true })
@@ -1017,122 +1005,6 @@ describe("ExtraIcons real source", function()
         assert.are.equal(iconClears, TestHelpers.getCalls(vs.iconPool[1], "ClearAllPoints"))
     end)
 
-    it("does not iterate inaccessible GetItemFrames results", function()
-        local inaccessibleFrames = {}
-        UtilityCooldownViewer.childXPadding = 4
-        UtilityCooldownViewer.iconScale = 1.0
-        UtilityCooldownViewer:SetWidth(22)
-        UtilityCooldownViewer.GetItemFrames = function()
-            return inaccessibleFrames
-        end
-        inaccessibleTables[inaccessibleFrames] = true
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
-
-        itemCounts[HEALTHSTONE_ID] = 1
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-        ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
-        end
-
-        assert.is_true(ExtraIcons:UpdateLayout("rated-bg"))
-
-        local vs = ExtraIcons._viewers.utility
-        assert.is_true(vs.container:IsShown())
-        local _, anchorFrame = vs.container:GetPoint(1)
-        assert.are.equal(UtilityCooldownViewer, anchorFrame)
-        assert.are.equal(1, #errorLogs)
-        assert.are.equal("ExtraIcons", errorLogs[1].module)
-        assert.are.equal("InaccessibleItemFrames:utility", errorLogs[1].key)
-        assert.are.equal("Cooldown viewer item frames are inaccessible for utility during rated-bg", errorLogs[1].message)
-        assert.are.equal("rated-bg", errorLogs[1].data.reason)
-        assert.are.equal("utility", errorLogs[1].data.viewerKey)
-        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
-        assert.is_true(errorLogs[1].data.viewerExists)
-        assert.is_true(errorLogs[1].data.viewerShown)
-        assert.are.equal(22, errorLogs[1].data.viewerWidth)
-        assert.are.equal(1.0, errorLogs[1].data.viewerIconScale)
-        assert.are.equal("table", errorLogs[1].data.itemFramesType)
-        assert.is_false(errorLogs[1].data.itemFramesAccessible)
-    end)
-
-    it("logs viewer diagnostics when GetItemFrames fails", function()
-        UtilityCooldownViewer.childXPadding = 4
-        UtilityCooldownViewer.iconScale = 1.0
-        UtilityCooldownViewer:SetWidth(22)
-        UtilityCooldownViewer.GetItemFrames = function()
-            error("GetItemFrames blocked")
-        end
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 100, 0)
-
-        itemCounts[HEALTHSTONE_ID] = 1
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-        ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
-        end
-
-        assert.has_no.errors(function()
-            ExtraIcons:UpdateLayout("rated-bg")
-        end)
-
-        assert.are.equal(1, #errorLogs)
-        assert.are.equal("ExtraIcons", errorLogs[1].module)
-        assert.are.equal("GetItemFrames:utility", errorLogs[1].key)
-        assert.is_truthy(errorLogs[1].message:find(
-            "Unable to read cooldown viewer item frames for utility during rated-bg:", 1, true))
-        assert.are.equal("rated-bg", errorLogs[1].data.reason)
-        assert.are.equal("utility", errorLogs[1].data.viewerKey)
-        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
-        assert.is_true(errorLogs[1].data.viewerExists)
-        assert.is_true(errorLogs[1].data.viewerShown)
-        assert.are.equal(22, errorLogs[1].data.viewerWidth)
-        assert.are.equal(1.0, errorLogs[1].data.viewerIconScale)
-        assert.is_truthy(errorLogs[1].data.error:find("GetItemFrames blocked", 1, true))
-    end)
-
-    it("rounds floating point values in the viewer placement debug log", function()
-        local logMessages = {}
-        local debugEntries = {
-            { kind = "itemStack", itemStackId = "healthstones" },
-            { kind = "spell", ids = { { spellId = 59752 } } },
-        }
-
-        ns.Log = function(_, message)
-            logMessages[#logMessages + 1] = message
-        end
-        ns.IsDebugEnabled = function()
-            return true
-        end
-
-        UtilityCooldownViewer.childXPadding = 2
-        UtilityCooldownViewer.iconScale = 1.2
-        UtilityCooldownViewer:SetWidth(32)
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", -40.8, 0)
-
-        itemCounts[HEALTHSTONE_ID] = 1
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-        knownSpells[59752] = true
-        spellTextures[59752] = "spellTexture"
-
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-        ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig(debugEntries)
-        end
-
-        assert.is_true(ExtraIcons:UpdateLayout("BuffBars:UNIT_AURA"))
-
-        local message = table.concat(logMessages, "\n")
-        assert.is_truthy(message:find("finalBlizzPoint=CENTER,UIParent,CENTER,-40.8,0", 1, true))
-        assert.is_truthy(message:find("finalContainerPoint=LEFT,UtilityCooldownViewer,RIGHT,2,0", 1, true))
-        assert.is_truthy(message:find("containerSize=66x32", 1, true))
-        assert.is_false(message:find("-40.799999237061", 1, true))
-        assert.is_false(message:find("2.0000002384186", 1, true))
-        assert.is_false(message:find("66.000038146973x31.999952316284", 1, true))
-    end)
-
     it("continues conservatively when GetItemFrames iteration fails", function()
         local taintedFrames = {}
         UtilityCooldownViewer.childXPadding = 4
@@ -1167,23 +1039,9 @@ describe("ExtraIcons real source", function()
         assert.is_true(ok, err)
         local vs = ExtraIcons._viewers.utility
         assert.is_true(vs.container:IsShown())
+        assert.are.equal(ns.Constants.DEFAULT_EXTRA_ICON_SIZE, vs.container:GetWidth())
         local _, anchorFrame = vs.container:GetPoint(1)
         assert.are.equal(UtilityCooldownViewer, anchorFrame)
-        assert.are.equal(1, #errorLogs)
-        assert.are.equal("ExtraIcons", errorLogs[1].module)
-        assert.are.equal("IterateItemFrames:utility", errorLogs[1].key)
-        assert.is_truthy(errorLogs[1].message:find(
-            "Unable to iterate cooldown viewer item frames for utility during rated-bg:", 1, true))
-        assert.is_truthy(errorLogs[1].message:find("attempted to iterate", 1, true))
-        assert.are.equal("rated-bg", errorLogs[1].data.reason)
-        assert.are.equal("utility", errorLogs[1].data.viewerKey)
-        assert.are.equal("UtilityCooldownViewer", errorLogs[1].data.blizzardFrameKey)
-        assert.is_true(errorLogs[1].data.viewerExists)
-        assert.is_true(errorLogs[1].data.viewerShown)
-        assert.are.equal(22, errorLogs[1].data.viewerWidth)
-        assert.are.equal("table", errorLogs[1].data.itemFramesType)
-        assert.is_true(errorLogs[1].data.itemFramesAccessible)
-        assert.is_truthy(errorLogs[1].data.error:find("attempted to iterate", 1, true))
     end)
 
     it("matches the utility viewer's square overlay footprint", function()
