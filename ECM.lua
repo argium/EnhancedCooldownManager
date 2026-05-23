@@ -174,7 +174,7 @@ function ns.ErrorLog(module, message, data)
     local messageStr = ns.ToString(message)
     local payload = makeErrorData(module, nil, data)
     local dataStr = ns.ToString(payload)
-    local coloredPrefix = "|cff" .. C.ERROR_COLOR .. "[" .. L["ADDON_ABRV"] .. " Error"
+    local coloredPrefix = "|cff" .. C.WARNING_COLOR .. "[" .. L["ADDON_ABRV"] .. " Warning"
         .. (module and (" " .. module) or "") .. "]|r "
 
     print(coloredPrefix .. messageStr .. "\n" .. dataStr)

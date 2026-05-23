@@ -861,7 +861,7 @@ local function initializerIsEnabled(initializer)
     return true
 end
 
-local function createCustomListRowInitializer(template, data, extent, initFrame)
+local function createCustomListRowInitializer(template, data, extent, initFrame, resetFrame)
     local initializer = interop.createElementInitializer(template, data)
     setInitializerExtent(initializer, extent)
 
@@ -915,6 +915,9 @@ local function createCustomListRowInitializer(template, data, extent, initFrame)
         if frame._lsbCanvas then
             frame._lsbCanvas:Hide()
             frame._lsbCanvas = nil
+        end
+        if resetFrame then
+            resetFrame(frame)
         end
         if self._lsbActiveFrame == frame then
             self._lsbActiveFrame = nil

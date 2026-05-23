@@ -9,7 +9,6 @@ local _, ns = ...
 local C = ns.Constants
 local L = ns.L
 local OptionUtil = ns.OptionUtil or {}
-local LSMW = LibStub("LibLSMSettingsWidgets-1.0", true)
 
 ns.OptionUtil = OptionUtil
 
@@ -359,12 +358,8 @@ function OptionUtil.CreateFontOverrideRow(isDisabled)
         type = "fontOverride",
         path = "",
         disabled = isDisabled,
-        fontValues = function()
-            return LSMW.GetFontValues()
-        end,
         fontFallback = getGlobalFont,
         fontSizeFallback = getGlobalFontSize,
-        fontTemplate = LSMW.FONT_PICKER_TEMPLATE,
     }
 end
 

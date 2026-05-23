@@ -11,12 +11,58 @@ describe("LibLSMSettingsWidgets", function()
     local originalGlobals
     local lsm
 
+    local function makeSetting(value)
+        return {
+            GetValue = function()
+                return value
+            end,
+            SetValue = function(_, nextValue)
+                value = nextValue
+            end,
+        }
+    end
+
+    local function makeDropdownHost()
+        local host = TestHelpers.makeFrame()
+        host.DecrementButton = TestHelpers.makeFrame()
+        host.IncrementButton = TestHelpers.makeFrame()
+        host.Dropdown = TestHelpers.makeFrame()
+        host.Dropdown.SetupMenu = function(self, callback)
+            self.__menuCallback = callback
+        end
+        host.Dropdown.OverrideText = function(self, text)
+            self.__overrideText = text
+        end
+        return host
+    end
+
+    local function makePickerFrame()
+        local frame = TestHelpers.makeFrame()
+        frame.Text = frame:CreateFontString()
+        return frame
+    end
+
+    local function buildMenu(dropdown)
+        local menu = { entries = {} }
+        function menu:SetScrollMode(height)
+            self.height = height
+        end
+        function menu:CreateRadio(label, isChecked, onClick)
+            self.entries[#self.entries + 1] = {
+                label = label,
+                isChecked = isChecked,
+                onClick = onClick,
+            }
+        end
+        dropdown.__menuCallback(nil, menu)
+        return menu
+    end
+
     setup(function()
         originalGlobals = TestHelpers.CaptureGlobals({
+            "CreateFrame",
+            "GameFontHighlight",
             "LibStub",
-            "SettingsListElementMixin",
-            "LibLSMSettingsWidgets_FontPickerMixin",
-            "LibLSMSettingsWidgets_TexturePickerMixin",
             "wipe",
         })
     end)
@@ -27,15 +73,15 @@ describe("LibLSMSettingsWidgets", function()
 
     before_each(function()
         TestHelpers.SetupLibStub()
+        _G.GameFontHighlight = {}
         _G.wipe = function(tbl)
             for key in pairs(tbl) do
                 tbl[key] = nil
             end
         end
-        _G.SettingsListElementMixin = {
-            OnLoad = function() end,
-            Init = function() end,
-        }
+        _G.CreateFrame = function()
+            return makeDropdownHost()
+        end
 
         lsm = LibStub:NewLibrary("LibSharedMedia-3.0", 1)
         if lsm then
@@ -79,214 +125,118 @@ describe("LibLSMSettingsWidgets", function()
         assert.are.same({ Beta = "Beta" }, lib.GetFontValues())
     end)
 
-    it("font dropdown radio selections update the setting and preview", function()
-        local selected = "Alpha"
-        local previewUpdates = 0
-        local radioEntries = {}
+    it("applies a font picker row and updates the setting from menu selection", function()
         lsm.List = function()
             return { "Beta", "Alpha" }
         end
-
-        local picker = {
-            setting = {
-                GetValue = function()
-                    return selected
-                end,
-                SetValue = function(_, value)
-                    selected = value
-                end,
-            },
-            DropDown = {
-                SetupMenu = function(_, callback)
-                    callback(nil, {
-                        SetScrollMode = function(self, height)
-                            self.height = height
-                        end,
-                        CreateRadio = function(_, label, isChecked, onClick)
-                            radioEntries[#radioEntries + 1] = {
-                                label = label,
-                                isChecked = isChecked,
-                                onClick = onClick,
-                            }
-                        end,
-                    })
-                end,
-            },
-            UpdatePreview = function()
-                previewUpdates = previewUpdates + 1
-            end,
-        }
-
-        LibLSMSettingsWidgets_FontPickerMixin.SetupDropdown(picker)
-
-        assert.are.equal("Alpha", radioEntries[1].label)
-        assert.is_true(radioEntries[1].isChecked())
-        radioEntries[2].onClick()
-        assert.are.equal("Beta", selected)
-        assert.are.equal(1, previewUpdates)
-    end)
-
-    it("SetupDropdown is a no-op until Init provides a setting", function()
-        local setupMenuCalled = false
-        local picker = {
-            DropDown = {
-                SetupMenu = function()
-                    setupMenuCalled = true
-                end,
-            },
-        }
-
-        LibLSMSettingsWidgets_TexturePickerMixin.SetupDropdown(picker)
-
-        assert.is_false(setupMenuCalled)
-    end)
-
-    it("updates font and texture previews from LibSharedMedia fetch results", function()
-        local fetched = {
-            font = "/fonts/alpha.ttf",
-            statusbar = "/textures/bar",
-        }
-        lsm.Fetch = function(_, mediaType)
-            return fetched[mediaType]
+        lsm.Fetch = function(_, mediaType, name)
+            return mediaType == "font" and "/fonts/" .. name .. ".ttf" or nil
         end
 
-        local fontPicker = {
-            setting = { GetValue = function() return "Alpha" end },
-            DropDown = {
-                OverrideText = function(self, text)
-                    self.text = text
-                end,
-            },
-            Preview = {
-                SetFont = function(self, path, size, flags)
-                    self.font = { path, size, flags }
-                end,
-                SetText = function(self, text)
-                    self.text = text
-                end,
-            },
-        }
-        LibLSMSettingsWidgets_FontPickerMixin.UpdatePreview(fontPicker)
-        assert.are.equal("Alpha", fontPicker.DropDown.text)
-        assert.are.same({ "/fonts/alpha.ttf", 14, "" }, fontPicker.Preview.font)
-        assert.are.equal("AaBbCcDd 1234", fontPicker.Preview.text)
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+        local setting = makeSetting("Alpha")
+        local frame = makePickerFrame()
+        local initializer = {}
 
-        local texturePicker = {
-            setting = { GetValue = function() return "Bar" end },
-            DropDown = {
-                OverrideText = function(self, text)
-                    self.text = text
-                end,
-            },
-            Preview = {
-                SetTexture = function(self, texture)
-                    self.texture = texture
-                end,
-            },
-        }
-        LibLSMSettingsWidgets_TexturePickerMixin.UpdatePreview(texturePicker)
-        assert.are.equal("Bar", texturePicker.DropDown.text)
-        assert.are.equal("/textures/bar", texturePicker.Preview.texture)
+        lib.ApplyFontPickerRow(frame, { name = "Font", setting = setting }, initializer)
+
+        local picker = frame._lsmwPicker
+        assert.are.equal("Font", frame.Text:GetText())
+        assert.are.equal("Alpha", picker.dropdown.__overrideText)
+        assert.are.same({ "/fonts/Alpha.ttf", 14, "" }, { picker.preview:GetFont() })
+        assert.are.equal("AaBbCcDd 1234", picker.preview:GetText())
+
+        local menu = buildMenu(picker.dropdown)
+        assert.are.equal(200, menu.height)
+        assert.are.equal("Alpha", menu.entries[1].label)
+        assert.is_true(menu.entries[1].isChecked())
+        menu.entries[2].onClick()
+        assert.are.equal("Beta", setting:GetValue())
+        assert.are.equal("Beta", picker.dropdown.__overrideText)
     end)
 
-    local pickerCases = {
-        { name = "FontPicker",    global = "LibLSMSettingsWidgets_FontPickerMixin" },
-        { name = "TexturePicker", global = "LibLSMSettingsWidgets_TexturePickerMixin" },
-    }
+    it("rebinds a recycled row from font to texture and reset hides picker children", function()
+        lsm.Fetch = function(_, mediaType, name)
+            if mediaType == "font" then
+                return "/fonts/" .. name .. ".ttf"
+            end
+            return "/textures/" .. name
+        end
 
-    for _, case in ipairs(pickerCases) do
-        it(case.name .. " SetEnabled disables dropdown and hides preview", function()
-            local dropdownEnabled, dropdownMouse
-            local hostEnabled, hostMouse
-            local previewShown = true
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+        local frame = makePickerFrame()
+        local initializer = {}
 
-            local picker = {
-                DropDown = {
-                    SetEnabled = function(_, enabled) dropdownEnabled = enabled end,
-                    EnableMouse = function(_, enabled) dropdownMouse = enabled end,
-                },
-                DropDownHost = {
-                    SetEnabled = function(_, enabled) hostEnabled = enabled end,
-                    EnableMouse = function(_, enabled) hostMouse = enabled end,
-                },
-                Preview = {
-                    Show = function() previewShown = true end,
-                    Hide = function() previewShown = false end,
-                },
-            }
+        lib.ApplyFontPickerRow(frame, { name = "Font", setting = makeSetting("Alpha") }, initializer)
+        local fontPreview = frame._lsmwPicker.fontPreview
+        assert.is_true(fontPreview:IsShown())
 
-            local mixin = _G[case.global]
-            mixin.SetEnabled(picker, false)
-            assert.is_false(dropdownEnabled)
-            assert.is_false(dropdownMouse)
-            assert.is_false(hostEnabled)
-            assert.is_false(hostMouse)
-            assert.is_false(previewShown)
+        lib.ApplyTexturePickerRow(frame, { name = "Texture", setting = makeSetting("Smooth") }, initializer)
+        local picker = frame._lsmwPicker
+        assert.is_false(fontPreview:IsShown())
+        assert.are.equal("/textures/Smooth", picker.texturePreview:GetTexture())
+        assert.are.equal("Texture", frame.Text:GetText())
 
-            mixin.SetEnabled(picker, true)
-            assert.is_true(dropdownEnabled)
-            assert.is_true(dropdownMouse)
-            assert.is_true(hostEnabled)
-            assert.is_true(hostMouse)
-            assert.is_true(previewShown)
-        end)
+        lib.ResetPickerRow(frame)
+        assert.is_false(picker.host:IsShown())
+        assert.is_false(picker.texturePreview:IsShown())
+    end)
 
-        it(case.name .. " Init bridges initializer.SetEnabled to frame", function()
-            local dropdownEnabled, previewShown
+    it("bridges initializer enabled state to the active picker frame", function()
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+        local frame = makePickerFrame()
+        local initializer = {}
 
-            local setting = {
-                GetValue = function() return "TestFont" end,
-                SetValue = function() end,
-            }
-            local staleSetting = {
-                GetValue = function() return "chain" end,
-                SetValue = function() end,
-            }
+        lib.ApplyTexturePickerRow(frame, { name = "Texture", setting = makeSetting("Smooth") }, initializer)
+        initializer:SetEnabled(false)
 
-            local initializer = {
-                GetData = function() return { name = "Test", setting = setting } end,
-                GetSetting = function() return staleSetting end,
-            }
+        local picker = frame._lsmwPicker
+        assert.is_false(picker.dropdown:IsEnabled())
+        assert.is_false(picker.dropdown:IsMouseEnabled())
+        assert.is_false(picker.host:IsEnabled())
+        assert.is_false(picker.host:IsMouseEnabled())
+        assert.is_false(picker.preview:IsShown())
+    end)
 
-            local picker = {
-                Text = { SetText = function() end },
-                DropDown = {
-                    SetupMenu = function() end,
-                    OverrideText = function() end,
-                    SetEnabled = function(_, enabled) dropdownEnabled = enabled end,
-                    EnableMouse = function() end,
-                },
-                DropDownHost = {
-                    SetEnabled = function() end,
-                    EnableMouse = function() end,
-                },
-                Preview = {
-                    SetFont = function() end,
-                    SetText = function() end,
-                    Show = function() previewShown = true end,
-                    Hide = function() previewShown = false end,
-                },
-                SetupDropdown = function() end,
-                UpdatePreview = function() end,
-            }
+    it("ignores stale initializer enabled updates after a picker frame is recycled", function()
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+        local frame = makePickerFrame()
+        local oldInitializer = {}
+        local newInitializer = {}
 
-            local mixin = _G[case.global]
-            picker.SetEnabled = mixin.SetEnabled
-            mixin.Init(picker, initializer)
+        lib.ApplyTexturePickerRow(frame, { name = "Old Texture", setting = makeSetting("Smooth") }, oldInitializer)
+        frame._lsbInitializer = oldInitializer
+        oldInitializer:SetEnabled(false)
 
-            assert.are.same(setting, picker.setting)
+        lib.ApplyTexturePickerRow(frame, { name = "New Texture", setting = makeSetting("Blizzard") }, newInitializer)
+        frame._lsbInitializer = newInitializer
+        newInitializer:SetEnabled(true)
 
-            -- Init should have bridged SetEnabled onto the initializer
-            assert.is_function(initializer.SetEnabled)
+        local picker = frame._lsmwPicker
+        assert.is_true(picker.dropdown:IsEnabled())
+        assert.is_true(picker.host:IsEnabled())
+        assert.is_true(picker.preview:IsShown())
 
-            -- Calling initializer:SetEnabled propagates to the frame
-            initializer:SetEnabled(false)
-            assert.is_false(dropdownEnabled)
-            assert.is_false(previewShown)
+        oldInitializer:SetEnabled(false)
 
-            initializer:SetEnabled(true)
-            assert.is_true(dropdownEnabled)
-            assert.is_true(previewShown)
-        end)
-    end
+        assert.is_true(picker.dropdown:IsEnabled())
+        assert.is_true(picker.host:IsEnabled())
+        assert.is_true(picker.preview:IsShown())
+    end)
+
+    it("registers declarative font and texture row types with LibSettingsBuilder", function()
+        local registered = {}
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+
+        lib.Register({
+            RegisterRowType = function(_, name, descriptor)
+                registered[name] = descriptor
+            end,
+        })
+
+        assert.is_function(registered.font.applyFrame)
+        assert.is_function(registered.texture.applyFrame)
+        assert.are.equal("string", registered.font.varType)
+        assert.are.equal("string", registered.texture.varType)
+    end)
 end)

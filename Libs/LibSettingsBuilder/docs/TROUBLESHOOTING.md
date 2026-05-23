@@ -101,4 +101,4 @@ If debugging slider behavior:
 
 - give the row an explicit `height`, or make sure the frame reports a stable height,
 - prefer built-in rows, `list`, or `sectionList` when you want Blizzard-style settings layout instead of a bespoke frame,
-- use `type = "custom"` for XML-backed row widgets rather than a full embedded canvas when you only need one custom control.
+- use a registered row type for reusable Lua-backed widgets rather than a full embedded canvas when you only need one custom control.

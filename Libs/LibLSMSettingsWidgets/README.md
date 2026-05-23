@@ -1,12 +1,12 @@
 # LibLSMSettingsWidgets-1.0
 
-LibSharedMedia picker widgets for the WoW Settings API. Provides font and texture picker templates with live previews.
+LibSharedMedia picker widgets for LibSettingsBuilder. Provides pure-Lua `font` and `texture` declarative row types with live previews.
 
 Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
 ## Features
 
-- Drop-in font and texture picker templates for `Settings.CreateControlTextContainer`.
+- Drop-in `type = "font"` and `type = "texture"` rows for LibSettingsBuilder declaratives.
 - Live preview of the selected font or texture in the dropdown.
 - Cached and sorted media name lists, auto-invalidated when new media is registered.
 - Graceful fallback when media fetch fails.
@@ -15,11 +15,15 @@ Distributed via [LibStub](https://www.wowace.com/projects/libstub).
 
 ```lua
 local LSW = LibStub("LibLSMSettingsWidgets-1.0")
+LSW.Register(LibStub("LibSettingsBuilder-1.0"))
 
--- Use the template name when creating a Settings dropdown:
--- LSW.FONT_PICKER_TEMPLATE
--- LSW.TEXTURE_PICKER_TEMPLATE
+rows = {
+	{ type = "font", path = "font", name = "Font" },
+	{ type = "texture", path = "texture", name = "Texture" },
+}
 ```
+
+When loaded after LibSettingsBuilder, the library registers these row types automatically. Calling `Register` is safe and idempotent for explicit setup.
 
 ## Testing
 

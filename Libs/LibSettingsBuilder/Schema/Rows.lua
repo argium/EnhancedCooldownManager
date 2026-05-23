@@ -18,7 +18,6 @@ schema.PROXY_ROW_TYPES = {
     dropdown = true,
     color = true,
     input = true,
-    custom = true,
 }
 
 schema.COMPOSITE_ROW_TYPES = {
@@ -37,7 +36,6 @@ schema.VALID_ROW_TYPES = {
     checkboxList = true,
     color = true,
     colorList = true,
-    custom = true,
     dropdown = true,
     fontOverride = true,
     header = true,
@@ -157,8 +155,6 @@ function schema.validateRow(sourceName, builder, row)
         assert(type(row.onClick) == "function", sourceName .. ": button row '" .. rowLabel .. "' requires onClick")
     elseif rowType == "canvas" then
         assert(row.canvas, sourceName .. ": canvas row '" .. rowLabel .. "' requires canvas")
-    elseif rowType == "custom" then
-        assert(row.template, sourceName .. ": custom row '" .. rowLabel .. "' requires template")
     elseif rowType == "dropdown" then
         assert(row.values ~= nil, sourceName .. ": dropdown row '" .. rowLabel .. "' requires values")
     elseif rowType == "list" then

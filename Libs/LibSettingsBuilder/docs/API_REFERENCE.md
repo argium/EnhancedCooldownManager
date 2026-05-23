@@ -15,6 +15,7 @@
 Documented surface:
 
 - `LSB.New(config)`
+- `LSB:RegisterRowType(name, descriptor)`
 - `lsb:GetSection(sectionKey)`
 - `lsb:GetRootPage()`
 - `lsb:GetPage(sectionKey, pageKey)`
@@ -58,6 +59,12 @@ Optional fields:
 - `sections`
 
 Returns an `lsb` runtime instance bound to one category tree.
+
+### `LSB:RegisterRowType(name, descriptor)`
+
+Registers a reusable Lua-backed proxy row type. The descriptor must provide `applyFrame(frame, data, initializer)` and may provide `resetFrame(frame)`, `extent`, `varType`, and `defaultValue`.
+
+Registered rows render on Blizzard's `SettingsListElementTemplate`; no XML template is required.
 
 ## Registration tree
 
@@ -194,19 +201,6 @@ Notes:
 - `debounce` delays preview recomputation through `C_Timer.NewTimer`.
 
 `debounceMilliseconds` is still normalized to `debounce / 1000` for compatibility.
-
-### `custom` row
-
-Additional fields:
-
-- `template`
-- `varType`
-
-Notes:
-
-- use this for XML-backed widgets that are not covered by the built-in controls,
-- the template must already be loaded by the time you register settings,
-- unlike `input`, `custom` does not create its frame structure in Lua.
 
 ### `button` row
 
@@ -388,7 +382,6 @@ Fields:
 - `fontTooltip`
 - `fontValues`
 - `fontFallback`
-- `fontTemplate`
 - `sizeName`
 - `sizeTooltip`
 - `sizeMin`
@@ -398,8 +391,9 @@ Fields:
 
 Notes:
 
-- expands to an override checkbox, a font selector, and a size slider,
-- when `fontTemplate` is present, the font selector uses `type = "custom"` instead of the built-in dropdown.
+- expands to an override checkbox, a font selector, and a size slider.
+- uses a registered `type = "font"` row when available; otherwise uses a built-in `dropdown` selector.
+- `fontValues` may provide the fallback dropdown values as a table or function; when omitted, the fallback dropdown lists the current `fontFallback()` value when available.
 
 ### `border`
 
@@ -446,7 +440,6 @@ Supported canonical row types:
 - `dropdown`
 - `input`
 - `color`
-- `custom`
 - `button`
 - `header`
 - `subheader`
@@ -473,11 +466,11 @@ The public API is declarative and intentionally narrow. Internally, the library 
 - **Schema** normalizes and validates raw row tables.
 - **Registry** materializes root pages, sections, page handles, refresh behavior, lifecycle callbacks, store/default bindings, callback contexts, and composite child rows.
 - **Builders** translate prepared row specs into simple primitive operations. Builders do not receive the runtime object or call Registry.
-- **Interop** is the only layer that calls Blizzard Settings/UI APIs, creates frames, installs hooks, or renders custom row widgets.
+- **Interop** is the only layer that calls Blizzard Settings/UI APIs, creates frames, installs hooks, or renders registered row widgets.
 
 Row builders still fall into the same public families:
 
-- **proxy controls** — persisted values backed by proxy settings (`checkbox`, `slider`, `dropdown`, `color`, `input`, `custom`),
+- **proxy controls** — persisted values backed by proxy settings (`checkbox`, `slider`, `dropdown`, `color`, `input`, and registered row types),
 - **layout rows** — structural/display rows without stored values (`header`, `subheader`, `info`, `button`, `canvas`, `pageActions`),
 - **composites** — declarative specs expanded by Registry into multiple child rows (`border`, `fontOverride`, `heightOverride`, `colorList`, `checkboxList`).
 

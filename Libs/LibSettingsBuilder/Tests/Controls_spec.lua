@@ -528,7 +528,7 @@ describe("LibSettingsBuilder Controls", function()
         assert.are.equal("Potions", displayedText)
     end)
 
-    it("passes custom row settings through initializer data", function()
+    it("passes registered row settings through initializer data", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
         _G.hooksecurefunc = function() end
@@ -540,6 +540,9 @@ describe("LibSettingsBuilder Controls", function()
         end
 
         TestHelpers.LoadLibSettingsBuilder()
+        LibStub("LibSettingsBuilder-1.0"):RegisterRowType("testPicker", {
+            applyFrame = function() end,
+        })
 
         local profile = { general = { font = "Expressway" } }
         local defaults = { general = { font = "Expressway" } }
@@ -561,10 +564,9 @@ describe("LibSettingsBuilder Controls", function()
                             key = "main",
                             rows = {
                                 {
-                                    type = "custom",
+                                    type = "testPicker",
                                     path = "font",
                                     name = "Font",
-                                    template = "TestFontPickerTemplate",
                                 },
                             },
                         },
