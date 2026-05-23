@@ -198,6 +198,32 @@ describe("LibLSMSettingsWidgets", function()
         assert.is_false(picker.preview:IsShown())
     end)
 
+    it("ignores stale initializer enabled updates after a picker frame is recycled", function()
+        local lib = LibStub("LibLSMSettingsWidgets-1.0")
+        local frame = makePickerFrame()
+        local oldInitializer = {}
+        local newInitializer = {}
+
+        lib.ApplyTexturePickerRow(frame, { name = "Old Texture", setting = makeSetting("Smooth") }, oldInitializer)
+        frame._lsbInitializer = oldInitializer
+        oldInitializer:SetEnabled(false)
+
+        lib.ApplyTexturePickerRow(frame, { name = "New Texture", setting = makeSetting("Blizzard") }, newInitializer)
+        frame._lsbInitializer = newInitializer
+        newInitializer:SetEnabled(true)
+
+        local picker = frame._lsmwPicker
+        assert.is_true(picker.dropdown:IsEnabled())
+        assert.is_true(picker.host:IsEnabled())
+        assert.is_true(picker.preview:IsShown())
+
+        oldInitializer:SetEnabled(false)
+
+        assert.is_true(picker.dropdown:IsEnabled())
+        assert.is_true(picker.host:IsEnabled())
+        assert.is_true(picker.preview:IsShown())
+    end)
+
     it("registers declarative font and texture row types with LibSettingsBuilder", function()
         local registered = {}
         local lib = LibStub("LibLSMSettingsWidgets-1.0")

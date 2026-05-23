@@ -110,6 +110,20 @@ local function setPickerEnabled(frame, enabled)
     picker.preview[enabled and "Show" or "Hide"](picker.preview)
 end
 
+local function configurePickerInitializer(initializer)
+    if initializer._lsmwHasEnabledBridge then return end
+
+    initializer._lsmwEnabled = true
+    initializer._lsmwHasEnabledBridge = true
+    initializer.SetEnabled = function(controlInitializer, enabled)
+        controlInitializer._lsmwEnabled = enabled
+        local frame = controlInitializer._lsbActiveFrame
+        if frame and (not frame._lsbInitializer or frame._lsbInitializer == controlInitializer) then
+            setPickerEnabled(frame, enabled)
+        end
+    end
+end
+
 local function anchorPicker(frame, picker)
     if frame.Text then
         frame.Text:ClearAllPoints()
@@ -184,6 +198,9 @@ local function setupMediaDropdown(frame, picker, setting, mediaType, fallback, u
 end
 
 local function applyPickerRow(frame, data, initializer, kind, mediaType, fallback, updatePreview)
+    configurePickerInitializer(initializer)
+    initializer._lsbActiveFrame = frame
+
     local picker = ensurePicker(frame, kind)
     local setting = data.setting
 
@@ -195,10 +212,7 @@ local function applyPickerRow(frame, data, initializer, kind, mediaType, fallbac
     anchorPicker(frame, picker)
     setupMediaDropdown(frame, picker, setting, mediaType, fallback, updatePreview)
     updatePreview(picker, setting)
-
-    initializer.SetEnabled = function(_, enabled)
-        setPickerEnabled(frame, enabled)
-    end
+    setPickerEnabled(frame, initializer._lsmwEnabled ~= false)
 end
 
 function lib.ApplyFontPickerRow(frame, data, initializer)
