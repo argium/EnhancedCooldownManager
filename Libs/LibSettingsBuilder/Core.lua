@@ -19,9 +19,9 @@ lib._internal = {
     builders = {},
     registry = {},
 }
-lib._registeredRowTypes = {}
-lib._pageLifecycleCallbacks = {}
-lib._pageLifecycleHooked = false
+lib._registeredRowTypes = lib._registeredRowTypes or {}
+lib._pageLifecycleCallbacks = lib._pageLifecycleCallbacks or {}
+lib._pageLifecycleHooked = lib._pageLifecycleHooked or false
 
 function lib:RegisterRowType(name, descriptor)
     assert(type(name) == "string" and name ~= "", "RegisterRowType: name is required")
