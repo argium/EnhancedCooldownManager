@@ -31,6 +31,7 @@ describe("FrameUtil", function()
             "GetTime",
             "UIParent",
             "issecretvalue",
+            "Round",
         })
     end)
 
@@ -74,10 +75,21 @@ describe("FrameUtil", function()
         _G.issecretvalue = function(value)
             return secretValues[value] == true
         end
+        _G.Round = function(value, digits)
+            local factor = 10 ^ (digits or 0)
+            return math.floor((value or 0) * factor + 0.5) / factor
+        end
 
         TestHelpers.LoadChunk("Constants.lua", "Unable to load Constants.lua")(nil, ns)
         TestHelpers.LoadChunk("Locales/en.lua", "Unable to load Locales/en.lua")(nil, ns)
         TestHelpers.LoadChunk("FrameUtil.lua", "Unable to load FrameUtil.lua")(nil, ns)
+
+        ns.Round = function(value)
+            return math.floor((value or 0) * 100 + 0.5) / 100
+        end
+        ns.NumericEquals = function(a, b)
+            return ns.Round(a) == ns.Round(b)
+        end
 
         FrameUtil = assert(ns.FrameUtil, "FrameUtil module did not initialize")
     end)
@@ -203,6 +215,29 @@ describe("FrameUtil", function()
             assert.are.equal(0, getCalls(frame, "SetPoint"))
         end)
 
+        it("LazySetAnchors updates the cache when live anchors match but the cache is stale", function()
+            local anchor = makeFrame({ name = "AnchorA" })
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchor, "BOTTOMLEFT", 1.234, -2.345 },
+                    { "TOPRIGHT", anchor, "BOTTOMRIGHT", 1.234, -2.345 },
+                },
+            })
+            local desired = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 1.234, -2.345 },
+                { "TOPRIGHT", anchor, "BOTTOMRIGHT", 1.234, -2.345 },
+            }
+            frame.__ecmAnchorCache = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 0, 0 },
+                { "TOPRIGHT", anchor, "BOTTOMRIGHT", 0, 0 },
+            }
+
+            assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(0, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(0, getCalls(frame, "SetPoint"))
+            assert.are.same(desired, frame.__ecmAnchorCache)
+        end)
+
         it("LazySetAnchors reapplies anchors when the live anchors differ", function()
             local anchorA = makeFrame({ name = "AnchorA" })
             local anchorB = makeFrame({ name = "AnchorB" })
@@ -268,6 +303,56 @@ describe("FrameUtil", function()
             assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
             assert.are.equal(1, getCalls(frame, "ClearAllPoints"))
             assert.are.equal(1, getCalls(frame, "SetPoint"))
+        end)
+
+        it("LazySetAnchors reuses cached anchors when any live anchor component is secret", function()
+            local anchor = makeFrame({ name = "AnchorA" })
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchor, "BOTTOMLEFT", 4, -5 },
+                },
+            })
+            local desired = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 4, -5 },
+            }
+            local secretRelativeTo = {}
+            local secretX = {}
+            local secretY = {}
+            secretValues[secretRelativeTo] = true
+            secretValues[secretX] = true
+            secretValues[secretY] = true
+
+            frame.GetPoint = function(self, index)
+                local a = self.__anchors[index]
+                if not a then return nil end
+                return a[1], secretRelativeTo, a[3], secretX, secretY
+            end
+
+            assert.is_true(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(1, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(1, getCalls(frame, "SetPoint"))
+
+            assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(1, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(1, getCalls(frame, "SetPoint"))
+        end)
+
+        it("LazySetAnchors treats anchor offsets that only differ after rounding as equal", function()
+            local anchor = makeFrame({ name = "AnchorA" })
+            local frame = makeFrame({
+                anchors = {
+                    { "TOPLEFT", anchor, "BOTTOMLEFT", 1.234, -2.344 },
+                },
+            })
+            local desired = {
+                { "TOPLEFT", anchor, "BOTTOMLEFT", 1.2345, -2.3445 },
+            }
+
+            assert.is_false(FrameUtil.LazySetAnchors(frame, desired))
+            assert.are.equal(0, getCalls(frame, "ClearAllPoints"))
+            assert.are.equal(0, getCalls(frame, "SetPoint"))
+            assert.are.equal(ns.Round(1.234), ns.Round(1.2345))
+            assert.are.equal(ns.Round(-2.344), ns.Round(-2.3445))
         end)
 
         it("LazySetBackgroundColor reads live texture color before writing", function()

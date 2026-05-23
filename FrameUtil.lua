@@ -257,8 +257,8 @@ local function liveAnchorsEqual(frame, anchors)
             point ~= want[1]
             or relativeTo ~= want[2]
             or relativePoint ~= want[3]
-            or (x or 0) ~= (want[4] or 0)
-            or (y or 0) ~= (want[5] or 0)
+            or not ns.NumericEquals(x, want[4])
+            or not ns.NumericEquals(y, want[5])
         then
             return false
         end
@@ -297,7 +297,13 @@ local function anchorsEqual(lhs, rhs)
     for i = 1, #lhs do
         local a = lhs[i]
         local b = rhs[i]
-        if a[1] ~= b[1] or a[2] ~= b[2] or a[3] ~= b[3] or (a[4] or 0) ~= (b[4] or 0) or (a[5] or 0) ~= (b[5] or 0) then
+        if
+            a[1] ~= b[1]
+            or a[2] ~= b[2]
+            or a[3] ~= b[3]
+            or not ns.NumericEquals(a[4], b[4])
+            or not ns.NumericEquals(a[5], b[5])
+        then
             return false
         end
     end
@@ -312,16 +318,38 @@ end
 ---@param a number|nil
 ---@return boolean
 local function colorEqualsRgba(color, r, g, b, a)
-    if not color then
+    if not color or r == nil or g == nil or b == nil then
         return false
     end
-    return color.r == r and color.g == g and color.b == b and color.a == (a or 1)
+    return ns.NumericEquals(color.r, r)
+        and ns.NumericEquals(color.g, g)
+        and ns.NumericEquals(color.b, b)
+        and ns.NumericEquals(color.a, a or 1)
+end
+
+---@param a ECM_Color|nil
+---@param b ECM_Color|nil
+---@return boolean
+local function colorsEqual(a, b)
+    if a == b then
+        return true
+    end
+    if not a or not b then
+        return false
+    end
+    return ns.NumericEquals(a.r, b.r)
+        and ns.NumericEquals(a.g, b.g)
+        and ns.NumericEquals(a.b, b.b)
+        and ns.NumericEquals(a.a, b.a)
 end
 
 --- Reads a texture color via available getters. Returns nil if unavailable.
 ---@param texture Texture|nil
 ---@return number|nil, number|nil, number|nil, number|nil
 local function getTextureColor(texture)
+    if not texture then
+        return nil, nil, nil, nil
+    end
     if texture.GetColorTexture then
         local r, g, b, a = texture:GetColorTexture()
         if r ~= nil then
@@ -349,7 +377,7 @@ end
 ---@param h number
 ---@return boolean changed
 function FrameUtil.LazySetHeight(frame, h)
-    if frame:GetHeight() == h then
+    if ns.NumericEquals(frame:GetHeight(), h) then
         return false
     end
     frame:SetHeight(h)
@@ -361,7 +389,7 @@ end
 ---@param w number
 ---@return boolean changed
 function FrameUtil.LazySetWidth(frame, w)
-    if frame:GetWidth() == w then
+    if ns.NumericEquals(frame:GetWidth(), w) then
         return false
     end
     frame:SetWidth(w)
@@ -373,7 +401,7 @@ end
 ---@param alpha number
 ---@return boolean changed
 function FrameUtil.LazySetAlpha(frame, alpha)
-    if frame:GetAlpha() == alpha then
+    if ns.NumericEquals(frame:GetAlpha(), alpha) then
         return false
     end
     frame:SetAlpha(alpha)
@@ -451,7 +479,11 @@ end
 function FrameUtil.LazySetStatusBarColor(bar, r, g, b, a)
     a = a or 1
     local cr, cg, cb, ca = bar:GetStatusBarColor()
-    if cr == r and cg == g and cb == b and (ca or 1) == a then
+    if ns.NumericEquals(cr, r)
+        and ns.NumericEquals(cg, g)
+        and ns.NumericEquals(cb, b)
+        and ns.NumericEquals(ca, a)
+    then
         return false
     end
     bar:SetStatusBarColor(r, g, b, a)
@@ -489,8 +521,9 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     if borderConfig.enabled then
         if
             liveEnabled == true
-            and liveThickness == thickness
-            and ns.ColorUtil.AreEqual(borderConfig.color, liveColor)
+            and liveThickness ~= nil
+            and ns.NumericEquals(liveThickness, thickness)
+            and colorsEqual(borderConfig.color, liveColor)
         then
             return false
         end
@@ -503,7 +536,7 @@ function FrameUtil.LazySetBorder(frame, borderConfig)
     if borderConfig.enabled then
         border:Show()
         ns.DebugAssert(borderConfig.thickness, "border thickness required when enabled")
-        if liveThickness ~= thickness then
+        if liveThickness == nil or not ns.NumericEquals(liveThickness, thickness) then
             border:SetBackdrop({
                 edgeFile = "Interface\\Buttons\\WHITE8X8",
                 edgeSize = thickness,

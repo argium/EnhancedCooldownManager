@@ -22,6 +22,14 @@ local LSM = LibStub("LibSharedMedia-3.0", true)
 local C = ns.Constants
 local L = ns.L
 
+function ns.Round(value)
+    return math.floor(value * 100 + 0.5) / 100
+end
+
+function ns.NumericEquals(a, b)
+    return ns.Round(a) == ns.Round(b)
+end
+
 --- Returns the global config section. Standalone accessor for non-module callers.
 ---@return ECM_GlobalConfig
 function ns.GetGlobalConfig()
@@ -36,10 +44,10 @@ function ns.IsDebugEnabled()
     return gc and gc.debug
 end
 
---- Returns whether targeted error logging is enabled.
-function ns.IsErrorLoggingEnabled()
+--- Returns whether targeted warning logging is enabled.
+function ns.AreWarningsEnabled()
     local gc = ns.GetGlobalConfig()
-    return not gc or gc.errorLogging ~= false
+    return not gc or gc.warnings ~= false
 end
 
 --- Returns whether the player is a Death Knight.
@@ -167,7 +175,7 @@ local function makeErrorData(module, key, data)
 end
 
 function ns.ErrorLog(module, message, data)
-    if not ns.IsErrorLoggingEnabled() then
+    if not ns.AreWarningsEnabled() then
         return
     end
 
@@ -190,7 +198,7 @@ function ns.ErrorLog(module, message, data)
 end
 
 function ns.ErrorLogOnce(module, key, message, data)
-    if not ns.IsErrorLoggingEnabled() then
+    if not ns.AreWarningsEnabled() then
         return
     end
 

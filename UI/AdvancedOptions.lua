@@ -16,9 +16,9 @@ local AdvancedOptions = {
                 { type = "header", name = L["TROUBLESHOOTING"] },
                 {
                     type = "checkbox",
-                    path = "errorLogging",
-                    name = L["ERROR_LOGGING"],
-                    tooltip = L["ERROR_LOGGING_DESC"],
+                    path = "warnings",
+                    name = L["WARNINGS"],
+                    tooltip = L["WARNINGS_DESC"],
                 },
                 {
                     type = "checkbox",

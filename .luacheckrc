@@ -83,6 +83,7 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
     "NO",
     "OKAY",
     "ReloadUI",
+    "Round",
     "ScrollUtil",
     "Settings",
     "SettingsDropdownControlMixin",
@@ -98,5 +99,6 @@ read_globals = {'C_PlayerInfo','DEFAULT_CHAT_FRAME', 'MenuUtil', 'GameTooltip', 
     "ADD",
     "REMOVE",
     "MinimalSliderWithSteppersMixin",
-    "GetInstanceInfo"
+    "GetInstanceInfo",
+    "CooldownViewerSettings"
 }

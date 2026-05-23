@@ -55,7 +55,7 @@ local _, ns = ...
 
 ---@class ECM_GlobalConfig Global configuration.
 ---@field debug boolean Whether debug logging is enabled.
----@field errorLogging boolean Whether targeted error logging is enabled.
+---@field warnings boolean Whether targeted warning logging is enabled.
 ---@field debugToChat boolean Whether debug output is also printed to chat.
 ---@field releasePopupSeenVersion string|nil Last release popup version acknowledged by the player.
 ---@field hideWhenMounted boolean Whether to hide when mounted or in a vehicle.
@@ -239,7 +239,7 @@ local defaults = {
         schemaVersion = C.CURRENT_SCHEMA_VERSION,
         global = {
             debug = false,
-            errorLogging = false,
+            warnings = false,
             debugToChat = false,
             releasePopupSeenVersion = "",
             hideWhenMounted = true,

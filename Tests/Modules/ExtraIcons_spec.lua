@@ -279,6 +279,10 @@ describe("ExtraIcons real source", function()
                 errorLogs[#errorLogs + 1] = { module = module, key = key, message = message, data = data }
             end,
             IsDebugEnabled = function() return false end,
+            Round = function(value)
+                if value == nil then return 0 end
+                return math.floor((value * 100) + 0.5) / 100
+            end,
             BarMixin = {
                 FrameProto = {
                     ShouldShow = function()
@@ -1087,6 +1091,46 @@ describe("ExtraIcons real source", function()
         assert.are.equal(22, errorLogs[1].data.viewerWidth)
         assert.are.equal(1.0, errorLogs[1].data.viewerIconScale)
         assert.is_truthy(errorLogs[1].data.error:find("GetItemFrames blocked", 1, true))
+    end)
+
+    it("rounds floating point values in the viewer placement debug log", function()
+        local logMessages = {}
+        local debugEntries = {
+            { kind = "itemStack", itemStackId = "healthstones" },
+            { kind = "spell", ids = { { spellId = 59752 } } },
+        }
+
+        ns.Log = function(_, message)
+            logMessages[#logMessages + 1] = message
+        end
+        ns.IsDebugEnabled = function()
+            return true
+        end
+
+        UtilityCooldownViewer.childXPadding = 2
+        UtilityCooldownViewer.iconScale = 1.2
+        UtilityCooldownViewer:SetWidth(32)
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", -40.8, 0)
+
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+        knownSpells[59752] = true
+        spellTextures[59752] = "spellTexture"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig(debugEntries)
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("BuffBars:UNIT_AURA"))
+
+        local message = table.concat(logMessages, "\n")
+        assert.is_truthy(message:find("finalBlizzPoint=CENTER,UIParent,CENTER,-40.8,0", 1, true))
+        assert.is_truthy(message:find("finalContainerPoint=LEFT,UtilityCooldownViewer,RIGHT,2,0", 1, true))
+        assert.is_truthy(message:find("containerSize=66x32", 1, true))
+        assert.is_false(message:find("-40.799999237061", 1, true))
+        assert.is_false(message:find("2.0000002384186", 1, true))
+        assert.is_false(message:find("66.000038146973x31.999952316284", 1, true))
     end)
 
     it("continues conservatively when GetItemFrames iteration fails", function()

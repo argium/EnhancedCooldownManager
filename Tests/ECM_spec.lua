@@ -371,6 +371,27 @@ describe("ECM layout system", function()
         TestHelpers.LoadChunk("UI/Dialogs.lua", "Unable to load UI/Dialogs.lua")(nil, ns)
     end)
 
+    describe("numeric helpers", function()
+        it("compares rounded values and treats nil as zero", function()
+            local originalRound = _G.Round
+            _G.Round = function(value, digits)
+                local factor = 10 ^ digits
+                return math.floor(value * factor + 0.5) / factor
+            end
+
+            local ok, err = xpcall(function()
+                assert.is_true(ns.NumericEquals(1.234, 1.234))
+                assert.is_false(ns.NumericEquals(1.234, 1.235))
+                assert.is_true(ns.NumericEquals(nil, 0))
+                assert.is_true(ns.NumericEquals(0, nil))
+            end, debug.traceback)
+
+            _G.Round = originalRound
+
+            assert.is_true(ok, err)
+        end)
+    end)
+
     describe("beta login warning", function()
         it("prints the pre-release warning on beta versions", function()
             addonVersion = "v0.6.1-beta"
@@ -392,14 +413,14 @@ describe("ECM layout system", function()
         end)
     end)
 
-    describe("error logging", function()
+    describe("warnings", function()
         it("is disabled by default", function()
-            assert.is_false(ns.IsErrorLoggingEnabled())
+            assert.is_false(ns.AreWarningsEnabled())
         end)
 
         it("prints targeted warnings to chat and DevTool", function()
             local devToolCalls = {}
-            _G._testDB.profile.global.errorLogging = true
+            _G._testDB.profile.global.warnings = true
             _G.DevTool = {
                 AddData = function(_, data, title)
                     devToolCalls[#devToolCalls + 1] = { data = data, title = title }
@@ -422,7 +443,7 @@ describe("ECM layout system", function()
         end)
 
         it("prints error data without requiring DevTool", function()
-            _G._testDB.profile.global.errorLogging = true
+            _G._testDB.profile.global.warnings = true
             _G.DevTool = nil
 
             ns.ErrorLog("Runtime", "Repeated layout requests detected", { reason = "ExternalBars:viewer:UpdateAuras" })
@@ -433,7 +454,7 @@ describe("ECM layout system", function()
         end)
 
         it("does not log when disabled", function()
-            _G._testDB.profile.global.errorLogging = false
+            _G._testDB.profile.global.warnings = false
             _G.DevTool = {
                 AddData = function()
                     error("expected DevTool not to be called")
@@ -447,7 +468,7 @@ describe("ECM layout system", function()
         end)
 
         it("suppresses repeated once-per-key errors", function()
-            _G._testDB.profile.global.errorLogging = true
+            _G._testDB.profile.global.warnings = true
             ns.ErrorLogOnce("Taint", "same-key", "first")
             ns.ErrorLogOnce("Taint", "same-key", "second")
             ns.ErrorLogOnce("Taint", "other-key", "third")

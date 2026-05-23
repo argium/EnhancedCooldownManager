@@ -26,14 +26,14 @@ local VIEWERS = {
 -- Shared horizontal centering
 --------------------------------------------------------------------------------
 
-local function cachePoint(vs, blizzFrame)
-    if vs.originalPoint or not blizzFrame then return end
+local function cachePoint(viewerState, blizzFrame)
+    if viewerState.originalPoint or not blizzFrame then return end
     local point, relativeTo, relativePoint, x, y = blizzFrame:GetPoint()
-    vs.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
+    viewerState.originalPoint = { point, relativeTo, relativePoint, x or 0, y or 0 }
 end
 
-local function updateMainViewerAnchor(vs, blizzFrame, rightFrame)
-    local anchor = vs and vs.anchorFrame
+local function updateMainViewerAnchor(viewerState, blizzFrame, rightFrame)
+    local anchor = viewerState and viewerState.anchorFrame
     if not anchor then return end
 
     if not blizzFrame or not blizzFrame:IsShown() then
@@ -424,13 +424,17 @@ end
 
 function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, moduleConfig, why)
     local blizzFrame = _G[viewerConfig.blizzKey]
-    local vs = self._viewers[viewerConfig.key]
-    if not vs then return false end
-    local container = vs.container
-    cachePoint(vs, blizzFrame)
+    local viewerState = self._viewers[viewerConfig.key]
+    if not viewerState then return false end
+    local container = viewerState.container
+    -- ArcUI hijacks viewer frame anchors; skip blizzFrame repositioning so
+    -- our changes are not immediately overridden, but still build and place
+    -- the extra-icon container.
+    local arcUIActive = C_AddOns.IsAddOnLoaded("ArcUI")
+    cachePoint(viewerState, blizzFrame)
     local debugEnabled = ns.IsDebugEnabled()
     if debugEnabled then
-        local p = vs.originalPoint
+        local p = viewerState.originalPoint
         debugLog(self.Name, "viewer-start", {
             debugField("trigger", why or ""),
             debugField("viewer", viewerConfig.key),
@@ -450,14 +454,14 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
         and {} or resolveEntries(entries, moduleConfig)
 
     if #items == 0 then
-        local p = vs.originalPoint
+        local p = viewerState.originalPoint
         local restoredAnchor = false
-        if p and blizzFrame then
+        if p and blizzFrame and not arcUIActive then
             restoredAnchor = FrameUtil.LazySetAnchors(blizzFrame, { { p[1], p[2], p[3], p[4], p[5] } })
         end
-        if isEditing then vs.originalPoint = nil end
+        if isEditing then viewerState.originalPoint = nil end
         container:Hide()
-        if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, nil) end
+        if viewerConfig.ownsAnchor then updateMainViewerAnchor(viewerState, blizzFrame, nil) end
         if debugEnabled then
             debugLog(self.Name, "viewer-empty", {
                 debugField("trigger", why or ""),
@@ -475,15 +479,15 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
         return false
     end
 
-    for _, icon in ipairs(vs.iconPool) do icon:Hide() end
-    for i = #vs.iconPool + 1, #items do
-        vs.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewerConfig.borderScale)
+    for _, icon in ipairs(viewerState.iconPool) do icon:Hide() end
+    for i = #viewerState.iconPool + 1, #items do
+        viewerState.iconPool[i] = createIcon(container, DEFAULT_SIZE, viewerConfig.borderScale)
     end
 
     local globalConfig = self:GetGlobalConfig()
     local iconSize = DEFAULT_SIZE
-    local viewerScale = blizzFrame.iconScale or 1.0
-    local spacing = blizzFrame.childXPadding or 0
+    local viewerScale = ns.Round(blizzFrame.iconScale or 1.0)
+    local spacing = ns.Round(blizzFrame.childXPadding or 0)
     local lastActive = nil
     local itemFramesCount = nil
     local activeItemFrames = 0
@@ -496,7 +500,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
             for _, itemFrame in ipairs(itemFrames) do
                 if itemFrame.isActive then
                     activeItemFrames = activeItemFrames + 1
-                    iconSize = itemFrame:GetWidth() or iconSize
+                    iconSize = ns.Round(itemFrame:GetWidth() or iconSize)
                     if itemFrame:IsShown() then
                         shownActiveItemFrames = shownActiveItemFrames + 1
                         lastActive = itemFrame
@@ -524,19 +528,19 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
     -- The Blizzard frame auto-sizes to its scaled active icons, so its
     -- on-screen centre already coincides with the original anchor; we only
     -- need to absorb the on-screen width of the gap + extra group.
-    local extraOnScreen = (spacing + totalWidth) * viewerScale
-    local p = vs.originalPoint
+    local extraOnScreen = ns.Round((spacing + totalWidth) * viewerScale)
+    local p = viewerState.originalPoint
     local viewerAnchor = nil
     local viewerAnchorChanged = false
-    if p and blizzFrame then
-        viewerAnchor = { p[1], p[2], p[3], p[4] - extraOnScreen / 2, p[5] }
+    if p and blizzFrame and not arcUIActive then
+        viewerAnchor = { p[1], p[2], p[3], ns.Round(p[4] - extraOnScreen / 2), p[5] }
         viewerAnchorChanged = FrameUtil.LazySetAnchors(blizzFrame, { viewerAnchor })
     end
 
     local xOffset = 0
     local iconAnchorChanges = 0
     for i, data in ipairs(items) do
-        local icon = vs.iconPool[i]
+        local icon = viewerState.iconPool[i]
         icon:SetSize(iconSize, iconSize)
         icon.Icon:SetSize(iconSize, iconSize)
         icon.Mask:SetSize(iconSize, iconSize)
@@ -562,7 +566,7 @@ function ExtraIcons:_updateSingleViewer(viewerConfig, entries, isEditing, module
     local containerAnchorChanged = FrameUtil.LazySetAnchors(container, { containerAnchor })
     container:Show()
 
-    if viewerConfig.ownsAnchor then updateMainViewerAnchor(vs, blizzFrame, container) end
+    if viewerConfig.ownsAnchor then updateMainViewerAnchor(viewerState, blizzFrame, container) end
     if debugEnabled then
         debugLog(self.Name, "viewer-placed", {
             debugField("trigger", why or ""),

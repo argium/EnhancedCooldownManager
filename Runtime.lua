@@ -141,11 +141,13 @@ end
 --- Applies alpha to all managed frames.
 --- @param alpha number
 local function setAlpha(alpha)
-    if _desiredAlpha == alpha then return end
+    alpha = ns.Round(alpha)
+    local changed = not ns.NumericEquals(_desiredAlpha, alpha)
     _desiredAlpha = alpha
+    if not changed then return end
     for _, module in pairs(_modules) do
         if module.InnerFrame then
-            ns.FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
+            FrameUtil.LazySetAlpha(module.InnerFrame, alpha)
         end
     end
 end

@@ -96,7 +96,8 @@
             "GameTooltip_Hide",
             "SettingsPanel",
             "SettingsSliderControlMixin",
-            "CreateSettingsListSectionHeaderInitializer"
+            "CreateSettingsListSectionHeaderInitializer",
+            "Round"
         ],
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"
