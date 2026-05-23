@@ -397,7 +397,7 @@ describe("ECM layout system", function()
             assert.is_false(ns.IsErrorLoggingEnabled())
         end)
 
-        it("prints targeted errors to chat and DevTool", function()
+        it("prints targeted warnings to chat and DevTool", function()
             local devToolCalls = {}
             _G._testDB.profile.global.errorLogging = true
             _G.DevTool = {
@@ -409,7 +409,7 @@ describe("ECM layout system", function()
             ns.ErrorLog("Taint", "ChatFrameUtil.SetLastTellTarget is tainted", { source = "EnhancedCooldownManager" })
 
             assert.are.equal(1, #printedMessages)
-            assert.is_truthy(printedMessages[1]:find("%[ECM Error Taint%]"))
+            assert.is_truthy(printedMessages[1]:find("%[ECM Warning Taint%]"))
             assert.is_truthy(printedMessages[1]:find("ChatFrameUtil.SetLastTellTarget is tainted", 1, true))
             assert.is_truthy(printedMessages[1]:find("source=EnhancedCooldownManager", 1, true))
             assert.is_truthy(printedMessages[1]:find("module=Taint", 1, true))
