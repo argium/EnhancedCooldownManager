@@ -19,15 +19,7 @@ describe("ColorUtil", function()
     end)
 
     before_each(function()
-        ns = {
-            Round = function(value)
-                if value == nil then return 0 end
-                return math.floor((value * 100) + 0.5) / 100
-            end,
-        }
-        ns.NumericEquals = function(a, b)
-            return ns.Round(a) == ns.Round(b)
-        end
+        ns = {}
 
         TestHelpers.LoadChunk("ColorUtil.lua", "Unable to load ColorUtil.lua")(nil, ns)
         ColorUtil = assert(ns.ColorUtil, "ColorUtil did not initialize")
