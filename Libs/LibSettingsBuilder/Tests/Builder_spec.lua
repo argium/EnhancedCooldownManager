@@ -93,6 +93,33 @@ describe("LibSettingsBuilder Builder", function()
         assert.is_true(sb:HasCategory(generalPage._category))
     end)
 
+    it("binds a hideDefaults page into the lifecycle callbacks", function()
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "profile",
+                    name = "Profile",
+                    pages = {
+                        {
+                            key = "main",
+                            hideDefaults = true,
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = assert(sb:GetPage("profile", "main"))
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local cbs = assert(lsb._pageLifecycleCallbacks[page._category])
+
+        assert.is_true(cbs.hideDefaults)
+        assert.is_nil(cbs.onDefault)
+    end)
+
     it("returns nil for missing section-page lookups", function()
         local sb = createBuilder({
             sections = {

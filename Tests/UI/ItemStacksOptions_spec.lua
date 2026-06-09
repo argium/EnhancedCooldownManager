@@ -147,6 +147,34 @@ describe("ItemStacksOptions settings page", function()
         assert.are.same({ "OptionsChanged" }, scheduledReasons)
     end)
 
+    it("creates item stacks from Retail StaticPopup frames that expose only EditBox", function()
+        local shown
+
+        _G.StaticPopup_Show = function(name, _text1, _text2, data)
+            shown = name
+            local dialog = assert(_G.StaticPopupDialogs[name])
+            local popupFrame, editBox = TestHelpers.MakeRetailStaticPopupFrame({ which = name, data = data })
+
+            assert.has_no.errors(function()
+                if dialog.OnShow then
+                    dialog.OnShow(popupFrame, data)
+                end
+            end)
+
+            editBox:SetText("Potions")
+            dialog.OnAccept(popupFrame, data)
+        end
+
+        getRow("createItemStack").onClick({ page = registeredPage })
+
+        assert.are.equal("ECM_CREATE_ITEM_STACK", shown)
+        assert.are.equal(1, profile.extraIcons.itemStacks.order[1])
+        assert.are.equal(2, profile.extraIcons.itemStacks.nextId)
+        assert.are.equal("Potions", profile.extraIcons.itemStacks.byId[1].name)
+        assert.are.same({ "OptionsChanged" }, scheduledReasons)
+        assert.are.same({ registeredPage._category }, refreshCalls)
+    end)
+
     it("renames an item stack without changing viewer references", function()
         createStack("Potions")
         profile.extraIcons.viewers.utility = { { kind = "itemStack", itemStackId = 1 } }

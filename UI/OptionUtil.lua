@@ -604,7 +604,7 @@ function OptionUtil.MakeConfirmDialog(text, button1, button2)
     }
 end
 
-local function getPopupEditBox(frame) return frame and frame.editBox end
+local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
 
 local function trimDialogText(text)
     return strtrim(text or "")

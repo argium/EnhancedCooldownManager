@@ -33,7 +33,7 @@
 ---@field onChanged LibSettingsBuilderChangedCallback Gets the callback fired after a row setter completes.
 ---@field store table|(fun(): table)|nil Gets the store table or lazy provider used by path-bound rows.
 ---@field defaults table|(fun(): table)|nil Gets the defaults table or lazy provider used by path-bound rows.
----@field defaultsConfirmation fun(pageName: string, onAccept: fun())|nil Gets the optional confirmation hook shown before any category-header `Defaults` reset.
+---@field defaultsConfirmation fun(pageName: string, onAccept: fun())|nil Gets the optional confirmation hook shown before a custom `onDefault` reset. Native resets keep Blizzard's own confirmation dialog and are not wrapped by this hook.
 ---@field getNestedValue LibSettingsBuilderGetNestedValue|nil Gets the custom nested-path reader used by path-bound rows.
 ---@field setNestedValue LibSettingsBuilderSetNestedValue|nil Gets the custom nested-path writer used by path-bound rows.
 ---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.

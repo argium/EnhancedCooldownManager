@@ -414,11 +414,9 @@ function TestHelpers.SetupSettingsStubs()
         local dialog = _G.StaticPopupDialogs[name]
         if dialog and dialog.OnAccept then
             if dialog.hasEditBox then
-                local text = ""
-                local editBox = { GetText = function() return text end, SetText = function(_, t) text = t end, HighlightText = function() end }
-                local self = { editBox = editBox, button1 = { IsEnabled = function() return true end, SetEnabled = function() end } }
-                if dialog.OnShow then dialog.OnShow(self) end
-                dialog.OnAccept(self, data)
+                local popupFrame = TestHelpers.MakeRetailStaticPopupFrame({ which = name, data = data })
+                if dialog.OnShow then dialog.OnShow(popupFrame, data) end
+                dialog.OnAccept(popupFrame, data)
             else
                 dialog.OnAccept(nil, data)
             end
@@ -1952,6 +1950,75 @@ function TestHelpers.FindButtonInitializer(initializers, buttonText)
     return nil
 end
 
+--- Find a pageActions action by its text from a declarative rows list.
+--- @param rows table
+--- @param text string
+--- @return table|nil
+function TestHelpers.FindPageAction(rows, text)
+    for _, row in ipairs(rows or {}) do
+        if row.type == "pageActions" then
+            for _, action in ipairs(row.actions or {}) do
+                if action.text == text then
+                    return action
+                end
+            end
+        end
+    end
+    return nil
+end
+
+--- Create a Retail-style StaticPopup frame whose text input is exposed via `EditBox`.
+--- @param opts table|nil
+--- @return table popupFrame
+--- @return table editBox
+function TestHelpers.MakeRetailStaticPopupFrame(opts)
+    opts = opts or {}
+
+    local text = opts.text or ""
+    local highlighted = false
+    local buttonEnabled = opts.buttonEnabled ~= false
+    local popupFrame
+    local editBox = {
+        GetText = function()
+            return text
+        end,
+        SetText = function(_, value)
+            text = value
+            highlighted = false
+        end,
+        HighlightText = function()
+            highlighted = true
+        end,
+        IsTextHighlighted = function()
+            return highlighted
+        end,
+    }
+
+    popupFrame = {
+        EditBox = editBox,
+        which = opts.which,
+        data = opts.data,
+        _hidden = false,
+        button1 = {
+            IsEnabled = function()
+                return buttonEnabled
+            end,
+            SetEnabled = function(_, enabled)
+                buttonEnabled = enabled == true
+            end,
+        },
+        Hide = function(self)
+            self._hidden = true
+        end,
+    }
+
+    function editBox:GetParent()
+        return popupFrame
+    end
+
+    return popupFrame, editBox
+end
+
 --- Override StaticPopup_Show to capture the popup key and auto-accept it.
 --- For edit-box dialogs, optionally sets provided text before OnAccept.
 --- @param editText string|nil
@@ -1966,29 +2033,10 @@ function TestHelpers.InstallPopupAutoAccept(editText)
         end
 
         if dialog.hasEditBox then
-            local text = ""
-            local editBox = {
-                GetText = function()
-                    return text
-                end,
-                SetText = function(_, value)
-                    text = value
-                end,
-                HighlightText = function() end,
-            }
-            local popupFrame = {
-                EditBox = editBox,
-                editBox = editBox,
-                button1 = {
-                    IsEnabled = function()
-                        return true
-                    end,
-                    SetEnabled = function() end,
-                },
-            }
+            local popupFrame, editBox = TestHelpers.MakeRetailStaticPopupFrame({ which = name, data = data })
 
             if dialog.OnShow then
-                dialog.OnShow(popupFrame)
+                dialog.OnShow(popupFrame, data)
             end
             if editText ~= nil then
                 editBox:SetText(editText)

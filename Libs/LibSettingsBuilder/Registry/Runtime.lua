@@ -83,6 +83,7 @@
 ---@field onHide LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard hides this page.
 ---@field onDefault fun()|nil Gets the callback invoked when the user clicks the Blizzard category-header `Defaults` button while this page is active. When supplied, the library replaces the button's default reset behavior for the duration the page is shown.
 ---@field onDefaultEnabled fun(): boolean|nil Gets the predicate that controls whether the `Defaults` button is enabled while this page is active. Defaults to always-enabled when `onDefault` is supplied.
+---@field hideDefaults boolean|nil Gets whether the Blizzard category-header `Defaults` button is hidden entirely while this page is active. Mutually exclusive with `onDefault`; the button is restored when the page is hidden.
 ---@field disabled LibSettingsBuilderPredicate|nil Gets the page-level disabled predicate propagated to child rows.
 ---@field hidden LibSettingsBuilderPredicate|nil Gets the page-level hidden predicate propagated to child rows.
 ---@field order number|nil Gets the sort order used when a section declares multiple pages.
@@ -736,13 +737,16 @@ local function assertPageMutable(page, sourceName)
 end
 
 local function bindPageLifecycle(page)
-    local confirmDefaults = page._builder._config.defaultsConfirmation
-    if page._onShow or page._onHide or page._onDefault or confirmDefaults then
+    -- The defaults confirmation only gates custom resets. Native resets keep Blizzard's
+    -- own "All Settings / These Settings" dialog, so wrapping them would show two dialogs.
+    local confirmDefaults = page._onDefault and page._builder._config.defaultsConfirmation or nil
+    if page._onShow or page._onHide or page._onDefault or page._hideDefaults then
         lib._pageLifecycleCallbacks[page._category] = {
             onShow = page._onShow,
             onHide = page._onHide,
             onDefault = page._onDefault,
             onDefaultEnabled = page._onDefaultEnabled,
+            hideDefaults = page._hideDefaults,
             confirmDefaults = confirmDefaults,
             pageName = page._name,
         }
@@ -806,6 +810,7 @@ local function createPage(owner, key, rows, opts)
         _onHide = opts.onHide,
         _onDefault = opts.onDefault,
         _onDefaultEnabled = opts.onDefaultEnabled,
+        _hideDefaults = opts.hideDefaults,
         _operations = {},
         _rowIDs = {},
         _registered = false,
@@ -976,6 +981,7 @@ local function registerPageDefinition(owner, pageDef, defaultName)
         onHide = pageDef.onHide,
         onDefault = pageDef.onDefault,
         onDefaultEnabled = pageDef.onDefaultEnabled,
+        hideDefaults = pageDef.hideDefaults,
         disabled = schema.normalizePredicate(pageDef.disabled),
         hidden = schema.normalizePredicate(pageDef.hidden),
         order = pageDef.order,

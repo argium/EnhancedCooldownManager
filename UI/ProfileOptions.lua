@@ -5,20 +5,27 @@
 local _, ns = ...
 local L = ns.L
 
+local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
+
 StaticPopupDialogs["ECM_NEW_PROFILE"] = {
     text = L["NEW_PROFILE_PROMPT"],
     button1 = L["CREATE"],
     button2 = L["DONT_CREATE"],
     hasEditBox = true,
     OnAccept = function(self, data)
-        local name = strtrim(self.editBox:GetText())
+        local editBox = getPopupEditBox(self)
+        local name = strtrim(editBox and editBox:GetText() or "")
         if name ~= "" and data and data.onAccept then
             data.onAccept(name)
         end
     end,
     OnShow = function(self)
-        self.editBox:SetText(UnitName("player") .. " - " .. date("%H%M%S"))
-        self.editBox:HighlightText()
+        local editBox = getPopupEditBox(self)
+        if not editBox then
+            return
+        end
+        editBox:SetText(UnitName("player") .. " - " .. date("%H%M%S"))
+        editBox:HighlightText()
     end,
     EditBoxOnEnterPressed = function(self)
         local parent = self:GetParent()
@@ -139,10 +146,7 @@ ProfileOptions.name = L["PROFILES"]
 ProfileOptions.pages = {
     {
         key = "main",
-        onDefault = function() end,
-        onDefaultEnabled = function()
-            return false
-        end,
+        hideDefaults = true,
         rows = {
     { type = "header", name = L["ACTIVE_PROFILE"] },
     {
@@ -224,10 +228,9 @@ ProfileOptions.pages = {
             })
         end,
     },
-    { type = "header", name = L["RESET"] },
     {
         type = "button",
-        name = L["RESET_PROFILE"],
+        name = L["RESET_PROFILE_BUTTON"],
         buttonText = L["RESET_PROFILE_BUTTON"],
         tooltip = L["RESET_PROFILE_DESC"],
         confirm = L["RESET_PROFILE_CONFIRM"],
@@ -236,33 +239,34 @@ ProfileOptions.pages = {
             ctx.page:Refresh()
         end,
     },
-    { type = "header", name = L["IMPORT_EXPORT"] },
     {
-        type = "button",
-        name = L["IMPORT_PROFILE"],
-        buttonText = L["IMPORT"],
-        tooltip = L["IMPORT_DESC"],
-        onClick = function()
-            if InCombatLockdown() then
-                ns.Print(L["CANNOT_IMPORT_IN_COMBAT"])
-                return
-            end
-            ns.Addon:ShowImportDialog()
-        end,
-    },
-    {
-        type = "button",
-        name = L["EXPORT_PROFILE"],
-        buttonText = L["EXPORT"],
-        tooltip = L["EXPORT_DESC"],
-        onClick = function()
-            local exportString, err = ns.ImportExport.ExportCurrentProfile()
-            if not exportString then
-                ns.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
-                return
-            end
-            ns.Addon:ShowExportDialog(exportString)
-        end,
+        type = "pageActions",
+        attachToCategoryHeader = true,
+        actions = {
+            {
+                text = L["IMPORT"],
+                tooltip = L["IMPORT_DESC"],
+                onClick = function()
+                    if InCombatLockdown() then
+                        ns.Print(L["CANNOT_IMPORT_IN_COMBAT"])
+                        return
+                    end
+                    ns.Addon:ShowImportDialog()
+                end,
+            },
+            {
+                text = L["EXPORT"],
+                tooltip = L["EXPORT_DESC"],
+                onClick = function()
+                    local exportString, err = ns.ImportExport.ExportCurrentProfile()
+                    if not exportString then
+                        ns.Print(string.format(L["EXPORT_FAILED"], err or "Unknown error"))
+                        return
+                    end
+                    ns.Addon:ShowExportDialog(exportString)
+                end,
+            },
+        },
     },
         },
     },

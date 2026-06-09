@@ -452,6 +452,8 @@ local function getCategoryDefaultsButton()
 end
 
 function interop.installCategoryDefaultsOverride(onClick, enabledPredicate, confirmDefaults, pageName)
+    assert(onClick, "installCategoryDefaultsOverride requires a custom onClick reset")
+
     local button = getCategoryDefaultsButton()
     if not button then
         return function() end
@@ -463,25 +465,19 @@ function interop.installCategoryDefaultsOverride(onClick, enabledPredicate, conf
     local function applyEnabled()
         if enabledPredicate then
             button:SetEnabled(enabledPredicate() and true or false)
-        elseif not onClick then
-            button:SetEnabled(originalEnabled)
         else
             button:SetEnabled(true)
         end
     end
 
-    button:SetScript("OnClick", function(self)
+    button:SetScript("OnClick", function()
         if enabledPredicate and not enabledPredicate() then
             return
         end
 
         local function reset()
-            if onClick then
-                onClick()
-                applyEnabled()
-            elseif originalOnClick then
-                originalOnClick(self)
-            end
+            onClick()
+            applyEnabled()
         end
 
         if confirmDefaults then
@@ -500,6 +496,22 @@ function interop.installCategoryDefaultsOverride(onClick, enabledPredicate, conf
     end
 end
 
+function interop.installCategoryDefaultsHide()
+    local button = getCategoryDefaultsButton()
+    if not button then
+        return function() end
+    end
+
+    local wasShown = button:IsShown()
+    button:Hide()
+
+    return function()
+        if wasShown then
+            button:Show()
+        end
+    end
+end
+
 local function notifyLifecycleHidden(category)
     local cbs = category and lib._pageLifecycleCallbacks[category] or nil
     if not cbs then
@@ -508,6 +520,10 @@ local function notifyLifecycleHidden(category)
     if cbs._defaultsRestore then
         cbs._defaultsRestore()
         cbs._defaultsRestore = nil
+    end
+    if cbs._defaultsHideRestore then
+        cbs._defaultsHideRestore()
+        cbs._defaultsHideRestore = nil
     end
     if cbs.onHide then
         cbs.onHide()
@@ -533,15 +549,16 @@ function interop.installPageLifecycleHooks()
         lib._activeLifecycleCategory = category
         local cbs = category and lib._pageLifecycleCallbacks[category] or nil
         if cbs then
-            if cbs.onDefault or cbs.confirmDefaults then
+            if cbs.onDefault then
                 cbs._defaultsRestore = interop.installCategoryDefaultsOverride(
                     cbs.onDefault,
                     cbs.onDefaultEnabled,
                     cbs.confirmDefaults,
                     cbs.pageName
                 )
-            end
-            if cbs.onShow then
+            end            if cbs.hideDefaults then
+                cbs._defaultsHideRestore = interop.installCategoryDefaultsHide()
+            end            if cbs.onShow then
                 cbs.onShow()
             end
         end

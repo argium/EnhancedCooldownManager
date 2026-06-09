@@ -203,4 +203,7 @@ function schema.validatePageDefinition(sourceName, pageDef)
     assert(type(pageDef.rows) == "table", sourceName .. ": page definition requires rows")
     assertBooleanOrCallback(sourceName, "disabled", pageDef.disabled)
     assertBooleanOrCallback(sourceName, "hidden", pageDef.hidden)
+    if pageDef.hideDefaults ~= nil then
+        assert(type(pageDef.hideDefaults) == "boolean", sourceName .. ": hideDefaults must be a boolean")
+    end
 end
