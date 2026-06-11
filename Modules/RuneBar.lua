@@ -293,7 +293,7 @@ function RuneBar:CreateFrame()
 end
 
 function RuneBar:ShouldShow()
-    return ns.IsDeathKnight() and ns.BarMixin.FrameProto.ShouldShow(self)
+    return ns.ClassUtil.IsDeathKnight() and ns.BarMixin.FrameProto.ShouldShow(self)
 end
 
 function RuneBar:Refresh(why, force)
@@ -359,7 +359,7 @@ function RuneBar:OnInitialize()
 end
 
 function RuneBar:OnEnable()
-    if not ns.IsDeathKnight() then
+    if not ns.ClassUtil.IsDeathKnight() then
         return
     end
 

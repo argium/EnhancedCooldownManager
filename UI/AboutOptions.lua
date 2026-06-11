@@ -14,6 +14,7 @@ end
 
 ns.AboutPage = {
     key = "about",
+    hideDefaults = true,
     rows = {
         {
             type = "info",

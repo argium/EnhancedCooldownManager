@@ -97,7 +97,8 @@
             "SettingsPanel",
             "SettingsSliderControlMixin",
             "CreateSettingsListSectionHeaderInitializer",
-            "Round"
+            "Round",
+            "CLASS_COLORS"
         ],
         "Lua.diagnostics.disable": [
             "assign-type-mismatch"

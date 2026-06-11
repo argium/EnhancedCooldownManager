@@ -177,19 +177,19 @@ local constants = {
 
 --- Predefined icon stacks resolved at runtime by stackKey.
 --- Each entry defines an icon kind and its candidate sources.
-local BUILTIN_STACKS = {
+constants.BUILTIN_STACKS = {
     trinket1 = { kind = "equipSlot", slotId = 13, label = "Trinket 1" },
     trinket2 = { kind = "equipSlot", slotId = 14, label = "Trinket 2" },
 }
 
 --- Default display order for builtin stack keys (matches default viewers.utility order).
-local BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
+constants.BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
 
-local DRACTHYR_WING_BUFFET_IDS = { 357214, 368970 } -- Base and enhanced evoker variants.
+local dracthyrWingBuffetIds = { 357214, 368970 } -- Base and enhanced evoker variants.
 
 --- Racial ability lookup keyed by UnitRace("player") raceFileName.
 --- One primary active racial per race.
-local RACIAL_ABILITIES = {
+constants.RACIAL_ABILITIES = {
     Human              = { spellId = 59752  }, -- Every Man for Himself
     Orc                = { spellId = 33697  }, -- Blood Fury
     Dwarf              = { spellId = 20594  }, -- Stoneform
@@ -213,25 +213,25 @@ local RACIAL_ABILITIES = {
     Vulpera            = { spellId = 312411 }, -- Bag of Tricks
     MagharOrc          = { spellId = 274738 }, -- Ancestral Call
     Mechagnome         = { spellId = 312924 }, -- Hyper Organic Light Originator
-    Dracthyr           = { spellIds = DRACTHYR_WING_BUFFET_IDS }, -- Wing Buffet
+    Dracthyr           = { spellIds = dracthyrWingBuffetIds }, -- Wing Buffet
     EarthenDwarf       = { spellId = 436717 }, -- Azerite Surge
 }
 
 --- Some racial abilities have different spell IDs. For example, Dracthyr evokers
 --- have a more potent wing buffet compared to other classes.
-local RACIAL_SPELL_ALIASES = {
-    [357214] = DRACTHYR_WING_BUFFET_IDS,
-    [368970] = DRACTHYR_WING_BUFFET_IDS,
+constants.RACIAL_SPELL_ALIASES = {
+    [357214] = dracthyrWingBuffetIds,
+    [368970] = dracthyrWingBuffetIds,
 }
 
-local BLIZZARD_FRAMES = {
+constants.BLIZZARD_FRAMES = {
     "EssentialCooldownViewer",
     "UtilityCooldownViewer",
     "BuffIconCooldownViewer",
     "BuffBarCooldownViewer",
 }
 
-local CLASS_COLORS = {
+constants.CLASS_COLORS = {
     DEATHKNIGHT = "C41F3B",
     DEMONHUNTER = "A330C9",
     DRUID = "FF7D0A",
@@ -249,19 +249,19 @@ local CLASS_COLORS = {
 
 -- Resource types that support a separate color when at maximum value.
 -- Code-level gate; user toggle is stored in the profile (maxColorsEnabled).
-local resourceBarMaxColorTypes = {
+constants.RESOURCEBAR_MAX_COLOR_TYPES = {
     [constants.RESOURCEBAR_TYPE_ICICLES] = true,
     [constants.RESOURCEBAR_TYPE_DEVOURER_META] = true,
     [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = true,
 }
 
-local resourceBarCastableMaxColorSpells = {
+constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = {
     [constants.RESOURCEBAR_TYPE_DEVOURER_META] = constants.SPELLID_COLLAPSING_STAR,
     [constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL] = constants.SPELLID_VOID_META,
 }
 
---- Authoritative mapping from module name to its profile config key.
-local moduleConfigKeys = {
+--- Maps modules to their respective profile config key.
+constants.MODULE_CONFIG_KEYS = {
     [constants.POWERBAR] = "powerBar",
     [constants.RESOURCEBAR] = "resourceBar",
     [constants.RUNEBAR] = "runeBar",
@@ -273,18 +273,20 @@ local moduleConfigKeys = {
 --- Returns the profile config key for a module name.
 --- Uses the authoritative lookup; falls back to lowercasing the first character.
 function constants.ConfigKeyForModule(name)
-    return moduleConfigKeys[name] or (name:sub(1, 1):lower() .. name:sub(2))
+    return constants.MODULE_CONFIG_KEYS[name] or (name:sub(1, 1):lower() .. name:sub(2))
 end
 
-local chainOrder = {
+-- Defines the ordering of modules for chained anchoring.
+constants.CHAIN_ORDER = {
     constants.POWERBAR,
     constants.RESOURCEBAR,
     constants.RUNEBAR,
     constants.BUFFBARS,
     constants.EXTERNALBARS,
 }
-constants.CHAIN_ORDER = chainOrder
-constants.MODULE_ORDER = {
+
+-- Controls the order that modules are loaded in.
+constants.MODULE_LOAD_ORDER = {
     constants.POWERBAR,
     constants.RESOURCEBAR,
     constants.RUNEBAR,
@@ -292,14 +294,5 @@ constants.MODULE_ORDER = {
     constants.EXTERNALBARS,
     constants.EXTRAICONS,
 }
-constants.MODULE_CONFIG_KEYS = moduleConfigKeys
-constants.BLIZZARD_FRAMES = BLIZZARD_FRAMES
-constants.BUILTIN_STACKS = BUILTIN_STACKS
-constants.BUILTIN_STACK_ORDER = BUILTIN_STACK_ORDER
-constants.RACIAL_ABILITIES = RACIAL_ABILITIES
-constants.RACIAL_SPELL_ALIASES = RACIAL_SPELL_ALIASES
-constants.RESOURCEBAR_CASTABLE_MAX_COLOR_SPELLS = resourceBarCastableMaxColorSpells
-constants.CLASS_COLORS = CLASS_COLORS
-constants.RESOURCEBAR_MAX_COLOR_TYPES = resourceBarMaxColorTypes
 
 ns.Constants = constants

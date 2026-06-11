@@ -45,16 +45,6 @@ describe("FrameUtil", function()
         secretValues = {}
 
         ns = {}
-        ns.ColorUtil = {}
-        ns.ColorUtil.AreEqual = function(a, b)
-            if a == nil and b == nil then
-                return true
-            end
-            if a == nil or b == nil then
-                return false
-            end
-            return a.r == b.r and a.g == b.g and a.b == b.b and a.a == b.a
-        end
         ns.DebugAssert = function(condition, message)
             if not condition then
                 error(message or "ECM.DebugAssert failed")

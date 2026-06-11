@@ -103,7 +103,10 @@ All Lua files start with:
 - Test load order mirrors TOC load order. Test files mirror source paths; library tests live under `Libs/<Name>/Tests/`.
 - Test production code directly. Do not mirror production logic in specs or preserve table-attached helpers just so specs can call them.
 - Prefer testing the real public flow, or the actual shared owner of the logic.
+- Tests and shared stubs must model the supported Retail runtime strictly. Do not add fallback fields, compatibility aliases, or helper behavior that production code does not receive.
+- Shared test helpers default to the current Retail API shape. If a test needs a non-Retail shape to cover a compatibility branch or malformed input, keep that stub local to the test and document why.
 - Stub the canonical function, not a wrapper or alias. If a stub diverges from real behavior, fix the stub.
+- If a test double masked a production bug, fix the shared helper first and add a regression that exercises the real runtime shape before considering the bug closed.
 - Do not guard production APIs only to satisfy tests. If an API exists in the supported runtime/load order, tests must stub it.
 - Reuse `Tests/TestHelpers.lua` before creating new shared helpers.
 - `StaticPopup_Show` stubs forward `(name, text1, text2, data)` and call `OnAccept(self, data)`.

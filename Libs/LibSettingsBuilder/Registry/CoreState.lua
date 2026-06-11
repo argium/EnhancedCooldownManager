@@ -33,7 +33,7 @@
 ---@field onChanged LibSettingsBuilderChangedCallback Gets the callback fired after a row setter completes.
 ---@field store table|(fun(): table)|nil Gets the store table or lazy provider used by path-bound rows.
 ---@field defaults table|(fun(): table)|nil Gets the defaults table or lazy provider used by path-bound rows.
----@field defaultsConfirmation fun(pageName: string, onAccept: fun())|nil Gets the optional confirmation hook shown before any category-header `Defaults` reset.
+---@field defaultsConfirmation table|nil Gets localized strings for page Defaults confirmations: `text`, `button1`, and `button2`.
 ---@field getNestedValue LibSettingsBuilderGetNestedValue|nil Gets the custom nested-path reader used by path-bound rows.
 ---@field setNestedValue LibSettingsBuilderSetNestedValue|nil Gets the custom nested-path writer used by path-bound rows.
 ---@field page LibSettingsBuilderPageConfig|nil Gets the optional root-owned page definition.
@@ -239,6 +239,9 @@ function registry.makeProxySetting(self, spec, varType, defaultFallback, binding
     end
 
     setting = interop.registerProxySetting(category, variable, varType, spec.name, defaultValue, getter, setter)
+    if spec.path ~= nil then
+        setting._lsbDefaultValue = defaultValue
+    end
     setting.SetValueNoCallback = setValueNoCallback
 
     return setting, category
@@ -261,15 +264,18 @@ function registry.makeColorSetting(self, spec)
         registry.postSet(self, spec, value, setting)
     end
 
+    local defaultValue = foundation.colorTableToHex(binding.default or {})
+
     setting = interop.registerProxySetting(
         category,
         variable,
         interop.getVarTypeString(),
         spec.name,
-        foundation.colorTableToHex(binding.default or {}),
+        defaultValue,
         getter,
         setter
     )
+    setting._lsbDefaultValue = defaultValue
 
     return setting, category
 end

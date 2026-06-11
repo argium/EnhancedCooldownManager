@@ -604,7 +604,7 @@ function OptionUtil.MakeConfirmDialog(text, button1, button2)
     }
 end
 
-local function getPopupEditBox(frame) return frame and frame.editBox end
+local function getPopupEditBox(frame) return frame and (frame.EditBox or frame.editBox) end
 
 local function trimDialogText(text)
     return strtrim(text or "")
@@ -668,31 +668,3 @@ function OptionUtil.MakeTextInputDialog(text, button1, button2)
     }
 end
 
-local function formatResetPageButton(pageName)
-    local format = L["RESET_PAGE_SETTINGS"]
-    if type(format) ~= "string" or not format:find("%%s") then
-        format = "Reset %s settings"
-    end
-    return format:format(pageName or "")
-end
-
-function OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
-    local addon = ns.Addon
-    if addon and addon.ShowConfirmDialog then
-        addon:ShowConfirmDialog(
-            "ECM_CONFIRM_RESET_SETTINGS_PAGE",
-            L["RESET_PAGE_CONFIRM"],
-            formatResetPageButton(pageName),
-            L["DONT_RESET"],
-            onAccept
-        )
-        return
-    end
-
-    StaticPopupDialogs["ECM_CONFIRM_RESET_SETTINGS_PAGE"] = OptionUtil.MakeConfirmDialog(
-        L["RESET_PAGE_CONFIRM"],
-        formatResetPageButton(pageName),
-        L["DONT_RESET"]
-    )
-    StaticPopup_Show("ECM_CONFIRM_RESET_SETTINGS_PAGE", nil, nil, { onAccept = onAccept })
-end

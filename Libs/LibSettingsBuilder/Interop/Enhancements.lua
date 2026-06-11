@@ -451,52 +451,71 @@ local function getCategoryDefaultsButton()
     return header and header.DefaultsButton or nil
 end
 
-function interop.installCategoryDefaultsOverride(onClick, enabledPredicate, confirmDefaults, pageName)
+local function isPageDefaultsEnabled(cbs)
+    return (cbs.onDefault or cbs.defaultSettings and #cbs.defaultSettings > 0)
+        and (not cbs.onDefaultEnabled or cbs.onDefaultEnabled())
+end
+
+local function resetPageDefaults(cbs)
+    if cbs.onDefault then
+        cbs.onDefault()
+        return
+    end
+
+    for _, setting in ipairs(cbs.defaultSettings or {}) do
+        setting:SetValue(setting._lsbDefaultValue)
+    end
+end
+
+local function getPageDefaultsConfirmText(cbs)
+    local text = cbs.defaultsConfirmText
+    if not text:find("%%s") then return text end
+    return string.format(text, tostring(cbs.pageName or ""):lower())
+end
+
+function interop.installCategoryDefaultsHide()
     local button = getCategoryDefaultsButton()
     if not button then
         return function() end
     end
 
-    local originalOnClick = button:GetScript("OnClick")
-    local originalEnabled = button:IsEnabled()
+    local wasShown = button:IsShown()
+    button:Hide()
+    interop.refreshVisibleSettingsFrames()
 
-    local function applyEnabled()
-        if enabledPredicate then
-            button:SetEnabled(enabledPredicate() and true or false)
-        elseif not onClick then
-            button:SetEnabled(originalEnabled)
-        else
-            button:SetEnabled(true)
+    return function()
+        if wasShown then
+            button:Show()
+            interop.refreshVisibleSettingsFrames()
         end
     end
+end
 
-    button:SetScript("OnClick", function(self)
-        if enabledPredicate and not enabledPredicate() then
+function interop.installCategoryDefaultsOverride(cbs)
+    local button = getCategoryDefaultsButton()
+    if not button then
+        return function() end
+    end
+
+    local originalScript = button:GetScript("OnClick")
+    local wasEnabled = button:IsEnabled()
+    button:SetEnabled(isPageDefaultsEnabled(cbs))
+    button:SetScript("OnClick", function()
+        if not isPageDefaultsEnabled(cbs) then
             return
         end
 
-        local function reset()
-            if onClick then
-                onClick()
-                applyEnabled()
-            elseif originalOnClick then
-                originalOnClick(self)
-            end
-        end
-
-        if confirmDefaults then
-            confirmDefaults(pageName, reset)
-        else
-            reset()
-        end
+        interop.showConfirmDialog(cbs.defaultsDialogName, getPageDefaultsConfirmText(cbs), {
+            onAccept = function()
+                resetPageDefaults(cbs)
+                interop.refreshVisibleSettingsFrames()
+            end,
+        })
     end)
-    applyEnabled()
 
     return function()
-        if button:GetScript("OnClick") then
-            button:SetScript("OnClick", originalOnClick)
-        end
-        button:SetEnabled(originalEnabled)
+        button:SetScript("OnClick", originalScript)
+        button:SetEnabled(wasEnabled)
     end
 end
 
@@ -505,9 +524,13 @@ local function notifyLifecycleHidden(category)
     if not cbs then
         return
     end
-    if cbs._defaultsRestore then
-        cbs._defaultsRestore()
-        cbs._defaultsRestore = nil
+    if cbs._defaultsHideRestore then
+        cbs._defaultsHideRestore()
+        cbs._defaultsHideRestore = nil
+    end
+    if cbs._defaultsOverrideRestore then
+        cbs._defaultsOverrideRestore()
+        cbs._defaultsOverrideRestore = nil
     end
     if cbs.onHide then
         cbs.onHide()
@@ -533,13 +556,10 @@ function interop.installPageLifecycleHooks()
         lib._activeLifecycleCategory = category
         local cbs = category and lib._pageLifecycleCallbacks[category] or nil
         if cbs then
-            if cbs.onDefault or cbs.confirmDefaults then
-                cbs._defaultsRestore = interop.installCategoryDefaultsOverride(
-                    cbs.onDefault,
-                    cbs.onDefaultEnabled,
-                    cbs.confirmDefaults,
-                    cbs.pageName
-                )
+            if cbs.hideDefaults then
+                cbs._defaultsHideRestore = interop.installCategoryDefaultsHide()
+            elseif cbs.onDefault or cbs.defaultSettings and #cbs.defaultSettings > 0 then
+                cbs._defaultsOverrideRestore = interop.installCategoryDefaultsOverride(cbs)
             end
             if cbs.onShow then
                 cbs.onShow()
@@ -583,12 +603,12 @@ function interop.refreshVisibleSettingsFrames()
     interop.forEachVisibleSettingsFrame(interop.refreshSettingsFrame)
 end
 
-function interop.ensureConfirmDialog(name)
+function interop.ensureConfirmDialog(name, button1, button2)
     if not StaticPopupDialogs[name] then
         StaticPopupDialogs[name] = {
             text = "%s",
-            button1 = YES,
-            button2 = NO,
+            button1 = button1 or YES,
+            button2 = button2 or NO,
             OnAccept = function(_, data)
                 if data and data.onAccept then
                     data.onAccept()

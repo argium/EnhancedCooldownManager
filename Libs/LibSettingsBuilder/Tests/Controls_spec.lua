@@ -299,6 +299,7 @@ describe("LibSettingsBuilder Controls", function()
         _G.SettingsListElementMixin = {}
         _G.SettingsDropdownControlMixin = {}
         _G.SettingsSliderControlMixin = {}
+        _G.SettingsPanel.HookScript = function() end
         _G.CreateFrame = function()
             return createScriptableFrame()
         end
@@ -722,6 +723,71 @@ describe("LibSettingsBuilder Controls", function()
         assert.are.equal(frame, clickedFrame)
     end)
 
+    it("anchors attached page action buttons to the header edge when Defaults is hidden", function()
+        TestHelpers.SetupLibStub()
+        TestHelpers.SetupSettingsStubs()
+        _G.hooksecurefunc = function() end
+        _G.SettingsListElementMixin = {}
+        _G.SettingsDropdownControlMixin = {}
+        _G.SettingsSliderControlMixin = {}
+
+        local settingsHeader = createScriptableFrame()
+        settingsHeader.DefaultsButton = createScriptableFrame()
+        settingsHeader.DefaultsButton:Hide()
+        _G.SettingsPanel = {
+            IsShown = function() return true end,
+            GetCurrentCategory = function() return nil end,
+            GetSettingsList = function()
+                return { Header = settingsHeader }
+            end,
+        }
+        _G.CreateFrame = function()
+            return createScriptableFrame()
+        end
+
+        TestHelpers.LoadLibSettingsBuilder()
+
+        local builder = LibStub("LibSettingsBuilder-1.0").New({
+            name = "Attached Actions",
+            store = function() return { general = {} } end,
+            defaults = function() return { general = {} } end,
+            onChanged = function() end,
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            rows = {
+                                {
+                                    type = "pageActions",
+                                    attachToCategoryHeader = true,
+                                    actions = {
+                                        { text = "Run" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local initializer = builder:GetPage("general", "main")._category:GetLayout()._initializers[1]
+        local frame = createScriptableFrame()
+        initializer:InitFrame(frame)
+
+        local button = assert(frame._lsbHeaderActionButtons[1])
+        local point, relativeTo, relativePoint, x, y = button:GetPoint(1)
+
+        assert.are.equal("RIGHT", point)
+        assert.are.equal(settingsHeader, relativeTo)
+        assert.are.equal("RIGHT", relativePoint)
+        assert.are.equal(-20, x)
+        assert.are.equal(0, y)
+    end)
+
     it("reevaluates dynamic button disabled predicates after handler-backed settings change", function()
         TestHelpers.SetupLibStub()
         TestHelpers.SetupSettingsStubs()
@@ -998,6 +1064,7 @@ describe("LibSettingsBuilder Controls", function()
         _G.SettingsListElementMixin = {}
         _G.SettingsDropdownControlMixin = {}
         _G.SettingsSliderControlMixin = {}
+        _G.SettingsPanel.HookScript = function() end
         _G.CreateFrame = function()
             return createScriptableFrame()
         end

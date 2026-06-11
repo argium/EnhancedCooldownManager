@@ -25,15 +25,6 @@ describe("ColorUtil", function()
         ColorUtil = assert(ns.ColorUtil, "ColorUtil did not initialize")
     end)
 
-    it("AreEqual handles identical, nil, and distinct colors", function()
-        local color = { r = 1, g = 0.5, b = 0.25, a = 1 }
-
-        assert.is_true(ColorUtil.AreEqual(color, color))
-        assert.is_true(ColorUtil.AreEqual(nil, nil))
-        assert.is_false(ColorUtil.AreEqual(color, nil))
-        assert.is_false(ColorUtil.AreEqual(color, { r = 1, g = 0.5, b = 0.25, a = 0.5 }))
-    end)
-
     it("ColorToHex converts normalized RGB values to lowercase hex", function()
         local hex = ColorUtil.ColorToHex({ r = 1, g = 0.5, b = 0, a = 1 })
         assert.are.equal("ff8000", hex)

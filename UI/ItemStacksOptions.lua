@@ -449,7 +449,16 @@ function ItemStacksOptions.OnInitialize()
     ItemStacksOptions.EnsureItemLoadFrame()
 end
 
+local function resetItemStacksToDefaults()
+    local defaultStacks = ns.Addon.db.defaults.profile.extraIcons.itemStacks
+    getProfile().extraIcons.itemStacks = ns.CloneValue(defaultStacks)
+    ItemStacksOptions._selectedStackId = nil
+    ItemStacksOptions._draftState.idText = nil
+    doAction()
+end
+
 ItemStacksOptions.page = {
+    onDefault = resetItemStacksToDefaults,
     key = "itemStacks",
     name = L["ITEM_STACKS"],
     onShow = function()

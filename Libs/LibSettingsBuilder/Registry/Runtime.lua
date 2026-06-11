@@ -81,8 +81,9 @@
 ---@field rows LibSettingsBuilderRowConfig[] Gets the declarative row array registered on the page.
 ---@field onShow LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard shows this page.
 ---@field onHide LibSettingsBuilderPageLifecycleCallback|nil Gets the callback fired when Blizzard hides this page.
----@field onDefault fun()|nil Gets the callback invoked when the user clicks the Blizzard category-header `Defaults` button while this page is active. When supplied, the library replaces the button's default reset behavior for the duration the page is shown.
----@field onDefaultEnabled fun(): boolean|nil Gets the predicate that controls whether the `Defaults` button is enabled while this page is active. Defaults to always-enabled when `onDefault` is supplied.
+---@field onDefault fun()|nil Gets the callback invoked after confirming the category-header `Defaults` button for this page.
+---@field onDefaultEnabled fun(): boolean|nil Gets the predicate that controls whether the custom defaults callback is enabled. Defaults to always-enabled when `onDefault` is supplied.
+---@field hideDefaults boolean|nil Gets whether the Blizzard category-header `Defaults` button is hidden entirely while this page is active. Mutually exclusive with `onDefault`; the button is restored when the page is hidden.
 ---@field disabled LibSettingsBuilderPredicate|nil Gets the page-level disabled predicate propagated to child rows.
 ---@field hidden LibSettingsBuilderPredicate|nil Gets the page-level hidden predicate propagated to child rows.
 ---@field order number|nil Gets the sort order used when a section declares multiple pages.
@@ -380,6 +381,24 @@ local function ensureConfirmDialog(builder)
     return interop.ensureConfirmDialog(builder._confirmDialogName)
 end
 
+local function getDefaultsConfirmation(builder)
+    local confirmation = builder._config.defaultsConfirmation
+    assert(type(confirmation) == "table", "LibSettingsBuilder: defaultsConfirmation is required when page defaults are enabled")
+    assert(type(confirmation.text) == "string" and confirmation.text ~= "", "LibSettingsBuilder: defaultsConfirmation.text is required")
+    assert(type(confirmation.button1) == "string" and confirmation.button1 ~= "", "LibSettingsBuilder: defaultsConfirmation.button1 is required")
+    assert(type(confirmation.button2) == "string" and confirmation.button2 ~= "", "LibSettingsBuilder: defaultsConfirmation.button2 is required")
+    return confirmation
+end
+
+local function ensureDefaultsConfirmDialog(builder, confirmation)
+    if builder._defaultsConfirmDialogName then
+        return builder._defaultsConfirmDialogName
+    end
+
+    builder._defaultsConfirmDialogName = builder._config.varPrefix .. "_" .. MAJOR:gsub("[%-%.]", "_") .. "_DefaultsConfirm"
+    return interop.ensureConfirmDialog(builder._defaultsConfirmDialogName, confirmation.button1, confirmation.button2)
+end
+
 local function prepareButtonClick(builder, spec)
     local callbackContext = registry.createCallbackContext(builder, spec)
     local originalClick = spec.onClick
@@ -478,6 +497,12 @@ end
 
 local rowRegistration = {}
 
+local function registerDefaultSetting(page, setting)
+    if setting and setting._lsbDefaultValue ~= nil then
+        page._defaultSettings[#page._defaultSettings + 1] = setting
+    end
+end
+
 local function registerBuiltRow(sourceName, page, row, created)
     local spec = prepareRow(sourceName, page, row)
     local builder = page._builder
@@ -488,6 +513,7 @@ local function registerBuiltRow(sourceName, page, row, created)
     end
 
     local initializer, setting = registry.applyBuildResult(builder, spec, build(spec))
+    registerDefaultSetting(page, setting)
     if row.id then
         created[row.id] = { initializer = initializer, setting = setting }
     end
@@ -736,15 +762,20 @@ local function assertPageMutable(page, sourceName)
 end
 
 local function bindPageLifecycle(page)
-    local confirmDefaults = page._builder._config.defaultsConfirmation
-    if page._onShow or page._onHide or page._onDefault or confirmDefaults then
+    local hasSettingDefaults = #page._defaultSettings > 0 and page._builder._config.defaultsConfirmation ~= nil
+    if page._onShow or page._onHide or page._onDefault or page._hideDefaults or hasSettingDefaults then
+        local hasDefaults = page._onDefault or hasSettingDefaults
+        local defaultsConfirmation = hasDefaults and getDefaultsConfirmation(page._builder) or nil
         lib._pageLifecycleCallbacks[page._category] = {
             onShow = page._onShow,
             onHide = page._onHide,
             onDefault = page._onDefault,
             onDefaultEnabled = page._onDefaultEnabled,
-            confirmDefaults = confirmDefaults,
-            pageName = page._name,
+            defaultSettings = hasSettingDefaults and page._defaultSettings or nil,
+            defaultsConfirmText = page._defaultsConfirmText or (defaultsConfirmation and defaultsConfirmation.text) or nil,
+            defaultsDialogName = defaultsConfirmation and ensureDefaultsConfirmDialog(page._builder, defaultsConfirmation) or nil,
+            hideDefaults = page._hideDefaults,
+            pageName = page._name or page._key,
         }
         interop.installPageLifecycleHooks()
     end
@@ -758,7 +789,6 @@ end
 local function materializePage(page, category)
     assert(not page._registered, "materializePage: page is already registered")
     page._category = category
-    bindPageLifecycle(page)
 
     -- Create the handle before row operations so ctx.page is available in callbacks
     -- registered during those operations (e.g. onClick, onSet).
@@ -776,6 +806,7 @@ local function materializePage(page, category)
     for _, operation in ipairs(page._operations) do
         operation(created)
     end
+    bindPageLifecycle(page)
 
     page._registered = true
     return page
@@ -806,6 +837,9 @@ local function createPage(owner, key, rows, opts)
         _onHide = opts.onHide,
         _onDefault = opts.onDefault,
         _onDefaultEnabled = opts.onDefaultEnabled,
+        _hideDefaults = opts.hideDefaults,
+        _defaultsConfirmText = opts.defaultsConfirmText,
+        _defaultSettings = {},
         _operations = {},
         _rowIDs = {},
         _registered = false,
@@ -976,6 +1010,8 @@ local function registerPageDefinition(owner, pageDef, defaultName)
         onHide = pageDef.onHide,
         onDefault = pageDef.onDefault,
         onDefaultEnabled = pageDef.onDefaultEnabled,
+        hideDefaults = pageDef.hideDefaults,
+        defaultsConfirmText = pageDef.defaultsConfirmText,
         disabled = schema.normalizePredicate(pageDef.disabled),
         hidden = schema.normalizePredicate(pageDef.hidden),
         order = pageDef.order,

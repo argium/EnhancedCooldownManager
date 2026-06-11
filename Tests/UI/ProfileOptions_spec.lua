@@ -41,8 +41,8 @@ describe("ProfileOptions getters/setters/defaults", function()
         assert.are.equal("profile", ns.ProfileOptions.key)
         assert.are.equal("Other", settings.ECM_ProfileCopy:GetValue())
         assert.is_not_nil(profileCategory)
+        assert.is_nil(ns.ProfileOptions.pages[1].hideDefaults)
         assert.is_function(ns.ProfileOptions.pages[1].onDefault)
-        assert.is_false(ns.ProfileOptions.pages[1].onDefaultEnabled())
     end)
 
     before_each(function()
@@ -76,9 +76,10 @@ describe("ProfileOptions getters/setters/defaults", function()
     end
 
     describe("switch profile", function()
-        it("disables the category defaults button for profile actions", function()
+        it("uses the category Defaults button", function()
+            assert.is_nil(ns.ProfileOptions.pages[1].hideDefaults)
             assert.is_function(ns.ProfileOptions.pages[1].onDefault)
-            assert.is_false(ns.ProfileOptions.pages[1].onDefaultEnabled())
+            assert.is_nil(ns.ProfileOptions.pages[1].onDefaultEnabled)
         end)
 
         it("getter returns current profile", function()
@@ -89,6 +90,14 @@ describe("ProfileOptions getters/setters/defaults", function()
             ns.Addon.db.SetProfile = function(_, value) called = value end
             getSetting("ProfileSwitch"):SetValue("Other")
             assert.are.equal("Other", called)
+        end)
+        it("ignores blank profile defaults from direct setting resets", function()
+            local called = false
+            ns.Addon.db.SetProfile = function() called = true end
+
+            getSetting("ProfileSwitch"):SetValue("")
+
+            assert.is_false(called)
         end)
         it("setter refreshes the category", function()
             getSetting("ProfileSwitch"):SetValue("Other")
@@ -109,6 +118,36 @@ describe("ProfileOptions getters/setters/defaults", function()
 
             assert.are.equal("ECM_NEW_PROFILE", getShown())
             assert.are.equal("MyCustomProfile", switched)
+            assert.are.same({ profileCategory }, refreshCalls)
+        end)
+
+        it("supports Retail StaticPopup frames that expose only EditBox", function()
+            local switched
+            local shown
+            ns.Addon.db.SetProfile = function(_, value) switched = value end
+
+            _G.StaticPopup_Show = function(name, _text1, _text2, data)
+                shown = name
+                local dialog = assert(_G.StaticPopupDialogs[name])
+                local popupFrame, editBox = TestHelpers.MakeRetailStaticPopupFrame({ which = name, data = data })
+
+                assert.has_no.errors(function()
+                    if dialog.OnShow then
+                        dialog.OnShow(popupFrame)
+                    end
+                end)
+
+                assert.are.equal("TestPlayer - 120000", editBox:GetText())
+                assert.is_true(editBox:IsTextHighlighted())
+
+                editBox:SetText("RetailPopupProfile")
+                dialog.OnAccept(popupFrame, data)
+            end
+
+            TestHelpers.FindButtonInitializer(initializers, ns.L["NEW_PROFILE"])._onClick()
+
+            assert.are.equal("ECM_NEW_PROFILE", shown)
+            assert.are.equal("RetailPopupProfile", switched)
             assert.are.same({ profileCategory }, refreshCalls)
         end)
     end)
@@ -221,14 +260,71 @@ describe("ProfileOptions getters/setters/defaults", function()
         end)
     end)
 
-    describe("reset profile", function()
-        it("calls db:ResetProfile", function()
+    local function getPageActions()
+        for _, row in ipairs(ns.ProfileOptions.pages[1].rows) do
+            if row.type == "pageActions" then
+                return row.actions
+            end
+        end
+    end
+
+    local function getPageAction(text)
+        return TestHelpers.FindPageAction(ns.ProfileOptions.pages[1].rows, text)
+    end
+
+    describe("profile page actions", function()
+        it("leaves defaults to the category header button", function()
+            local actions = assert(getPageActions())
+
+            assert.are.equal(2, #actions)
+            assert.are.equal(ns.L["IMPORT"], actions[1].text)
+            assert.are.equal(ns.L["EXPORT"], actions[2].text)
+        end)
+
+        it("resets the current profile through the page defaults hook", function()
             local reset = false
             ns.Addon.db.ResetProfile = function() reset = true end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["RESET_PROFILE_BUTTON"])._onClick()
+            ns.ProfileOptions.pages[1].onDefault()
 
             assert.is_true(reset)
+            assert.are.same({ profileCategory }, refreshCalls)
+        end)
+
+        it("resets the current profile through the custom Defaults button", function()
+            local nativeReset = false
+            local reset = false
+            local button = {
+                _enabled = true,
+                _script = function()
+                    nativeReset = true
+                end,
+                GetScript = function(self)
+                    return self._script
+                end,
+                IsEnabled = function(self)
+                    return self._enabled
+                end,
+                SetEnabled = function(self, enabled)
+                    self._enabled = enabled
+                end,
+                SetScript = function(self, _, script)
+                    self._script = script
+                end,
+            }
+
+            rawset(SettingsPanel, "GetSettingsList", function()
+                return { Header = { DefaultsButton = button } }
+            end)
+            ns.Addon.db.ResetProfile = function() reset = true end
+
+            SettingsPanel:SetCurrentCategory(profileCategory)
+            SettingsPanel:DisplayCategory(profileCategory)
+            button:GetScript("OnClick")(button)
+
+            assert.is_false(nativeReset)
+            assert.is_true(reset)
+            assert.are.same({ profileCategory }, refreshCalls)
         end)
     end)
 
@@ -238,7 +334,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             local opened = false
             ns.Addon.ShowImportDialog = function() opened = true end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["IMPORT"])._onClick()
+            assert(getPageAction(ns.L["IMPORT"])).onClick()
 
             assert.is_true(opened)
         end)
@@ -250,7 +346,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             ns.Addon.ShowImportDialog = function() opened = true end
             ns.Print = function(msg) printed = msg end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["IMPORT"])._onClick()
+            assert(getPageAction(ns.L["IMPORT"])).onClick()
 
             assert.is_false(opened)
             assert.are.equal(ns.L["CANNOT_IMPORT_IN_COMBAT"], printed)
@@ -262,7 +358,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             local exportedWith
             ns.Addon.ShowExportDialog = function(_, str) exportedWith = str end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["EXPORT"])._onClick()
+            assert(getPageAction(ns.L["EXPORT"])).onClick()
 
             assert.are.equal("exported_string", exportedWith)
         end)
@@ -272,7 +368,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             local printed
             ns.Print = function(msg) printed = msg end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["EXPORT"])._onClick()
+            assert(getPageAction(ns.L["EXPORT"])).onClick()
 
             assert.are.equal(string.format(ns.L["EXPORT_FAILED"], "codec broke"), printed)
         end)
@@ -282,7 +378,7 @@ describe("ProfileOptions getters/setters/defaults", function()
             local printed
             ns.Print = function(msg) printed = msg end
 
-            TestHelpers.FindButtonInitializer(initializers, ns.L["EXPORT"])._onClick()
+            assert(getPageAction(ns.L["EXPORT"])).onClick()
 
             assert.are.equal(string.format(ns.L["EXPORT_FAILED"], "Unknown error"), printed)
         end)
