@@ -23,7 +23,9 @@ Documented surface:
 - `page:GetId()`
 - `page:Refresh()`
 - `config.page` and `config.sections`
+- `config.defaultsConfirmation`
 - raw row tables in `rows = { ... }`
+- page defaults fields: `onDefault`, `onDefaultEnabled`, `hideDefaults`, and `defaultsConfirmText`
 
 The runtime returned by `LSB.New(...)` is intentionally narrow. Row helper constructors are not available on `lsb` instances, and deprecated transition namespaces like `LSBDeprecated` are not part of the documented public API.
 
@@ -53,12 +55,19 @@ Optional fields:
 
 - `store` — table or function returning the live store used by path-bound rows
 - `defaults` — table or function returning default values for path-bound rows
+- `defaultsConfirmation` — table of localized strings for page Defaults confirmations; required when page defaults are enabled by path-bound defaultable rows or `onDefault`
 - `getNestedValue`
 - `setNestedValue`
 - `page`
 - `sections`
 
 Returns an `lsb` runtime instance bound to one category tree.
+
+`defaultsConfirmation` fields:
+
+- `text` — confirmation prompt; `%s`, when present, is replaced with the lowercase page name
+- `button1` — accept button text
+- `button2` — decline button text
 
 ### `LSB:RegisterRowType(name, descriptor)`
 
@@ -82,6 +91,10 @@ Root page definition fields:
 - `name` (optional; defaults to the root name)
 - `onShow`
 - `onHide`
+- `onDefault`
+- `onDefaultEnabled`
+- `hideDefaults`
+- `defaultsConfirmText`
 - `disabled`
 - `hidden`
 - `order`
@@ -103,6 +116,10 @@ Page definition fields inside `pages`:
 - `rows`
 - `onShow`
 - `onHide`
+- `onDefault`
+- `onDefaultEnabled`
+- `hideDefaults`
+- `defaultsConfirmText`
 - `disabled`
 - `hidden`
 - `order`
@@ -117,6 +134,21 @@ Notes:
 - page-level `disabled` and `hidden` values propagate to child rows unless a row overrides them.
 
 Declarative root registration is the only supported page-construction API.
+
+### Page defaults behavior
+
+LibSettingsBuilder can override Blizzard's category **Defaults** button for a visible page.
+
+The button is active when the page has resettable path-bound rows or provides `onDefault`. Pages with resettable path-bound rows reset those rows to values from `config.defaults`; pages with `onDefault` run that callback instead.
+
+Page defaults fields:
+
+- `onDefault(ctx)` — custom reset callback for the page. When present, it replaces generic path-bound setting resets for that page.
+- `onDefaultEnabled(ctx)` — optional predicate for enabling the Defaults button. When omitted, the button is enabled.
+- `hideDefaults = true` — hides the category Defaults button while the page is visible. Use this for informational pages or pages where reset behavior does not apply.
+- `defaultsConfirmText` — page-specific confirmation prompt. If omitted, `config.defaultsConfirmation.text` is used. `%s`, when present, is replaced with the lowercase page name; prompts without `%s` are shown verbatim.
+
+`config.defaultsConfirmation` is required for pages that expose Defaults behavior through resettable path-bound rows or `onDefault`. Its `button1` and `button2` labels are shared by all page defaults confirmations for that runtime.
 
 ### Lookup and page operations
 

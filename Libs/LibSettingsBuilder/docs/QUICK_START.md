@@ -24,6 +24,11 @@ local lsb = LSB.New({
     name = "My Addon",
     store = MyAddonDB.profile,
     defaults = MyAddonDefaults.profile,
+    defaultsConfirmation = {
+        text = "Reset %s to defaults?",
+        button1 = "Reset",
+        button2 = "Don't reset",
+    },
     onChanged = function(ctx)
         MyAddon:Refresh()
     end,
@@ -71,6 +76,8 @@ local lsb = LSB.New({
 ```
 
 `name` and `onChanged` are required when you register a root page or section tree. `store` enables path mode; use handler mode when your values do not live in a dot-path table.
+
+Provide `defaultsConfirmation` when pages should expose Blizzard's category **Defaults** button for path-bound rows or custom `onDefault` reset logic. Pages can hide the button with `hideDefaults = true`, disable it with `onDefaultEnabled`, or override the prompt with `defaultsConfirmText`.
 
 Declarative pages can mix persisted controls and layout-only rows freely, so it is normal to combine `checkbox`, `slider`, `input`, `header`, `subheader`, `info`, `button`, `pageActions`, `list`, `sectionList`, and `canvas` entries on one page.
 

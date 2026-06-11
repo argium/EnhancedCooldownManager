@@ -276,7 +276,7 @@ describe("LibSettingsBuilder Builder", function()
     it("uses per-page defaultsConfirmText when provided", function()
         local button = createDefaultsButton()
         installDefaultsButton(button)
-        local getPopup, getPopupText = recordPopupAutoAccept()
+        local _, getPopupText = recordPopupAutoAccept()
 
         local sb = createBuilder({
             sections = {
