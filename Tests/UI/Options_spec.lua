@@ -181,6 +181,10 @@ describe("OptionUtil", function()
             assert.is_table(registeredPage)
             assert.are.equal(ns.L["ADDON_NAME"], registeredPage:GetId())
         end)
+
+        it("hides the defaults button", function()
+            assert.is_true(ns.AboutPage.hideDefaults)
+        end)
     end)
 
     describe("CreateModuleEnabledHandler", function()
@@ -519,13 +523,9 @@ describe("OptionUtil", function()
             assert.are.equal(profileCategory:GetID(), openedCategory)
         end)
 
-        it("confirms native page defaults before invoking the header reset", function()
+        it("does not override Defaults when the page has no reset behavior", function()
             local nativeResetCalls = 0
-            local popupKey
-            local popupText
-            local acceptText
-            local cancelText
-            local acceptFn
+            local popupShown = false
             local button = {
                 _script = function()
                     nativeResetCalls = nativeResetCalls + 1
@@ -548,27 +548,16 @@ describe("OptionUtil", function()
             rawset(SettingsPanel, "GetSettingsList", function()
                 return { Header = { DefaultsButton = button } }
             end)
-            ns.Addon.ShowConfirmDialog = function(_, key, text, button1, button2, onAccept)
-                popupKey = key
-                popupText = text
-                acceptText = button1
-                cancelText = button2
-                acceptFn = onAccept
+            ns.Addon.ShowConfirmDialog = function()
+                popupShown = true
             end
 
             SettingsPanel:SetCurrentCategory(generalCategory)
             SettingsPanel:DisplayCategory(generalCategory)
             button:GetScript("OnClick")(button)
 
-            assert.are.equal(0, nativeResetCalls)
-            assert.are.equal("ECM_CONFIRM_RESET_SETTINGS_PAGE", popupKey)
-            assert.are.equal("Are you sure you want to reset settings on this page?", popupText)
-            assert.are.equal("Reset General settings", acceptText)
-            assert.are.equal("Don't reset", cancelText)
-
-            acceptFn()
-
             assert.are.equal(1, nativeResetCalls)
+            assert.is_false(popupShown)
         end)
     end)
 end)

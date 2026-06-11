@@ -16,6 +16,11 @@ local LSB = LibStub("LibSettingsBuilder-1.0")
 
 ns.Settings = LSB:New({
     name = L["ADDON_NAME"],
+    defaultsConfirmation = {
+        text = L["RESET_PAGE_TO_DEFAULTS_CONFIRM"],
+        button1 = L["RESET"],
+        button2 = L["DONT_RESET"],
+    },
     store = function()
         return ns.Addon.db and ns.Addon.db.profile
     end,
@@ -26,9 +31,6 @@ ns.Settings = LSB:New({
         if ctx.spec.layout ~= false then
             ns.Runtime.ScheduleLayoutUpdate(0, "OptionsChanged")
         end
-    end,
-    defaultsConfirmation = function(pageName, onAccept)
-        ns.OptionUtil.ConfirmPageDefaultsReset(pageName, onAccept)
     end,
 })
 ns.SettingsBuilder = ns.Settings

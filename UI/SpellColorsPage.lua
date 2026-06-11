@@ -3,7 +3,6 @@
 -- Licensed under the GNU General Public License v3.0
 
 local _, ns = ...
-local C = ns.Constants
 local L = ns.L
 
 local REMOVE_STALE_SPELL_COLORS_POPUP = "ECM_CONFIRM_REMOVE_STALE_SPELL_COLORS"
@@ -29,7 +28,7 @@ end
 local function getScopeDefaultColor(scope)
     local defaults = ns.defaults and ns.defaults.profile and ns.defaults.profile[scope]
     local color = defaults and defaults.colors and defaults.colors.defaultColor
-    return color or C.BUFFBARS_DEFAULT_COLOR
+    return color or ns.Constants.BUFFBARS_DEFAULT_COLOR
 end
 
 ---@param entries { key: ECM_SpellColorKey }[]|nil
@@ -301,13 +300,6 @@ function SpellColorsPage:OnInitialize()
     addon:RegisterEvent("PLAYER_REGEN_ENABLED", combatRefreshCallback)
 end
 
----@param section table
-local function resetSpellColorSection(section)
-    local spellColors = getSpellColors(section.scope)
-    spellColors:ClearCurrentSpecColors()
-    spellColors:SetDefaultColor(getScopeDefaultColor(section.scope))
-end
-
 local function reconcileSpellColors()
     ns.Addon:ConfirmReloadUI(L["SPELL_COLORS_SECRET_NAMES_DESC"])
 end
@@ -428,6 +420,13 @@ local function canMaintainAnySpellColorSection()
         return not isSpellColorSectionInteractionDisabled(section)
             and getSectionSpellColorPageState(section).canReconcile
     end)
+end
+
+---@param section table
+local function resetSpellColorSection(section)
+    local spellColors = getSpellColors(section.scope)
+    spellColors:ClearCurrentSpecColors()
+    spellColors:SetDefaultColor(getScopeDefaultColor(section.scope))
 end
 
 ---@param refreshPage fun()

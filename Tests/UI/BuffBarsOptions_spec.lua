@@ -597,16 +597,19 @@ describe("BuffBarsOptions", function()
         assert.are.equal(ns.L["SPELL_COLORS_SECRET_NAMES_DESC"], confirmText)
     end)
 
-    it("shared reset clears all editable spell color sections", function()
-        local buffKey = SpellColors.MakeKey("Buff Keep", 111, 222, 333)
-        local externalKey = SpellColors.MakeKey("External Reset", 444, 555, 666)
-        local buffDefaultColor = { r = 0.2, g = 0.3, b = 0.4, a = 1 }
-        local buffResetDefaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR
-        local externalResetDefaultColor = ns.Constants.BUFFBARS_DEFAULT_COLOR
-        local externalCustomDefaultColor = { r = 0.9, g = 0.8, b = 0.7, a = 1 }
+    it("registers shared spell color defaults for the category Defaults button", function()
+        local spellColorsSpec = registerSpellColorsSpec()
 
-        BuffSpellColors:SetDefaultColor(buffDefaultColor)
-        ExternalSpellColors:SetDefaultColor(externalCustomDefaultColor)
+        assert.is_function(spellColorsSpec.onDefault)
+        assert.is_function(spellColorsSpec.onDefaultEnabled)
+    end)
+
+    it("shared spell color defaults reset all editable sections", function()
+        local buffKey = SpellColors.MakeKey("Buff Reset", 111, 222, 333)
+        local externalKey = SpellColors.MakeKey("External Reset", 444, 555, 666)
+
+        BuffSpellColors:SetDefaultColor({ r = 0.2, g = 0.3, b = 0.4, a = 1 })
+        ExternalSpellColors:SetDefaultColor({ r = 0.9, g = 0.8, b = 0.7, a = 1 })
         BuffSpellColors:SetColorByKey(buffKey, { r = 0.3, g = 0.4, b = 0.5, a = 1 })
         ExternalSpellColors:SetColorByKey(externalKey, { r = 0.6, g = 0.5, b = 0.4, a = 1 })
 
@@ -614,8 +617,8 @@ describe("BuffBarsOptions", function()
 
         spellColorsSpec.onDefault()
 
-        assert.are.same(buffResetDefaultColor, BuffSpellColors:GetDefaultColor())
-        assert.are.same(externalResetDefaultColor, ExternalSpellColors:GetDefaultColor())
+        assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, BuffSpellColors:GetDefaultColor())
+        assert.are.same(ns.Constants.BUFFBARS_DEFAULT_COLOR, ExternalSpellColors:GetDefaultColor())
         assert.is_nil(BuffSpellColors:GetColorByKey(buffKey))
         assert.is_nil(ExternalSpellColors:GetColorByKey(externalKey))
         assert.are.same({ ns.L["SPELL_COLORS_SUBCAT"] }, refreshCalls)
@@ -664,7 +667,6 @@ describe("BuffBarsOptions", function()
         local buffItems = getSpellColorCollectionItems(spellColorsSpec, "buffBars")
         local externalItems = getSpellColorCollectionItems(spellColorsSpec, "externalBars")
 
-        assert.is_true(spellColorsSpec.onDefaultEnabled())
         assert.is_false(buffHeader.disabled())
         assert.is_true(externalHeader.disabled())
         assert.is_true(buffItems[1].color.enabled())
@@ -802,7 +804,7 @@ describe("BuffBarsOptions", function()
         assert.is_false(actions[2].enabled())
     end)
 
-    it("header actions disable all three actions while spell color editing is locked", function()
+    it("header actions disable while spell color editing is locked", function()
         BuffSpellColors:SetColorByKey(SpellColors.MakeKey("Immolation Aura", 258920, nil, nil), {
             r = 0.2, g = 0.3, b = 0.4, a = 1,
         })
@@ -966,7 +968,6 @@ describe("BuffBarsOptions", function()
 
         actions[1].onClick()
         actions[2].onClick()
-        spellColorsSpec.onDefault()
 
         assert.is_nil(confirmText)
         assert.is_nil(popupKey)

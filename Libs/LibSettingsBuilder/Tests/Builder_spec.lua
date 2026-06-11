@@ -53,10 +53,75 @@ describe("LibSettingsBuilder Builder", function()
             defaults = function()
                 return defaults
             end,
+            defaultsConfirmation = {
+                text = "Localized reset %s?",
+                button1 = "Localized reset",
+                button2 = "Localized don't reset",
+            },
             onChanged = function() end,
             page = config and config.page or nil,
             sections = config and config.sections or nil,
         }), profile, defaults
+    end
+
+    local function createDefaultsButton()
+        return {
+            _enabled = true,
+            _script = function(self)
+                self._nativeResetCalls = (self._nativeResetCalls or 0) + 1
+            end,
+            GetScript = function(self)
+                return self._script
+            end,
+            IsEnabled = function(self)
+                return self._enabled
+            end,
+            SetEnabled = function(self, enabled)
+                self._enabled = enabled
+            end,
+            SetScript = function(self, _, script)
+                self._script = script
+            end,
+        }
+    end
+
+    local function installDefaultsButton(button)
+        local currentCategory
+        _G.hooksecurefunc = function(tbl, method, hook)
+            local original = tbl[method]
+            tbl[method] = function(...)
+                original(...)
+                hook(...)
+            end
+        end
+        rawset(SettingsPanel, "DisplayCategory", function(_, category)
+            currentCategory = category
+        end)
+        rawset(SettingsPanel, "GetCurrentCategory", function()
+            return currentCategory
+        end)
+        rawset(SettingsPanel, "GetSettingsList", function()
+            return { Header = { DefaultsButton = button } }
+        end)
+        rawset(SettingsPanel, "HookScript", function() end)
+    end
+
+    local function recordPopupAutoAccept()
+        local originalShow = StaticPopup_Show
+        local shown
+        local text
+        _G.StaticPopup_Show = function(name, text1, text2, data)
+            shown = name
+            text = text1
+            originalShow(name, text1, text2, data)
+        end
+        local function getShown()
+            return shown
+        end
+        local function getText()
+            return text
+        end
+        return getShown, getText
     end
 
     it("registers root and section pages through LSB.New", function()
@@ -118,6 +183,200 @@ describe("LibSettingsBuilder Builder", function()
 
         assert.is_true(cbs.hideDefaults)
         assert.is_nil(cbs.onDefault)
+    end)
+
+    it("binds custom page defaults into lifecycle callbacks", function()
+        local resetCalls = 0
+        local defaultEnabled = true
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "native",
+                            name = "Native",
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                        {
+                            key = "custom",
+                            name = "Custom",
+                            onDefault = function()
+                                resetCalls = resetCalls + 1
+                            end,
+                            onDefaultEnabled = function()
+                                return defaultEnabled
+                            end,
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+        local nativePage = assert(sb:GetPage("general", "native"))
+        local customPage = assert(sb:GetPage("general", "custom"))
+        local cbs = assert(lsb._pageLifecycleCallbacks[customPage._category])
+
+        assert.is_nil(lsb._pageLifecycleCallbacks[nativePage._category])
+        assert.are.equal("Custom", cbs.pageName)
+        assert.is_function(cbs.onDefault)
+        assert.is_true(cbs.onDefaultEnabled())
+
+        cbs.onDefault()
+
+        assert.are.equal(1, resetCalls)
+
+        defaultEnabled = false
+
+        assert.is_false(cbs.onDefaultEnabled())
+    end)
+
+    it("resets current page settings through a custom Defaults confirmation", function()
+        local button = createDefaultsButton()
+        installDefaultsButton(button)
+        local getPopup, getPopupText = recordPopupAutoAccept()
+
+        local sb, profile = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            name = "General Page",
+                            rows = {
+                                { type = "checkbox", path = "general.enabled", name = "Enabled" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = assert(sb:GetPage("general", "main"))
+        SettingsPanel:DisplayCategory(page._category)
+        button:GetScript("OnClick")(button)
+
+        assert.are.equal(0, button._nativeResetCalls or 0)
+        assert.are.equal("BS_LibSettingsBuilder_1_0_DefaultsConfirm", getPopup())
+        assert.are.equal("Localized reset general page?", getPopupText())
+        assert.are.equal("Localized reset", StaticPopupDialogs.BS_LibSettingsBuilder_1_0_DefaultsConfirm.button1)
+        assert.are.equal("Localized don't reset", StaticPopupDialogs.BS_LibSettingsBuilder_1_0_DefaultsConfirm.button2)
+        assert.is_false(profile.general.enabled)
+    end)
+
+    it("uses per-page defaultsConfirmText when provided", function()
+        local button = createDefaultsButton()
+        installDefaultsButton(button)
+        local getPopup, getPopupText = recordPopupAutoAccept()
+
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            defaultsConfirmText = "Custom confirm text",
+                            onDefault = function() end,
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = assert(sb:GetPage("general", "main"))
+        SettingsPanel:DisplayCategory(page._category)
+        button:GetScript("OnClick")(button)
+
+        assert.are.equal("Custom confirm text", getPopupText())
+    end)
+
+    it("runs custom page defaults instead of generic setting resets", function()
+        local resetCalls = 0
+        local button = createDefaultsButton()
+        installDefaultsButton(button)
+        recordPopupAutoAccept()
+
+        local sb, profile = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            onDefault = function()
+                                resetCalls = resetCalls + 1
+                            end,
+                            rows = {
+                                { type = "checkbox", path = "general.enabled", name = "Enabled" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = assert(sb:GetPage("general", "main"))
+        SettingsPanel:DisplayCategory(page._category)
+        button:GetScript("OnClick")(button)
+
+        assert.are.equal(1, resetCalls)
+        assert.is_true(profile.general.enabled)
+    end)
+
+    it("disables custom page defaults when the page predicate returns false", function()
+        local resetCalls = 0
+        local popupShown = false
+        local button = createDefaultsButton()
+        installDefaultsButton(button)
+        _G.StaticPopup_Show = function()
+            popupShown = true
+        end
+
+        local sb = createBuilder({
+            sections = {
+                {
+                    key = "general",
+                    name = "General",
+                    pages = {
+                        {
+                            key = "main",
+                            onDefault = function()
+                                resetCalls = resetCalls + 1
+                            end,
+                            onDefaultEnabled = function()
+                                return false
+                            end,
+                            rows = {
+                                { type = "info", name = "Version", value = "1.0" },
+                            },
+                        },
+                    },
+                },
+            },
+        })
+
+        local page = assert(sb:GetPage("general", "main"))
+        SettingsPanel:DisplayCategory(page._category)
+        button:GetScript("OnClick")(button)
+
+        assert.is_false(button:IsEnabled())
+        assert.is_false(popupShown)
+        assert.are.equal(0, resetCalls)
     end)
 
     it("returns nil for missing section-page lookups", function()

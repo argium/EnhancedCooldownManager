@@ -141,12 +141,18 @@ local deleteProfileRow, getDeleteProfile, resetDeleteProfile = createProfilePick
     otherProfilesGenerator
 )
 
+local function resetCurrentProfile()
+    ns.Addon.db:ResetProfile()
+    ns.Settings:GetPage("profile", "main"):Refresh()
+end
+
 ProfileOptions.key = "profile"
 ProfileOptions.name = L["PROFILES"]
 ProfileOptions.pages = {
     {
         key = "main",
-        hideDefaults = true,
+        onDefault = resetCurrentProfile,
+        defaultsConfirmText = L["RESET_PROFILE_TO_DEFAULTS_CONFIRM"],
         rows = {
     { type = "header", name = L["ACTIVE_PROFILE"] },
     {
@@ -167,7 +173,9 @@ ProfileOptions.pages = {
             return ns.Addon.db:GetCurrentProfile()
         end,
         set = function(value)
-            ns.Addon.db:SetProfile(value)
+            if value and value ~= "" then
+                ns.Addon.db:SetProfile(value)
+            end
         end,
         onSet = function(ctx)
             ctx.page:Refresh()
@@ -226,17 +234,6 @@ ProfileOptions.pages = {
                     ctx.page:Refresh()
                 end,
             })
-        end,
-    },
-    {
-        type = "button",
-        name = L["RESET_PROFILE_BUTTON"],
-        buttonText = L["RESET_PROFILE_BUTTON"],
-        tooltip = L["RESET_PROFILE_DESC"],
-        confirm = L["RESET_PROFILE_CONFIRM"],
-        onClick = function(ctx)
-            ns.Addon.db:ResetProfile()
-            ctx.page:Refresh()
         end,
     },
     {

@@ -425,4 +425,23 @@ describe("ItemStacksOptions settings page", function()
         assert.is_false(profile.extraIcons.itemStacks.byId.combatPotions.hideInInstances)
         assert.is_true(profile.extraIcons.itemStacks.byId.combatPotions.hideInRatedPvp)
     end)
+
+    it("exposes onDefault handler on the page table", function()
+        assert.is_function(page.onDefault)
+    end)
+
+    it("resets item stacks to defaults via onDefault", function()
+        ns.Addon.db.defaults = { profile = TestHelpers.deepClone(defaults) }
+        profile.extraIcons.itemStacks = TestHelpers.deepClone(defaults.extraIcons.itemStacks)
+
+        createStack("Custom Stack")
+        assert.is_not_nil(profile.extraIcons.itemStacks.byId[1])
+
+        page.onDefault()
+
+        assert.is_nil(profile.extraIcons.itemStacks.byId[1])
+        assert.is_not_nil(profile.extraIcons.itemStacks.byId.combatPotions)
+        assert.is_not_nil(profile.extraIcons.itemStacks.byId.healthPotions)
+        assert.is_not_nil(profile.extraIcons.itemStacks.byId.healthstones)
+    end)
 end)

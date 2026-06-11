@@ -950,7 +950,6 @@ ExtraIconsOptions.pages = {
                 footerSpacing = 4,
                 disabled = isDisabled,
                 sections = ExtraIconsOptions.BuildSections,
-                onDefault = ExtraIconsOptions.ResetToDefaults,
             },
         },
     },

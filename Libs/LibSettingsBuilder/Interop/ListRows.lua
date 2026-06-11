@@ -168,7 +168,8 @@ local function applyHeaderFrame(frame, data)
     ensureHeaderRowWidgets(frame)
     local settingsHeader = data.attachToCategoryHeader and getSettingsListHeader() or nil
     local actionParent = settingsHeader or frame
-    local rightAnchor = settingsHeader and settingsHeader.DefaultsButton or nil
+    local defaultsButton = settingsHeader and settingsHeader.DefaultsButton or nil
+    local rightAnchor = defaultsButton and defaultsButton:IsShown() and defaultsButton or nil
 
     if frame._lsbHeaderTitle then
         frame._lsbHeaderTitle:ClearAllPoints()
