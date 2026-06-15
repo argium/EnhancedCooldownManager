@@ -78,6 +78,7 @@ local constants = {
     SPELLID_DEVOURER_SOUL_FRAGMENTS = 1225789, -- tracks progress towards void meta form (50 soul fragments)
     SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT = 1245577, -- alternate aura for void meta soul fragments
     SPELLID_SOUL_GLUTTEN = 1247534, -- reduces the number of souls needed for void meta by 15
+    SPELLID_SURRENDER_TO_VOID = 1261423, -- PvP talent spell; adds 50 devourer soul fragments when active
     SPELLID_VOID_META = 1217607, -- void meta
 
     -- Buff bars

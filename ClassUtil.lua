@@ -78,12 +78,17 @@ local function getMaelstromWeaponMax()
     return C.RESOURCEBAR_MAELSTROM_WEAPON_MAX_BASE
 end
 
--- Gets the max devourer soul fragments needed for void meta form based on talents
 local function getDevourerSoulFragmentsMax()
+    local max = C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX
+
     if C_SpellBook.IsSpellKnown(C.SPELLID_SOUL_GLUTTEN) then
-        return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX - 15
+        max = max - 15
     end
-    return C.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX
+
+    if C_SpellBook.IsSpellKnown(C.SPELLID_SURRENDER_TO_VOID) then
+        max = max + 50
+    end
+    return max
 end
 
 local function getDevourerSoulFragmentsAura()

@@ -256,6 +256,48 @@ describe("ClassUtil", function()
             assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 2)
         end)
 
+        it("adds 50 to devourer max when Surrender to the Void is active", function()
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SURRENDER_TO_VOID, true)
+
+            assertValues(
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
+                (ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX + 50) / 5,
+                0
+            )
+        end)
+
+        it("does not add 50 when Surrender to the Void is selected but inactive", function()
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SURRENDER_TO_VOID, false)
+
+            assertValues(
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
+                ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5,
+                0
+            )
+        end)
+
+        it("adds 50 after Soul Glutten adjustment when both are active", function()
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SOUL_GLUTTEN, true)
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SURRENDER_TO_VOID, true)
+
+            assertValues(
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
+                (ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX - 15 + 50) / 5,
+                0
+            )
+        end)
+
+        it("does not add 50 after Soul Glutten adjustment when Surrender to the Void is inactive", function()
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SOUL_GLUTTEN, true)
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SURRENDER_TO_VOID, false)
+
+            assertValues(
+                ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL,
+                (ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX - 15) / 5,
+                0
+            )
+        end)
+
         it("returns devourer normal values from alternate void fragment aura", function()
             CUnitAurasStub.SetAura(ns.Constants.SPELLID_DEVOURER_SOUL_FRAGMENTS_ALT, { applications = 15 })
             assertValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL, ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, 3)
@@ -318,6 +360,13 @@ describe("ClassUtil", function()
         it("returns devourer normal max as safeMax", function()
             local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
             assert.are.equal(ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX / 5, safeMax)
+        end)
+
+        it("returns devourer normal safeMax with active Surrender to the Void bonus", function()
+            CSpellBookStub.SetSpellKnown(ns.Constants.SPELLID_SURRENDER_TO_VOID, true)
+
+            local _, _, safeMax = ns.ClassUtil.GetCurrentMaxResourceValues(ns.Constants.RESOURCEBAR_TYPE_DEVOURER_NORMAL)
+            assert.are.equal((ns.Constants.RESOURCEBAR_DEVOURER_SOUL_FRAGMENTS_MAX + 50) / 5, safeMax)
         end)
 
         it("returns devourer meta max as safeMax", function()
