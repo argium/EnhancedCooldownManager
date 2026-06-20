@@ -441,4 +441,92 @@ describe("RuneBar real source", function()
             assert.same(case.expected, frags[1].__color)
         end
     end)
+
+    it("reuses pooled cooldown-state tables across ticks instead of allocating", function()
+        local frags = {}
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
+            frags[i] = {
+                SetValue = function() end,
+                SetStatusBarColor = function() end,
+            }
+        end
+        RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+        RuneBar.InnerFrame.FragmentedBars = frags
+        RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.InnerFrame._lastReadySet = {}
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
+            -- Mark rune 1 as not-ready so the ready-set never changes between ticks,
+            -- keeping the lightweight value path active (no relayout request).
+            RuneBar.InnerFrame._lastReadySet[i] = i ~= 1
+        end
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 0.8, g = 0.1, b = 0.2 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        ns.Runtime.RequestRefresh = function() end
+        ns.Runtime.RequestLayout = function() end
+        _G.GetRuneCooldown = function(index)
+            if index == 1 then
+                return now - 5, 10, false
+            end
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        RuneBar:OnRunePowerUpdate()
+
+        RuneBar._valueTicker.callback()
+        local firstEntry = RuneBar.InnerFrame._cdLookup[1]
+        assert.is_not_nil(firstEntry)
+
+        now = now + 1
+        RuneBar._valueTicker.callback()
+        local secondEntry = RuneBar.InnerFrame._cdLookup[1]
+
+        -- Same table object is reused from the pool, proving no per-tick allocation.
+        assert.are.equal(firstEntry, secondEntry)
+    end)
+
+    it("stops the animation ticker when the bar becomes hidden", function()
+        local frags = {}
+        for i = 1, ns.Constants.RUNEBAR_MAX_RUNES do
+            frags[i] = {
+                SetValue = function() end,
+                SetStatusBarColor = function() end,
+            }
+        end
+        RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+        RuneBar.InnerFrame.FragmentedBars = frags
+        RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 0.8, g = 0.1, b = 0.2 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.04, texture = "Solid" }
+        end
+        ns.Runtime.RequestRefresh = function() end
+        _G.GetRuneCooldown = function(index)
+            if index == 1 then
+                return now - 5, 10, false
+            end
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        RuneBar:OnRunePowerUpdate()
+        assert.is_not_nil(RuneBar._valueTicker)
+
+        local ticker = RuneBar._valueTicker
+        RuneBar.InnerFrame:Hide()
+        ticker.callback()
+
+        assert.is_true(ticker.cancelled)
+        assert.is_nil(RuneBar._valueTicker)
+    end)
 end)

@@ -9,6 +9,7 @@
 ---@field _maxResources number|nil Maximum rune count.
 ---@field _readySet table|nil Per-frame ready state lookup (reused).
 ---@field _cdLookup table|nil Per-frame cooldown lookup (reused).
+---@field _cdPool table|nil Per-frame pool of reusable cooldown-state tables by rune index.
 ---@field _lastReadySet table|nil Snapshot of previous ready states.
 ---@field _lastBarWidth number|nil Cached bar width for change detection.
 ---@field _lastBarHeight number|nil Cached bar height for change detection.
@@ -46,7 +47,15 @@ local function getRuneCooldownState(index, now)
     return false, remaining, frac
 end
 
-local function buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+--- Rebuilds the ready/cooldown lookup tables for the current rune states.
+--- Cooldown entries are drawn from a per-frame pool keyed by rune index so the
+--- hot-path ticker performs no per-call allocation after warmup.
+---@param maxRunes number
+---@param now number
+---@param readySet table Reused ready-state set (wiped each call).
+---@param cdLookup table Reused cooldown lookup (wiped each call).
+---@param cdPool table Persistent pool of reusable cooldown-state tables by index.
+local function buildRuneStateTables(maxRunes, now, readySet, cdLookup, cdPool)
     wipe(readySet)
     wipe(cdLookup)
 
@@ -55,7 +64,14 @@ local function buildRuneStateTables(maxRunes, now, readySet, cdLookup)
         if isReady then
             readySet[i] = true
         else
-            cdLookup[i] = { remaining = remaining, frac = frac }
+            local entry = cdPool[i]
+            if not entry then
+                entry = {}
+                cdPool[i] = entry
+            end
+            entry.remaining = remaining
+            entry.frac = frac
+            cdLookup[i] = entry
         end
     end
 end
@@ -70,18 +86,26 @@ local function runeReadyStatesDiffer(lastReadySet, readySet, maxRunes)
 end
 
 local function applyRuneFragmentVisual(frag, isReady, cd, color)
+    local value, r, g, b
     if isReady then
-        frag:SetValue(1)
-        frag:SetStatusBarColor(color.r, color.g, color.b)
-        return
+        value = 1
+        r, g, b = color.r, color.g, color.b
+    else
+        value = cd and cd.frac or 0
+        r = color.r * C.RUNEBAR_CD_DIM_FACTOR
+        g = color.g * C.RUNEBAR_CD_DIM_FACTOR
+        b = color.b * C.RUNEBAR_CD_DIM_FACTOR
     end
 
-    frag:SetValue(cd and cd.frac or 0)
-    frag:SetStatusBarColor(
-        color.r * C.RUNEBAR_CD_DIM_FACTOR,
-        color.g * C.RUNEBAR_CD_DIM_FACTOR,
-        color.b * C.RUNEBAR_CD_DIM_FACTOR
-    )
+    if frag._lastValue ~= value then
+        frag:SetValue(value)
+        frag._lastValue = value
+    end
+
+    if frag._lastR ~= r or frag._lastG ~= g or frag._lastB ~= b then
+        frag:SetStatusBarColor(r, g, b)
+        frag._lastR, frag._lastG, frag._lastB = r, g, b
+    end
 end
 
 --- Creates or returns fragmented sub-bars for runes.
@@ -141,8 +165,9 @@ local function updateFragmentedRuneDisplay(bar, maxRunes, moduleConfig, globalCo
     -- Reuse per-bar tables to avoid per-call allocation
     bar._readySet = bar._readySet or {}
     bar._cdLookup = bar._cdLookup or {}
+    bar._cdPool = bar._cdPool or {}
     local readySet, cdLookup = bar._readySet, bar._cdLookup
-    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup, bar._cdPool)
 
     local statesChanged = (bar._lastReadySet == nil) or runeReadyStatesDiffer(bar._lastReadySet, readySet, maxRunes)
     local dimensionsChanged = (bar._lastBarWidth ~= barWidth) or (bar._lastBarHeight ~= barHeight)
@@ -247,8 +272,9 @@ local function updateRuneValues(self, frame)
 
     frame._readySet = frame._readySet or {}
     frame._cdLookup = frame._cdLookup or {}
+    frame._cdPool = frame._cdPool or {}
     local readySet, cdLookup = frame._readySet, frame._cdLookup
-    buildRuneStateTables(maxRunes, now, readySet, cdLookup)
+    buildRuneStateTables(maxRunes, now, readySet, cdLookup, frame._cdPool)
 
     -- Detect state transitions to trigger full reorder/reposition
     if runeReadyStatesDiffer(frame._lastReadySet, readySet, maxRunes) then
@@ -340,9 +366,13 @@ function RuneBar:_StartAnimationTicker()
         return
     end
     self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
-        if self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown() then
-            updateRuneValues(self, self.InnerFrame --[[@as RuneBarFrame]])
+        if not (self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown()) then
+            -- Bar is hidden or disabled: stop polling. Refresh restarts the ticker
+            -- when the bar becomes visible again with runes still cooling down.
+            self:_StopAnimationTicker()
+            return
         end
+        updateRuneValues(self, self.InnerFrame --[[@as RuneBarFrame]])
     end)
 end
 
