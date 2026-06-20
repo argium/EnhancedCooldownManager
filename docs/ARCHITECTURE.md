@@ -518,6 +518,7 @@ Shared settings-page builder for spell colors. BuffBars and ExternalBars both re
 |--------|-------------|
 | `GetResourceType(class, specIndex, shapeshiftForm)` | Return resource type enum for given spec |
 | `GetPlayerResourceType()` | Return resource type for current player |
+| `IsDeathKnight()` | Check if player is a Death Knight |
 | `GetCurrentMaxResourceValues(resourceType)` | Return `(max, current, safeMax)` for resource type |
 
 ### ColorUtil (`ns.ColorUtil`)
@@ -577,8 +578,7 @@ Top-level namespace utilities and addon methods available globally.
 |--------|-------------|
 | `ns.GetGlobalConfig()` | Return global config section from database |
 | `ns.IsDebugEnabled()` | Check if debug mode is enabled |
-| `ns.IsErrorLoggingEnabled()` | Check if targeted warning logging is enabled |
-| `ns.IsDeathKnight()` | Check if player is a Death Knight |
+| `ns.AreWarningsEnabled()` | Check if targeted warning logging is enabled |
 | `ns.ToString(v)` | Convert value to safe string (handles taint) |
 | `ns.CloneValue(value)` | Deep-clone a value |
 | `ns.Log(module, message, data)` | Log to debug chat and DevTool |
