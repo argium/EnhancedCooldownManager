@@ -1,4 +1,4 @@
-# Enhanced Cooldown Manager by Argium
+# Enhanced Cooldown Manager
 
 ECM enriches the built-in Cooldown Manager with new features, including power and resource bars, customisable per-spell aura bars, and extra spell and item icons. It's designed to be reminiscent of the pre-Midnight WeakAura HUDs, and it **looks and works great out of the box** while being **straightforward to customise**.
 
