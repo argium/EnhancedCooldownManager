@@ -11,9 +11,9 @@
 | **Source file** | [`Modules/RuneBar.lua`](../Modules/RuneBar.lua) |
 | **Mixin** | `BarMixin.AddBarMixin(self, "RuneBar")` → `BarMixin.BarProto` layered over `BarMixin.FrameProto`; `RuneBar` overrides `CreateFrame()`, `ShouldShow()`, and `Refresh()`. |
 | **Events listened to** | - `RUNE_POWER_UPDATE` — the only WoW event registered directly by `RuneBar`; starts the value ticker and requests a throttled refresh.<br/>- Shared layout pulses come from [`Runtime.lua`](../Runtime.lua), which calls `RuneBar:UpdateLayout(...)` on global lifecycle events rather than having `RuneBar` register them itself. |
-| **Dependencies** | - [`BarMixin.lua`](../BarMixin.lua) — shared frame/bar mixins, tick pools, Edit Mode frame registration.<br/>- [`Runtime.lua`](../Runtime.lua) — module registration, shared layout execution, shared fade/hidden state, refresh requests.<br/>- [`FrameUtil.lua`](../FrameUtil.lua) — texture lookup, pixel snapping, lazy frame setters used indirectly through layout helpers and directly for fragment sizing.<br/>- [`Constants.lua`](../Constants.lua) — `RUNEBAR_MAX_RUNES`, `RUNEBAR_CD_DIM_FACTOR`, Death Knight spec constants, chain order, shared timing defaults.<br/>- [`ECM.lua`](../ECM.lua) — `ns.IsDeathKnight()`, `ns.GetGlobalConfig()`, addon module lifecycle.<br/>- WoW APIs — `GetRuneCooldown()`, `GetSpecialization()`, `GetTime()`, `C_Timer.NewTicker()`, `CreateFrame()`. |
+| **Dependencies** | - [`BarMixin.lua`](../BarMixin.lua) — shared frame/bar mixins, tick pools, Edit Mode frame registration.<br/>- [`Runtime.lua`](../Runtime.lua) — module registration, shared layout execution, shared fade/hidden state, refresh requests.<br/>- [`FrameUtil.lua`](../FrameUtil.lua) — texture lookup, pixel snapping, lazy frame setters used indirectly through layout helpers and directly for fragment sizing.<br/>- [`Constants.lua`](../Constants.lua) — `RUNEBAR_MAX_RUNES`, `RUNEBAR_CD_DIM_FACTOR`, Death Knight spec constants, chain order, shared timing defaults.<br/>- [`ClassUtil.lua`](../ClassUtil.lua) — `ns.ClassUtil.IsDeathKnight()` for Death Knight class gating.<br/>- [`ECM.lua`](../ECM.lua) — `ns.GetGlobalConfig()`, addon module lifecycle.<br/>- WoW APIs — `GetRuneCooldown()`, `GetSpecialization()`, `GetTime()`, `C_Timer.NewTicker()`, `CreateFrame()`. |
 | **Options file(s)** | [`UI/RuneBarOptions.lua`](../UI/RuneBarOptions.lua) |
-| **Options dependencies** | - `ns.OptionUtil` — standard bar rows, module enable handler, disabled delegates.<br/>- `ns.Addon.db.profile.runeBar` — live config reads/writes for checkbox and color rows.<br/>- `ns.L` — localized labels/tooltips.<br/>- `ns.IsDeathKnight()` — DK-only gating for warning text and page disabled state.<br/>- [`UI/Options.lua`](../UI/Options.lua) / `LibSettingsBuilder-1.0` — consumes `ns.RuneBarOptions` as one section in the root settings tree. |
+| **Options dependencies** | - `ns.OptionUtil` — standard bar rows, module enable handler, disabled delegates.<br/>- `ns.Addon.db.profile.runeBar` — live config reads/writes for checkbox and color rows.<br/>- `ns.L` — localized labels/tooltips.<br/>- `ns.ClassUtil.IsDeathKnight()` — DK-only gating for warning text and page disabled state.<br/>- [`UI/Options.lua`](../UI/Options.lua) / `LibSettingsBuilder-1.0` — consumes `ns.RuneBarOptions` as one section in the root settings tree. |
 
 ## Actor diagram
 
@@ -132,8 +132,9 @@ StatusBar / ticks / throttled refresh"]
 
     subgraph DATA["Shared addon state"]
         ECM["`ECM.lua`
-`ns.IsDeathKnight()`
 `ns.GetGlobalConfig()`"]
+        ClassUtil["`ClassUtil.lua`
+`ns.ClassUtil.IsDeathKnight()`"]
         Constants["`Constants.lua`
 chain order / rune constants"]
         Defaults["`Defaults.lua`
@@ -172,6 +173,7 @@ layout order cache"]
 
     RuneBar -->|mixin methods| BarProto
     RuneBar -->|module/global config lookup| ECM
+    RuneBar -->|Death Knight class gating| ClassUtil
     RuneBar -->|rune count, dim factor, spec keys| Constants
     RuneBar -->|default persisted config| Defaults
     RuneBar -->|frame creation / texture / pixel snapping| FrameUtil
@@ -288,5 +290,5 @@ classDiagram
 ## Notes
 
 - `RuneBar` does **not** call into [`BarStyle.lua`](../BarStyle.lua); that shared styling namespace is for `BuffBars` / `ExternalBars`. RuneBar styling is bar-native through `BarMixin` + `FrameUtil`.
-- `ClassUtil.lua` and `ColorUtil.lua` do not participate directly in RuneBar runtime logic; RuneBar uses Death Knight class gating from [`ECM.lua`](../ECM.lua) and its own rune/spec color selection.
+- `ColorUtil.lua` does not participate directly in RuneBar runtime logic; RuneBar uses Death Knight class gating from [`ClassUtil.lua`](../ClassUtil.lua) (`ns.ClassUtil.IsDeathKnight()`) and its own rune/spec color selection.
 - Config in the class diagram is verified against [`Defaults.lua`](../Defaults.lua). Registered events are verified against explicit `RegisterEvent(...)` calls in [`Modules/RuneBar.lua`](../Modules/RuneBar.lua) and shared runtime registration in [`Runtime.lua`](../Runtime.lua).
