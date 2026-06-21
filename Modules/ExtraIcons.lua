@@ -9,6 +9,7 @@ local ExtraIcons = ns.Addon:NewModule("ExtraIcons")
 ns.Addon.ExtraIcons = ExtraIcons
 
 local BUILTIN_STACKS = ns.Constants.BUILTIN_STACKS
+local IGNORED_ITEMS = ns.Constants.EXTRA_ICON_IGNORED_ITEMS
 local RACIAL_SPELL_ALIASES = ns.Constants.RACIAL_SPELL_ALIASES
 local DEFAULT_SIZE = ns.Constants.DEFAULT_EXTRA_ICON_SIZE
 local MAIN_BORDER_SCALE = ns.Constants.EXTRA_ICON_MAIN_BORDER_SCALE
@@ -69,12 +70,14 @@ local function resolveFirstItem(ids, showIfMissing)
 
     for _, entry in ipairs(ids) do
         local itemId = entry.itemID or entry.itemId
-        if itemId and C_Item.GetItemCount(itemId) > 0 then
-            local texture = C_Item.GetItemIconByID(itemId)
-            if texture then return { itemId = itemId, texture = texture } end
-        elseif itemId and showIfMissing and not missingData then
-            local texture = C_Item.GetItemIconByID(itemId)
-            if texture then missingData = { itemId = itemId, texture = texture, missing = true } end
+        if itemId and not IGNORED_ITEMS[itemId] then
+            if C_Item.GetItemCount(itemId) > 0 then
+                local texture = C_Item.GetItemIconByID(itemId)
+                if texture then return { itemId = itemId, texture = texture } end
+            elseif showIfMissing and not missingData then
+                local texture = C_Item.GetItemIconByID(itemId)
+                if texture then missingData = { itemId = itemId, texture = texture, missing = true } end
+            end
         end
     end
 

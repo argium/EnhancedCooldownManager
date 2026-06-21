@@ -1212,6 +1212,34 @@ describe("ExtraIcons real source", function()
         assert.are.equal(DEMONIC_HEALTHSTONE_ID, ExtraIcons._viewers.utility.iconPool[1].itemId)
     end)
 
+    it("completely ignores items in the ignored item list", function()
+        local DRUMS_OF_RENEWED_BONDS_ID = 248583
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+
+        itemCounts[DRUMS_OF_RENEWED_BONDS_ID] = 1
+        itemIconsByID[DRUMS_OF_RENEWED_BONDS_ID] = "drums"
+        itemCounts[DEMONIC_HEALTHSTONE_ID] = 1
+        itemIconsByID[DEMONIC_HEALTHSTONE_ID] = "demonic-healthstone"
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({
+                { kind = "item", ids = { { itemID = DRUMS_OF_RENEWED_BONDS_ID } } },
+                { kind = "itemStack", itemStackId = "healthstones" },
+            })
+        end
+
+        assert.is_true(ExtraIcons:UpdateLayout("test"))
+        local vs = ExtraIcons._viewers.utility
+        assert.are.equal(DEMONIC_HEALTHSTONE_ID, vs.iconPool[1].itemId)
+        assert.is_nil(vs.iconPool[2])
+    end)
+
     it("resolves item stack entries through their priority list", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
         utilityIconChild.GetSpellID = function() return 1 end

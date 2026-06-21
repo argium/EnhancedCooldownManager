@@ -186,6 +186,12 @@ constants.BUILTIN_STACKS = {
 --- Default display order for builtin stack keys (matches default viewers.utility order).
 constants.BUILTIN_STACK_ORDER = { "trinket1", "trinket2" }
 
+--- Item IDs that are completely ignored as extra icons. An ignored item never
+--- resolves to an icon, even when added to a viewer or referenced by an item stack.
+constants.EXTRA_ICON_IGNORED_ITEMS = {
+    [248583] = true, -- Drums of Renewed Bonds
+}
+
 local dracthyrWingBuffetIds = { 357214, 368970 } -- Base and enhanced evoker variants.
 
 --- Racial ability lookup keyed by UnitRace("player") raceFileName.
