@@ -13,7 +13,6 @@ Authoritative source for repo-wide agent rules. Topic-specific docs own their ow
 | [Libs/LibSettingsBuilder/README.md](Libs/LibSettingsBuilder/README.md) | Settings builder API and schema |
 | [Libs/LibConsole/README.md](Libs/LibConsole/README.md) | Slash-command library |
 | [Libs/LibEvent/README.md](Libs/LibEvent/README.md) | Embeddable event system |
-| [Libs/LibLSMSettingsWidgets/README.md](Libs/LibLSMSettingsWidgets/README.md) | LSM picker templates |
 | [`.agents/prompts/default-refactor-cleanup.md`](.agents/prompts/default-refactor-cleanup.md) | Reusable prompt for applying the default implementation standard to future refactors |
 
 Keep `docs/ARCHITECTURE.md` current for addon-level design changes; each library's README owns its quick-start, API, and tests.
@@ -34,7 +33,6 @@ busted Tests
 busted --run libsettingsbuilder
 busted --run libconsole
 busted --run libevent
-busted --run liblsmsettingswidgets
 luacheck . -q
 ```
 

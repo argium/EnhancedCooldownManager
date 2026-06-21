@@ -148,7 +148,7 @@ describe("LibSettingsBuilder Core", function()
                                     min = 0,
                                     max = 10,
                                     step = 1,
-                                    formatValue = function(value)
+                                    formatter = function(value)
                                         return tostring(value)
                                     end,
                                 },

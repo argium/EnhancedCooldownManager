@@ -94,11 +94,6 @@ function schema.normalizeRow(sourceName, row)
     end
     spec.value = rowType == "button" and nil or spec.value
 
-    if rowType == "dropdown" and spec.scrollHeight == nil and spec.maxScrollDisplayHeight ~= nil then
-        spec.scrollHeight = spec.maxScrollDisplayHeight
-    end
-    spec.maxScrollDisplayHeight = nil
-
     if rowType == "info" and spec.values ~= nil then
         assert(spec.value == nil, sourceName .. ": info row '" .. schema.getRowLabel(spec) .. "' cannot define both value and values")
         assert(type(spec.values) == "table", sourceName .. ": info row '" .. schema.getRowLabel(spec) .. "' values must be a table")
@@ -106,16 +101,6 @@ function schema.normalizeRow(sourceName, row)
         spec.multiline = true
         spec.values = nil
     end
-
-    if rowType == "input" and spec.debounce == nil and spec.debounceMilliseconds ~= nil then
-        spec.debounce = spec.debounceMilliseconds / 1000
-    end
-    spec.debounceMilliseconds = nil
-
-    if rowType == "slider" and spec.formatter == nil and spec.formatValue ~= nil then
-        spec.formatter = spec.formatValue
-    end
-    spec.formatValue = nil
 
     spec.id = row.id
     spec.disabled = schema.normalizePredicate(spec.disabled)

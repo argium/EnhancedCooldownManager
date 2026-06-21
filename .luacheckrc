@@ -31,8 +31,6 @@ files = {
 }
 
 globals = {
-    "LibLSMSettingsWidgets_FontPickerMixin",
-    "LibLSMSettingsWidgets_TexturePickerMixin",
     "SlashCmdList",
     "hash_SlashCmdList",
     "StaticPopupDialogs",

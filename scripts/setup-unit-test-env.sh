@@ -94,7 +94,6 @@ After sandboxing, run:
   busted --run libsettingsbuilder
   busted --run libconsole
   busted --run libevent
-  busted --run liblsmsettingswidgets
   luacheck . -q
 
 EOF

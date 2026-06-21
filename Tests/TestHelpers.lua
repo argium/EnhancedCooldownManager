@@ -1778,6 +1778,7 @@ local LIB_SETTINGS_BUILDER_SOURCE_FILES = {
     "Libs/LibSettingsBuilder/Builders/LayoutRows.lua",
     "Libs/LibSettingsBuilder/Builders/Collections.lua",
     "Libs/LibSettingsBuilder/Registry/Runtime.lua",
+    "Libs/LibSettingsBuilder/Interop/MediaRows.lua",
 }
 
 function TestHelpers.LoadLibSettingsBuilder()
@@ -1786,18 +1787,18 @@ function TestHelpers.LoadLibSettingsBuilder()
     end
 end
 
---- Load LibSettingsBuilder and register the shared LibLSMSettingsWidgets test stub.
+--- Load LibSettingsBuilder and register shared media row test stubs.
 function TestHelpers.SetupLibSettingsBuilder()
     TestHelpers.LoadLibSettingsBuilder()
 
-    local lsmw = LibStub:NewLibrary("LibLSMSettingsWidgets-1.0", 1) or LibStub("LibLSMSettingsWidgets-1.0")
-    lsmw.GetFontValues = function()
+    local mediaRows = {}
+    mediaRows.GetFontValues = function()
         return { Expressway = "Expressway" }
     end
-    lsmw.GetStatusbarValues = function()
+    mediaRows.GetStatusbarValues = function()
         return { Solid = "Solid" }
     end
-    lsmw.Register = function(lsb)
+    mediaRows.Register = function(lsb)
         lsb:RegisterRowType("font", {
             applyFrame = function() end,
         })
@@ -1805,9 +1806,9 @@ function TestHelpers.SetupLibSettingsBuilder()
             applyFrame = function() end,
         })
     end
-    lsmw.Register(LibStub("LibSettingsBuilder-1.0"))
+    mediaRows.Register(LibStub("LibSettingsBuilder-1.0"))
 
-    return lsmw
+    return mediaRows
 end
 
 --- Load LibSettingsBuilder + Options.lua and return the SB and ns.

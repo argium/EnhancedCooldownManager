@@ -569,9 +569,6 @@ describe("LibSettingsBuilder Builder", function()
                                     {
                                         type = "fontOverride",
                                         path = "",
-                                        fontValues = {
-                                            ["Fallback Font"] = "Fallback Font",
-                                        },
                                     },
                                 },
                             },

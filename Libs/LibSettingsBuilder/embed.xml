@@ -12,4 +12,5 @@
     <Script file="Builders/LayoutRows.lua"/>
     <Script file="Builders/Collections.lua"/>
     <Script file="Registry/Runtime.lua"/>
+    <Script file="Interop/MediaRows.lua"/>
 </Ui>

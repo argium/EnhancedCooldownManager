@@ -32,9 +32,6 @@ The runtime returned by `LSB.New(...)` is intentionally narrow. Row helper const
 The declarative loader still normalizes a small compatibility subset of older field names:
 
 - `button.value` → `buttonText`
-- `slider.formatValue` → `formatter`
-- `dropdown.maxScrollDisplayHeight` → `scrollHeight`
-- `input.debounceMilliseconds` → `debounce` (seconds)
 - `info.values` → newline-joined `value` plus `multiline = true`
 
 Removed fields such as `desc`, `condition`, `parent`, and `parentCheck` error at registration time.
@@ -207,8 +204,6 @@ Additional fields:
 
 Dropdown values are emitted in deterministic order to keep menus stable between sessions.
 
-`maxScrollDisplayHeight` is still normalized to `scrollHeight` for compatibility.
-
 ### `color` row
 
 Reads and writes `{ r, g, b, a }` tables through a hex proxy value.
@@ -231,8 +226,6 @@ Notes:
 - the edit box writes through the same proxy-setting pipeline as the other built-in controls,
 - `resolveText` enables an optional preview line below the edit box,
 - `debounce` delays preview recomputation through `C_Timer.NewTimer`.
-
-`debounceMilliseconds` is still normalized to `debounce / 1000` for compatibility.
 
 ### `button` row
 

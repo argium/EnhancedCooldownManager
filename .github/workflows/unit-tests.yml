@@ -39,7 +39,6 @@ jobs:
                   busted -c --run libsettingsbuilder --output=junit > test-results/lsb-junit.xml
                   busted -c --run libconsole --output=junit > test-results/libconsole-junit.xml
                   busted -c --run libevent --output=junit > test-results/libevent-junit.xml
-                  busted -c --run liblsmsettingswidgets --output=junit > test-results/liblsm-junit.xml
                   luacov
                   luacov --config .luacov-html
                   mv luacov.report.out test-results/luacov.report.out
@@ -70,4 +69,3 @@ jobs:
                       test-results/lsb-junit.xml
                       test-results/libconsole-junit.xml
                       test-results/libevent-junit.xml
-                      test-results/liblsm-junit.xml

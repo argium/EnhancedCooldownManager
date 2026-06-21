@@ -8,7 +8,6 @@ return {
         "^Modules/",
         "^UI/",
         "^Libs/LibSettingsBuilder/",
-        "^Libs/LibLSMSettingsWidgets/",
     },
     exclude = {
         "^Tests/",

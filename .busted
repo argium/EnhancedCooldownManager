@@ -14,7 +14,4 @@ return {
     libevent = {
         ROOT = { "Libs/LibEvent/Tests" },
     },
-    liblsmsettingswidgets = {
-        ROOT = { "Libs/LibLSMSettingsWidgets/Tests" },
-    },
 }

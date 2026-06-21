@@ -130,7 +130,7 @@ describe("BuffBarsOptions", function()
         end
 
         -- Load library
-        local lsmw = LibStub("LibLSMSettingsWidgets-1.0", true) or TestHelpers.SetupLibSettingsBuilder()
+        local lsmw = TestHelpers.SetupLibSettingsBuilder()
         lsmw.GetFontValues = function()
             return {}
         end

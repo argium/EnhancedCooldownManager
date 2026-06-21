@@ -2,13 +2,12 @@
 -- Author: Argium
 -- Licensed under the GNU General Public License v3.0
 
--- LibLSMSettingsWidgets: LibSharedMedia picker widgets for LibSettingsBuilder rows.
-
-local MAJOR, MINOR = "LibLSMSettingsWidgets-1.0", 3
-local lib = LibStub:NewLibrary(MAJOR, MINOR)
+local MAJOR = "LibSettingsBuilder-1.0"
+local lib = LibStub(MAJOR, true)
 if not lib then return end
 
-local LSM = LibStub("LibSharedMedia-3.0")
+local LSM = LibStub("LibSharedMedia-3.0", true)
+if not LSM then return end
 
 local FONT_PREVIEW_TEXT = "AaBbCcDd 1234"
 local mediaCache = {}
@@ -16,8 +15,6 @@ local mediaCache = {}
 local function invalidateMediaCache()
     wipe(mediaCache)
 end
-
-LSM:RegisterCallback("LibSharedMedia_Registered", invalidateMediaCache)
 
 local function getSortedMediaNames(mediaType, fallback)
     local cached = mediaCache[mediaType]
@@ -39,30 +36,10 @@ local function getSortedMediaNames(mediaType, fallback)
     return sorted
 end
 
-local function getMediaValues(mediaType, fallback)
-    local values = {}
-    for _, name in ipairs(getSortedMediaNames(mediaType, fallback)) do
-        values[name] = name
-    end
-    return values
-end
-
-function lib.GetFontValues()
-    return getMediaValues("font", "Expressway")
-end
-
-function lib.GetStatusbarValues()
-    return getMediaValues("statusbar", "Blizzard")
-end
-
-local function createDropDown(frame)
+local function createDropdown(frame)
     local host = CreateFrame("Frame", nil, frame, "SettingsDropdownWithButtonsTemplate")
-    if host.DecrementButton then
-        host.DecrementButton:Hide()
-    end
-    if host.IncrementButton then
-        host.IncrementButton:Hide()
-    end
+    host.DecrementButton:Hide()
+    host.IncrementButton:Hide()
 
     local dropdown = host.Dropdown or host
     dropdown:SetWidth(200)
@@ -70,11 +47,11 @@ local function createDropDown(frame)
 end
 
 local function ensurePicker(frame, kind)
-    local picker = frame._lsmwPicker
+    local picker = frame._lsbMediaPicker
     if not picker then
-        local host, dropdown = createDropDown(frame)
+        local host, dropdown = createDropdown(frame)
         picker = { host = host, dropdown = dropdown }
-        frame._lsmwPicker = picker
+        frame._lsbMediaPicker = picker
     end
 
     if picker.kind ~= kind then
@@ -100,7 +77,7 @@ local function ensurePicker(frame, kind)
 end
 
 local function setPickerEnabled(frame, enabled)
-    local picker = frame._lsmwPicker
+    local picker = frame._lsbMediaPicker
     if not picker then return end
 
     picker.dropdown:SetEnabled(enabled)
@@ -111,12 +88,12 @@ local function setPickerEnabled(frame, enabled)
 end
 
 local function configurePickerInitializer(initializer)
-    if initializer._lsmwHasEnabledBridge then return end
+    if initializer._lsbMediaPickerEnabledBridge then return end
 
-    initializer._lsmwEnabled = true
-    initializer._lsmwHasEnabledBridge = true
+    initializer._lsbMediaPickerEnabled = true
+    initializer._lsbMediaPickerEnabledBridge = true
     initializer.SetEnabled = function(controlInitializer, enabled)
-        controlInitializer._lsmwEnabled = enabled
+        controlInitializer._lsbMediaPickerEnabled = enabled
         local frame = controlInitializer._lsbActiveFrame
         if frame and (not frame._lsbInitializer or frame._lsbInitializer == controlInitializer) then
             setPickerEnabled(frame, enabled)
@@ -134,11 +111,7 @@ local function anchorPicker(frame, picker)
     end
 
     picker.host:ClearAllPoints()
-    if frame.Text then
-        picker.host:SetPoint("LEFT", frame.Text, "RIGHT", 10, 0)
-    else
-        picker.host:SetPoint("LEFT", frame, "CENTER", -80, 0)
-    end
+    picker.host:SetPoint("LEFT", frame.Text or frame, frame.Text and "RIGHT" or "CENTER", frame.Text and 10 or -80, 0)
     picker.host:Show()
 
     picker.preview:ClearAllPoints()
@@ -149,16 +122,11 @@ end
 
 local function updateDropdownText(picker, setting, mediaType)
     local currentName = setting and setting.GetValue and setting:GetValue() or nil
-
     if picker.dropdown.OverrideText then
         picker.dropdown:OverrideText(currentName or "")
     end
 
-    if not currentName then
-        return nil, nil
-    end
-
-    return currentName, LSM:Fetch(mediaType, currentName)
+    return currentName, currentName and LSM:Fetch(mediaType, currentName) or nil
 end
 
 local function updateFontPreview(picker, setting)
@@ -178,8 +146,6 @@ local function updateTexturePreview(picker, setting)
 end
 
 local function setupMediaDropdown(frame, picker, setting, mediaType, fallback, updatePreview)
-    if not setting then return end
-
     picker.dropdown:SetupMenu(function(_, rootDescription)
         rootDescription:SetScrollMode(200)
 
@@ -203,8 +169,6 @@ local function applyPickerRow(frame, data, initializer, kind, mediaType, fallbac
 
     local picker = ensurePicker(frame, kind)
     local setting = data.setting
-
-    frame._lsmwPickerSetting = setting
     if frame.Text then
         frame.Text:SetText(data.name or "")
     end
@@ -212,48 +176,36 @@ local function applyPickerRow(frame, data, initializer, kind, mediaType, fallbac
     anchorPicker(frame, picker)
     setupMediaDropdown(frame, picker, setting, mediaType, fallback, updatePreview)
     updatePreview(picker, setting)
-    setPickerEnabled(frame, initializer._lsmwEnabled ~= false)
+    setPickerEnabled(frame, initializer._lsbMediaPickerEnabled ~= false)
 end
 
-function lib.ApplyFontPickerRow(frame, data, initializer)
-    applyPickerRow(frame, data, initializer, "font", "font", "Expressway", updateFontPreview)
-end
-
-function lib.ApplyTexturePickerRow(frame, data, initializer)
-    applyPickerRow(frame, data, initializer, "texture", "statusbar", "Blizzard", updateTexturePreview)
-end
-
-function lib.ResetPickerRow(frame)
-    local picker = frame._lsmwPicker
+local function resetPickerRow(frame)
+    local picker = frame._lsbMediaPicker
     if not picker then return end
 
     picker.host:Hide()
-    if picker.fontPreview then
-        picker.fontPreview:Hide()
-    end
-    if picker.texturePreview then
-        picker.texturePreview:Hide()
-    end
-    frame._lsmwPickerSetting = nil
+    if picker.fontPreview then picker.fontPreview:Hide() end
+    if picker.texturePreview then picker.texturePreview:Hide() end
 end
 
-function lib.Register(settingsBuilder)
-    if not settingsBuilder or not settingsBuilder.RegisterRowType then return end
+LSM:RegisterCallback("LibSharedMedia_Registered", invalidateMediaCache)
 
-    settingsBuilder:RegisterRowType("font", {
-        varType = "string",
-        defaultValue = "",
-        extent = 26,
-        applyFrame = lib.ApplyFontPickerRow,
-        resetFrame = lib.ResetPickerRow,
-    })
-    settingsBuilder:RegisterRowType("texture", {
-        varType = "string",
-        defaultValue = "",
-        extent = 26,
-        applyFrame = lib.ApplyTexturePickerRow,
-        resetFrame = lib.ResetPickerRow,
-    })
-end
+lib:RegisterRowType("font", {
+    varType = "string",
+    defaultValue = "",
+    extent = 26,
+    applyFrame = function(frame, data, initializer)
+        applyPickerRow(frame, data, initializer, "font", "font", "Expressway", updateFontPreview)
+    end,
+    resetFrame = resetPickerRow,
+})
 
-lib.Register(LibStub("LibSettingsBuilder-1.0", true))
+lib:RegisterRowType("texture", {
+    varType = "string",
+    defaultValue = "",
+    extent = 26,
+    applyFrame = function(frame, data, initializer)
+        applyPickerRow(frame, data, initializer, "texture", "statusbar", "Blizzard", updateTexturePreview)
+    end,
+    resetFrame = resetPickerRow,
+})
