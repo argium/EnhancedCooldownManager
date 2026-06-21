@@ -360,6 +360,24 @@ function RuneBar:Refresh(why, force)
     return true
 end
 
+--- Restarts the animation ticker after a layout pass re-shows the bar.
+--- The base layout re-shows the frame in ApplyFramePosition, but its trailing
+--- ThrottledRefresh can suppress Refresh() (and the ticker restart it performs)
+--- when it lands within updateFrequency, leaving a still-cooling bar frozen.
+--- Restarting here ensures visibility changes always resume polling.
+function RuneBar:UpdateLayout(why)
+    if not ns.BarMixin.FrameProto.UpdateLayout(self, why) then
+        return false
+    end
+
+    local frame = self.InnerFrame
+    if frame and frame._cdLookup and next(frame._cdLookup) ~= nil then
+        self:_StartAnimationTicker()
+    end
+
+    return true
+end
+
 --- Starts the cooldown animation ticker if not already running.
 function RuneBar:_StartAnimationTicker()
     if self._valueTicker then
@@ -367,8 +385,8 @@ function RuneBar:_StartAnimationTicker()
     end
     self._valueTicker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
         if not (self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown()) then
-            -- Bar is hidden or disabled: stop polling. Refresh restarts the ticker
-            -- when the bar becomes visible again with runes still cooling down.
+            -- Bar is hidden or disabled: stop polling. UpdateLayout restarts the
+            -- ticker when the bar becomes visible again with runes still cooling down.
             self:_StopAnimationTicker()
             return
         end

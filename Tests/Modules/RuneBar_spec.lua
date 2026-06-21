@@ -17,6 +17,7 @@ describe("RuneBar real source", function()
     local makeFrame = TestHelpers.makeFrame
     local createFrameCalls
     local frameRefreshResult
+    local throttleRefresh
     local now
 
     setup(function()
@@ -43,6 +44,7 @@ describe("RuneBar real source", function()
         unregisterFrameCalls = 0
         createFrameCalls = 0
         frameRefreshResult = true
+        throttleRefresh = false
         now = 100
 
         ns = {
@@ -53,6 +55,23 @@ describe("RuneBar real source", function()
                     end,
                     Refresh = function()
                         return frameRefreshResult
+                    end,
+                    UpdateLayout = function(self, why)
+                        if not ns.BarMixin.FrameProto.ShouldShow(self) then
+                            if self.InnerFrame then
+                                self.InnerFrame:Hide()
+                            end
+                            return false
+                        end
+                        -- Mirror ApplyFramePosition: re-show the frame on layout.
+                        if self.InnerFrame then
+                            self.InnerFrame:Show()
+                        end
+                        -- Mirror ThrottledRefresh: Refresh() may be suppressed.
+                        if not throttleRefresh then
+                            ns.BarMixin.FrameProto.Refresh(self, why)
+                        end
+                        return true
                     end,
                     CreateFrame = function(self)
                         local frame = makeFrame({ name = self.Name, shown = true, width = 300, height = 20 })
@@ -528,5 +547,46 @@ describe("RuneBar real source", function()
 
         assert.is_true(ticker.cancelled)
         assert.is_nil(RuneBar._valueTicker)
+    end)
+
+    it("restarts the animation ticker on layout when a hidden bar is shown with runes cooling", function()
+        RuneBar.InnerFrame = makeFrame({ shown = true, width = 300, height = 20 })
+        RuneBar.InnerFrame._maxResources = ns.Constants.RUNEBAR_MAX_RUNES
+        -- Simulate a prior layout pass leaving rune 1 mid-cooldown.
+        RuneBar.InnerFrame._cdLookup = { [1] = { remaining = 5, frac = 0.5 } }
+        RuneBar.GetModuleConfig = function()
+            return { useSpecColor = false, color = { r = 0.8, g = 0.1, b = 0.2 }, texture = "Solid" }
+        end
+        RuneBar.GetGlobalConfig = function()
+            return { updateFrequency = 0.5, texture = "Solid" }
+        end
+        ns.Runtime.RequestRefresh = function() end
+        _G.GetRuneCooldown = function(index)
+            if index == 1 then
+                return now - 5, 10, false
+            end
+            return 0, 0, true
+        end
+        isDeathKnight = true
+
+        RuneBar:OnInitialize()
+        RuneBar:OnEnable()
+        RuneBar:OnRunePowerUpdate()
+        assert.is_not_nil(RuneBar._valueTicker)
+
+        -- Shared visibility hides the bar; the running ticker self-cancels.
+        local ticker = RuneBar._valueTicker
+        RuneBar.InnerFrame:Hide()
+        ticker.callback()
+        assert.is_true(ticker.cancelled)
+        assert.is_nil(RuneBar._valueTicker)
+
+        -- Bar becomes visible again, but ThrottledRefresh suppresses Refresh().
+        throttleRefresh = true
+        RuneBar.InnerFrame:Show()
+        assert.is_true(RuneBar:UpdateLayout("SetHidden"))
+
+        -- The ticker must resume even though Refresh() never ran.
+        assert.is_not_nil(RuneBar._valueTicker)
     end)
 end)
