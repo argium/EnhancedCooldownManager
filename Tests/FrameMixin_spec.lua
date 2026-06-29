@@ -605,6 +605,41 @@ describe("FrameMixin real source", function()
         )
     end)
 
+    it("UpdateLayout reuses layout params and anchors across repeated passes", function()
+        local globalConfig = {
+            barHeight = 20,
+            barWidth = 180,
+            barBgColor = color(0, 0, 0, 0.5),
+            moduleGrowDirection = ns.Constants.GROW_DIRECTION_DOWN,
+            offsetY = 4,
+            updateFrequency = 0,
+        }
+        local moduleConfig = {
+            enabled = true,
+            anchorMode = ns.Constants.ANCHORMODE_CHAIN,
+            bgColor = color(0, 0, 0, 0.5),
+        }
+        ns.Addon.GetECMModule = function()
+            return nil
+        end
+
+        local mod = makeFreeModeModule(ns.Constants.CHAIN_ORDER[1], globalConfig, moduleConfig)
+
+        assert.is_true(mod:UpdateLayout("initial"))
+        local layoutParams = mod._layoutParams
+        local layoutAnchors = mod._layoutAnchors
+        local leftAnchor = layoutAnchors[1]
+        local rightAnchor = layoutAnchors[2]
+
+        assert.is_true(mod:UpdateLayout("repeat"))
+
+        assert.are.equal(layoutParams, mod._layoutParams)
+        assert.are.equal(layoutAnchors, mod._layoutAnchors)
+        assert.are.equal(leftAnchor, mod._layoutAnchors[1])
+        assert.are.equal(rightAnchor, mod._layoutAnchors[2])
+        assert.are.equal(2, mod.InnerFrame:GetNumPoints())
+    end)
+
     it("AddMixin skips Edit Mode registration when the module opts out", function()
         local registerCalls = 0
         local mod = {
