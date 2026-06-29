@@ -318,6 +318,7 @@ function FrameProto.NormalizeGrowDirection(direction)
 end
 
 ---@param self FrameProto
+---@param params table reused output table populated with layout parameters
 ---@param globalConfig table
 ---@param moduleConfig table
 ---@param mode string
