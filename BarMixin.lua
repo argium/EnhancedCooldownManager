@@ -318,11 +318,12 @@ function FrameProto.NormalizeGrowDirection(direction)
 end
 
 ---@param self FrameProto
+---@param params table reused output table populated with layout parameters
 ---@param globalConfig table
 ---@param moduleConfig table
 ---@param mode string
 ---@return table
-local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
+local function getStackedLayoutParams(self, params, globalConfig, moduleConfig, mode)
     local isDetached = mode == C.ANCHORMODE_DETACHED
     if not isDetached then
         mode = C.ANCHORMODE_CHAIN
@@ -346,16 +347,44 @@ local function getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
     local flippedPoint = growsUp and "TOPLEFT" or "BOTTOMLEFT"
     local anchorRelativePoint = (isDetached and isFirst) and anchorPoint or flippedPoint
 
-    return {
-        mode = mode,
-        anchor = anchor,
-        isFirst = isFirst,
-        anchorPoint = anchorPoint,
-        anchorRelativePoint = anchorRelativePoint,
-        offsetX = 0,
-        offsetY = growsUp and gap or -gap,
-        height = moduleConfig.height or globalConfig.barHeight,
-    }
+    params.mode = mode
+    params.anchor = anchor
+    params.isFirst = isFirst
+    params.anchorPoint = anchorPoint
+    params.anchorRelativePoint = anchorRelativePoint
+    params.offsetX = 0
+    params.offsetY = growsUp and gap or -gap
+    params.height = moduleConfig.height or globalConfig.barHeight
+    params.width = nil
+    return params
+end
+
+---@param self FrameProto
+---@return table
+local function getLayoutParams(self)
+    self._layoutParams = self._layoutParams or {}
+    return self._layoutParams
+end
+
+---@param anchors table[]
+---@param index number
+---@param point string
+---@param anchor Frame
+---@param relativePoint string
+---@param offsetX number|nil
+---@param offsetY number|nil
+local function setAnchorSpec(anchors, index, point, anchor, relativePoint, offsetX, offsetY)
+    local spec = anchors[index]
+    if not spec then
+        spec = {}
+        anchors[index] = spec
+    end
+
+    spec[1] = point
+    spec[2] = anchor
+    spec[3] = relativePoint
+    spec[4] = offsetX
+    spec[5] = offsetY
 end
 
 --- Default layout parameter calculation for chain/detached/free anchor modes.
@@ -365,22 +394,22 @@ function FrameProto:CalculateLayoutParams()
     local globalConfig = assert(self:GetGlobalConfig(), "global config required")
     local moduleConfig = assert(self:GetModuleConfig(), "module config required")
     local mode = moduleConfig.anchorMode or C.ANCHORMODE_CHAIN
+    local params = getLayoutParams(self)
     if mode == C.ANCHORMODE_FREE then
         local pos = EditMode.GetPosition(moduleConfig and moduleConfig.editModePositions)
-        return {
-            mode = C.ANCHORMODE_FREE,
-            anchor = UIParent,
-            isFirst = false,
-            anchorPoint = pos.point,
-            anchorRelativePoint = pos.point,
-            offsetX = pos.x,
-            offsetY = pos.y,
-            height = moduleConfig.height or globalConfig.barHeight,
-            width = moduleConfig.width or globalConfig.barWidth,
-        }
+        params.mode = C.ANCHORMODE_FREE
+        params.anchor = UIParent
+        params.isFirst = false
+        params.anchorPoint = pos.point
+        params.anchorRelativePoint = pos.point
+        params.offsetX = pos.x
+        params.offsetY = pos.y
+        params.height = moduleConfig.height or globalConfig.barHeight
+        params.width = moduleConfig.width or globalConfig.barWidth
+        return params
     end
 
-    return getStackedLayoutParams(self, globalConfig, moduleConfig, mode)
+    return getStackedLayoutParams(self, params, globalConfig, moduleConfig, mode)
 end
 
 --- Applies positioning to a frame based on layout parameters.
@@ -401,21 +430,27 @@ function FrameProto:ApplyFramePosition()
 
     local params = self:CalculateLayoutParams()
     local anchorCount = params.mode == C.ANCHORMODE_FREE and 1 or 2
-    local anchors = {}
+    self._layoutAnchors = self._layoutAnchors or {}
+    local anchors = self._layoutAnchors
     if params.mode == C.ANCHORMODE_FREE then
         assert(params.anchor ~= nil, "anchor required for free anchor mode")
     end
 
     local lp = params.anchorPoint or "TOPLEFT"
     local lr = params.anchorRelativePoint or "BOTTOMLEFT"
-    for i = 1, anchorCount do
-        anchors[i] = {
-            i == 1 and lp or self.ChainRightPoint(lp, "TOPRIGHT"),
+    setAnchorSpec(anchors, 1, lp, params.anchor, lr, params.offsetX, params.offsetY)
+    if anchorCount == 2 then
+        setAnchorSpec(
+            anchors,
+            2,
+            self.ChainRightPoint(lp, "TOPRIGHT"),
             params.anchor,
-            i == 1 and lr or self.ChainRightPoint(lr, "BOTTOMRIGHT"),
+            self.ChainRightPoint(lr, "BOTTOMRIGHT"),
             params.offsetX,
-            params.offsetY,
-        }
+            params.offsetY
+        )
+    else
+        anchors[2] = nil
     end
 
     FrameUtil.LazySetAnchors(frame, anchors)
