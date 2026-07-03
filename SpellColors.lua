@@ -199,6 +199,32 @@ local function mergeKeys(base, other)
     )
 end
 
+---@param key ECM_SpellColorKey|nil
+---@return boolean
+local function isCompleteKey(key)
+    return key ~= nil
+        and key.spellName ~= nil
+        and key.spellID ~= nil
+        and key.cooldownID ~= nil
+        and key.textureFileID ~= nil
+end
+
+---@param base ECM_SpellColorKey|nil
+---@param discovered ECM_SpellColorKey|nil
+---@return ECM_SpellColorKey|nil
+local function mergeDiscoveredKey(base, discovered)
+    local merged = mergeKeys(base, discovered)
+    if not merged then
+        return nil
+    end
+
+    if discovered and discovered.textureFileID and merged.textureFileID ~= discovered.textureFileID then
+        return buildKey(merged.spellName, merged.spellID, merged.cooldownID, discovered.textureFileID, merged.keyType)
+    end
+
+    return merged
+end
+
 ---@param spellName string|nil
 ---@param spellID number|nil
 ---@param cooldownID number|nil
@@ -690,7 +716,8 @@ end
 --- across all tiers and propagates it to every valid tier that is missing
 --- or outdated.
 ---@param store ECM_SpellColorStore
-local function reconcile(store, keys)
+---@param metadataKey ECM_SpellColorKey|nil
+local function reconcile(store, keys, metadataKey)
     local tables = scopeTables(store)
     if not tables then
         return false
@@ -720,14 +747,27 @@ local function reconcile(store, keys)
         return false
     end
 
-    -- Propagate to every valid tier that is missing or outdated.
     local changed = false
+    if isCompleteKey(metadataKey) and normalizeEntryMetadata(winner, metadataKey) then
+        changed = true
+    end
+
+    -- Propagate to every valid tier that is missing or outdated.
     for i = 1, #KEY_DEFS do
-        if vkeys[i] and tables[KEY_DEFS[i]] then
-            local existing = tables[KEY_DEFS[i]][vkeys[i]]
+        local tierTable = tables[KEY_DEFS[i]]
+        local targetKey = vkeys[i]
+        if targetKey and tierTable then
+            local existing = tierTable[targetKey]
             if not existing or stampTs(existing) < winnerTs then
-                tables[KEY_DEFS[i]][vkeys[i]] = winner
+                tierTable[targetKey] = winner
                 changed = true
+            end
+
+            for rawKey, entry in pairs(tierTable) do
+                if rawKey ~= targetKey and entry == winner then
+                    tierTable[rawKey] = nil
+                    changed = true
+                end
             end
         end
     end
@@ -738,8 +778,9 @@ end
 ---@param store ECM_SpellColorStore
 local function reconcileAll(store, keysList)
     local changed = 0
-    for _, keys in ipairs(keysList) do
-        if reconcile(store, keys) then
+    for _, key in ipairs(keysList) do
+        local keys = key and key.ToArray and key:ToArray() or key
+        if reconcile(store, keys, key) then
             changed = changed + 1
         end
     end
@@ -979,7 +1020,7 @@ function SpellColorStore:GetAllColorEntries()
         local merged = false
         for _, row in ipairs(result) do
             if row.key:Matches(dKey) then
-                row.key = row.key:Merge(dKey) or row.key
+                row.key = mergeDiscoveredKey(row.key, dKey) or row.key
                 merged = true
                 break
             end
@@ -1055,7 +1096,7 @@ function SpellColorStore:ReconcileAllKeys(keys)
         for _, key in ipairs(keys) do
             local normalized = normalizeKey(key)
             if normalized then
-                keys_list[#keys_list + 1] = normalized:ToArray()
+                keys_list[#keys_list + 1] = normalized
             end
         end
     end
@@ -1092,7 +1133,8 @@ function SpellColorStore:RemoveEntriesByKeys(keys)
 end
 
 --- Registers a bar frame's identifying values in the runtime discovered cache.
---- Called during layout so values are captured before they become secret.
+--- Called during layout so values are captured before they become secret and
+--- can repair persisted rows written while some values were hidden.
 ---@param frame ECM_BuffBarMixin
 function SpellColorStore:DiscoverBar(frame)
     local key = makeKeyFromBar(frame)
@@ -1102,11 +1144,13 @@ function SpellColorStore:DiscoverBar(frame)
     local discoveredKeys = getDiscoveredKeys(self)
     for i, existing in ipairs(discoveredKeys) do
         if keysMatch(existing, key) then
-            discoveredKeys[i] = mergeKeys(existing, key) or existing
+            discoveredKeys[i] = mergeDiscoveredKey(existing, key) or existing
+            reconcile(self, discoveredKeys[i]:ToArray(), key)
             return
         end
     end
     discoveredKeys[#discoveredKeys + 1] = key
+    reconcile(self, key:ToArray(), key)
 end
 
 --- Wipes the runtime discovered keys cache.

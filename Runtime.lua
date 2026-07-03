@@ -159,6 +159,60 @@ local function isInInstanceContext()
     return IsInInstance() or (C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress())
 end
 
+local DRUID_MOUNT_FORM_SPELL_IDS = {
+    [783] = true, -- Travel Form, including the modern flight-capable form.
+    [33943] = true, -- Flight Form.
+    [40120] = true, -- Swift Flight Form.
+}
+
+local DRUID_MOUNT_FORM_IDS = {
+    [3] = true, -- Travel Form.
+    [27] = true, -- Swift Flight Form.
+    [29] = true, -- Flight Form.
+}
+
+local function isDruidMountFormActive()
+    if type(UnitClass) ~= "function" then
+        return false
+    end
+
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= "DRUID" then
+        return false
+    end
+
+    if type(GetShapeshiftFormID) == "function" then
+        local formID = GetShapeshiftFormID()
+        if formID and DRUID_MOUNT_FORM_IDS[formID] then
+            return true
+        end
+    end
+
+    if type(GetNumShapeshiftForms) == "function" and type(GetShapeshiftFormInfo) == "function" then
+        local formCount = GetNumShapeshiftForms() or 0
+        for index = 1, formCount do
+            local _, _, active, _, spellID = GetShapeshiftFormInfo(index)
+            if active and spellID and DRUID_MOUNT_FORM_SPELL_IDS[spellID] then
+                return true
+            end
+        end
+    end
+
+    if C_UnitAuras and type(C_UnitAuras.GetPlayerAuraBySpellID) == "function" then
+        for spellID in pairs(DRUID_MOUNT_FORM_SPELL_IDS) do
+            if C_UnitAuras.GetPlayerAuraBySpellID(spellID) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function isPlayerMountedOrMountedEquivalent()
+    return IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player") or isDruidMountFormActive()
+end
+
 --- Checks all fade and hide conditions and updates global state.
 local function updateFadeAndHiddenStates()
     local globalConfig = ns.GetGlobalConfig()
@@ -171,7 +225,7 @@ local function updateFadeAndHiddenStates()
 
     if not (LibEditMode:IsInEditMode() or _layoutPreviewActive) then
         hidden = not C_CVar.GetCVarBool("cooldownViewerEnabled")
-            or (globalConfig.hideWhenMounted and (IsMounted() or UnitInVehicle("player") or UnitOnTaxi("player")))
+            or (globalConfig.hideWhenMounted and isPlayerMountedOrMountedEquivalent())
             or (not _inCombat and globalConfig.hideOutOfCombatInRestAreas and IsResting())
 
         local fadeConfig = globalConfig.outOfCombatFade

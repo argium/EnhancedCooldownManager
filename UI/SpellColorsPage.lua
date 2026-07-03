@@ -73,12 +73,14 @@ local function getSpellColorKeyState(key, _scope)
         return nil
     end
 
+    local hasSecretName = type(primaryKey) == "string" and (issecretvalue(primaryKey) or primaryKey == "")
+
     return {
-        hasSecretName = type(primaryKey) == "string" and (issecretvalue(primaryKey) or primaryKey == ""),
-        isIncomplete = normalized ~= nil and (normalized.spellName == nil
+        hasSecretName = hasSecretName,
+        isIncomplete = hasSecretName or (normalized ~= nil and (normalized.spellName == nil
             or normalized.spellID == nil
             or normalized.cooldownID == nil
-            or normalized.textureFileID == nil),
+            or normalized.textureFileID == nil)),
     }
 end
 
@@ -415,10 +417,18 @@ local function canResetAnySpellColorSection()
 end
 
 ---@return boolean
-local function canMaintainAnySpellColorSection()
+local function canReconcileAnySpellColorSection()
     return doesAnySpellColorSectionMatch(function(section)
         return not isSpellColorSectionInteractionDisabled(section)
             and getSectionSpellColorPageState(section).canReconcile
+    end)
+end
+
+---@return boolean
+local function canRemoveStaleAnySpellColorSection()
+    return doesAnySpellColorSectionMatch(function(section)
+        return not isSpellColorSectionInteractionDisabled(section)
+            and getSectionSpellColorPageState(section).hasRowsNeedingReconcile
     end)
 end
 
@@ -449,7 +459,7 @@ end
 
 ---@param refreshPage fun()
 local function removeAllStaleSpellColors(refreshPage)
-    if not canMaintainAnySpellColorSection() then
+    if not canRemoveStaleAnySpellColorSection() then
         return
     end
 
@@ -463,7 +473,7 @@ local function removeAllStaleSpellColors(refreshPage)
 
             for _, section in ipairs(spellColorSections) do
                 if not isSpellColorSectionInteractionDisabled(section)
-                    and getSectionSpellColorPageState(section).canReconcile then
+                    and getSectionSpellColorPageState(section).hasRowsNeedingReconcile then
                     local removedKeys = removeStaleSpellColorSection(section)
                     if #removedKeys > 0 then
                         removedAny = true
@@ -491,10 +501,10 @@ local function createSpellColorPageActionsRow(refreshPage)
                 text = L["SPELL_COLORS_RECONCILE_BUTTON"],
                 width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                 enabled = function()
-                    return canMaintainAnySpellColorSection()
+                    return canReconcileAnySpellColorSection()
                 end,
                 onClick = function()
-                    if not canMaintainAnySpellColorSection() then
+                    if not canReconcileAnySpellColorSection() then
                         return
                     end
 
@@ -506,10 +516,10 @@ local function createSpellColorPageActionsRow(refreshPage)
                 width = SPELL_COLORS_HEADER_BUTTON_WIDTH,
                 tooltip = L["SPELL_COLORS_REMOVE_STALE_TOOLTIP"],
                 enabled = function()
-                    return canMaintainAnySpellColorSection()
+                    return canRemoveStaleAnySpellColorSection()
                 end,
                 onClick = function()
-                    if not canMaintainAnySpellColorSection() then
+                    if not canRemoveStaleAnySpellColorSection() then
                         return
                     end
 

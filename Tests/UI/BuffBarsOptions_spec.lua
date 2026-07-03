@@ -315,6 +315,8 @@ describe("BuffBarsOptions", function()
         })
 
         assert.is_true(state.showSecretNameWarning)
+        assert.is_true(state.hasRowsNeedingReconcile)
+        assert.is_true(state.canReconcile)
     end)
 
     it("_GetSpellColorsPageState disables reconcile in instances", function()
@@ -789,7 +791,7 @@ describe("BuffBarsOptions", function()
         assert.is_true(actions[2].enabled())
     end)
 
-    it("header actions disable reconcile and remove stale in restricted areas", function()
+    it("header actions disable reconcile but keep remove stale available in restricted areas", function()
         _G.IsInInstance = function()
             return true, "party"
         end
@@ -801,7 +803,7 @@ describe("BuffBarsOptions", function()
         local actions = getSpellColorActions(spellColorsSpec)
 
         assert.is_false(actions[1].enabled())
-        assert.is_false(actions[2].enabled())
+        assert.is_true(actions[2].enabled())
     end)
 
     it("header actions disable while spell color editing is locked", function()

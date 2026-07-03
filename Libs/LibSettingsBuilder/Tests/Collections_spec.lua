@@ -539,6 +539,123 @@ describe("LibSettingsBuilder Collections", function()
         assert.are.same({ "second:42" }, calls)
     end)
 
+    it("clears editor controls when a flat collection row is reused as a swatch row", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb._internal.interop.applyCollectionFrame(host, {
+            preset = "editor",
+            rowHeight = 34,
+            items = function()
+                return {
+                    {
+                        label = "Tick 1",
+                        fields = {
+                            { value = 50, min = 1, max = 100, step = 1 },
+                        },
+                        color = {
+                            value = { r = 1, g = 1, b = 1, a = 1 },
+                        },
+                        remove = {
+                            text = "Remove",
+                        },
+                    },
+                }
+            end,
+        })
+
+        local row = host._lsbCollectionScrollBox._rows[1]
+    local label = row._label
+    local swatch = row._swatch
+        assert.is_true(row._fieldWidgets[1].slider:IsShown())
+        assert.is_true(row._fieldWidgets[1].valueText:IsShown())
+        assert.is_true(row._removeButton:IsShown())
+
+        lsb._internal.interop.applyCollectionFrame(host, {
+            preset = "swatch",
+            rowHeight = 26,
+            items = function()
+                return {
+                    {
+                        label = "Eclipse (Solar)",
+                        icon = 236151,
+                        color = {
+                            value = { r = 0.2, g = 0.8, b = 0.2, a = 1 },
+                        },
+                    },
+                }
+            end,
+        })
+
+        assert.is_false(row._fieldWidgets[1].slider:IsShown())
+        assert.is_false(row._fieldWidgets[1].valueText:IsShown())
+        assert.is_false(row._removeButton:IsShown())
+        assert.are.equal(label, row._label)
+        assert.are.equal(swatch, row._swatch)
+    end)
+
+    it("clears swatch-only controls when a flat collection row is reused as an editor row", function()
+        _G.CreateFrame = function()
+            return makeCollectionControl()
+        end
+
+        local host = makeCollectionControl()
+        local lsb = LibStub("LibSettingsBuilder-1.0")
+
+        lsb._internal.interop.applyCollectionFrame(host, {
+            preset = "swatch",
+            rowHeight = 26,
+            items = function()
+                return {
+                    {
+                        label = "Eclipse (Solar)",
+                        icon = 236151,
+                        color = {
+                            value = { r = 0.2, g = 0.8, b = 0.2, a = 1 },
+                        },
+                    },
+                }
+            end,
+        })
+
+        local row = host._lsbCollectionScrollBox._rows[1]
+        local label = row._label
+        local swatch = row._swatch
+        assert.is_true(row._icon:IsShown())
+
+        lsb._internal.interop.applyCollectionFrame(host, {
+            preset = "editor",
+            rowHeight = 34,
+            items = function()
+                return {
+                    {
+                        label = "Tick 1",
+                        fields = {
+                            { value = 50, min = 1, max = 100, step = 1 },
+                        },
+                        color = {
+                            value = { r = 1, g = 1, b = 1, a = 1 },
+                        },
+                        remove = {
+                            text = "Remove",
+                        },
+                    },
+                }
+            end,
+        })
+
+        assert.is_false(row._icon:IsShown())
+        assert.is_true(row._fieldWidgets[1].slider:IsShown())
+        assert.is_true(row._fieldWidgets[1].valueText:IsShown())
+        assert.is_true(row._removeButton:IsShown())
+        assert.are.equal(label, row._label)
+        assert.are.equal(swatch, row._swatch)
+    end)
+
     it("resolves editor slider text entry ranges against the current item", function()
         _G.CreateFrame = function()
             return makeCollectionControl()

@@ -922,6 +922,30 @@ describe("SpellColors", function()
         assert.are.equal(1111, entries[1].key.textureFileID)
     end)
 
+    it("DiscoverBar replaces stale discovered placeholder textures with later real textures", function()
+        BuffSpellColors:ClearDiscoveredKeys()
+
+        BuffSpellColors:DiscoverBar(makeFrame({
+            spellName = "Eclipse (Solar)",
+            spellID = 191034,
+            cooldownID = 7001,
+            textureFileID = 134400,
+        }))
+        BuffSpellColors:DiscoverBar(makeFrame({
+            spellName = "Eclipse (Solar)",
+            spellID = 191034,
+            cooldownID = 7001,
+            textureFileID = 987654,
+        }))
+
+        local entries = BuffSpellColors:GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal("Eclipse (Solar)", entries[1].key.spellName)
+        assert.are.equal(191034, entries[1].key.spellID)
+        assert.are.equal(7001, entries[1].key.cooldownID)
+        assert.are.equal(987654, entries[1].key.textureFileID)
+    end)
+
     it("discovered keys merge with persisted entries in GetAllColorEntries", function()
         BuffSpellColors:ClearDiscoveredKeys()
 
@@ -941,6 +965,31 @@ describe("SpellColors", function()
         assert.are.equal(258920, entries[1].key.spellID)
         assert.are.equal(77, entries[1].key.cooldownID)
         assert.are.equal(9001, entries[1].key.textureFileID)
+        assert.are.same(c, entries[1].color)
+    end)
+
+    it("DiscoverBar reconciles persisted placeholder texture aliases when full keys are rediscovered", function()
+        BuffSpellColors:ClearDiscoveredKeys()
+
+        local c = color(0.5, 0.6, 0.7)
+        BuffSpellColors:SetColorByKey(SpellColors.MakeKey("Eclipse (Solar)", 191034, 7001, 134400), c)
+
+        BuffSpellColors:DiscoverBar(makeFrame({
+            spellName = "Eclipse (Solar)",
+            spellID = 191034,
+            cooldownID = 7001,
+            textureFileID = 987654,
+        }))
+
+        assert.are.same(c, BuffSpellColors:GetColorByKey({ spellName = "Eclipse (Solar)" }))
+        assert.are.same(c, BuffSpellColors:GetColorByKey({ spellID = 191034 }))
+        assert.are.same(c, BuffSpellColors:GetColorByKey({ cooldownID = 7001 }))
+        assert.are.same(c, BuffSpellColors:GetColorByKey({ textureFileID = 987654 }))
+        assert.is_nil(BuffSpellColors:GetColorByKey({ textureFileID = 134400 }))
+
+        local entries = BuffSpellColors:GetAllColorEntries()
+        assert.are.equal(1, #entries)
+        assert.are.equal(987654, entries[1].key.textureFileID)
         assert.are.same(c, entries[1].color)
     end)
 

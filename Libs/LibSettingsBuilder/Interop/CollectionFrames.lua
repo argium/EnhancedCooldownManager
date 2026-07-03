@@ -209,22 +209,40 @@ local function ensureSwatchCollectionRow(row)
     row:SetHeight(26)
     ensureHighlight(row)
 
-    row._icon = row:CreateTexture(nil, "ARTWORK")
-    row._icon:SetPoint("LEFT", 0, 0)
-    row._icon:SetSize(16, 16)
-    row._icon:Hide()
+    if not row._icon then
+        row._icon = row:CreateTexture(nil, "ARTWORK")
+        row._icon:SetPoint("LEFT", 0, 0)
+        row._icon:SetSize(16, 16)
+        row._icon:Hide()
+    end
 
-    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row._label:SetPoint("LEFT", row, "LEFT", 0, 0)
-    row._label:SetJustifyH("LEFT")
-    row._label:SetWordWrap(false)
+    if not row._label then
+        row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row._label:SetJustifyH("LEFT")
+        row._label:SetWordWrap(false)
+    end
 
-    row._swatch = interop.createColorSwatch(row)
-    row._swatch:SetPoint("LEFT", row, "CENTER", DEFAULT_SWATCH_CENTER_X, 0)
+    if not row._swatch then
+        row._swatch = interop.createColorSwatch(row)
+    end
+end
+
+local function hideEditorCollectionControls(row)
+    if row._fieldWidgets then
+        for _, widgets in ipairs(row._fieldWidgets) do
+            widgets.slider:Hide()
+            widgets.valueText:Hide()
+        end
+    end
+    if row._removeButton then
+        row._removeButton:SetScript("OnClick", nil)
+        row._removeButton:Hide()
+    end
 end
 
 local function refreshSwatchCollectionRow(row, item)
     ensureSwatchCollectionRow(row)
+    hideEditorCollectionControls(row)
 
     if item.icon then
         setTextureValue(row._icon, item.icon)
@@ -238,6 +256,8 @@ local function refreshSwatchCollectionRow(row, item)
         row._label:SetPoint("LEFT", row, "LEFT", 0, 0)
     end
     row._label:SetPoint("RIGHT", row._swatch, "LEFT", -8, 0)
+    row._swatch:ClearAllPoints()
+    row._swatch:SetPoint("LEFT", row, "CENTER", DEFAULT_SWATCH_CENTER_X, 0)
 
     row._label:SetText(item.label or "")
     applyCollectionRowStyle(row, item)
@@ -267,13 +287,15 @@ local function ensureEditorCollectionRow(row)
     row:SetHeight(34)
     ensureHighlight(row)
 
-    row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row._label:SetPoint("LEFT", row, "LEFT", 10, 0)
-    row._label:SetWidth(70)
-    row._label:SetJustifyH("LEFT")
+    if not row._label then
+        row._label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row._label:SetJustifyH("LEFT")
+    end
 
     row._fieldWidgets = {}
-    row._swatch = interop.createColorSwatch(row)
+    if not row._swatch then
+        row._swatch = interop.createColorSwatch(row)
+    end
     row._removeButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     preventMouseClickPropagation(row._removeButton)
     row._removeButton:RegisterForClicks("LeftButtonUp")
@@ -302,7 +324,15 @@ end
 local function refreshEditorCollectionRow(row, item)
     ensureEditorCollectionRow(row)
 
+    if row._icon then
+        setTextureValue(row._icon, nil)
+        row._icon:Hide()
+    end
+
     row._label:SetText(item.label or "")
+    row._label:SetWidth(70)
+    row._label:ClearAllPoints()
+    row._label:SetPoint("LEFT", row, "LEFT", 10, 0)
     applyCollectionRowStyle(row, item)
     bindCollectionRowTooltip(row, nil)
 
@@ -315,6 +345,9 @@ local function refreshEditorCollectionRow(row, item)
         local slider = widgets.slider
         local valueText = widgets.valueText
         local minValue, maxValue, step = field.min or 0, field.max or 1, field.step or 1
+
+        slider:Show()
+        valueText:Show()
 
         if field.getRange then
             local nextMin, nextMax, nextStep = field.getRange(item, field.value)
@@ -365,6 +398,12 @@ local function refreshEditorCollectionRow(row, item)
         previousValueText = valueText
     end
 
+    for i = #fields + 1, #(row._fieldWidgets or {}) do
+        local widgets = row._fieldWidgets[i]
+        widgets.slider:Hide()
+        widgets.valueText:Hide()
+    end
+
     local color = item.color or {}
     row._swatch:ClearAllPoints()
     if previousValueText then
@@ -384,6 +423,7 @@ local function refreshEditorCollectionRow(row, item)
     end)
     row._removeButton:SetEnabled(item.remove == nil or item.remove.enabled ~= false)
     setSimpleTooltip(row._removeButton, item.remove and item.remove.tooltip)
+    row._removeButton:Show()
 
     row._lsbRefreshing = true
     for i = 1, #fields do
