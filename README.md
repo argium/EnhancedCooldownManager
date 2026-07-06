@@ -14,6 +14,10 @@ Adds bars for resources: mana, rage, energy, focus, fury, and runic power.
 
 Also supports special class resources such as holy power, runes, and soul shards.
 
+#### Brewmaster Stagger Bar
+
+Adds a dedicated Stagger bar for Brewmaster Monks that shows your current stagger as a percentage of your health and recolours itself as stagger climbs from light to moderate to heavy — so you can read your danger level at a glance.
+
 #### Aura Bars
 
 Styles the default aura bars to match power and resource bars.

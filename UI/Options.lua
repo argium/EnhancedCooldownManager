@@ -88,6 +88,7 @@ function Options:OnInitialize()
         ns.PowerBarOptions,
         ns.ResourceBarOptions,
         ns.RuneBarOptions,
+        ns.StaggerBarOptions,
         ns.BuffBarsOptions,
         ns.ExtraIconsOptions,
     }

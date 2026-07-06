@@ -69,6 +69,7 @@ L["GROW_DIRECTION_ATTACHED_DESC"] = "Whether the attached stack grows above or b
 L["POWER_BAR"] = "Power Bar"
 L["RESOURCE_BAR"] = "Resource Bar"
 L["RUNE_BAR"] = "Rune Bar"
+L["STAGGER_BAR"] = "Stagger Bar"
 L["AURA_BARS"] = "Aura Bars"
 L["EXTERNAL_BARS"] = "External Cooldowns"
 L["EXTRA_ICONS"] = "Extra Icons"
@@ -174,6 +175,16 @@ L["RUNE_COLOR"] = "Rune color"
 L["BLOOD_COLOR"] = "Blood color"
 L["FROST_COLOR"] = "Frost color"
 L["UNHOLY_COLOR"] = "Unholy color"
+
+--------------------------------------------------------------------------------
+-- Stagger Bar Options
+--------------------------------------------------------------------------------
+
+L["BREWMASTER_ONLY_WARNING"] = "|cffFF8800These settings are only applicable to Brewmaster Monks.|r"
+L["ENABLE_STAGGER_BAR"] = "Enable stagger bar"
+L["STAGGER_LIGHT_COLOR"] = "Light stagger color"
+L["STAGGER_MODERATE_COLOR"] = "Moderate stagger color"
+L["STAGGER_HEAVY_COLOR"] = "Heavy stagger color"
 
 --------------------------------------------------------------------------------
 -- Buff / Aura Bars Options
