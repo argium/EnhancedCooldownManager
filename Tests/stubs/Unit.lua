@@ -8,8 +8,6 @@ local state = {
     classByUnit = {},
     powerMaxByType = {},
     powerByType = {},
-    staggerByUnit = {},
-    healthMaxByUnit = {},
 }
 
 local function resolvePowerType(powerType)
@@ -25,20 +23,10 @@ function Unit.Reset()
     state.classByUnit = {}
     state.powerMaxByType = {}
     state.powerByType = {}
-    state.staggerByUnit = {}
-    state.healthMaxByUnit = {}
 end
 
 function Unit.SetClass(unit, classToken)
     state.classByUnit[unit or "player"] = classToken
-end
-
-function Unit.SetStagger(unit, value)
-    state.staggerByUnit[unit or "player"] = value
-end
-
-function Unit.SetHealthMax(unit, value)
-    state.healthMaxByUnit[unit or "player"] = value
 end
 
 function Unit.SetPowerMax(powerType, value)
@@ -60,14 +48,6 @@ function Unit.Install()
 
     _G.UnitPower = function(_, powerType)
         return state.powerByType[resolvePowerType(powerType)] or 0
-    end
-
-    _G.UnitStagger = function(unit)
-        return state.staggerByUnit[unit or "player"]
-    end
-
-    _G.UnitHealthMax = function(unit)
-        return state.healthMaxByUnit[unit or "player"]
     end
 end
 
