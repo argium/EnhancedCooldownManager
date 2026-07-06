@@ -70,6 +70,12 @@ function ClassUtil.IsDeathKnight()
     return class == "DEATHKNIGHT"
 end
 
+--- Returns whether the player is a Brewmaster Monk (Monk class, Brewmaster spec).
+function ClassUtil.IsBrewmasterMonk()
+    local _, class = UnitClass("player")
+    return class == "MONK" and GetSpecialization() == C.MONK_BREWMASTER_SPEC_INDEX
+end
+
 --- Gets the max Maelstrom value that can diff based on talents
 local function getMaelstromWeaponMax()
     if C_SpellBook.IsSpellKnown(C.RESOURCEBAR_RAGING_MAELSTROM_SPELLID) then

@@ -21,6 +21,7 @@ local constants = {
     POWERBAR = "PowerBar",
     RESOURCEBAR = "ResourceBar",
     RUNEBAR = "RuneBar",
+    STAGGERBAR = "StaggerBar",
 
     -- Shared configuration values
     ANCHORMODE_CHAIN = "chain",
@@ -90,6 +91,11 @@ local constants = {
     -- Rune bar
     RUNEBAR_CD_DIM_FACTOR = 0.5,
     RUNEBAR_MAX_RUNES = 6,
+
+    -- Stagger bar (Brewmaster Monk stagger debuff spell IDs)
+    SPELLID_STAGGER_LIGHT = 124275,
+    SPELLID_STAGGER_MODERATE = 124274,
+    SPELLID_STAGGER_HEAVY = 124273,
 
     -- Class and specialization identifiers
     DEATHKNIGHT_FROST_SPEC_INDEX = 2,
@@ -272,6 +278,7 @@ constants.MODULE_CONFIG_KEYS = {
     [constants.POWERBAR] = "powerBar",
     [constants.RESOURCEBAR] = "resourceBar",
     [constants.RUNEBAR] = "runeBar",
+    [constants.STAGGERBAR] = "staggerBar",
     [constants.BUFFBARS] = constants.SCOPE_BUFFBARS,
     [constants.EXTERNALBARS] = constants.SCOPE_EXTERNALBARS,
     [constants.EXTRAICONS] = "extraIcons",
@@ -288,6 +295,7 @@ constants.CHAIN_ORDER = {
     constants.POWERBAR,
     constants.RESOURCEBAR,
     constants.RUNEBAR,
+    constants.STAGGERBAR,
     constants.BUFFBARS,
     constants.EXTERNALBARS,
 }
@@ -297,6 +305,7 @@ constants.MODULE_LOAD_ORDER = {
     constants.POWERBAR,
     constants.RESOURCEBAR,
     constants.RUNEBAR,
+    constants.STAGGERBAR,
     constants.BUFFBARS,
     constants.EXTERNALBARS,
     constants.EXTRAICONS,

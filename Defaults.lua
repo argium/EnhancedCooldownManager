@@ -51,6 +51,11 @@ local _, ns = ...
 ---@field colorFrost ECM_Color Frost rune color.
 ---@field colorUnholy ECM_Color Unholy rune color.
 
+---@class ECM_StaggerBarConfig : ECM_BarConfigBase Stagger bar configuration.
+---@field colorLight ECM_Color Light stagger color.
+---@field colorModerate ECM_Color Moderate stagger color.
+---@field colorHeavy ECM_Color Heavy stagger color.
+
 ---@alias ECM_ResourceType number|string Resource type identifier.
 
 ---@class ECM_GlobalConfig Global configuration.
@@ -180,6 +185,7 @@ local _, ns = ...
 ---@field powerBar ECM_PowerBarConfig Power bar settings.
 ---@field resourceBar ECM_ResourceBarConfig Resource bar settings.
 ---@field runeBar ECM_RuneBarConfig Rune bar settings.
+---@field staggerBar ECM_StaggerBarConfig Stagger bar settings.
 ---@field buffBars ECM_BuffBarsConfig Buff bars configuration.
 ---@field externalBars ECM_ExternalBarsConfig External cooldown bars configuration.
 ---@field extraIcons ECM_ExtraIconsConfig Extra icons configuration.
@@ -345,6 +351,17 @@ local defaults = {
             colorBlood = { r = 0.87, g = 0.10, b = 0.22, a = 1 },
             colorFrost = { r = 0.33, g = 0.69, b = 0.87, a = 1 },
             colorUnholy = { r = 0.00, g = 0.61, b = 0.00, a = 1 },
+        },
+        staggerBar = {
+            enabled = true,
+            anchorMode = C.ANCHORMODE_CHAIN,
+            width = 300,
+            editModePositions = {},
+            overrideFont = false,
+            showText = false,
+            colorLight = { r = 0.52, g = 0.85, b = 0.35, a = 1 },
+            colorModerate = { r = 1.00, g = 0.82, b = 0.20, a = 1 },
+            colorHeavy = { r = 0.87, g = 0.20, b = 0.20, a = 1 },
         },
         buffBars = {
             enabled = true,

@@ -473,6 +473,7 @@ describe("OptionUtil", function()
             ns.PowerBarOptions = placeholderSection("powerBar", ns.L["POWER_BAR"])
             ns.ResourceBarOptions = placeholderSection("resourceBar", ns.L["RESOURCE_BAR"])
             ns.RuneBarOptions = placeholderSection("runeBar", ns.L["RUNE_BAR"])
+            ns.StaggerBarOptions = placeholderSection("staggerBar", ns.L["STAGGER_BAR"])
             ns.BuffBarsOptions = placeholderSection("buffBars", ns.L["AURA_BARS"])
             ns.ExtraIconsOptions = placeholderSection("extraIcons", ns.L["EXTRA_ICONS"])
             ns.ItemStacksOptions = { OnInitialize = function() end }

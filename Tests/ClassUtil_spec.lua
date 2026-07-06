@@ -24,6 +24,7 @@ describe("ClassUtil", function()
             "UnitPowerMax",
             "UnitPower",
             "GetShapeshiftForm",
+            "GetSpecialization",
             "C_UnitAuras",
             "C_Spell",
             "C_SpellBook",
@@ -86,6 +87,41 @@ describe("ClassUtil", function()
             end
 
             assert.is_false(ns.ClassUtil.IsDeathKnight())
+        end)
+    end)
+
+    describe("IsBrewmasterMonk", function()
+        it("returns true for a Monk in the Brewmaster spec", function()
+            _G.UnitClass = function()
+                return "Monk", "MONK", 10
+            end
+            _G.GetSpecialization = function()
+                return ns.Constants.MONK_BREWMASTER_SPEC_INDEX
+            end
+
+            assert.is_true(ns.ClassUtil.IsBrewmasterMonk())
+        end)
+
+        it("returns false for a Monk in a non-Brewmaster spec", function()
+            _G.UnitClass = function()
+                return "Monk", "MONK", 10
+            end
+            _G.GetSpecialization = function()
+                return ns.Constants.MONK_WINDWALKER_SPEC_INDEX
+            end
+
+            assert.is_false(ns.ClassUtil.IsBrewmasterMonk())
+        end)
+
+        it("returns false for a non-Monk class regardless of spec index", function()
+            _G.UnitClass = function()
+                return "Warrior", "WARRIOR", 1
+            end
+            _G.GetSpecialization = function()
+                return ns.Constants.MONK_BREWMASTER_SPEC_INDEX
+            end
+
+            assert.is_false(ns.ClassUtil.IsBrewmasterMonk())
         end)
     end)
 
