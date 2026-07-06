@@ -90,10 +90,16 @@ describe("StaggerBarOptions getters/setters/defaults", function()
         it("section is enabled for a Brewmaster Monk", function()
             assert.is_false(ns.StaggerBarOptions.disabled())
         end)
-        it("does not warn about the class requirement when Brewmaster", function()
+        it("keeps the class-requirement warning hidden when Brewmaster", function()
+            local warningRow
             for _, row in ipairs(capturedPage.rows) do
-                assert.are_not.equal(ns.L["BREWMASTER_ONLY_WARNING"], row.name)
+                if row.name == ns.L["BREWMASTER_ONLY_WARNING"] then
+                    warningRow = row
+                end
             end
+            assert.is_not_nil(warningRow)
+            assert.is_function(warningRow.hidden)
+            assert.is_true(warningRow.hidden())
         end)
     end)
 end)
@@ -121,12 +127,14 @@ describe("StaggerBarOptions class gating (non-Brewmaster)", function()
 
         assert.is_true(ns.StaggerBarOptions.disabled())
 
-        local hasWarning = false
+        local warningRow
         for _, row in ipairs(ns.StaggerBarOptions.pages[1].rows) do
             if row.name == ns.L["BREWMASTER_ONLY_WARNING"] then
-                hasWarning = true
+                warningRow = row
             end
         end
-        assert.is_true(hasWarning)
+        assert.is_not_nil(warningRow)
+        assert.is_function(warningRow.hidden)
+        assert.is_false(warningRow.hidden())
     end)
 end)

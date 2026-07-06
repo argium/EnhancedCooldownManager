@@ -166,32 +166,40 @@ describe("StaggerBar real source", function()
         assert.same({ r = 0, g = 0, b = 1, a = 1 }, StaggerBar:GetStatusBarColor())
     end)
 
-    it("only reacts to player unit events and starts the drain ticker", function()
+    it("only reacts to player unit events and starts the ticker only while stagger is active", function()
         local reasons = {}
         ns.Runtime.RequestRefresh = function(_, reason)
             reasons[#reasons + 1] = reason
         end
 
+        -- Non-player units are ignored entirely.
         StaggerBar:OnEventUpdate("UNIT_AURA", "target")
         assert.are.equal(0, tickerCount)
+        assert.same({}, reasons)
 
+        -- A player event with no stagger still refreshes but does not start the ticker.
         StaggerBar:OnEventUpdate("UNIT_AURA", "player")
         assert.same({ "UNIT_AURA" }, reasons)
-        assert.are.equal(1, tickerCount)
+        assert.are.equal(0, tickerCount)
 
-        -- Ticker start is idempotent while one is already running.
+        -- Once stagger is present the ticker starts, and starting stays idempotent.
+        auras[ns.Constants.SPELLID_STAGGER_LIGHT] = { applications = 1 }
+        StaggerBar:OnEventUpdate("UNIT_AURA", "player")
+        assert.are.equal(1, tickerCount)
         StaggerBar:OnEventUpdate("UNIT_AURA", "player")
         assert.are.equal(1, tickerCount)
     end)
 
-    it("drain ticker refreshes while stagger is present and self-stops when it clears", function()
+    it("drain ticker refreshes while stagger is present and forces a final frame when it clears", function()
         function StaggerBar:IsEnabled()
             return true
         end
         StaggerBar.InnerFrame = { IsShown = function() return true end }
         local refreshCount = 0
-        function StaggerBar:ThrottledRefresh()
+        local lastImmediate
+        function StaggerBar:ThrottledRefresh(_, immediate)
             refreshCount = refreshCount + 1
+            lastImmediate = immediate
         end
 
         auras[ns.Constants.SPELLID_STAGGER_LIGHT] = { applications = 1 }
@@ -200,14 +208,50 @@ describe("StaggerBar real source", function()
 
         activeTicker.callback()
         assert.are.equal(1, refreshCount)
+        assert.is_nil(lastImmediate)
         assert.is_false(activeTicker.cancelled)
 
-        -- Stagger clears: next tick refreshes once more, then cancels itself.
+        -- Stagger clears: the final tick forces an immediate refresh so the emptied
+        -- pool is drawn even under a throttling updateFrequency, then self-cancels.
         auras[ns.Constants.SPELLID_STAGGER_LIGHT] = nil
         activeTicker.callback()
         assert.are.equal(2, refreshCount)
+        assert.is_true(lastImmediate)
         assert.is_true(activeTicker.cancelled)
         assert.is_nil(StaggerBar._ticker)
+    end)
+
+    it("UpdateLayout restarts the ticker when the bar is re-shown mid-stagger", function()
+        function StaggerBar:IsEnabled()
+            return true
+        end
+        local layoutCalls = 0
+        ns.BarMixin.FrameProto.UpdateLayout = function()
+            layoutCalls = layoutCalls + 1
+            return true
+        end
+        StaggerBar.InnerFrame = { IsShown = function() return true end }
+
+        -- No stagger: the base layout runs but the ticker stays stopped.
+        assert.is_true(StaggerBar:UpdateLayout("test"))
+        assert.are.equal(1, layoutCalls)
+        assert.are.equal(0, tickerCount)
+
+        -- Stagger active and bar shown: the ticker resumes.
+        auras[ns.Constants.SPELLID_STAGGER_LIGHT] = { applications = 1 }
+        assert.is_true(StaggerBar:UpdateLayout("test"))
+        assert.are.equal(1, tickerCount)
+    end)
+
+    it("UpdateLayout returns false and leaves the ticker stopped when the base layout skips", function()
+        auras[ns.Constants.SPELLID_STAGGER_LIGHT] = { applications = 1 }
+        ns.BarMixin.FrameProto.UpdateLayout = function()
+            return false
+        end
+        StaggerBar.InnerFrame = { IsShown = function() return true end }
+
+        assert.is_false(StaggerBar:UpdateLayout("test"))
+        assert.are.equal(0, tickerCount)
     end)
 
     it("OnEnable only builds the frame for Monks; other classes are skipped", function()

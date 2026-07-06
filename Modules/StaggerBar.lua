@@ -51,14 +51,36 @@ function StaggerBar:_StartTicker()
     end
     self._ticker = C_Timer.NewTicker(C.DEFAULT_REFRESH_FREQUENCY, function()
         if not (self:IsEnabled() and self.InnerFrame and self.InnerFrame:IsShown()) then
+            -- Bar is hidden or disabled: stop polling. UpdateLayout restarts the
+            -- ticker when the bar becomes visible again while stagger is active.
             self:_StopTicker()
             return
         end
-        self:ThrottledRefresh("StaggerBar:Ticker")
-        if not hasAnyStagger() then
+        if hasAnyStagger() then
+            self:ThrottledRefresh("StaggerBar:Ticker")
+        else
+            -- Force the final frame so the emptied pool renders even when the
+            -- global updateFrequency would otherwise throttle this tick's refresh.
+            self:ThrottledRefresh("StaggerBar:TickerFinal", true)
             self:_StopTicker()
         end
     end)
+end
+
+--- Restarts the drain ticker after a layout pass re-shows the bar while stagger
+--- is still active. The base layout re-shows the frame, but its trailing
+--- ThrottledRefresh can be throttled, and ticker startup is otherwise only driven
+--- by UNIT_AURA, so a bar hidden mid-stagger would otherwise stay frozen.
+function StaggerBar:UpdateLayout(why)
+    if not ns.BarMixin.FrameProto.UpdateLayout(self, why) then
+        return false
+    end
+
+    if self.InnerFrame and self.InnerFrame:IsShown() and hasAnyStagger() then
+        self:_StartTicker()
+    end
+
+    return true
 end
 
 --- Stops the drain animation ticker.
@@ -73,7 +95,9 @@ function StaggerBar:OnEventUpdate(event, unit)
     if unit ~= "player" then
         return
     end
-    self:_StartTicker()
+    if hasAnyStagger() then
+        self:_StartTicker()
+    end
     ns.Runtime.RequestRefresh(self, event or "StaggerBar:OnEventUpdate")
 end
 

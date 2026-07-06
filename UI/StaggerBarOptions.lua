@@ -21,12 +21,16 @@ for _, row in ipairs(ns.OptionUtil.CreateBarRows(isDisabled, { showText = true, 
     rows[#rows + 1] = row
 end
 
-if not ns.ClassUtil.IsBrewmasterMonk() then
-    table.insert(rows, 1, {
-        type = "subheader",
-        name = L["BREWMASTER_ONLY_WARNING"],
-    })
-end
+-- Always present so the row tracks the live spec; hidden while the player is a
+-- Brewmaster Monk. The predicate is re-evaluated on each refresh, so switching
+-- specs shows or hides the warning without a stale insert from file-load time.
+table.insert(rows, 1, {
+    type = "subheader",
+    name = L["BREWMASTER_ONLY_WARNING"],
+    hidden = function()
+        return ns.ClassUtil.IsBrewmasterMonk()
+    end,
+})
 
 rows[#rows + 1] = {
     id = "colorLabel",
