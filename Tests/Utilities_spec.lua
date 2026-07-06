@@ -195,4 +195,16 @@ describe("Utilities", function()
         assert.are.equal("FONT:DB Global Font", call.path)
         assert.are.equal(15, call.size)
     end)
+
+    it("ECM.ApplyFont skips repeated setter calls when font settings are unchanged", function()
+        local fontString = newFontStringSpy()
+        local globalConfig = ns.Addon.db.profile.global
+
+        ns.FrameUtil.ApplyFont(fontString, globalConfig, { overrideFont = false })
+        ns.FrameUtil.ApplyFont(fontString, globalConfig, { overrideFont = false })
+
+        assert.are.equal(1, #fontString.setFontCalls)
+        assert.are.equal(1, #fontString.shadowOffsetCalls)
+        assert.are.equal(0, #fontString.shadowColorCalls)
+    end)
 end)

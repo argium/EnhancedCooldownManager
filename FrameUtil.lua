@@ -570,6 +570,44 @@ local function getLsmMedia(mediaType, key)
     end
 end
 
+local function fontMatches(fontString, fontPath, fontSize, fontOutline)
+    if fontString.GetFont then
+        local livePath, liveSize, liveOutline = fontString:GetFont()
+        if livePath ~= nil then
+            return livePath == fontPath
+                and ns.NumericEquals(liveSize, fontSize)
+                and (liveOutline or "") == fontOutline
+        end
+    end
+
+    return fontString.__ecmFontPath == fontPath
+        and ns.NumericEquals(fontString.__ecmFontSize, fontSize)
+        and fontString.__ecmFontOutline == fontOutline
+end
+
+local function shadowMatches(fontString, hasShadow, offsetX, offsetY)
+    if fontString.GetShadowOffset then
+        local liveX, liveY = fontString:GetShadowOffset()
+        if not ns.NumericEquals(liveX, offsetX) or not ns.NumericEquals(liveY, offsetY) then
+            return false
+        end
+
+        if hasShadow and fontString.GetShadowColor then
+            local r, g, b, a = fontString:GetShadowColor()
+            return ns.NumericEquals(r, 0)
+                and ns.NumericEquals(g, 0)
+                and ns.NumericEquals(b, 0)
+                and ns.NumericEquals(a, 1)
+        end
+
+        return true
+    end
+
+    return fontString.__ecmFontShadow == hasShadow
+        and ns.NumericEquals(fontString.__ecmFontShadowOffsetX, offsetX)
+        and ns.NumericEquals(fontString.__ecmFontShadowOffsetY, offsetY)
+end
+
 function FrameUtil.GetTexture(texture)
     local fetched = texture and getLsmMedia("statusbar", texture)
     if fetched then return fetched end
@@ -597,14 +635,25 @@ function FrameUtil.ApplyFont(fontString, globalConfig, moduleConfig)
     ns.DebugAssert(fontSize, "Font size cannot be nil")
     ns.DebugAssert(fontOutline, "Font outline cannot be nil")
 
-    fontString:SetFont(fontPath, fontSize, fontOutline)
+    if not fontMatches(fontString, fontPath, fontSize, fontOutline) then
+        fontString:SetFont(fontPath, fontSize, fontOutline)
+        fontString.__ecmFontPath = fontPath
+        fontString.__ecmFontSize = fontSize
+        fontString.__ecmFontOutline = fontOutline
+    end
 
+    local shadowOffsetX = hasShadow and 1 or 0
+    local shadowOffsetY = hasShadow and -1 or 0
+    if shadowMatches(fontString, hasShadow, shadowOffsetX, shadowOffsetY) then
+        return
+    end
     if hasShadow then
         fontString:SetShadowColor(0, 0, 0, 1)
-        fontString:SetShadowOffset(1, -1)
-    else
-        fontString:SetShadowOffset(0, 0)
     end
+    fontString:SetShadowOffset(shadowOffsetX, shadowOffsetY)
+    fontString.__ecmFontShadow = hasShadow
+    fontString.__ecmFontShadowOffsetX = shadowOffsetX
+    fontString.__ecmFontShadowOffsetY = shadowOffsetY
 end
 
 function FrameUtil.PixelSnap(v)
