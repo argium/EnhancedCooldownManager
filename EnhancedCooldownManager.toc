@@ -47,6 +47,7 @@ Modules\ExternalBars.lua
 Modules\PowerBar.lua
 Modules\ResourceBar.lua
 Modules\RuneBar.lua
+Modules\StaggerBar.lua
 Modules\ExtraIcons.lua
 
 UI\OptionUtil.lua
@@ -59,6 +60,7 @@ UI\LayoutOptions.lua
 UI\PowerBarOptions.lua
 UI\ResourceBarOptions.lua
 UI\RuneBarOptions.lua
+UI\StaggerBarOptions.lua
 UI\ProfileOptions.lua
 UI\ExtraIconsShared.lua
 UI\ExtraIconsOptions.lua

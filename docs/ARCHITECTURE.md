@@ -1,7 +1,7 @@
 # ECM Architecture
 
 EnhancedCooldownManager is an event-driven WoW addon built on AceAddon-3.0 / AceDB-3.0.
-`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, lays out `ExtraIcons` first when it widens the main viewer, and then iterates the chained bar modules. `PowerBar`, `ResourceBar`, and `RuneBar` use `BarMixin.AddBarMixin()`. `BuffBars`, `ExternalBars`, and `ExtraIcons` use `BarMixin.AddFrameMixin()` and manage their own child content.
+`Runtime.lua` is the central dispatcher: it registers WoW events, manages layout coalescing, lays out `ExtraIcons` first when it widens the main viewer, and then iterates the chained bar modules. `PowerBar`, `ResourceBar`, `RuneBar`, and `StaggerBar` use `BarMixin.AddBarMixin()`. `BuffBars`, `ExternalBars`, and `ExtraIcons` use `BarMixin.AddFrameMixin()` and manage their own child content.
 
 ## Modules
 
@@ -12,6 +12,7 @@ Each module owns its own reference doc with a summary table, actor diagram, comp
 | PowerBar | [docs/PowerBar.md](docs/PowerBar.md) | `AddBarMixin` |
 | ResourceBar | [docs/ResourceBar.md](docs/ResourceBar.md) | `AddBarMixin` |
 | RuneBar | [docs/RuneBar.md](docs/RuneBar.md) | `AddBarMixin` |
+| StaggerBar | [docs/StaggerBar.md](docs/StaggerBar.md) | `AddBarMixin` |
 | BuffBars | [docs/BuffBars.md](docs/BuffBars.md) | `AddFrameMixin` |
 | ExternalBars | [docs/ExternalBars.md](docs/ExternalBars.md) | `AddFrameMixin` |
 | ExtraIcons | [docs/ExtraIcons.md](docs/ExtraIcons.md) | `AddFrameMixin` |
@@ -191,7 +192,7 @@ flowchart TD
         INV_DET["invalidateDetachedAnchorMetrics()"]
         UPD_DET["updateDetachedAnchorLayout()"]
         EXTRA_FIRST["ExtraIcons:UpdateLayout(reason)<br/>first, so the main viewer width is final"]
-        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ BuffBars → ExternalBars"]
+        CHAIN_LOOP["For each module in CHAIN_ORDER:<br/>PowerBar → ResourceBar → RuneBar<br/>→ StaggerBar → BuffBars → ExternalBars"]
         OTHER_LOOP["Remaining non-chain modules (if any)"]
         MOD_UPD["module:UpdateLayout(reason)"]
         INV_DET --> UPD_DET --> EXTRA_FIRST --> CHAIN_LOOP --> OTHER_LOOP --> MOD_UPD
@@ -357,6 +358,7 @@ Registered by each module in its own `OnEnable`. See the [module reference doc](
 |---|---|---|
 | UNIT_POWER_UPDATE | PowerBar, ResourceBar | Power-bar value update |
 | UNIT_AURA | ResourceBar | Aura-driven resource refresh |
+| UNIT_AURA | StaggerBar | Start stagger drain ticker; request refresh |
 | RUNE_POWER_UPDATE | RuneBar | Start rune animation ticker; request layout |
 | BAG_UPDATE_COOLDOWN | ExtraIcons | Throttled cooldown-state refresh |
 | BAG_UPDATE_DELAYED | ExtraIcons | Layout after bag contents finalize |
@@ -393,7 +395,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | Method | Description |
 |--------|-------------|
 | `AddFrameMixin(target, name)` | Apply frame-only mixin (used by BuffBars, ExternalBars, ExtraIcons) |
-| `AddBarMixin(module, name)` | Apply bar mixin: frame + StatusBar + ticks (used by PowerBar, ResourceBar, RuneBar) |
+| `AddBarMixin(module, name)` | Apply bar mixin: frame + StatusBar + ticks (used by PowerBar, ResourceBar, RuneBar, StaggerBar) |
 
 **FrameProto (mixed into every module):**
 
@@ -412,7 +414,7 @@ Two mixins applied in `OnInitialize`. `FrameProto` provides positioning, visibil
 | `CalculateLayoutParams()` | Calculate layout params for current anchor mode |
 | `ApplyFramePosition()` | Apply positioning from layout params |
 
-**BarProto (mixed into PowerBar, ResourceBar, RuneBar):**
+**BarProto (mixed into PowerBar, ResourceBar, RuneBar, StaggerBar):**
 
 | Method | Description |
 |--------|-------------|
@@ -445,6 +447,7 @@ Per-module surface (config, events, hooks, internal state, options) lives with e
 - [docs/PowerBar.md](docs/PowerBar.md)
 - [docs/ResourceBar.md](docs/ResourceBar.md)
 - [docs/RuneBar.md](docs/RuneBar.md)
+- [docs/StaggerBar.md](docs/StaggerBar.md)
 - [docs/BuffBars.md](docs/BuffBars.md)
 - [docs/ExternalBars.md](docs/ExternalBars.md)
 - [docs/ExtraIcons.md](docs/ExtraIcons.md)

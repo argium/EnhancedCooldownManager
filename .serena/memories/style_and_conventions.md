@@ -58,4 +58,4 @@
 
 ## Secret Values and Deprecated APIs
 - Treat `UnitPowerMax`, `UnitPower`, `UnitPowerPercent`, and `C_UnitAuras.GetUnitAuraBySpellID` as secret values; see `repo/secret-values-and-deprecated-apis` for exact handling rules.
-- Do not use deprecated Blizzard APIs, constants, aliases, or mixins listed in `repo/secret-values-and-deprecated-apis` for 12.0.5.
+- Do not use deprecated Blizzard APIs, constants, aliases, or mixins listed in `repo/secret-values-and-deprecated-apis` for 12.0.7.
