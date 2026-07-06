@@ -144,4 +144,4 @@ Treat `UnitPowerMax`, `UnitPower`, `UnitPowerPercent`, and `C_UnitAuras.GetUnitA
 
 # Deprecated Blizzard APIs
 
-Do not use deprecated Blizzard functions, constants, aliases, or mixins. See [docs/BlizzardDeprecatedApis.md](docs/BlizzardDeprecatedApis.md) for the 12.0.5 denylist and replacement-source guidance.
+Do not use deprecated Blizzard functions, constants, aliases, or mixins. See [docs/BlizzardDeprecatedApis.md](docs/BlizzardDeprecatedApis.md) for the 12.0.7 denylist and replacement-source guidance. Regenerate it with `scripts/update-deprecated-apis.ps1 -Tag <version>`.
