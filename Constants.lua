@@ -11,7 +11,7 @@ local constants = {
     DEBUG_COLOR = "F17934",
     ERROR_COLOR = "ff4040",
     WARNING_COLOR = "ffd100",
-    RELEASE_POPUP_VERSION = "v0.8.9",
+    RELEASE_POPUP_VERSION = "v0.8.10",
     VERSION_TAG_BETA = "beta",
 
     -- Module identifiers
