@@ -117,6 +117,34 @@ function Get-ReleaseMessage {
     return $Message
 }
 
+function ConvertTo-LuaStringLiteral {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Text
+    )
+
+    return '"' + $Text.Replace('\', '\\').Replace('"', '\"').Replace("`t", "\t") + '"'
+}
+
+function ConvertTo-LuaConcatenatedString {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Text
+    )
+
+    $lines = @($Text.Trim().Replace("`r`n", "`n").Replace("`r", "`n") -split "`n")
+    $parts = for ($i = 0; $i -lt $lines.Count; $i++) {
+        $literal = ConvertTo-LuaStringLiteral -Text $lines[$i]
+        if ($i -lt ($lines.Count - 1)) {
+            $literal = $literal.Substring(0, $literal.Length - 1) + '\n"'
+        }
+        $prefix = if ($i -eq 0) { "    " } else { "    .. " }
+        $prefix + $literal
+    }
+
+    return $parts -join "`n"
+}
+
 function Get-GitHubWorkflowsUrl {
     param(
         [Parameter(Mandatory = $true)]
@@ -201,6 +229,49 @@ function Set-ReleasePopupVersion {
 
     Set-Content -LiteralPath $ConstantsPath -Value $newContent -NoNewline
     Write-Host "Updated RELEASE_POPUP_VERSION to '$Version' in $ConstantsPath"
+    return $true
+}
+
+function Set-ReleasePopupBody {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Message,
+        [string]$LocalePath = "Locales/en.lua"
+    )
+
+    if (-not (Test-Path -LiteralPath $LocalePath)) {
+        throw "Locale file not found: $LocalePath"
+    }
+
+    $content = Get-Content -LiteralPath $LocalePath -Raw
+    $pattern = '(?s)(L\["WHATS_NEW_BODY"\]\s*=)\s*.*?(\r?\nL\["CLOSE"\])'
+    $regex = [regex]::new($pattern)
+    if (-not $regex.IsMatch($content)) {
+        throw "Could not find WHATS_NEW_BODY in $LocalePath"
+    }
+
+    $body = ConvertTo-LuaConcatenatedString -Text $Message
+    $newContent = $regex.Replace(
+        $content,
+        [System.Text.RegularExpressions.MatchEvaluator]{
+            param($match)
+            $match.Groups[1].Value + "`n" + $body + $match.Groups[2].Value
+        },
+        1
+    )
+
+    if ($newContent -eq $content) {
+        Write-Host "WHATS_NEW_BODY is already current in $LocalePath"
+        return $false
+    }
+
+    if ($DryRun) {
+        Write-Host "Dry run: would update WHATS_NEW_BODY in $LocalePath"
+        return $false
+    }
+
+    Set-Content -LiteralPath $LocalePath -Value $newContent -NoNewline
+    Write-Host "Updated WHATS_NEW_BODY in $LocalePath"
     return $true
 }
 
@@ -359,17 +430,18 @@ if (-not $isPrerelease -and $branch -ne "main") {
     throw "Stable releases must come from 'main'. '$version' is a stable version but the current branch is '$branch'."
 }
 
-$commit = Get-GitOutput -Arguments @("rev-parse", "HEAD")
-
 Invoke-Gh -Arguments @("auth", "status")
 
 if ($ShowReleasePopup) {
     $releasePopupVersionChanged = Set-ReleasePopupVersion -Version $version
-    if ($releasePopupVersionChanged) {
-        Invoke-Git -Arguments @("add", "Constants.lua")
-        Invoke-Git -Arguments @("commit", "-m", "Set release popup version to $version")
+    $releasePopupBodyChanged = Set-ReleasePopupBody -Message $releaseMessage
+    if ($releasePopupVersionChanged -or $releasePopupBodyChanged) {
+        Invoke-Git -Arguments @("add", "Constants.lua", "Locales/en.lua")
+        Invoke-Git -Arguments @("commit", "-m", "Update release popup for $version")
     }
 }
+
+$commit = Get-GitOutput -Arguments @("rev-parse", "HEAD")
 
 Assert-RemoteReleaseAvailable -Version $version -Commit $commit
 Sync-ReleaseBranch -BranchName $branch
