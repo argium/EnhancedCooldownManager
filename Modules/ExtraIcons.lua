@@ -74,14 +74,9 @@ local function resolveFirstItem(ids, showIfMissing)
             if C_Item.GetItemCount(itemId) > 0 then
                 local texture = C_Item.GetItemIconByID(itemId)
                 if texture then return { itemId = itemId, texture = texture } end
-            elseif not missingData then
+            elseif showIfMissing and not missingData then
                 local texture = C_Item.GetItemIconByID(itemId)
-                if texture then
-                    local _, duration = C_Item.GetItemCooldown(itemId)
-                    if showIfMissing or (duration and duration > 0) then
-                        missingData = { itemId = itemId, texture = texture, missing = true }
-                    end
-                end
+                if texture then missingData = { itemId = itemId, texture = texture, missing = true } end
             end
         end
     end
