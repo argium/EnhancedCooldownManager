@@ -1524,47 +1524,28 @@ describe("ExtraIcons real source", function()
         assert.same({ 100, 60 }, ExtraIcons._viewers.utility.iconPool[1].Cooldown.__cooldown)
     end)
 
-    it("hides consumed item stack icon even when item has active cooldown if showIfMissing is not set", function()
-        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
-        utilityIconChild.GetSpellID = function() return 1 end
-        UtilityCooldownViewer.childXPadding = 0
-        UtilityCooldownViewer.iconScale = 1
-        UtilityCooldownViewer._children = { utilityIconChild }
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    for _, cd in ipairs({ { 100, 60, true }, { 0, 0, false } }) do
+        it("hides consumed item stack icon when showIfMissing is not set (cooldown=" .. tostring(cd[3]) .. ")", function()
+            local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+            utilityIconChild.GetSpellID = function() return 1 end
+            UtilityCooldownViewer.childXPadding = 0
+            UtilityCooldownViewer.iconScale = 1
+            UtilityCooldownViewer._children = { utilityIconChild }
+            UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
-        itemCounts[HEALTHSTONE_ID] = 0
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-        itemCooldownByID[HEALTHSTONE_ID] = { 100, 60, true }
+            itemCounts[HEALTHSTONE_ID] = 0
+            itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+            itemCooldownByID[HEALTHSTONE_ID] = cd
 
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-        ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
-        end
+            ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+            ExtraIcons.GetModuleConfig = function()
+                return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+            end
 
-        assert.is_false(ExtraIcons:UpdateLayout("test"))
-        assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
-    end)
-
-    it("hides consumed item stack icon once cooldown expires when showIfMissing is not set", function()
-        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
-        utilityIconChild.GetSpellID = function() return 1 end
-        UtilityCooldownViewer.childXPadding = 0
-        UtilityCooldownViewer.iconScale = 1
-        UtilityCooldownViewer._children = { utilityIconChild }
-        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-
-        itemCounts[HEALTHSTONE_ID] = 0
-        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
-        itemCooldownByID[HEALTHSTONE_ID] = { 0, 0, false }
-
-        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
-        ExtraIcons.GetModuleConfig = function()
-            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
-        end
-
-        assert.is_false(ExtraIcons:UpdateLayout("test"))
-        assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
-    end)
+            assert.is_false(ExtraIcons:UpdateLayout("test"))
+            assert.is_false(ExtraIcons._viewers.utility.container:IsShown())
+        end)
+    end
 
     it("shows item stack counts when enabled", function()
         local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
