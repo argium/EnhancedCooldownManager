@@ -74,9 +74,14 @@ local function resolveFirstItem(ids, showIfMissing)
             if C_Item.GetItemCount(itemId) > 0 then
                 local texture = C_Item.GetItemIconByID(itemId)
                 if texture then return { itemId = itemId, texture = texture } end
-            elseif showIfMissing and not missingData then
+            elseif not missingData then
                 local texture = C_Item.GetItemIconByID(itemId)
-                if texture then missingData = { itemId = itemId, texture = texture, missing = true } end
+                if texture then
+                    local _, duration = C_Item.GetItemCooldown(itemId)
+                    if showIfMissing or (duration and duration > 0) then
+                        missingData = { itemId = itemId, texture = texture, missing = true }
+                    end
+                end
             end
         end
     end
@@ -482,6 +487,7 @@ end
 
 function ExtraIcons:OnBagUpdateCooldown()
     self:ThrottledRefresh("OnBagUpdateCooldown")
+    ns.Runtime.RequestLayout("ExtraIcons:OnBagUpdateCooldown")
 end
 
 function ExtraIcons:OnBagUpdateDelayed()
