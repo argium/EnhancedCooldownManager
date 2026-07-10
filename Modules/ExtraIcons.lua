@@ -482,6 +482,7 @@ end
 
 function ExtraIcons:OnBagUpdateCooldown()
     self:ThrottledRefresh("OnBagUpdateCooldown")
+    ns.Runtime.RequestLayout("ExtraIcons:OnBagUpdateCooldown")
 end
 
 function ExtraIcons:OnBagUpdateDelayed()
