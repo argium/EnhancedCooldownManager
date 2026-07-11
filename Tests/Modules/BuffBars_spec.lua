@@ -846,6 +846,16 @@ describe("BuffBars real source", function()
     end)
 
     it("coalesces player UNIT_AURA into one owner-local restyle", function()
+        stubChildLayoutEnvironment()
+        local child = makeStyledChild("Changed Aura", true, 1)
+        child.__ecmHooked = true
+        function BuffBarCooldownViewer:GetChildren()
+            return child
+        end
+        local discovered = {}
+        spellColorStore.DiscoverBar = function(_, bar)
+            discovered[#discovered + 1] = bar
+        end
         local captured = {}
         function BuffBars:RegisterEvent(event, cb)
             captured[event] = cb
@@ -854,10 +864,14 @@ describe("BuffBars real source", function()
             return true
         end
         function BuffBars:GetModuleConfig()
-            return {}
+            return { showIcon = false, showSpellName = true, showDuration = true }
         end
         function BuffBars:GetGlobalConfig()
-            return {}
+            return {
+                texture = "Solid",
+                barHeight = 20,
+                barBgColor = { r = 0, g = 0, b = 0, a = 0.8 },
+            }
         end
         local reasons = {}
         ns.Runtime.RequestLayout = function(reason)
@@ -882,6 +896,7 @@ describe("BuffBars real source", function()
         assert.is_nil(BuffBars._auraRestylePending)
         assert.is_false(BuffBars._editLocked)
         assert.is_false(BuffBars._warned)
+        assert.same({ child }, discovered)
     end)
 
     it("unregisters on disable", function()
