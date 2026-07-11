@@ -848,7 +848,6 @@ describe("BuffBars real source", function()
     it("coalesces player UNIT_AURA into one owner-local restyle", function()
         stubChildLayoutEnvironment()
         local child = makeStyledChild("Changed Aura", true, 1)
-        child.__ecmHooked = true
         function BuffBarCooldownViewer:GetChildren()
             return child
         end
@@ -896,6 +895,7 @@ describe("BuffBars real source", function()
         assert.is_nil(BuffBars._auraRestylePending)
         assert.is_false(BuffBars._editLocked)
         assert.is_false(BuffBars._warned)
+        assert.is_true(child.__ecmHooked)
         assert.same({ child }, discovered)
     end)
 

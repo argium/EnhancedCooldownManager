@@ -165,6 +165,7 @@ local function restyleActiveChildren(module, why)
     local ok, err = pcall(function()
         for _, entry in ipairs(children) do
             local child = entry.frame
+            hookChildFrame(child, module)
             spellColors:DiscoverBar(child)
             if child:IsShown() then
                 StyleChildBar(module, child, cfg, globalConfig, spellColors)
