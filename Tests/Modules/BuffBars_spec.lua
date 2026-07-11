@@ -845,10 +845,19 @@ describe("BuffBars real source", function()
         assert.is_true(BuffBars._viewerHooked)
     end)
 
-    it("registers UNIT_AURA on enable and requests layout only for player auras", function()
+    it("coalesces player UNIT_AURA into one owner-local restyle", function()
         local captured = {}
         function BuffBars:RegisterEvent(event, cb)
             captured[event] = cb
+        end
+        function BuffBars:IsEnabled()
+            return true
+        end
+        function BuffBars:GetModuleConfig()
+            return {}
+        end
+        function BuffBars:GetGlobalConfig()
+            return {}
         end
         local reasons = {}
         ns.Runtime.RequestLayout = function(reason)
@@ -862,8 +871,17 @@ describe("BuffBars real source", function()
         -- LibEvent dispatches cb(target, event, ...wowArgs)
         cb(BuffBars, "UNIT_AURA", "target")
         cb(BuffBars, "UNIT_AURA", "player")
+        cb(BuffBars, "UNIT_AURA", "player")
+        BuffBars._editLocked = true
+        BuffBars._warned = true
 
-        assert.same({ "BuffBars:UNIT_AURA" }, reasons)
+        assert.are.equal(2, #timerCallbacks)
+        timerCallbacks[2]()
+
+        assert.same({}, reasons)
+        assert.is_nil(BuffBars._auraRestylePending)
+        assert.is_false(BuffBars._editLocked)
+        assert.is_false(BuffBars._warned)
     end)
 
     it("unregisters on disable", function()

@@ -480,9 +480,36 @@ end
 -- Events and hooks
 --------------------------------------------------------------------------------
 
+local function getMainFootprint(extraIcons)
+    local state = extraIcons._viewers and extraIcons._viewers.main
+    local container = state and state.container
+    local shown = container and container:IsShown() or false
+    return shown, shown and container:GetWidth() or 0, shown and container:GetScale() or 1
+end
+
+local function reconcileBagCooldown(extraIcons)
+    if not extraIcons:IsEnabled() or not extraIcons.InnerFrame or not extraIcons._viewers then return end
+
+    local wasShown, oldWidth, oldScale = getMainFootprint(extraIcons)
+    extraIcons:UpdateLayout("OnBagUpdateCooldown")
+    local isShown, newWidth, newScale = getMainFootprint(extraIcons)
+    if wasShown ~= isShown or not ns.NumericEquals(oldWidth, newWidth) or not ns.NumericEquals(oldScale, newScale) then
+        ns.Runtime.RequestLayout("ExtraIcons:OnBagUpdateCooldown:FootprintChanged")
+    end
+end
+
+--- Coalesces bag cooldown bursts and reconciles after Blizzard updates item data.
 function ExtraIcons:OnBagUpdateCooldown()
-    self:ThrottledRefresh("OnBagUpdateCooldown")
-    ns.Runtime.RequestLayout("ExtraIcons:OnBagUpdateCooldown")
+    if self._bagCooldownPending then return end
+    self._bagCooldownPending = true
+    local generation = (self._bagCooldownGeneration or 0) + 1
+    self._bagCooldownGeneration = generation
+
+    C_Timer.After(0, function()
+        if generation ~= self._bagCooldownGeneration then return end
+        self._bagCooldownPending = nil
+        reconcileBagCooldown(self)
+    end)
 end
 
 function ExtraIcons:OnBagUpdateDelayed()
@@ -618,8 +645,12 @@ function ExtraIcons:OnDisable()
     ns.Runtime.UnregisterFrame(self)
 
     if self._viewers then
-        for _, vs in pairs(self._viewers) do vs.originalPoint = nil end
+        for _, vs in pairs(self._viewers) do
+            vs.originalPoint = nil
+        end
     end
     self._isEditModeActive = nil
     self._trackedEquipSlots = nil
+    self._bagCooldownPending = nil
+    self._bagCooldownGeneration = (self._bagCooldownGeneration or 0) + 1
 end

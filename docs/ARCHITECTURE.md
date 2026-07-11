@@ -135,7 +135,7 @@ flowchart TD
 
 ## Event Flow & Layout Pipeline
 
-WoW events funnel through `Runtime.lua` into a data-driven scheduler path. Red nodes and regions identify changed or newly documented architecture.
+WoW events funnel through `Runtime.lua` into a data-driven scheduler path. High-frequency module-owned updates are coalesced locally: ExtraIcons bag cooldowns, BuffBars player auras, and ExternalBars aura hooks update only their owner unless the change affects downstream geometry. Red nodes and regions identify changed or newly documented architecture.
 
 ```mermaid
 flowchart TD
@@ -153,6 +153,7 @@ flowchart TD
         PB_PWR["UNIT_POWER_UPDATE<br/>→ PowerBar handler"]
         RB_AURA["UNIT_AURA / UNIT_POWER_UPDATE<br/>→ ResourceBar handler"]
         BB_ZONE["ZONE_CHANGED_* / PLAYER_ENTERING_WORLD<br/>→ BuffBars:OnZoneChanged"]
+        LOCAL["High-frequency owner updates<br/>ExtraIcons / BuffBars / ExternalBars<br/>→ coalesced local update"]
     end
 
     subgraph HOOKS["Frame Hooks (BuffBars / ExternalBars)"]
@@ -201,6 +202,7 @@ flowchart TD
     WOW_MOUNT & WOW_COMBAT & WOW_ZONE & WOW_SPEC & WOW_TARGET & WOW_REST & WOW_CVAR --> DISPATCH
     DISPATCH --> SCHEDULER
     PB_PWR & RB_AURA & BB_ZONE --> REQ_LAY
+    LOCAL --> MOD_UPD
     BB_HOOKS & EB_HOOKS --> REQ_LAY
     FLUSH --> EXECUTE
     UPD_FADE --> FADE_LOGIC

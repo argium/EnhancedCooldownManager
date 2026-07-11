@@ -630,26 +630,81 @@ describe("ExtraIcons real source", function()
         assert.is_true(#vs.iconPool >= 1)
     end)
 
-    it("refreshes cooldowns via ThrottledRefresh", function()
-        local reasons = {}
-        function ExtraIcons:ThrottledRefresh(reason)
-            reasons[#reasons + 1] = reason
+    it("coalesces bag cooldown bursts and updates a healthstone locally", function()
+        local layoutReasons = {}
+        ns.Runtime.RequestLayout = function(reason)
+            layoutReasons[#layoutReasons + 1] = reason
         end
-
+        local utilityIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        utilityIconChild.GetSpellID = function() return 1 end
+        UtilityCooldownViewer.childXPadding = 0
+        UtilityCooldownViewer.iconScale = 1
+        UtilityCooldownViewer._children = { utilityIconChild }
+        UtilityCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({ { kind = "itemStack", itemStackId = "healthstones" } })
+        end
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        assert.is_true(ExtraIcons:UpdateLayout("initial"))
+        itemCooldownByID[HEALTHSTONE_ID] = { 100, 60, true }
+
         ExtraIcons:OnBagUpdateCooldown()
-        assert.same({ "OnBagUpdateCooldown" }, reasons)
+        ExtraIcons:OnBagUpdateCooldown()
+
+        assert.are.equal(1, #timerCallbacks)
+        timerCallbacks[1]()
+
+        assert.same({ 100, 60 }, ExtraIcons._viewers.utility.iconPool[1].Cooldown.__cooldown)
+        assert.same({}, layoutReasons)
     end)
 
-    it("requests layout on bag cooldown change so charged item display is re-evaluated", function()
+    it("requests downstream layout when bag cooldown reconciliation changes the main footprint", function()
         local layoutReasons = {}
         ns.Runtime.RequestLayout = function(reason)
             layoutReasons[#layoutReasons + 1] = reason
         end
 
+        local mainIconChild = TestHelpers.makeFrame({ shown = true, width = 18, height = 18 })
+        mainIconChild.GetSpellID = function() return 1 end
+        EssentialCooldownViewer.childXPadding = 0
+        EssentialCooldownViewer.iconScale = 1
+        EssentialCooldownViewer._children = { mainIconChild }
+        EssentialCooldownViewer:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        itemCounts[HEALTHSTONE_ID] = 1
+        itemIconsByID[HEALTHSTONE_ID] = "healthstone"
+        ExtraIcons.GetModuleConfig = function()
+            return makeViewersConfig({}, { { kind = "itemStack", itemStackId = "healthstones" } })
+        end
+
+        ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
+        assert.is_true(ExtraIcons:UpdateLayout("initial"))
+        itemCounts[HEALTHSTONE_ID] = 0
+
+        ExtraIcons:OnBagUpdateCooldown()
+        timerCallbacks[1]()
+
+        assert.same({ "ExtraIcons:OnBagUpdateCooldown:FootprintChanged" }, layoutReasons)
+        assert.is_false(ExtraIcons._viewers.main.container:IsShown())
+    end)
+
+    it("does not run a pending bag cooldown reconciliation after disable", function()
+        local layouts = 0
+        function ExtraIcons:UpdateLayout()
+            layouts = layouts + 1
+        end
+        function ExtraIcons:UnregisterAllEvents() end
+
         ExtraIcons.InnerFrame = ExtraIcons:CreateFrame()
         ExtraIcons:OnBagUpdateCooldown()
-        assert.same({ "ExtraIcons:OnBagUpdateCooldown" }, layoutReasons)
+        ExtraIcons:OnDisable()
+        assert.are.equal(1, layouts)
+
+        timerCallbacks[1]()
+
+        assert.are.equal(1, layouts)
+        assert.is_nil(ExtraIcons._bagCooldownPending)
     end)
 
     it("edit mode callbacks toggle state and defer layout", function()
