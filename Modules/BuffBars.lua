@@ -148,6 +148,8 @@ end
 ---@param why string|nil
 local function restyleActiveChildren(module, why)
     local viewer = BuffBarCooldownViewer
+    if not viewer then return end
+
     local cfg = module:GetModuleConfig()
     local globalConfig = module:GetGlobalConfig()
     if not cfg or not globalConfig then

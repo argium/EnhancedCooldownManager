@@ -899,6 +899,20 @@ describe("BuffBars real source", function()
         assert.same({ child }, discovered)
     end)
 
+    it("ignores an early player aura update while the viewer is unavailable", function()
+        BuffBarCooldownViewer = nil
+        _G.BuffBarCooldownViewer = nil
+        function BuffBars:IsEnabled()
+            return true
+        end
+
+        BuffBars:OnUnitAura("player")
+        timerCallbacks[1]()
+
+        assert.same({}, errorLogs)
+        assert.is_nil(BuffBars._auraRestylePending)
+    end)
+
     it("unregisters on disable", function()
         function BuffBars:UnregisterAllEvents() end
 
