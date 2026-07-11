@@ -845,10 +845,32 @@ describe("BuffBars real source", function()
         assert.is_true(BuffBars._viewerHooked)
     end)
 
-    it("registers UNIT_AURA on enable and requests layout only for player auras", function()
+    it("coalesces player UNIT_AURA into one owner-local restyle", function()
+        stubChildLayoutEnvironment()
+        local child = makeStyledChild("Changed Aura", true, 1)
+        function BuffBarCooldownViewer:GetChildren()
+            return child
+        end
+        local discovered = {}
+        spellColorStore.DiscoverBar = function(_, bar)
+            discovered[#discovered + 1] = bar
+        end
         local captured = {}
         function BuffBars:RegisterEvent(event, cb)
             captured[event] = cb
+        end
+        function BuffBars:IsEnabled()
+            return true
+        end
+        function BuffBars:GetModuleConfig()
+            return { showIcon = false, showSpellName = true, showDuration = true }
+        end
+        function BuffBars:GetGlobalConfig()
+            return {
+                texture = "Solid",
+                barHeight = 20,
+                barBgColor = { r = 0, g = 0, b = 0, a = 0.8 },
+            }
         end
         local reasons = {}
         ns.Runtime.RequestLayout = function(reason)
@@ -862,8 +884,33 @@ describe("BuffBars real source", function()
         -- LibEvent dispatches cb(target, event, ...wowArgs)
         cb(BuffBars, "UNIT_AURA", "target")
         cb(BuffBars, "UNIT_AURA", "player")
+        cb(BuffBars, "UNIT_AURA", "player")
+        BuffBars._editLocked = true
+        BuffBars._warned = true
 
-        assert.same({ "BuffBars:UNIT_AURA" }, reasons)
+        assert.are.equal(2, #timerCallbacks)
+        timerCallbacks[2]()
+
+        assert.same({}, reasons)
+        assert.is_nil(BuffBars._auraRestylePending)
+        assert.is_false(BuffBars._editLocked)
+        assert.is_false(BuffBars._warned)
+        assert.is_true(child.__ecmHooked)
+        assert.same({ child }, discovered)
+    end)
+
+    it("ignores an early player aura update while the viewer is unavailable", function()
+        BuffBarCooldownViewer = nil
+        _G.BuffBarCooldownViewer = nil
+        function BuffBars:IsEnabled()
+            return true
+        end
+
+        BuffBars:OnUnitAura("player")
+        timerCallbacks[1]()
+
+        assert.same({}, errorLogs)
+        assert.is_nil(BuffBars._auraRestylePending)
     end)
 
     it("unregisters on disable", function()

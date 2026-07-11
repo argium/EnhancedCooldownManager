@@ -686,6 +686,61 @@ describe("ExternalBars real source", function()
         assert.are.equal(18, diagnostics.globalBarHeight)
     end)
 
+    it("updates same-count aura content locally without requesting global layout", function()
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+        assert.is_true(syncAndLayout("initial"))
+        requestLayoutReasons = {}
+
+        setViewerAuras({
+            {
+                auraInstanceID = 22,
+                texture = 5022,
+                duration = 10,
+                expirationTime = 110,
+                auraData = { name = "Pain Suppression", spellId = 33206 },
+            },
+        })
+        ExternalBars:OnExternalAurasUpdated("viewer:UpdateAuras")
+
+        assert.same({}, requestLayoutReasons)
+        assert.are.equal("Pain Suppression", ExternalBars._barPool[1].Bar.Name:GetText())
+        assert.are.equal(5022, ExternalBars._barPool[1]._iconTexture:GetTexture())
+    end)
+
+    it("coalesces viewer aura update bursts before synchronizing", function()
+        setViewerAuras({
+            {
+                auraInstanceID = 11,
+                texture = 5011,
+                duration = 12,
+                expirationTime = 112,
+                auraData = { name = "Ironbark", spellId = 102342 },
+            },
+        })
+        ensureModuleFrame()
+        function ExternalBars:IsEnabled()
+            return true
+        end
+        ExternalBars:HookViewer()
+
+        viewer:UpdateAuras()
+        viewer:UpdateAuras()
+
+        assert.are.equal(1, #afterCallbacks)
+        assert.same({}, requestLayoutReasons)
+        afterCallbacks[1]()
+
+        assert.same({ "ExternalBars:viewer:UpdateAuras" }, requestLayoutReasons)
+    end)
+
     it("configures duration bar progress when duration text is hidden", function()
         profile.externalBars.showDuration = false
 

@@ -13,7 +13,7 @@ This module is intentionally absent from the `docs/ARCHITECTURE.md` Event Refere
 | **Source file** | [`Modules/ExternalBars.lua`](../Modules/ExternalBars.lua) |
 | **Mixin** | `BarMixin.AddFrameMixin`; inherits [`FrameProto`](../BarMixin.lua) |
 | **Events listened to** | None for aura data. `ExternalBars` does not call `RegisterEvent()` in `Modules/ExternalBars.lua`; aura refresh is driven by hooks on `ExternalDefensivesFrame:UpdateAuras()` plus the frame's `OnShow` / `OnHide`. `OnDisable()` still calls `UnregisterAllEvents()` as defensive cleanup. |
-| **Hooks** | - Post-hook `ExternalDefensivesFrame:UpdateAuras()` → `OnExternalAurasUpdated()`<br>- `ExternalDefensivesFrame:HookScript("OnShow")` → refresh original-icon state, then resync aura state<br>- `ExternalDefensivesFrame:HookScript("OnHide")` → clear active rows, stop duration ticker, request layout<br>- `hideOriginalIcons` uses `ExternalDefensivesFrame:SetAlpha(0)` and `EnableMouse(false)` instead of `Hide()` so Blizzard keeps driving `UpdateAuras()` |
+| **Hooks** | - Post-hook `ExternalDefensivesFrame:UpdateAuras()` → coalesced deferred `OnExternalAurasUpdated()`<br>- Same-count updates run `ExternalBars:UpdateLayout()` locally; count changes request global layout because downstream anchors may move<br>- `ExternalDefensivesFrame:HookScript("OnShow")` → refresh original-icon state, then resync aura state<br>- `ExternalDefensivesFrame:HookScript("OnHide")` → clear active rows, stop duration ticker, request layout<br>- `hideOriginalIcons` uses `ExternalDefensivesFrame:SetAlpha(0)` and `EnableMouse(false)` instead of `Hide()` so Blizzard keeps driving `UpdateAuras()` |
 | **Dependencies** | - `ns.SpellColors.Get("externalBars")` scoped color store<br>- `BarStyle.StyleChildBar(...)` shared BuffBars / ExternalBars row styling<br>- `C_UnitAuras.GetAuraDataByAuraInstanceID("player", auraInstanceID)` for accessible aura metadata<br>- `C_UnitAuras.GetAuraDuration("player", auraInstanceID)` duration objects for secret-safe bar timers and text<br>- `FrameUtil` lazy setters and icon helpers<br>- `ns.Runtime.RequestLayout(...)` / runtime layout passes |
 | **Options file(s)** | [`UI/ExternalBarsOptions.lua`](../UI/ExternalBarsOptions.lua), shared section registration in [`UI/SpellColorsPage.lua`](../UI/SpellColorsPage.lua) |
 | **Options dependencies** | - `ns.OptionUtil` for disabled predicates, default-value transforms, module toggle handling, and layout breadcrumbs<br>- `LibSettingsBuilder` for the declarative Settings rows consumed by the root options tree<br>- `ns.SpellColors` for the scoped color store edited by the shared page<br>- `ns.SpellColorsPage` for `RegisterSection(...)` and the shared spell-colors editor |
@@ -47,7 +47,7 @@ sequenceDiagram
     EB->>Viewer: hooksecurefunc(UpdateAuras)
     EB->>Viewer: HookScript(OnShow / OnHide)
     EB->>EB: _RefreshOriginalIconsState()
-    EB->>EB: OnExternalAurasUpdated()
+    EB->>EB: Coalesce into one deferred OnExternalAurasUpdated()
     EB->>Runtime: RequestLayout("ExternalBars:OnEnable")
     end
 
@@ -60,7 +60,11 @@ sequenceDiagram
         AuraAPI-->>EB: accessible aura metadata
         EB->>EB: copy into _auraStates[index]
     end
-    EB->>Runtime: RequestLayout("ExternalBars:UpdateAuras")
+    alt active aura count changed
+        EB->>Runtime: RequestLayout("ExternalBars:UpdateAuras")
+    else count unchanged
+        EB->>EB: UpdateLayout("viewer:UpdateAuras")
+    end
     end
 
     rect rgb(30,30,60)

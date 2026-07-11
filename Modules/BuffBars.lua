@@ -143,6 +143,44 @@ local function hookChildFrame(child, module)
     child.__ecmHooked = true
 end
 
+--- Restyles visible children without changing their layout.
+---@param module BuffBars
+---@param why string|nil
+local function restyleActiveChildren(module, why)
+    local viewer = BuffBarCooldownViewer
+    if not viewer then return end
+
+    local cfg = module:GetModuleConfig()
+    local globalConfig = module:GetGlobalConfig()
+    if not cfg or not globalConfig then
+        return
+    end
+
+    local children = getChildrenOrdered(viewer, why)
+    if not children then
+        return
+    end
+
+    local spellColors = getSpellColors()
+    module._layoutRunning = true
+    module._editLocked = false
+    local ok, err = pcall(function()
+        for _, entry in ipairs(children) do
+            local child = entry.frame
+            hookChildFrame(child, module)
+            spellColors:DiscoverBar(child)
+            if child:IsShown() then
+                StyleChildBar(module, child, cfg, globalConfig, spellColors)
+            end
+        end
+    end)
+    module._layoutRunning = nil
+    if not module._editLocked then
+        module._warned = false
+    end
+    ns.DebugAssert(ok, "Error restyling buff bars after UNIT_AURA: " .. tostring(err))
+end
+
 local function getViewerPosition(module)
     local cfg = module:GetModuleConfig()
     local mode = cfg and cfg.anchorMode or ns.Constants.ANCHORMODE_CHAIN
@@ -393,6 +431,28 @@ function BuffBars:OnZoneChanged()
     ns.Runtime.RequestLayout("BuffBars:OnZoneChanged")
 end
 
+--- Coalesces player aura changes into one deferred restyle after Blizzard's handler.
+---@param unit string
+function BuffBars:OnUnitAura(unit)
+    if unit ~= "player" then
+        return
+    end
+    if self._auraRestylePending then
+        return
+    end
+    self._auraRestylePending = true
+    local generation = (self._auraRestyleGeneration or 0) + 1
+    self._auraRestyleGeneration = generation
+
+    C_Timer.After(0, function()
+        if generation ~= self._auraRestyleGeneration then return end
+        self._auraRestylePending = nil
+        if self:IsEnabled() then
+            restyleActiveChildren(self, "UNIT_AURA")
+        end
+    end)
+end
+
 --- Gets a boolean indicating if editing is allowed.
 --- @return boolean isEditLocked Whether editing is locked due to combat or secrets
 --- @return string reason Reason editing is locked ("combat", "secrets", or nil)
@@ -416,16 +476,9 @@ function BuffBars:OnEnable()
     self:RegisterEvent("ZONE_CHANGED_INDOORS", function(_, ...) self:OnZoneChanged() end)
     self:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, ...) self:OnZoneChanged() end)
     -- Blizzard updates each child's auraInstanceID synchronously inside its own
-    -- UNIT_AURA handler but does not always re-fire SetPoint/OnShow/OnHide on
-    -- bars whose layout order is unchanged (e.g. a configured slot whose aura
-    -- toggles on/off). Defer a layout pass so StyleChildBar re-evaluates the
+    -- UNIT_AURA handler; OnUnitAura defers so StyleChildBar re-evaluates the
     -- active-aura background after Blizzard's update completes.
-    self:RegisterEvent("UNIT_AURA", function(_, _, unit)
-        if unit ~= "player" then
-            return
-        end
-        ns.Runtime.RequestLayout("BuffBars:UNIT_AURA")
-    end)
+    self:RegisterEvent("UNIT_AURA", function(_, _, unit) self:OnUnitAura(unit) end)
 
     C_Timer.After(0.1, function()
         self:HookViewer()
@@ -436,4 +489,6 @@ end
 function BuffBars:OnDisable()
     self:UnregisterAllEvents()
     ns.Runtime.UnregisterFrame(self)
+    self._auraRestylePending = nil
+    self._auraRestyleGeneration = (self._auraRestyleGeneration or 0) + 1
 end

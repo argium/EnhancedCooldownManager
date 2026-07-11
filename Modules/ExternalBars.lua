@@ -743,6 +743,30 @@ function ExternalBars:CreateFrame()
     return frame
 end
 
+local function queueAuraUpdate(externalBars, reason)
+    externalBars._pendingAuraUpdateReason = reason
+    if externalBars._auraUpdatePending then return end
+
+    externalBars._auraUpdatePending = true
+    local generation = (externalBars._auraUpdateGeneration or 0) + 1
+    externalBars._auraUpdateGeneration = generation
+    C_Timer.After(0, function()
+        if generation ~= externalBars._auraUpdateGeneration then return end
+        externalBars._auraUpdatePending = nil
+        local updateReason = externalBars._pendingAuraUpdateReason
+        externalBars._pendingAuraUpdateReason = nil
+        if externalBars:IsEnabled() then
+            externalBars:OnExternalAurasUpdated(updateReason)
+        end
+    end)
+end
+
+local function cancelQueuedAuraUpdate(externalBars)
+    externalBars._auraUpdateGeneration = (externalBars._auraUpdateGeneration or 0) + 1
+    externalBars._auraUpdatePending = nil
+    externalBars._pendingAuraUpdateReason = nil
+end
+
 function ExternalBars:HookViewer()
     local viewer = getViewer()
     if not viewer then
@@ -769,7 +793,7 @@ function ExternalBars:HookViewer()
 
     hooksecurefunc(viewer, "UpdateAuras", function()
         if self:IsEnabled() then
-            self:OnExternalAurasUpdated("viewer:UpdateAuras")
+            queueAuraUpdate(self, "viewer:UpdateAuras")
         end
     end)
 
@@ -777,6 +801,7 @@ function ExternalBars:HookViewer()
         if not self:IsEnabled() then
             return
         end
+        cancelQueuedAuraUpdate(self)
         self:_RefreshOriginalIconsState()
         self:OnExternalAurasUpdated("viewer:OnShow")
     end)
@@ -785,6 +810,7 @@ function ExternalBars:HookViewer()
         if not self:IsEnabled() then
             return
         end
+        cancelQueuedAuraUpdate(self)
         self._activeAuraCount = 0
         self:_hideExcessBars(0)
         self:_StopDurationTicker()
@@ -805,6 +831,7 @@ function ExternalBars:OnExternalAurasUpdated(reason)
     local auraInfo = viewer and viewer.auraInfo or nil
     local auraStates = self._auraStates or {}
     self._auraStates = auraStates
+    local previousAuraCount = self._activeAuraCount or 0
     local debugEnabled = ns.IsDebugEnabled()
     local auraDiagnostics = debugEnabled and {} or nil
 
@@ -864,6 +891,11 @@ function ExternalBars:OnExternalAurasUpdated(reason)
             auraInfoType = type(auraInfo),
             auras = auraDiagnostics,
         })
+    end
+
+    if activeAuraCount == previousAuraCount and self.InnerFrame then
+        self:UpdateLayout(reason)
+        return
     end
 
     ns.Runtime.RequestLayout("ExternalBars:" .. (reason or "UpdateAuras"), {
@@ -1032,6 +1064,7 @@ end
 
 function ExternalBars:OnDisable()
     self:UnregisterAllEvents()
+    cancelQueuedAuraUpdate(self)
     self:_StopDurationTicker()
     self:_SetOriginalIconsHidden(false)
     self._activeAuraCount = 0
